@@ -38,8 +38,10 @@ class AllHandlersSpec extends AlephiumFlowActorSpec("AllHandlersSpec") {
     val block0     = mineFromMemPool(blockFlow0, chainIndex)
     addAndCheck(blockFlow0, block0)
     val block1 = mineFromMemPool(blockFlow0, chainIndex)
-    allHandlers.dependencyHandler ! DependencyHandler.AddFlowData(AVector(block0, block1),
-                                                                  DataOrigin.Local)
+    allHandlers.dependencyHandler ! DependencyHandler.AddFlowData(
+      AVector(block0, block1),
+      DataOrigin.Local
+    )
 
     expectMsg(BlockChainHandler.BlockAdded(block0.hash))
     expectMsg(BlockChainHandler.BlockAdded(block1.hash))

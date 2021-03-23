@@ -33,10 +33,12 @@ import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
-  def contractCreation(code: StatefulContract,
-                       initialState: AVector[Val],
-                       lockupScript: LockupScript,
-                       alfAmount: U256): StatefulScript = {
+  def contractCreation(
+      code: StatefulContract,
+      initialState: AVector[Val],
+      lockupScript: LockupScript,
+      alfAmount: U256
+  ): StatefulScript = {
     val address  = Address(NetworkType.Testnet, lockupScript)
     val codeRaw  = Hex.toHexString(serialize(code))
     val stateRaw = Hex.toHexString(serialize(initialState))
@@ -203,13 +205,15 @@ class VMSpec extends AlephiumSpec {
       val contractOutputRef = createContract(input, initialState)
 
       val contractKey = contractOutputRef.key
-      checkState(blockFlow,
-                 chainIndex,
-                 contractKey,
-                 initialState,
-                 contractOutputRef,
-                 numAssets,
-                 numContracts)
+      checkState(
+        blockFlow,
+        chainIndex,
+        contractKey,
+        initialState,
+        contractOutputRef,
+        numAssets,
+        numContracts
+      )
 
       contractOutputRef
     }
@@ -315,13 +319,15 @@ class VMSpec extends AlephiumSpec {
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().toOption.get.length is 3
 
-    checkState(blockFlow,
-               chainIndex,
-               contractKey0,
-               newState,
-               contractOutputRef0,
-               numAssets    = 5,
-               numContracts = 3)
+    checkState(
+      blockFlow,
+      chainIndex,
+      contractKey0,
+      newState,
+      contractOutputRef0,
+      numAssets = 5,
+      numContracts = 3
+    )
   }
 
   it should "issue new token" in new ContractFixture {
@@ -358,11 +364,10 @@ class VMSpec extends AlephiumSpec {
 
     val worldState0 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState0.getContractStates().toOption.get.length is 2
-    worldState0.getContractOutputs(ByteString.empty).toOption.get.foreach {
-      case (ref, output) =>
-        if (ref != ContractOutputRef.forSMT) {
-          output.tokens.head is (contractKey -> U256.unsafe(10000000))
-        }
+    worldState0.getContractOutputs(ByteString.empty).toOption.get.foreach { case (ref, output) =>
+      if (ref != ContractOutputRef.forSMT) {
+        output.tokens.head is (contractKey -> U256.unsafe(10000000))
+      }
     }
 
     val block1 = payableCall(blockFlow, chainIndex, script)
@@ -370,11 +375,10 @@ class VMSpec extends AlephiumSpec {
 
     val worldState1 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState1.getContractStates().toOption.get.length is 2
-    worldState1.getContractOutputs(ByteString.empty).toOption.get.foreach {
-      case (ref, output) =>
-        if (ref != ContractOutputRef.forSMT) {
-          output.tokens.head is (contractKey -> U256.unsafe(20000000))
-        }
+    worldState1.getContractOutputs(ByteString.empty).toOption.get.foreach { case (ref, output) =>
+      if (ref != ContractOutputRef.forSMT) {
+        output.tokens.head is (contractKey -> U256.unsafe(20000000))
+      }
     }
   }
 
@@ -453,7 +457,8 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val swapContractKey = createContract(
       swapContract,
-      AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero))).key
+      AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero))
+    ).key
 
     def checkSwapBalance(alfReserve: U256, tokenReserve: U256) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)

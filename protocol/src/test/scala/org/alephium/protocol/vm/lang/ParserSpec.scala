@@ -32,14 +32,17 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("(x + y)", StatelessParser.expr(_)).get.value is
       ParenExpr[StatelessContext](Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
     fastparse.parse("(x + y) + (x + y)", StatelessParser.expr(_)).get.value is
-      Binop[StatelessContext](Add,
-                              ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
-                              ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+      Binop[StatelessContext](
+        Add,
+        ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
+        ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+      )
     fastparse.parse("x + y * z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
-        Variable(Ident("u")))
+        Variable(Ident("u"))
+      )
     fastparse.parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         And,
@@ -51,9 +54,11 @@ class ParserSpec extends AlephiumSpec {
         Binop(Lt, Variable(Ident("y")), Variable(Ident("z")))
       )
     fastparse.parse("x && y || z", StatelessParser.expr(_)).get.value is
-      Binop[StatelessContext](Or,
-                              Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
-                              Variable(Ident("z")))
+      Binop[StatelessContext](
+        Or,
+        Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
+        Variable(Ident("z"))
+      )
     fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
       CallExpr[StatelessContext](FuncId("foo", false), List(Variable(Ident("x"))))
     fastparse.parse("Foo(x)", StatelessParser.expr(_)).get.value is
@@ -63,8 +68,10 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
-        CallExpr(FuncId("foo", false),
-                 List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))),
+        CallExpr(
+          FuncId("foo", false),
+          List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+        ),
         CallExpr(FuncId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
       )
     fastparse.parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
@@ -101,8 +108,10 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse functions" in {
     val parsed0 = fastparse
-      .parse("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
-             StatelessParser.func(_))
+      .parse(
+        "fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
+        StatelessParser.func(_)
+      )
       .get
       .value
     parsed0.id is Ast.FuncId("add", false)
@@ -112,8 +121,10 @@ class ParserSpec extends AlephiumSpec {
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
     val parsed1 = fastparse
-      .parse("pub payable fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
-             StatelessParser.func(_))
+      .parse(
+        "pub payable fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
+        StatelessParser.func(_)
+      )
       .get
       .value
     parsed1.id is Ast.FuncId("add", false)
@@ -128,11 +139,13 @@ class ParserSpec extends AlephiumSpec {
     val address  = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
     val stateRaw = s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}]"
     val expected =
-      Seq[Val](Val.U256(U256.One),
-               Val.I256(I256.Two),
-               Val.True,
-               Val.Address(address.lockupScript),
-               Val.ByteVec.from(bytes))
+      Seq[Val](
+        Val.U256(U256.One),
+        Val.I256(I256.Two),
+        Val.True,
+        Val.Address(address.lockupScript),
+        Val.ByteVec.from(bytes)
+      )
     fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
     Compiler.compileState(stateRaw).rightValue is AVector.from(expected)
   }

@@ -49,8 +49,8 @@ class EitherFSpec extends AlephiumSpec {
     forAll { ns: Seq[Int] =>
       if (ns.nonEmpty) {
         val r = ns(Random.source.nextInt(ns.length))
-        val result = EitherF.foldTry[Int, Unit, Unit](ns, ()) {
-          case (_, n) => if (n.equals(r)) Left(()) else Right(())
+        val result = EitherF.foldTry[Int, Unit, Unit](ns, ()) { case (_, n) =>
+          if (n.equals(r)) Left(()) else Right(())
         }
         result.isLeft is true
       }

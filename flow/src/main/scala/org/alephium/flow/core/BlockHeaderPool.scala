@@ -46,6 +46,8 @@ trait BlockHeaderPool extends BlockHashPool {
 
   def isTip(bh: BlockHeader): Boolean = isTip(bh.hash)
 
-  def getHeightedBlockHeaders(fromTs: TimeStamp,
-                              toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]]
+  def getHeightedBlockHeaders(
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(BlockHeader, Int)]]
 }

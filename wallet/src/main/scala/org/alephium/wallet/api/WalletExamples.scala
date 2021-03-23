@@ -44,16 +44,20 @@ trait WalletExamples {
   def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
-    Example(WalletCreation(password, None, None, None, None),
-            name    = None,
-            summary = Some("Default")),
     Example(
-      WalletCreation(password,
-                     Some(walletName),
-                     Some(true),
-                     Some(mnemonicPassphrase),
-                     Some(Mnemonic.Size.list.head)),
-      name    = None,
+      WalletCreation(password, None, None, None, None),
+      name = None,
+      summary = Some("Default")
+    ),
+    Example(
+      WalletCreation(
+        password,
+        Some(walletName),
+        Some(true),
+        Some(mnemonicPassphrase),
+        Some(Mnemonic.Size.list.head)
+      ),
+      name = None,
       summary = Some("More settings")
     )
   )

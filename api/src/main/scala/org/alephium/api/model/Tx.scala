@@ -27,17 +27,19 @@ final case class Tx(
 )
 
 object Tx {
-  def from(tx: Transaction, networkType: NetworkType): Tx = Tx(
-    tx.id,
-    tx.unsigned.inputs.map(Input.from) ++
-      tx.contractInputs.map(Input.from),
-    tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
-      tx.generatedOutputs.map(Output.from(_, networkType))
-  )
+  def from(tx: Transaction, networkType: NetworkType): Tx =
+    Tx(
+      tx.id,
+      tx.unsigned.inputs.map(Input.from) ++
+        tx.contractInputs.map(Input.from),
+      tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
+        tx.generatedOutputs.map(Output.from(_, networkType))
+    )
 
-  def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx = Tx(
-    tx.id,
-    tx.unsigned.inputs.map(Input.from),
-    tx.unsigned.fixedOutputs.map(Output.from(_, networkType))
-  )
+  def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx =
+    Tx(
+      tx.id,
+      tx.unsigned.inputs.map(Input.from),
+      tx.unsigned.fixedOutputs.map(Output.from(_, networkType))
+    )
 }

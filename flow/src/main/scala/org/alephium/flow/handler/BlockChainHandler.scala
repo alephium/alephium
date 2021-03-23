@@ -30,11 +30,15 @@ import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, EventStream}
 
 object BlockChainHandler {
-  def props(blockFlow: BlockFlow,
-            chainIndex: ChainIndex,
-            flowHandler: ActorRefT[FlowHandler.Command])(implicit brokerConfig: BrokerConfig,
-                                                         consensusConfig: ConsensusConfig,
-                                                         networkSetting: NetworkSetting): Props =
+  def props(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      flowHandler: ActorRefT[FlowHandler.Command]
+  )(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting
+  ): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, flowHandler))
 
   sealed trait Command
@@ -47,23 +51,26 @@ object BlockChainHandler {
   final case class InvalidBlock(hash: BlockHash) extends Event
 }
 
-class BlockChainHandler(blockFlow: BlockFlow,
-                        chainIndex: ChainIndex,
-                        flowHandler: ActorRefT[FlowHandler.Command])(
-    implicit brokerConfig: BrokerConfig,
+class BlockChainHandler(
+    blockFlow: BlockFlow,
+    chainIndex: ChainIndex,
+    flowHandler: ActorRefT[FlowHandler.Command]
+)(implicit
+    brokerConfig: BrokerConfig,
     consensusConfig: ConsensusConfig,
-    networkSetting: NetworkSetting)
-    extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
+    networkSetting: NetworkSetting
+) extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
       blockFlow,
       chainIndex,
-      BlockValidation.build)
+      BlockValidation.build
+    )
     with EventStream.Publisher {
   import BlockChainHandler._
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
 
-  override def receive: Receive = {
-    case Validate(block, broker, origin) => handleData(block, broker, origin)
+  override def receive: Receive = { case Validate(block, broker, origin) =>
+    handleData(block, broker, origin)
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
@@ -78,9 +85,11 @@ class BlockChainHandler(blockFlow: BlockFlow,
     }
   }
 
-  override def addToFlowHandler(block: Block,
-                                broker: ActorRefT[ChainHandler.Event],
-                                origin: DataOrigin): Unit = {
+  override def addToFlowHandler(
+      block: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
     flowHandler ! FlowHandler.AddBlock(block, broker, origin)
   }
 

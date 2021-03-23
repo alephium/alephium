@@ -99,7 +99,9 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
 
   it should "encode response - failure" in {
     val failure: JsonRPC.Response = JsonRPC.Response.Failure(JsonRPC.Error.InvalidRequest, Some(1))
-    show(failure) is """{"jsonrpc":"2.0","error":{"code":-32600,"message":"Invalid Request"},"id":1}"""
+    show(
+      failure
+    ) is """{"jsonrpc":"2.0","error":{"code":-32600,"message":"Invalid Request"},"id":1}"""
   }
 
   it should "encode response - failure - no id" in {
@@ -189,10 +191,9 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
     val jsonRaw  = """{"jsonrpc": "2.0", "result": 42, "id": 1}"""
     val response = parse(jsonRaw).toOption.get.as[JsonRPC.Response].toOption.get
 
-    inside(response) {
-      case JsonRPC.Response.Success(result, id) =>
-        result is Json.fromInt(42)
-        id is 1
+    inside(response) { case JsonRPC.Response.Success(result, id) =>
+      result is Json.fromInt(42)
+      id is 1
     }
   }
 
@@ -200,10 +201,9 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
     val jsonRaw  = """{"jsonrpc":"2.0","error":{"code":42,"message":"foo"},"id":1}"""
     val response = parse(jsonRaw).toOption.get.as[JsonRPC.Response].toOption.get
 
-    inside(response) {
-      case JsonRPC.Response.Failure(error, id) =>
-        error is JsonRPC.Error.apply(42, "foo")
-        id is Some(1L)
+    inside(response) { case JsonRPC.Response.Failure(error, id) =>
+      error is JsonRPC.Error.apply(42, "foo")
+      id is Some(1L)
     }
   }
 

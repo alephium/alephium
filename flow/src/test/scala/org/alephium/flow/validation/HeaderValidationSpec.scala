@@ -41,8 +41,10 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
       result.isRight is true
     }
 
-    def failValidation(result: HeaderValidationResult[Unit],
-                       error: InvalidHeaderStatus): Assertion = {
+    def failValidation(
+        result: HeaderValidationResult[Unit],
+        error: InvalidHeaderStatus
+    ): Assertion = {
       result.left.value isE error
     }
   }
@@ -147,9 +149,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     def updateNonceForIndex(modified: BlockHeader): BlockHeader = {
       posLongGen
         .map(nonce => modified.copy(nonce = nonce))
-        .retryUntil { newHeader =>
-          (newHeader.chainIndex equals chainIndex)
-        }
+        .retryUntil { newHeader => (newHeader.chainIndex equals chainIndex) }
         .sample
         .get
     }
@@ -192,11 +192,13 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     val correctDeps = header.blockDeps.deps
     correctDeps.indices.tail.foreach { k =>
       val modified0 = updateNonce(
-        header.copy(blockDeps = BlockDeps.unsafe(correctDeps.replace(k, correctDeps(k - 1)))))
+        header.copy(blockDeps = BlockDeps.unsafe(correctDeps.replace(k, correctDeps(k - 1))))
+      )
       failValidation(modified0, InvalidDepsIndex)
 
       val modified1 = updateNonce(
-        header.copy(blockDeps = BlockDeps.unsafe(correctDeps.replace(k - 1, correctDeps(k)))))
+        header.copy(blockDeps = BlockDeps.unsafe(correctDeps.replace(k - 1, correctDeps(k))))
+      )
       failValidation(modified1, InvalidDepsIndex)
     }
   }
@@ -227,12 +229,11 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     val correctDeps = header.blockDeps.deps
     forAll(Gen.someOf(correctDeps.indices.filter(_ != groups0 + 1))) { depIndexes =>
       if (depIndexes.nonEmpty) {
-        val newDeps = depIndexes.foldLeft(correctDeps) {
-          case (deps, k) =>
-            val newDep = Gen
-              .resultOf[Unit, BlockHash](_ => BlockHash.random)
-              .retryUntil(hash => ChainIndex.from(hash) equals ChainIndex.from(correctDeps(k)))
-            deps.replace(k, newDep.sample.get)
+        val newDeps = depIndexes.foldLeft(correctDeps) { case (deps, k) =>
+          val newDep = Gen
+            .resultOf[Unit, BlockHash](_ => BlockHash.random)
+            .retryUntil(hash => ChainIndex.from(hash) equals ChainIndex.from(correctDeps(k)))
+          deps.replace(k, newDep.sample.get)
         }
         val modified =
           mineHeader(header.chainIndex, newDeps, header.txsHash, header.timestamp, header.target)

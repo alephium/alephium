@@ -26,13 +26,12 @@ trait SafeSerde[T, Config] {
   def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[Staging[T]]
 
   def deserialize(input: ByteString)(implicit config: Config): SerdeResult[T] = {
-    _deserialize(input).flatMap {
-      case Staging(output, rest) =>
-        if (rest.isEmpty) {
-          Right(output)
-        } else {
-          Left(SerdeError.redundant(input.size - rest.size, input.size))
-        }
+    _deserialize(input).flatMap { case Staging(output, rest) =>
+      if (rest.isEmpty) {
+        Right(output)
+      } else {
+        Left(SerdeError.redundant(input.size - rest.size, input.size))
+      }
     }
   }
 }
@@ -47,12 +46,11 @@ trait SafeSerdeImpl[T, Config] extends SafeSerde[T, Config] {
   def serialize(t: T): ByteString = _serde.serialize(t)
 
   def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[Staging[T]] = {
-    _serde._deserialize(input).flatMap {
-      case Staging(t, rest) =>
-        validate(t) match {
-          case Right(_)    => Right(Staging(t, rest))
-          case Left(error) => Left(SerdeError.validation(error))
-        }
+    _serde._deserialize(input).flatMap { case Staging(t, rest) =>
+      validate(t) match {
+        case Right(_)    => Right(Staging(t, rest))
+        case Left(error) => Left(SerdeError.validation(error))
+      }
     }
   }
 }

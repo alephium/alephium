@@ -42,18 +42,14 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
 
     val minerAddressesWithGroup = walletService.getMinerAddresses(walletName).rightValue
 
-    val groups         = minerAddressesWithGroup.flatMap(_.map { case (groups, _)    => groups.value })
+    val groups         = minerAddressesWithGroup.flatMap(_.map { case (groups, _) => groups.value })
     val minerAddresses = minerAddressesWithGroup.flatMap(_.map { case (_, addresses) => addresses })
 
     groups.length is groupNum
     minerAddresses.length is addresses.length
 
-    (0 to (groupNum - 1)).foreach { group =>
-      groups.contains(group)
-    }
-    minerAddresses.foreach { address =>
-      addresses.contains(address)
-    }
+    (0 to (groupNum - 1)).foreach { group => groups.contains(group) }
+    minerAddresses.foreach { address => addresses.contains(address) }
 
     walletService.deriveNextAddress(walletName) is Left(WalletService.MinerWalletRequired)
 
@@ -104,8 +100,10 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
     val walletName = "wallet"
     val notFound   = WalletNotFound(new File(tempSecretDir.toString, walletName))
     val address =
-      Address(NetworkType.Devnet,
-              LockupScript.fromBase58("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get)
+      Address(
+        NetworkType.Devnet,
+        LockupScript.fromBase58("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
+      )
 
     walletService.unlockWallet(walletName, "").leftValue is notFound
     walletService.getBalances(walletName).futureValue.leftValue is notFound
@@ -146,9 +144,11 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
       ActorSystem(s"wallet-service-spec-${Random.source.nextInt}")
     implicit val executionContext = system.dispatcher
     lazy val blockFlowClient =
-      BlockFlowClient.apply(config.blockflow.uri,
-                            config.networkType,
-                            config.blockflow.blockflowFetchMaxAge)
+      BlockFlowClient.apply(
+        config.blockflow.uri,
+        config.networkType,
+        config.blockflow.blockflowFetchMaxAge
+      )
 
     lazy val walletService: WalletService =
       WalletService.apply(blockFlowClient, tempSecretDir, config.networkType, config.lockingTimeout)

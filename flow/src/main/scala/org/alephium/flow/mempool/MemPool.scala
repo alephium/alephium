@@ -36,51 +36,65 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
 
   def size: Int = pools.sumBy(_.size)
 
-  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = readOnly {
-    contains(index, transaction.id)
-  }
+  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean =
+    readOnly {
+      contains(index, transaction.id)
+    }
 
-  def contains(index: ChainIndex, txId: Hash): Boolean = readOnly {
-    getPool(index).contains(txId)
-  }
+  def contains(index: ChainIndex, txId: Hash): Boolean =
+    readOnly {
+      getPool(index).contains(txId)
+    }
 
-  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
-    getPool(index).collectForBlock(maxNum)
-  }
+  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
+    readOnly {
+      getPool(index).collectForBlock(maxNum)
+    }
 
-  def getAll(index: ChainIndex): AVector[TransactionTemplate] = readOnly {
-    getPool(index).getAll
-  }
+  def getAll(index: ChainIndex): AVector[TransactionTemplate] =
+    readOnly {
+      getPool(index).getAll
+    }
 
-  def add(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = readOnly {
-    getPool(index).add(transactions)
-  }
+  def add(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
+    readOnly {
+      getPool(index).add(transactions)
+    }
 
-  def remove(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = readOnly {
-    getPool(index).remove(transactions)
-  }
+  def remove(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
+    readOnly {
+      getPool(index).remove(transactions)
+    }
 
   // Note: we lock the mem pool so that we could update all the transaction pools
-  def reorg(toRemove: AVector[AVector[Transaction]],
-            toAdd: AVector[AVector[Transaction]]): (Int, Int) = writeOnly {
-    assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
+  def reorg(
+      toRemove: AVector[AVector[Transaction]],
+      toAdd: AVector[AVector[Transaction]]
+  ): (Int, Int) =
+    writeOnly {
+      assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
-    // First, add transactions from short chains, then remove transactions from canonical chains
-    val added =
-      toAdd.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).add(txs.map(_.toTemplate)))
-    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
-      sum + pools(toGroup).remove(txs.map(_.toTemplate)))
-    (removed, added)
-  }
+      // First, add transactions from short chains, then remove transactions from canonical chains
+      val added =
+        toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
+          sum + pools(toGroup).add(txs.map(_.toTemplate))
+        )
+      val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
+        sum + pools(toGroup).remove(txs.map(_.toTemplate))
+      )
+      (removed, added)
+    }
 
-  def clear(): Unit = writeOnly {
-    pools.foreach(_.clear())
-  }
+  def clear(): Unit =
+    writeOnly {
+      pools.foreach(_.clear())
+    }
 }
 
 object MemPool {
-  def empty(groupIndex: GroupIndex)(implicit groupConfig: GroupConfig,
-                                    memPoolSetting: MemPoolSetting): MemPool = {
+  def empty(
+      groupIndex: GroupIndex
+  )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
     val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
     new MemPool(groupIndex, pools)
   }

@@ -48,7 +48,8 @@ lazy val macros = project("macros")
   .settings(
     libraryDependencies += `scala-reflect`(scalaVersion.value),
     wartremoverErrors in (Compile, compile) := Warts.allBut(
-      wartsCompileExcludes :+ Wart.AsInstanceOf: _*)
+      wartsCompileExcludes :+ Wart.AsInstanceOf: _*
+    )
   )
 
 lazy val util = project("util")
@@ -66,7 +67,7 @@ lazy val util = project("util")
 lazy val serde = project("serde")
   .settings(
     Compile / sourceGenerators += (sourceManaged in Compile).map(Boilerplate.genSrc).taskValue,
-    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue,
+    Test / sourceGenerators += (sourceManaged in Test).map(Boilerplate.genTest).taskValue
   )
   .dependsOn(util % "test->test;compile->compile")
 
@@ -106,7 +107,7 @@ lazy val api = project("api")
       `circe-generic`,
       `scala-logging`,
       `tapir-core`,
-      `tapir-circe`,
+      `tapir-circe`
     )
   )
 
@@ -197,10 +198,10 @@ val publishSettings = Seq(
   licenses := Seq("LGPL 3.0" -> new URL("https://www.gnu.org/licenses/lgpl-3.0.en.html")),
   developers := List(
     Developer(
-      id    = "alephium core dev",
-      name  = "alephium core dev",
+      id = "alephium core dev",
+      name = "alephium core dev",
       email = "dev@alephium.org",
-      url   = url("https://alephium.org/")
+      url = url("https://alephium.org/")
     )
   )
 )
@@ -268,7 +269,7 @@ val wartsCompileExcludes = Seq(
   Wart.ImplicitParameter,
   Wart.NonUnitStatements,
   Wart.Nothing,
-  Wart.Null, // Partially covered by scalastyle, only use _ inside actors
+  Wart.Null,   // Partially covered by scalastyle, only use _ inside actors
   Wart.Return, // Covered by scalastyle
   Wart.Any,
   Wart.Throw,

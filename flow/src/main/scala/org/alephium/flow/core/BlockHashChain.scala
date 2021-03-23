@@ -41,12 +41,14 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def heightIndexStorage: HeightIndexStorage
 
-  protected def addHash(hash: BlockHash,
-                        parentHash: BlockHash,
-                        height: Int,
-                        weight: BigInteger,
-                        timestamp: TimeStamp,
-                        isCanonical: Boolean): IOResult[Unit] = {
+  protected def addHash(
+      hash: BlockHash,
+      parentHash: BlockHash,
+      height: Int,
+      weight: BigInteger,
+      timestamp: TimeStamp,
+      isCanonical: Boolean
+  ): IOResult[Unit] = {
     for {
       _ <- blockStateStorage.put(hash, BlockState(height, weight))
       _ <- updateHeightIndex(hash, height, isCanonical)
@@ -69,9 +71,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @inline
-  private def updateHeightIndex(hash: BlockHash,
-                                height: Int,
-                                isCanonical: Boolean): IOResult[Unit] = {
+  private def updateHeightIndex(
+      hash: BlockHash,
+      height: Int,
+      isCanonical: Boolean
+  ): IOResult[Unit] = {
     heightIndexStorage.getOpt(height).flatMap {
       case Some(hashes) =>
         if (isCanonical) {
@@ -85,18 +89,20 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def getParentHash(hash: BlockHash): IOResult[BlockHash]
 
-  def maxWeight: IOResult[BigInteger] = EitherF.foldTry(tips.keys, BigInteger.ZERO) {
-    (weight, hash) =>
+  def maxWeight: IOResult[BigInteger] =
+    EitherF.foldTry(tips.keys, BigInteger.ZERO) { (weight, hash) =>
       getWeight(hash).map(weight.max)
-  }
+    }
 
-  def maxHeight: IOResult[Int] = EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
-    getHeight(hash).map(math.max(height, _))
-  }
+  def maxHeight: IOResult[Int] =
+    EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
+      getHeight(hash).map(math.max(height, _))
+    }
 
-  def maxHeightUnsafe: Int = tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>
-    math.max(getHeightUnsafe(hash), height)
-  }
+  def maxHeightUnsafe: Int =
+    tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>
+      math.max(getHeightUnsafe(hash), height)
+    }
 
   def isCanonicalUnsafe(hash: BlockHash): Boolean = {
     blockStateStorage.getOptUnsafe(hash).exists { state =>
@@ -152,8 +158,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def getHashesAfter(height: Int,
-                             hashes: AVector[BlockHash]): IOResult[AVector[BlockHash]] = {
+  private def getHashesAfter(
+      height: Int,
+      hashes: AVector[BlockHash]
+  ): IOResult[AVector[BlockHash]] = {
     if (hashes.isEmpty) {
       Right(AVector.empty)
     } else {
@@ -184,8 +192,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   // If oldHash is an ancestor of newHash, it returns all the new hashes after oldHash to newHash (inclusive)
-  def getBlockHashesBetween(newHash: BlockHash,
-                            oldHash: BlockHash): IOResult[AVector[BlockHash]] = {
+  def getBlockHashesBetween(
+      newHash: BlockHash,
+      oldHash: BlockHash
+  ): IOResult[AVector[BlockHash]] = {
     for {
       newHeight <- getHeight(newHash)
       oldHeight <- getHeight(oldHash)
@@ -193,22 +203,27 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     } yield result
   }
 
-  def getBlockHashesBetween(newHash: BlockHash,
-                            newHeight: Int,
-                            oldHash: BlockHash,
-                            oldHeight: Int): IOResult[AVector[BlockHash]] = {
+  def getBlockHashesBetween(
+      newHash: BlockHash,
+      newHeight: Int,
+      oldHash: BlockHash,
+      oldHeight: Int
+  ): IOResult[AVector[BlockHash]] = {
     assume(oldHeight >= ALF.GenesisHeight)
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def iter(acc: AVector[BlockHash],
-             currentHash: BlockHash,
-             currentHeight: Int): IOResult[AVector[BlockHash]] = {
+    def iter(
+        acc: AVector[BlockHash],
+        currentHash: BlockHash,
+        currentHeight: Int
+    ): IOResult[AVector[BlockHash]] = {
       if (currentHeight > oldHeight) {
         getParentHash(currentHash).flatMap(iter(acc :+ currentHash, _, currentHeight - 1))
       } else if (currentHeight == oldHeight && currentHash == oldHash) {
         Right(acc)
       } else {
         val error = new RuntimeException(
-          s"Cannot calculate the hashes between new ${newHash.shortHex} and old ${oldHash.shortHex}")
+          s"Cannot calculate the hashes between new ${newHash.shortHex} and old ${oldHash.shortHex}"
+        )
         Left(IOError.Other(error))
       }
     }
@@ -244,10 +259,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     } yield result
   }
 
-  private def isBefore(hash1: BlockHash,
-                       height1: Int,
-                       hash2: BlockHash,
-                       height2: Int): IOResult[Boolean] = {
+  private def isBefore(
+      hash1: BlockHash,
+      height1: Int,
+      hash2: BlockHash,
+      height2: Int
+  ): IOResult[Boolean] = {
     if (height1 < height2) {
       getPredecessor(hash2, height1).map(_.equals(hash1))
     } else if (height1 == height2) {
@@ -271,8 +288,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def calHashDiffFromSameHeight(newHash: BlockHash,
-                                        oldHash: BlockHash): IOResult[ChainDiff] = {
+  private def calHashDiffFromSameHeight(
+      newHash: BlockHash,
+      oldHash: BlockHash
+  ): IOResult[ChainDiff] = {
     if (newHash == oldHash) {
       Right(ChainDiff(AVector.empty, AVector.empty))
     } else {

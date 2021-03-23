@@ -89,7 +89,8 @@ object JsonRPC extends StrictLogging {
         case Right(a) => Right(a)
         case Left(decodingFailure) =>
           logger.debug(
-            s"Unable to decode JsonRPC request parameters. ($method@$id: $decodingFailure)")
+            s"Unable to decode JsonRPC request parameters. ($method@$id: $decodingFailure)"
+          )
           Left(Response.failed(this, Error.InvalidParams))
       }
   }

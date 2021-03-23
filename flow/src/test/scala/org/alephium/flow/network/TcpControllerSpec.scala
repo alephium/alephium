@@ -106,8 +106,10 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     val fixture1 = new Fixture {}
     val fixture2 = new Fixture {}
     eventually {
-      fixture2.controller ! TcpController.ConnectTo(fixture1.bindAddress,
-                                                    ActorRefT(TestProbe().ref))
+      fixture2.controller ! TcpController.ConnectTo(
+        fixture1.bindAddress,
+        ActorRefT(TestProbe().ref)
+      )
       fixture2.controllerActor.confirmedConnections.contains(fixture1.bindAddress) is true
     }
   }

@@ -80,9 +80,8 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   protected def persistTxs(block: Block): IOResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
-      block.transactions.foreachWithIndexE {
-        case (tx, index) =>
-          txStorage.add(tx.id, TxIndex(block.hash, index))
+      block.transactions.foreachWithIndexE { case (tx, index) =>
+        txStorage.add(tx.id, TxIndex(block.hash, index))
       }
     } else {
       Right(())
@@ -115,23 +114,23 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getLatestHashesUnsafe(): AVector[BlockHash] = {
     val toHeight   = maxHeightUnsafe
     val fromHeight = math.max(ALF.GenesisHeight + 1, toHeight - 100)
-    (fromHeight to toHeight).foldLeft(AVector.empty[BlockHash]) {
-      case (acc, height) => acc ++ Utils.unsafe(getHashes(height))
+    (fromHeight to toHeight).foldLeft(AVector.empty[BlockHash]) { case (acc, height) =>
+      acc ++ Utils.unsafe(getHashes(height))
     }
   }
 }
 
 object BlockChain {
-  def fromGenesisUnsafe(storages: Storages)(genesisBlock: Block)(
-      implicit brokerConfig: BrokerConfig,
-      consensusSetting: ConsensusSetting): BlockChain = {
+  def fromGenesisUnsafe(storages: Storages)(
+      genesisBlock: Block
+  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockChain = {
     val initialize = initializeGenesis(genesisBlock)(_)
     createUnsafe(genesisBlock, storages, initialize)
   }
 
-  def fromStorageUnsafe(storages: Storages)(genesisBlock: Block)(
-      implicit brokerConfig: BrokerConfig,
-      consensusSetting: ConsensusSetting): BlockChain = {
+  def fromStorageUnsafe(storages: Storages)(
+      genesisBlock: Block
+  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockChain = {
     createUnsafe(genesisBlock, storages, initializeFromStorage)
   }
 

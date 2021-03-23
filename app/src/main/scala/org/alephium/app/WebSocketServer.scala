@@ -44,10 +44,11 @@ import org.alephium.protocol.model.NetworkType
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, Duration, EventBus, Service}
 
-class WebSocketServer(node: Node, wsPort: Int)(implicit val system: ActorSystem,
-                                               val apiConfig: ApiConfig,
-                                               val executionContext: ExecutionContext)
-    extends ApiModelCodec
+class WebSocketServer(node: Node, wsPort: Int)(implicit
+    val system: ActorSystem,
+    val apiConfig: ApiConfig,
+    val executionContext: ExecutionContext
+) extends ApiModelCodec
     with StrictLogging
     with Service {
   import WebSocketServer._
@@ -59,9 +60,11 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit val system: ActorSystem,
 
   private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
-  private def wsFlow(eventBus: ActorRefT[EventBus.Message],
-                     actor: ActorRef,
-                     source: Source[Nothing, NotUsed]): Flow[Any, TextMessage, Unit] = {
+  private def wsFlow(
+      eventBus: ActorRefT[EventBus.Message],
+      actor: ActorRef,
+      source: Source[Nothing, NotUsed]
+  ): Flow[Any, TextMessage, Unit] = {
     Flow
       .fromSinkAndSourceCoupled(Sink.ignore, source.map(handleEvent))
       .watchTermination() { (_, termination) =>
@@ -125,9 +128,11 @@ object WebSocketServer {
 
   val bufferSize: Int = 64
 
-  def apply(node: Node)(implicit system: ActorSystem,
-                        apiConfig: ApiConfig,
-                        executionContext: ExecutionContext): WebSocketServer = {
+  def apply(node: Node)(implicit
+      system: ActorSystem,
+      apiConfig: ApiConfig,
+      executionContext: ExecutionContext
+  ): WebSocketServer = {
     val wsPort = node.config.network.wsPort
     new WebSocketServer(node, wsPort)
   }
@@ -147,12 +152,11 @@ object WebSocketServer {
     def actorRef(implicit system: ActorSystem): (ActorRef, Source[Nothing, NotUsed]) =
       Source
         .actorRef(
-          {
-            case Websocket.Completed =>
-              CompletionStrategy.draining
-          }, {
-            case Websocket.Failed =>
-              new Throwable("failure on events websocket")
+          { case Websocket.Completed =>
+            CompletionStrategy.draining
+          },
+          { case Websocket.Failed =>
+            new Throwable("failure on events websocket")
           },
           bufferSize,
           OverflowStrategy.fail

@@ -31,9 +31,7 @@ class BlocksExporterSpec extends AlephiumSpec {
       "",
       ".",
       ".."
-    ).foreach { filename =>
-      blocksExporter.export(filename).leftValue is a[IOError]
-    }
+    ).foreach { filename => blocksExporter.export(filename).leftValue is a[IOError] }
 
     Seq(
       "correct-file",
@@ -41,9 +39,7 @@ class BlocksExporterSpec extends AlephiumSpec {
       "correct.file",
       "correctfile._",
       "correct.file."
-    ).foreach { filename =>
-      blocksExporter.export(filename).rightValue is ()
-    }
+    ).foreach { filename => blocksExporter.export(filename).rightValue is () }
   }
 
   trait Fixture extends FlowFixture {

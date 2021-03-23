@@ -35,18 +35,14 @@ class CollectionBench {
   @Benchmark
   def accessVector(): Int = {
     var sum = 0
-    (0 until N).foreach { _ =>
-      sum += vector(Random.source.nextInt(N))
-    }
+    (0 until N).foreach { _ => sum += vector(Random.source.nextInt(N)) }
     sum
   }
 
   @Benchmark
   def accessAVector(): Int = {
     var sum = 0
-    (0 until N).foreach { _ =>
-      sum += avector(Random.source.nextInt(N))
-    }
+    (0 until N).foreach { _ => sum += avector(Random.source.nextInt(N)) }
     sum
   }
 

@@ -41,12 +41,15 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
     query[TimeStamp]("fromTs")
       .and(query[TimeStamp]("toTs"))
       .validate(
-        Validator.custom({ case (from, to) => from <= to }, "`fromTs` must be before `toTs`"))
+        Validator.custom({ case (from, to) => from <= to }, "`fromTs` must be before `toTs`")
+      )
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
-        (timeInterval.from, timeInterval.to))
+        (timeInterval.from, timeInterval.to)
+      )
 
-  private def jsonBody[T: Encoder: Decoder: Schema: Validator](
-      implicit examples: List[Example[T]]) =
+  private def jsonBody[T: Encoder: Decoder: Schema: Validator](implicit
+      examples: List[Example[T]]
+  ) =
     tapirJsonBody[T].examples(examples)
 
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
@@ -169,7 +172,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .summary("List unconfirmed transactions")
 
   val buildTransaction
-    : BaseEndpoint[(PublicKey, Address, Option[TimeStamp], U256), BuildTransactionResult] =
+      : BaseEndpoint[(PublicKey, Address, Option[TimeStamp], U256), BuildTransactionResult] =
     transactionsEndpoint.get
       .in("build")
       .in(query[PublicKey]("fromKey"))

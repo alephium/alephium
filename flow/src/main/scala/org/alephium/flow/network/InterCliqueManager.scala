@@ -34,33 +34,40 @@ import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object InterCliqueManager {
   // scalastyle:off parameter.number
-  def props(selfCliqueInfo: CliqueInfo,
-            blockflow: BlockFlow,
-            allHandlers: AllHandlers,
-            discoveryServer: ActorRefT[DiscoveryServer.Command],
-            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-      implicit brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting): Props =
+  def props(
+      selfCliqueInfo: CliqueInfo,
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers,
+      discoveryServer: ActorRefT[DiscoveryServer.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
-      new InterCliqueManager(selfCliqueInfo,
-                             blockflow,
-                             allHandlers,
-                             discoveryServer,
-                             blockFlowSynchronizer))
+      new InterCliqueManager(
+        selfCliqueInfo,
+        blockflow,
+        allHandlers,
+        discoveryServer,
+        blockFlowSynchronizer
+      )
+    )
   //scalastyle:on
 
   sealed trait Command              extends CliqueManager.Command
   final case object GetSyncStatuses extends Command
 
-  final case class SyncStatus(peerId: PeerId,
-                              address: InetSocketAddress,
-                              isSynced: Boolean,
-                              groupNumPerBroker: Int)
+  final case class SyncStatus(
+      peerId: PeerId,
+      address: InetSocketAddress,
+      isSynced: Boolean,
+      groupNumPerBroker: Int
+  )
 
-  final case class BrokerState(info: BrokerInfo,
-                               connectionType: ConnectionType,
-                               actor: ActorRefT[BrokerHandler.Command],
-                               isSynced: Boolean) {
+  final case class BrokerState(
+      info: BrokerInfo,
+      connectionType: ConnectionType,
+      actor: ActorRefT[BrokerHandler.Command],
+      isSynced: Boolean
+  ) {
     def setSynced(): BrokerState = this.copy(isSynced = true)
 
     def readyFor(chainIndex: ChainIndex): Boolean = {
@@ -71,13 +78,13 @@ object InterCliqueManager {
   final case class PeerDisconnected(peer: InetSocketAddress)
 }
 
-class InterCliqueManager(selfCliqueInfo: CliqueInfo,
-                         blockflow: BlockFlow,
-                         allHandlers: AllHandlers,
-                         discoveryServer: ActorRefT[DiscoveryServer.Command],
-                         blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-    implicit val brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting)
+class InterCliqueManager(
+    selfCliqueInfo: CliqueInfo,
+    blockflow: BlockFlow,
+    allHandlers: AllHandlers,
+    discoveryServer: ActorRefT[DiscoveryServer.Command],
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+)(implicit val brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
     with EventStream.Subscriber
     with InterCliqueManagerState {
@@ -91,8 +98,8 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
 
-  def handleNewClique: Receive = {
-    case DiscoveryServer.NewPeer(peerInfo) => connect(peerInfo)
+  def handleNewClique: Receive = { case DiscoveryServer.NewPeer(peerInfo) =>
+    connect(peerInfo)
   }
 
   def handleConnection: Receive = {
@@ -150,10 +157,12 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
     case GetSyncStatuses =>
       val syncStatuses: Seq[SyncStatus] = mapBrokers { (peerId, brokerState) =>
-        SyncStatus(peerId,
-                   brokerState.info.address,
-                   brokerState.isSynced,
-                   brokerState.info.groupNumPerBroker)
+        SyncStatus(
+          peerId,
+          brokerState.info.address,
+          brokerState.isSynced,
+          brokerState.info.groupNumPerBroker
+        )
       }
       sender() ! syncStatuses
 
@@ -170,12 +179,14 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
     log.debug(s"Try to connect to $brokerInfo")
     val props =
-      OutboundBrokerHandler.props(selfCliqueInfo,
-                                  brokerInfo,
-                                  blockflow,
-                                  allHandlers,
-                                  ActorRefT(self),
-                                  blockFlowSynchronizer)
+      OutboundBrokerHandler.props(
+        selfCliqueInfo,
+        brokerInfo,
+        blockflow,
+        allHandlers,
+        ActorRefT(self),
+        blockFlowSynchronizer
+      )
     val out = context.actorOf(props)
     context.watchWith(out, PeerDisconnected(brokerInfo.address))
     ()
@@ -197,9 +208,11 @@ trait InterCliqueManagerState {
   // The key is (CliqueId, BrokerId)
   val brokers = collection.mutable.HashMap.empty[PeerId, BrokerState]
 
-  def addBroker(brokerInfo: BrokerInfo,
-                connectionType: ConnectionType,
-                broker: ActorRefT[BrokerHandler.Command]): Unit = {
+  def addBroker(
+      brokerInfo: BrokerInfo,
+      connectionType: ConnectionType,
+      broker: ActorRefT[BrokerHandler.Command]
+  ): Unit = {
     val peerId = brokerInfo.peerId
     if (!brokers.contains(peerId)) {
       brokers += peerId -> BrokerState(brokerInfo, connectionType, broker, isSynced = false)
@@ -213,14 +226,14 @@ trait InterCliqueManagerState {
   }
 
   def iterBrokers(f: (PeerId, BrokerState) => Unit): Unit = {
-    brokers.foreach {
-      case (peerId, state) => f(peerId, state)
+    brokers.foreach { case (peerId, state) =>
+      f(peerId, state)
     }
   }
 
   def mapBrokers[A](f: (PeerId, BrokerState) => A): Seq[A] = {
-    brokers.collect {
-      case (peerId, state) => f(peerId, state)
+    brokers.collect { case (peerId, state) =>
+      f(peerId, state)
     }.toSeq
   }
 
@@ -233,26 +246,28 @@ trait InterCliqueManagerState {
   }
 
   def getOutConnectionPerGroup(groupIndex: GroupIndex): Int = {
-    brokers.foldLeft(0) {
-      case (count, (_, brokerState)) =>
-        if (brokerState.connectionType == OutboundConnection &&
-            brokerState.info.contains(groupIndex)) {
-          count + 1
-        } else {
-          count
-        }
+    brokers.foldLeft(0) { case (count, (_, brokerState)) =>
+      if (
+        brokerState.connectionType == OutboundConnection &&
+        brokerState.info.contains(groupIndex)
+      ) {
+        count + 1
+      } else {
+        count
+      }
     }
   }
 
   def getInConnectionPerGroup(groupIndex: GroupIndex): Int = {
-    brokers.foldLeft(0) {
-      case (count, (_, brokerState)) =>
-        if (brokerState.connectionType == InboundConnection &&
-            brokerState.info.contains(groupIndex)) {
-          count + 1
-        } else {
-          count
-        }
+    brokers.foldLeft(0) { case (count, (_, brokerState)) =>
+      if (
+        brokerState.connectionType == InboundConnection &&
+        brokerState.info.contains(groupIndex)
+      ) {
+        count + 1
+      } else {
+        count
+      }
     }
   }
 
@@ -260,8 +275,10 @@ trait InterCliqueManagerState {
     brokers.filterInPlace { case (_, state) => state.info.address != peer }
   }
 
-  def checkForOutConnection(brokerInfo: BrokerInfo,
-                            maxOutboundConnectionsPerGroup: Int): Boolean = {
+  def checkForOutConnection(
+      brokerInfo: BrokerInfo,
+      maxOutboundConnectionsPerGroup: Int
+  ): Boolean = {
     brokerConfig.intersect(brokerInfo) && !containsBroker(brokerInfo) && {
       val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
       (groupFrom until groupUntil).exists { group =>

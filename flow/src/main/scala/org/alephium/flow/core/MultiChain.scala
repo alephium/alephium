@@ -71,8 +71,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(hash).isTip(hash)
   }
 
-  def getHeightedBlockHeaders(fromTs: TimeStamp,
-                              toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] =
+  def getHeightedBlockHeaders(
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(BlockHeader, Int)]] =
     aggregateHeaderE(_.getHeightedBlockHeaders(fromTs, toTs))(_ ++ _)
 
   def getHashesAfter(locator: BlockHash): IOResult[AVector[BlockHash]] =

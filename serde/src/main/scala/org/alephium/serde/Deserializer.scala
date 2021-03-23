@@ -22,23 +22,21 @@ trait Deserializer[T] { self =>
   def _deserialize(input: ByteString): SerdeResult[Staging[T]]
 
   def deserialize(input: ByteString): SerdeResult[T] =
-    _deserialize(input).flatMap {
-      case Staging(output, rest) =>
-        if (rest.isEmpty) {
-          Right(output)
-        } else {
-          Left(SerdeError.redundant(input.size - rest.size, input.size))
-        }
+    _deserialize(input).flatMap { case Staging(output, rest) =>
+      if (rest.isEmpty) {
+        Right(output)
+      } else {
+        Left(SerdeError.redundant(input.size - rest.size, input.size))
+      }
     }
 
   def validateGet[U](get: T => Option[U], error: T => String): Deserializer[U] =
     (input: ByteString) => {
-      self._deserialize(input).flatMap {
-        case Staging(t, rest) =>
-          get(t) match {
-            case Some(u) => Right(Staging(u, rest))
-            case None    => Left(SerdeError.wrongFormat(error(t)))
-          }
+      self._deserialize(input).flatMap { case Staging(t, rest) =>
+        get(t) match {
+          case Some(u) => Right(Staging(u, rest))
+          case None    => Left(SerdeError.wrongFormat(error(t)))
+        }
       }
     }
 }

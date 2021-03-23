@@ -47,7 +47,7 @@ trait Node extends Service {
   def allHandlers: AllHandlers
   def monitor: ActorRefT[Node.Command]
 
-  override implicit def executionContext: ExecutionContext = system.dispatcher
+  implicit override def executionContext: ExecutionContext = system.dispatcher
 
   override def subServices: ArraySeq[Service] = ArraySeq.empty
 
@@ -61,8 +61,8 @@ trait Node extends Service {
 
 // scalastyle:off method.length
 object Node {
-  def build(storages: Storages)(
-      implicit actorSystem: ActorSystem,
+  def build(storages: Storages)(implicit
+      actorSystem: ActorSystem,
       _config: AlephiumConfig
   ): Node = new Default(storages)
 
@@ -71,10 +71,10 @@ object Node {
       with StrictLogging {
     implicit val system                  = actorSystem
     val config                           = _config
-    private implicit val brokerConfig    = config.broker
-    private implicit val consensusConfig = config.consensus
-    private implicit val networkSetting  = config.network
-    private implicit val discoveryConfig = config.discovery
+    implicit private val brokerConfig    = config.broker
+    implicit private val consensusConfig = config.consensus
+    implicit private val networkSetting  = config.network
+    implicit private val discoveryConfig = config.discovery
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
@@ -82,9 +82,11 @@ object Node {
       ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
 
     val discoveryProps: Props =
-      DiscoveryServer.props(networkSetting.bindAddress,
-                            misbehaviorManager,
-                            config.discovery.bootstrap)
+      DiscoveryServer.props(
+        networkSetting.bindAddress,
+        misbehaviorManager,
+        config.discovery.bootstrap
+      )
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
@@ -92,7 +94,8 @@ object Node {
       ActorRefT
         .build[TcpController.Command](
           system,
-          TcpController.props(config.network.bindAddress, misbehaviorManager))
+          TcpController.props(config.network.bindAddress, misbehaviorManager)
+        )
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
@@ -105,7 +108,8 @@ object Node {
       ActorRefT.build(
         system,
         CliqueManager.props(blockFlow, allHandlers, discoveryServer, blockFlowSynchronizer),
-        "CliqueManager")
+        "CliqueManager"
+      )
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")
@@ -118,13 +122,17 @@ object Node {
     val nodeStateStorage = storages.nodeStateStorage
     val isInitialized    = Utils.unsafe(nodeStateStorage.isInitialized())
     if (isInitialized) {
-      BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)(config.broker,
-                                                                  config.consensus,
-                                                                  config.mempool)
+      BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)(
+        config.broker,
+        config.consensus,
+        config.mempool
+      )
     } else {
-      val blockflow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)(config.broker,
-                                                                                  config.consensus,
-                                                                                  config.mempool)
+      val blockflow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)(
+        config.broker,
+        config.consensus,
+        config.mempool
+      )
       Utils.unsafe(nodeStateStorage.setInitialized())
       blockflow
     }
@@ -147,10 +155,9 @@ object Node {
       node.eventBus
     ) ++ node.allHandlers.orderedHandlers
 
-    override def receive: Receive = {
-      case Stop =>
-        log.info("Stopping the node")
-        terminate(orderedActors, sender())
+    override def receive: Receive = { case Stop =>
+      log.info("Stopping the node")
+      terminate(orderedActors, sender())
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.ListUnapply"))

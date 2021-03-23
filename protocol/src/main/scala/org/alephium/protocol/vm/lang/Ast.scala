@@ -33,13 +33,14 @@ object Ast {
   sealed trait Expr[Ctx <: StatelessContext] {
     var tpe: Option[Seq[Type]] = None
     protected def _getType(state: Compiler.State[Ctx]): Seq[Type]
-    def getType(state: Compiler.State[Ctx]): Seq[Type] = tpe match {
-      case Some(ts) => ts
-      case None =>
-        val t = _getType(state)
-        tpe = Some(t)
-        t
-    }
+    def getType(state: Compiler.State[Ctx]): Seq[Type] =
+      tpe match {
+        case Some(ts) => ts
+        case None =>
+          val t = _getType(state)
+          tpe = Some(t)
+          t
+      }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
@@ -85,7 +86,8 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       left.genCode(state) ++ right.genCode(state) ++ op.genCode(
-        left.getType(state) ++ right.getType(state))
+        left.getType(state) ++ right.getType(state)
+      )
     }
   }
   final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
@@ -133,10 +135,11 @@ object Ast {
       }
     }
   }
-  final case class ContractCallExpr(obj: Expr[StatefulContext],
-                                    callId: FuncId,
-                                    args: Seq[Expr[StatefulContext]])
-      extends Expr[StatefulContext]
+  final case class ContractCallExpr(
+      obj: Expr[StatefulContext],
+      callId: FuncId,
+      args: Seq[Expr[StatefulContext]]
+  ) extends Expr[StatefulContext]
       with ContractCallBase {
     override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] =
       _getTypeBase(state)
@@ -161,9 +164,11 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
   object Statement {
-    @inline def getCondIR[Ctx <: StatelessContext](condition: Expr[Ctx],
-                                                   state: Compiler.State[Ctx],
-                                                   offset: Byte): Seq[Instr[Ctx]] = {
+    @inline def getCondIR[Ctx <: StatelessContext](
+        condition: Expr[Ctx],
+        state: Compiler.State[Ctx],
+        offset: Byte
+    ): Seq[Instr[Ctx]] = {
       condition match {
         case Binop(op: TestOperator, left, right) =>
           left.genCode(state) ++ right.genCode(state) ++ op.toBranchIR(left.getType(state), offset)
@@ -174,10 +179,11 @@ object Ast {
       }
     }
   }
-  final case class VarDef[Ctx <: StatelessContext](isMutable: Boolean,
-                                                   ident: Ident,
-                                                   value: Expr[Ctx])
-      extends Statement[Ctx] {
+  final case class VarDef[Ctx <: StatelessContext](
+      isMutable: Boolean,
+      ident: Ident,
+      value: Expr[Ctx]
+  ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit =
       state.addVariable(ident, value.getType(state), isMutable)
 
@@ -185,12 +191,14 @@ object Ast {
       value.genCode(state) :+ state.genStoreCode(ident)
     }
   }
-  final case class FuncDef[Ctx <: StatelessContext](id: FuncId,
-                                                    isPublic: Boolean,
-                                                    isPayable: Boolean,
-                                                    args: Seq[Argument],
-                                                    rtypes: Seq[Type],
-                                                    body: Seq[Statement[Ctx]]) {
+  final case class FuncDef[Ctx <: StatelessContext](
+      id: FuncId,
+      isPublic: Boolean,
+      isPayable: Boolean,
+      args: Seq[Argument],
+      rtypes: Seq[Type],
+      body: Seq[Statement[Ctx]]
+  ) {
     def check(state: Compiler.State[Ctx]): Unit = {
       args.foreach(arg => state.addVariable(arg.ident, arg.tpe, arg.isMutable))
       body.foreach(_.check(state))
@@ -204,12 +212,14 @@ object Ast {
       val argsType   = localVars.take(args.length).map(_.tpe.toVal)
       val returnType = AVector.from(rtypes.view.map(_.toVal))
       val instrs     = body.flatMap(_.genCode(state))
-      Method[Ctx](isPublic,
-                  isPayable,
-                  AVector.from(argsType),
-                  localVars.length,
-                  returnType,
-                  AVector.from(instrs))
+      Method[Ctx](
+        isPublic,
+        isPayable,
+        AVector.from(argsType),
+        localVars.length,
+        returnType,
+        AVector.from(instrs)
+      )
     }
   }
   // TODO: handle multiple returns
@@ -238,10 +248,11 @@ object Ast {
       args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++ Seq.fill(returnType.length)(Pop)
     }
   }
-  final case class ContractCall(obj: Expr[StatefulContext],
-                                callId: FuncId,
-                                args: Seq[Expr[StatefulContext]])
-      extends Statement[StatefulContext]
+  final case class ContractCall(
+      obj: Expr[StatefulContext],
+      callId: FuncId,
+      args: Seq[Expr[StatefulContext]]
+  ) extends Statement[StatefulContext]
       with ContractCallBase {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       _getTypeBase(state)
@@ -259,10 +270,11 @@ object Ast {
         Seq.fill[Instr[StatefulContext]](returnType.length)(Pop)
     }
   }
-  final case class IfElse[Ctx <: StatelessContext](condition: Expr[Ctx],
-                                                   ifBranch: Seq[Statement[Ctx]],
-                                                   elseBranch: Seq[Statement[Ctx]])
-      extends Statement[Ctx] {
+  final case class IfElse[Ctx <: StatelessContext](
+      condition: Expr[Ctx],
+      ifBranch: Seq[Statement[Ctx]],
+      elseBranch: Seq[Statement[Ctx]]
+  ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
@@ -276,7 +288,7 @@ object Ast {
       val elseIRs  = elseBranch.flatMap(_.genCode(state))
       val offsetIR = if (elseIRs.nonEmpty) Seq(Forward(elseIRs.length.toByte)) else Seq.empty
       val ifIRs    = ifBranch.flatMap(_.genCode(state)) ++ offsetIR
-      if (ifIRs.length > 0xFF || elseIRs.length > 0xFF) {
+      if (ifIRs.length > 0xff || elseIRs.length > 0xff) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
@@ -298,7 +310,7 @@ object Ast {
       val bodyIR   = body.flatMap(_.genCode(state))
       val condIR   = Statement.getCondIR(condition, state, (bodyIR.length + 1).toByte)
       val whileLen = condIR.length + bodyIR.length + 1
-      if (whileLen > 0xFF) {
+      if (whileLen > 0xff) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
@@ -357,19 +369,23 @@ object Ast {
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
       StatefulScript
         .from(methods)
-        .getOrElse(throw Compiler.Error(
-          "Expect the 1st function to be public and the other functions to be private for tx script"))
+        .getOrElse(
+          throw Compiler.Error(
+            "Expect the 1st function to be public and the other functions to be private for tx script"
+          )
+        )
     }
   }
 
-  final case class TxContract(ident: TypeId,
-                              fields: Seq[Argument],
-                              funcs: Seq[FuncDef[StatefulContext]])
-      extends ContractWithState {
+  final case class TxContract(
+      ident: TypeId,
+      fields: Seq[Argument],
+      funcs: Seq[FuncDef[StatefulContext]]
+  ) extends ContractWithState {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
       val fieldsTypes = AVector.from(fields.view.map(assign => assign.tpe.toVal))
-      val methods     = AVector.from(funcs.view.map(func    => func.toMethod(state)))
+      val methods     = AVector.from(funcs.view.map(func => func.toMethod(state)))
       StatefulContract(fieldsTypes, methods)
     }
   }

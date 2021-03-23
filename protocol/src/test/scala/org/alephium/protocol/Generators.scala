@@ -44,23 +44,27 @@ trait Generators extends NumericHelpers {
       to   <- Gen.choose(0, config.groups - 1)
     } yield ChainIndex.unsafe(from, to)
 
-  def chainIndexGenRelatedTo(broker: BrokerGroupInfo)(
-      implicit config: GroupConfig): Gen[ChainIndex] =
+  def chainIndexGenRelatedTo(
+      broker: BrokerGroupInfo
+  )(implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(_.relateTo(broker))
 
-  def chainIndexGenForBroker(broker: BrokerGroupInfo)(
-      implicit config: GroupConfig): Gen[ChainIndex] =
+  def chainIndexGenForBroker(
+      broker: BrokerGroupInfo
+  )(implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(index => broker.contains(index.from))
 
-  def chainIndexGenNotRelatedTo(broker: BrokerGroupInfo)(
-      implicit config: GroupConfig): Gen[ChainIndex] =
+  def chainIndexGenNotRelatedTo(
+      broker: BrokerGroupInfo
+  )(implicit config: GroupConfig): Gen[ChainIndex] =
     chainIndexGen.retryUntil(!_.relateTo(broker))
 
   def chainIndexFrom(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[ChainIndex] =
     Gen.choose(0, config.groups - 1).map(ChainIndex.unsafe(groupIndex.value, _))
 
-  def keypairGen(groupIndex: GroupIndex)(
-      implicit config: GroupConfig): Gen[(PrivateKey, PublicKey)] =
+  def keypairGen(
+      groupIndex: GroupIndex
+  )(implicit config: GroupConfig): Gen[(PrivateKey, PublicKey)] =
     Gen.const(()).map(_ => groupIndex.generateKey)
 
   def publicKeyGen(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[PublicKey] =
@@ -84,21 +88,23 @@ trait Generators extends NumericHelpers {
       groupNumPerBroker <- groupNumPerBrokerGen
       peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
       cid               <- cliqueIdGen
-    } yield
-      CliqueInfo.unsafe(cid,
-                        AVector.from(peers.map(Option.apply)),
-                        AVector.from(peers),
-                        groupNumPerBroker)
+    } yield CliqueInfo.unsafe(
+      cid,
+      AVector.from(peers.map(Option.apply)),
+      AVector.from(peers),
+      groupNumPerBroker
+    )
 
   def cliqueInfoGen(groupNumPerBroker: Int)(implicit config: GroupConfig): Gen[CliqueInfo] =
     for {
       peers <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
       cid   <- cliqueIdGen
-    } yield
-      CliqueInfo.unsafe(cid,
-                        AVector.from(peers.map(Option.apply)),
-                        AVector.from(peers),
-                        groupNumPerBroker)
+    } yield CliqueInfo.unsafe(
+      cid,
+      AVector.from(peers.map(Option.apply)),
+      AVector.from(peers),
+      groupNumPerBroker
+    )
 
   def interCliqueInfoGen(implicit config: GroupConfig): Gen[InterCliqueInfo] =
     for {
@@ -126,9 +132,10 @@ trait Generators extends NumericHelpers {
 }
 
 trait DefaultGenerators extends Generators {
-  implicit def config: GroupConfig = new GroupConfig {
-    override def groups: Int = 3
-  }
+  implicit def config: GroupConfig =
+    new GroupConfig {
+      override def groups: Int = 3
+    }
 }
 
 object Generators extends Generators

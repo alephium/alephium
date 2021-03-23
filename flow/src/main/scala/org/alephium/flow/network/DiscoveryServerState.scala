@@ -176,7 +176,9 @@ trait DiscoveryServerState {
 
   def atLeastOnePeerPerGroup(): Boolean = {
     (brokerConfig.groupFrom until brokerConfig.groupUntil).forall { group =>
-      table.values.count(_.info.contains(GroupIndex.unsafe(group))) >= 2 // peers from self clique is counted
+      table.values.count(
+        _.info.contains(GroupIndex.unsafe(group))
+      ) >= 2 // peers from self clique is counted
     }
   }
 
@@ -196,7 +198,8 @@ trait DiscoveryServerState {
         socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
       case None =>
         log.debug(
-          s"Udp socket is not available, might be network issues. Ignoring sending $payload to $remote")
+          s"Udp socket is not available, might be network issues. Ignoring sending $payload to $remote"
+        )
     }
   }
 

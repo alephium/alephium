@@ -82,10 +82,12 @@ trait Server extends Service {
 }
 
 object Server {
-  def apply(rootPath: Path)(implicit config: AlephiumConfig,
-                            apiConfig: ApiConfig,
-                            system: ActorSystem,
-                            executionContext: ExecutionContext): Server = {
+  def apply(rootPath: Path)(implicit
+      config: AlephiumConfig,
+      apiConfig: ApiConfig,
+      system: ActorSystem,
+      executionContext: ExecutionContext
+  ): Server = {
     new Impl(rootPath)
   }
 
@@ -93,11 +95,12 @@ object Server {
     s"db-${config.broker.brokerId}-${config.network.bindAddress.getPort}"
   }
 
-  private final class Impl(rootPath: Path)(implicit val config: AlephiumConfig,
-                                           val apiConfig: ApiConfig,
-                                           val system: ActorSystem,
-                                           val executionContext: ExecutionContext)
-      extends Server {
+  final private class Impl(rootPath: Path)(implicit
+      val config: AlephiumConfig,
+      val apiConfig: ApiConfig,
+      val system: ActorSystem,
+      val executionContext: ExecutionContext
+  ) extends Server {
     val storages: Storages = {
       Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
     }

@@ -27,15 +27,17 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "generate distinct coinbase transactions" in {
     val (_, key) = GroupIndex.unsafe(0).generateKey
     val script   = LockupScript.p2pkh(key)
-    val coinbaseTxs = (0 to 1000).map(
-      _ =>
-        Transaction
-          .coinbase(ChainIndex.unsafe(0, 0),
-                    0,
-                    script,
-                    Hash.generate.bytes,
-                    Target.Max,
-                    TimeStamp.zero))
+    val coinbaseTxs = (0 to 1000).map(_ =>
+      Transaction
+        .coinbase(
+          ChainIndex.unsafe(0, 0),
+          0,
+          script,
+          Hash.generate.bytes,
+          Target.Max,
+          TimeStamp.zero
+        )
+    )
 
     coinbaseTxs.size is coinbaseTxs.distinct.size
   }
@@ -50,21 +52,27 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "avoid hash collision for coinbase txs" in {
     val script = LockupScript.p2pkh(PublicKey.generate)
-    val coinbase0 = Transaction.coinbase(ChainIndex.unsafe(0, 0),
-                                         gasFee = U256.Zero,
-                                         script,
-                                         target  = Target.Max,
-                                         blockTs = TimeStamp.zero)
-    val coinbase1 = Transaction.coinbase(ChainIndex.unsafe(0, 1),
-                                         gasFee = U256.Zero,
-                                         script,
-                                         target  = Target.Max,
-                                         blockTs = TimeStamp.zero)
-    val coinbase2 = Transaction.coinbase(ChainIndex.unsafe(0, 0),
-                                         gasFee = U256.Zero,
-                                         script,
-                                         target  = Target.Max,
-                                         blockTs = TimeStamp.now())
+    val coinbase0 = Transaction.coinbase(
+      ChainIndex.unsafe(0, 0),
+      gasFee = U256.Zero,
+      script,
+      target = Target.Max,
+      blockTs = TimeStamp.zero
+    )
+    val coinbase1 = Transaction.coinbase(
+      ChainIndex.unsafe(0, 1),
+      gasFee = U256.Zero,
+      script,
+      target = Target.Max,
+      blockTs = TimeStamp.zero
+    )
+    val coinbase2 = Transaction.coinbase(
+      ChainIndex.unsafe(0, 0),
+      gasFee = U256.Zero,
+      script,
+      target = Target.Max,
+      blockTs = TimeStamp.now()
+    )
     (coinbase0.id equals coinbase1.id) is false
     (coinbase0.id equals coinbase2.id) is false
   }

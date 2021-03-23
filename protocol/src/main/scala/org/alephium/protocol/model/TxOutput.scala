@@ -41,7 +41,8 @@ object TxOutput {
     {
       case Left(assetOutput)     => assetOutput
       case Right(contractOutput) => contractOutput
-    }, {
+    },
+    {
       case output: AssetOutput    => Left(output)
       case output: ContractOutput => Right(output)
     }
@@ -62,9 +63,11 @@ object TxOutput {
     AssetOutput(amount, lockupScript, lockTime, AVector.empty, ByteString.empty)
   }
 
-  def asset(amount: U256,
-            lockupScript: LockupScript,
-            lockTimeOpt: Option[TimeStamp]): AssetOutput = {
+  def asset(
+      amount: U256,
+      lockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp]
+  ): AssetOutput = {
     val lockTime = lockTimeOpt.getOrElse(TimeStamp.zero)
     asset(amount, lockupScript, lockTime)
   }
@@ -82,19 +85,18 @@ object TxOutput {
     ContractOutput(U256.One, LockupScript.p2pkh(Hash.zero), AVector.empty)
 }
 
-/**
-  *
-  * @param amount the number of ALF in the output
+/** @param amount the number of ALF in the output
   * @param lockupScript guarding script for unspent output
   * @param tokens secondary tokens in the output
   * @param additionalData data payload for additional information
   */
-final case class AssetOutput(amount: U256,
-                             lockupScript: LockupScript, // TODO: exclude p2c script
-                             lockTime: TimeStamp,
-                             tokens: AVector[(TokenId, U256)],
-                             additionalData: ByteString)
-    extends TxOutput {
+final case class AssetOutput(
+    amount: U256,
+    lockupScript: LockupScript, // TODO: exclude p2c script
+    lockTime: TimeStamp,
+    tokens: AVector[(TokenId, U256)],
+    additionalData: ByteString
+) extends TxOutput {
   def isAsset: Boolean = true
 
   def hint: Hint = Hint.from(this)
@@ -106,16 +108,19 @@ final case class AssetOutput(amount: U256,
 }
 
 object AssetOutput {
-  private[model] implicit val tokenSerde: Serde[(TokenId, U256)] = Serde.tuple2[TokenId, U256]
+  implicit private[model] val tokenSerde: Serde[(TokenId, U256)] = Serde.tuple2[TokenId, U256]
   implicit val serde: Serde[AssetOutput] =
-    Serde.forProduct5(AssetOutput.apply,
-                      t => (t.amount, t.lockupScript, t.lockTime, t.tokens, t.additionalData))
+    Serde.forProduct5(
+      AssetOutput.apply,
+      t => (t.amount, t.lockupScript, t.lockTime, t.tokens, t.additionalData)
+    )
 }
 
-final case class ContractOutput(amount: U256,
-                                lockupScript: LockupScript,
-                                tokens: AVector[(TokenId, U256)])
-    extends TxOutput {
+final case class ContractOutput(
+    amount: U256,
+    lockupScript: LockupScript,
+    tokens: AVector[(TokenId, U256)]
+) extends TxOutput {
   def isAsset: Boolean = false
 
   def hint: Hint = Hint.from(this)

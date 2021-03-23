@@ -31,9 +31,11 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("5u", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
-      Hex.asArraySeq(byte32).get)
+      Hex.asArraySeq(byte32).get
+    )
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
-      address.lockupScript)
+      address.lockupScript
+    )
     fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     fastparse.parse("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")

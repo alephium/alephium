@@ -70,15 +70,16 @@ class DiscoveryServerStateSpec
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
         createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
-      socketProbe.expectMsgPF() {
-        case send: Udp.Send =>
-          val message =
-            DiscoveryMessage
-              .deserialize(CliqueId.generate, send.payload, networkConfig.networkType)(peerConfig,
-                                                                                       peerConfig)
-              .toOption
-              .get
-          message.payload is a[T]
+      socketProbe.expectMsgPF() { case send: Udp.Send =>
+        val message =
+          DiscoveryMessage
+            .deserialize(CliqueId.generate, send.payload, networkConfig.networkType)(
+              peerConfig,
+              peerConfig
+            )
+            .toOption
+            .get
+        message.payload is a[T]
       }
     }
 
@@ -192,7 +193,8 @@ class DiscoveryServerStateSpec
 
     val clique0 = cliqueInfoGen.retryUntil(_.brokerNum > 1).sample.get
     state.appendPeer(
-      clique0.interBrokers.get.filter(broker => !state.brokerConfig.intersect(broker)).head)
+      clique0.interBrokers.get.filter(broker => !state.brokerConfig.intersect(broker)).head
+    )
     state.shouldScanFast() is true
     state.atLeastOnePeerPerGroup() is false
 

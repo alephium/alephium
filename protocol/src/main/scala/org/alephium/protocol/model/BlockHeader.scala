@@ -89,20 +89,22 @@ final case class BlockHeader(
 
 object BlockHeader {
   // use fixed width bytes for U256 serialization
-  private implicit val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
+  implicit private val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
 
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
 
-  def genesis(txsHash: Hash, target: Target, nonce: U256)(
-      implicit config: GroupConfig): BlockHeader = {
+  def genesis(txsHash: Hash, target: Target, nonce: U256)(implicit
+      config: GroupConfig
+  ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
     BlockHeader(deps, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 
-  def genesis(chainIndex: ChainIndex, txsHash: Hash)(
-      implicit groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig): BlockHeader = {
+  def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit
+      groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig
+  ): BlockHeader = {
     @tailrec
     def iter(nonce: U256): BlockHeader = {
       val header = BlockHeader.genesis(txsHash, consensusConfig.maxMiningTarget, nonce)
@@ -113,11 +115,13 @@ object BlockHeader {
     iter(U256.Zero)
   }
 
-  def unsafe(deps: AVector[BlockHash],
-             txsHash: Hash,
-             timestamp: TimeStamp,
-             target: Target,
-             nonce: U256)(implicit config: GroupConfig): BlockHeader = {
+  def unsafe(
+      deps: AVector[BlockHash],
+      txsHash: Hash,
+      timestamp: TimeStamp,
+      target: Target,
+      nonce: U256
+  )(implicit config: GroupConfig): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
     BlockHeader(blockDeps, txsHash, timestamp, target, nonce)
   }

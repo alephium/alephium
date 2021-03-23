@@ -33,8 +33,11 @@ trait ConflictedBlocks {
   def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash]
 
   lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(
-    ConflictedBlocks.emptyCache(consensusConfig.blockCacheCapacityPerChain * brokerConfig.groups,
-                                consensusConfig.conflictCacheKeepDuration))
+    ConflictedBlocks.emptyCache(
+      consensusConfig.blockCacheCapacityPerChain * brokerConfig.groups,
+      consensusConfig.conflictCacheKeepDuration
+    )
+  )
 
   def getCache(block: Block): GroupCache =
     caches(block.chainIndex.from.value - brokerConfig.groupFrom)
@@ -51,10 +54,12 @@ trait ConflictedBlocks {
     getCache(hashes.head).isConflicted(hashes, getBlock)
   }
 
-  def filterConflicts(target: GroupIndex,
-                      deps: BlockDeps,
-                      txs: AVector[TransactionTemplate],
-                      getBlock: BlockHash => Block): AVector[TransactionTemplate] = {
+  def filterConflicts(
+      target: GroupIndex,
+      deps: BlockDeps,
+      txs: AVector[TransactionTemplate],
+      getBlock: BlockHash => Block
+  ): AVector[TransactionTemplate] = {
     val diffs = getHashesForUpdatesUnsafe(target, deps)
     getCache(target).filterConflicts(diffs, txs, getBlock)
   }
@@ -66,64 +71,67 @@ object ConflictedBlocks {
       keepDuration: Duration,
       blockCache: mutable.HashMap[BlockHash, Block],
       txCache: mutable.HashMap[TxOutputRef, ArrayBuffer[BlockHash]],
-      conflictedBlocks: mutable.HashMap[BlockHash, ArrayBuffer[BlockHash]]) {
+      conflictedBlocks: mutable.HashMap[BlockHash, ArrayBuffer[BlockHash]]
+  ) {
     def isBlockCached(block: Block): Boolean    = isBlockCached(block.hash)
     def isBlockCached(hash: BlockHash): Boolean = blockCache.contains(hash)
 
     def add(block: Block): Unit = this.synchronized(addUnsafe(block))
 
     // thread unsafe
-    def addUnsafe(block: Block): Unit = if (!isBlockCached(block)) {
-      blockCache.addOne(block.hash -> block)
+    def addUnsafe(block: Block): Unit =
+      if (!isBlockCached(block)) {
+        blockCache.addOne(block.hash -> block)
 
-      val conflicts = mutable.HashSet.empty[BlockHash]
-      block.transactions.foreach { tx =>
-        tx.unsigned.inputs.foreach { input =>
-          txCache.get(input.outputRef) match {
-            case Some(blockHashes) =>
-              if (!blockHashes.contains(block.hash)) {
-                blockHashes.foreach(conflicts.add)
-                blockHashes.addOne(block.hash)
-              }
-            case None =>
-              txCache += input.outputRef -> ArrayBuffer(block.hash)
+        val conflicts = mutable.HashSet.empty[BlockHash]
+        block.transactions.foreach { tx =>
+          tx.unsigned.inputs.foreach { input =>
+            txCache.get(input.outputRef) match {
+              case Some(blockHashes) =>
+                if (!blockHashes.contains(block.hash)) {
+                  blockHashes.foreach(conflicts.add)
+                  blockHashes.addOne(block.hash)
+                }
+              case None =>
+                txCache += input.outputRef -> ArrayBuffer(block.hash)
+            }
+          }
+        }
+
+        if (conflicts.nonEmpty) {
+          conflictedBlocks += block.hash -> ArrayBuffer.from(conflicts)
+          conflicts.foreach[Unit] { hash =>
+            conflictedBlocks.get(hash) match {
+              case Some(conflicts) => conflicts.addOne(block.hash)
+              case None            => conflictedBlocks += hash -> ArrayBuffer(block.hash)
+            }
           }
         }
       }
-
-      if (conflicts.nonEmpty) {
-        conflictedBlocks += block.hash -> ArrayBuffer.from(conflicts)
-        conflicts.foreach[Unit] { hash =>
-          conflictedBlocks.get(hash) match {
-            case Some(conflicts) => conflicts.addOne(block.hash)
-            case None            => conflictedBlocks += hash -> ArrayBuffer(block.hash)
-          }
-        }
-      }
-    }
 
     // thread unsafe
-    def remove(block: Block): Unit = if (isBlockCached(block)) {
-      blockCache.remove(block.hash)
+    def remove(block: Block): Unit =
+      if (isBlockCached(block)) {
+        blockCache.remove(block.hash)
 
-      block.transactions.foreach { tx =>
-        tx.unsigned.inputs.foreach { input =>
-          txCache.get(input.outputRef).foreach { blockHashes =>
-            blockHashes.subtractOne(block.hash)
-            if (blockHashes.isEmpty) txCache.subtractOne(input.outputRef)
+        block.transactions.foreach { tx =>
+          tx.unsigned.inputs.foreach { input =>
+            txCache.get(input.outputRef).foreach { blockHashes =>
+              blockHashes.subtractOne(block.hash)
+              if (blockHashes.isEmpty) txCache.subtractOne(input.outputRef)
+            }
           }
         }
-      }
 
-      conflictedBlocks.get(block.hash).foreach { conflicts =>
-        conflicts.foreach { hash =>
-          val conflicts = conflictedBlocks(hash)
-          conflicts.subtractOne(block.hash)
-          if (conflicts.isEmpty) conflictedBlocks.subtractOne(hash)
+        conflictedBlocks.get(block.hash).foreach { conflicts =>
+          conflicts.foreach { hash =>
+            val conflicts = conflictedBlocks(hash)
+            conflicts.subtractOne(block.hash)
+            if (conflicts.isEmpty) conflictedBlocks.subtractOne(hash)
+          }
+          conflictedBlocks.subtractOne(block.hash)
         }
-        conflictedBlocks.subtractOne(block.hash)
       }
-    }
 
     private def isConflicted(hash: BlockHash, newDeps: AVector[BlockHash]): Boolean = {
       conflictedBlocks.get(hash).exists { conflicts =>
@@ -134,7 +142,8 @@ object ConflictedBlocks {
 
     def isConflicted(tx: TransactionAbstract, diffs: AVector[BlockHash]): Boolean = {
       tx.unsigned.inputs.exists(input =>
-        txCache.get(input.outputRef).exists(_.exists(diffs.contains)))
+        txCache.get(input.outputRef).exists(_.exists(diffs.contains))
+      )
     }
 
     def cacheAll(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Unit = {
@@ -145,18 +154,19 @@ object ConflictedBlocks {
       this.synchronized {
         cacheAll(hashes, getBlock)
 
-        val result = hashes.existsWithIndex {
-          case (hash, index) =>
-            isConflicted(hash, hashes.drop(index + 1))
+        val result = hashes.existsWithIndex { case (hash, index) =>
+          isConflicted(hash, hashes.drop(index + 1))
         }
 
         uncacheOldTips(keepDuration, hashes.head)
         result
       }
 
-    def filterConflicts(diffs: AVector[BlockHash],
-                        txs: AVector[TransactionTemplate],
-                        getBlock: BlockHash => Block): AVector[TransactionTemplate] =
+    def filterConflicts(
+        diffs: AVector[BlockHash],
+        txs: AVector[TransactionTemplate],
+        getBlock: BlockHash => Block
+    ): AVector[TransactionTemplate] =
       this.synchronized {
         cacheAll(diffs, getBlock)
         txs.filterNot(tx => isConflicted(tx, diffs))
@@ -176,9 +186,11 @@ object ConflictedBlocks {
   }
 
   def emptyCache(cacheSizeBoundary: Int, keepDuration: Duration): GroupCache =
-    GroupCache(cacheSizeBoundary,
-               keepDuration,
-               mutable.HashMap.empty,
-               mutable.HashMap.empty,
-               mutable.HashMap.empty)
+    GroupCache(
+      cacheSizeBoundary,
+      keepDuration,
+      mutable.HashMap.empty,
+      mutable.HashMap.empty,
+      mutable.HashMap.empty
+    )
 }

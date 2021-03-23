@@ -58,18 +58,22 @@ trait BlockChainWithState extends BlockChain {
 }
 
 object BlockChainWithState {
-  def fromGenesisUnsafe(storages: Storages)(genesisBlock: Block,
-                                            updateState: BlockFlow.WorldStateUpdater)(
-      implicit brokerConfig: BrokerConfig,
-      consensusSetting: ConsensusSetting): BlockChainWithState = {
+  def fromGenesisUnsafe(
+      storages: Storages
+  )(genesisBlock: Block, updateState: BlockFlow.WorldStateUpdater)(implicit
+      brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting
+  ): BlockChainWithState = {
     val initialize = initializeGenesis(genesisBlock, storages.emptyWorldState)(_)
     createUnsafe(genesisBlock, storages, updateState, initialize)
   }
 
-  def fromStorageUnsafe(storages: Storages)(genesisBlock: Block,
-                                            updateState: BlockFlow.WorldStateUpdater)(
-      implicit brokerConfig: BrokerConfig,
-      consensusSetting: ConsensusSetting): BlockChainWithState = {
+  def fromStorageUnsafe(
+      storages: Storages
+  )(genesisBlock: Block, updateState: BlockFlow.WorldStateUpdater)(implicit
+      brokerConfig: BrokerConfig,
+      consensusSetting: ConsensusSetting
+  ): BlockChainWithState = {
     createUnsafe(genesisBlock, storages, updateState, initializeFromStorage)
   }
 
@@ -78,8 +82,10 @@ object BlockChainWithState {
       storages: Storages,
       _updateState: BlockFlow.WorldStateUpdater,
       initialize: BlockChainWithState => IOResult[Unit]
-  )(implicit _brokerConfig: BrokerConfig,
-    _consensusSetting: ConsensusSetting): BlockChainWithState = {
+  )(implicit
+      _brokerConfig: BrokerConfig,
+      _consensusSetting: ConsensusSetting
+  ): BlockChainWithState = {
     val blockchain = new BlockChainWithState {
       override val brokerConfig      = _brokerConfig
       override val consensusConfig   = _consensusSetting
@@ -103,7 +109,8 @@ object BlockChainWithState {
   }
 
   def initializeGenesis(genesisBlock: Block, emptyWorldState: WorldState.Persisted)(
-      chain: BlockChainWithState): IOResult[Unit] = {
+      chain: BlockChainWithState
+  ): IOResult[Unit] = {
     val initialWorldState = emptyWorldState.cached()
     for {
       _             <- chain.addGenesis(genesisBlock)

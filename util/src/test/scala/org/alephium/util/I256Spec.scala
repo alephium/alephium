@@ -21,9 +21,11 @@ import java.math.BigInteger
 class I256Spec extends AlephiumSpec {
   val numGen = (0L to 3L).flatMap { i =>
     val n = BigInteger.valueOf(i)
-    List(n.subtract(BigInteger.ONE),
-         I256.MinValue.toBigInt.add(n),
-         I256.MaxValue.toBigInt.subtract(n))
+    List(
+      n.subtract(BigInteger.ONE),
+      I256.MinValue.toBigInt.add(n),
+      I256.MaxValue.toBigInt.subtract(n)
+    )
   }
 
   it should "be bounded properly" in {
@@ -50,11 +52,11 @@ class I256Spec extends AlephiumSpec {
   }
 
   def test(
-      op: (I256, I256)                     => Option[I256],
-      opUnsafe: (I256, I256)               => I256,
+      op: (I256, I256) => Option[I256],
+      opUnsafe: (I256, I256) => I256,
       opExpected: (BigInteger, BigInteger) => BigInteger,
-      condition: (BigInteger, BigInteger)  => Boolean = _ >= I256.lowerBound && _ >= I256.lowerBound)
-    : Unit = {
+      condition: (BigInteger, BigInteger) => Boolean = _ >= I256.lowerBound && _ >= I256.lowerBound
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen
@@ -85,19 +87,23 @@ class I256Spec extends AlephiumSpec {
   }
 
   it should "test div" in {
-    test(_.div(_),
-         _.divUnsafe(_),
-         _.divide(_),
-         (a, b) =>
-           b != BigInteger.ZERO && !(a.equals(I256.lowerBound) && b.equals(I256.NegOne.toBigInt)))
+    test(
+      _.div(_),
+      _.divUnsafe(_),
+      _.divide(_),
+      (a, b) =>
+        b != BigInteger.ZERO && !(a.equals(I256.lowerBound) && b.equals(I256.NegOne.toBigInt))
+    )
   }
 
   it should "test mod" in {
-    test(_.mod(_),
-         _.modUnsafe(_),
-         _.remainder(_),
-         (a, b) =>
-           b != BigInteger.ZERO && !(a.equals(I256.lowerBound) && b.equals(I256.NegOne.toBigInt)))
+    test(
+      _.mod(_),
+      _.modUnsafe(_),
+      _.remainder(_),
+      (a, b) =>
+        b != BigInteger.ZERO && !(a.equals(I256.lowerBound) && b.equals(I256.NegOne.toBigInt))
+    )
   }
 
   it should "compare I256" in {
@@ -119,8 +125,6 @@ class I256Spec extends AlephiumSpec {
   }
 
   it should "construct from Long" in {
-    forAll { x: Long =>
-      I256.from(x).toBigInt is BigInteger.valueOf(x)
-    }
+    forAll { x: Long => I256.from(x).toBigInt is BigInteger.valueOf(x) }
   }
 }

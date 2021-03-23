@@ -37,9 +37,9 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       SparseMerkleTrie.getHighNibble(input) is high
     }
     test(0x00.toByte, 0x00.toByte, 0x00.toByte)
-    test(0x0F.toByte, 0x00.toByte, 0x0F.toByte)
-    test(0xF0.toByte, 0x0F.toByte, 0x00.toByte)
-    test(0xFF.toByte, 0x0F.toByte, 0x0F.toByte)
+    test(0x0f.toByte, 0x00.toByte, 0x0f.toByte)
+    test(0xf0.toByte, 0x0f.toByte, 0x00.toByte)
+    test(0xff.toByte, 0x0f.toByte, 0x0f.toByte)
   }
 
   it should "convert" in {
@@ -94,9 +94,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   }
 
   it should "serde correctly" in new NodeFixture {
-    forAll(nodeGen) { node =>
-      deserialize[Node](serialize[Node](node)) isE node
-    }
+    forAll(nodeGen) { node => deserialize[Node](serialize[Node](node)) isE node }
   }
 
   behavior of "Merkle Patricia Trie"
@@ -119,10 +117,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
   }
 
-  def withTrieFixture[T](f: TrieFixture => T): TrieFixture = new TrieFixture {
-    f(this)
-    postTest()
-  }
+  def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
+    new TrieFixture {
+      f(this)
+      postTest()
+    }
 
   it should "be able to create a trie" in withTrieFixture { fixture =>
     fixture.trie.rootHash is genesisNode.hash
@@ -152,9 +151,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
         true is false
     }
 
-    keys.foreach { key =>
-      trie.getOptRaw(key).map(_.nonEmpty) isE true
-    }
+    keys.foreach { key => trie.getOptRaw(key).map(_.nonEmpty) isE true }
 
     val allStored    = trie.getAllRaw(ByteString.empty).toOption.get
     val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())

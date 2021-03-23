@@ -38,8 +38,9 @@ object Utils {
     elems.map(showDataDigest).mkString(", ")
   }
 
-  def unsafe[T](e: IOResult[T]): T = e match {
-    case Right(t) => t
-    case Left(e)  => throw e
-  }
+  def unsafe[T](e: IOResult[T]): T =
+    e match {
+      case Right(t) => t
+      case Left(e)  => throw e
+    }
 }

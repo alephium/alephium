@@ -31,12 +31,12 @@ import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object CliqueManager {
-  def props(blockflow: BlockFlow,
-            allHandlers: AllHandlers,
-            discoveryServer: ActorRefT[DiscoveryServer.Command],
-            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-      implicit brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting): Props =
+  def props(
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers,
+      discoveryServer: ActorRefT[DiscoveryServer.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(new CliqueManager(blockflow, allHandlers, discoveryServer, blockFlowSynchronizer))
 
   trait Command
@@ -49,11 +49,12 @@ object CliqueManager {
       isRecent: Boolean
   ) extends Command
       with EventStream.Event
-  final case class BroadCastTx(tx: TransactionTemplate,
-                               txMsg: ByteString,
-                               chainIndex: ChainIndex,
-                               origin: DataOrigin)
-      extends Command
+  final case class BroadCastTx(
+      tx: TransactionTemplate,
+      txMsg: ByteString,
+      chainIndex: ChainIndex,
+      origin: DataOrigin
+  ) extends Command
       with EventStream.Event
   final case class HandShaked(brokerInfo: BrokerInfo, connectionType: ConnectionType)
       extends Command
@@ -61,12 +62,12 @@ object CliqueManager {
   final case object IsSelfCliqueReady             extends Command
 }
 
-class CliqueManager(blockflow: BlockFlow,
-                    allHandlers: AllHandlers,
-                    discoveryServer: ActorRefT[DiscoveryServer.Command],
-                    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-    implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting)
+class CliqueManager(
+    blockflow: BlockFlow,
+    allHandlers: AllHandlers,
+    discoveryServer: ActorRefT[DiscoveryServer.Command],
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+)(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
     with Stash
     with EventStream.Subscriber {
@@ -80,15 +81,15 @@ class CliqueManager(blockflow: BlockFlow,
     case Start(cliqueInfo) =>
       log.debug("Start intra and inter clique managers")
       val intraCliqueManager =
-        context.actorOf(IntraCliqueManager.props(cliqueInfo,
-                                                 blockflow,
-                                                 allHandlers,
-                                                 ActorRefT(self),
-                                                 blockFlowSynchronizer),
-                        "IntraCliqueManager")
+        context.actorOf(
+          IntraCliqueManager
+            .props(cliqueInfo, blockflow, allHandlers, ActorRefT(self), blockFlowSynchronizer),
+          "IntraCliqueManager"
+        )
       unstashAll()
       context.become(
-        isSelfCliqueSynced orElse awaitIntraCliqueReady(intraCliqueManager, cliqueInfo))
+        isSelfCliqueSynced orElse awaitIntraCliqueReady(intraCliqueManager, cliqueInfo)
+      )
 
     case _ => stash()
   }
@@ -96,11 +97,13 @@ class CliqueManager(blockflow: BlockFlow,
   def awaitIntraCliqueReady(intraCliqueManager: ActorRef, cliqueInfo: CliqueInfo): Receive = {
     case IntraCliqueManager.Ready =>
       log.debug(s"Intra clique manager is ready")
-      val props = InterCliqueManager.props(cliqueInfo,
-                                           blockflow,
-                                           allHandlers,
-                                           discoveryServer,
-                                           blockFlowSynchronizer)
+      val props = InterCliqueManager.props(
+        cliqueInfo,
+        blockflow,
+        allHandlers,
+        discoveryServer,
+        blockFlowSynchronizer
+      )
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
       subscribeEvent(self, classOf[BroadCastTx])
@@ -130,7 +133,7 @@ class CliqueManager(blockflow: BlockFlow,
       interCliqueManager.forward(c)
   }
 
-  def isSelfCliqueSynced: Receive = {
-    case IsSelfCliqueReady => sender() ! selfCliqueReady
+  def isSelfCliqueSynced: Receive = { case IsSelfCliqueReady =>
+    sender() ! selfCliqueReady
   }
 }

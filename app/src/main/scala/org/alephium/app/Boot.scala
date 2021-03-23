@@ -78,10 +78,13 @@ class BootUp extends StrictLogging {
   }
 
   def stop(): Unit =
-    Await.result(for {
-      _ <- server.stop()
-      _ <- system.terminate()
-    } yield (), FlowMonitor.shutdownTimeout.asScala)
+    Await.result(
+      for {
+        _ <- server.stop()
+        _ <- system.terminate()
+      } yield (),
+      FlowMonitor.shutdownTimeout.asScala
+    )
 
   def logConfig(): Unit = {
     val renderOptions =

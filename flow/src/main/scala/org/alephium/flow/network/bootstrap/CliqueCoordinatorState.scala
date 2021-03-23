@@ -34,10 +34,12 @@ trait CliqueCoordinatorState {
 
   def addBrokerInfo(info: PeerInfo, sender: ActorRef): Boolean = {
     val id = info.id
-    if (id != brokerConfig.brokerId &&
-        info.groupNumPerBroker == brokerConfig.groupNumPerBroker &&
-        brokerInfos(id).isEmpty) {
-      brokerInfos(id)      = Some(info)
+    if (
+      id != brokerConfig.brokerId &&
+      info.groupNumPerBroker == brokerConfig.groupNumPerBroker &&
+      brokerInfos(id).isEmpty
+    ) {
+      brokerInfos(id) = Some(info)
       brokerConnectors(id) = Some(sender)
       true
     } else {
@@ -46,15 +48,15 @@ trait CliqueCoordinatorState {
   }
 
   def isBrokerInfoFull: Boolean = {
-    brokerInfos.zipWithIndex.forall {
-      case (opt, idx) => opt.nonEmpty || idx == brokerConfig.brokerId
+    brokerInfos.zipWithIndex.forall { case (opt, idx) =>
+      opt.nonEmpty || idx == brokerConfig.brokerId
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def broadcast[T](message: T): Unit = {
-    brokerConnectors.zipWithIndex.foreach {
-      case (opt, idx) => if (idx != brokerConfig.brokerId) opt.get ! message
+    brokerConnectors.zipWithIndex.foreach { case (opt, idx) =>
+      if (idx != brokerConfig.brokerId) opt.get ! message
     }
   }
 
@@ -64,9 +66,11 @@ trait CliqueCoordinatorState {
       if (i == brokerConfig.brokerId) PeerInfo.self else brokerInfos(i).get
     }
     assume(infos.length * brokerConfig.groupNumPerBroker == brokerConfig.groups)
-    IntraCliqueInfo.unsafe(CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes),
-                           infos,
-                           brokerConfig.groupNumPerBroker)
+    IntraCliqueInfo.unsafe(
+      CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes),
+      infos,
+      brokerConfig.groupNumPerBroker
+    )
   }
 
   val readys: Array[Boolean] = {

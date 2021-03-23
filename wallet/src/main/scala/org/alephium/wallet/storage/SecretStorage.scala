@@ -42,7 +42,7 @@ trait SecretStorage {
   def isMiner(): Either[SecretStorage.Error, Boolean]
   def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def getAllPrivateKeys()
-    : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
+      : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
   def deriveNextKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit]
 }
@@ -62,32 +62,39 @@ object SecretStorage {
 
   final case class SecretFileNotFound(file: File) extends Error
 
-  final case class StoredState(seed: ByteString,
-                               isMiner: Boolean,
-                               numberOfAddresses: Int,
-                               activeAddressIndex: Int)
+  final case class StoredState(
+      seed: ByteString,
+      isMiner: Boolean,
+      numberOfAddresses: Int,
+      activeAddressIndex: Int
+  )
 
   object StoredState {
     implicit val serde: Serde[StoredState] =
       Serde.forProduct4(
         apply,
-        state => (state.seed, state.isMiner, state.numberOfAddresses, state.activeAddressIndex))
+        state => (state.seed, state.isMiner, state.numberOfAddresses, state.activeAddressIndex)
+      )
   }
 
-  private final case class State(seed: ByteString,
-                                 password: String,
-                                 isMiner: Boolean,
-                                 activeKey: ExtendedPrivateKey,
-                                 privateKeys: AVector[ExtendedPrivateKey])
+  final private case class State(
+      seed: ByteString,
+      password: String,
+      isMiner: Boolean,
+      activeKey: ExtendedPrivateKey,
+      privateKeys: AVector[ExtendedPrivateKey]
+  )
 
-  private final case class SecretFile(encrypted: ByteString,
-                                      salt: ByteString,
-                                      iv: ByteString,
-                                      version: Int) {
+  final private case class SecretFile(
+      encrypted: ByteString,
+      salt: ByteString,
+      iv: ByteString,
+      version: Int
+  ) {
     def toAESEncrytped: AES.Encrypted = AES.Encrypted(encrypted, salt, iv)
   }
 
-  private implicit val codec: Codec[SecretFile] = deriveCodec[SecretFile]
+  implicit private val codec: Codec[SecretFile] = deriveCodec[SecretFile]
 
   def load(file: File, path: AVector[Int]): Either[Error, SecretStorage] = {
     Using(Source.fromFile(file)("UTF-8")) { source =>
@@ -103,11 +110,13 @@ object SecretStorage {
     }.flatten
   }
 
-  def create(seed: ByteString,
-             password: String,
-             isMiner: Boolean,
-             file: File,
-             path: AVector[Int]): Either[Error, SecretStorage] = {
+  def create(
+      seed: ByteString,
+      password: String,
+      isMiner: Boolean,
+      file: File,
+      path: AVector[Int]
+  ): Either[Error, SecretStorage] = {
     if (file.exists) {
       Left(SecretFileAlreadyExists)
     } else {
@@ -115,7 +124,8 @@ object SecretStorage {
         _ <- storeStateToFile(
           file,
           StoredState(seed, isMiner, numberOfAddresses = 1, activeAddressIndex = 0),
-          password)
+          password
+        )
         state <- stateFromFile(file, password, path)
       } yield {
         new Impl(file, Some(state), path)
@@ -123,9 +133,11 @@ object SecretStorage {
     }
   }
 
-  private[storage] def fromFile(file: File,
-                                password: String,
-                                path: AVector[Int]): Either[Error, SecretStorage] = {
+  private[storage] def fromFile(
+      file: File,
+      password: String,
+      path: AVector[Int]
+  ): Either[Error, SecretStorage] = {
     for {
       state <- stateFromFile(file, password, path)
     } yield {
@@ -184,9 +196,11 @@ object SecretStorage {
         latestKey     <- state.privateKeys.lastOption.toRight(InvalidState)
         newPrivateKey <- deriveNextPrivateKey(state.seed, latestKey)
         keys = state.privateKeys :+ newPrivateKey
-        _ <- storeStateToFile(file,
-                              StoredState(state.seed, state.isMiner, keys.length, keys.length - 1),
-                              state.password)
+        _ <- storeStateToFile(
+          file,
+          StoredState(state.seed, state.isMiner, keys.length, keys.length - 1),
+          state.password
+        )
       } yield {
         maybeState = Some(state.copy(activeKey = newPrivateKey, privateKeys = keys))
         newPrivateKey
@@ -201,7 +215,8 @@ object SecretStorage {
         _ <- storeStateToFile(
           file,
           StoredState(state.seed, state.isMiner, state.privateKeys.length, index),
-          state.password)
+          state.password
+        )
       } yield {
         maybeState = Some(state.copy(activeKey = key))
         ()
@@ -210,7 +225,8 @@ object SecretStorage {
 
     private def deriveNextPrivateKey(
         seed: ByteString,
-        privateKey: ExtendedPrivateKey): Either[Error, ExtendedPrivateKey] =
+        privateKey: ExtendedPrivateKey
+    ): Either[Error, ExtendedPrivateKey] =
       (for {
         index  <- privateKey.path.lastOption.map(_ + 1)
         parent <- BIP32.btcMasterKey(seed).derive(path.init)
@@ -220,9 +236,11 @@ object SecretStorage {
     private def getState: Either[Error, State] = maybeState.toRight(Locked)
   }
 
-  private def stateFromFile(file: File,
-                            password: String,
-                            path: AVector[Int]): Either[Error, State] = {
+  private def stateFromFile(
+      file: File,
+      password: String,
+      path: AVector[Int]
+  ): Either[Error, State] = {
     Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
@@ -241,9 +259,11 @@ object SecretStorage {
     }.toEither.left.map(_ => SecretFileError).flatten
   }
 
-  private def deriveKeys(seed: ByteString,
-                         number: Int,
-                         path: AVector[Int]): Either[Error, AVector[ExtendedPrivateKey]] = {
+  private def deriveKeys(
+      seed: ByteString,
+      number: Int,
+      path: AVector[Int]
+  ): Either[Error, AVector[ExtendedPrivateKey]] = {
     if (number <= 0) {
       Right(AVector.empty)
     } else {
@@ -259,9 +279,11 @@ object SecretStorage {
     }
   }
 
-  private def storeStateToFile(file: File,
-                               storedState: StoredState,
-                               password: String): Either[Error, Unit] = {
+  private def storeStateToFile(
+      file: File,
+      storedState: StoredState,
+      password: String
+  ): Either[Error, Unit] = {
     Using
       .Manager { use =>
         val outWriter = use(new PrintWriter(file))

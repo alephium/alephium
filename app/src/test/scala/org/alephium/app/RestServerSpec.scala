@@ -136,11 +136,15 @@ class RestServerSpec
   }
 
   it should "call GET /transactions/build" in new RestServerFixture {
-    Get(s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1") ~> server.route ~> check {
+    Get(
+      s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1"
+    ) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[BuildTransactionResult] is dummyBuildTransactionResult
     }
-    Get(s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&lockTime=1234&value=1") ~> server.route ~> check {
+    Get(
+      s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&lockTime=1234&value=1"
+    ) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[BuildTransactionResult] isnot dummyBuildTransactionResult
     }
@@ -148,7 +152,9 @@ class RestServerSpec
 
   it should "call POST /transactions/send" in new RestServerFixture {
     val tx =
-      s"""{"unsignedTx":"${Hex.toHexString(serialize(dummyTx.unsigned))}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
+      s"""{"unsignedTx":"${Hex.toHexString(
+        serialize(dummyTx.unsigned)
+      )}","signature":"${dummySignature.toHexString}","publicKey":"$dummyKey"}"""
     val entity = HttpEntity(ContentTypes.`application/json`, tx)
     Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.OK
@@ -157,7 +163,9 @@ class RestServerSpec
   }
 
   it should "call GET /transactions/status" in new RestServerFixture {
-    Get(s"/transactions/status?txId=${Hash.zero.toHexString}&fromGroup=0&toGroup=1") ~> server.route ~> check {
+    Get(
+      s"/transactions/status?txId=${Hash.zero.toHexString}&fromGroup=0&toGroup=1"
+    ) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[TxStatus] is dummyTxStatus
     }
@@ -198,7 +206,8 @@ class RestServerSpec
 
   it should "call PUT /miners/addresses" in new RestServerFixture {
     val newAddresses = AVector.tabulate(config.broker.groups)(i =>
-      addressStringGen(GroupIndex.unsafe(i)).sample.get._1)
+      addressStringGen(GroupIndex.unsafe(i)).sample.get._1
+    )
     val body   = s"""{"addresses":${newAddresses.asJson}}"""
     val entity = HttpEntity(ContentTypes.`application/json`, body)
 
@@ -216,7 +225,8 @@ class RestServerSpec
       responseAs[ApiModel.Error] is ApiModel.Error(
         -32000,
         "Server error",
-        Some(s"Wrong number of addresses, expected ${config.broker.groups}, got 1"))
+        Some(s"Wrong number of addresses, expected ${config.broker.groups}, got 1")
+      )
     }
 
     val wrongGroup       = AVector.tabulate(config.broker.groups)(_ => dummyKeyAddress)
@@ -227,7 +237,8 @@ class RestServerSpec
       responseAs[ApiModel.Error] is ApiModel.Error(
         -32000,
         "Server error",
-        Some(s"Address ${dummyKeyAddress} doesn't belong to group 1"))
+        Some(s"Address ${dummyKeyAddress} doesn't belong to group 1")
+      )
     }
   }
 
@@ -271,19 +282,22 @@ class RestServerSpec
     lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
 
     lazy val blockFlowProbe = TestProbe()
-    lazy val node = new NodeDummy(dummyIntraCliqueInfo,
-                                  dummyNeighborPeers,
-                                  dummyBlock,
-                                  blockFlowProbe.ref,
-                                  dummyTx,
-                                  storages)
+    lazy val node = new NodeDummy(
+      dummyIntraCliqueInfo,
+      dummyNeighborPeers,
+      dummyBlock,
+      blockFlowProbe.ref,
+      dummyTx,
+      storages
+    )
     lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
     val walletConfig: WalletConfig = WalletConfig(
       0,
       (new java.io.File("")).toPath,
       NetworkType.Devnet,
       Duration.ofMinutesUnsafe(0),
-      WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0)))
+      WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0))
+    )
 
     lazy val walletApp = new WalletApp(walletConfig)
     lazy val server: RestServer =

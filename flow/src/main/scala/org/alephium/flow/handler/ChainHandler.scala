@@ -28,10 +28,11 @@ object ChainHandler {
   trait Event
 }
 
-abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](blockFlow: BlockFlow,
-                                                                        val chainIndex: ChainIndex,
-                                                                        validator: Validation[T, S])
-    extends IOBaseActor {
+abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](
+    blockFlow: BlockFlow,
+    val chainIndex: ChainIndex,
+    validator: Validation[T, S]
+) extends IOBaseActor {
   import ChainHandler.Event
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
@@ -44,16 +45,20 @@ abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](blockFlo
     }
   }
 
-  def handleIOError(hash: BlockHash,
-                    broker: ActorRefT[ChainHandler.Event],
-                    error: IOError): Unit = {
+  def handleIOError(
+      hash: BlockHash,
+      broker: ActorRefT[ChainHandler.Event],
+      error: IOError
+  ): Unit = {
     log.error(s"IO failed in block/header ${hash.shortHex} validation: ${error.toString}")
     broker ! dataAddingFailed()
   }
 
-  def handleInvalidData(data: T,
-                        broker: ActorRefT[ChainHandler.Event],
-                        status: InvalidStatus): Unit = {
+  def handleInvalidData(
+      data: T,
+      broker: ActorRefT[ChainHandler.Event],
+      status: InvalidStatus
+  ): Unit = {
     log.warning(s"Invalid block/blockheader ${data.shortHex}: $status")
     sender() ! DependencyHandler.Invalid(data.hash)
     broker ! dataInvalid(data)

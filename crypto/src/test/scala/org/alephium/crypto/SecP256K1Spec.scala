@@ -30,7 +30,8 @@ class SecP256K1Spec extends AlephiumSpec {
     val (r, s) = signature.bytes.splitAt(32)
     val ss     = SecP256K1.params.getN.subtract(new BigInteger(1, s.toArray))
     SecP256K1Signature.unsafe(
-      r ++ (ByteString.fromArrayUnsafe(ss.toByteArray).dropWhile(_ equals 0.toByte)))
+      r ++ (ByteString.fromArrayUnsafe(ss.toByteArray).dropWhile(_ equals 0.toByte))
+    )
   }
 
   it should "derive public key" in {
@@ -102,19 +103,20 @@ class SecP256K1Spec extends AlephiumSpec {
         "Alan Turing",
         hex"304402207063ae83e7f62bbb171798131b4a0564b956930092b33b07b395615d9ec7e15c022058dfcc1e00a35e1572f366ffe34ba0fc47db1e7189759b9fb233c5b05ab388ea"
       ),
-      (hex"e91671c46231f833a6406ccbea0e3e392c76c167bac1cb013f6f1013980455c2",
-       "There is a computer disease that anybody who works with computers knows about. It's a very serious disease and it interferes completely with the work. The trouble with computers is that you 'play' with them!",
-       hex"3045022100b552edd27580141f3b2a5463048cb7cd3e047b97c9f98076c32dbdf85a68718b0220279fa72dd19bfae05577e06c7c0c1900c371fcd5893f7e1d56a37d30174671f6")
+      (
+        hex"e91671c46231f833a6406ccbea0e3e392c76c167bac1cb013f6f1013980455c2",
+        "There is a computer disease that anybody who works with computers knows about. It's a very serious disease and it interferes completely with the work. The trouble with computers is that you 'play' with them!",
+        hex"3045022100b552edd27580141f3b2a5463048cb7cd3e047b97c9f98076c32dbdf85a68718b0220279fa72dd19bfae05577e06c7c0c1900c371fcd5893f7e1d56a37d30174671f6"
+      )
     )
 
-    cases.foreach {
-      case (rawPrivateKey, rawMessage, derSignature) =>
-        val privateKey = SecP256K1PrivateKey.unsafe(rawPrivateKey)
-        val message    = Sha256.hash(rawMessage).bytes
-        val signature  = der2Compact(derSignature)
+    cases.foreach { case (rawPrivateKey, rawMessage, derSignature) =>
+      val privateKey = SecP256K1PrivateKey.unsafe(rawPrivateKey)
+      val message    = Sha256.hash(rawMessage).bytes
+      val signature  = der2Compact(derSignature)
 
-        SecP256K1.sign(message, privateKey) is signature
-        SecP256K1.verify(message, signature, privateKey.publicKey) is true
+      SecP256K1.sign(message, privateKey) is signature
+      SecP256K1.verify(message, signature, privateKey.publicKey) is true
     }
   }
 }

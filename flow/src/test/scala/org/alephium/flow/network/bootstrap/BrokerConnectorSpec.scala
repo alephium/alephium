@@ -34,17 +34,20 @@ class BrokerConnectorSpec
     val cliqueCoordinator = TestProbe()
     val brokerConnector =
       TestActorRef[BrokerConnector](
-        BrokerConnector.props(socketAddressGen.sample.get, connection.ref, cliqueCoordinator.ref))
+        BrokerConnector.props(socketAddressGen.sample.get, connection.ref, cliqueCoordinator.ref)
+      )
 
     val randomId      = Random.source.nextInt(brokerConfig.brokerNum)
     val randomAddress = socketAddressGen.sample.get
     val randomInfo =
-      PeerInfo.unsafe(randomId,
-                      brokerConfig.groupNumPerBroker,
-                      Some(randomAddress),
-                      randomAddress,
-                      Random.source.nextInt,
-                      Random.source.nextInt)
+      PeerInfo.unsafe(
+        randomId,
+        brokerConfig.groupNumPerBroker,
+        Some(randomAddress),
+        randomAddress,
+        Random.source.nextInt,
+        Random.source.nextInt
+      )
 
     connection.expectMsgType[Tcp.Register]
     watch(brokerConnector)
@@ -55,16 +58,14 @@ class BrokerConnectorSpec
     val randomCliqueInfo = genIntraCliqueInfo
     brokerConnector ! BrokerConnector.Send(randomCliqueInfo)
     connection.expectMsg(Tcp.ResumeReading)
-    connection.expectMsgPF() {
-      case Tcp.Write(data, _) =>
-        Message.deserialize(data) isE Staging(Message.Clique(randomCliqueInfo), ByteString.empty)
+    connection.expectMsgPF() { case Tcp.Write(data, _) =>
+      Message.deserialize(data) isE Staging(Message.Clique(randomCliqueInfo), ByteString.empty)
     }
 
     brokerConnector ! BrokerConnector.Received(Message.Ack(randomId))
     brokerConnector ! CliqueCoordinator.Ready
-    connection.expectMsgPF() {
-      case Tcp.Write(data, _) =>
-        Message.deserialize(data) isE Staging(Message.Ready, ByteString.empty)
+    connection.expectMsgPF() { case Tcp.Write(data, _) =>
+      Message.deserialize(data) isE Staging(Message.Ready, ByteString.empty)
     }
 
     system.stop(brokerConnector.underlyingActor.connectionHandler.ref)

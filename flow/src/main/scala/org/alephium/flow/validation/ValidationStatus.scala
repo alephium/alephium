@@ -66,7 +66,8 @@ object ValidationStatus {
   private[validation] def validTx[T](t: T): TxValidationResult[T]         = Right(t)
 
   private[validation] def from[Invalid, T](
-      result: IOResult[T]): Either[Either[IOError, Invalid], T] = {
+      result: IOResult[T]
+  ): Either[Either[IOError, Invalid], T] = {
     result match {
       case Right(t)    => Right(t)
       case Left(error) => Left(Left(error))

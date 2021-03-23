@@ -47,7 +47,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
       AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref), "")
 
     val miner = system.actorOf(
-      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers))
+      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
+    )
 
     miner ! Miner.Start
     flowHandler.expectMsgType[FlowHandler.SetHandler]
@@ -70,7 +71,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val (allHandlers, _) = TestUtils.createBlockHandlersProbe
     val miner = system.actorOf(
-      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers))
+      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
+    )
 
     miner ! Miner.MiningResult(None, ChainIndex.unsafe(0, 0), 0)
   }
@@ -80,7 +82,8 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
     val (allHandlers, _) = TestUtils.createBlockHandlersProbe
     val miner = system.actorOf(
-      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers))
+      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
+    )
 
     miner
       .ask(Miner.GetAddresses)

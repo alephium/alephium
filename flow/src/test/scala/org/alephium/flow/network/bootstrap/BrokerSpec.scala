@@ -37,25 +37,24 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     val broker = system.actorOf(
       Broker.props(ActorRefT[Bootstrapper.Command](bootstrapper.ref))(
         brokerConfig,
-        networkSetting.copy(coordinatorAddress = coordinatorAddress)))
+        networkSetting.copy(coordinatorAddress = coordinatorAddress)
+      )
+    )
     watch(broker)
 
-    connection.expectMsgPF() {
-      case Tcp.Connected(_, expectedMasterAddress) =>
-        expectedMasterAddress is coordinatorAddress
+    connection.expectMsgPF() { case Tcp.Connected(_, expectedMasterAddress) =>
+      expectedMasterAddress is coordinatorAddress
     }
     connection.reply(Tcp.Register(connection.ref))
 
-    connection.expectMsgPF() {
-      case Tcp.Received(data) =>
-        Message.deserialize(data) isE Staging(Message.Peer(PeerInfo.self), ByteString.empty)
+    connection.expectMsgPF() { case Tcp.Received(data) =>
+      Message.deserialize(data) isE Staging(Message.Peer(PeerInfo.self), ByteString.empty)
     }
 
     val randomInfo = genIntraCliqueInfo
     broker.tell(Broker.Received(Message.Clique(randomInfo)), connection.ref)
-    connection.expectMsgPF() {
-      case Tcp.Received(data) =>
-        Message.deserialize(data) isE Staging(Message.Ack(brokerConfig.brokerId), ByteString.empty)
+    connection.expectMsgPF() { case Tcp.Received(data) =>
+      Message.deserialize(data) isE Staging(Message.Ack(brokerConfig.brokerId), ByteString.empty)
     }
 
     broker.tell(Broker.Received(Message.Ready), connection.ref)

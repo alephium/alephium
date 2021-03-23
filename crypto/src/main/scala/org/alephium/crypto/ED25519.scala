@@ -31,10 +31,13 @@ class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey {
 }
 
 object ED25519PrivateKey
-    extends RandomBytes.Companion[ED25519PrivateKey](bs => {
-      assume(bs.size == bcEd25519.SECRET_KEY_SIZE)
-      new ED25519PrivateKey(bs)
-    }, _.bytes) {
+    extends RandomBytes.Companion[ED25519PrivateKey](
+      bs => {
+        assume(bs.size == bcEd25519.SECRET_KEY_SIZE)
+        new ED25519PrivateKey(bs)
+      },
+      _.bytes
+    ) {
   override def length: Int = bcEd25519.SECRET_KEY_SIZE
 }
 
@@ -43,20 +46,26 @@ class ED25519PublicKey(val bytes: ByteString) extends PublicKey {
 }
 
 object ED25519PublicKey
-    extends RandomBytes.Companion[ED25519PublicKey](bs => {
-      assume(bs.size == bcEd25519.PUBLIC_KEY_SIZE)
-      new ED25519PublicKey(bs)
-    }, _.bytes) {
+    extends RandomBytes.Companion[ED25519PublicKey](
+      bs => {
+        assume(bs.size == bcEd25519.PUBLIC_KEY_SIZE)
+        new ED25519PublicKey(bs)
+      },
+      _.bytes
+    ) {
   override def length: Int = bcEd25519.PUBLIC_KEY_SIZE
 }
 
 class ED25519Signature(val bytes: ByteString) extends Signature
 
 object ED25519Signature
-    extends RandomBytes.Companion[ED25519Signature](bs => {
-      assume(bs.size == bcEd25519.SIGNATURE_SIZE)
-      new ED25519Signature(bs)
-    }, _.bytes) {
+    extends RandomBytes.Companion[ED25519Signature](
+      bs => {
+        assume(bs.size == bcEd25519.SIGNATURE_SIZE)
+        new ED25519Signature(bs)
+      },
+      _.bytes
+    ) {
   override def length: Int = bcEd25519.SIGNATURE_SIZE
 }
 
@@ -72,9 +81,11 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
     ED25519Signature.unsafe(ByteString.fromArrayUnsafe(signature))
   }
 
-  protected def verify(message: Array[Byte],
-                       signature: Array[Byte],
-                       publicKey: Array[Byte]): Boolean = {
+  protected def verify(
+      message: Array[Byte],
+      signature: Array[Byte],
+      publicKey: Array[Byte]
+  ): Boolean = {
     bcEd25519.verify(signature, 0, publicKey, 0, message, 0, message.length)
   }
 }

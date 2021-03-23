@@ -41,16 +41,16 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     def createBlockChain(blocks: AVector[Block]): BlockChain = {
       assume(blocks.nonEmpty)
       val chain = buildBlockChain(blocks.head)
-      blocks.toIterable.zipWithIndex.tail foreach {
-        case (block, index) =>
-          chain.add(block, index * 2)
+      blocks.toIterable.zipWithIndex.tail foreach { case (block, index) =>
+        chain.add(block, index * 2)
       }
       chain
     }
 
     def addBlocks(chain: BlockChain, blocks: AVector[Block], preBlocks: Int = 0): Unit = {
       blocks.foreachWithIndex((block, index) =>
-        chain.add(block, preBlocks + index + 1).isRight is true)
+        chain.add(block, preBlocks + index + 1).isRight is true
+      )
     }
   }
 
@@ -86,32 +86,32 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     val chain = buildBlockChain()
     forAll(blockGen) { block0 =>
       chain.add(block0, 1).isRight is true
-      block0.transactions.foreachWithIndex {
-        case (tx, index) =>
-          val txIndex = TxIndex(block0.hash, index)
-          if (brokerConfig.contains(block0.chainIndex.from)) {
-            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex))
-          } else {
-            chain.txStorage.exists(tx.id) isE false
-          }
+      block0.transactions.foreachWithIndex { case (tx, index) =>
+        val txIndex = TxIndex(block0.hash, index)
+        if (brokerConfig.contains(block0.chainIndex.from)) {
+          chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex))
+        } else {
+          chain.txStorage.exists(tx.id) isE false
+        }
       }
       val block1 = block0.copy(header = block0.header.copy(nonce = 123456))
       chain.add(block1, 1).isRight is true
-      block1.transactions.foreachWithIndex {
-        case (tx, index) =>
-          val txIndex0 = TxIndex(block0.hash, index)
-          val txIndex1 = TxIndex(block1.hash, index)
-          (brokerConfig.contains(block0.chainIndex.from),
-           brokerConfig.contains(block1.chainIndex.from)) match {
-            case (true, true) =>
-              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0, txIndex1))
-            case (true, false) =>
-              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0))
-            case (false, true) =>
-              chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex1))
-            case (false, false) =>
-              chain.txStorage.exists(tx.id) isE false
-          }
+      block1.transactions.foreachWithIndex { case (tx, index) =>
+        val txIndex0 = TxIndex(block0.hash, index)
+        val txIndex1 = TxIndex(block1.hash, index)
+        (
+          brokerConfig.contains(block0.chainIndex.from),
+          brokerConfig.contains(block1.chainIndex.from)
+        ) match {
+          case (true, true) =>
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0, txIndex1))
+          case (true, false) =>
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0))
+          case (false, true) =>
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex1))
+          case (false, false) =>
+            chain.txStorage.exists(tx.id) isE false
+        }
       }
     }
   }
@@ -124,44 +124,34 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     val chain      = buildBlockChain()
 
     shortChain.foreach { block =>
-      block.transactions.foreach { tx =>
-        chain.getTxStatus(tx.id) isE None
-      }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
     longChain.foreach { block =>
-      block.transactions.foreach { tx =>
-        chain.getTxStatus(tx.id) isE None
-      }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
 
     addBlocks(chain, shortChain)
-    shortChain.foreachWithIndex {
-      case (block, blockIndex) =>
-        block.transactions.foreachWithIndex {
-          case (tx, txIndex) =>
-            chain.getTxStatus(tx.id) isE Some(
-              TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex))
-        }
+    shortChain.foreachWithIndex { case (block, blockIndex) =>
+      block.transactions.foreachWithIndex { case (tx, txIndex) =>
+        chain.getTxStatus(tx.id) isE Some(
+          TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex)
+        )
+      }
     }
     longChain.foreach { block =>
-      block.transactions.foreach { tx =>
-        chain.getTxStatus(tx.id) isE None
-      }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
 
     addBlocks(chain, longChain)
     shortChain.foreach { block =>
-      block.transactions.foreach { tx =>
-        chain.getTxStatus(tx.id) isE None
-      }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
-    longChain.foreachWithIndex {
-      case (block, blockIndex) =>
-        block.transactions.foreachWithIndex {
-          case (tx, txIndex) =>
-            chain.getTxStatus(tx.id) isE Some(
-              TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex))
-        }
+    longChain.foreachWithIndex { case (block, blockIndex) =>
+      block.transactions.foreachWithIndex { case (tx, txIndex) =>
+        chain.getTxStatus(tx.id) isE Some(
+          TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex)
+        )
+      }
     }
   }
 
@@ -169,63 +159,55 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     val longChain = chainGenOf(4, genesis).sample.get
-    val shortChain = chainGenOf(2, genesis).sample.get.mapWithIndex {
-      case (block, index) =>
-        block.copy(transactions = longChain(index).transactions)
+    val shortChain = chainGenOf(2, genesis).sample.get.mapWithIndex { case (block, index) =>
+      block.copy(transactions = longChain(index).transactions)
     }
     val chain = buildBlockChain()
 
     shortChain.foreach { block =>
-      block.transactions.foreach { tx =>
-        chain.getTxStatus(tx.id) isE None
-      }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
     longChain.foreach { block =>
-      block.transactions.foreach { tx =>
-        chain.getTxStatus(tx.id) isE None
-      }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
 
     addBlocks(chain, shortChain)
-    shortChain.foreachWithIndex {
-      case (block, blockIndex) =>
-        block.transactions.foreachWithIndex {
-          case (tx, txIndex) =>
-            chain.getTxStatus(tx.id) isE Some(
-              TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex))
-        }
+    shortChain.foreachWithIndex { case (block, blockIndex) =>
+      block.transactions.foreachWithIndex { case (tx, txIndex) =>
+        chain.getTxStatus(tx.id) isE Some(
+          TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex)
+        )
+      }
     }
-    longChain.foreachWithIndex {
-      case (block, blockIndex) =>
-        block.transactions.foreachWithIndex {
-          case (tx, txIndex) =>
-            if (blockIndex < shortChain.length) {
-              chain.getTxStatus(tx.id) isE Some(
-                TxStatus(TxIndex(shortChain(blockIndex).hash, txIndex),
-                         shortChain.length - blockIndex))
-            } else {
-              chain.getTxStatus(tx.id) isE None
-            }
+    longChain.foreachWithIndex { case (block, blockIndex) =>
+      block.transactions.foreachWithIndex { case (tx, txIndex) =>
+        if (blockIndex < shortChain.length) {
+          chain.getTxStatus(tx.id) isE Some(
+            TxStatus(
+              TxIndex(shortChain(blockIndex).hash, txIndex),
+              shortChain.length - blockIndex
+            )
+          )
+        } else {
+          chain.getTxStatus(tx.id) isE None
         }
+      }
     }
 
     addBlocks(chain, longChain)
-    shortChain.foreachWithIndex {
-      case (block, blockIndex) =>
-        block.transactions.foreachWithIndex {
-          case (tx, txIndex) =>
-            chain.getTxStatus(tx.id) isE Some(
-              TxStatus(TxIndex(longChain(blockIndex).hash, txIndex), longChain.length - blockIndex)
-            )
-        }
+    shortChain.foreachWithIndex { case (block, blockIndex) =>
+      block.transactions.foreachWithIndex { case (tx, txIndex) =>
+        chain.getTxStatus(tx.id) isE Some(
+          TxStatus(TxIndex(longChain(blockIndex).hash, txIndex), longChain.length - blockIndex)
+        )
+      }
     }
-    longChain.foreachWithIndex {
-      case (block, blockIndex) =>
-        block.transactions.foreachWithIndex {
-          case (tx, txIndex) =>
-            chain.getTxStatus(tx.id) isE Some(
-              TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex))
-        }
+    longChain.foreachWithIndex { case (block, blockIndex) =>
+      block.transactions.foreachWithIndex { case (tx, txIndex) =>
+        chain.getTxStatus(tx.id) isE Some(
+          TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex)
+        )
+      }
     }
   }
 
@@ -300,29 +282,17 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
 
     val chain = buildBlockChain()
     addBlocks(chain, shortChain)
-    shortChain.foreach { block =>
-      chain.isCanonicalUnsafe(block.hash) is true
-    }
-    longChain.foreach { block =>
-      chain.isCanonicalUnsafe(block.hash) is false
-    }
+    shortChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is true }
+    longChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is false }
 
     addBlocks(chain, longChain.init)
-    shortChain.foreach { block =>
-      chain.isCanonicalUnsafe(block.hash) is false
-    }
-    longChain.init.foreach { block =>
-      chain.isCanonicalUnsafe(block.hash) is true
-    }
+    shortChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is false }
+    longChain.init.foreach { block => chain.isCanonicalUnsafe(block.hash) is true }
     chain.isCanonicalUnsafe(longChain.last.hash) is false
 
     chain.add(longChain.last, longChain.length)
-    shortChain.foreach { block =>
-      chain.isCanonicalUnsafe(block.hash) is false
-    }
-    longChain.foreach { block =>
-      chain.isCanonicalUnsafe(block.hash) is true
-    }
+    shortChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is false }
+    longChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is true }
   }
 
   it should "check reorg" in new Fixture {
@@ -421,9 +391,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
   }
 
   it should "test getPredecessor" in new UnforkedFixture {
-    blocks.foreach { block =>
-      chain.getPredecessor(block.hash, ALF.GenesisHeight) isE genesis.hash
-    }
+    blocks.foreach { block => chain.getPredecessor(block.hash, ALF.GenesisHeight) isE genesis.hash }
     chain.getPredecessor(blocks.last.hash, ALF.GenesisHeight + 1) isE blocks.head.hash
   }
 

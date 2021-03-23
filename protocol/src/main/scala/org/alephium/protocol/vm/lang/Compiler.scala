@@ -125,32 +125,37 @@ object Compiler {
   }
   object SimpleFunc {
     def from[Ctx <: StatelessContext](funcs: Seq[Ast.FuncDef[Ctx]]): Seq[SimpleFunc[Ctx]] = {
-      funcs.view.zipWithIndex.map {
-        case (func, index) =>
-          new SimpleFunc[Ctx](func.id,
-                              func.isPublic,
-                              func.args.map(_.tpe),
-                              func.rtypes,
-                              index.toByte)
+      funcs.view.zipWithIndex.map { case (func, index) =>
+        new SimpleFunc[Ctx](
+          func.id,
+          func.isPublic,
+          func.args.map(_.tpe),
+          func.rtypes,
+          index.toByte
+        )
       }.toSeq
     }
   }
 
   object State {
     def buildFor(script: Ast.AssetScript): State[StatelessContext] =
-      StateForScript(mutable.HashMap.empty,
-                     Ast.FuncId.empty,
-                     0,
-                     script.funcTable,
-                     immutable.Map(script.ident -> script.funcTable))
+      StateForScript(
+        mutable.HashMap.empty,
+        Ast.FuncId.empty,
+        0,
+        script.funcTable,
+        immutable.Map(script.ident -> script.funcTable)
+      )
 
     def buildFor(multiContract: MultiTxContract, contractIndex: Int): State[StatefulContext] = {
       val contractTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
-      StateForContract(mutable.HashMap.empty,
-                       Ast.FuncId.empty,
-                       0,
-                       multiContract.get(contractIndex).funcTable,
-                       contractTable)
+      StateForContract(
+        mutable.HashMap.empty,
+        Ast.FuncId.empty,
+        0,
+        multiContract.get(contractIndex).funcTable,
+        contractTable
+      )
     }
   }
 
@@ -162,7 +167,7 @@ object Compiler {
     def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]]
 
     def setFuncScope(funcId: Ast.FuncId): Unit = {
-      scope    = funcId
+      scope = funcId
       varIndex = 0
     }
 
@@ -174,6 +179,7 @@ object Compiler {
       if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
 
+    // scalastyle:off magic.number
     def addVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {
       val name  = ident.name
       val sname = scopedName(name)
@@ -181,8 +187,8 @@ object Compiler {
         throw Error(s"Global variable has the same name as local variable: $name")
       } else if (varTable.contains(sname)) {
         throw Error(s"Local variables have the same name: $name")
-      } else if (varIndex >= 0xFF) {
-        throw Error(s"Number of variables more than ${0xFF}")
+      } else if (varIndex >= 0xff) {
+        throw Error(s"Number of variables more than ${0xff}")
       } else {
         val varType = tpe match {
           case c: Type.Contract => Type.Contract.local(c.id, ident)
@@ -192,6 +198,7 @@ object Compiler {
         varIndex += 1
       }
     }
+    // scalastyle:on magic.number
 
     def getVariable(ident: Ast.Ident): VarInfo = {
       val name  = ident.name
@@ -258,14 +265,14 @@ object Compiler {
     }
   }
 
+  type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]
   final case class StateForScript(
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
-      val funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]],
-      val contractTable: immutable.Map[Ast.TypeId,
-                                       immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]]])
-      extends State[StatelessContext] {
+      funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]],
+      contractTable: immutable.Map[Ast.TypeId, Contract[StatelessContext]]
+  ) extends State[StatelessContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
       BuiltIn.statelessFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
@@ -294,10 +301,9 @@ object Compiler {
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
-      val funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]],
-      val contractTable: immutable.Map[Ast.TypeId,
-                                       immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]]])
-      extends State[StatefulContext] {
+      funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]],
+      contractTable: immutable.Map[Ast.TypeId, Contract[StatefulContext]]
+  ) extends State[StatefulContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
       BuiltIn.statefulFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))

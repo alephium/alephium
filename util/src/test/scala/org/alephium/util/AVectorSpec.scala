@@ -42,12 +42,14 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     lazy val vectorGen: Gen[AVector[A]] =
       Gen.oneOf(vectorGen0, vectorGen1, vectorGen2, vectorGen3)
 
-    def checkState[B](vector: AVector[B],
-                      start: Int,
-                      end: Int,
-                      length: Int,
-                      capacity: Int,
-                      appendable: Boolean): Assertion = {
+    def checkState[B](
+        vector: AVector[B],
+        start: Int,
+        end: Int,
+        length: Int,
+        capacity: Int,
+        appendable: Boolean
+    ): Assertion = {
       vector.start is start
       vector.end is end
       vector.length is length
@@ -61,9 +63,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
     def checkEq(vc: AVector[A], xs: scala.collection.mutable.Seq[A]): Unit = {
       vc.length is xs.length
-      xs.indices.foreach { i =>
-        vc(i) should be(xs(i))
-      }
+      xs.indices.foreach { i => vc(i) should be(xs(i)) }
     }
   }
 
@@ -83,9 +83,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(sizeGen) { n =>
       val vector = AVector.tabulate[Int](n)(identity)
       checkState(vector, n)
-      vector.foreachWithIndex { (elem, index) =>
-        elem is index
-      }
+      vector.foreachWithIndex { (elem, index) => elem is index }
     }
   }
 
@@ -93,9 +91,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll { xs: List[A] =>
       val vector = AVector.from(xs)
       checkState(vector, xs.length)
-      xs.indices.foreach { i =>
-        vector(i) is xs(i)
-      }
+      xs.indices.foreach { i => vector(i) is xs(i) }
     }
   }
 
@@ -111,9 +107,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     0 until 4 foreach { e =>
       val start = 1 << e
       val end   = 1 << (e + 1)
-      (start + 1) until end foreach { n =>
-        AVector.nextPowerOfTwo(n) is end
-      }
+      (start + 1) until end foreach { n => AVector.nextPowerOfTwo(n) is end }
     }
   }
 
@@ -233,30 +227,22 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   it should "contain" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc: AVector[A], a: A) =>
       vc.contains(a) is vc.toArray.contains(a)
-      vc.foreach { elem =>
-        vc.contains(elem) is true
-      }
+      vc.foreach { elem => vc.contains(elem) is true }
     }
   }
 
   it should "reverse vector" in new Fixture {
-    forAll(vectorGen) { vc =>
-      checkEq(vc.reverse, vc.toArray.reverse)
-    }
+    forAll(vectorGen) { vc => checkEq(vc.reverse, vc.toArray.reverse) }
   }
 
   it should "foreach" in new Fixture {
     forAll(vectorGen) { vc =>
       val buffer = ArrayBuffer.empty[A]
-      vc.foreach { elem =>
-        buffer.append(elem)
-      }
+      vc.foreach { elem => buffer.append(elem) }
       checkEq(vc, buffer)
 
       val arr = new Array[A](vc.length)
-      vc.foreachWithIndex { (elem, i) =>
-        arr(i) = elem
-      }
+      vc.foreachWithIndex { (elem, i) => arr(i) = elem }
       checkEq(vc, arr)
     }
   }
@@ -301,14 +287,14 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val vc1  = vc.filterNotE[Unit](e => Right(p(e)))
       val arr1 = arr.filterNot(p)
       checkEq(vc1.toOption.get, arr1)
-      vc.filterE[Unit](_    => Left(())).isLeft is true
+      vc.filterE[Unit](_ => Left(())).isLeft is true
       vc.filterNotE[Unit](_ => Left(())).isLeft is true
     }
   }
 
   trait FixtureF extends Fixture {
     def alwaysRight: A => Either[Unit, A] = Right.apply
-    def alwaysLeft: A  => Either[Unit, A] = _ => Left(())
+    def alwaysLeft: A => Either[Unit, A]  = _ => Left(())
 
     def doNothing: A => Either[Unit, Unit] = _ => Right(())
   }
@@ -321,17 +307,13 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   }
 
   it should "foreachE" in new FixtureF {
-    forAll(vectorGen) { vc =>
-      vc.foreachE[Unit](doNothing).isRight is true
-    }
+    forAll(vectorGen) { vc => vc.foreachE[Unit](doNothing).isRight is true }
   }
 
   it should "exists" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
-      arr.foreach { elem =>
-        vc.exists(_ equals elem) is vc.contains(elem)
-      }
+      arr.foreach { elem => vc.exists(_ equals elem) is vc.contains(elem) }
       vc.exists(_ equals a) is vc.contains(a)
       vc.foreachWithIndex { (elem, index) =>
         vc.existsWithIndex((e, i) => (e equals elem) && (i equals index)) is true
@@ -384,18 +366,14 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen0.filter(_.nonEmpty)) { vc =>
       val index = Random.source.nextInt(vc.length)
       val vc1   = vc.replace(index, vc.head)
-      vc.indices.foreach { i =>
-        if (i equals index) vc1(i) is vc.head else vc1(i) is vc(i)
-      }
+      vc.indices.foreach { i => if (i equals index) vc1(i) is vc.head else vc1(i) is vc(i) }
     }
   }
 
   it should "convert to array" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
-      0 until vc.length foreach { i =>
-        vc(i) is arr(i)
-      }
+      0 until vc.length foreach { i => vc(i) is arr(i) }
     }
   }
 
@@ -540,9 +518,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       checkState(matrix, 0, n1, n1, n1, true)
       matrix.foreachWithIndex { (vector, index1) =>
         checkState(vector, 0, n2, n2, n2, true)
-        vector.foreachWithIndex { (elem, index2) =>
-          elem is index1 + index2
-        }
+        vector.foreachWithIndex { (elem, index2) => elem is index1 + index2 }
       }
     }
   }

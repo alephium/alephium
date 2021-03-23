@@ -29,33 +29,35 @@ object Message {
   final case class Ack(id: Int)                  extends Message
   case object Ready                              extends Message
 
-  def serialize(input: Message): ByteString = input match {
-    case Peer(info)   => ByteString(0) ++ PeerInfo.serialize(info)
-    case Clique(info) => ByteString(1) ++ IntraCliqueInfo.serialize(info)
-    case Ack(id)      => ByteString(2) ++ intSerde.serialize(id)
-    case Ready        => ByteString(3)
-  }
+  def serialize(input: Message): ByteString =
+    input match {
+      case Peer(info)   => ByteString(0) ++ PeerInfo.serialize(info)
+      case Clique(info) => ByteString(1) ++ IntraCliqueInfo.serialize(info)
+      case Ack(id)      => ByteString(2) ++ intSerde.serialize(id)
+      case Ready        => ByteString(3)
+    }
 
-  def deserialize(input: ByteString)(
-      implicit groupConfig: GroupConfig): SerdeResult[Staging[Message]] = {
-    byteSerde._deserialize(input).flatMap {
-      case Staging(byte, rest) =>
-        if (byte == 0) {
-          PeerInfo._deserialize(rest).map(_.mapValue(Peer(_)))
-        } else if (byte == 1) {
-          IntraCliqueInfo._deserialize(rest).map(_.mapValue(Clique(_)))
-        } else if (byte == 2) {
-          intSerde._deserialize(rest).map(_.mapValue(Ack(_)))
-        } else if (byte == 3) {
-          Right(Staging(Ready, rest))
-        } else {
-          Left(SerdeError.wrongFormat(s"Invalid bootstrap message code: $byte"))
-        }
+  def deserialize(
+      input: ByteString
+  )(implicit groupConfig: GroupConfig): SerdeResult[Staging[Message]] = {
+    byteSerde._deserialize(input).flatMap { case Staging(byte, rest) =>
+      if (byte == 0) {
+        PeerInfo._deserialize(rest).map(_.mapValue(Peer(_)))
+      } else if (byte == 1) {
+        IntraCliqueInfo._deserialize(rest).map(_.mapValue(Clique(_)))
+      } else if (byte == 2) {
+        intSerde._deserialize(rest).map(_.mapValue(Ack(_)))
+      } else if (byte == 3) {
+        Right(Staging(Ready, rest))
+      } else {
+        Left(SerdeError.wrongFormat(s"Invalid bootstrap message code: $byte"))
+      }
     }
   }
 
-  def tryDeserialize(data: ByteString)(
-      implicit groupConfig: GroupConfig): SerdeResult[Option[Staging[Message]]] = {
+  def tryDeserialize(
+      data: ByteString
+  )(implicit groupConfig: GroupConfig): SerdeResult[Option[Staging[Message]]] = {
     SerdeUtils.unwrap(deserialize(data))
   }
 }

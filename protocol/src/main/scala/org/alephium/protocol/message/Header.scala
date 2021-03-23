@@ -31,8 +31,9 @@ object Header {
             Right(Header(version))
           } else {
             Left(
-              SerdeError.wrongFormat(s"Invalid version, got $version, expect ${Protocol.version}"))
-        },
+              SerdeError.wrongFormat(s"Invalid version, got $version, expect ${Protocol.version}")
+            )
+          },
         header => header.version
       )
 }

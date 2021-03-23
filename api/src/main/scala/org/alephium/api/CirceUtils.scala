@@ -38,8 +38,10 @@ object CirceUtils {
     Codec.from(decoder, encoder)
   }
 
-  def codecXemap[T, U](to: T => Either[String, U], from: U => T)(implicit _encoder: Encoder[T],
-                                                                 _decoder: Decoder[T]): Codec[U] = {
+  def codecXemap[T, U](to: T => Either[String, U], from: U => T)(implicit
+      _encoder: Encoder[T],
+      _decoder: Decoder[T]
+  ): Codec[U] = {
     val encoder = _encoder.contramap(from)
     val decoder = _decoder.emap(to)
     Codec.from(decoder, encoder)
@@ -51,8 +53,10 @@ object CirceUtils {
   implicit def arrayDecoder[A: ClassTag](implicit decoder: Decoder[A]): Decoder[Array[A]] =
     Decoder.decodeArray[A]
 
-  implicit def arrayCodec[A: ClassTag](implicit encoder: Encoder[A],
-                                       decoder: Decoder[A]): Codec[Array[A]] = {
+  implicit def arrayCodec[A: ClassTag](implicit
+      encoder: Encoder[A],
+      decoder: Decoder[A]
+  ): Codec[Array[A]] = {
     Codec.from(arrayDecoder[A], arrayEncoder[A])
   }
 
@@ -62,8 +66,10 @@ object CirceUtils {
   implicit def avectorDecoder[A: ClassTag](implicit decoder: Decoder[A]): Decoder[AVector[A]] =
     Decoder.decodeArray[A].map(AVector.unsafe(_))
 
-  implicit def avectorCodec[A: ClassTag](implicit encoder: Encoder[A],
-                                         decoder: Decoder[A]): Codec[AVector[A]] = {
+  implicit def avectorCodec[A: ClassTag](implicit
+      encoder: Encoder[A],
+      decoder: Decoder[A]
+  ): Codec[AVector[A]] = {
     Codec.from(avectorDecoder[A], avectorEncoder[A])
   }
 
@@ -71,9 +77,7 @@ object CirceUtils {
     (bs: ByteString) => Json.fromString(Hex.toHexString(bs))
 
   implicit val byteStringDecoder: Decoder[ByteString] =
-    Decoder.decodeString.emap { bs =>
-      Hex.from(bs).toRight(s"Invalid hex string: $bs")
-    }
+    Decoder.decodeString.emap { bs => Hex.from(bs).toRight(s"Invalid hex string: $bs") }
 
   implicit val inetAddressCodec: Codec[InetAddress] = {
     codecXemap[String, InetAddress](createInetAddress, _.getHostAddress)
@@ -86,15 +90,18 @@ object CirceUtils {
 
   implicit val socketAddressCodec: Codec[InetSocketAddress] = {
     val encoder = Encoder.forProduct2[InetSocketAddress, InetAddress, Int]("addr", "port")(sAddr =>
-      (sAddr.getAddress, sAddr.getPort))
+      (sAddr.getAddress, sAddr.getPort)
+    )
     val decoder = Decoder
       .forProduct2[(InetAddress, Int), InetAddress, Int]("addr", "port")((_, _))
       .emap { case (iAddr, port) => createSocketAddress(iAddr, port) }
     Codec.from(decoder, encoder)
   }
 
-  private def createSocketAddress(address: InetAddress,
-                                  port: Int): Either[String, InetSocketAddress] = {
+  private def createSocketAddress(
+      address: InetAddress,
+      port: Int
+  ): Either[String, InetSocketAddress] = {
     try Right(new InetSocketAddress(address, port))
     catch { case e: Throwable => Left(e.getMessage) }
   }

@@ -24,10 +24,13 @@ import org.alephium.util.Hex
 
 final case class BuildContractResult(unsignedTx: String, hash: Hash, fromGroup: Int, toGroup: Int)
 object BuildContractResult {
-  def from(unsignedTx: UnsignedTransaction)(
-      implicit groupConfig: GroupConfig): BuildContractResult =
-    BuildContractResult(Hex.toHexString(serialize(unsignedTx)),
-                        unsignedTx.hash,
-                        unsignedTx.fromGroup.value,
-                        unsignedTx.toGroup.value)
+  def from(
+      unsignedTx: UnsignedTransaction
+  )(implicit groupConfig: GroupConfig): BuildContractResult =
+    BuildContractResult(
+      Hex.toHexString(serialize(unsignedTx)),
+      unsignedTx.hash,
+      unsignedTx.fromGroup.value,
+      unsignedTx.toGroup.value
+    )
 }

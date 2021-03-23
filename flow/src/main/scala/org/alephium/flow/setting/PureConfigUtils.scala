@@ -63,7 +63,8 @@ object PureConfigUtils {
   implicit val inetSocketAddressConfig: ConfigReader[InetSocketAddress] =
     ConfigReader[String].emap { addressInput =>
       parseHostAndPort(addressInput).toRight(
-        CannotConvert(addressInput, "InetSocketAddress", "oops"))
+        CannotConvert(addressInput, "InetSocketAddress", "oops")
+      )
     }
 
   implicit val inetAddressConfig: ConfigReader[InetAddress] =
@@ -85,9 +86,11 @@ object PureConfigUtils {
     case Array(empty) if empty == "" => Right(ArraySeq.empty)
     case inputs =>
       val result = inputs.flatMap(parseHostAndPort)
-      Either.cond(result.size == inputs.size,
-                  ArraySeq.from(result),
-                  CannotConvert(inputs.mkString(", "), "ArraySeq[InetAddress]", "oops"))
+      Either.cond(
+        result.size == inputs.size,
+        ArraySeq.from(result),
+        CannotConvert(inputs.mkString(", "), "ArraySeq[InetAddress]", "oops")
+      )
   }
 
   //We can't put explicitly the type, otherwise the automatic derivation of `pureconfig` fail
@@ -115,7 +118,9 @@ object PureConfigUtils {
       case NetworkType.Mainnet =>
         Left(
           ExceptionThrown(
-            new Throwable(s"`miner-addresses` field is mandatory for ${networkType.name}")))
+            new Throwable(s"`miner-addresses` field is mandatory for ${networkType.name}")
+          )
+        )
       case _ =>
         Right {
           AVector.tabulate(brokerConfig.groups) { i =>

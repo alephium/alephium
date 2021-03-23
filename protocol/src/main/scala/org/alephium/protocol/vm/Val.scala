@@ -75,9 +75,12 @@ object Val {
   }
   object Type {
     implicit val serde: Serde[Type] =
-      byteSerde.xfmap(byte => {
-        types.get(Bytes.toPosInt(byte)).toRight(SerdeError.validation(s"Invalid Val Type"))
-      }, _.id)
+      byteSerde.xfmap(
+        byte => {
+          types.get(Bytes.toPosInt(byte)).toRight(SerdeError.validation(s"Invalid Val Type"))
+        },
+        _.id
+      )
 
     val types: AVector[Type] = AVector[Type](Bool, Byte, I256, U256) ++
       AVector[Type](BoolVec, ByteVec, I256Vec, U256Vec, Address)

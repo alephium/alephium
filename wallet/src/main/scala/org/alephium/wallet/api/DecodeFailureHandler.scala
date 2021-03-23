@@ -48,9 +48,11 @@ trait DecodeFailureHandler {
   val myDecodeFailureHandler = ServerDefaults.decodeFailureHandler.copy(
     response = myFailureResponse,
     respondWithStatusCode = ServerDefaults.FailureHandling
-      .respondWithStatusCode(_,
-                             badRequestOnPathErrorIfPathShapeMatches   = true,
-                             badRequestOnPathInvalidIfPathShapeMatches = true),
+      .respondWithStatusCode(
+        _,
+        badRequestOnPathErrorIfPathShapeMatches = true,
+        badRequestOnPathInvalidIfPathShapeMatches = true
+      ),
     failureMessage = myFailureMessage
   )
 

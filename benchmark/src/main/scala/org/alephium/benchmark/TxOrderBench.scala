@@ -36,17 +36,24 @@ class TxOrderBench {
   }
   val txNum: Int = 2000
   val header: BlockHeader =
-    BlockHeader.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                       Hash.zero,
-                       TimeStamp.zero,
-                       Target.Max,
-                       U256.Zero)
+    BlockHeader.unsafe(
+      AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+      Hash.zero,
+      TimeStamp.zero,
+      Target.Max,
+      U256.Zero
+    )
   val txs: AVector[Transaction] =
     AVector.fill(txNum)(
-      Transaction.from(UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),
-                                           AVector.empty,
-                                           AVector.empty),
-                       AVector.empty[Signature]))
+      Transaction.from(
+        UnsignedTransaction(
+          Some(StatefulScript.unsafe(AVector.empty)),
+          AVector.empty,
+          AVector.empty
+        ),
+        AVector.empty[Signature]
+      )
+    )
   val block: Block = Block(header, txs)
 
   @Benchmark

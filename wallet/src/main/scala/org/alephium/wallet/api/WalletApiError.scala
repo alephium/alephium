@@ -29,12 +29,14 @@ sealed trait WalletApiError {
 
 object WalletApiError {
 
-  private def encodeApiError[A <: WalletApiError]: Encoder[A] = new Encoder[A] {
-    final def apply(apiError: A): Json = Json.obj(
-      ("status", Json.fromInt(apiError.status.code)),
-      ("detail", Json.fromString(apiError.detail))
-    )
-  }
+  private def encodeApiError[A <: WalletApiError]: Encoder[A] =
+    new Encoder[A] {
+      final def apply(apiError: A): Json =
+        Json.obj(
+          ("status", Json.fromInt(apiError.status.code)),
+          ("detail", Json.fromString(apiError.detail))
+        )
+    }
 
   final case class Unauthorized(val detail: String) extends WalletApiError {
     final val status: StatusCode = StatusCode.Unauthorized
@@ -50,9 +52,14 @@ object WalletApiError {
     implicit val decoder: Decoder[Unauthorized] = deriveDecoder
     implicit val schema: Schema[Unauthorized] =
       Schema(
-        SProduct(SObjectInfo("Unauthorized"),
-                 List(FieldName("status") -> Schema.schemaForInt,
-                      FieldName("detail") -> Schema.schemaForString)))
+        SProduct(
+          SObjectInfo("Unauthorized"),
+          List(
+            FieldName("status") -> Schema.schemaForInt,
+            FieldName("detail") -> Schema.schemaForString
+          )
+        )
+      )
   }
 
   final case class BadRequest(val detail: String) extends WalletApiError {
@@ -67,9 +74,14 @@ object WalletApiError {
     implicit val decoder: Decoder[BadRequest] = deriveDecoder
     implicit val schema: Schema[BadRequest] =
       Schema(
-        SProduct(SObjectInfo("BadRequest"),
-                 List(FieldName("status") -> Schema.schemaForInt,
-                      FieldName("detail") -> Schema.schemaForString)))
+        SProduct(
+          SObjectInfo("BadRequest"),
+          List(
+            FieldName("status") -> Schema.schemaForInt,
+            FieldName("detail") -> Schema.schemaForString
+          )
+        )
+      )
   }
 
   final case class NotFound(resource: String) extends WalletApiError {
@@ -87,18 +99,24 @@ object WalletApiError {
     implicit val decoder: Decoder[NotFound] = deriveDecoder
     implicit val schema: Schema[NotFound] =
       Schema(
-        SProduct(SObjectInfo("NotFound"),
-                 List(FieldName("status") -> Schema.schemaForInt,
-                      FieldName("detail") -> Schema.schemaForString)))
+        SProduct(
+          SObjectInfo("NotFound"),
+          List(
+            FieldName("status") -> Schema.schemaForInt,
+            FieldName("detail") -> Schema.schemaForString
+          )
+        )
+      )
   }
 
   implicit val decoder: Decoder[WalletApiError] = new Decoder[WalletApiError] {
-    def dec(c: HCursor, status: StatusCode): Decoder.Result[WalletApiError] = status match {
-      case StatusCode.BadRequest   => BadRequest.decoder(c)
-      case StatusCode.NotFound     => NotFound.decoder(c)
-      case StatusCode.Unauthorized => Unauthorized.decoder(c)
-      case _                       => Left(DecodingFailure(s"$status not supported", c.history))
-    }
+    def dec(c: HCursor, status: StatusCode): Decoder.Result[WalletApiError] =
+      status match {
+        case StatusCode.BadRequest   => BadRequest.decoder(c)
+        case StatusCode.NotFound     => NotFound.decoder(c)
+        case StatusCode.Unauthorized => Unauthorized.decoder(c)
+        case _                       => Left(DecodingFailure(s"$status not supported", c.history))
+      }
     final def apply(c: HCursor): Decoder.Result[WalletApiError] =
       for {
         statusAsInt <- c.downField("status").as[Int]
@@ -107,18 +125,22 @@ object WalletApiError {
   }
 
   implicit val encoder: Encoder[WalletApiError] = new Encoder[WalletApiError] {
-    final def apply(apiError: WalletApiError): Json = apiError match {
-      case badRequest: BadRequest     => BadRequest.encoder(badRequest)
-      case notFound: NotFound         => NotFound.encoder(notFound)
-      case unauthorized: Unauthorized => Unauthorized.encoder(unauthorized)
-      case _                          => encodeApiError[WalletApiError](apiError)
-    }
+    final def apply(apiError: WalletApiError): Json =
+      apiError match {
+        case badRequest: BadRequest     => BadRequest.encoder(badRequest)
+        case notFound: NotFound         => NotFound.encoder(notFound)
+        case unauthorized: Unauthorized => Unauthorized.encoder(unauthorized)
+        case _                          => encodeApiError[WalletApiError](apiError)
+      }
   }
 
   @SuppressWarnings(
-    Array("org.wartremover.warts.JavaSerializable",
-          "org.wartremover.warts.Product",
-          "org.wartremover.warts.Serializable"))
+    Array(
+      "org.wartremover.warts.JavaSerializable",
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"
+    )
+  )
   implicit val schema: Schema[WalletApiError] =
     Schema.oneOf[WalletApiError, StatusCode](_.status, _.toString)(
       StatusCode.BadRequest   -> BadRequest.schema,

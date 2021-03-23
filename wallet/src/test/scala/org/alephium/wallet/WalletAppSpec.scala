@@ -97,7 +97,10 @@ class WalletAppSpec
     Post(s"/wallets/${wallet}/transfer", entity(transferJson(amount))) ~> routes
   def deriveNextAddress() = Post(s"/wallets/${wallet}/deriveNextAddress") ~> routes
   def changeActiveAddress(address: Address) =
-    Post(s"/wallets/${wallet}/changeActiveAddress", entity(changeActiveAddressJson(address))) ~> routes
+    Post(
+      s"/wallets/${wallet}/changeActiveAddress",
+      entity(changeActiveAddressJson(address))
+    ) ~> routes
   def listWallets() = Get(s"/wallets") ~> routes
 
   def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
@@ -106,7 +109,9 @@ class WalletAppSpec
 
     unlock() ~> check {
       status is StatusCodes.NotFound
-      CirceUtils.print(responseAs[Json]) is s"""{"resource":"$wallet","status":404,"detail":"$wallet not found"}"""
+      CirceUtils.print(
+        responseAs[Json]
+      ) is s"""{"resource":"$wallet","status":404,"detail":"$wallet not found"}"""
     }
 
     create(2) ~> check {
@@ -118,7 +123,7 @@ class WalletAppSpec
     create(24) ~> check {
       val result = responseAs[model.WalletCreation.Result]
       mnemonic = result.mnemonic
-      wallet   = result.walletName
+      wallet = result.walletName
       status is StatusCodes.OK
     }
 
@@ -153,14 +158,15 @@ class WalletAppSpec
 
     getAddresses() ~> check {
       addresses = responseAs[model.Addresses]
-      address   = addresses.activeAddress
+      address = addresses.activeAddress
       status is StatusCodes.OK
     }
 
     getBalance() ~> check {
       responseAs[model.Balances] is model.Balances(
         balanceAmount,
-        AVector(model.Balances.AddressBalance(address, balanceAmount)))
+        AVector(model.Balances.AddressBalance(address, balanceAmount))
+      )
       status is StatusCodes.OK
     }
 
@@ -177,7 +183,7 @@ class WalletAppSpec
     }
 
     deriveNextAddress() ~> check {
-      address   = responseAs[Address]
+      address = responseAs[Address]
       addresses = model.Addresses(address, addresses.addresses :+ address)
       status is StatusCodes.OK
     }
@@ -187,7 +193,7 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
-    address   = addresses.addresses.head
+    address = addresses.addresses.head
     addresses = addresses.copy(activeAddress = address)
 
     changeActiveAddress(address) ~> check {
@@ -234,10 +240,10 @@ class WalletAppSpec
 
 object WalletAppSpec extends {
 
-  class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(
-      implicit val groupConfig: GroupConfig,
-      system: ActorSystem)
-      extends FailFastCirceSupport
+  class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(implicit
+      val groupConfig: GroupConfig,
+      system: ActorSystem
+  ) extends FailFastCirceSupport
       with TxGenerators
       with ApiModelCodec {
 
@@ -254,10 +260,12 @@ object WalletAppSpec extends {
               parameters("value".as[Int]) { _ =>
                 val unsignedTx = transactionGen().sample.get.unsigned
                 complete(
-                  BuildTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                                         unsignedTx.hash,
-                                         unsignedTx.fromGroup.value,
-                                         unsignedTx.toGroup.value)
+                  BuildTransactionResult(
+                    Hex.toHexString(serialize(unsignedTx)),
+                    unsignedTx.hash,
+                    unsignedTx.fromGroup.value,
+                    unsignedTx.toGroup.value
+                  )
                 )
               }
             }
@@ -266,9 +274,7 @@ object WalletAppSpec extends {
       } ~
         path("transactions" / "send") {
           post {
-            entity(as[SendTransaction]) { _ =>
-              complete(TxResult(Hash.generate, 0, 0))
-            }
+            entity(as[SendTransaction]) { _ => complete(TxResult(Hash.generate, 0, 0)) }
           }
         } ~
         path("infos" / "self-clique") {

@@ -32,18 +32,26 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
 import org.alephium.util._
 
 object DiscoveryServer {
-  def props(bindAddress: InetSocketAddress,
-            misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
-            bootstrap: ArraySeq[InetSocketAddress])(implicit brokerConfig: BrokerConfig,
-                                                    discoveryConfig: DiscoveryConfig,
-                                                    networkConfig: NetworkConfig): Props =
+  def props(
+      bindAddress: InetSocketAddress,
+      misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+      bootstrap: ArraySeq[InetSocketAddress]
+  )(implicit
+      brokerConfig: BrokerConfig,
+      discoveryConfig: DiscoveryConfig,
+      networkConfig: NetworkConfig
+  ): Props =
     Props(new DiscoveryServer(bindAddress, misbehaviorManager, bootstrap))
 
-  def props(bindAddress: InetSocketAddress,
-            misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
-            peers: InetSocketAddress*)(implicit brokerConfig: BrokerConfig,
-                                       discoveryConfig: DiscoveryConfig,
-                                       networkConfig: NetworkConfig): Props = {
+  def props(
+      bindAddress: InetSocketAddress,
+      misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+      peers: InetSocketAddress*
+  )(implicit
+      brokerConfig: BrokerConfig,
+      discoveryConfig: DiscoveryConfig,
+      networkConfig: NetworkConfig
+  ): Props = {
     props(bindAddress, misbehaviorManager, ArraySeq.from(peers))
   }
 
@@ -87,13 +95,15 @@ object DiscoveryServer {
  *
  *  TODO: each group has several buckets instead of just one bucket
  */
-class DiscoveryServer(val bindAddress: InetSocketAddress,
-                      val misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
-                      val bootstrap: ArraySeq[InetSocketAddress])(
-    implicit val brokerConfig: BrokerConfig,
+class DiscoveryServer(
+    val bindAddress: InetSocketAddress,
+    val misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+    val bootstrap: ArraySeq[InetSocketAddress]
+)(implicit
+    val brokerConfig: BrokerConfig,
     val discoveryConfig: DiscoveryConfig,
-    val networkConfig: NetworkConfig)
-    extends BaseActor
+    val networkConfig: NetworkConfig
+) extends BaseActor
     with Stash
     with Timers
     with DiscoveryServerState
@@ -110,9 +120,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
-      cliqueInfo.interBrokers.foreach { brokers =>
-        brokers.foreach(addSelfCliquePeer)
-      }
+      cliqueInfo.interBrokers.foreach { brokers => brokers.foreach(addSelfCliquePeer) }
       unstashAll()
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
@@ -184,11 +192,10 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
       scanAndSchedule()
   }
 
-  def handleBanning: Receive = {
-    case MisbehaviorManager.PeerBanned(peer) =>
-      if (banPeerFromAddress(peer)) {
-        scanAndSchedule()
-      }
+  def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
+    if (banPeerFromAddress(peer)) {
+      scanAndSchedule()
+    }
   }
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =
@@ -204,9 +211,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
             }
         }
       case Pong(peerInfo) =>
-        validatePeerInfo(remote, peerInfo) { validPeerInfo =>
-          handlePong(validPeerInfo)
-        }
+        validatePeerInfo(remote, peerInfo) { validPeerInfo => handlePong(validPeerInfo) }
       case FindNode(targetId) =>
         val neighbors = getNeighbors(targetId)
         send(remote, Neighbors(neighbors))
@@ -244,7 +249,8 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
   }
 
   private def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
-      f: BrokerInfo => Unit): Unit = {
+      f: BrokerInfo => Unit
+  ): Unit = {
     if (remote == peerInfo.address) {
       f(peerInfo)
     } else {
@@ -266,7 +272,7 @@ class DiscoveryServer(val bindAddress: InetSocketAddress,
     if (currentTs > unsilentPoint) {
       log.warning(message)
       silentDuration = silentDuration.timesUnsafe(2)
-      unsilentPoint  = unsilentPoint + silentDuration
+      unsilentPoint = unsilentPoint + silentDuration
     } else {
       log.debug(message)
     }

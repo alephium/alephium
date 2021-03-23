@@ -68,21 +68,26 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "be random" in {
     def gen(): Block = {
       val header: BlockHeader =
-        BlockHeader.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                           Hash.zero,
-                           TimeStamp.now(),
-                           Target.Max,
-                           0)
+        BlockHeader.unsafe(
+          AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+          Hash.zero,
+          TimeStamp.now(),
+          Target.Max,
+          0
+        )
       val txs: AVector[Transaction] =
         AVector.fill(3)(
           Transaction.from(
-            UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),
-                                minimalGas,
-                                U256.unsafe(Random.nextLong(Long.MaxValue)),
-                                AVector.empty,
-                                AVector.empty),
+            UnsignedTransaction(
+              Some(StatefulScript.unsafe(AVector.empty)),
+              minimalGas,
+              U256.unsafe(Random.nextLong(Long.MaxValue)),
+              AVector.empty,
+              AVector.empty
+            ),
             AVector.empty[Signature]
-          ))
+          )
+        )
       Block(header, txs :+ txs.head) // add a fake coinbase tx
     }
     val blockGen = Gen.const(()).map(_ => gen())
@@ -96,28 +101,34 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "put non-script txs in the last" in {
     forAll(posLongGen, posLongGen) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
-        BlockHeader.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                           Hash.zero,
-                           TimeStamp.now(),
-                           Target.Max,
-                           0)
+        BlockHeader.unsafe(
+          AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+          Hash.zero,
+          TimeStamp.now(),
+          Target.Max,
+          0
+        )
       val tx0 = Transaction.from(
-        UnsignedTransaction(Some(StatefulScript.unsafe(AVector.empty)),
-                            minimalGas,
-                            U256.unsafe(gasPrice0),
-                            AVector.empty,
-                            AVector.empty),
+        UnsignedTransaction(
+          Some(StatefulScript.unsafe(AVector.empty)),
+          minimalGas,
+          U256.unsafe(gasPrice0),
+          AVector.empty,
+          AVector.empty
+        ),
         AVector.empty[Signature]
       )
       val tx1 = Transaction.from(
         UnsignedTransaction(None, minimalGas, U256.unsafe(gasPrice1), AVector.empty, AVector.empty),
         AVector.empty[Signature]
       )
-      val coinbase = Transaction.coinbase(ChainIndex.unsafe(0, 0),
-                                          U256.Zero,
-                                          LockupScript.p2pkh(PublicKey.generate),
-                                          Target.Max,
-                                          TimeStamp.zero)
+      val coinbase = Transaction.coinbase(
+        ChainIndex.unsafe(0, 0),
+        U256.Zero,
+        LockupScript.p2pkh(PublicKey.generate),
+        Target.Max,
+        TimeStamp.zero
+      )
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
       Block.scriptIndexes(block0.nonCoinbase).toSeq is Seq(0)

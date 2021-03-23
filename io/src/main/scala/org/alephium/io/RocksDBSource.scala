@@ -54,14 +54,14 @@ object RocksDBSource {
 
     val SSD: Compaction = Compaction(
       initialFileSize = 64 * MB,
-      blockSize       = 16 * KB,
-      writeRateLimit  = None
+      blockSize = 16 * KB,
+      writeRateLimit = None
     )
 
     val HDD: Compaction = Compaction(
       initialFileSize = 256 * MB,
-      blockSize       = 64 * KB,
-      writeRateLimit  = Some(16 * MB)
+      blockSize = 64 * KB,
+      writeRateLimit = Some(16 * MB)
     )
   }
 
@@ -106,8 +106,10 @@ object RocksDBSource {
     def columnOptions(compaction: Compaction): ColumnFamilyOptions =
       columnOptionsForBudget(compaction, memoryBudgetPerCol)
 
-    def columnOptionsForBudget(compaction: Compaction,
-                               memoryBudgetPerCol: Long): ColumnFamilyOptions = {
+    def columnOptionsForBudget(
+        compaction: Compaction,
+        memoryBudgetPerCol: Long
+    ): ColumnFamilyOptions = {
       import scala.jdk.CollectionConverters._
 
       (new ColumnFamilyOptions)
@@ -135,19 +137,24 @@ object RocksDBSource {
     RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
   }
 
-  def open(path: Path, compaction: Compaction): IOResult[RocksDBSource] = tryExecute {
-    openUnsafe(path, compaction)
-  }
+  def open(path: Path, compaction: Compaction): IOResult[RocksDBSource] =
+    tryExecute {
+      openUnsafe(path, compaction)
+    }
 
   def openUnsafe(path: Path, compaction: Compaction): RocksDBSource =
-    openUnsafeWithOptions(path,
-                          Settings.databaseOptions(compaction),
-                          Settings.columnOptions(compaction))
+    openUnsafeWithOptions(
+      path,
+      Settings.databaseOptions(compaction),
+      Settings.columnOptions(compaction)
+    )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def openUnsafeWithOptions(path: Path,
-                            databaseOptions: DBOptions,
-                            columnOptions: ColumnFamilyOptions): RocksDBSource = {
+  def openUnsafeWithOptions(
+      path: Path,
+      databaseOptions: DBOptions,
+      columnOptions: ColumnFamilyOptions
+  ): RocksDBSource = {
     import scala.jdk.CollectionConverters._
 
     val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
@@ -155,10 +162,12 @@ object RocksDBSource {
       new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8), columnOptions)
     }
 
-    val db = RocksDB.open(databaseOptions,
-                          path.toString,
-                          descriptors.toIterable.toList.asJava,
-                          handles.asJava)
+    val db = RocksDB.open(
+      databaseOptions,
+      path.toString,
+      descriptors.toIterable.toList.asJava,
+      handles.asJava
+    )
 
     new RocksDBSource(path, db, AVector.from(handles))
   }
@@ -172,18 +181,20 @@ class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFa
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
     cfHandles(ColumnFamily.values.indexWhere(_ == cf))
 
-  def close(): IOResult[Unit] = tryExecute {
-    db.close()
-  }
+  def close(): IOResult[Unit] =
+    tryExecute {
+      db.close()
+    }
 
   def closeUnsafe(): Unit = {
     cfHandles.foreach(_.close())
     db.close()
   }
 
-  def dESTROY(): IOResult[Unit] = tryExecute {
-    dESTROYUnsafe()
-  }
+  def dESTROY(): IOResult[Unit] =
+    tryExecute {
+      dESTROYUnsafe()
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def dESTROYUnsafe(): Unit = {

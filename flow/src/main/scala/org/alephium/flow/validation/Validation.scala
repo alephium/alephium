@@ -37,16 +37,16 @@ abstract class Validation[T <: FlowData, I <: InvalidStatus] {
 object Validation {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def validateFlowForest[T <: FlowData](
-      datas: AVector[T]): Option[AVector[Forest[BlockHash, T]]] = {
+      datas: AVector[T]
+  ): Option[AVector[Forest[BlockHash, T]]] = {
     val splits = datas.splitBy(_.chainIndex)
     val builds = splits.map(ds => Forest.tryBuild[BlockHash, T](ds, _.hash, _.parentHash))
     if (builds.forall(_.nonEmpty)) Some(builds.map(_.get)) else None
   }
 
-  def preValidate[T <: FlowData](datas: AVector[T])(
-      implicit consensusConfig: ConsensusConfig): Boolean = {
-    datas.forall { data =>
-      (data.target <= consensusConfig.maxMiningTarget) && PoW.checkWork(data)
-    }
+  def preValidate[T <: FlowData](
+      datas: AVector[T]
+  )(implicit consensusConfig: ConsensusConfig): Boolean = {
+    datas.forall { data => (data.target <= consensusConfig.maxMiningTarget) && PoW.checkWork(data) }
   }
 }

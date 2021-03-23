@@ -42,10 +42,12 @@ trait TxStorage extends KeyValueStorage[Hash, TxIndexes] {
 }
 
 object TxRocksDBStorage extends RocksDBKeyValueCompanion[TxRocksDBStorage] {
-  override def apply(storage: RocksDBSource,
-                     cf: ColumnFamily,
-                     writeOptions: WriteOptions,
-                     readOptions: ReadOptions): TxRocksDBStorage =
+  override def apply(
+      storage: RocksDBSource,
+      cf: ColumnFamily,
+      writeOptions: WriteOptions,
+      readOptions: ReadOptions
+  ): TxRocksDBStorage =
     new TxRocksDBStorage(storage, cf, writeOptions, readOptions)
 }
 
@@ -54,10 +56,12 @@ class TxRocksDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockChain.TxIndexes](storage,
-                                                               cf,
-                                                               writeOptions,
-                                                               readOptions)
+) extends RocksDBKeyValueStorage[Hash, BlockChain.TxIndexes](
+      storage,
+      cf,
+      writeOptions,
+      readOptions
+    )
     with TxStorage {
   override def delete(key: Hash): IOResult[Unit] = ???
 
