@@ -133,23 +133,22 @@ class RestServer(
     }
   }
 
-  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute { case (from, to, height) =>
+  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute { case (chainIndex, height) =>
     Future.successful(
       serverUtils.getHashesAtHeight(
         blockFlow,
-        ChainIndex(from, to),
-        GetHashesAtHeight(from.value, to.value, height)
+        chainIndex,
+        GetHashesAtHeight(chainIndex.from.value, chainIndex.to.value, height)
       )
     )
   }
 
-  private val getChainInfoRoute = getChainInfo.toRoute { case (from, to) =>
-    Future.successful(serverUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
+  private val getChainInfoRoute = getChainInfo.toRoute { chainIndex =>
+    Future.successful(serverUtils.getChainInfo(blockFlow, chainIndex))
   }
 
-  private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute {
-    case (from, to) =>
-      Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
+  private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute { chainIndex =>
+    Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
   }
 
   private val buildTransactionRoute = buildTransaction.toRoute {
@@ -166,8 +165,8 @@ class RestServer(
     serverUtils.sendTransaction(txHandler, transaction)
   }
 
-  private val getTransactionStatusRoute = getTransactionStatus.toRoute { case (txId, from, to) =>
-    Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, ChainIndex(from, to)))
+  private val getTransactionStatusRoute = getTransactionStatus.toRoute { case (txId, chainIndex) =>
+    Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, chainIndex))
   }
 
   private val minerActionRoute = minerAction.toRoute {
