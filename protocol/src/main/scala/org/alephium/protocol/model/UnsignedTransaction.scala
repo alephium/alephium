@@ -22,8 +22,7 @@ import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, UnlockScr
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-/**
-  * Upto one new token might be issued in each transaction exception for the coinbase transaction
+/** Upto one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
   *
   * @param scriptOpt optional script for invoking stateful contracts
@@ -31,12 +30,13 @@ import org.alephium.util.{AVector, TimeStamp, U256}
   * @param inputs a vector of TxInput
   * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
-final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
-                                     startGas: GasBox,
-                                     gasPrice: U256,
-                                     inputs: AVector[TxInput],
-                                     fixedOutputs: AVector[AssetOutput])
-    extends HashSerde[UnsignedTransaction] {
+final case class UnsignedTransaction(
+    scriptOpt: Option[StatefulScript],
+    startGas: GasBox,
+    gasPrice: U256,
+    inputs: AVector[TxInput],
+    fixedOutputs: AVector[AssetOutput]
+) extends HashSerde[UnsignedTransaction] {
   override lazy val hash: Hash = _getHash
 
   // this might only works for validated tx
@@ -67,19 +67,19 @@ final case class UnsignedTransaction(scriptOpt: Option[StatefulScript],
 object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] =
     Serde
-      .forProduct5[Option[StatefulScript],
-                   GasBox,
-                   U256,
-                   AVector[TxInput],
-                   AVector[AssetOutput],
-                   UnsignedTransaction](
+      .forProduct5[Option[StatefulScript], GasBox, U256, AVector[TxInput], AVector[
+        AssetOutput
+      ], UnsignedTransaction](
         UnsignedTransaction.apply,
-        t => (t.scriptOpt, t.startGas, t.gasPrice, t.inputs, t.fixedOutputs))
+        t => (t.scriptOpt, t.startGas, t.gasPrice, t.inputs, t.fixedOutputs)
+      )
       .validate(tx => if (GasBox.validate(tx.startGas)) Right(()) else Left("Invalid Gas"))
 
-  def apply(txScriptOpt: Option[StatefulScript],
-            inputs: AVector[TxInput],
-            fixedOutputs: AVector[AssetOutput]): UnsignedTransaction = {
+  def apply(
+      txScriptOpt: Option[StatefulScript],
+      inputs: AVector[TxInput],
+      fixedOutputs: AVector[AssetOutput]
+  ): UnsignedTransaction = {
     UnsignedTransaction(txScriptOpt, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
@@ -87,14 +87,16 @@ object UnsignedTransaction {
     UnsignedTransaction(None, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
-  def transferAlf(inputs: AVector[(AssetOutputRef, AssetOutput)],
-                  fromLockupScript: LockupScript,
-                  fromUnlockScript: UnlockScript,
-                  toLockupScript: LockupScript,
-                  lockTimeOpt: Option[TimeStamp],
-                  amount: U256,
-                  gas: GasBox,
-                  gasPrice: U256): Either[String, UnsignedTransaction] = {
+  def transferAlf(
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      fromLockupScript: LockupScript,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp],
+      amount: U256,
+      gas: GasBox,
+      gasPrice: U256
+  ): Either[String, UnsignedTransaction] = {
     val inputSum = inputs.fold(U256.Zero)(_ addUnsafe _._2.amount)
     (for {
       gasFee     <- gasPrice.mul(gas.toU256)
@@ -110,9 +112,15 @@ object UnsignedTransaction {
         } else {
           AVector[AssetOutput](toOutput)
         }
-      UnsignedTransaction(None, gas, gasPrice, inputs.map {
-        case (ref, _) => TxInput(ref, fromUnlockScript)
-      }, outputs)
+      UnsignedTransaction(
+        None,
+        gas,
+        gasPrice,
+        inputs.map { case (ref, _) =>
+          TxInput(ref, fromUnlockScript)
+        },
+        outputs
+      )
     }).toRight(s"Not enough balance")
   }
 }

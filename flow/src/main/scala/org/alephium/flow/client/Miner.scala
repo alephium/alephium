@@ -39,14 +39,19 @@ object Miner {
     props(config.network.networkType, config.minerAddresses, node.blockFlow, node.allHandlers)(
       config.broker,
       config.consensus,
-      config.mining)
+      config.mining
+    )
 
-  def props(networkType: NetworkType,
-            addresses: AVector[LockupScript],
-            blockFlow: BlockFlow,
-            allHandlers: AllHandlers)(implicit brokerConfig: BrokerConfig,
-                                      emissionConfig: EmissionConfig,
-                                      miningConfig: MiningSetting): Props = {
+  def props(
+      networkType: NetworkType,
+      addresses: AVector[LockupScript],
+      blockFlow: BlockFlow,
+      allHandlers: AllHandlers
+  )(implicit
+      brokerConfig: BrokerConfig,
+      emissionConfig: EmissionConfig,
+      miningConfig: MiningSetting
+  ): Props = {
     require(validateAddresses(addresses))
     Props(new Miner(networkType, addresses, blockFlow, allHandlers))
   }
@@ -61,9 +66,10 @@ object Miner {
       extends Command
   final case class UpdateAddresses(addresses: AVector[LockupScript]) extends Command
 
-  def mine(index: ChainIndex, template: BlockTemplate)(
-      implicit groupConfig: GroupConfig,
-      miningConfig: MiningSetting): Option[(Block, U256)] = {
+  def mine(index: ChainIndex, template: BlockTemplate)(implicit
+      groupConfig: GroupConfig,
+      miningConfig: MiningSetting
+  ): Option[(Block, U256)] = {
     val nonceStart = Random.nextU256NonUniform(U256.HalfMaxValue)
     val nonceEnd   = nonceStart.addUnsafe(miningConfig.nonceStep)
 
@@ -97,22 +103,24 @@ object Miner {
     }
   }
 
-  def validateAddresses(addresses: AVector[LockupScript])(
-      implicit groupConfig: GroupConfig): Boolean = {
+  def validateAddresses(
+      addresses: AVector[LockupScript]
+  )(implicit groupConfig: GroupConfig): Boolean = {
     (addresses.length == groupConfig.groups) &&
-    addresses.forallWithIndex { (lockupScript, i) =>
-      lockupScript.groupIndex.value == i
-    }
+    addresses.forallWithIndex { (lockupScript, i) => lockupScript.groupIndex.value == i }
   }
 }
 
-class Miner(networkType: NetworkType,
-            var addresses: AVector[LockupScript],
-            blockFlow: BlockFlow,
-            allHandlers: AllHandlers)(implicit val brokerConfig: BrokerConfig,
-                                      val emissionConfig: EmissionConfig,
-                                      val miningConfig: MiningSetting)
-    extends BaseActor
+class Miner(
+    networkType: NetworkType,
+    var addresses: AVector[LockupScript],
+    blockFlow: BlockFlow,
+    allHandlers: AllHandlers
+)(implicit
+    val brokerConfig: BrokerConfig,
+    val emissionConfig: EmissionConfig,
+    val miningConfig: MiningSetting
+) extends BaseActor
     with MinerState {
   val handlers = allHandlers
 
@@ -155,7 +163,8 @@ class Miner(networkType: NetworkType,
             Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
           log.info(
             s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
-              s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress")
+              s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress"
+          )
         case None =>
           setIdle(fromShift, to)
           startNewTasks()
@@ -183,31 +192,38 @@ class Miner(networkType: NetworkType,
     case Miner.GetAddresses => sender() ! addresses
   }
 
-  private def coinbase(chainIndex: ChainIndex,
-                       txs: AVector[Transaction],
-                       to: Int,
-                       target: Target,
-                       blockTs: TimeStamp): Transaction = {
+  private def coinbase(
+      chainIndex: ChainIndex,
+      txs: AVector[Transaction],
+      to: Int,
+      target: Target,
+      blockTs: TimeStamp
+  ): Transaction = {
     Transaction.coinbase(chainIndex, txs, addresses(to), target, blockTs)
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
     assume(
-      0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups)
+      0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups
+    )
     val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
     val blockTs      = Miner.nextTimeStamp(flowTemplate)
     val coinbaseTx   = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
-    BlockTemplate(flowTemplate.deps,
-                  flowTemplate.target,
-                  blockTs,
-                  flowTemplate.transactions :+ coinbaseTx)
+    BlockTemplate(
+      flowTemplate.deps,
+      flowTemplate.target,
+      blockTs,
+      flowTemplate.transactions :+ coinbaseTx
+    )
   }
 
-  def startTask(fromShift: Int,
-                to: Int,
-                template: BlockTemplate,
-                blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
+  def startTask(
+      fromShift: Int,
+      to: Int,
+      template: BlockTemplate,
+      blockHandler: ActorRefT[BlockChainHandler.Command]
+  ): Unit = {
     val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
     scheduleOnce(self, Miner.Mine(index, template), miningConfig.batchDelay)
   }

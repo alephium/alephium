@@ -32,11 +32,14 @@ class MerkleHashableSpec extends AlephiumSpec {
 
   def test(hashes: AVector[Hash], expected: Hash): Assertion = {
     MerkleHashable.rootHash(hashAlgo, hashes.toArray) is expected
-    MerkleHashable.rootHash(hashAlgo,
-                            hashes.map[MerkleHashable[Hash]](h =>
-                              new MerkleHashable[Hash] {
-                                override def merkleHash: Hash = h
-                            })) is expected
+    MerkleHashable.rootHash(
+      hashAlgo,
+      hashes.map[MerkleHashable[Hash]](h =>
+        new MerkleHashable[Hash] {
+          override def merkleHash: Hash = h
+        }
+      )
+    ) is expected
   }
 
   it should "compute rootHash for few hashes" in {
@@ -63,14 +66,18 @@ class MerkleHashableSpec extends AlephiumSpec {
 
     val hashes6 = AVector.fill(6)(hashAlgo.random)
     val expected6 =
-      hash(hash(hash(hashes6(0), hashes6(1)), hash(hashes6(2), hashes6(3))),
-           hash(hash(hashes6(4), hashes6(5))))
+      hash(
+        hash(hash(hashes6(0), hashes6(1)), hash(hashes6(2), hashes6(3))),
+        hash(hash(hashes6(4), hashes6(5)))
+      )
     test(hashes6, expected6)
 
     val hashes7 = AVector.fill(7)(hashAlgo.random)
     val expected7 =
-      hash(hash(hash(hashes7(0), hashes7(1)), hash(hashes7(2), hashes7(3))),
-           hash(hash(hashes7(4), hashes7(5)), hash(hashes7(6))))
+      hash(
+        hash(hash(hashes7(0), hashes7(1)), hash(hashes7(2), hashes7(3))),
+        hash(hash(hashes7(4), hashes7(5)), hash(hashes7(6)))
+      )
     test(hashes7, expected7)
   }
 }

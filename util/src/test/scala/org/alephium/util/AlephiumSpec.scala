@@ -33,7 +33,7 @@ trait AlephiumSpec
     extends AnyFlatSpecLike
     with ScalaCheckDrivenPropertyChecks
     with AlephiumFixture {
-  @nowarn protected implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  @nowarn implicit protected def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 }
 
 trait AlephiumFixture extends Matchers {
@@ -42,7 +42,8 @@ trait AlephiumFixture extends Matchers {
   lazy val negLongGen: Gen[Long] = Gen.chooseNum(Long.MinValue, -1L)
 
   implicit lazy val bytesArb: Arbitrary[AVector[Byte]] = Arbitrary(
-    arbitrary[List[Byte]].map(AVector.from))
+    arbitrary[List[Byte]].map(AVector.from)
+  )
   implicit lazy val i32Arb: Arbitrary[I32]   = Arbitrary(arbitrary[Int].map(I32.unsafe))
   implicit lazy val u32Arb: Arbitrary[U32]   = Arbitrary(arbitrary[Int].map(U32.unsafe))
   implicit lazy val i64Arb: Arbitrary[I64]   = Arbitrary(arbitrary[Long].map(I64.from))
@@ -58,15 +59,17 @@ trait AlephiumFixture extends Matchers {
   }
 
   implicit class IsEOps[A: Equality, L](left: Either[L, A])(implicit pos: Position) {
-    def rightValue: A = left match {
-      case Left(error) => throw new AssertionError(error)
-      case Right(a)    => a
-    }
+    def rightValue: A =
+      left match {
+        case Left(error) => throw new AssertionError(error)
+        case Right(a)    => a
+      }
 
-    def leftValue: L = left match {
-      case Left(error) => error
-      case Right(a)    => throw new AssertionError(a)
-    }
+    def leftValue: L =
+      left match {
+        case Left(error) => error
+        case Right(a)    => throw new AssertionError(a)
+      }
 
     def isE(right: A): Assertion                             = rightValue shouldEqual right
     def isE(right: ResultOfATypeInvocation[_]): Assertion    = rightValue shouldBe right

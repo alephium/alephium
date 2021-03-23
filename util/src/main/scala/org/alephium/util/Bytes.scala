@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 object Bytes {
   def toPosInt(byte: Byte): Int = {
-    byte & 0xFF
+    byte & 0xff
   }
 
   def from(value: Int): ByteString = {
@@ -31,30 +31,32 @@ object Bytes {
 
   def toIntUnsafe(bytes: ByteString): Int = {
     assume(bytes.length == 4)
-    bytes(0) << 24 | (bytes(1) & 0xFF) << 16 | (bytes(2) & 0xFF) << 8 | (bytes(3) & 0xFF)
+    bytes(0) << 24 | (bytes(1) & 0xff) << 16 | (bytes(2) & 0xff) << 8 | (bytes(3) & 0xff)
   }
 
   def toBytes(value: Long): ByteString = {
-    ByteString((value >> 56).toByte,
-               (value >> 48).toByte,
-               (value >> 40).toByte,
-               (value >> 32).toByte,
-               (value >> 24).toByte,
-               (value >> 16).toByte,
-               (value >> 8).toByte,
-               value.toByte)
+    ByteString(
+      (value >> 56).toByte,
+      (value >> 48).toByte,
+      (value >> 40).toByte,
+      (value >> 32).toByte,
+      (value >> 24).toByte,
+      (value >> 16).toByte,
+      (value >> 8).toByte,
+      value.toByte
+    )
   }
 
   def toLongUnsafe(bytes: ByteString): Long = {
     assume(bytes.length == 8)
-    (bytes(0) & 0xFFL) << 56 |
-      (bytes(1) & 0xFFL) << 48 |
-      (bytes(2) & 0xFFL) << 40 |
-      (bytes(3) & 0xFFL) << 32 |
-      (bytes(4) & 0xFFL) << 24 |
-      (bytes(5) & 0xFFL) << 16 |
-      (bytes(6) & 0xFFL) << 8 |
-      (bytes(7) & 0xFFL)
+    (bytes(0) & 0xffL) << 56 |
+      (bytes(1) & 0xffL) << 48 |
+      (bytes(2) & 0xffL) << 40 |
+      (bytes(3) & 0xffL) << 32 |
+      (bytes(4) & 0xffL) << 24 |
+      (bytes(5) & 0xffL) << 16 |
+      (bytes(6) & 0xffL) << 8 |
+      (bytes(7) & 0xffL)
   }
 
   def xorByte(value: Int): Byte = {

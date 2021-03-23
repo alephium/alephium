@@ -52,5 +52,6 @@ trait WalletConfigFixture {
     tempSecretDir,
     networkType,
     lockingTimeout,
-    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge))
+    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge)
+  )
 }

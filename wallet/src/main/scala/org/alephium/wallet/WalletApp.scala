@@ -33,19 +33,22 @@ import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.web._
 
-class WalletApp(config: WalletConfig)(implicit actorSystem: ActorSystem,
-                                      val executionContext: ExecutionContext)
-    extends Service
+class WalletApp(config: WalletConfig)(implicit
+    actorSystem: ActorSystem,
+    val executionContext: ExecutionContext
+) extends Service
     with StrictLogging {
 
-  private implicit val groupConfig = new GroupConfig {
+  implicit private val groupConfig = new GroupConfig {
     override def groups: Int = config.blockflow.groups
   }
 
   val blockFlowClient: BlockFlowClient =
-    BlockFlowClient.apply(config.blockflow.uri,
-                          config.networkType,
-                          config.blockflow.blockflowFetchMaxAge)
+    BlockFlowClient.apply(
+      config.blockflow.uri,
+      config.networkType,
+      config.blockflow.blockflowFetchMaxAge
+    )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private val secretDir = Paths.get(config.secretDir.toString, config.networkType.name)

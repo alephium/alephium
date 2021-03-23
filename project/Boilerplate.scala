@@ -23,11 +23,12 @@ import sbt._
 object Boilerplate {
   import scala.StringContext._
 
-  private def _gen(templates: Seq[Template], dir: File) = templates.map { template =>
-    val tgtFile = template.filename(dir)
-    IO.write(tgtFile, template.body)
-    tgtFile
-  }
+  private def _gen(templates: Seq[Template], dir: File) =
+    templates.map { template =>
+      val tgtFile = template.filename(dir)
+      IO.write(tgtFile, template.body)
+      tgtFile
+    }
 
   def genSrc(dir: File): Seq[File]  = _gen(templatesSrc, dir)
   def genTest(dir: File): Seq[File] = _gen(templatesTest, dir)

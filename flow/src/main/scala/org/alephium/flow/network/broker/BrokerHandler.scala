@@ -98,22 +98,25 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
     remoteBrokerInfo = _remoteBrokerInfo
   }
 
-  @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit = f match {
-    case Right(t) => g(t)
-    case Left(error) =>
-      log.error(s"IO error in $action: $error")
-  }
+  @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit =
+    f match {
+      case Right(t) => g(t)
+      case Left(error) =>
+        log.error(s"IO error in $action: $error")
+    }
 
   def exchanging: Receive
 
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
       log.debug(
-        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress")
+        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
+      )
       send(GetBlocks(hashes))
     case Received(SendBlocks(blocks)) =>
       log.debug(
-        s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress")
+        s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress"
+      )
       handleFlowData(blocks, dataOrigin, isBlock = true)
     case Received(GetBlocks(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
@@ -121,7 +124,8 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       }
     case Received(SendHeaders(headers)) =>
       log.debug(
-        s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress")
+        s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress"
+      )
       handleFlowData(headers, dataOrigin, isBlock = false)
     case Received(GetHeaders(hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
@@ -195,7 +199,8 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       pingNonce = 0
     } else {
       log.debug(
-        s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce")
+        s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce"
+      )
       publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
     }
   }
@@ -210,11 +215,12 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
     brokerConnectionHandler ! ConnectionHandler.CloseConnection
   }
 
-  override def unhandled(message: Any): Unit = message match {
-    case Terminated(_) =>
-      context stop self
-    case _ => super.unhandled(message)
-  }
+  override def unhandled(message: Any): Unit =
+    message match {
+      case Terminated(_) =>
+        context stop self
+      case _ => super.unhandled(message)
+    }
 }
 
 trait FlowDataHandler extends BaseActor with EventStream.Publisher {
@@ -224,16 +230,16 @@ trait FlowDataHandler extends BaseActor with EventStream.Publisher {
   def blockflow: BlockFlow
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def handleFlowData[T <: FlowData](datas: AVector[T],
-                                    dataOrigin: DataOrigin,
-                                    isBlock: Boolean): Unit = {
+  def handleFlowData[T <: FlowData](
+      datas: AVector[T],
+      dataOrigin: DataOrigin,
+      isBlock: Boolean
+  ): Unit = {
     if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
       log.warning(s"The data received does not contain minimal work")
       publishEvent(MisbehaviorManager.InvalidPoW(remoteAddress))
     } else {
-      val ok = datas.forall { data =>
-        data.chainIndex.relateTo(brokerConfig) == isBlock
-      }
+      val ok = datas.forall { data => data.chainIndex.relateTo(brokerConfig) == isBlock }
       if (ok) {
         val message = DependencyHandler.AddFlowData(datas, dataOrigin)
         allHandlers.dependencyHandler ! message

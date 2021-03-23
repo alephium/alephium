@@ -22,16 +22,21 @@ import org.alephium.protocol.model.UnsignedTransaction
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildTransactionResult(unsignedTx: String,
-                                        txId: Hash,
-                                        fromGroup: Int,
-                                        toGroup: Int)
+final case class BuildTransactionResult(
+    unsignedTx: String,
+    txId: Hash,
+    fromGroup: Int,
+    toGroup: Int
+)
 object BuildTransactionResult {
 
-  def from(unsignedTx: UnsignedTransaction)(
-      implicit groupConfig: GroupConfig): BuildTransactionResult =
-    BuildTransactionResult(Hex.toHexString(serialize(unsignedTx)),
-                           unsignedTx.hash,
-                           unsignedTx.fromGroup.value,
-                           unsignedTx.toGroup.value)
+  def from(
+      unsignedTx: UnsignedTransaction
+  )(implicit groupConfig: GroupConfig): BuildTransactionResult =
+    BuildTransactionResult(
+      Hex.toHexString(serialize(unsignedTx)),
+      unsignedTx.hash,
+      unsignedTx.fromGroup.value,
+      unsignedTx.toGroup.value
+    )
 }

@@ -45,10 +45,12 @@ object Stack {
 }
 
 // Note: current place at underlying is empty
-class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
-                             val offset: Int,
-                             val capacity: Int,
-                             var currentIndex: Int) {
+class Stack[@sp T: ClassTag](
+    val underlying: mutable.ArraySeq[T],
+    val offset: Int,
+    val capacity: Int,
+    var currentIndex: Int
+) {
   val maxIndex: Int = offset + capacity
 
   def isEmpty: Boolean = currentIndex == offset
@@ -99,9 +101,7 @@ class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
       Right(AVector.ofSize(0))
     } else if (n <= size) {
       val start = currentIndex - n // always >= offset
-      val elems = AVector.tabulate(n) { k =>
-        underlying(start + k)
-      }
+      val elems = AVector.tabulate(n) { k => underlying(start + k) }
       currentIndex = start
       Right(elems)
     } else {
@@ -146,7 +146,7 @@ class Stack[@sp T: ClassTag](val underlying: mutable.ArraySeq[T],
     } else {
       val tmp = underlying(fromIndex)
       underlying(fromIndex) = underlying(toIndex)
-      underlying(toIndex)   = tmp
+      underlying(toIndex) = tmp
       Right(())
     }
   }

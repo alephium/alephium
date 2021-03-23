@@ -23,19 +23,25 @@ import org.alephium.serde._
 object RocksDBKeyValueStorage {
   import RocksDBSource.Settings
 
-  def apply[K: Serializer, V: Serde](storage: RocksDBSource,
-                                     cf: RocksDBSource.ColumnFamily): KeyValueStorage[K, V] =
+  def apply[K: Serializer, V: Serde](
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily
+  ): KeyValueStorage[K, V] =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
-  def apply[K: Serializer, V: Serde](storage: RocksDBSource,
-                                     cf: RocksDBSource.ColumnFamily,
-                                     writeOptions: WriteOptions): KeyValueStorage[K, V] =
+  def apply[K: Serializer, V: Serde](
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily,
+      writeOptions: WriteOptions
+  ): KeyValueStorage[K, V] =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply[K: Serializer, V: Serde](storage: RocksDBSource,
-                                     cf: RocksDBSource.ColumnFamily,
-                                     writeOptions: WriteOptions,
-                                     readOptions: ReadOptions): KeyValueStorage[K, V] =
+  def apply[K: Serializer, V: Serde](
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily,
+      writeOptions: WriteOptions,
+      readOptions: ReadOptions
+  ): KeyValueStorage[K, V] =
     new RocksDBKeyValueStorage(storage, cf, writeOptions, readOptions)
 }
 

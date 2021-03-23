@@ -26,9 +26,11 @@ import org.alephium.util.{ActorRefT, AVector}
 object BrokerStatusTracker {
   final case class Status(lastSeenHeights: AVector[Int])
 
-  final case class ConnectingBroker(remoteAddress: InetSocketAddress,
-                                    localAddress: InetSocketAddress,
-                                    handler: ActorRefT[BrokerHandler.Command])
+  final case class ConnectingBroker(
+      remoteAddress: InetSocketAddress,
+      localAddress: InetSocketAddress,
+      handler: ActorRefT[BrokerHandler.Command]
+  )
   final case class HandShakedBroker(brokerInfo: BrokerInfo)
 
   type ConnectingBrokers = mutable.HashMap[ActorRefT[BrokerHandler.Command], ConnectingBroker]

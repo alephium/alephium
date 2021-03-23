@@ -65,8 +65,10 @@ trait ServerFixture
   lazy val dummyBalance         = Balance(U256.Zero, U256.Zero, 0)
   lazy val dummyGroup           = Group(0)
 
-  lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(GroupIndex.unsafe(0)).sample.get
-  lazy val (dummyToAddres, dummyToKey, _)               = addressStringGen(GroupIndex.unsafe(1)).sample.get
+  lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
+    GroupIndex.unsafe(0)
+  ).sample.get
+  lazy val (dummyToAddres, dummyToKey, _) = addressStringGen(GroupIndex.unsafe(1)).sample.get
 
   lazy val dummyHashesAtHeight = HashesAtHeight(AVector.empty)
   lazy val dummyChainInfo      = ChainInfo(0)
@@ -75,8 +77,10 @@ trait ServerFixture
     .sample
     .get
   lazy val dummySignature =
-    SignatureSchema.sign(dummyTx.unsigned.hash.bytes,
-                         PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey)))
+    SignatureSchema.sign(
+      dummyTx.unsigned.hash.bytes,
+      PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey))
+    )
   lazy val dummyTransferResult = TxResult(
     dummyTx.id,
     dummyTx.fromGroup.value,
@@ -97,24 +101,25 @@ object ServerFixture {
   }
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
-    def receive: Receive = {
-      case DiscoveryServer.GetNeighborPeers =>
-        sender() ! DiscoveryServer.NeighborPeers(neighborPeers.peers)
+    def receive: Receive = { case DiscoveryServer.GetNeighborPeers =>
+      sender() ! DiscoveryServer.NeighborPeers(neighborPeers.peers)
     }
   }
 
   class BootstrapperDummy(intraCliqueInfo: IntraCliqueInfo) extends BaseActor {
-    def receive: Receive = {
-      case Bootstrapper.GetIntraCliqueInfo => sender() ! intraCliqueInfo
+    def receive: Receive = { case Bootstrapper.GetIntraCliqueInfo =>
+      sender() ! intraCliqueInfo
     }
   }
 
-  class NodeDummy(intraCliqueInfo: IntraCliqueInfo,
-                  neighborPeers: NeighborPeers,
-                  block: Block,
-                  blockFlowProbe: ActorRef,
-                  dummyTx: Transaction,
-                  storages: Storages)(implicit val config: AlephiumConfig)
+  class NodeDummy(
+      intraCliqueInfo: IntraCliqueInfo,
+      neighborPeers: NeighborPeers,
+      block: Block,
+      blockFlowProbe: ActorRef,
+      dummyTx: Transaction,
+      storages: Storages
+  )(implicit val config: AlephiumConfig)
       extends Node {
     implicit val system: ActorSystem = ActorSystem("NodeDummy")
     val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
@@ -131,22 +136,26 @@ object ServerFixture {
 
     val selfCliqueSynced = true
     val cliqueManager: ActorRefT[CliqueManager.Command] =
-      ActorRefT.build(system, Props(new BaseActor {
-        override def receive: Receive = {
-          case CliqueManager.IsSelfCliqueReady => sender() ! selfCliqueSynced
-        }
-      }), "clique-manager")
+      ActorRefT.build(
+        system,
+        Props(new BaseActor {
+          override def receive: Receive = { case CliqueManager.IsSelfCliqueReady =>
+            sender() ! selfCliqueSynced
+          }
+        }),
+        "clique-manager"
+      )
 
     val txHandlerRef =
       system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
     val txHandler = ActorRefT[TxHandler.Command](txHandlerRef)
 
     val allHandlers: AllHandlers = AllHandlers(
-      flowHandler       = ActorRefT(TestProbe().ref),
-      txHandler         = txHandler,
+      flowHandler = ActorRefT(TestProbe().ref),
+      txHandler = txHandler,
       dependencyHandler = ActorRefT(TestProbe().ref),
-      blockHandlers     = Map.empty,
-      headerHandlers    = Map.empty
+      blockHandlers = Map.empty,
+      headerHandlers = Map.empty
     )(config.broker)
 
     val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
@@ -158,14 +167,18 @@ object ServerFixture {
     override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
   }
 
-  class BlockFlowDummy(block: Block,
-                       blockFlowProbe: ActorRef,
-                       dummyTx: Transaction,
-                       val storages: Storages)(implicit val config: AlephiumConfig)
+  class BlockFlowDummy(
+      block: Block,
+      blockFlowProbe: ActorRef,
+      dummyTx: Transaction,
+      val storages: Storages
+  )(implicit val config: AlephiumConfig)
       extends EmptyBlockFlow {
 
-    override def getHeightedBlockHeaders(fromTs: TimeStamp,
-                                         toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
+    override def getHeightedBlockHeaders(
+        fromTs: TimeStamp,
+        toTs: TimeStamp
+    ): IOResult[AVector[(BlockHeader, Int)]] = {
       blockFlowProbe ! (block.header.timestamp >= fromTs && block.header.timestamp <= toTs)
       Right(AVector((block.header, 1)))
     }
@@ -173,10 +186,12 @@ object ServerFixture {
     override def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] =
       Right((U256.Zero, U256.Zero, 0))
 
-    override def prepareUnsignedTx(fromKey: PublicKey,
-                                   toLockupScript: LockupScript,
-                                   lockTimeOpt: Option[TimeStamp],
-                                   amount: U256): IOResult[Either[String, UnsignedTransaction]] =
+    override def prepareUnsignedTx(
+        fromKey: PublicKey,
+        toLockupScript: LockupScript,
+        lockTimeOpt: Option[TimeStamp],
+        amount: U256
+    ): IOResult[Either[String, UnsignedTransaction]] =
       lockTimeOpt match {
         case None => Right(Right(dummyTx.unsigned))
         case Some(lockTime) =>
@@ -185,8 +200,10 @@ object ServerFixture {
           Right(Right(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
       }
 
-    override def getTxStatus(txId: Hash,
-                             chainIndex: ChainIndex): IOResult[Option[BlockFlowState.TxStatus]] =
+    override def getTxStatus(
+        txId: Hash,
+        chainIndex: ChainIndex
+    ): IOResult[Option[BlockFlowState.TxStatus]] =
       Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
 
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)

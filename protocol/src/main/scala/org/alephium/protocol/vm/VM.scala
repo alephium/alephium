@@ -22,9 +22,11 @@ import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
-sealed abstract class VM[Ctx <: Context](ctx: Ctx,
-                                         frameStack: Stack[Frame[Ctx]],
-                                         operandStack: Stack[Val]) {
+sealed abstract class VM[Ctx <: Context](
+    ctx: Ctx,
+    frameStack: Stack[Frame[Ctx]],
+    operandStack: Stack[Val]
+) {
   def execute(obj: ContractObj[Ctx], methodIndex: Int, args: AVector[Val]): ExeResult[Unit] = {
     for {
       startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack)
@@ -33,10 +35,12 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
     } yield ()
   }
 
-  def executeWithOutputs(obj: ContractObj[Ctx],
-                         methodIndex: Int,
-                         args: AVector[Val]): ExeResult[AVector[Val]] = {
-    var outputs: AVector[Val] = AVector.ofSize(0)
+  def executeWithOutputs(
+      obj: ContractObj[Ctx],
+      methodIndex: Int,
+      args: AVector[Val]
+  ): ExeResult[AVector[Val]] = {
+    var outputs: AVector[Val]                     = AVector.ofSize(0)
     val returnTo: AVector[Val] => ExeResult[Unit] = returns => { outputs = returns; Right(()) }
     for {
       startFrame <- obj.startFrameWithOutputs(ctx, methodIndex, args, operandStack, returnTo)
@@ -82,22 +86,28 @@ sealed abstract class VM[Ctx <: Context](ctx: Ctx,
   protected def completeLastFrame(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
 
-final class StatelessVM(ctx: StatelessContext,
-                        frameStack: Stack[Frame[StatelessContext]],
-                        operandStack: Stack[Val])
-    extends VM(ctx, frameStack, operandStack) {
-  protected def switchFrame(currentFrame: Frame[StatelessContext],
-                            nextFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
+final class StatelessVM(
+    ctx: StatelessContext,
+    frameStack: Stack[Frame[StatelessContext]],
+    operandStack: Stack[Val]
+) extends VM(ctx, frameStack, operandStack) {
+  protected def switchFrame(
+      currentFrame: Frame[StatelessContext],
+      nextFrame: Frame[StatelessContext]
+  ): ExeResult[Unit] = Right(())
 
   protected def completeLastFrame(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 }
 
-final class StatefulVM(ctx: StatefulContext,
-                       frameStack: Stack[Frame[StatefulContext]],
-                       operandStack: Stack[Val])
-    extends VM(ctx, frameStack, operandStack) {
-  protected def switchFrame(currentFrame: Frame[StatefulContext],
-                            nextFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+final class StatefulVM(
+    ctx: StatefulContext,
+    frameStack: Stack[Frame[StatefulContext]],
+    operandStack: Stack[Val]
+) extends VM(ctx, frameStack, operandStack) {
+  protected def switchFrame(
+      currentFrame: Frame[StatefulContext],
+      nextFrame: Frame[StatefulContext]
+  ): ExeResult[Unit] = {
     if (currentFrame.method.isPayable) {
       val resultOpt = for {
         currentBalances <- currentFrame.balanceStateOpt
@@ -188,75 +198,97 @@ final class StatefulVM(ctx: StatefulContext,
 object StatelessVM {
   final case class AssetScriptExecution(gasRemaining: GasBox)
 
-  def runAssetScript(txId: Hash,
-                     initialGas: GasBox,
-                     script: StatelessScript,
-                     args: AVector[Val],
-                     signature: Signature): ExeResult[AssetScriptExecution] = {
+  def runAssetScript(
+      txId: Hash,
+      initialGas: GasBox,
+      script: StatelessScript,
+      args: AVector[Val],
+      signature: Signature
+  ): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(txId, initialGas, signature)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  def runAssetScript(txId: Hash,
-                     initialGas: GasBox,
-                     script: StatelessScript,
-                     args: AVector[Val],
-                     signatures: Stack[Signature]): ExeResult[AssetScriptExecution] = {
+  def runAssetScript(
+      txId: Hash,
+      initialGas: GasBox,
+      script: StatelessScript,
+      args: AVector[Val],
+      signatures: Stack[Signature]
+  ): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(txId, initialGas, signatures)
     val obj     = script.toObject
     execute(context, obj, args)
   }
 
-  private def execute(context: StatelessContext,
-                      obj: ContractObj[StatelessContext],
-                      args: AVector[Val]): ExeResult[AssetScriptExecution] = {
-    val vm = new StatelessVM(context,
-                             Stack.ofCapacity(frameStackMaxSize),
-                             Stack.ofCapacity(opStackMaxSize))
+  private def execute(
+      context: StatelessContext,
+      obj: ContractObj[StatelessContext],
+      args: AVector[Val]
+  ): ExeResult[AssetScriptExecution] = {
+    val vm = new StatelessVM(
+      context,
+      Stack.ofCapacity(frameStackMaxSize),
+      Stack.ofCapacity(opStackMaxSize)
+    )
     vm.execute(obj, 0, args).map(_ => AssetScriptExecution(context.gasRemaining))
   }
 
-  def executeWithOutputs(context: StatelessContext,
-                         obj: ContractObj[StatelessContext],
-                         args: AVector[Val]): ExeResult[AVector[Val]] = {
-    val vm = new StatelessVM(context,
-                             Stack.ofCapacity(frameStackMaxSize),
-                             Stack.ofCapacity(opStackMaxSize))
+  def executeWithOutputs(
+      context: StatelessContext,
+      obj: ContractObj[StatelessContext],
+      args: AVector[Val]
+  ): ExeResult[AVector[Val]] = {
+    val vm = new StatelessVM(
+      context,
+      Stack.ofCapacity(frameStackMaxSize),
+      Stack.ofCapacity(opStackMaxSize)
+    )
     vm.executeWithOutputs(obj, 0, args)
   }
 }
 
 object StatefulVM {
-  final case class TxScriptExecution(gasBox: GasBox,
-                                     contractInputs: AVector[ContractOutputRef],
-                                     generatedOutputs: AVector[TxOutput])
+  final case class TxScriptExecution(
+      gasBox: GasBox,
+      contractInputs: AVector[ContractOutputRef],
+      generatedOutputs: AVector[TxOutput]
+  )
 
-  def runTxScript(worldState: WorldState.Cached,
-                  tx: TransactionAbstract,
-                  script: StatefulScript,
-                  gasRemaining: GasBox): ExeResult[TxScriptExecution] = {
+  def runTxScript(
+      worldState: WorldState.Cached,
+      tx: TransactionAbstract,
+      script: StatefulScript,
+      gasRemaining: GasBox
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(tx, gasRemaining, worldState)
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map { _ =>
       context.worldState.commit()
-      TxScriptExecution(context.gasRemaining,
-                        AVector.from(context.contractInputs),
-                        AVector.from(context.generatedOutputs))
+      TxScriptExecution(
+        context.gasRemaining,
+        AVector.from(context.contractInputs),
+        AVector.from(context.generatedOutputs)
+      )
     }
   }
 
-  def execute(context: StatefulContext,
-              obj: ContractObj[StatefulContext],
-              args: AVector[Val]): ExeResult[Unit] = {
+  def execute(
+      context: StatefulContext,
+      obj: ContractObj[StatefulContext],
+      args: AVector[Val]
+  ): ExeResult[Unit] = {
     val vm =
       new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
     vm.execute(obj, 0, args)
   }
 
-  def executeWithOutputs(context: StatefulContext,
-                         obj: ContractObj[StatefulContext],
-                         args: AVector[Val]): ExeResult[AVector[Val]] = {
+  def executeWithOutputs(
+      context: StatefulContext,
+      obj: ContractObj[StatefulContext],
+      args: AVector[Val]
+  ): ExeResult[AVector[Val]] = {
     val vm =
       new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
     vm.executeWithOutputs(obj, 0, args)

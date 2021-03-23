@@ -75,12 +75,11 @@ trait MinerState {
   }
 
   protected def startNewTasks(): Unit = {
-    pickTasks().foreach {
-      case (fromShift, to, template) =>
-        val index        = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
-        val blockHandler = handlers.getBlockHandler(index)
-        startTask(fromShift, to, template, blockHandler)
-        setRunning(fromShift, to)
+    pickTasks().foreach { case (fromShift, to, template) =>
+      val index        = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
+      val blockHandler = handlers.getBlockHandler(index)
+      startTask(fromShift, to, template, blockHandler)
+      setRunning(fromShift, to)
     }
   }
 
@@ -93,8 +92,10 @@ trait MinerState {
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
 
-  def startTask(fromShift: Int,
-                to: Int,
-                template: BlockTemplate,
-                blockHandler: ActorRefT[BlockChainHandler.Command]): Unit
+  def startTask(
+      fromShift: Int,
+      to: Int,
+      template: BlockTemplate,
+      blockHandler: ActorRefT[BlockChainHandler.Command]
+  ): Unit
 }

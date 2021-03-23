@@ -37,11 +37,13 @@ class I32Spec extends AlephiumSpec {
     I32.from(I32.MaxValue.toBigInt.add(BigInteger.ONE)).isEmpty is true
   }
 
-  def test(op: (I32, I32)                       => Option[I32],
-           opUnsafe: (I32, I32)                 => I32,
-           opExpected: (BigInteger, BigInteger) => BigInteger,
-           bcondition: Int                      => Boolean = _ >= Int.MinValue,
-           abcondition: (Int, Int)              => Boolean = _ + _ >= Int.MinValue): Unit = {
+  def test(
+      op: (I32, I32) => Option[I32],
+      opUnsafe: (I32, I32) => I32,
+      opExpected: (BigInteger, BigInteger) => BigInteger,
+      bcondition: Int => Boolean = _ >= Int.MinValue,
+      abcondition: (Int, Int) => Boolean = _ + _ >= Int.MinValue
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen
@@ -49,7 +51,12 @@ class I32Spec extends AlephiumSpec {
       val aI32          = I32.unsafe(a)
       val bI32          = I32.unsafe(b)
       lazy val expected = opExpected(aI32.toBigInt, bI32.toBigInt)
-      if (bcondition(b) && abcondition(a, b) && expected >= I32.MinValue.toBigInt && expected <= I32.MaxValue.toBigInt) {
+      if (
+        bcondition(b) && abcondition(
+          a,
+          b
+        ) && expected >= I32.MinValue.toBigInt && expected <= I32.MaxValue.toBigInt
+      ) {
         op(aI32, bI32).get.toBigInt is expected
         opUnsafe(aI32, bI32).toBigInt is expected
       } else {

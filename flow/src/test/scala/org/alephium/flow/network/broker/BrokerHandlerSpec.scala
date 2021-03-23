@@ -38,7 +38,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
     val blockFlowSynchronizer = TestProbe()
     val brokerHandler =
       TestActorRef[TestBrokerHandler](
-        TestBrokerHandler.props(connectionHandler.ref, blockFlowSynchronizer.ref, blockFlow))
+        TestBrokerHandler.props(connectionHandler.ref, blockFlowSynchronizer.ref, blockFlow)
+      )
 
     connectionHandler.expectMsgType[ConnectionHandler.Send]
     brokerHandler.underlyingActor.pingPongTickOpt is None
@@ -52,18 +53,20 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
 }
 
 object TestBrokerHandler {
-  def props(brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-            blockflow: BlockFlow)(implicit brokerConfig: BrokerConfig,
-                                  networkSetting: NetworkSetting): Props = {
+  def props(
+      brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+      blockflow: BlockFlow
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
     Props(new TestBrokerHandler(brokerConnectionHandler, blockFlowSynchronizer, blockflow))
   }
 }
 
-class TestBrokerHandler(val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-                        val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-                        val blockflow: BlockFlow)(implicit val brokerConfig: BrokerConfig,
-                                                  val networkSetting: NetworkSetting)
+class TestBrokerHandler(
+    val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+    val blockflow: BlockFlow
+)(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BrokerHandler {
   val connectionType: ConnectionType = OutboundConnection
 

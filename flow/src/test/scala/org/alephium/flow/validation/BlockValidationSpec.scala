@@ -47,12 +47,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   class Fixture extends BlockValidation.Impl()
 
   it should "validate group for block" in new Fixture {
-    forAll(blockGenOf(brokerConfig)) { block =>
-      passCheck(checkGroup(block))
-    }
-    forAll(blockGenNotOf(brokerConfig)) { block =>
-      failCheck(checkGroup(block), InvalidGroup)
-    }
+    forAll(blockGenOf(brokerConfig)) { block => passCheck(checkGroup(block)) }
+    forAll(blockGenNotOf(brokerConfig)) { block => failCheck(checkGroup(block), InvalidGroup) }
   }
 
   it should "validate nonEmpty transaction list" in new Fixture {
@@ -70,11 +66,13 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val (privateKey, publicKey) = SignatureSchema.generatePriPub()
     val lockupScript            = LockupScript.p2pkh(publicKey)
     val block0 =
-      Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                 AVector.empty,
-                 consensusConfig.maxMiningTarget,
-                 TimeStamp.zero,
-                 0)
+      Block.from(
+        AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+        AVector.empty,
+        consensusConfig.maxMiningTarget,
+        TimeStamp.zero,
+        0
+      )
 
     val input0          = txInputGen.sample.get
     val output0         = assetOutputGen.sample.get
@@ -131,7 +129,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val miningReward      = consensusConfig.emission.miningReward(block.header)
     val coinbaseOutputNew = block.coinbase.unsigned.fixedOutputs.head.copy(amount = miningReward)
     val coinbaseNew = block.coinbase.copy(
-      unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew)))
+      unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew))
+    )
     val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
     val blockNew = block.copy(transactions = txsNew)
     failCheck(checkCoinbaseReward(blockNew), InvalidCoinbaseReward)
@@ -187,7 +186,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       blockFlow.getOutTips(blockFlow.getBlockHeaderUnsafe(intraDep), inclusive = false)
     val diff = blockFlow.getTipsDiffUnsafe(newOutTips, oldOutTips)
     assertThrows[IOError.KeyNotFound[_]](
-      !blockFlow.isConflicted(block1.hash +: diff, blockFlow.getBlockUnsafe))
+      !blockFlow.isConflicted(block1.hash +: diff, blockFlow.getBlockUnsafe)
+    )
 
     blockValidation.validate(block1, blockFlow) isE ()
   }

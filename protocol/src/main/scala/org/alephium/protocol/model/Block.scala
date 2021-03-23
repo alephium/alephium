@@ -78,38 +78,42 @@ object Block {
   def calTxsHash(transactions: AVector[Transaction]): Hash =
     MerkleHashable.rootHash(Hash, transactions)
 
-  def from(deps: AVector[BlockHash],
-           transactions: AVector[Transaction],
-           target: Target,
-           timeStamp: TimeStamp,
-           nonce: U256)(implicit config: GroupConfig): Block = {
+  def from(
+      deps: AVector[BlockHash],
+      transactions: AVector[Transaction],
+      target: Target,
+      timeStamp: TimeStamp,
+      nonce: U256
+  )(implicit config: GroupConfig): Block = {
     val txsHash     = calTxsHash(transactions)
     val blockDeps   = BlockDeps.build(deps)
     val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
 
-  def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(
-      implicit groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig): Block = {
+  def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(implicit
+      groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig
+  ): Block = {
     val txsHash = calTxsHash(transactions)
     Block(BlockHeader.genesis(chainIndex, txsHash), transactions)
   }
 
   def scriptIndexes[T <: TransactionAbstract](nonCoinbase: AVector[T]): ArrayBuffer[Int] = {
     val indexes = ArrayBuffer.empty[Int]
-    nonCoinbase.foreachWithIndex {
-      case (tx, txIndex) =>
-        if (tx.unsigned.scriptOpt.nonEmpty) {
-          indexes.addOne(txIndex)
-        }
+    nonCoinbase.foreachWithIndex { case (tx, txIndex) =>
+      if (tx.unsigned.scriptOpt.nonEmpty) {
+        indexes.addOne(txIndex)
+      }
     }
     indexes
   }
 
   // we shuffle tx scripts randomly for execution to mitigate front-running
-  def getScriptExecutionOrder[T <: TransactionAbstract](parentHash: BlockHash,
-                                                        nonCoinbase: AVector[T]): AVector[Int] = {
+  def getScriptExecutionOrder[T <: TransactionAbstract](
+      parentHash: BlockHash,
+      nonCoinbase: AVector[T]
+  ): AVector[Int] = {
     val nonCoinbaseLength = nonCoinbase.length
     val scriptOrders      = scriptIndexes(nonCoinbase)
 
@@ -119,7 +123,7 @@ object Block {
         val txRemaining = scriptOrders.length - index
         val randomIndex = index + Math.floorMod(seed.toRandomIntUnsafe, txRemaining)
         val tmp         = scriptOrders(index)
-        scriptOrders(index)       = scriptOrders(randomIndex)
+        scriptOrders(index) = scriptOrders(randomIndex)
         scriptOrders(randomIndex) = tmp
         shuffle(index + 1, nonCoinbase(randomIndex).id)
       }
@@ -129,10 +133,9 @@ object Block {
       val initialSeed = {
         val maxIndex = nonCoinbaseLength - 1
         val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
-        samples.foldLeft(Hash.unsafe(parentHash.bytes)) {
-          case (acc, index) =>
-            val tx = nonCoinbase(index)
-            Hash.xor(acc, tx.id)
+        samples.foldLeft(Hash.unsafe(parentHash.bytes)) { case (acc, index) =>
+          val tx = nonCoinbase(index)
+          Hash.xor(acc, tx.id)
         }
       }
       shuffle(0, initialSeed)
@@ -142,10 +145,12 @@ object Block {
 
   def getNonCoinbaseExecutionOrder[T <: TransactionAbstract](
       parentHash: BlockHash,
-      nonCoinbase: AVector[T]): AVector[Int] = {
+      nonCoinbase: AVector[T]
+  ): AVector[Int] = {
     getScriptExecutionOrder(parentHash, nonCoinbase) ++ nonCoinbase.foldWithIndex(
-      AVector.empty[Int]) {
-      case (acc, tx, index) => if (tx.unsigned.scriptOpt.isEmpty) acc :+ index else acc
+      AVector.empty[Int]
+    ) { case (acc, tx, index) =>
+      if (tx.unsigned.scriptOpt.isEmpty) acc :+ index else acc
     }
   }
 }

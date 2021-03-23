@@ -33,7 +33,8 @@ class ConnectionHandlerSpec
     val brokerHandler = TestProbe()
 
     val connectionHandler = TestActorRef[ConnectionHandler.CliqueConnectionHandler](
-      ConnectionHandler.clique(remoteAddress, connection.ref, brokerHandler.ref))
+      ConnectionHandler.clique(remoteAddress, connection.ref, brokerHandler.ref)
+    )
     connection.expectMsgType[Tcp.Register]
     connection.expectMsg(Tcp.ResumeReading)
 

@@ -33,15 +33,13 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     blockDeps.deps.forall { dep =>
       val flowTips = getFlowTipsUnsafe(dep, targetGroup)
 
-      val ok1 = flowTips.inTips.forallWithIndex {
-        case (depInTip, k) =>
-          val blockInTip = blockDeps.inDeps(k)
-          isExtendingUnsafe(blockInTip, depInTip)
+      val ok1 = flowTips.inTips.forallWithIndex { case (depInTip, k) =>
+        val blockInTip = blockDeps.inDeps(k)
+        isExtendingUnsafe(blockInTip, depInTip)
       }
-      val ok2 = flowTips.outTips.forallWithIndex {
-        case (depOutTip, k) =>
-          val blockOutTip = blockDeps.outDeps(k)
-          isExtendingUnsafe(blockOutTip, depOutTip)
+      val ok2 = flowTips.outTips.forallWithIndex { case (depOutTip, k) =>
+        val blockOutTip = blockDeps.outDeps(k)
+        isExtendingUnsafe(blockOutTip, depOutTip)
       }
       ok1 && ok2
     }
@@ -57,7 +55,9 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     val intraDep   = block.header.intraDep
     val oldOutTips = getOutTips(getBlockHeaderUnsafe(intraDep), inclusive = false)
     val diff       = getTipsDiffUnsafe(newOutTips, oldOutTips)
-    !isConflicted(block.hash +: diff,
-                  hash => if (hash == block.hash) block else getBlockUnsafe(hash))
+    !isConflicted(
+      block.hash +: diff,
+      hash => if (hash == block.hash) block else getBlockUnsafe(hash)
+    )
   }
 }

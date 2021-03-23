@@ -41,10 +41,10 @@ object Type {
     }
   }
 
-  case object Bool    extends Type { def toVal: Val.Type = Val.Bool }
-  case object Byte    extends Type { def toVal: Val.Type = Val.Byte }
-  case object I256    extends Type { def toVal: Val.Type = Val.I256 }
-  case object U256    extends Type { def toVal: Val.Type = Val.U256 }
+  case object Bool    extends Type { def toVal: Val.Type = Val.Bool    }
+  case object Byte    extends Type { def toVal: Val.Type = Val.Byte    }
+  case object I256    extends Type { def toVal: Val.Type = Val.I256    }
+  case object U256    extends Type { def toVal: Val.Type = Val.U256    }
   case object BoolVec extends Type { def toVal: Val.Type = Val.BoolVec }
   case object ByteVec extends Type { def toVal: Val.Type = Val.ByteVec }
   case object I256Vec extends Type { def toVal: Val.Type = Val.I256Vec }
@@ -57,10 +57,11 @@ object Type {
 
     override def hashCode(): Int = id.hashCode()
 
-    override def equals(obj: Any): Boolean = obj match {
-      case that: Contract => this.id == that.id
-      case _              => false
-    }
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case that: Contract => this.id == that.id
+        case _              => false
+      }
   }
   object Contract {
     def local(id: Ast.TypeId, variable: Ast.Ident): LocalVar   = new LocalVar(id, variable)

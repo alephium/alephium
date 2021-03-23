@@ -142,37 +142,27 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def contains(elem: A): Boolean = {
-    cfor(start)(_ < end, _ + 1) { i =>
-      if (elems(i) == elem) return true
-    }
+    cfor(start)(_ < end, _ + 1) { i => if (elems(i) == elem) return true }
     false
   }
 
   def exists(f: A => Boolean): Boolean = {
-    foreach { a =>
-      if (f(a)) { return true }
-    }
+    foreach { a => if (f(a)) { return true } }
     false
   }
 
   def existsWithIndex(f: (A, Int) => Boolean): Boolean = {
-    foreachWithIndex { (a, i) =>
-      if (f(a, i)) { return true }
-    }
+    foreachWithIndex { (a, i) => if (f(a, i)) { return true } }
     false
   }
 
   def grouped(k: Int): AVector[AVector[A]] = {
     assume(length % k == 0)
-    AVector.tabulate(length / k) { l =>
-      slice(k * l, k * (l + 1))
-    }
+    AVector.tabulate(length / k) { l => slice(k * l, k * (l + 1)) }
   }
 
   def forall(f: A => Boolean): Boolean = {
-    foreach { a =>
-      if (!f(a)) { return false }
-    }
+    foreach { a => if (!f(a)) { return false } }
     true
   }
 
@@ -188,9 +178,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def forallWithIndex(f: (A, Int) => Boolean): Boolean = {
-    foreachWithIndex { (a, i) =>
-      if (!f(a, i)) { return false }
-    }
+    foreachWithIndex { (a, i) => if (!f(a, i)) { return false } }
     true
   }
 
@@ -245,9 +233,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   private def _reverse: AVector[A] = {
     val arr       = new Array[A](length)
     val rightmost = end - 1
-    cfor(0)(_ < length, _ + 1) { i =>
-      arr(i) = elems(rightmost - i)
-    }
+    cfor(0)(_ < length, _ + 1) { i => arr(i) = elems(rightmost - i) }
     AVector.unsafe(arr)
   }
 
@@ -266,9 +252,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def map[@sp B: ClassTag](f: A => B): AVector[B] = {
-    AVector.tabulate(length) { i =>
-      f(apply(i))
-    }
+    AVector.tabulate(length) { i => f(apply(i)) }
   }
 
   def mapE[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
@@ -282,15 +266,11 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def mapToArray[@sp B: ClassTag](f: A => B): Array[B] = {
-    Array.tabulate(length) { i =>
-      f(apply(i))
-    }
+    Array.tabulate(length) { i => f(apply(i)) }
   }
 
   def mapWithIndex[@sp B: ClassTag](f: (A, Int) => B): AVector[B] = {
-    AVector.tabulate(length) { i =>
-      f(apply(i), i)
-    }
+    AVector.tabulate(length) { i => f(apply(i), i) }
   }
 
   def filter(p: A => Boolean): AVector[A] = {
@@ -311,9 +291,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   @inline
   private def filterImpl(p: A => Boolean, target: Boolean): AVector[A] = {
-    fold(AVector.empty[A]) { (acc, elem) =>
-      if (p(elem) == target) acc :+ elem else acc
-    }
+    fold(AVector.empty[A]) { (acc, elem) => if (p(elem) == target) acc :+ elem else acc }
   }
 
   @inline
@@ -351,21 +329,15 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   class WithFilter(p: A => Boolean) {
     def map[@sp B: ClassTag](f: A => B): AVector[B] = {
-      fold(AVector.empty[B]) { (acc, elem) =>
-        if (p(elem)) acc :+ f(elem) else acc
-      }
+      fold(AVector.empty[B]) { (acc, elem) => if (p(elem)) acc :+ f(elem) else acc }
     }
 
     def flatMap[@sp B: ClassTag](f: A => AVector[B]): AVector[B] = {
-      fold(AVector.empty[B]) { (acc, elem) =>
-        if (p(elem)) acc ++ f(elem) else acc
-      }
+      fold(AVector.empty[B]) { (acc, elem) => if (p(elem)) acc ++ f(elem) else acc }
     }
 
     def foreach[U](f: A => U): Unit = {
-      self.foreach { elem =>
-        if (p(elem)) f(elem)
-      }
+      self.foreach { elem => if (p(elem)) f(elem) }
     }
 
     def withFilter(q: A => Boolean): WithFilter = new WithFilter(elem => p(elem) && q(elem))
@@ -373,17 +345,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def fold[B](zero: B)(f: (B, A) => B): B = {
     var res = zero
-    cfor(start)(_ < end, _ + 1) { i =>
-      res = f(res, elems(i))
-    }
+    cfor(start)(_ < end, _ + 1) { i => res = f(res, elems(i)) }
     res
   }
 
   def foldWithIndex[B](zero: B)(f: (B, A, Int) => B): B = {
     var res = zero
-    foreachWithIndex { (elem, i) =>
-      res = f(res, elem, i)
-    }
+    foreachWithIndex { (elem, i) => res = f(res, elem, i) }
     res
   }
 
@@ -410,14 +378,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def collect[B: ClassTag](pf: PartialFunction[A, B]): AVector[B] = {
     val marker = Statics.pfMarker
-    fold(AVector.empty[B]) {
-      case (acc, elem) =>
-        val v = pf.applyOrElse(elem, ((_: A) => marker).asInstanceOf[A => B])
-        if (marker ne v.asInstanceOf[AnyRef]) {
-          acc :+ v
-        } else {
-          acc
-        }
+    fold(AVector.empty[B]) { case (acc, elem) =>
+      val v = pf.applyOrElse(elem, ((_: A) => marker).asInstanceOf[A => B])
+      if (marker ne v.asInstanceOf[AnyRef]) {
+        acc :+ v
+      } else {
+        acc
+      }
     }
   }
 
@@ -429,9 +396,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     assume(nonEmpty)
 
     var acc = f(elems(start))
-    cfor(start + 1)(_ < end, _ + 1) { i =>
-      acc = op(acc, f(elems(i)))
-    }
+    cfor(start + 1)(_ < end, _ + 1) { i => acc = op(acc, f(elems(i))) }
     acc
   }
 
@@ -452,30 +417,24 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def flatMap[@sp B: ClassTag](f: A => AVector[B]): AVector[B] = {
-    fold(AVector.empty[B]) { (acc, elem) =>
-      acc ++ f(elem)
-    }
+    fold(AVector.empty[B]) { (acc, elem) => acc ++ f(elem) }
   }
 
   def flatMapE[L, R: ClassTag](f: A => Either[L, AVector[R]]): Either[L, AVector[R]] = {
-    foldE(AVector.empty[R]) { (acc, elem) =>
-      f(elem).map(acc ++ _)
-    }
+    foldE(AVector.empty[R]) { (acc, elem) => f(elem).map(acc ++ _) }
   }
 
   def flatMapWithIndex[@sp B: ClassTag](f: (A, Int) => AVector[B]): AVector[B] = {
-    val (_, xs) = fold((0, AVector.empty[B])) {
-      case ((i, acc), elem) =>
-        (i + 1, acc ++ f(elem, i))
+    val (_, xs) = fold((0, AVector.empty[B])) { case ((i, acc), elem) =>
+      (i + 1, acc ++ f(elem, i))
     }
     xs
   }
 
   def flatMapWithIndexE[L, R: ClassTag](
-      f: (A, Int) => Either[L, AVector[R]]): Either[L, AVector[R]] = {
-    foldWithIndexE(AVector.empty[R]) { (acc, elem, index) =>
-      f(elem, index).map(acc ++ _)
-    }
+      f: (A, Int) => Either[L, AVector[R]]
+  ): Either[L, AVector[R]] = {
+    foldWithIndexE(AVector.empty[R]) { (acc, elem, index) => f(elem, index).map(acc ++ _) }
   }
 
   def scanLeft[@sp B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
@@ -498,9 +457,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def indexWhere(f: A => Boolean): Int = {
-    cfor(start)(_ < end, _ + 1) { i =>
-      if (f(elems(i))) return i - start
-    }
+    cfor(start)(_ < end, _ + 1) { i => if (f(elems(i))) return i - start }
     -1
   }
 
@@ -519,9 +476,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def sum(implicit num: Numeric[A]): A = fold(num.zero)(num.plus)
 
   def sumBy[B](f: A => B)(implicit num: Numeric[B]): B = {
-    fold(num.zero) { (sum, elem) =>
-      num.plus(sum, f(elem))
-    }
+    fold(num.zero) { (sum, elem) => num.plus(sum, f(elem)) }
   }
 
   def max(implicit cmp: Ordering[A]): A = {
@@ -584,8 +539,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
         if (current == prev) {
           acc = acc :+ elem
         } else {
-          res  = res :+ acc
-          acc  = AVector(elem)
+          res = res :+ acc
+          acc = AVector(elem)
           prev = current
         }
       }
@@ -625,8 +580,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def toIterable: Iterable[A] = {
     new Iterable[A] {
-      override def size: Int    = length
-      def iterator: Iterator[A] = elems.iterator.slice(start, end)
+      override def size: Int                   = length
+      def iterator: Iterator[A]                = elems.iterator.slice(start, end)
       override def foreach[U](f: A => U): Unit = self.foreach(f)
     }
   }
@@ -643,25 +598,22 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def mkString(sep: String): String = mkString("", sep, "")
 
-  override def equals(obj: Any): Boolean = obj match {
-    case that: AVector[A] =>
-      if (length == that.length && ct == that.ct) {
-        cfor(0)(_ < length, _ + 1) { i =>
-          if (apply(i) != that(i)) return false
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case that: AVector[A] =>
+        if (length == that.length && ct == that.ct) {
+          cfor(0)(_ < length, _ + 1) { i => if (apply(i) != that(i)) return false }
+          true
+        } else {
+          false
         }
-        true
-      } else {
-        false
-      }
-    case _ => false
-  }
+      case _ => false
+    }
 
   // scalastyle:off magic.number
   override def hashCode(): Int = {
     var code: Int = 0xd55d283e
-    cfor(start)(_ < end, _ + 1) { i =>
-      code = (code * 19) + elems(i).##
-    }
+    cfor(start)(_ < end, _ + 1) { i => code = (code * 19) + elems(i).## }
     code
   }
 
@@ -700,9 +652,7 @@ object AVector {
     assume(n >= 0)
 
     val arr = new Array[A](n)
-    cfor(0)(_ < n, _ + 1) { i =>
-      arr(i) = f(i)
-    }
+    cfor(0)(_ < n, _ + 1) { i => arr(i) = f(i) }
     unsafe(arr)
   }
 
@@ -738,10 +688,12 @@ object AVector {
     unsafe(elems, start, end, appendable)
   }
 
-  private def unsafe[@sp A: ClassTag](_elems: Array[A],
-                                      _start: Int,
-                                      _end: Int,
-                                      _appendable: Boolean): AVector[A] =
+  private def unsafe[@sp A: ClassTag](
+      _elems: Array[A],
+      _start: Int,
+      _end: Int,
+      _appendable: Boolean
+  ): AVector[A] =
     new AVector[A] {
       override var elems: Array[A]     = _elems
       override def start: Int          = _start

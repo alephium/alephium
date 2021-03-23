@@ -22,13 +22,14 @@ import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
-  Array("org.wartremover.warts.JavaSerializable",
-        "org.wartremover.warts.Product",
-        "org.wartremover.warts.Serializable"))
+  Array(
+    "org.wartremover.warts.JavaSerializable",
+    "org.wartremover.warts.Product",
+    "org.wartremover.warts.Serializable"
+  )
+)
 abstract class Parser[Ctx <: StatelessContext] {
-  implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] =>
-    Lexer.emptyChars(ctx)
-  }
+  implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
   def const[_: P]: P[Ast.Const[Ctx]] =
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(Ast.Const.apply[Ctx])
@@ -41,28 +42,25 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
   def chain[_: P](p: => P[Ast.Expr[Ctx]], op: => P[Operator]): P[Ast.Expr[Ctx]] =
-    P(p ~ (op ~ p).rep).map {
-      case (lhs, rhs) =>
-        rhs.foldLeft(lhs) {
-          case (acc, (op, right)) => Ast.Binop(op, acc, right)
-        }
+    P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
+      rhs.foldLeft(lhs) { case (acc, (op, right)) =>
+        Ast.Binop(op, acc, right)
+      }
     }
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def chainBool[_: P](p: => P[Ast.Expr[Ctx]], op: => P[TestOperator]): P[Ast.Expr[Ctx]] =
-    P(p ~ (op ~ p).rep).map {
-      case (lhs, rhs) =>
-        if (rhs.isEmpty) {
-          lhs
-        } else {
-          val (op, right) = rhs(0)
-          val acc         = Ast.Binop(op, lhs, right)
-          rhs.tail
-            .foldLeft((acc, right)) {
-              case ((acc, last), (op, right)) =>
-                (Ast.Binop(And, acc, Ast.Binop(op, last, right)), right)
-            }
-            ._1
-        }
+    P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
+      if (rhs.isEmpty) {
+        lhs
+      } else {
+        val (op, right) = rhs(0)
+        val acc         = Ast.Binop(op, lhs, right)
+        rhs.tail
+          .foldLeft((acc, right)) { case ((acc, last), (op, right)) =>
+            (Ast.Binop(And, acc, Ast.Binop(op, last, right)), right)
+          }
+          ._1
+      }
     }
 
   // Optimize chained comparisions
@@ -87,34 +85,34 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map {
       case (isMutable, ident, expr) => Ast.VarDef(isMutable, ident, expr)
     }
-  def assign[_: P]: P[Ast.Assign[Ctx]] = P(Lexer.ident ~ "=" ~ expr).map {
-    case (ident, expr) => Ast.Assign(ident, expr)
-  }
+  def assign[_: P]: P[Ast.Assign[Ctx]] =
+    P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
+      Ast.Assign(ident, expr)
+    }
 
   def funcArgument[_: P]: P[Ast.Argument] =
-    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
-      case (isMutable, ident, typeId) =>
-        val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.local(typeId, ident))
-        Ast.Argument(ident, tpe, isMutable)
+    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map { case (isMutable, ident, typeId) =>
+      val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.local(typeId, ident))
+      Ast.Argument(ident, tpe, isMutable)
     }
   def funParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
-  def returnType[_: P]: P[Seq[Type]] = P("->" ~ "(" ~ Lexer.typeId.rep(0, ",") ~ ")").map {
-    _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.Contract.stack(typeId)))
-  }
+  def returnType[_: P]: P[Seq[Type]] =
+    P("->" ~ "(" ~ Lexer.typeId.rep(0, ",") ~ ")").map {
+      _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.Contract.stack(typeId)))
+    }
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(
       Lexer.funcModifier.rep(0) ~ Lexer
-        .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}")
-      .map {
-        case (modifiers, funcId, params, returnType, statement) =>
-          if (modifiers.toSet.size != modifiers.length) {
-            throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
-          } else {
-            val isPublic  = modifiers.contains(Lexer.Pub)
-            val isPayable = modifiers.contains(Lexer.Payable)
-            Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statement)
-          }
+        .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}"
+    ).map { case (modifiers, funcId, params, returnType, statement) =>
+      if (modifiers.toSet.size != modifiers.length) {
+        throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
+      } else {
+        val isPublic  = modifiers.contains(Lexer.Pub)
+        val isPayable = modifiers.contains(Lexer.Payable)
+        Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statement)
       }
+    }
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
 
@@ -131,17 +129,19 @@ abstract class Parser[Ctx <: StatelessContext] {
   def statement[_: P]: P[Ast.Statement[Ctx]]
 
   def contractArgument[_: P]: P[Ast.Argument] =
-    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map {
-      case (isMutable, ident, typeId) =>
-        val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.global(typeId, ident))
-        Ast.Argument(ident, tpe, isMutable)
+    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map { case (isMutable, ident, typeId) =>
+      val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.global(typeId, ident))
+      Ast.Argument(ident, tpe, isMutable)
     }
 }
 
 @SuppressWarnings(
-  Array("org.wartremover.warts.JavaSerializable",
-        "org.wartremover.warts.Product",
-        "org.wartremover.warts.Serializable"))
+  Array(
+    "org.wartremover.warts.JavaSerializable",
+    "org.wartremover.warts.Product",
+    "org.wartremover.warts.Serializable"
+  )
+)
 object StatelessParser extends Parser[StatelessContext] {
   def atom[_: P]: P[Ast.Expr[StatelessContext]] =
     P(const | callExpr | contractConv | variable | parenExpr)
@@ -155,16 +155,19 @@ object StatelessParser extends Parser[StatelessContext] {
 }
 
 @SuppressWarnings(
-  Array("org.wartremover.warts.JavaSerializable",
-        "org.wartremover.warts.Product",
-        "org.wartremover.warts.Serializable"))
+  Array(
+    "org.wartremover.warts.JavaSerializable",
+    "org.wartremover.warts.Product",
+    "org.wartremover.warts.Serializable"
+  )
+)
 object StatefulParser extends Parser[StatefulContext] {
   def atom[_: P]: P[Ast.Expr[StatefulContext]] =
     P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)
 
   def contractCallExpr[_: P]: P[Ast.ContractCallExpr] =
-    P((contractConv | variable) ~ "." ~ callAbs).map {
-      case (obj, (callId, exprs)) => Ast.ContractCallExpr(obj, callId, exprs)
+    P((contractConv | variable) ~ "." ~ callAbs).map { case (obj, (callId, exprs)) =>
+      Ast.ContractCallExpr(obj, callId, exprs)
     }
 
   def contractCall[_: P]: P[Ast.ContractCall] =

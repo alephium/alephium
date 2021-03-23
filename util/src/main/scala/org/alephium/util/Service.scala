@@ -31,35 +31,37 @@ trait Service {
   protected def startSelfOnce(): Future[Unit]
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def start(): Future[Unit] = startPromise.synchronized {
-    if (!started) {
-      started = true
-      try {
-        startPromise.completeWith {
-          for {
-            _ <- Future.sequence(subServices.view.reverse.map(_.start()))
-            _ <- startSelfOnce()
-          } yield ()
+  def start(): Future[Unit] =
+    startPromise.synchronized {
+      if (!started) {
+        started = true
+        try {
+          startPromise.completeWith {
+            for {
+              _ <- Future.sequence(subServices.view.reverse.map(_.start()))
+              _ <- startSelfOnce()
+            } yield ()
+          }
+        } catch {
+          case NonFatal(e) =>
+            startPromise.failure(e)
+          case t: Throwable =>
+            startPromise.failure(t)
+            throw t
         }
-      } catch {
-        case NonFatal(e) =>
-          startPromise.failure(e)
-        case t: Throwable =>
-          startPromise.failure(t)
-          throw t
       }
+      startPromise.future
     }
-    startPromise.future
-  }
 
   private val stopPromise: Promise[Unit] = Promise()
   private var stopped: Boolean           = false
 
   protected def stopSelfOnce(): Future[Unit]
 
-  final def stop(): Future[Unit] = stopPromise.synchronized {
-    if (started) stopAfterStarted() else Future.successful(())
-  }
+  final def stop(): Future[Unit] =
+    stopPromise.synchronized {
+      if (started) stopAfterStarted() else Future.successful(())
+    }
 
   private def stopAfterStarted(): Future[Unit] = {
     if (!stopped) {

@@ -60,9 +60,11 @@ trait FlowFixture
     LockupScript.p2pkh(publicKey)
   }
 
-  def tryToTransfer(blockFlow: BlockFlow,
-                    chainIndex: ChainIndex,
-                    amount: U256 = ALF.alf(1)): Block = {
+  def tryToTransfer(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      amount: U256 = ALF.alf(1)
+  ): Block = {
     if (blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
     } else {
@@ -70,9 +72,11 @@ trait FlowFixture
     }
   }
 
-  def transferOnlyForIntraGroup(blockFlow: BlockFlow,
-                                chainIndex: ChainIndex,
-                                amount: U256 = ALF.alf(1)): Block = {
+  def transferOnlyForIntraGroup(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      amount: U256 = ALF.alf(1)
+  ): Block = {
     if (chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
     } else {
@@ -84,42 +88,51 @@ trait FlowFixture
     mine(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
 
-  def simpleScript(blockFlow: BlockFlow,
-                   chainIndex: ChainIndex,
-                   txScript: StatefulScript): Block = {
+  def simpleScript(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      txScript: StatefulScript
+  ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
     mine(blockFlow, chainIndex)(transferTxs(_, _, ALF.alf(1), 1, Some(txScript), true))
   }
 
-  def simpleScriptMulti(blockFlow: BlockFlow,
-                        chainIndex: ChainIndex,
-                        invokers: AVector[LockupScript],
-                        txScripts: AVector[StatefulScript]): Block = {
+  def simpleScriptMulti(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      invokers: AVector[LockupScript],
+      txScripts: AVector[StatefulScript]
+  ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
-    val zipped = invokers.mapWithIndex {
-      case (invoker, index) => invoker -> txScripts(index)
+    val zipped = invokers.mapWithIndex { case (invoker, index) =>
+      invoker -> txScripts(index)
     }
     mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALF.alf(1) / 1000))
   }
 
-  def transfer(blockFlow: BlockFlow,
-               chainIndex: ChainIndex,
-               amount: U256                   = ALF.alf(1),
-               numReceivers: Int              = 1,
-               gasFeeInTheAmount: Boolean     = true,
-               lockTimeOpt: Option[TimeStamp] = None): Block = {
+  def transfer(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      amount: U256 = ALF.alf(1),
+      numReceivers: Int = 1,
+      gasFeeInTheAmount: Boolean = true,
+      lockTimeOpt: Option[TimeStamp] = None
+  ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from))
     mine(blockFlow, chainIndex)(
-      transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount, lockTimeOpt))
+      transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount, lockTimeOpt)
+    )
   }
 
-  def transferTxs(blockFlow: BlockFlow,
-                  chainIndex: ChainIndex,
-                  amount: U256,
-                  numReceivers: Int,
-                  txScriptOpt: Option[StatefulScript],
-                  gasFeeInTheAmount: Boolean,
-                  lockTimeOpt: Option[TimeStamp] = None): AVector[Transaction] = {
+  def transferTxs(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      amount: U256,
+      numReceivers: Int,
+      txScriptOpt: Option[StatefulScript],
+      gasFeeInTheAmount: Boolean,
+      lockTimeOpt: Option[TimeStamp] = None
+  ): AVector[Transaction] = {
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
@@ -149,21 +162,24 @@ trait FlowFixture
     AVector(Transaction.from(unsignedTx, privateKey))
   }
 
-  def transferTxsMulti(blockFlow: BlockFlow,
-                       chainIndex: ChainIndex,
-                       scripts: AVector[(LockupScript, StatefulScript)],
-                       amount: U256): AVector[Transaction] = {
-    scripts.map {
-      case (lockupScript, txScript) =>
-        transferTx(blockFlow, chainIndex, lockupScript, amount, Some(txScript))
+  def transferTxsMulti(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      scripts: AVector[(LockupScript, StatefulScript)],
+      amount: U256
+  ): AVector[Transaction] = {
+    scripts.map { case (lockupScript, txScript) =>
+      transferTx(blockFlow, chainIndex, lockupScript, amount, Some(txScript))
     }
   }
 
-  def transferTx(blockFlow: BlockFlow,
-                 chainIndex: ChainIndex,
-                 fromLockupScript: LockupScript,
-                 amount: U256,
-                 txScriptOpt: Option[StatefulScript]): Transaction = {
+  def transferTx(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      fromLockupScript: LockupScript,
+      amount: U256,
+      txScriptOpt: Option[StatefulScript]
+  ): Transaction = {
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
@@ -210,9 +226,11 @@ trait FlowFixture
     mine(blockFlow, chainIndex)(payableCallTxs(_, _, script))
   }
 
-  def payableCallTxs(blockFlow: BlockFlow,
-                     chainIndex: ChainIndex,
-                     script: StatefulScript): AVector[Transaction] = {
+  def payableCallTxs(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      script: StatefulScript
+  ): AVector[Transaction] = {
     assume(chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from))
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
@@ -245,7 +263,8 @@ trait FlowFixture
   }
 
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
-      prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]): Block = {
+      prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
+  ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
@@ -258,9 +277,11 @@ trait FlowFixture
     mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
   }
 
-  def mineWithoutCoinbase(chainIndex: ChainIndex,
-                          txs: AVector[Transaction],
-                          blockTs: TimeStamp): Block = {
+  def mineWithoutCoinbase(
+      chainIndex: ChainIndex,
+      txs: AVector[Transaction],
+      blockTs: TimeStamp
+  ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
@@ -270,20 +291,24 @@ trait FlowFixture
     mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
   }
 
-  def mine(chainIndex: ChainIndex,
-           deps: AVector[BlockHash],
-           txs: AVector[Transaction],
-           blockTs: TimeStamp,
-           target: Target = consensusConfig.maxMiningTarget): Block = {
+  def mine(
+      chainIndex: ChainIndex,
+      deps: AVector[BlockHash],
+      txs: AVector[Transaction],
+      blockTs: TimeStamp,
+      target: Target = consensusConfig.maxMiningTarget
+  ): Block = {
     val txsHash = Block.calTxsHash(txs)
     Block(mineHeader(chainIndex, deps, txsHash, blockTs, target), txs)
   }
 
-  def mineHeader(chainIndex: ChainIndex,
-                 deps: AVector[BlockHash],
-                 txsHash: Hash,
-                 blockTs: TimeStamp,
-                 target: Target = consensusConfig.maxMiningTarget): BlockHeader = {
+  def mineHeader(
+      chainIndex: ChainIndex,
+      deps: AVector[BlockHash],
+      txsHash: Hash,
+      blockTs: TimeStamp,
+      target: Target = consensusConfig.maxMiningTarget
+  ): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
 
     @tailrec
@@ -299,7 +324,8 @@ trait FlowFixture
       blockFlow: BlockFlow,
       mainGroup: GroupIndex,
       tx: TransactionTemplate,
-      txScript: StatefulScript): (AVector[ContractOutputRef], AVector[TxOutput]) = {
+      txScript: StatefulScript
+  ): (AVector[ContractOutputRef], AVector[TxOutput]) = {
     val worldState = blockFlow.getBestCachedWorldState(mainGroup).toOption.get
     val result = StatefulVM
       .runTxScript(worldState, tx, txScript, tx.unsigned.startGas)
@@ -381,13 +407,15 @@ trait FlowFixture
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 
-  def checkState(blockFlow: BlockFlow,
-                 chainIndex: ChainIndex,
-                 key: Hash,
-                 fields: AVector[Val],
-                 outputRef: ContractOutputRef,
-                 numAssets: Int    = 2,
-                 numContracts: Int = 2): Assertion = {
+  def checkState(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      key: Hash,
+      fields: AVector[Val],
+      outputRef: ContractOutputRef,
+      numAssets: Int = 2,
+      numContracts: Int = 2
+  ): Assertion = {
     val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(key).fold(throw _, identity)
 

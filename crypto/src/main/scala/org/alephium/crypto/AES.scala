@@ -62,10 +62,12 @@ object AES {
     array
   }
 
-  private def initCipher(mode: Int,
-                         password: String,
-                         salt: Array[Byte],
-                         iv: Array[Byte]): Cipher = {
+  private def initCipher(
+      mode: Int,
+      password: String,
+      salt: Array[Byte],
+      iv: Array[Byte]
+  ): Cipher = {
     val keySpec          = new PBEKeySpec(password.toCharArray, salt, iterationCount, keyLength)
     val secretKeyFactory = SecretKeyFactory.getInstance(keyAlgorithm)
     val key              = secretKeyFactory.generateSecret(keySpec).getEncoded

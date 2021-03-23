@@ -30,24 +30,31 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
   trait Fixture {
     def blockGen0(txInputs: TxInput*): Block = {
       val transaction =
-        Transaction.from(AVector.from(txInputs),
-                         AVector.empty[AssetOutput],
-                         AVector.empty[Signature])
-      Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                 AVector(transaction),
-                 Target.Max,
-                 TimeStamp.now(),
-                 Random.nextNonNegative())
+        Transaction.from(
+          AVector.from(txInputs),
+          AVector.empty[AssetOutput],
+          AVector.empty[Signature]
+        )
+      Block.from(
+        AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+        AVector(transaction),
+        Target.Max,
+        TimeStamp.now(),
+        Random.nextNonNegative()
+      )
     }
 
     def blockGen1(txInputs: AVector[TxInput]*): Block = {
       val transactions = txInputs.map(inputs =>
-        Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Signature]))
-      Block.from(AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-                 AVector.from(transactions),
-                 Target.Max,
-                 TimeStamp.now(),
-                 Random.nextNonNegative())
+        Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Signature])
+      )
+      Block.from(
+        AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+        AVector.from(transactions),
+        Target.Max,
+        TimeStamp.now(),
+        Random.nextNonNegative()
+      )
     }
 
     val cache = ConflictedBlocks.emptyCache(0, Duration.ofMinutesUnsafe(10))
@@ -99,9 +106,18 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     cache.conflictedBlocks(block1.hash).toSet is Set(block0.hash, block2.hash)
     cache.conflictedBlocks(block2.hash).toSet is Set(block1.hash)
 
-    cache.isConflicted(block0.transactions.head, AVector(block0.hash, block1.hash, block2.hash)) is true
-    cache.isConflicted(block1.transactions.head, AVector(block0.hash, block1.hash, block2.hash)) is true
-    cache.isConflicted(block2.transactions.head, AVector(block0.hash, block1.hash, block2.hash)) is true
+    cache.isConflicted(
+      block0.transactions.head,
+      AVector(block0.hash, block1.hash, block2.hash)
+    ) is true
+    cache.isConflicted(
+      block1.transactions.head,
+      AVector(block0.hash, block1.hash, block2.hash)
+    ) is true
+    cache.isConflicted(
+      block2.transactions.head,
+      AVector(block0.hash, block1.hash, block2.hash)
+    ) is true
     cache.isConflicted(block0.transactions.head, AVector(block0.hash)) is true
     cache.isConflicted(block0.transactions.head, AVector(block1.hash)) is true
     cache.isConflicted(block0.transactions.head, AVector(block2.hash)) is false
@@ -184,7 +200,9 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
     cache.conflictedBlocks(block0.hash).toSet is Set(block1.hash)
     cache.conflictedBlocks(block1.hash).toSet is Set(block0.hash)
 
-    cache.isConflicted(AVector(block0.hash, block1.hash),
-                       hash => blocks.filter(_.hash equals hash).head) is true
+    cache.isConflicted(
+      AVector(block0.hash, block1.hash),
+      hash => blocks.filter(_.hash equals hash).head
+    ) is true
   }
 }

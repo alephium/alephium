@@ -32,11 +32,11 @@ import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object ConnectionHandler {
-  def clique(remoteAddress: InetSocketAddress,
-             connection: ActorRefT[Tcp.Command],
-             brokerHandler: ActorRefT[BrokerHandler.Command])(
-      implicit groupConfig: GroupConfig,
-      networkSetting: NetworkSetting): Props =
+  def clique(
+      remoteAddress: InetSocketAddress,
+      connection: ActorRefT[Tcp.Command],
+      brokerHandler: ActorRefT[BrokerHandler.Command]
+  )(implicit groupConfig: GroupConfig, networkSetting: NetworkSetting): Props =
     Props(new CliqueConnectionHandler(remoteAddress, connection, brokerHandler))
 
   final case class Ack(id: Int) extends Tcp.Event
@@ -45,8 +45,9 @@ object ConnectionHandler {
   case object CloseConnection                extends Command
   final case class Send(message: ByteString) extends Command
 
-  def tryDeserializePayload(data: ByteString, networkType: NetworkType)(
-      implicit config: GroupConfig): SerdeResult[Option[Staging[Payload]]] = {
+  def tryDeserializePayload(data: ByteString, networkType: NetworkType)(implicit
+      config: GroupConfig
+  ): SerdeResult[Option[Staging[Payload]]] = {
     Message._deserialize(data, networkType) match {
       case Right(Staging(message, newRest))   => Right(Some(Staging(message.payload, newRest)))
       case Left(_: SerdeError.NotEnoughBytes) => Right(None)
@@ -54,11 +55,11 @@ object ConnectionHandler {
     }
   }
 
-  class CliqueConnectionHandler(val remoteAddress: InetSocketAddress,
-                                val connection: ActorRefT[Tcp.Command],
-                                val brokerHandler: ActorRefT[BrokerHandler.Command])(
-      implicit val groupConfig: GroupConfig,
-      val networkSetting: NetworkSetting)
+  class CliqueConnectionHandler(
+      val remoteAddress: InetSocketAddress,
+      val connection: ActorRefT[Tcp.Command],
+      val brokerHandler: ActorRefT[BrokerHandler.Command]
+  )(implicit val groupConfig: GroupConfig, val networkSetting: NetworkSetting)
       extends ConnectionHandler[Payload] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Payload]]] = {
       tryDeserializePayload(data, networkSetting.networkType)
@@ -91,11 +92,10 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   def bufferedCommunicating(ack: Int): Receive = reading orElse bufferedWriting(ack) orElse closed
 
-  def reading: Receive = {
-    case Tcp.Received(data) =>
-      bufferInMessage(data)
-      processInMessageBuffer()
-      connection ! Tcp.ResumeReading
+  def reading: Receive = { case Tcp.Received(data) =>
+    bufferInMessage(data)
+    processInMessageBuffer()
+    connection ! Tcp.ResumeReading
   }
 
   def writing: Receive = {
@@ -141,21 +141,23 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     }
   }
 
-  def closed: Receive = {
-    case _: Tcp.ConnectionClosed | Terminated(_) =>
-      log.debug(s"Peer connection closed: [$remoteAddress]")
-      context stop self
+  def closed: Receive = { case _: Tcp.ConnectionClosed | Terminated(_) =>
+    log.debug(s"Peer connection closed: [$remoteAddress]")
+    context stop self
   }
 
   def closing: Receive = {
     case Tcp.CommandFailed(_: Tcp.Write) =>
       connection ! Tcp.ResumeWriting
-      context.become({
-        case Tcp.WritingResumed =>
-          writeAll()
-          context.unbecome()
-        case Ack(ack) => acknowledge(ack)
-      }, discardOld = false)
+      context.become(
+        {
+          case Tcp.WritingResumed =>
+            writeAll()
+            context.unbecome()
+          case Ack(ack) => acknowledge(ack)
+        },
+        discardOld = false
+      )
 
     case Ack(ack) =>
       acknowledge(ack)
@@ -168,15 +170,15 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     log.debug(s"transferred $transferred bytes from/to [$remoteAddress]")
   }
 
-  private[broker] final var storageOffset = 0
-  private[broker] final var storage       = Vector.empty[ByteString]
-  private[broker] final var stored        = 0L
-  private[broker] final var transferred   = 0L
+  final private[broker] var storageOffset = 0
+  final private[broker] var storage       = Vector.empty[ByteString]
+  final private[broker] var stored        = 0L
+  final private[broker] var transferred   = 0L
 
   final val maxStored                 = networkSetting.connectionBufferCapacityInByte
   final val highWatermark             = maxStored * 5 / 10
   final val lowWatermark              = maxStored * 3 / 10
-  private[broker] final var suspended = false
+  final private[broker] var suspended = false
 
   private def currentOffset = storageOffset + storage.size
 
@@ -224,7 +226,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     }
   }
 
-  private final var inMessageBuffer = ByteString.empty
+  final private var inMessageBuffer = ByteString.empty
 
   def bufferInMessage(data: ByteString): Unit = {
     inMessageBuffer ++= data

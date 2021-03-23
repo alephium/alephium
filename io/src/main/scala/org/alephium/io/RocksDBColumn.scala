@@ -25,15 +25,19 @@ object RocksDBColumn {
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): RocksDBColumn =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBSource,
-            cf: RocksDBSource.ColumnFamily,
-            writeOptions: WriteOptions): RocksDBColumn =
+  def apply(
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily,
+      writeOptions: WriteOptions
+  ): RocksDBColumn =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBSource,
-            cf: RocksDBSource.ColumnFamily,
-            _writeOptions: WriteOptions,
-            _readOptions: ReadOptions): RocksDBColumn =
+  def apply(
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily,
+      _writeOptions: WriteOptions,
+      _readOptions: ReadOptions
+  ): RocksDBColumn =
     new RocksDBColumn {
       protected def db: RocksDB                = storage.db
       protected def handle: ColumnFamilyHandle = storage.handle(cf)

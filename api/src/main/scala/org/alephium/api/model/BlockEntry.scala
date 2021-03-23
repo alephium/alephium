@@ -32,12 +32,12 @@ final case class BlockEntry(
 object BlockEntry {
   def from(header: BlockHeader, height: Int): BlockEntry = {
     BlockEntry(
-      hash         = header.hash,
-      timestamp    = header.timestamp,
-      chainFrom    = header.chainIndex.from.value,
-      chainTo      = header.chainIndex.to.value,
-      height       = height,
-      deps         = header.blockDeps.deps,
+      hash = header.hash,
+      timestamp = header.timestamp,
+      chainFrom = header.chainIndex.from.value,
+      chainTo = header.chainIndex.to.value,
+      height = height,
+      deps = header.blockDeps.deps,
       transactions = None
     )
   }

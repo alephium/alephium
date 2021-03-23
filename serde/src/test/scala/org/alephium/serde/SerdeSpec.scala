@@ -99,9 +99,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for String" should "serialize correctly" in {
-    forAll { s: String =>
-      deserialize[String](serialize(s)) isE s
-    }
+    forAll { s: String => deserialize[String](serialize(s)) isE s }
   }
 
   "Serde for BigInteger" should "serde correctly" in {

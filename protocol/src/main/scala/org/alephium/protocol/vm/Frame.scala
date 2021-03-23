@@ -59,12 +59,13 @@ abstract class Frame[Ctx <: Context] {
   def pop(): ExeResult[Val] = opStack.pop()
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def popT[T <: Val](): ExeResult[T] = pop().flatMap { elem =>
-    try Right(elem.asInstanceOf[T])
-    catch {
-      case _: ClassCastException => Left(InvalidType(elem))
+  def popT[T <: Val](): ExeResult[T] =
+    pop().flatMap { elem =>
+      try Right(elem.asInstanceOf[T])
+      catch {
+        case _: ClassCastException => Left(InvalidType(elem))
+      }
     }
-  }
 
   def getLocal(index: Int): ExeResult[Val] = {
     if (locals.isDefinedAt(index)) Right(locals(index)) else Left(InvalidLocalIndex)
@@ -172,7 +173,8 @@ final class StatefulFrame(
 ) extends Frame[StatefulContext] {
   private def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
-      method: Method[StatefulContext]): ExeResult[Option[Frame.BalanceState]] = {
+      method: Method[StatefulContext]
+  ): ExeResult[Option[Frame.BalanceState]] = {
     if (method.isPayable) {
       for {
         state <- balanceStateOpt.toRight[ExeFailure](EmptyBalanceForPayableMethod)
@@ -207,8 +209,10 @@ final class StatefulFrame(
     }
   }
 
-  override def externalMethodFrame(contractKey: Hash,
-                                   index: Int): ExeResult[Frame[StatefulContext]] = {
+  override def externalMethodFrame(
+      contractKey: Hash,
+      index: Int
+  ): ExeResult[Frame[StatefulContext]] = {
     for {
       contractObj        <- ctx.loadContract(contractKey)
       method             <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
@@ -263,37 +267,43 @@ final class StatefulFrame(
 object StatefulFrame {}
 
 object Frame {
-  def stateless(ctx: StatelessContext,
-                obj: ContractObj[StatelessContext],
-                method: Method[StatelessContext],
-                args: AVector[Val],
-                operandStack: Stack[Val],
-                returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatelessContext] = {
+  def stateless(
+      ctx: StatelessContext,
+      obj: ContractObj[StatelessContext],
+      method: Method[StatelessContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): Frame[StatelessContext] = {
     val locals = Array.fill[Val](method.localsLength)(Val.False)
-    method.argsType.foreachWithIndex {
-      case (tpe, index) => locals(index) = tpe.default
+    method.argsType.foreachWithIndex { case (tpe, index) =>
+      locals(index) = tpe.default
     }
     args.foreachWithIndex((v, index) => locals(index) = v)
     new StatelessFrame(0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
   }
 
-  def stateful(ctx: StatefulContext,
-               balanceStateOpt: Option[Frame.BalanceState],
-               obj: ContractObj[StatefulContext],
-               method: Method[StatefulContext],
-               args: AVector[Val],
-               operandStack: Stack[Val],
-               returnTo: AVector[Val] => ExeResult[Unit]): Frame[StatefulContext] = {
+  def stateful(
+      ctx: StatefulContext,
+      balanceStateOpt: Option[Frame.BalanceState],
+      obj: ContractObj[StatefulContext],
+      method: Method[StatefulContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): Frame[StatefulContext] = {
     val locals = Array.fill[Val](method.localsLength)(Val.False)
     args.foreachWithIndex((v, index) => locals(index) = v)
-    new StatefulFrame(0,
-                      obj,
-                      operandStack.subStack(),
-                      method,
-                      locals,
-                      returnTo,
-                      ctx,
-                      balanceStateOpt)
+    new StatefulFrame(
+      0,
+      obj,
+      operandStack.subStack(),
+      method,
+      locals,
+      returnTo,
+      ctx,
+      balanceStateOpt
+    )
   }
 
   /*
@@ -399,9 +409,8 @@ object Frame {
     }
 
     def use(): Balances = {
-      val newAll = all.map {
-        case (lockupScript, balancesPerLockup) =>
-          lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)
+      val newAll = all.map { case (lockupScript, balancesPerLockup) =>
+        lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)
       }
       all.clear()
       Balances(newAll)
@@ -410,9 +419,7 @@ object Frame {
     def useForNewContract(): Option[BalancesPerLockup] = {
       Option.when(all.nonEmpty) {
         val accumulator = BalancesPerLockup.empty
-        all.foreach { balances =>
-          accumulator.add(balances._2)
-        }
+        all.foreach { balances => accumulator.add(balances._2) }
         all.clear()
         accumulator
       }
@@ -456,9 +463,11 @@ object Frame {
     def empty: Balances = Balances(ArrayBuffer.empty)
   }
 
-  final case class BalancesPerLockup(var alfAmount: U256,
-                                     tokenAmounts: mutable.Map[TokenId, U256],
-                                     scopeDepth: Int) {
+  final case class BalancesPerLockup(
+      var alfAmount: U256,
+      tokenAmounts: mutable.Map[TokenId, U256],
+      scopeDepth: Int
+  ) {
     def tokenVector: AVector[(TokenId, U256)] = {
       import org.alephium.protocol.model.tokenIdOrder
       AVector.from(tokenAmounts.filter(_._2.nonZero)).sortBy(_._1)
@@ -493,29 +502,27 @@ object Frame {
     def add(another: BalancesPerLockup): Option[Unit] =
       Try {
         alfAmount = alfAmount.add(another.alfAmount).getOrElse(throw BalancesPerLockup.error)
-        another.tokenAmounts.foreach {
-          case (tokenId, amount) =>
-            tokenAmounts.get(tokenId) match {
-              case Some(currentAmount) =>
-                tokenAmounts(tokenId) =
-                  currentAmount.add(amount).getOrElse(throw BalancesPerLockup.error)
-              case None =>
-                tokenAmounts(tokenId) = amount
-            }
+        another.tokenAmounts.foreach { case (tokenId, amount) =>
+          tokenAmounts.get(tokenId) match {
+            case Some(currentAmount) =>
+              tokenAmounts(tokenId) =
+                currentAmount.add(amount).getOrElse(throw BalancesPerLockup.error)
+            case None =>
+              tokenAmounts(tokenId) = amount
+          }
         }
       }.toOption
 
     def sub(another: BalancesPerLockup): Option[Unit] =
       Try {
         alfAmount = alfAmount.sub(another.alfAmount).getOrElse(throw BalancesPerLockup.error)
-        another.tokenAmounts.foreach {
-          case (tokenId, amount) =>
-            tokenAmounts.get(tokenId) match {
-              case Some(currentAmount) =>
-                tokenAmounts(tokenId) =
-                  currentAmount.sub(amount).getOrElse(throw BalancesPerLockup.error)
-              case None => throw BalancesPerLockup.error
-            }
+        another.tokenAmounts.foreach { case (tokenId, amount) =>
+          tokenAmounts.get(tokenId) match {
+            case Some(currentAmount) =>
+              tokenAmounts(tokenId) =
+                currentAmount.sub(amount).getOrElse(throw BalancesPerLockup.error)
+            case None => throw BalancesPerLockup.error
+          }
         }
       }.toOption
 

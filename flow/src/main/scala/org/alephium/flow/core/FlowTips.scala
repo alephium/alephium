@@ -20,9 +20,11 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{BlockDeps, GroupIndex}
 import org.alephium.util.AVector
 
-final case class FlowTips(targetGroup: GroupIndex,
-                          inTips: AVector[BlockHash],
-                          outTips: AVector[BlockHash]) {
+final case class FlowTips(
+    targetGroup: GroupIndex,
+    inTips: AVector[BlockHash],
+    outTips: AVector[BlockHash]
+) {
   def toBlockDeps: BlockDeps = BlockDeps.unsafe(inTips ++ outTips)
 
   def sameAs(blockDeps: BlockDeps): Boolean = {

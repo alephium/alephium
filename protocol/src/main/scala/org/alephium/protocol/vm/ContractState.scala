@@ -20,9 +20,11 @@ import org.alephium.protocol.model.ContractOutputRef
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-final case class ContractState(code: StatefulContract,
-                               fields: AVector[Val],
-                               contractOutputRef: ContractOutputRef)
+final case class ContractState(
+    code: StatefulContract,
+    fields: AVector[Val],
+    contractOutputRef: ContractOutputRef
+)
 
 object ContractState {
   implicit val serde: Serde[ContractState] =

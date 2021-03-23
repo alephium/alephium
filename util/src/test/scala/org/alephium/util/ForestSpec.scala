@@ -128,10 +128,12 @@ class ForestSpec extends AlephiumSpec {
     tests.foreach(checkFlatten)
   }
 
-  def checkRemoveNode(pairs: List[(Int, Int)],
-                      key: Int,
-                      expected: Option[Int],
-                      newRootSize: Int): Assertion = {
+  def checkRemoveNode(
+      pairs: List[(Int, Int)],
+      key: Int,
+      expected: Option[Int],
+      newRootSize: Int
+  ): Assertion = {
     val forest = build(pairs).get
     forest.removeRootNode(key).map(_.key) is expected
     forest.roots.size is newRootSize
@@ -149,10 +151,12 @@ class ForestSpec extends AlephiumSpec {
     checkRemoveNode(forest2, 3, Some(3), 3)
   }
 
-  def checkRemoveBranch(pairs: List[(Int, Int)],
-                        key: Int,
-                        expected: Option[Int],
-                        newRootSize: Int): Assertion = {
+  def checkRemoveBranch(
+      pairs: List[(Int, Int)],
+      key: Int,
+      expected: Option[Int],
+      newRootSize: Int
+  ): Assertion = {
     val forest = build(pairs).get
     forest.removeBranch(key).map(_.key) is expected
     forest.roots.size is newRootSize

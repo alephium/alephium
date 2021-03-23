@@ -28,11 +28,7 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
   private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
   def get(peer: InetAddress): Option[MisbehaviorStatus] = {
-    peers.get(peer).map { status =>
-      withUpdatedStatus(peer, status) { (_, status) =>
-        status
-      }
-    }
+    peers.get(peer).map { status => withUpdatedStatus(peer, status) { (_, status) => status } }
   }
 
   def update(peer: InetAddress, penalty: Penalty): Unit = {
@@ -60,16 +56,14 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
   }
 
   def list(): AVector[Peer] = {
-    AVector.from(peers.map {
-      case (peer, status) =>
-        withUpdatedStatus(peer, status) { (peer, newStatus) =>
-          Peer(peer, newStatus)
-        }
+    AVector.from(peers.map { case (peer, status) =>
+      withUpdatedStatus(peer, status) { (peer, newStatus) => Peer(peer, newStatus) }
     })
   }
 
   private def withUpdatedStatus[A](peer: InetAddress, status: MisbehaviorStatus)(
-      f: (InetAddress, MisbehaviorStatus) => A): A = {
+      f: (InetAddress, MisbehaviorStatus) => A
+  ): A = {
     status match {
       case Banned(until) if until < TimeStamp.now() =>
         val newStatus = Penalty(0)

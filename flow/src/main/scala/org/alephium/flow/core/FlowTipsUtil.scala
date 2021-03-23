@@ -82,9 +82,11 @@ trait FlowTipsUtil {
   }
 
   // if inclusive is true, the current header would be included
-  def getInOutTips(header: BlockHeader,
-                   currentGroup: GroupIndex,
-                   inclusive: Boolean): IOResult[AVector[BlockHash]] = {
+  def getInOutTips(
+      header: BlockHeader,
+      currentGroup: GroupIndex,
+      inclusive: Boolean
+  ): IOResult[AVector[BlockHash]] = {
     assume(currentGroup == header.chainIndex.from)
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
@@ -102,9 +104,11 @@ trait FlowTipsUtil {
     }
   }
 
-  def getInOutTips(hash: BlockHash,
-                   currentGroup: GroupIndex,
-                   inclusive: Boolean): IOResult[AVector[BlockHash]] = {
+  def getInOutTips(
+      hash: BlockHash,
+      currentGroup: GroupIndex,
+      inclusive: Boolean
+  ): IOResult[AVector[BlockHash]] = {
     getBlockHeader(hash).flatMap(getInOutTips(_, currentGroup, inclusive))
   }
 
@@ -112,13 +116,17 @@ trait FlowTipsUtil {
     getHashChain(oldTip).getBlockHashesBetween(newTip, oldTip)
   }
 
-  def getTipsDiffUnsafe(newTips: AVector[BlockHash],
-                        oldTips: AVector[BlockHash]): AVector[BlockHash] = {
+  def getTipsDiffUnsafe(
+      newTips: AVector[BlockHash],
+      oldTips: AVector[BlockHash]
+  ): AVector[BlockHash] = {
     Utils.unsafe(getTipsDiff(newTips, oldTips))
   }
 
-  protected def getTipsDiff(newTips: AVector[BlockHash],
-                            oldTips: AVector[BlockHash]): IOResult[AVector[BlockHash]] = {
+  protected def getTipsDiff(
+      newTips: AVector[BlockHash],
+      oldTips: AVector[BlockHash]
+  ): IOResult[AVector[BlockHash]] = {
     assume(newTips.length == oldTips.length)
     EitherF.foldTry(newTips.indices, AVector.empty[BlockHash]) { (acc, i) =>
       getTipsDiff(newTips(i), oldTips(i)).map(acc ++ _)
@@ -137,18 +145,21 @@ trait FlowTipsUtil {
     FlowTips(targetGroup, inTips, targetTips)
   }
 
-  private[core] def getFlowTipsDiffUnsafe(newTips: FlowTips,
-                                          oldTips: FlowTips): AVector[BlockHash] = {
+  private[core] def getFlowTipsDiffUnsafe(
+      newTips: FlowTips,
+      oldTips: FlowTips
+  ): AVector[BlockHash] = {
     val outDiffs = getTipsDiffUnsafe(newTips.outTips, oldTips.outTips)
-    val groupDiffs = newTips.inTips.indices.foldLeft(AVector.empty[BlockHash]) {
-      case (acc, g) =>
-        acc ++ getGroupTipsDiffUnsafe(newTips.inTips(g), oldTips.inTips(g))
+    val groupDiffs = newTips.inTips.indices.foldLeft(AVector.empty[BlockHash]) { case (acc, g) =>
+      acc ++ getGroupTipsDiffUnsafe(newTips.inTips(g), oldTips.inTips(g))
     }
     groupDiffs ++ outDiffs
   }
 
-  private[core] def getGroupTipsDiffUnsafe(newTip: BlockHash,
-                                           oldTip: BlockHash): AVector[BlockHash] = {
+  private[core] def getGroupTipsDiffUnsafe(
+      newTip: BlockHash,
+      oldTip: BlockHash
+  ): AVector[BlockHash] = {
     val newOutTips = getOutTips(getBlockHeaderUnsafe(newTip), true)
     val oldOutTips = getOutTips(getBlockHeaderUnsafe(oldTip), true)
     getTipsDiffUnsafe(newOutTips, oldOutTips)
@@ -159,8 +170,10 @@ trait FlowTipsUtil {
     getLightTipsUnsafe(header, targetGroup)
   }
 
-  private[core] def getLightTipsUnsafe(header: BlockHeader,
-                                       targetGroup: GroupIndex): FlowTips.Light = {
+  private[core] def getLightTipsUnsafe(
+      header: BlockHeader,
+      targetGroup: GroupIndex
+  ): FlowTips.Light = {
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
         val g = if (i < targetGroup.value) i else i + 1
@@ -178,9 +191,11 @@ trait FlowTipsUtil {
     }
   }
 
-  private[core] def getOutTipsUnsafe(tip: BlockHash,
-                                     targetGroup: GroupIndex,
-                                     inclusive: Boolean): AVector[BlockHash] = {
+  private[core] def getOutTipsUnsafe(
+      tip: BlockHash,
+      targetGroup: GroupIndex,
+      inclusive: Boolean
+  ): AVector[BlockHash] = {
     val header = getBlockHeaderUnsafe(tip)
     getOutTipsUnsafe(header, targetGroup, inclusive)
   }
@@ -190,9 +205,11 @@ trait FlowTipsUtil {
     getOutTips(header, inclusive)
   }
 
-  private[core] def getOutTipsUnsafe(header: BlockHeader,
-                                     targetGroup: GroupIndex,
-                                     inclusive: Boolean): AVector[BlockHash] = {
+  private[core] def getOutTipsUnsafe(
+      header: BlockHeader,
+      targetGroup: GroupIndex,
+      inclusive: Boolean
+  ): AVector[BlockHash] = {
     val index = header.chainIndex
     if (index.from == targetGroup) {
       getOutTips(header, inclusive)
@@ -205,16 +222,20 @@ trait FlowTipsUtil {
     }
   }
 
-  private[core] def tryMergeUnsafe(flowTips: FlowTips,
-                                   tip: BlockHash,
-                                   targetGroup: GroupIndex,
-                                   checkTxConflicts: Boolean): Option[FlowTips] = {
+  private[core] def tryMergeUnsafe(
+      flowTips: FlowTips,
+      tip: BlockHash,
+      targetGroup: GroupIndex,
+      checkTxConflicts: Boolean
+  ): Option[FlowTips] = {
     tryMergeUnsafe(flowTips, getLightTipsUnsafe(tip, targetGroup), checkTxConflicts)
   }
 
-  private[core] def tryMergeUnsafe(flowTips: FlowTips,
-                                   newTips: FlowTips.Light,
-                                   checkTxConflicts: Boolean): Option[FlowTips] = {
+  private[core] def tryMergeUnsafe(
+      flowTips: FlowTips,
+      newTips: FlowTips.Light,
+      checkTxConflicts: Boolean
+  ): Option[FlowTips] = {
     for {
       newInTips  <- mergeInTips(flowTips.inTips, newTips.inTips)
       newOutTips <- mergeOutTips(flowTips.outTips, newTips.outTip, checkTxConflicts)
@@ -231,8 +252,10 @@ trait FlowTipsUtil {
     }
   }
 
-  private[core] def mergeTips(tips1: AVector[BlockHash],
-                              tips2: AVector[BlockHash]): Option[AVector[BlockHash]] = {
+  private[core] def mergeTips(
+      tips1: AVector[BlockHash],
+      tips2: AVector[BlockHash]
+  ): Option[AVector[BlockHash]] = {
     assume(tips1.length == tips2.length)
 
     @tailrec
@@ -250,14 +273,18 @@ trait FlowTipsUtil {
     iter(AVector.ofSize(tips1.length), 0)
   }
 
-  private[core] def mergeInTips(inTips1: AVector[BlockHash],
-                                inTips2: AVector[BlockHash]): Option[AVector[BlockHash]] = {
+  private[core] def mergeInTips(
+      inTips1: AVector[BlockHash],
+      inTips2: AVector[BlockHash]
+  ): Option[AVector[BlockHash]] = {
     mergeTips(inTips1, inTips2)
   }
 
-  private[core] def mergeOutTips(outTips: AVector[BlockHash],
-                                 newTip: BlockHash,
-                                 checkTxConflicts: Boolean): Option[AVector[BlockHash]] = {
+  private[core] def mergeOutTips(
+      outTips: AVector[BlockHash],
+      newTip: BlockHash,
+      checkTxConflicts: Boolean
+  ): Option[AVector[BlockHash]] = {
     assume(outTips.length == groups)
     val newOutTips = getOutTipsUnsafe(newTip, inclusive = true)
 

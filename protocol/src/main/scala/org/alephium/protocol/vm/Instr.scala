@@ -56,7 +56,8 @@ object Instr {
       for {
         code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
         instrCompanion <- getStatelessCompanion(code).toRight(
-          SerdeError.validation(s"Instruction - invalid code $code"))
+          SerdeError.validation(s"Instruction - invalid code $code")
+        )
         output <- instrCompanion.deserialize[StatelessContext](input.tail)
       } yield output
     }
@@ -69,7 +70,8 @@ object Instr {
       for {
         code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
         instrCompanion <- getStatefulCompanion(code).toRight(
-          SerdeError.validation(s"Instruction - invalid code $code"))
+          SerdeError.validation(s"Instruction - invalid code $code")
+        )
         output <- instrCompanion.deserialize[StatefulContext](input.tail)
       } yield output
     }
@@ -119,7 +121,7 @@ object Instr {
   val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
 }
 
-sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule {}
+sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
 sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
 sealed trait StatefulInstrSimpleGas
     extends StatefulInstr
@@ -231,20 +233,20 @@ sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
   }
 }
 
-object ConstTrue  extends ConstInstr0 { val const: Val = Val.Bool(true) }
+object ConstTrue  extends ConstInstr0 { val const: Val = Val.Bool(true)  }
 object ConstFalse extends ConstInstr0 { val const: Val = Val.Bool(false) }
 
-object I256ConstN1 extends ConstInstr0 { val const: Val = Val.I256(util.I256.NegOne) }
-object I256Const0  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Zero) }
-object I256Const1  extends ConstInstr0 { val const: Val = Val.I256(util.I256.One) }
-object I256Const2  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Two) }
+object I256ConstN1 extends ConstInstr0 { val const: Val = Val.I256(util.I256.NegOne)   }
+object I256Const0  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Zero)     }
+object I256Const1  extends ConstInstr0 { val const: Val = Val.I256(util.I256.One)      }
+object I256Const2  extends ConstInstr0 { val const: Val = Val.I256(util.I256.Two)      }
 object I256Const3  extends ConstInstr0 { val const: Val = Val.I256(util.I256.from(3L)) }
 object I256Const4  extends ConstInstr0 { val const: Val = Val.I256(util.I256.from(4L)) }
 object I256Const5  extends ConstInstr0 { val const: Val = Val.I256(util.I256.from(5L)) }
 
-object U256Const0 extends ConstInstr0 { val const: Val = Val.U256(util.U256.Zero) }
-object U256Const1 extends ConstInstr0 { val const: Val = Val.U256(util.U256.One) }
-object U256Const2 extends ConstInstr0 { val const: Val = Val.U256(util.U256.Two) }
+object U256Const0 extends ConstInstr0 { val const: Val = Val.U256(util.U256.Zero)       }
+object U256Const1 extends ConstInstr0 { val const: Val = Val.U256(util.U256.One)        }
+object U256Const2 extends ConstInstr0 { val const: Val = Val.U256(util.U256.Two)        }
 object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(3L)) }
 object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
@@ -542,12 +544,12 @@ sealed trait ConversionInstr[R <: Val, U <: Val]
 
 case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] with GasVeryLow {
   override def converse(from: Val.Byte): ExeResult[Val.I256] = {
-    Right(Val.I256(util.I256.from(from.v & 0xFFL)))
+    Right(Val.I256(util.I256.from(from.v & 0xffL)))
   }
 }
 case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] with GasVeryLow {
   override def converse(from: Val.Byte): ExeResult[Val.U256] = {
-    Right(Val.U256(util.U256.unsafe(from.v & 0xFFL)))
+    Right(Val.U256(util.U256.unsafe(from.v & 0xffL)))
   }
 }
 
@@ -574,11 +576,11 @@ case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryL
 }
 
 sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
-sealed trait NewBooleanVec extends ObjectInstr with GasSchedule {}
-sealed trait NewByteVec    extends ObjectInstr with GasSchedule {}
-sealed trait NewI256Vec    extends ObjectInstr with GasSchedule {}
-sealed trait NewU256Vec    extends ObjectInstr with GasSchedule {}
-sealed trait NewByte256Vec extends ObjectInstr with GasSchedule {}
+sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}
+sealed trait NewByteVec    extends ObjectInstr with GasSchedule    {}
+sealed trait NewI256Vec    extends ObjectInstr with GasSchedule    {}
+sealed trait NewU256Vec    extends ObjectInstr with GasSchedule    {}
+sealed trait NewByte256Vec extends ObjectInstr with GasSchedule    {}
 
 sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh
 
@@ -765,7 +767,7 @@ case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0
   }
 }
 
-sealed trait CryptoInstr extends StatelessInstr with GasSchedule {}
+sealed trait CryptoInstr extends StatelessInstr with GasSchedule                         {}
 sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
 
 sealed trait CheckEqT[T <: Val]
@@ -919,9 +921,11 @@ sealed trait Transfer extends AssetInstr {
     frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract).map(LockupScript.p2c)
   }
 
-  def transferAlf[C <: StatefulContext](frame: Frame[C],
-                                        fromThunk: => ExeResult[LockupScript],
-                                        toThunk:   => ExeResult[LockupScript]): ExeResult[Unit] = {
+  def transferAlf[C <: StatefulContext](
+      frame: Frame[C],
+      fromThunk: => ExeResult[LockupScript],
+      toThunk: => ExeResult[LockupScript]
+  ): ExeResult[Unit] = {
     for {
       amount       <- frame.popT[Val.U256]()
       to           <- toThunk
@@ -934,9 +938,11 @@ sealed trait Transfer extends AssetInstr {
     } yield ()
   }
 
-  def transferToken[C <: StatefulContext](frame: Frame[C],
-                                          fromThunk: => ExeResult[LockupScript],
-                                          toThunk:   => ExeResult[LockupScript]): ExeResult[Unit] = {
+  def transferToken[C <: StatefulContext](
+      frame: Frame[C],
+      fromThunk: => ExeResult[LockupScript],
+      toThunk: => ExeResult[LockupScript]
+  ): ExeResult[Unit] = {
     for {
       amount       <- frame.popT[Val.U256]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
@@ -956,49 +962,61 @@ sealed trait Transfer extends AssetInstr {
 
 object TransferAlf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferAlf(frame,
-                frame.popT[Val.Address]().map(_.lockupScript),
-                frame.popT[Val.Address]().map(_.lockupScript))
+    transferAlf(
+      frame,
+      frame.popT[Val.Address]().map(_.lockupScript),
+      frame.popT[Val.Address]().map(_.lockupScript)
+    )
   }
 }
 
 object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferAlf(frame,
-                getContractLockupScript(frame),
-                frame.popT[Val.Address]().map(_.lockupScript))
+    transferAlf(
+      frame,
+      getContractLockupScript(frame),
+      frame.popT[Val.Address]().map(_.lockupScript)
+    )
   }
 }
 
 object TransferAlfToSelf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferAlf(frame,
-                frame.popT[Val.Address]().map(_.lockupScript),
-                getContractLockupScript(frame))
+    transferAlf(
+      frame,
+      frame.popT[Val.Address]().map(_.lockupScript),
+      getContractLockupScript(frame)
+    )
   }
 }
 
 object TransferToken extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferToken(frame,
-                  frame.popT[Val.Address]().map(_.lockupScript),
-                  frame.popT[Val.Address]().map(_.lockupScript))
+    transferToken(
+      frame,
+      frame.popT[Val.Address]().map(_.lockupScript),
+      frame.popT[Val.Address]().map(_.lockupScript)
+    )
   }
 }
 
 object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferToken(frame,
-                  getContractLockupScript(frame),
-                  frame.popT[Val.Address]().map(_.lockupScript))
+    transferToken(
+      frame,
+      getContractLockupScript(frame),
+      frame.popT[Val.Address]().map(_.lockupScript)
+    )
   }
 }
 
 object TransferTokenToSelf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferToken(frame,
-                  frame.popT[Val.Address]().map(_.lockupScript),
-                  getContractLockupScript(frame))
+    transferToken(
+      frame,
+      frame.popT[Val.Address]().map(_.lockupScript),
+      getContractLockupScript(frame)
+    )
   }
 }
 

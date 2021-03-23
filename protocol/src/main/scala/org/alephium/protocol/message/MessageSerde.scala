@@ -33,8 +33,10 @@ object MessageSerde {
   def length(data: ByteString): ByteString =
     intSerde.serialize(data.length)
 
-  def unwrap[M](input: ByteString,
-                networkType: NetworkType): SerdeResult[(ByteString, Int, ByteString)] = {
+  def unwrap[M](
+      input: ByteString,
+      networkType: NetworkType
+  ): SerdeResult[(ByteString, Int, ByteString)] = {
     for {
       rest         <- checkMagicBytes(input, networkType)
       checksumRest <- extractChecksum(rest)
@@ -62,8 +64,10 @@ object MessageSerde {
     }
   }
 
-  private def checkMagicBytes(data: ByteString,
-                              networkType: NetworkType): SerdeResult[ByteString] = {
+  private def checkMagicBytes(
+      data: ByteString,
+      networkType: NetworkType
+  ): SerdeResult[ByteString] = {
     if (data.length < networkType.magicBytes.length) {
       Left(SerdeError.notEnoughBytes(networkType.magicBytes.length, data.length))
     } else {
@@ -81,7 +85,8 @@ object MessageSerde {
       digest == toCheck,
       (),
       SerdeError.wrongFormat(
-        s"Wrong checksum: expected ${Hex.toHexString(digest)}, got ${Hex.toHexString(toCheck)}")
+        s"Wrong checksum: expected ${Hex.toHexString(digest)}, got ${Hex.toHexString(toCheck)}"
+      )
     )
   }
 }

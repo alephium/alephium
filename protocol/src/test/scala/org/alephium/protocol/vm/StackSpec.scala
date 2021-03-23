@@ -103,12 +103,11 @@ class StackSpec extends AlephiumSpec {
     stack.remove(n) isE ()
     stack.size is 0
 
-    (0 until n).foldLeft(stack.subStack()) {
-      case (subStack, k) =>
-        subStack.currentIndex is k
-        subStack.push(k) isE ()
-        subStack.size is 1
-        subStack.subStack()
+    (0 until n).foldLeft(stack.subStack()) { case (subStack, k) =>
+      subStack.currentIndex is k
+      subStack.push(k) isE ()
+      subStack.size is 1
+      subStack.subStack()
     }
     stack.size is 0
   }

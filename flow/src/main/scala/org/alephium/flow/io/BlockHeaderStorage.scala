@@ -38,10 +38,12 @@ trait BlockHeaderStorage extends KeyValueStorage[BlockHash, BlockHeader] {
 }
 
 object BlockHeaderRockDBStorage extends RocksDBKeyValueCompanion[BlockHeaderRockDBStorage] {
-  def apply(storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions,
-            readOptions: ReadOptions): BlockHeaderRockDBStorage = {
+  def apply(
+      storage: RocksDBSource,
+      cf: ColumnFamily,
+      writeOptions: WriteOptions,
+      readOptions: ReadOptions
+  ): BlockHeaderRockDBStorage = {
     new BlockHeaderRockDBStorage(storage, cf, writeOptions, readOptions)
   }
 }

@@ -26,8 +26,9 @@ import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object WalletGen extends App {
   @tailrec
-  def gen(networkType: NetworkType, groupIndex: GroupIndex)(implicit config: GroupConfig)
-    : (Address, SecP256K1PublicKey, SecP256K1PrivateKey, Mnemonic) = {
+  def gen(networkType: NetworkType, groupIndex: GroupIndex)(implicit
+      config: GroupConfig
+  ): (Address, SecP256K1PublicKey, SecP256K1PrivateKey, Mnemonic) = {
     // scalastyle:off magic.number
     val mnemonic = Mnemonic.generate(24).get
     // scalastyle:on magic.number

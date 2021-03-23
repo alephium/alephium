@@ -28,8 +28,9 @@ object HPC {
   def cfor[A](init: A)(test: A => Boolean, next: A => A)(body: A => Unit): Unit =
     macro cforMacro[A]
 
-  def cforMacro[A](c: Context)(init: c.Expr[A])(test: c.Expr[A => Boolean], next: c.Expr[A => A])(
-      body: c.Expr[A                                           => Unit]): c.Expr[Unit] = {
+  def cforMacro[A](c: Context)(
+      init: c.Expr[A]
+  )(test: c.Expr[A => Boolean], next: c.Expr[A => A])(body: c.Expr[A => Unit]): c.Expr[Unit] = {
 
     import c.universe._
     val util  = SyntaxUtil[c.type](c)
@@ -98,41 +99,41 @@ class InlineUtil[C <: Context with Singleton](val c: C) {
 
     class InlineSymbol(name: TermName, symbol: Symbol, value: Tree) extends Transformer {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      override def transform(tree: Tree): Tree = tree match {
-        case tree: Ident if tree.symbol == symbol =>
-          if (tree.name == name) {
-            value
-          } else {
-            super.transform(tree)
-          }
+      override def transform(tree: Tree): Tree =
+        tree match {
+          case tree: Ident if tree.symbol == symbol =>
+            if (tree.name == name) {
+              value
+            } else {
+              super.transform(tree)
+            }
 
-        case tt: TypeTree if tt.original != null =>
-          super.transform(Compat.setOrig(c)(TypeTree(), transform(tt.original)))
-        case _ =>
-          super.transform(tree)
-      }
+          case tt: TypeTree if tt.original != null =>
+            super.transform(Compat.setOrig(c)(TypeTree(), transform(tt.original)))
+          case _ =>
+            super.transform(tree)
+        }
     }
 
     object InlineApply extends Transformer {
       def inlineSymbol(name: TermName, symbol: Symbol, body: Tree, arg: Tree): Tree =
         new InlineSymbol(name, symbol, arg).transform(body)
 
-      override def transform(tree: Tree): Tree = tree match {
-        case Apply(Select(Function(params, body), ApplyName), args) =>
-          params.zip(args).foldLeft(body) {
-            case (b, (param, arg)) =>
+      override def transform(tree: Tree): Tree =
+        tree match {
+          case Apply(Select(Function(params, body), ApplyName), args) =>
+            params.zip(args).foldLeft(body) { case (b, (param, arg)) =>
               inlineSymbol(param.name, param.symbol, b, arg)
-          }
+            }
 
-        case Apply(Function(params, body), args) =>
-          params.zip(args).foldLeft(body) {
-            case (b, (param, arg)) =>
+          case Apply(Function(params, body), args) =>
+            params.zip(args).foldLeft(body) { case (b, (param, arg)) =>
               inlineSymbol(param.name, param.symbol, b, arg)
-          }
+            }
 
-        case _ =>
-          super.transform(tree)
-      }
+          case _ =>
+            super.transform(tree)
+        }
     }
 
     InlineApply.transform(tree)

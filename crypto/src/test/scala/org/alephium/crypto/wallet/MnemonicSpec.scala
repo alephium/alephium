@@ -169,16 +169,15 @@ class MnemonicSpec extends AlephiumSpec {
     ).tail
 
     val passphrase = "TREZOR"
-    cases.foreach {
-      case (_entropy, sentence, _seed, _) =>
-        val worldList = AVector.unsafe(sentence.split(" "))
-        val mnemonic  = Mnemonic.fromWords(worldList).get
+    cases.foreach { case (_entropy, sentence, _seed, _) =>
+      val worldList = AVector.unsafe(sentence.split(" "))
+      val mnemonic  = Mnemonic.fromWords(worldList).get
 
-        val entropy = Hex.from(_entropy).get
-        Mnemonic.from(entropy).get is mnemonic
+      val entropy = Hex.from(_entropy).get
+      Mnemonic.from(entropy).get is mnemonic
 
-        val seed = Hex.from(_seed).get
-        mnemonic.toSeed(passphrase) is seed
+      val seed = Hex.from(_seed).get
+      mnemonic.toSeed(passphrase) is seed
     }
   }
 }

@@ -35,8 +35,9 @@ object Storages {
   val heightPostfix: Byte        = 3
   val chainStatePostfix: Byte    = 4
 
-  def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(
-      implicit config: GroupConfig): Storages = {
+  def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(implicit
+      config: GroupConfig
+  ): Storages = {
     val db                = createRocksDBUnsafe(rootPath, dbFolder)
     val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
@@ -47,14 +48,16 @@ object Storages {
     val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage)
 
-    Storages(AVector(db),
-             headerStorage,
-             blockStorage,
-             txStorage,
-             emptyWorldState,
-             trieHashStorage,
-             blockStateStorage,
-             nodeStateStorage)
+    Storages(
+      AVector(db),
+      headerStorage,
+      blockStorage,
+      txStorage,
+      emptyWorldState,
+      trieHashStorage,
+      blockStateStorage,
+      nodeStateStorage
+    )
   }
 
   private def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {

@@ -61,11 +61,13 @@ object SparseMerkleTrie {
   }
 
   object Node {
-    def branch(path: ByteString,
-               nibble1: Int,
-               node1: Node,
-               nibble2: Int,
-               node2: Node): BranchNode = {
+    def branch(
+        path: ByteString,
+        nibble1: Int,
+        node1: Node,
+        nibble2: Int,
+        node2: Node
+    ): BranchNode = {
       assume(nibble1 != nibble2 && nibble1 < 16 && nibble2 < 16)
       val array = Array.fill[Option[Hash]](16)(None)
       array(nibble1) = Some(node1.hash)
@@ -109,43 +111,45 @@ object SparseMerkleTrie {
         fixedSizeSerde(16)
       }
 
-      def _serialize(node: Node): ByteString = node match {
-        case n: BranchNode =>
-          val flag     = SerdeNode.encodeFlag(n.path.length, isLeaf = false)
-          val nibbles  = encodeNibbles(n.path)
-          val children = childrenSerde.serialize(n.children)
-          (intSerde.serialize(flag) ++ nibbles) ++ children
-        case n: LeafNode =>
-          val flag    = SerdeNode.encodeFlag(n.path.length, isLeaf = true)
-          val nibbles = encodeNibbles(n.path)
-          (intSerde.serialize(flag) ++ nibbles) ++ bytestringSerde.serialize(n.data)
-      }
+      def _serialize(node: Node): ByteString =
+        node match {
+          case n: BranchNode =>
+            val flag     = SerdeNode.encodeFlag(n.path.length, isLeaf = false)
+            val nibbles  = encodeNibbles(n.path)
+            val children = childrenSerde.serialize(n.children)
+            (intSerde.serialize(flag) ++ nibbles) ++ children
+          case n: LeafNode =>
+            val flag    = SerdeNode.encodeFlag(n.path.length, isLeaf = true)
+            val nibbles = encodeNibbles(n.path)
+            (intSerde.serialize(flag) ++ nibbles) ++ bytestringSerde.serialize(n.data)
+        }
 
       override def serialize(node: Node): ByteString = node.serialized
 
       override def _deserialize(input: ByteString): SerdeResult[Staging[Node]] = {
-        intSerde._deserialize(input).flatMap {
-          case Staging(flag, rest) =>
-            val (length, isLeaf) = SerdeNode.decodeFlag(flag)
-            val (left, right)    = rest.splitAt((length + 1) / 2)
-            val path             = decodeNibbles(left, length)
-            if (isLeaf) {
-              bytestringSerde._deserialize(right).map {
-                case Staging(data, rest1) => Staging(LeafNode(path, data), rest1)
-              }
-            } else {
-              childrenSerde._deserialize(right).map {
-                case Staging(children, rest1) => Staging(BranchNode(path, children), rest1)
-              }
+        intSerde._deserialize(input).flatMap { case Staging(flag, rest) =>
+          val (length, isLeaf) = SerdeNode.decodeFlag(flag)
+          val (left, right)    = rest.splitAt((length + 1) / 2)
+          val path             = decodeNibbles(left, length)
+          if (isLeaf) {
+            bytestringSerde._deserialize(right).map { case Staging(data, rest1) =>
+              Staging(LeafNode(path, data), rest1)
             }
+          } else {
+            childrenSerde._deserialize(right).map { case Staging(children, rest1) =>
+              Staging(BranchNode(path, children), rest1)
+            }
+          }
         }
       }
     }
   }
 
-  final case class TrieUpdateActions(nodeOpt: Option[Node],
-                                     toDelete: AVector[Hash],
-                                     toAdd: AVector[Node])
+  final case class TrieUpdateActions(
+      nodeOpt: Option[Node],
+      toDelete: AVector[Hash],
+      toAdd: AVector[Node]
+  )
 
   final case class SMTException(message: String) extends Exception(message)
   object SMTException {
@@ -155,11 +159,11 @@ object SparseMerkleTrie {
   private val removalNoKey = IOError.Other(SMTException.keyNotFound("removal"))
 
   def getHighNibble(byte: Byte): Byte = {
-    ((byte & 0xF0) >> 4).toByte
+    ((byte & 0xf0) >> 4).toByte
   }
 
   def getLowNibble(byte: Byte): Byte = {
-    (byte & 0x0F).toByte
+    (byte & 0x0f).toByte
   }
 
   def getNibble(nibbles: ByteString, index: Int): Int = {
@@ -172,9 +176,7 @@ object SparseMerkleTrie {
   }
 
   def bytes2Nibbles(bytes: ByteString): ByteString = {
-    ByteString(bytes.flatMap { byte =>
-      ByteString(getHighNibble(byte), getLowNibble(byte))
-    })
+    ByteString(bytes.flatMap { byte => ByteString(getHighNibble(byte), getLowNibble(byte)) })
   }
 
   def nibbles2Bytes(nibbles: ByteString): ByteString = {
@@ -187,9 +189,11 @@ object SparseMerkleTrie {
     ByteString.fromArrayUnsafe(bytes)
   }
 
-  def build[K: Serde, V: Serde](storage: KeyValueStorage[Hash, Node],
-                                genesisKey: K,
-                                genesisValue: V): SparseMerkleTrie[K, V] = {
+  def build[K: Serde, V: Serde](
+      storage: KeyValueStorage[Hash, Node],
+      genesisKey: K,
+      genesisValue: V
+  ): SparseMerkleTrie[K, V] = {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
     val genesisNode = LeafNode(genesisPath, genesisData)
@@ -197,8 +201,10 @@ object SparseMerkleTrie {
     new SparseMerkleTrie(genesisNode.hash, storage)
   }
 
-  def apply[K: Serde, V: Serde](rootHash: Hash,
-                                storage: KeyValueStorage[Hash, Node]): SparseMerkleTrie[K, V] =
+  def apply[K: Serde, V: Serde](
+      rootHash: Hash,
+      storage: KeyValueStorage[Hash, Node]
+  ): SparseMerkleTrie[K, V] =
     new SparseMerkleTrie[K, V](rootHash, storage)
 }
 
@@ -211,9 +217,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 
   def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
     result.toAdd
-      .foreachE { node =>
-        storage.put(node.hash, node)
-      }
+      .foreachE { node => storage.put(node.hash, node) }
       .map { _ =>
         result.nodeOpt match {
           case None       => this
@@ -320,10 +324,12 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def handleChildUpdateResult(branchHash: Hash,
-                              branchNode: BranchNode,
-                              nibble: Int,
-                              result: TrieUpdateActions): IOResult[TrieUpdateActions] = {
+  def handleChildUpdateResult(
+      branchHash: Hash,
+      branchNode: BranchNode,
+      nibble: Int,
+      result: TrieUpdateActions
+  ): IOResult[TrieUpdateActions] = {
     val children     = branchNode.children
     val childOptHash = result.nodeOpt.map(_.hash)
     val newChildren  = children.replace(nibble, childOptHash)
@@ -364,17 +370,21 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     } yield trie
   }
 
-  private def put(hash: Hash,
-                  nibbles: ByteString,
-                  value: ByteString): IOResult[TrieUpdateActions] = {
+  private def put(
+      hash: Hash,
+      nibbles: ByteString,
+      value: ByteString
+  ): IOResult[TrieUpdateActions] = {
     assume(nibbles.nonEmpty)
     getNode(hash).flatMap(put(hash, _, nibbles, value))
   }
 
-  private def put(hash: Hash,
-                  node: Node,
-                  nibbles: ByteString,
-                  value: ByteString): IOResult[TrieUpdateActions] = {
+  private def put(
+      hash: Hash,
+      node: Node,
+      nibbles: ByteString,
+      value: ByteString
+  ): IOResult[TrieUpdateActions] = {
     val path = node.path
     assume(path.length <= nibbles.length)
     val branchIndex = node.path.indices.indexWhere(i => nibbles(i) != path(i))
@@ -407,11 +417,13 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  private def branch(hash: Hash,
-                     node: Node,
-                     branchIndex: Int,
-                     nibbles: ByteString,
-                     value: ByteString): IOResult[TrieUpdateActions] = {
+  private def branch(
+      hash: Hash,
+      node: Node,
+      branchIndex: Int,
+      nibbles: ByteString,
+      value: ByteString
+  ): IOResult[TrieUpdateActions] = {
     val path         = node.path
     val prefix       = path.take(branchIndex)
     val nibble1      = getNibble(path, branchIndex)
@@ -428,27 +440,28 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
   def getAll(prefix: ByteString): IOResult[AVector[(K, V)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
     getAllRaw(prefixNibbles, rootHash, ByteString.empty).flatMap { dataVec =>
-      dataVec.mapE {
-        case (nibbles, leaf) =>
-          val deser = for {
-            key   <- deserialize[K](SparseMerkleTrie.nibbles2Bytes(nibbles))
-            value <- deserialize[V](leaf.data)
-          } yield (key, value)
-          deser.left.map(IOError.Serde)
+      dataVec.mapE { case (nibbles, leaf) =>
+        val deser = for {
+          key   <- deserialize[K](SparseMerkleTrie.nibbles2Bytes(nibbles))
+          value <- deserialize[V](leaf.data)
+        } yield (key, value)
+        deser.left.map(IOError.Serde)
       }
     }
   }
 
   def getAllRaw(prefix: ByteString): IOResult[AVector[(ByteString, ByteString)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty).map(_.map {
-      case (nibbles, leaf) => (SparseMerkleTrie.nibbles2Bytes(nibbles), leaf.data)
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty).map(_.map { case (nibbles, leaf) =>
+      (SparseMerkleTrie.nibbles2Bytes(nibbles), leaf.data)
     })
   }
 
-  protected def getAllRaw(prefix: ByteString,
-                          hash: Hash,
-                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+  protected def getAllRaw(
+      prefix: ByteString,
+      hash: Hash,
+      acc: ByteString
+  ): IOResult[AVector[(ByteString, LeafNode)]] = {
     if (prefix.isEmpty) {
       getAllRaw(hash, acc)
     } else {
@@ -457,9 +470,11 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  protected def getAllRaw(prefix: ByteString,
-                          node: Node,
-                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+  protected def getAllRaw(
+      prefix: ByteString,
+      node: Node,
+      acc: ByteString
+  ): IOResult[AVector[(ByteString, LeafNode)]] = {
     node match {
       case n: BranchNode =>
         if (n.path.length >= prefix.length) {
@@ -487,8 +502,10 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  protected def getAllRaw(hash: Hash,
-                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+  protected def getAllRaw(
+      hash: Hash,
+      acc: ByteString
+  ): IOResult[AVector[(ByteString, LeafNode)]] = {
     getNode(hash).flatMap {
       case n: BranchNode =>
         getAllRaw(n, acc)
@@ -496,8 +513,10 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  protected def getAllRaw(node: BranchNode,
-                          acc: ByteString): IOResult[AVector[(ByteString, LeafNode)]] = {
+  protected def getAllRaw(
+      node: BranchNode,
+      acc: ByteString
+  ): IOResult[AVector[(ByteString, LeafNode)]] = {
     node.children.flatMapWithIndexE { (childOpt, index) =>
       childOpt match {
         case Some(child) => getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte))

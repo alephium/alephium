@@ -46,8 +46,8 @@ trait DownloadTracker extends BaseActor {
   def cleanupDownloading(aliveDuration: Duration): Unit = {
     val threshold = TimeStamp.now().minusUnsafe(aliveDuration)
     val oldSize   = downloading.size
-    downloading.filterInPlace {
-      case (_, downloadTs) => downloadTs > threshold
+    downloading.filterInPlace { case (_, downloadTs) =>
+      downloadTs > threshold
     }
     val newSize   = downloading.size
     val sizeDelta = oldSize - newSize

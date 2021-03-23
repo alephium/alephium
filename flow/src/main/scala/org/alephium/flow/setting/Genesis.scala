@@ -53,9 +53,11 @@ object Genesis {
   )
   // scalastyle:on magic.number
 
-  private def build(addressRaw: String,
-                    amount: U256,
-                    networkType: NetworkType): (LockupScript, U256) = {
+  private def build(
+      addressRaw: String,
+      amount: U256,
+      networkType: NetworkType
+  ): (LockupScript, U256) = {
     val address = Address
       .fromBase58(addressRaw, networkType)
       .getOrElse(throw new RuntimeException(s"Invalid address $addressRaw for $networkType"))

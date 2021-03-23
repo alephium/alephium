@@ -102,8 +102,10 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     import emission._
 
     equalU256(reward(Target.Max, TimeStamp.zero, TimeStamp.zero), lowHashRateInitialRewardPerChain)
-    reward(onePhPerSecondDivided,
-           TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
-           TimeStamp.zero) is stableMaxRewardPerChain
+    reward(
+      onePhPerSecondDivided,
+      TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
+      TimeStamp.zero
+    ) is stableMaxRewardPerChain
   }
 }

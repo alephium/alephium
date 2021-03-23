@@ -52,16 +52,15 @@ trait ContractPool extends CostStrategy {
   }
 
   def commitContractStates(): ExeResult[Unit] = {
-    EitherF.foreachTry(pool) {
-      case (contractKey, contractObj) =>
-        if (contractObj.isUpdated) {
-          for {
-            _ <- chargeContractUpdate()
-            _ <- updateState(contractKey, AVector.from(contractObj.fields))
-          } yield ()
-        } else {
-          Right(())
-        }
+    EitherF.foreachTry(pool) { case (contractKey, contractObj) =>
+      if (contractObj.isUpdated) {
+        for {
+          _ <- chargeContractUpdate()
+          _ <- updateState(contractKey, AVector.from(contractObj.fields))
+        } yield ()
+      } else {
+        Right(())
+      }
     }
   }
 

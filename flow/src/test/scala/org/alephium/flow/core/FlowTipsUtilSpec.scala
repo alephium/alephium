@@ -52,9 +52,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
 
       lightTips.inTips.toSeq is (0 until groups0)
         .filter(_ != target)
-        .map { k =>
-          if (k equals from) block.hash else blockFlow.bestGenesisHashes(k)
-        }
+        .map { k => if (k equals from) block.hash else blockFlow.bestGenesisHashes(k) }
       lightTips.outTip is
         (if (target equals from) block.hash else blockFlow.bestGenesisHashes(target))
 
@@ -79,9 +77,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
 
       lightTips.inTips.toSeq is (0 until groups0)
         .filter(_ != target)
-        .map { k =>
-          if (k equals from) block.hash else bestNewHashes(k)
-        }
+        .map { k => if (k equals from) block.hash else bestNewHashes(k) }
       lightTips.outTip is (if (target equals from) block.hash else bestNewHashes(target))
     }
   }
@@ -129,9 +125,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       block.chainIndex is ChainIndex.unsafe(from, to)
       flowTips.inTips.toSeq is (0 until groups0)
         .filter(_ != target)
-        .map { k =>
-          if (k equals from) block.hash else blockFlow.bestGenesisHashes(k)
-        }
+        .map { k => if (k equals from) block.hash else blockFlow.bestGenesisHashes(k) }
       val outTipsExpected = if (target equals from) {
         block.header.outTips
       } else {
@@ -161,9 +155,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       block.chainIndex is ChainIndex.unsafe(from, to)
       flowTips.inTips.toSeq is (0 until groups0)
         .filter(_ != target)
-        .map { k =>
-          if (k equals from) block.hash else bestNewHashes0(k)
-        }
+        .map { k => if (k equals from) block.hash else bestNewHashes0(k) }
       val outTipsExpected = if (target equals from) {
         block.header.outTips
       } else {

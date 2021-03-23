@@ -37,37 +37,36 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   val path        = Constants.path(NetworkType.Devnet)
 
   it should "create/lock/unlock the secret storage" in {
-    forAll(seedGen, passwordGen, passwordGen) {
-      case (seed, password, wrongPassword) =>
-        val name  = Hash.generate.shortHex
-        val file  = new File(s"$secretDir/$name")
-        val miner = false
+    forAll(seedGen, passwordGen, passwordGen) { case (seed, password, wrongPassword) =>
+      val name  = Hash.generate.shortHex
+      val file  = new File(s"$secretDir/$name")
+      val miner = false
 
-        val secretStorage = SecretStorage.create(seed, password, miner, file, path).toOption.get
-        val privateKey    = BIP32.btcMasterKey(seed).derive(path).get
+      val secretStorage = SecretStorage.create(seed, password, miner, file, path).toOption.get
+      val privateKey    = BIP32.btcMasterKey(seed).derive(path).get
 
-        secretStorage.getCurrentPrivateKey() isE privateKey
-        secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey)))
+      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey)))
 
-        val newKey = secretStorage.deriveNextKey().toOption.get
+      val newKey = secretStorage.deriveNextKey().toOption.get
 
-        secretStorage.getCurrentPrivateKey() isE newKey
-        secretStorage.getAllPrivateKeys() isE ((newKey, AVector(privateKey, newKey)))
+      secretStorage.getCurrentPrivateKey() isE newKey
+      secretStorage.getAllPrivateKeys() isE ((newKey, AVector(privateKey, newKey)))
 
-        secretStorage.changeActiveKey(privateKey) isE (())
+      secretStorage.changeActiveKey(privateKey) isE (())
 
-        secretStorage.getCurrentPrivateKey() isE privateKey
-        secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey, newKey)))
+      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey, newKey)))
 
-        secretStorage.changeActiveKey(privateKey.derive(0).get) is Left(SecretStorage.UnknownKey)
+      secretStorage.changeActiveKey(privateKey.derive(0).get) is Left(SecretStorage.UnknownKey)
 
-        secretStorage.lock()
-        secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
+      secretStorage.lock()
+      secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
 
-        secretStorage.unlock(wrongPassword).isLeft is true
+      secretStorage.unlock(wrongPassword).isLeft is true
 
-        secretStorage.unlock(password) is Right(())
-        secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.unlock(password) is Right(())
+      secretStorage.getCurrentPrivateKey() isE privateKey
     }
   }
 

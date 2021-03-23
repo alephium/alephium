@@ -26,7 +26,7 @@ import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.AlephiumSpec
 
 class ServerSpec extends AlephiumSpec with ScalaFutures {
-  override implicit val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
+  implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   it should "start and stop correctly" in {
     val rootPath                                    = Platform.getRootPath()

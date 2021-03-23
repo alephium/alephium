@@ -32,31 +32,34 @@ import org.alephium.util.ActorRefT
 
 object OutboundBrokerHandler {
   // scalastyle:off parameter.number
-  def props(selfCliqueInfo: CliqueInfo,
-            remoteBroker: BrokerInfo,
-            blockflow: BlockFlow,
-            allHandlers: AllHandlers,
-            cliqueManager: ActorRefT[CliqueManager.Command],
-            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-      implicit brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting): Props =
+  def props(
+      selfCliqueInfo: CliqueInfo,
+      remoteBroker: BrokerInfo,
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers,
+      cliqueManager: ActorRefT[CliqueManager.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
-      new OutboundBrokerHandler(selfCliqueInfo,
-                                remoteBroker.address,
-                                blockflow,
-                                allHandlers,
-                                cliqueManager,
-                                blockFlowSynchronizer))
+      new OutboundBrokerHandler(
+        selfCliqueInfo,
+        remoteBroker.address,
+        blockflow,
+        allHandlers,
+        cliqueManager,
+        blockFlowSynchronizer
+      )
+    )
   //scalastyle:on
 }
 
-class OutboundBrokerHandler(val selfCliqueInfo: CliqueInfo,
-                            val remoteAddress: InetSocketAddress,
-                            val blockflow: BlockFlow,
-                            val allHandlers: AllHandlers,
-                            val cliqueManager: ActorRefT[CliqueManager.Command],
-                            val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-    implicit val brokerConfig: BrokerConfig,
-    val networkSetting: NetworkSetting)
+class OutboundBrokerHandler(
+    val selfCliqueInfo: CliqueInfo,
+    val remoteAddress: InetSocketAddress,
+    val blockflow: BlockFlow,
+    val allHandlers: AllHandlers,
+    val cliqueManager: ActorRefT[CliqueManager.Command],
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+)(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseOutboundBrokerHandler
     with BrokerHandler

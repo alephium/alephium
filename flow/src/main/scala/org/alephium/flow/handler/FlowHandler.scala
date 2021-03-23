@@ -28,17 +28,19 @@ import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
-  def props(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
-      implicit brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig): Props =
+  def props(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig
+  ): Props =
     Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
   final case class SetHandler(handler: ActorRefT[DependencyHandler.Command]) extends Command
-  final case class AddHeader(header: BlockHeader,
-                             broker: ActorRefT[ChainHandler.Event],
-                             origin: DataOrigin)
-      extends Command
+  final case class AddHeader(
+      header: BlockHeader,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ) extends Command
   final case class AddBlock(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
   final case class GetBlocks(locators: AVector[BlockHash])                   extends Command
@@ -51,12 +53,13 @@ object FlowHandler {
   case object UnRegister                                                     extends Command
 
   sealed trait Event
-  final case class BlockFlowTemplate(index: ChainIndex,
-                                     deps: AVector[BlockHash],
-                                     target: Target,
-                                     parentTs: TimeStamp,
-                                     transactions: AVector[Transaction])
-      extends Event
+  final case class BlockFlowTemplate(
+      index: ChainIndex,
+      deps: AVector[BlockHash],
+      target: Target,
+      parentTs: TimeStamp,
+      transactions: AVector[Transaction]
+  )                                                                     extends Event
   final case class BlocksLocated(blocks: AVector[Block])                extends Event
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Event
   final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[BlockHash]])
@@ -66,8 +69,10 @@ object FlowHandler {
       if (groupUntil <= groupFrom) {
         AVector.empty
       } else {
-        hashes.slice((groupFrom - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups,
-                     (groupUntil - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups)
+        hashes.slice(
+          (groupFrom - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups,
+          (groupUntil - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups
+        )
       }
     }
   }
@@ -76,10 +81,10 @@ object FlowHandler {
 
 // TODO: set AddHeader and AddBlock with highest priority
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
-    implicit brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig)
-    extends IOBaseActor
+class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(implicit
+    brokerConfig: BrokerConfig,
+    consensusConfig: ConsensusConfig
+) extends IOBaseActor
     with Stash {
   import FlowHandler._
 
@@ -144,9 +149,11 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
   }
 
-  def handleHeader(minerOpt: Option[ActorRefT[Miner.Command]],
-                   header: BlockHeader,
-                   broker: ActorRefT[ChainHandler.Event]): Unit = {
+  def handleHeader(
+      minerOpt: Option[ActorRefT[Miner.Command]],
+      header: BlockHeader,
+      broker: ActorRefT[ChainHandler.Event]
+  ): Unit = {
     blockFlow.contains(header) match {
       case Right(true) =>
         log.debug(s"Blockheader ${header.shortHex} exists already")
@@ -163,10 +170,12 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
     }
   }
 
-  def handleBlock(minerOpt: Option[ActorRefT[Miner.Command]],
-                  block: Block,
-                  broker: ActorRefT[ChainHandler.Event],
-                  origin: DataOrigin): Unit = {
+  def handleBlock(
+      minerOpt: Option[ActorRefT[Miner.Command]],
+      block: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
     escapeIOError(blockFlow.contains(block)) { isIncluded =>
       if (!isIncluded) {
         blockFlow.add(block) match {

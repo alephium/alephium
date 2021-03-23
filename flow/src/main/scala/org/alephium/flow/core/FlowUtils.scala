@@ -52,9 +52,11 @@ trait FlowUtils
     mempools(chainIndex.from.value - brokerConfig.groupFrom)
   }
 
-  def calMemPoolChangesUnsafe(mainGroup: GroupIndex,
-                              oldDeps: BlockDeps,
-                              newDeps: BlockDeps): MemPoolChanges = {
+  def calMemPoolChangesUnsafe(
+      mainGroup: GroupIndex,
+      oldDeps: BlockDeps,
+      newDeps: BlockDeps
+  ): MemPoolChanges = {
     val oldOutDeps = oldDeps.outDeps
     val newOutDeps = newDeps.outDeps
     val diffs = AVector.tabulate(brokerConfig.groups) { toGroup =>
@@ -99,15 +101,19 @@ trait FlowUtils
     getPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
   }
 
-  def filterValidInputsUnsafe(chainIndex: ChainIndex,
-                              deps: BlockDeps,
-                              txs: AVector[TransactionTemplate]): AVector[TransactionTemplate] = {
+  def filterValidInputsUnsafe(
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      txs: AVector[TransactionTemplate]
+  ): AVector[TransactionTemplate] = {
     val cachedWorldState = Utils.unsafe(getCachedWorldState(deps, chainIndex.from))
     txs.filter(tx => Utils.unsafe(cachedWorldState.containsAllInputs(tx)))
   }
 
-  def collectTransactions(chainIndex: ChainIndex,
-                          deps: BlockDeps): IOResult[AVector[TransactionTemplate]] =
+  def collectTransactions(
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): IOResult[AVector[TransactionTemplate]] =
     IOUtils.tryExecute {
       val candidates0 = collectPooledTxs(chainIndex)
       val candidates1 = FlowUtils.filterDoubleSpending(candidates0)
@@ -121,16 +127,17 @@ trait FlowUtils
   private def executeTxTemplates(
       chainIndex: ChainIndex,
       deps: BlockDeps,
-      txTemplates: AVector[TransactionTemplate]): IOResult[AVector[Transaction]] = {
+      txTemplates: AVector[TransactionTemplate]
+  ): IOResult[AVector[Transaction]] = {
     if (chainIndex.isIntraGroup) {
       val parentHash = deps.getOutDep(chainIndex.to)
       val order      = Block.getScriptExecutionOrder(parentHash, txTemplates)
-      val fullTxs    = Array.ofDim[Transaction](txTemplates.length + 1) // reverse 1 slot for coinbase tx
-      txTemplates.foreachWithIndex {
-        case (tx, index) =>
-          if (tx.unsigned.scriptOpt.isEmpty) {
-            fullTxs(index) = FlowUtils.convertNonScriptTx(tx)
-          }
+      val fullTxs =
+        Array.ofDim[Transaction](txTemplates.length + 1) // reverse 1 slot for coinbase tx
+      txTemplates.foreachWithIndex { case (tx, index) =>
+        if (tx.unsigned.scriptOpt.isEmpty) {
+          fullTxs(index) = FlowUtils.convertNonScriptTx(tx)
+        }
       }
 
       for {
@@ -178,42 +185,54 @@ object FlowUtils {
   }
 
   def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
-    Transaction(txTemplate.unsigned,
-                AVector.empty,
-                AVector.empty,
-                txTemplate.inputSignatures,
-                txTemplate.contractSignatures)
+    Transaction(
+      txTemplate.unsigned,
+      AVector.empty,
+      AVector.empty,
+      txTemplate.inputSignatures,
+      txTemplate.contractSignatures
+    )
   }
 
-  def convertSuccessfulTx(txTemplate: TransactionTemplate,
-                          result: TxScriptExecution): Transaction = {
-    Transaction(txTemplate.unsigned,
-                result.contractInputs,
-                result.generatedOutputs,
-                txTemplate.inputSignatures,
-                txTemplate.contractSignatures)
+  def convertSuccessfulTx(
+      txTemplate: TransactionTemplate,
+      result: TxScriptExecution
+  ): Transaction = {
+    Transaction(
+      txTemplate.unsigned,
+      result.contractInputs,
+      result.generatedOutputs,
+      txTemplate.inputSignatures,
+      txTemplate.contractSignatures
+    )
   }
 
   def deductGas(inputs: AVector[TxOutput], gasFee: U256): AVector[TxOutput] = {
     inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
   }
 
-  def convertFailedScriptTx(worldState: MutableWorldState,
-                            txTemplate: TransactionTemplate): IOResult[Transaction] = {
+  def convertFailedScriptTx(
+      worldState: MutableWorldState,
+      txTemplate: TransactionTemplate
+  ): IOResult[Transaction] = {
     worldState.getPreOutputsForVM(txTemplate).map { inputs =>
       assume(inputs.forall(_.isAsset))
       val remainingBalances = deductGas(inputs, txTemplate.gasFeeUnsafe)
-      Transaction(txTemplate.unsigned,
-                  AVector.empty,
-                  generatedOutputs = remainingBalances,
-                  txTemplate.inputSignatures,
-                  txTemplate.contractSignatures)
+      Transaction(
+        txTemplate.unsigned,
+        AVector.empty,
+        generatedOutputs = remainingBalances,
+        txTemplate.inputSignatures,
+        txTemplate.contractSignatures
+      )
     }
   }
 
-  def generateFullTx(worldState: WorldState.Cached,
-                     tx: TransactionTemplate,
-                     script: StatefulScript): IOResult[Transaction] = {
+  def generateFullTx(
+      worldState: WorldState.Cached,
+      tx: TransactionTemplate,
+      script: StatefulScript
+  ): IOResult[Transaction] = {
     StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
       case Left(_)       => convertFailedScriptTx(worldState, tx)
       case Right(result) => Right(FlowUtils.convertSuccessfulTx(tx, result))
@@ -223,21 +242,25 @@ object FlowUtils {
 
 trait SyncUtils {
   def getIntraSyncInventories(
-      remoteBroker: BrokerGroupInfo): IOResult[AVector[AVector[BlockHash]]] =
+      remoteBroker: BrokerGroupInfo
+  ): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getIntraSyncInventoriesUnsafe(remoteBroker))
 
   def getSyncLocators(): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncLocatorsUnsafe())
 
   def getSyncInventories(
-      locators: AVector[AVector[BlockHash]]): IOResult[AVector[AVector[BlockHash]]] =
+      locators: AVector[AVector[BlockHash]]
+  ): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators))
 
   protected def getIntraSyncInventoriesUnsafe(
-      remoteBroker: BrokerGroupInfo): AVector[AVector[BlockHash]]
+      remoteBroker: BrokerGroupInfo
+  ): AVector[AVector[BlockHash]]
 
   protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]]
 
   protected def getSyncInventoriesUnsafe(
-      locators: AVector[AVector[BlockHash]]): AVector[AVector[BlockHash]]
+      locators: AVector[AVector[BlockHash]]
+  ): AVector[AVector[BlockHash]]
 }

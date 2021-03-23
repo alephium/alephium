@@ -20,11 +20,12 @@ import org.alephium.protocol.BlockHash
 
 sealed trait TxStatus
 
-final case class Confirmed(blockHash: BlockHash,
-                           blockIndex: Int,
-                           chainConfirmations: Int,
-                           fromGroupConfirmations: Int,
-                           toGroupConfirmations: Int)
-    extends TxStatus
+final case class Confirmed(
+    blockHash: BlockHash,
+    blockIndex: Int,
+    chainConfirmations: Int,
+    fromGroupConfirmations: Int,
+    toGroupConfirmations: Int
+)                           extends TxStatus
 final case object MemPooled extends TxStatus
 final case object NotFound  extends TxStatus

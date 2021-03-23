@@ -47,7 +47,8 @@ trait BlockFlow
   }
 
   private def getSyncLocatorsUnsafe(
-      peerBrokerInfo: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
+      peerBrokerInfo: BrokerGroupInfo
+  ): AVector[AVector[BlockHash]] = {
     val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
     AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
       val offset    = index / groups
@@ -69,7 +70,8 @@ trait BlockFlow
   }
 
   override protected def getSyncInventoriesUnsafe(
-      locators: AVector[AVector[BlockHash]]): AVector[AVector[BlockHash]] = {
+      locators: AVector[AVector[BlockHash]]
+  ): AVector[AVector[BlockHash]] = {
     locators.map { locatorsPerChain =>
       if (locatorsPerChain.isEmpty) {
         AVector.empty[BlockHash]
@@ -82,7 +84,8 @@ trait BlockFlow
   }
 
   override protected def getIntraSyncInventoriesUnsafe(
-      remoteBroker: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
+      remoteBroker: BrokerGroupInfo
+  ): AVector[AVector[BlockHash]] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
       val k         = index / remoteBroker.groupNumPerBroker
       val l         = index % remoteBroker.groupNumPerBroker
@@ -103,15 +106,18 @@ object BlockFlow extends StrictLogging {
   type WorldStateUpdater = (WorldState.Cached, Block) => IOResult[Unit]
 
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
-    fromGenesisUnsafe(storages, config.genesisBlocks)(config.broker,
-                                                      config.consensus,
-                                                      config.mempool)
+    fromGenesisUnsafe(storages, config.genesisBlocks)(
+      config.broker,
+      config.consensus,
+      config.mempool
+    )
   }
 
-  def fromGenesisUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(
-      implicit brokerConfig: BrokerConfig,
+  def fromGenesisUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
+      brokerConfig: BrokerConfig,
       consensusSetting: ConsensusSetting,
-      memPoolSetting: MemPoolSetting): BlockFlow = {
+      memPoolSetting: MemPoolSetting
+  ): BlockFlow = {
     logger.info(s"Initialize storage for BlockFlow")
     new BlockFlowImpl(
       genesisBlocks,
@@ -122,15 +128,18 @@ object BlockFlow extends StrictLogging {
   }
 
   def fromStorageUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
-    fromStorageUnsafe(storages, config.genesisBlocks)(config.broker,
-                                                      config.consensus,
-                                                      config.mempool)
+    fromStorageUnsafe(storages, config.genesisBlocks)(
+      config.broker,
+      config.consensus,
+      config.mempool
+    )
   }
 
-  def fromStorageUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(
-      implicit brokerConfig: BrokerConfig,
+  def fromStorageUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
+      brokerConfig: BrokerConfig,
       consensusSetting: ConsensusSetting,
-      memPoolSetting: MemPoolSetting): BlockFlow = {
+      memPoolSetting: MemPoolSetting
+  ): BlockFlow = {
     val blockflow = new BlockFlowImpl(
       genesisBlocks,
       BlockChainWithState.fromStorageUnsafe(storages),
@@ -145,12 +154,13 @@ object BlockFlow extends StrictLogging {
   class BlockFlowImpl(
       val genesisBlocks: AVector[AVector[Block]],
       val blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState,
-      val blockchainBuilder: Block                                         => BlockChain,
-      val blockheaderChainBuilder: BlockHeader                             => BlockHeaderChain
-  )(implicit val brokerConfig: BrokerConfig,
-    val consensusConfig: ConsensusSetting,
-    val mempoolSetting: MemPoolSetting)
-      extends BlockFlow {
+      val blockchainBuilder: Block => BlockChain,
+      val blockheaderChainBuilder: BlockHeader => BlockHeaderChain
+  )(implicit
+      val brokerConfig: BrokerConfig,
+      val consensusConfig: ConsensusSetting,
+      val mempoolSetting: MemPoolSetting
+  ) extends BlockFlow {
 
     def add(block: Block): IOResult[Unit] = {
       val index = block.chainIndex
@@ -202,8 +212,8 @@ object BlockFlow extends StrictLogging {
       val diffs         = getFlowTipsDiffUnsafe(currentFlowTips, intraFlowTips)
 
       val intraWeight = getWeightUnsafe(intraDep)
-      val diffsWeight = diffs.fold(BigInteger.ZERO) {
-        case (acc, diff) => acc add getBlockHeaderUnsafe(diff).target.value
+      val diffsWeight = diffs.fold(BigInteger.ZERO) { case (acc, diff) =>
+        acc add getBlockHeaderUnsafe(diff).target.value
       }
 
       intraWeight add diffsWeight
@@ -217,26 +227,27 @@ object BlockFlow extends StrictLogging {
       aggregateHash(_.getAllTips)(_ ++ _)
     }
 
-    def tryExtendUnsafe(tipsCur: FlowTips,
-                        weightCur: BigInteger,
-                        group: GroupIndex,
-                        toTry: AVector[BlockHash],
-                        bestTip: BlockHash): (FlowTips, BigInteger) = {
+    def tryExtendUnsafe(
+        tipsCur: FlowTips,
+        weightCur: BigInteger,
+        group: GroupIndex,
+        toTry: AVector[BlockHash],
+        bestTip: BlockHash
+    ): (FlowTips, BigInteger) = {
       toTry
         .sorted(blockHashOrdering.reverse) // useful for draw situation
-        .fold[(FlowTips, BigInteger)](tipsCur -> weightCur) {
-          case ((maxTips, maxWeight), tip) =>
-            // only consider tips < bestTip
-            if (blockHashOrdering.lt(tip, bestTip)) {
-              tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
-                case Some(merged) =>
-                  val weight = calWeightUnsafe(merged, group)
-                  if (weight.compareTo(maxWeight) > 0) (merged, weight) else (maxTips, maxWeight)
-                case None => (maxTips, maxWeight)
-              }
-            } else {
-              maxTips -> maxWeight
+        .fold[(FlowTips, BigInteger)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
+          // only consider tips < bestTip
+          if (blockHashOrdering.lt(tip, bestTip)) {
+            tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
+              case Some(merged) =>
+                val weight = calWeightUnsafe(merged, group)
+                if (weight.compareTo(maxWeight) > 0) (merged, weight) else (maxTips, maxWeight)
+              case None => (maxTips, maxWeight)
             }
+          } else {
+            maxTips -> maxWeight
+          }
         }
     }
 
@@ -249,22 +260,20 @@ object BlockFlow extends StrictLogging {
 
       val (flowTips1, weight1) =
         (if (bestIndex.from == group) groupOrder.filter(_ != bestIndex.to.value) else groupOrder)
-          .fold(flowTips0 -> weight0) {
-            case ((tipsCur, weightCur), _r) =>
-              val r     = GroupIndex.unsafe(_r)
-              val chain = getHashChain(group, r)
-              tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips, bestTip)
+          .fold(flowTips0 -> weight0) { case ((tipsCur, weightCur), _r) =>
+            val r     = GroupIndex.unsafe(_r)
+            val chain = getHashChain(group, r)
+            tryExtendUnsafe(tipsCur, weightCur, group, chain.getAllTips, bestTip)
           }
       val (flowTips2, _) = groupOrder
         .filter(g => g != group.value && g != bestIndex.from.value)
-        .fold(flowTips1 -> weight1) {
-          case ((tipsCur, weightCur), _l) =>
-            val l = GroupIndex.unsafe(_l)
-            val toTry = (0 until groups).foldLeft(AVector.empty[BlockHash]) { (acc, _r) =>
-              val r = GroupIndex.unsafe(_r)
-              acc ++ getHashChain(l, r).getAllTips
-            }
-            tryExtendUnsafe(tipsCur, weightCur, group, toTry, bestTip)
+        .fold(flowTips1 -> weight1) { case ((tipsCur, weightCur), _l) =>
+          val l = GroupIndex.unsafe(_l)
+          val toTry = (0 until groups).foldLeft(AVector.empty[BlockHash]) { (acc, _r) =>
+            val r = GroupIndex.unsafe(_r)
+            acc ++ getHashChain(l, r).getAllTips
+          }
+          tryExtendUnsafe(tipsCur, weightCur, group, toTry, bestTip)
         }
       flowTips2.toBlockDeps
     }
@@ -297,7 +306,7 @@ object BlockFlow extends StrictLogging {
         val groupRemaining = groupOrders.length - index
         val randomIndex    = index + Math.floorMod(seed.toRandomIntUnsafe, groupRemaining)
         val tmp            = groupOrders(index)
-        groupOrders(index)       = groupOrders(randomIndex)
+        groupOrders(index) = groupOrders(randomIndex)
         groupOrders(randomIndex) = tmp
         shuffle(index + 1, BlockHash.hash(seed.bytes))
       }

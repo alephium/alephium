@@ -71,14 +71,16 @@ trait TapirCodecs extends ApiModelCodec {
   implicit val inetSocketAddressTapirCodec: Codec[String, InetAddress, TextPlain] =
     fromCirce[InetAddress]
 
-  implicit def groupIndexCodec(
-      implicit groupConfig: GroupConfig): Codec[String, GroupIndex, TextPlain] =
+  implicit def groupIndexCodec(implicit
+      groupConfig: GroupConfig
+  ): Codec[String, GroupIndex, TextPlain] =
     Codec.int.mapDecode(int =>
       GroupIndex.from(int) match {
         case Some(groupIndex) => DecodeResult.Value(groupIndex)
         case None =>
           DecodeResult.Error(s"$int", new IllegalArgumentException("Invalid group index"))
-    })(_.value)
+      }
+    )(_.value)
 
   implicit val mnemonicSizeTapirCodec: Codec[String, Mnemonic.Size, TextPlain] =
     fromCirce[Mnemonic.Size]

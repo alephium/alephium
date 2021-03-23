@@ -96,23 +96,23 @@ class CachedTrieSpec extends AlephiumSpec {
       cached.remove(key).swap isE a[IOError.KeyNotFound[_]]
     }
 
-    def switchMode() = cached match {
-      case c: CachedSMT[Hash, Hash] =>
-        if (Random.nextBoolean()) {
-          val newTrie = c.persist().rightValue
-          cached = CachedSMT.from(newTrie)
-        } else {
-          cached = c.staging()
-        }
-      case c: StagingSMT[Hash, Hash] =>
-        cached = c.commit()
-    }
+    def switchMode() =
+      cached match {
+        case c: CachedSMT[Hash, Hash] =>
+          if (Random.nextBoolean()) {
+            val newTrie = c.persist().rightValue
+            cached = CachedSMT.from(newTrie)
+          } else {
+            cached = c.staging()
+          }
+        case c: StagingSMT[Hash, Hash] =>
+          cached = c.commit()
+      }
 
     def finalTest() = {
-      logs.foreach {
-        case (key, value) =>
-          cached.get(key) isE value
-          cached.remove(key) isE ()
+      logs.foreach { case (key, value) =>
+        cached.get(key) isE value
+        cached.remove(key) isE ()
       }
       val newTrie = cached match {
         case c: CachedSMT[Hash, Hash] =>
@@ -120,9 +120,8 @@ class CachedTrieSpec extends AlephiumSpec {
         case c: StagingSMT[Hash, Hash] =>
           c.commit().persist().rightValue
       }
-      logs.foreach {
-        case (key, _) =>
-          newTrie.exist(key) isE false
+      logs.foreach { case (key, _) =>
+        newTrie.exist(key) isE false
       }
     }
 
@@ -135,9 +134,7 @@ class CachedTrieSpec extends AlephiumSpec {
       (5, Gen.const(testFalseDelete)),
       (5, Gen.const(switchMode))
     )
-    (0 until 2000).foreach { _ =>
-      gen.sample.get.apply()
-    }
+    (0 until 2000).foreach { _ => gen.sample.get.apply() }
     finalTest()
   }
 

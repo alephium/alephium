@@ -27,17 +27,19 @@ import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
 
 object HeaderChainHandler {
-  def props(blockFlow: BlockFlow,
-            chainIndex: ChainIndex,
-            flowHandler: ActorRefT[FlowHandler.Command])(implicit brokerConfig: BrokerConfig,
-                                                         consensusConfig: ConsensusConfig): Props =
+  def props(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      flowHandler: ActorRefT[FlowHandler.Command]
+  )(implicit brokerConfig: BrokerConfig, consensusConfig: ConsensusConfig): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
 
   sealed trait Command
-  final case class Validate(header: BlockHeader,
-                            broker: ActorRefT[ChainHandler.Event],
-                            origin: DataOrigin)
-      extends Command
+  final case class Validate(
+      header: BlockHeader,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ) extends Command
 
   sealed trait Event                              extends ChainHandler.Event
   final case class HeaderAdded(hash: BlockHash)   extends Event
@@ -45,26 +47,29 @@ object HeaderChainHandler {
   final case class InvalidHeader(hash: BlockHash) extends Event
 }
 
-class HeaderChainHandler(blockFlow: BlockFlow,
-                         chainIndex: ChainIndex,
-                         flowHandler: ActorRefT[FlowHandler.Command])(
-    implicit brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig)
+class HeaderChainHandler(
+    blockFlow: BlockFlow,
+    chainIndex: ChainIndex,
+    flowHandler: ActorRefT[FlowHandler.Command]
+)(implicit brokerConfig: BrokerConfig, consensusConfig: ConsensusConfig)
     extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderChainHandler.Command](
       blockFlow,
       chainIndex,
-      HeaderValidation.build) {
+      HeaderValidation.build
+    ) {
   import HeaderChainHandler._
 
-  override def receive: Receive = {
-    case Validate(header, broker, origin) => handleData(header, broker, origin)
+  override def receive: Receive = { case Validate(header, broker, origin) =>
+    handleData(header, broker, origin)
   }
 
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
-  override def addToFlowHandler(header: BlockHeader,
-                                broker: ActorRefT[ChainHandler.Event],
-                                origin: DataOrigin): Unit = {
+  override def addToFlowHandler(
+      header: BlockHeader,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
     flowHandler ! FlowHandler.AddHeader(header, broker, origin)
   }
 

@@ -38,12 +38,11 @@ class CliqueInfoSpec extends AlephiumSpec with Generators {
       }
 
       val intraBrokers = cliqueInfo.intraBrokers
-      intraBrokers.foreachWithIndex {
-        case (broker, index) =>
-          broker.cliqueId is cliqueInfo.id
-          broker.brokerId is index
-          broker.groupNumPerBroker is brokerConfig.groupNumPerBroker
-          broker.address is cliqueInfo.internalAddresses(index)
+      intraBrokers.foreachWithIndex { case (broker, index) =>
+        broker.cliqueId is cliqueInfo.id
+        broker.brokerId is index
+        broker.groupNumPerBroker is brokerConfig.groupNumPerBroker
+        broker.address is cliqueInfo.internalAddresses(index)
       }
 
       val selfInterBrokerInfo = cliqueInfo.selfInterBrokerInfo
@@ -58,12 +57,11 @@ class CliqueInfoSpec extends AlephiumSpec with Generators {
       selfBrokerInfo.address is cliqueInfo.externalAddresses(brokerConfig.brokerId).get
 
       val brokerInfos = cliqueInfo.interBrokers.get
-      brokerInfos.foreachWithIndex {
-        case (brokerInfo, index) =>
-          brokerInfo.cliqueId is cliqueInfo.id
-          brokerInfo.brokerId is index
-          brokerInfo.groupNumPerBroker is brokerConfig.groupNumPerBroker
-          brokerInfo.address is cliqueInfo.externalAddresses(index).get
+      brokerInfos.foreachWithIndex { case (brokerInfo, index) =>
+        brokerInfo.cliqueId is cliqueInfo.id
+        brokerInfo.brokerId is index
+        brokerInfo.groupNumPerBroker is brokerConfig.groupNumPerBroker
+        brokerInfo.address is cliqueInfo.externalAddresses(index).get
       }
     }
   }

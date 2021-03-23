@@ -39,9 +39,10 @@ object Lexer {
     P(lowercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
   def typeId[_: P]: P[Ast.TypeId] =
     P(uppercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.TypeId)
-  def funcId[_: P]: P[Ast.FuncId] = P(ident ~ "!".?.!).map {
-    case (id, postfix) => Ast.FuncId(id.name, postfix.nonEmpty)
-  }
+  def funcId[_: P]: P[Ast.FuncId] =
+    P(ident ~ "!".?.!).map { case (id, postfix) =>
+      Ast.FuncId(id.name, postfix.nonEmpty)
+    }
 
   private[lang] def getSimpleName(obj: Object): String = {
     obj.getClass.getSimpleName.dropRight(1)
@@ -56,10 +57,11 @@ object Lexer {
   def hexNum[_: P]: P[BigInteger] = P("0x" ~ hex).!.map(new BigInteger(_, 16))
   def decNum[_: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
   def num[_: P]: P[BigInteger]    = negatable(P(hexNum | decNum))
-  def negatable[_: P](p: => P[BigInteger]): P[BigInteger] = ("-".?.! ~ p).map {
-    case ("-", i) => i.negate()
-    case (_, i)   => i
-  }
+  def negatable[_: P](p: => P[BigInteger]): P[BigInteger] =
+    ("-".?.! ~ p).map {
+      case ("-", i) => i.negate()
+      case (_, i)   => i
+    }
   def typedNum[_: P]: P[Val] =
     P(num ~ ("i" | "u" | "b").?.!)
       .map {
@@ -80,43 +82,46 @@ object Lexer {
           }
       }
 
-  def bytesInternal[_: P]: P[Val.ByteVec] = P(hex).!.map { hexString =>
-    val byteVecOpt = Hex.asArraySeq(hexString).map(ByteVec(_))
-    byteVecOpt match {
-      case Some(byteVec) => byteVec
-      case None          => throw Compiler.Error(s"Invalid byteVec: $hexString")
+  def bytesInternal[_: P]: P[Val.ByteVec] =
+    P(hex).!.map { hexString =>
+      val byteVecOpt = Hex.asArraySeq(hexString).map(ByteVec(_))
+      byteVecOpt match {
+        case Some(byteVec) => byteVec
+        case None          => throw Compiler.Error(s"Invalid byteVec: $hexString")
+      }
     }
-  }
   def bytes[_: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
 
-  def addressInternal[_: P]: P[Val.Address] = P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
-    val lockupScriptOpt = Address.extractLockupScript(input)
-    lockupScriptOpt match {
-      case Some(lockupScript) => Val.Address(lockupScript)
-      case None               => throw Compiler.Error(s"Invalid address: $input")
+  def addressInternal[_: P]: P[Val.Address] =
+    P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
+      val lockupScriptOpt = Address.extractLockupScript(input)
+      lockupScriptOpt match {
+        case Some(lockupScript) => Val.Address(lockupScript)
+        case None               => throw Compiler.Error(s"Invalid address: $input")
+      }
     }
-  }
   def address[_: P]: P[Val.Address] = P("@" ~ addressInternal)
 
-  def bool[_: P]: P[Val.Bool] = P(keyword("true") | keyword("false")).!.map {
-    case "true" => Val.Bool(true)
-    case _      => Val.Bool(false)
-  }
+  def bool[_: P]: P[Val.Bool] =
+    P(keyword("true") | keyword("false")).!.map {
+      case "true" => Val.Bool(true)
+      case _      => Val.Bool(false)
+    }
 
-  def opAdd[_: P]: P[Operator]        = P("+").map(_  => Add)
-  def opSub[_: P]: P[Operator]        = P("-").map(_  => Sub)
-  def opMul[_: P]: P[Operator]        = P("*").map(_  => Mul)
-  def opDiv[_: P]: P[Operator]        = P("/").map(_  => Div)
-  def opMod[_: P]: P[Operator]        = P("%").map(_  => Mod)
+  def opAdd[_: P]: P[Operator]        = P("+").map(_ => Add)
+  def opSub[_: P]: P[Operator]        = P("-").map(_ => Sub)
+  def opMul[_: P]: P[Operator]        = P("*").map(_ => Mul)
+  def opDiv[_: P]: P[Operator]        = P("/").map(_ => Div)
+  def opMod[_: P]: P[Operator]        = P("%").map(_ => Mod)
   def opEq[_: P]: P[TestOperator]     = P("==").map(_ => Eq)
   def opNe[_: P]: P[TestOperator]     = P("!=").map(_ => Ne)
-  def opLt[_: P]: P[TestOperator]     = P("<").map(_  => Lt)
+  def opLt[_: P]: P[TestOperator]     = P("<").map(_ => Lt)
   def opLe[_: P]: P[TestOperator]     = P("<=").map(_ => Le)
-  def opGt[_: P]: P[TestOperator]     = P(">").map(_  => Gt)
+  def opGt[_: P]: P[TestOperator]     = P(">").map(_ => Gt)
   def opGe[_: P]: P[TestOperator]     = P(">=").map(_ => Ge)
   def opAnd[_: P]: P[LogicalOperator] = P("&&").map(_ => And)
   def opOr[_: P]: P[LogicalOperator]  = P("||").map(_ => Or)
-  def opNot[_: P]: P[LogicalOperator] = P("!").map(_  => Not)
+  def opNot[_: P]: P[LogicalOperator] = P("!").map(_ => Not)
 
   sealed trait FuncModifier
   case object Pub     extends FuncModifier
