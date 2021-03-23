@@ -33,23 +33,23 @@ object Dependencies {
   lazy val `akka-stream`      = "com.typesafe.akka" %% "akka-stream"         % Version.akka
   lazy val `akka-test`        = "com.typesafe.akka" %% "akka-testkit"        % Version.akka % Test
   lazy val `akka-http-test`   = "com.typesafe.akka" %% "akka-http-testkit"   % Version.`akka-http` % Test
-  lazy val `akka-http-cors`   = "ch.megard"         %% "akka-http-cors"      % "0.4.3"
+  lazy val `akka-http-cors`   = "ch.megard"         %% "akka-http-cors"      % "1.0.0"
   lazy val `akka-stream-test` = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
 
   lazy val `circe-core`    = "io.circe"                   %% "circe-core"      % Version.circe
   lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"    % Version.circe
   lazy val `circe-generic` = "io.circe"                   %% "circe-generic"   % Version.circe
-  lazy val pureconfig      = "com.github.pureconfig"      %% "pureconfig"      % "0.13.0"
-  lazy val bcprov          = "org.bouncycastle"           % "bcprov-jdk15on"   % "1.67"
-  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.2.2"
+  lazy val pureconfig      = "com.github.pureconfig"      %% "pureconfig"      % "0.14.1"
+  lazy val bcprov          = "org.bouncycastle"           % "bcprov-jdk15on"   % "1.68"
+  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.1"
   lazy val logback         = "ch.qos.logback"             % "logback-classic"  % "1.2.3"
   lazy val metrics         = "io.dropwizard.metrics"      % "metrics-core"     % Version.metrics
   lazy val `metrics-jmx`   = "io.dropwizard.metrics"      % "metrics-jmx"      % Version.metrics
-  lazy val rocksdb         = "org.rocksdb"                % "rocksdbjni"       % "5.18.3"
+  lazy val rocksdb         = "org.rocksdb"                % "rocksdbjni"       % "5.18.4"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.2"
-  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.14.3" % Test
-  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.1.1" % Test
-  lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.1.1.1" % Test
+  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.15.3" % Test
+  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.6" % Test
+  lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
   lazy val weupnp          = "org.bitlet"                 % "weupnp"           % "0.1.4"
 
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
