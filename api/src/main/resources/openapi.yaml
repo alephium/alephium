@@ -662,7 +662,7 @@ paths:
                 cliqueId: b51d57737a6880aeaf94fd4587e50c139682b2e05fb18215c7b2689178d295645d
                 networkType: mainnet
                 numZerosAtLeastInHash: 18
-                peers:
+                nodes:
                 - address: 1.2.3.4
                   restPort: 12377
                   wsPort: 12366
@@ -1585,7 +1585,7 @@ components:
           $ref: '#/components/schemas/NetworkType'
         numZerosAtLeastInHash:
           type: integer
-        peers:
+        nodes:
           type: array
           items:
             $ref: '#/components/schemas/PeerAddress'

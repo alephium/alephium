@@ -29,14 +29,14 @@ class MiningTest extends AlephiumSpec {
     val selfClique = request[SelfClique](getSelfClique)
     val group      = request[Group](getGroup(address))
     val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.peers(index).restPort
+    val restPort   = selfClique.nodes(index).restPort
 
     request[Balance](getBalance(address), restPort) is initialBalance
 
     startWS(defaultWsMasterPort)
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
-    selfClique.peers.foreach { peer =>
+    selfClique.nodes.foreach { peer =>
       request[Boolean](startMining, peer.restPort) is true
     }
     confirmTx(tx, restPort)
@@ -52,7 +52,7 @@ class MiningTest extends AlephiumSpec {
         Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 0, 1)
     }
 
-    selfClique.peers.foreach { peer =>
+    selfClique.nodes.foreach { peer =>
       request[Boolean](stopMining, peer.restPort) is true
     }
     server1.stop().futureValue is ()
