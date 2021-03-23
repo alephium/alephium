@@ -34,12 +34,12 @@ class BroadcastTxTest extends AlephiumSpec {
     val selfClique1 = request[SelfClique](getSelfClique)
     val group1      = request[Group](getGroup(address))
     val index1      = group1.group / selfClique1.groupNumPerBroker
-    val restPort1   = selfClique1.peers(index1).restPort
+    val restPort1   = selfClique1.nodes(index1).restPort
 
     val selfClique2 = request[SelfClique](getSelfClique, restPort(port2))
     val group2      = request[Group](getGroup(address), restPort(port2))
     val index2      = group2.group / selfClique2.groupNumPerBroker
-    val restPort2   = selfClique2.peers(index2).restPort
+    val restPort2   = selfClique2.nodes(index2).restPort
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort1)
 

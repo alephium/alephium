@@ -52,7 +52,10 @@ object InterCliqueManager {
   sealed trait Command              extends CliqueManager.Command
   final case object GetSyncStatuses extends Command
 
-  final case class SyncStatus(peerId: PeerId, address: InetSocketAddress, isSynced: Boolean)
+  final case class SyncStatus(peerId: PeerId,
+                              address: InetSocketAddress,
+                              isSynced: Boolean,
+                              groupNumPerBroker: Int)
 
   final case class BrokerState(info: BrokerInfo,
                                connectionType: ConnectionType,
@@ -147,7 +150,10 @@ class InterCliqueManager(selfCliqueInfo: CliqueInfo,
 
     case GetSyncStatuses =>
       val syncStatuses: Seq[SyncStatus] = mapBrokers { (peerId, brokerState) =>
-        SyncStatus(peerId, brokerState.info.address, brokerState.isSynced)
+        SyncStatus(peerId,
+                   brokerState.info.address,
+                   brokerState.isSynced,
+                   brokerState.info.groupNumPerBroker)
       }
       sender() ! syncStatuses
 

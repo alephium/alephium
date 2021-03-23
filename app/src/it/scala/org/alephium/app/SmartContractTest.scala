@@ -34,7 +34,7 @@ class SmartContractTest extends AlephiumSpec {
     val selfClique = request[SelfClique](getSelfClique)
     val group      = request[Group](getGroup(address))
     val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.peers(index).restPort
+    val restPort   = selfClique.nodes(index).restPort
 
     def contract(code: String, state: Option[String] = None): Hash = {
       execute("contract", code, state)
@@ -83,7 +83,7 @@ class SmartContractTest extends AlephiumSpec {
     request[Balance](getBalance(address), restPort) is initialBalance
     startWS(defaultWsMasterPort)
 
-    selfClique.peers.foreach { peer =>
+    selfClique.nodes.foreach { peer =>
       request[Boolean](startMining, peer.restPort) is true
     }
 

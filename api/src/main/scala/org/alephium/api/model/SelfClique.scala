@@ -22,10 +22,10 @@ import org.alephium.util.{AVector}
 final case class SelfClique(cliqueId: CliqueId,
                             networkType: NetworkType,
                             numZerosAtLeastInHash: Int,
-                            peers: AVector[PeerAddress],
+                            nodes: AVector[PeerAddress],
                             synced: Boolean,
                             groupNumPerBroker: Int,
                             groups: Int) {
   def peer(groupIndex: GroupIndex): PeerAddress =
-    peers((groupIndex.value / groupNumPerBroker) % peers.length)
+    nodes((groupIndex.value / groupNumPerBroker) % nodes.length)
 }

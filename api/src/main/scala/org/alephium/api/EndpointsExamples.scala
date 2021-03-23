@@ -82,7 +82,12 @@ trait EndpointsExamples {
 
   implicit val interCliquePeerInfosExamples: List[Example[AVector[InterCliquePeerInfo]]] =
     simpleExample(
-      AVector(InterCliquePeerInfo(cliqueId, brokerId = 1, inetSocketAddress, isSynced = true)))
+      AVector(
+        InterCliquePeerInfo(cliqueId,
+                            brokerId          = 1,
+                            groupNumPerBroker = 2,
+                            inetSocketAddress,
+                            isSynced = true)))
 
   implicit val discoveredNeighborExamples: List[Example[AVector[BrokerInfo]]] =
     simpleExample(AVector(BrokerInfo.unsafe(cliqueId, 1, 1, inetSocketAddress)))
