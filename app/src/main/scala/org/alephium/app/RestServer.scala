@@ -340,6 +340,10 @@ object RestServer {
 
   def interCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
     val peerId = syncStatus.peerId
-    InterCliquePeerInfo(peerId.cliqueId, peerId.brokerId, syncStatus.address, syncStatus.isSynced)
+    InterCliquePeerInfo(peerId.cliqueId,
+                        peerId.brokerId,
+                        syncStatus.groupNumPerBroker,
+                        syncStatus.address,
+                        syncStatus.isSynced)
   }
 }

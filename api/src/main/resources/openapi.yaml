@@ -696,6 +696,7 @@ paths:
               example:
               - cliqueId: 89329865fd774d03aa17faf8bca8de0a0e3f38d3a925374e12e66a1c64917181ee
                 brokerId: 1
+                groupNumPerBroker: 2
                 address:
                   addr: 1.2.3.4
                   port: 12344
@@ -1623,6 +1624,7 @@ components:
       required:
       - cliqueId
       - brokerId
+      - groupNumPerBroker
       - address
       - isSynced
       type: object
@@ -1630,6 +1632,8 @@ components:
         cliqueId:
           type: string
         brokerId:
+          type: integer
+        groupNumPerBroker:
           type: integer
         address:
           type: string
