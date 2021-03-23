@@ -28,12 +28,32 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{Hello, Payload}
+import org.alephium.protocol.message.{Hello, Payload, Pong}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{ActorRefT, Duration}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
-  it should "handshake with new connection" in {
+  it should "handshake with new connection" in new Fixture {
+    val brokerInfo =
+      BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("localhost", 0))
+    val hello = Hello.unsafe(brokerInfo.interBrokerInfo)
+    brokerHandler ! BrokerHandler.Received(hello)
+    brokerHandler.underlyingActor.pingPongTickOpt is a[Some[_]]
+  }
+
+  it should "stop when handshake timeout" in new Fixture {
+    watch(brokerHandler)
+    brokerHandler ! BrokerHandler.HandShakeTimeout
+    expectTerminated(brokerHandler)
+  }
+
+  it should "stop when received other message than handshake message" in new Fixture {
+    watch(brokerHandler)
+    brokerHandler ! BrokerHandler.Received(Pong(100))
+    expectTerminated(brokerHandler)
+  }
+
+  trait Fixture {
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
     val brokerHandler =
@@ -43,12 +63,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
 
     connectionHandler.expectMsgType[ConnectionHandler.Send]
     brokerHandler.underlyingActor.pingPongTickOpt is None
-
-    val brokerInfo =
-      BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("localhost", 0))
-    val hello = Hello.unsafe(brokerInfo.interBrokerInfo)
-    brokerHandler ! BrokerHandler.Received(hello)
-    brokerHandler.underlyingActor.pingPongTickOpt is a[Some[_]]
   }
 }
 
