@@ -22,6 +22,7 @@ import akka.actor.Terminated
 import akka.io.{IO, Tcp}
 import akka.testkit.TestProbe
 
+import org.alephium.api.model.SelfClique
 import org.alephium.util._
 
 class ShutdownTest extends AlephiumSpec {
@@ -41,7 +42,8 @@ class ShutdownTest extends AlephiumSpec {
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is ())
 
-    Thread.sleep(1000) // wait until children are created
+    eventually(request[SelfClique](getSelfClique).synced is true)
+
     server0.stop().futureValue is ()
     server1.system.whenTerminated.futureValue is a[Terminated]
   }
