@@ -22,17 +22,13 @@ class BitsSpec extends AlephiumSpec {
 
     Bits.from(0) is zero
     Bits.from(-1) is AVector.fill(8)(true)
-    0 until 8 foreach { k =>
-      Bits.from((1 << k).toByte) is zero.replace(7 - k, true)
-    }
+    0 until 8 foreach { k => Bits.from((1 << k).toByte) is zero.replace(7 - k, true) }
 
     Bits.toInt(zero) is 0
     Bits.toInt(AVector.fill(10)(true)) is 1023
   }
 
   it should "convert general byte" in {
-    forAll { byte: Byte =>
-      Bits.toInt(Bits.from(byte)) is Bytes.toPosInt(byte)
-    }
+    forAll { byte: Byte => Bits.toInt(Bits.from(byte)) is Bytes.toPosInt(byte) }
   }
 }

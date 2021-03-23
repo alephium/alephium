@@ -31,31 +31,34 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object IntraCliqueManager {
-  def props(cliqueInfo: CliqueInfo,
-            blockflow: BlockFlow,
-            allHandlers: AllHandlers,
-            cliqueManager: ActorRefT[CliqueManager.Command],
-            blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-      implicit brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting): Props =
+  def props(
+      cliqueInfo: CliqueInfo,
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers,
+      cliqueManager: ActorRefT[CliqueManager.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
-      new IntraCliqueManager(cliqueInfo,
-                             blockflow,
-                             allHandlers,
-                             cliqueManager,
-                             blockFlowSynchronizer))
+      new IntraCliqueManager(
+        cliqueInfo,
+        blockflow,
+        allHandlers,
+        cliqueManager,
+        blockFlowSynchronizer
+      )
+    )
 
   sealed trait Command    extends CliqueManager.Command
   final case object Ready extends Command
 }
 
-class IntraCliqueManager(cliqueInfo: CliqueInfo,
-                         blockflow: BlockFlow,
-                         allHandlers: AllHandlers,
-                         cliqueManager: ActorRefT[CliqueManager.Command],
-                         blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command])(
-    implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting)
+class IntraCliqueManager(
+    cliqueInfo: CliqueInfo,
+    blockflow: BlockFlow,
+    allHandlers: AllHandlers,
+    cliqueManager: ActorRefT[CliqueManager.Command],
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+)(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
     with EventStream.Publisher {
 
@@ -63,12 +66,14 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
     cliqueInfo.intraBrokers.foreach { remoteBroker =>
       if (remoteBroker.brokerId > brokerConfig.brokerId) {
         log.debug(s"Connect to broker $remoteBroker")
-        val props = OutboundBrokerHandler.props(cliqueInfo,
-                                                remoteBroker,
-                                                blockflow,
-                                                allHandlers,
-                                                ActorRefT[CliqueManager.Command](self),
-                                                blockFlowSynchronizer)
+        val props = OutboundBrokerHandler.props(
+          cliqueInfo,
+          remoteBroker,
+          blockflow,
+          allHandlers,
+          ActorRefT[CliqueManager.Command](self),
+          blockFlowSynchronizer
+        )
         val outbound = context.actorOf(props)
         context.watch(outbound)
         ()
@@ -94,13 +99,15 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
         // Note: index == -1 is also the right condition
         log.debug(s"The connection from $remote is incoming connection")
         val props =
-          InboundBrokerHandler.props(cliqueInfo,
-                                     remote,
-                                     networkSetting.connectionBuild(sender()),
-                                     blockflow,
-                                     allHandlers,
-                                     ActorRefT[CliqueManager.Command](self),
-                                     blockFlowSynchronizer)
+          InboundBrokerHandler.props(
+            cliqueInfo,
+            remote,
+            networkSetting.connectionBuild(sender()),
+            blockflow,
+            allHandlers,
+            ActorRefT[CliqueManager.Command](self),
+            blockFlowSynchronizer
+          )
         val inbound = context.actorOf(props)
         context.watch(inbound)
         ()
@@ -131,23 +138,24 @@ class IntraCliqueManager(cliqueInfo: CliqueInfo,
       assume(block.chainIndex.relateTo(brokerConfig))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       // TODO: optimize this without using iteration
-      brokers.foreach {
-        case (_, (info, broker)) =>
-          if (!origin.isFrom(info)) {
-            if (block.chainIndex.relateTo(info)) {
-              log.debug(s"Send block ${block.shortHex} to broker $info")
-              broker ! BrokerHandler.Send(blockMsg)
-            } else {
-              log.debug(s"Send header ${block.shortHex} to broker $info")
-              broker ! BrokerHandler.Send(headerMsg)
-            }
+      brokers.foreach { case (_, (info, broker)) =>
+        if (!origin.isFrom(info)) {
+          if (block.chainIndex.relateTo(info)) {
+            log.debug(s"Send block ${block.shortHex} to broker $info")
+            broker ! BrokerHandler.Send(blockMsg)
+          } else {
+            log.debug(s"Send header ${block.shortHex} to broker $info")
+            broker ! BrokerHandler.Send(headerMsg)
           }
+        }
       }
     case Terminated(actor) => handleTerminated(actor, brokers)
   }
 
-  def handleTerminated(actor: ActorRef,
-                       brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Unit = {
+  def handleTerminated(
+      actor: ActorRef,
+      brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]
+  ): Unit = {
     brokers.foreach {
       case (_, (info, broker)) if broker == ActorRefT[BrokerHandler.Command](actor) =>
         log.error(s"Self clique node $info is not functioning, shutdown the system now")

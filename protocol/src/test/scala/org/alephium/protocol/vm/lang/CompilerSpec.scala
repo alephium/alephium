@@ -79,14 +79,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "infer types" in {
-    def check(xMut: String,
-              a: String,
-              aType: String,
-              b: String,
-              bType: String,
-              rType: String,
-              fname: String,
-              validity: Boolean = false) = {
+    def check(
+        xMut: String,
+        a: String,
+        aType: String,
+        b: String,
+        bType: String,
+        rType: String,
+        fname: String,
+        validity: Boolean = false
+    ) = {
       val contract =
         s"""
          |TxContract Foo($xMut x: U256) {
@@ -142,10 +144,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   trait Fixture {
-    def test(input: String,
-             args: AVector[Val],
-             output: AVector[Val] = AVector.empty,
-             fields: AVector[Val] = AVector.empty): Assertion = {
+    def test(
+        input: String,
+        args: AVector[Val],
+        output: AVector[Val] = AVector.empty,
+        fields: AVector[Val] = AVector.empty
+    ): Assertion = {
       val contract = Compiler.compileContract(input).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
@@ -169,10 +173,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    test(input,
-         AVector(Val.U256(U256.Two)),
-         AVector(Val.U256(U256.unsafe(5))),
-         AVector(Val.U256(U256.One)))
+    test(
+      input,
+      AVector(Val.U256(U256.Two)),
+      AVector(Val.U256(U256.unsafe(5))),
+      AVector(Val.U256(U256.One))
+    )
   }
 
   it should "verify signature" in {
@@ -316,18 +322,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       AVector.empty,
-      AVector[Val](Val.True,
-                   Val.False,
-                   Val.True,
-                   Val.False,
-                   Val.True,
-                   Val.False,
-                   Val.True,
-                   Val.True,
-                   Val.True,
-                   Val.False,
-                   Val.True,
-                   Val.True)
+      AVector[Val](
+        Val.True,
+        Val.False,
+        Val.True,
+        Val.False,
+        Val.True,
+        Val.False,
+        Val.True,
+        Val.True,
+        Val.True,
+        Val.False,
+        Val.True,
+        Val.True
+      )
     )
 
     test(
@@ -373,8 +381,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract,
       AVector(Val.U256(U256.unsafe(1000))),
       AVector(Val.U256(U256.unsafe(99))),
-      AVector(Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(10)),
-              Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(100)))
+      AVector(
+        Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(10)),
+        Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(100))
+      )
     )
   }
 

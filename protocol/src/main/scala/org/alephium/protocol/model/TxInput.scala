@@ -58,7 +58,8 @@ object AssetOutputRef {
           Right(())
         } else {
           Left("Expect AssetOutputRef, got ContractOutputRef")
-      })
+        }
+      )
 
   def unsafe(hint: Hint, key: Hash): AssetOutputRef = new AssetOutputRef(hint, key)
 
@@ -85,7 +86,8 @@ object ContractOutputRef {
           Right(())
         } else {
           Left("Expected ContractOutputRef, got AssetOutputRef")
-      })
+        }
+      )
 
   def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
 

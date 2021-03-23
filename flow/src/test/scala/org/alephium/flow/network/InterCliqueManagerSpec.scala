@@ -89,7 +89,10 @@ class InterCliqueManagerSpec
 
   it should "not include brokers that are not related to our groups" in new Fixture {
     val badBroker = irrelevantBrokerInfo()
-    interCliqueManagerActor.checkForOutConnection(badBroker, maxOutboundConnectionsPerGroup) is false
+    interCliqueManagerActor.checkForOutConnection(
+      badBroker,
+      maxOutboundConnectionsPerGroup
+    ) is false
     interCliqueManagerActor.checkForInConnection(badBroker, maxInboundConnectionsPerGroup) is false
   }
 
@@ -132,23 +135,29 @@ class InterCliqueManagerSpec
 
     val parentName = s"InterCliqueManager-${Random.source.nextInt}"
     val interCliqueManager = TestActorRef[InterCliqueManager](
-      InterCliqueManager.props(cliqueInfo,
-                               blockFlow,
-                               allHandlers,
-                               ActorRefT(discoveryServer.ref),
-                               ActorRefT(blockFlowSynchronizer.ref)),
-      parentName)
+      InterCliqueManager.props(
+        cliqueInfo,
+        blockFlow,
+        allHandlers,
+        ActorRefT(discoveryServer.ref),
+        ActorRefT(blockFlowSynchronizer.ref)
+      ),
+      parentName
+    )
     val interCliqueManagerActor = interCliqueManager.underlyingActor
 
     lazy val peer = socketAddressGen.sample.get
 
-    lazy val peerInfo = BrokerInfo.unsafe(cliqueIdGen.sample.get,
-                                          brokerConfig.brokerId,
-                                          cliqueInfo.groupNumPerBroker,
-                                          peer)
+    lazy val peerInfo = BrokerInfo.unsafe(
+      cliqueIdGen.sample.get,
+      brokerConfig.brokerId,
+      cliqueInfo.groupNumPerBroker,
+      peer
+    )
 
-    def getActor(name: String)(
-        implicit executionContext: ExecutionContext): Future[Option[ActorRef]] =
+    def getActor(
+        name: String
+    )(implicit executionContext: ExecutionContext): Future[Option[ActorRef]] =
       system
         .actorSelection(s"user/$parentName/$name")
         .resolveOne()
@@ -171,10 +180,12 @@ class InterCliqueManagerSpec
     }
 
     def newBrokerInfo(info: BrokerInfo): BrokerInfo = {
-      BrokerInfo.unsafe(cliqueIdGen.sample.get,
-                        info.brokerId,
-                        info.groupNumPerBroker,
-                        socketAddressGen.sample.get)
+      BrokerInfo.unsafe(
+        cliqueIdGen.sample.get,
+        info.brokerId,
+        info.groupNumPerBroker,
+        socketAddressGen.sample.get
+      )
     }
   }
 }

@@ -83,12 +83,16 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
       lowHashRateInitialRewardPerChain addUnsafe U256.unsafe(rewardPlus)
     } else if (target >= oneEhPerSecondDivided) {
       val rewardReduce = (initialMaxRewardPerChain subUnsafe stableMaxRewardPerChain).toBigInt
-        .multiply(oneEhPerSecondDivided.value) // we don't subtract onePhPerSecond for simplification
+        .multiply(
+          oneEhPerSecondDivided.value
+        ) // we don't subtract onePhPerSecond for simplification
         .divide(target.value)
       initialMaxRewardPerChain subUnsafe U256.unsafe(rewardReduce)
     } else if (target >= a128EhPerSecondDivided) {
       val rewardReduce = stableMaxRewardPerChain.toBigInt
-        .multiply(a128EhPerSecondDivided.value) // we don't subtract oneEhPerSecond for simplification
+        .multiply(
+          a128EhPerSecondDivided.value
+        ) // we don't subtract oneEhPerSecond for simplification
         .divide(target.value)
       stableMaxRewardPerChain subUnsafe U256.unsafe(rewardReduce)
     } else {

@@ -31,8 +31,8 @@ import org.alephium.serde.{SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor, Duration, EventStream, TimeStamp}
 
 object Broker {
-  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(
-      implicit brokerConfig: BrokerConfig,
+  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
+      brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting
   ): Props = Props(new Broker(bootstrapper))
 
@@ -40,15 +40,16 @@ object Broker {
   case object Retry                           extends Command
   final case class Received(message: Message) extends Command
 
-  def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig,
-      networkSetting: NetworkSetting): Props =
+  def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(implicit
+      groupConfig: GroupConfig,
+      networkSetting: NetworkSetting
+  ): Props =
     Props(new MyConnectionHandler(remoteAddress, connection))
 
-  class MyConnectionHandler(val remoteAddress: InetSocketAddress,
-                            val connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig,
-      val networkSetting: NetworkSetting)
+  class MyConnectionHandler(
+      val remoteAddress: InetSocketAddress,
+      val connection: ActorRefT[Tcp.Command]
+  )(implicit groupConfig: GroupConfig, val networkSetting: NetworkSetting)
       extends ConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Message]]] = {
       Message.tryDeserialize(data)
@@ -65,9 +66,10 @@ object Broker {
   }
 }
 
-class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfig: BrokerConfig,
-                                                            networkSetting: NetworkSetting)
-    extends BaseActor
+class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
+    brokerConfig: BrokerConfig,
+    networkSetting: NetworkSetting
+) extends BaseActor
     with SerdeUtils
     with EventStream.Publisher {
   val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
@@ -86,7 +88,8 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       log.debug(s"Connected to master: $remoteAddress")
       val connection = sender()
       val connectionHandler = ActorRefT[ConnectionHandler.Command](
-        context.actorOf(Broker.connectionProps(remoteAddress, ActorRefT(connection))))
+        context.actorOf(Broker.connectionProps(remoteAddress, ActorRefT(connection)))
+      )
       context watch connectionHandler.ref
 
       val message = Message.serialize(Message.Peer(PeerInfo.self))
@@ -112,19 +115,19 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit brokerConfi
       context become awaitReady(connectionHandler, clique.info)
   }
 
-  def awaitReady(connection: ActorRefT[ConnectionHandler.Command],
-                 cliqueInfo: IntraCliqueInfo): Receive = {
-    case Broker.Received(Message.Ready) =>
-      log.debug(s"Clique is ready")
-      connection ! ConnectionHandler.CloseConnection
-      context become awaitClose(cliqueInfo)
+  def awaitReady(
+      connection: ActorRefT[ConnectionHandler.Command],
+      cliqueInfo: IntraCliqueInfo
+  ): Receive = { case Broker.Received(Message.Ready) =>
+    log.debug(s"Clique is ready")
+    connection ! ConnectionHandler.CloseConnection
+    context become awaitClose(cliqueInfo)
   }
 
-  def awaitClose(cliqueInfo: IntraCliqueInfo): Receive = {
-    case Terminated(_) =>
-      log.debug(s"Connection to master ${networkSetting.coordinatorAddress} is closed")
-      bootstrapper ! Bootstrapper.SendIntraCliqueInfo(cliqueInfo)
-      context.stop(self)
+  def awaitClose(cliqueInfo: IntraCliqueInfo): Receive = { case Terminated(_) =>
+    log.debug(s"Connection to master ${networkSetting.coordinatorAddress} is closed")
+    bootstrapper ! Bootstrapper.SendIntraCliqueInfo(cliqueInfo)
+    context.stop(self)
   }
 
   override def unhandled(message: Any): Unit = {

@@ -27,8 +27,10 @@ trait RocksDBKeyValueCompanion[S <: RocksDBKeyValueStorage[_, _]] {
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily, writeOptions: WriteOptions): S =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
-  def apply(storage: RocksDBSource,
-            cf: RocksDBSource.ColumnFamily,
-            writeOptions: WriteOptions,
-            readOptions: ReadOptions): S
+  def apply(
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily,
+      writeOptions: WriteOptions,
+      readOptions: ReadOptions
+  ): S
 }

@@ -23,7 +23,7 @@ import org.alephium.util._
 class MiningTest extends AlephiumSpec {
   it should "work with 2 nodes" in new TestFixture("2-nodes") {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId      = 1)
+    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     val selfClique = request[SelfClique](getSelfClique)
@@ -36,9 +36,7 @@ class MiningTest extends AlephiumSpec {
     startWS(defaultWsMasterPort)
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
-    selfClique.nodes.foreach { peer =>
-      request[Boolean](startMining, peer.restPort) is true
-    }
+    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
     confirmTx(tx, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
@@ -52,9 +50,7 @@ class MiningTest extends AlephiumSpec {
         Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 0, 1)
     }
 
-    selfClique.nodes.foreach { peer =>
-      request[Boolean](stopMining, peer.restPort) is true
-    }
+    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     server1.stop().futureValue is ()
     server0.stop().futureValue is ()
   }

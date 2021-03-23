@@ -61,24 +61,30 @@ class ServerUtils(networkType: NetworkType) {
     Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
   }
 
-  def listUnconfirmedTransactions(blockFlow: BlockFlow,
-                                  chainIndex: ChainIndex): Try[AVector[Tx]] = {
+  def listUnconfirmedTransactions(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex
+  ): Try[AVector[Tx]] = {
     Right(
       blockFlow
         .getPool(chainIndex)
         .getAll(chainIndex)
-        .map(Tx.fromTemplate(_, networkType)))
+        .map(Tx.fromTemplate(_, networkType))
+    )
   }
 
-  def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(
-      implicit groupConfig: GroupConfig): Try[BuildTransactionResult] = {
+  def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(implicit
+      groupConfig: GroupConfig
+  ): Try[BuildTransactionResult] = {
     val resultEither = for {
       _ <- checkGroup(blockFlow, query.fromKey)
-      unsignedTx <- prepareUnsignedTransaction(blockFlow,
-                                               query.fromKey,
-                                               query.toAddress.lockupScript,
-                                               query.lockTime,
-                                               query.value)
+      unsignedTx <- prepareUnsignedTransaction(
+        blockFlow,
+        query.fromKey,
+        query.toAddress.lockupScript,
+        query.lockTime,
+        query.value
+      )
     } yield {
       BuildTransactionResult.from(unsignedTx)
     }
@@ -88,10 +94,11 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def sendTransaction(txHandler: ActorRefT[TxHandler.Command], query: SendTransaction)(
-      implicit config: GroupConfig,
+  def sendTransaction(txHandler: ActorRefT[TxHandler.Command], query: SendTransaction)(implicit
+      config: GroupConfig,
       askTimeout: Timeout,
-      executionContext: ExecutionContext): FutureTry[TxResult] = {
+      executionContext: ExecutionContext
+  ): FutureTry[TxResult] = {
     createTxTemplate(query) match {
       case Right(tx)   => publishTx(txHandler, tx)
       case Left(error) => Future.successful(Left(error))
@@ -102,32 +109,40 @@ class ServerUtils(networkType: NetworkType) {
     for {
       txByteString <- Hex.from(query.unsignedTx).toRight(apiError(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        apiError(serdeError.getMessage))
+        apiError(serdeError.getMessage)
+      )
     } yield {
-      TransactionTemplate(unsignedTx,
-                          AVector.fill(unsignedTx.inputs.length)(query.signature),
-                          contractSignatures = AVector.empty)
+      TransactionTemplate(
+        unsignedTx,
+        AVector.fill(unsignedTx.inputs.length)(query.signature),
+        contractSignatures = AVector.empty
+      )
     }
   }
 
   def convert(status: BlockFlowState.TxStatus): TxStatus =
-    Confirmed(status.index.hash,
-              status.index.index,
-              status.chainConfirmations,
-              status.fromGroupConfirmations,
-              status.toGroupConfirmations)
+    Confirmed(
+      status.index.hash,
+      status.index.index,
+      status.chainConfirmations,
+      status.fromGroupConfirmations,
+      status.toGroupConfirmations
+    )
 
-  def getTransactionStatus(blockFlow: BlockFlow, txId: Hash, fromGroup: Int, toGroup: Int)(
-      implicit groupConfig: GroupConfig): Try[TxStatus] = {
+  def getTransactionStatus(blockFlow: BlockFlow, txId: Hash, fromGroup: Int, toGroup: Int)(implicit
+      groupConfig: GroupConfig
+  ): Try[TxStatus] = {
     for {
       chainIndex <- checkTxChainIndex(blockFlow, fromGroup, toGroup)
       status     <- getTransactionStatus(blockFlow, txId, chainIndex)
     } yield status
   }
 
-  def getTransactionStatus(blockFlow: BlockFlow,
-                           txId: Hash,
-                           chainIndex: ChainIndex): Try[TxStatus] = {
+  def getTransactionStatus(
+      blockFlow: BlockFlow,
+      txId: Hash,
+      chainIndex: ChainIndex
+  ): Try[TxStatus] = {
     blockFlow.getTxStatus(txId, chainIndex).left.map(apiError).map {
       case Some(status) => convert(status)
       case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
@@ -151,9 +166,11 @@ class ServerUtils(networkType: NetworkType) {
         .map(error => apiError(s"Failed in IO: $error"))
     } yield BlockEntry.from(block, height, networkType)
 
-  def getHashesAtHeight(blockFlow: BlockFlow,
-                        chainIndex: ChainIndex,
-                        query: GetHashesAtHeight): Try[HashesAtHeight] =
+  def getHashesAtHeight(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      query: GetHashesAtHeight
+  ): Try[HashesAtHeight] =
     for {
       hashes <- blockFlow
         .getHashes(chainIndex, query.height)
@@ -169,10 +186,11 @@ class ServerUtils(networkType: NetworkType) {
         .map(_ => apiError("Failed in IO"))
     } yield ChainInfo(maxHeight)
 
-  private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(
-      implicit config: GroupConfig,
+  private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
+      config: GroupConfig,
       askTimeout: Timeout,
-      executionContext: ExecutionContext): FutureTry[TxResult] = {
+      executionContext: ExecutionContext
+  ): FutureTry[TxResult] = {
     val message = TxHandler.AddTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
@@ -182,11 +200,13 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def prepareUnsignedTransaction(blockFlow: BlockFlow,
-                                 fromKey: PublicKey,
-                                 toLockupScript: LockupScript,
-                                 lockTimeOpt: Option[TimeStamp],
-                                 value: U256): Try[UnsignedTransaction] = {
+  def prepareUnsignedTransaction(
+      blockFlow: BlockFlow,
+      fromKey: PublicKey,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp],
+      value: U256
+  ): Try[UnsignedTransaction] = {
     blockFlow.prepareUnsignedTx(fromKey, toLockupScript, lockTimeOpt, value) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(apiError(error))
@@ -215,26 +235,32 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def checkChainIndex(blockFlow: BlockFlow, hash: BlockHash)(
-      implicit groupConfig: GroupConfig): Try[Unit] = {
+  def checkChainIndex(blockFlow: BlockFlow, hash: BlockHash)(implicit
+      groupConfig: GroupConfig
+  ): Try[Unit] = {
     val chainIndex = ChainIndex.from(hash)
-    if (blockFlow.brokerConfig.contains(chainIndex.from) ||
-        blockFlow.brokerConfig.contains(chainIndex.to)) {
+    if (
+      blockFlow.brokerConfig.contains(chainIndex.from) ||
+      blockFlow.brokerConfig.contains(chainIndex.to)
+    ) {
       Right(())
     } else {
       Left(apiError(s"${hash.toHexString} belongs to other groups"))
     }
   }
 
-  def checkTxChainIndex(blockFlow: BlockFlow, fromGroup: Int, toGroup: Int)(
-      implicit groupConfig: GroupConfig): Try[ChainIndex] = {
+  def checkTxChainIndex(blockFlow: BlockFlow, fromGroup: Int, toGroup: Int)(implicit
+      groupConfig: GroupConfig
+  ): Try[ChainIndex] = {
     val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
     for {
       _ <- checkGroup(fromGroup)
       _ <- checkGroup(toGroup)
       _ <- {
-        if (blockFlow.brokerConfig.contains(chainIndex.from) ||
-            blockFlow.brokerConfig.contains(chainIndex.to)) {
+        if (
+          blockFlow.brokerConfig.contains(chainIndex.from) ||
+          blockFlow.brokerConfig.contains(chainIndex.to)
+        ) {
           Right(())
         } else {
           Left(apiError(s"$chainIndex belongs to other groups"))
@@ -258,10 +284,12 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  private def buildContract(contract: StatefulContract,
-                            address: Address,
-                            initialState: AVector[Val],
-                            alfAmount: U256): Either[Compiler.Error, StatefulScript] = {
+  private def buildContract(
+      contract: StatefulContract,
+      address: Address,
+      initialState: AVector[Val],
+      alfAmount: U256
+  ): Either[Compiler.Error, StatefulScript] = {
 
     val codeRaw  = Hex.toHexString(serialize(contract))
     val stateRaw = Hex.toHexString(serialize(initialState))
@@ -306,43 +334,53 @@ class ServerUtils(networkType: NetworkType) {
     } yield {
       val contractInputs  = result.contractInputs
       val generateOutputs = result.generatedOutputs
-      Transaction(contractTx.unsigned,
-                  contractInputs,
-                  generateOutputs,
-                  contractTx.inputSignatures,
-                  contractTx.contractSignatures)
+      Transaction(
+        contractTx.unsigned,
+        contractInputs,
+        generateOutputs,
+        contractTx.inputSignatures,
+        contractTx.contractSignatures
+      )
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def buildContract(blockFlow: BlockFlow, query: BuildContract)(
-      implicit groupConfig: GroupConfig): FutureTry[BuildContractResult] = {
+  def buildContract(blockFlow: BlockFlow, query: BuildContract)(implicit
+      groupConfig: GroupConfig
+  ): FutureTry[BuildContractResult] = {
     Future.successful((for {
       codeBytestring <- Hex
         .from(query.code)
         .toRight(apiError("Cannot decode code hex string"))
       script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
-        apiError(serdeError.getMessage))
-      utx <- unignedTxFromScript(blockFlow,
-                                 script,
-                                 LockupScript.p2pkh(query.fromKey),
-                                 query.fromKey).left.map(error => apiError(error.toString))
+        apiError(serdeError.getMessage)
+      )
+      utx <- unignedTxFromScript(
+        blockFlow,
+        script,
+        LockupScript.p2pkh(query.fromKey),
+        query.fromKey
+      ).left.map(error => apiError(error.toString))
     } yield utx).map(BuildContractResult.from))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def sendContract(txHandler: ActorRefT[TxHandler.Command], query: SendContract)(
-      implicit groupConfig: GroupConfig,
+  def sendContract(txHandler: ActorRefT[TxHandler.Command], query: SendContract)(implicit
+      groupConfig: GroupConfig,
       askTimeout: Timeout,
-      executionContext: ExecutionContext): FutureTry[TxResult] = {
+      executionContext: ExecutionContext
+  ): FutureTry[TxResult] = {
     (for {
       txByteString <- Hex.from(query.tx).toRight(apiError(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        apiError(serdeError.getMessage))
+        apiError(serdeError.getMessage)
+      )
     } yield {
-      TransactionTemplate(unsignedTx,
-                          AVector.fill(unsignedTx.inputs.length)(query.signature),
-                          AVector.empty)
+      TransactionTemplate(
+        unsignedTx,
+        AVector.fill(unsignedTx.inputs.length)(query.signature),
+        AVector.empty
+      )
     }) match {
       case Left(error)       => Future.successful(Left(error))
       case Right(txTemplate) => publishTx(txHandler, txTemplate)

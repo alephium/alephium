@@ -31,26 +31,25 @@ trait LockFixture extends AlephiumSpec with Conductors {
 
     private def resetLocked(): Unit = (0 until 10).foreach(i => lock(i))
 
-    private def checkTryLock(rwl: ReentrantReadWriteLock)(readLock: Boolean,
-                                                          writeLock: Boolean): Unit = {
+    private def checkTryLock(
+        rwl: ReentrantReadWriteLock
+    )(readLock: Boolean, writeLock: Boolean): Unit = {
       rwl.readLock().tryLock() is readLock
       if (readLock) rwl.readLock().unlock()
       rwl.writeLock().tryLock() is writeLock
       if (writeLock) rwl.writeLock().unlock()
     }
 
-    def checkReadLock[T](rwl: ReentrantReadWriteLock)(initial: T,
-                                                      f: => T,
-                                                      expected: T,
-                                                      timeoutMillis: Long = 100): Assertion = {
+    def checkReadLock[T](
+        rwl: ReentrantReadWriteLock
+    )(initial: T, f: => T, expected: T, timeoutMillis: Long = 100): Assertion = {
       checkLockUsed(rwl)(initial, f, expected, timeoutMillis)
       checkNoWriteLock(rwl)(initial, f, expected)
     }
 
-    def checkWriteLock[T](rwl: ReentrantReadWriteLock)(initial: T,
-                                                       f: => T,
-                                                       expected: T,
-                                                       timeoutMillis: Long = 100): Assertion = {
+    def checkWriteLock[T](
+        rwl: ReentrantReadWriteLock
+    )(initial: T, f: => T, expected: T, timeoutMillis: Long = 100): Assertion = {
       val conductor = new Conductor
       val readLock  = rwl.readLock()
 
@@ -85,7 +84,8 @@ trait LockFixture extends AlephiumSpec with Conductors {
     }
 
     def checkNoWriteLock[T](
-        rwl: ReentrantReadWriteLock)(initial: T, f: => T, expected: T): Assertion = {
+        rwl: ReentrantReadWriteLock
+    )(initial: T, f: => T, expected: T): Assertion = {
       val conductor = new Conductor
       val readLock  = rwl.readLock()
 
@@ -115,10 +115,9 @@ trait LockFixture extends AlephiumSpec with Conductors {
       }
     }
 
-    def checkLockUsed[T](rwl: ReentrantReadWriteLock)(initial: T,
-                                                      f: => T,
-                                                      expected: T,
-                                                      timeoutMillis: Long = 100): Assertion = {
+    def checkLockUsed[T](
+        rwl: ReentrantReadWriteLock
+    )(initial: T, f: => T, expected: T, timeoutMillis: Long = 100): Assertion = {
       val conductor = new Conductor
       val writeLock = rwl.writeLock()
 

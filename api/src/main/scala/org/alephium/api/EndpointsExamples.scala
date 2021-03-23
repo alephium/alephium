@@ -56,9 +56,9 @@ trait EndpointsExamples {
     blockHash,
     timestamp = TimeStamp.now(),
     chainFrom = 1,
-    chainTo   = 2,
+    chainTo = 2,
     height,
-    deps         = AVector(blockHash, blockHash),
+    deps = AVector(blockHash, blockHash),
     transactions = None
   )
 
@@ -68,26 +68,34 @@ trait EndpointsExamples {
 
   val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
-    Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None))
+    Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
+  )
 
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(
-      SelfClique(cliqueId,
-                 networkType,
-                 numZerosAtLeastInHash = 18,
-                 peers,
-                 synced            = true,
-                 groupNumPerBroker = 1,
-                 groups            = 2))
+      SelfClique(
+        cliqueId,
+        networkType,
+        numZerosAtLeastInHash = 18,
+        peers,
+        synced = true,
+        groupNumPerBroker = 1,
+        groups = 2
+      )
+    )
 
   implicit val interCliquePeerInfosExamples: List[Example[AVector[InterCliquePeerInfo]]] =
     simpleExample(
       AVector(
-        InterCliquePeerInfo(cliqueId,
-                            brokerId          = 1,
-                            groupNumPerBroker = 2,
-                            inetSocketAddress,
-                            isSynced = true)))
+        InterCliquePeerInfo(
+          cliqueId,
+          brokerId = 1,
+          groupNumPerBroker = 2,
+          inetSocketAddress,
+          isSynced = true
+        )
+      )
+    )
 
   implicit val discoveredNeighborExamples: List[Example[AVector[BrokerInfo]]] =
     simpleExample(AVector(BrokerInfo.unsafe(cliqueId, 1, 1, inetSocketAddress)))
@@ -102,7 +110,9 @@ trait EndpointsExamples {
           hash,
           AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
           AVector(Output(amount = balance, address, Some(TimeStamp.unsafe(1234))))
-        )))
+        )
+      )
+    )
 
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(AVector(blockEntry)))
@@ -146,7 +156,8 @@ trait EndpointsExamples {
         code =
           "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
         state = Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7")
-      ))
+      )
+    )
 
   implicit val compileResultExamples: List[Example[CompileResult]] =
     simpleExample(CompileResult(code = hexString))
@@ -156,7 +167,8 @@ trait EndpointsExamples {
 
   implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
     simpleExample(
-      BuildContractResult(unsignedTx = hexString, hash = hash, fromGroup = 2, toGroup = 1))
+      BuildContractResult(unsignedTx = hexString, hash = hash, fromGroup = 2, toGroup = 1)
+    )
 
   implicit val sendContractExamples: List[Example[SendContract]] =
     simpleExample(SendContract(code = hexString, tx = hexString, signature, fromGroup = 2))

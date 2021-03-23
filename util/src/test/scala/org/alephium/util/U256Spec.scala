@@ -46,10 +46,12 @@ class U256Spec extends AlephiumSpec {
     U256.from(U256.MaxValue.toBigInt.add(BigInteger.ONE)).isEmpty is true
   }
 
-  def test(op: (U256, U256)                     => Option[U256],
-           opUnsafe: (U256, U256)               => U256,
-           opExpected: (BigInteger, BigInteger) => BigInteger,
-           condition: BigInteger                => Boolean = _ >= BigInteger.ZERO): Unit = {
+  def test(
+      op: (U256, U256) => Option[U256],
+      opUnsafe: (U256, U256) => U256,
+      opExpected: (BigInteger, BigInteger) => BigInteger,
+      condition: BigInteger => Boolean = _ >= BigInteger.ZERO
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen

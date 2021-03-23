@@ -45,12 +45,15 @@ trait ChainDifficultyAdjustment {
   }
 
   // DigiShield DAA V3 variant
-  final protected[core] def calHashTarget(hash: BlockHash,
-                                          currentTarget: Target): IOResult[Target] = {
+  final protected[core] def calHashTarget(
+      hash: BlockHash,
+      currentTarget: Target
+  ): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height >= ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
         calTimeSpan(hash, height).map { timeSpan =>
-          var clippedTimeSpan = consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
+          var clippedTimeSpan =
+            consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
           if (clippedTimeSpan < consensusConfig.windowTimeSpanMin.millis) {
             clippedTimeSpan = consensusConfig.windowTimeSpanMin.millis
           } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {

@@ -63,7 +63,7 @@ trait TestFixtureLike
     with ApiModelCodec
     with ScalaFutures
     with Eventually {
-  override implicit val patienceConfig =
+  implicit override val patienceConfig =
     PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
@@ -127,10 +127,12 @@ trait TestFixtureLike
 
   val blockNotifyProbe = TestProbe()
 
-  def httpRequest(method: HttpMethod,
-                  endpoint: String,
-                  maybeEntity: Option[String]     = None,
-                  maybeHeader: Option[HttpHeader] = None): Int => HttpRequest = { port =>
+  def httpRequest(
+      method: HttpMethod,
+      endpoint: String,
+      maybeEntity: Option[String] = None,
+      maybeHeader: Option[HttpHeader] = None
+  ): Int => HttpRequest = { port =>
     val request = HttpRequest(method, uri = s"http://localhost:${port}$endpoint")
 
     val requestWithEntity = maybeEntity match {
@@ -169,11 +171,13 @@ trait TestFixtureLike
     response.status is StatusCodes.InternalServerError
   }
 
-  def transfer(fromPubKey: String,
-               toAddress: String,
-               amount: U256,
-               privateKey: String,
-               restPort: Int): TxResult = eventually {
+  def transfer(
+      fromPubKey: String,
+      toAddress: String,
+      amount: U256,
+      privateKey: String,
+      restPort: Int
+  ): TxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, toAddress, amount)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val sendTx     = sendTransaction(unsignedTx, privateKey)
@@ -245,12 +249,14 @@ trait TestFixtureLike
     }
   }
 
-  def buildEnv(publicPort: Int,
-               masterPort: Int,
-               walletPort: Int,
-               brokerId: Int,
-               brokerNum: Int,
-               bootstrap: Option[InetSocketAddress]) = {
+  def buildEnv(
+      publicPort: Int,
+      masterPort: Int,
+      walletPort: Int,
+      brokerId: Int,
+      brokerNum: Int,
+      bootstrap: Option[InetSocketAddress]
+  ) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
         ("alephium.network.bind-address", s"localhost:$publicPort"),
@@ -267,7 +273,7 @@ trait TestFixtureLike
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )
-      override implicit lazy val config = {
+      implicit override lazy val config = {
         val tmp = AlephiumConfig.load(newConfig).toOption.get
         bootstrap match {
           case Some(address) =>
@@ -283,18 +289,19 @@ trait TestFixtureLike
   def bootClique(
       nbOfNodes: Int,
       bootstrap: Option[InetSocketAddress] = None,
-      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Seq[Server] = {
+      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+  ): Seq[Server] = {
     val masterPort = generatePort
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
       val publicPort = if (brokerId equals 0) masterPort else generatePort
       bootNode(
-        publicPort      = publicPort,
-        masterPort      = masterPort,
-        brokerId        = brokerId,
-        walletPort      = generatePort,
-        bootstrap       = bootstrap,
-        brokerNum       = nbOfNodes,
+        publicPort = publicPort,
+        masterPort = masterPort,
+        brokerId = brokerId,
+        walletPort = generatePort,
+        bootstrap = bootstrap,
+        brokerNum = nbOfNodes,
         connectionBuild = connectionBuild
       )
     }
@@ -302,13 +309,15 @@ trait TestFixtureLike
     servers
   }
 
-  def bootNode(publicPort: Int,
-               brokerId: Int,
-               brokerNum: Int                       = 2,
-               masterPort: Int                      = defaultMasterPort,
-               walletPort: Int                      = defaultWalletPort,
-               bootstrap: Option[InetSocketAddress] = None,
-               connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply): Server = {
+  def bootNode(
+      publicPort: Int,
+      brokerId: Int,
+      brokerNum: Int = 2,
+      masterPort: Int = defaultMasterPort,
+      walletPort: Int = defaultWalletPort,
+      bootstrap: Option[InetSocketAddress] = None,
+      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+  ): Server = {
     val platformEnv =
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
@@ -347,9 +356,7 @@ trait TestFixtureLike
   def startWS(port: Int): Promise[Option[Message]] = {
     val flow: Flow[Message, Message, Promise[Option[Message]]] =
       Flow.fromSinkAndSourceMat(
-        Sink.foreach[Message] { blockNotify =>
-          blockNotifyProbe.ref ! blockNotify
-        },
+        Sink.foreach[Message] { blockNotify => blockNotifyProbe.ref ! blockNotify },
         Source.empty
           .concatMat(Source.maybe[Message])(Keep.right)
       )(Keep.right)
@@ -403,21 +410,26 @@ trait TestFixtureLike
     )
   }
   def sendTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
-    val signature: Signature = SignatureSchema.sign(buildTransactionResult.txId.bytes,
-                                                    PrivateKey.unsafe(Hex.unsafe(privateKey)))
+    val signature: Signature = SignatureSchema.sign(
+      buildTransactionResult.txId.bytes,
+      PrivateKey.unsafe(Hex.unsafe(privateKey))
+    )
     httpPost(
       "/transactions/send",
       Some(
-        s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}""")
+        s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""
+      )
     )
   }
   def getTransactionStatus(tx: TxResult) = {
     httpGet(
-      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}")
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
+    )
   }
   def getTransactionStatus(tx: Transfer.Result) = {
     httpGet(
-      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}")
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
+    )
   }
 
   def compileFilang(code: String) = {

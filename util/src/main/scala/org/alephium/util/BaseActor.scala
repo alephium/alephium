@@ -32,8 +32,10 @@ trait BaseActor extends Actor with ActorLogging {
   def scheduleCancellable(receiver: ActorRef, message: Any, delay: Duration): Cancellable = {
     val delayScala = delay.asScala
     context.system.scheduler
-      .scheduleWithFixedDelay(delayScala, delayScala, receiver, message)(context.dispatcher,
-                                                                         context.self)
+      .scheduleWithFixedDelay(delayScala, delayScala, receiver, message)(
+        context.dispatcher,
+        context.self
+      )
   }
 
   def schedule(receiver: ActorRef, message: Any, delay: Duration): Unit = {
@@ -57,9 +59,11 @@ object BaseActor {
   def envalidActorName(name: String): String = {
     name.map { char =>
       // The following magic string is from ActorPath.ValidSymbols
-      if (Character.isLetter(char) ||
-          Character.isDigit(char) ||
-          """-_.*$+:@&=,!~';""".contains(char)) {
+      if (
+        Character.isLetter(char) ||
+        Character.isDigit(char) ||
+        """-_.*$+:@&=,!~';""".contains(char)
+      ) {
         char
       } else {
         '-'
@@ -78,15 +82,13 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
     }
   }
 
-  val resumeStrategy: OneForOneStrategy = OneForOneStrategy() {
-    case e: Throwable =>
-      logger.error("Unhandled throwable, resume the actor", e)
-      SupervisorStrategy.Resume
+  val resumeStrategy: OneForOneStrategy = OneForOneStrategy() { case e: Throwable =>
+    logger.error("Unhandled throwable, resume the actor", e)
+    SupervisorStrategy.Resume
   }
 
-  val stopStrategy: OneForOneStrategy = OneForOneStrategy() {
-    case e: Throwable =>
-      logger.error("Unhandled throwable, stop the actor", e)
-      SupervisorStrategy.Stop
+  val stopStrategy: OneForOneStrategy = OneForOneStrategy() { case e: Throwable =>
+    logger.error("Unhandled throwable, stop the actor", e)
+    SupervisorStrategy.Stop
   }
 }

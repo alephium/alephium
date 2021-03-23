@@ -20,8 +20,8 @@ import akka.actor.{Actor, Props}
 
 object AlephiumTestActors {
   class ConstActor(message: Any) extends Actor {
-    override def receive: Receive = {
-      case _ => sender() ! message
+    override def receive: Receive = { case _ =>
+      sender() ! message
     }
   }
 

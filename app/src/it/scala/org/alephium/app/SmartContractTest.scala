@@ -28,7 +28,7 @@ class SmartContractTest extends AlephiumSpec {
   it should "compile/execute smart contracts" in new TestFixture("swap") {
 
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId      = 1)
+    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     val selfClique = request[SelfClique](getSelfClique)
@@ -83,9 +83,7 @@ class SmartContractTest extends AlephiumSpec {
     request[Balance](getBalance(address), restPort) is initialBalance
     startWS(defaultWsMasterPort)
 
-    selfClique.nodes.foreach { peer =>
-      request[Boolean](startMining, peer.restPort) is true
-    }
+    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
 
     val tokenContract = s"""
       |TxContract Token(mut x: U256) {

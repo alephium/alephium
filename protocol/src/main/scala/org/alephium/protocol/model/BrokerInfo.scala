@@ -56,10 +56,12 @@ final case class BrokerInfo private (
 
 object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
   def from(remoteAddress: InetSocketAddress, remoteBroker: InterBrokerInfo): BrokerInfo =
-    unsafe(remoteBroker.cliqueId,
-           remoteBroker.brokerId,
-           remoteBroker.groupNumPerBroker,
-           remoteAddress)
+    unsafe(
+      remoteBroker.cliqueId,
+      remoteBroker.brokerId,
+      remoteBroker.groupNumPerBroker,
+      remoteAddress
+    )
 
   val _serde: Serde[BrokerInfo] =
     Serde.forProduct4(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker, t.address))
@@ -69,7 +71,8 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
   }
 
   def from(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
-      implicit config: GroupConfig): Option[BrokerInfo] = {
+      implicit config: GroupConfig
+  ): Option[BrokerInfo] = {
     if (validate(brokerId, groupNumPerBroker).isRight) {
       Some(new BrokerInfo(cliqueId, brokerId, groupNumPerBroker, address))
     } else {
@@ -77,14 +80,17 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
     }
   }
 
-  def unsafe(cliqueId: CliqueId,
-             brokerId: Int,
-             groupNumPerBroker: Int,
-             address: InetSocketAddress): BrokerInfo =
+  def unsafe(
+      cliqueId: CliqueId,
+      brokerId: Int,
+      groupNumPerBroker: Int,
+      address: InetSocketAddress
+  ): BrokerInfo =
     new BrokerInfo(cliqueId, brokerId, groupNumPerBroker, address)
 
-  def validate(id: Int, groupNumPerBroker: Int)(
-      implicit config: GroupConfig): Either[String, Unit] = {
+  def validate(id: Int, groupNumPerBroker: Int)(implicit
+      config: GroupConfig
+  ): Either[String, Unit] = {
     if (id < 0 || id >= config.groups) {
       Left(s"BrokerInfo - invalid id: $id")
     } else if (groupNumPerBroker <= 0 || (config.groups % groupNumPerBroker != 0)) {

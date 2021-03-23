@@ -44,12 +44,13 @@ final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) exten
 
 //scalastyle:off magic.number
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-final case class ConsensusSetting(blockTargetTime: Duration,
-                                  numZerosAtLeastInHash: Int,
-                                  tipsPruneInterval: Int,
-                                  blockCacheCapacityPerChain: Int,
-                                  emission: Emission)
-    extends ConsensusConfig {
+final case class ConsensusSetting(
+    blockTargetTime: Duration,
+    numZerosAtLeastInHash: Int,
+    tipsPruneInterval: Int,
+    blockCacheCapacityPerChain: Int,
+    emission: Emission
+) extends ConsensusConfig {
   val maxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
 
@@ -59,10 +60,10 @@ final case class ConsensusSetting(blockTargetTime: Duration,
 
   val diffAdjustDownMax: Int = 16
   val diffAdjustUpMax: Int   = 8
-  val windowTimeSpanMin
-    : Duration = (expectedWindowTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
-  val windowTimeSpanMax
-    : Duration = (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
+  val windowTimeSpanMin: Duration =
+    (expectedWindowTimeSpan * (100L - diffAdjustDownMax)).get divUnsafe 100L
+  val windowTimeSpanMax: Duration =
+    (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
@@ -106,9 +107,11 @@ final case class NetworkSetting(
   }
 }
 
-final case class UpnpSettings(enabled: Boolean,
-                              httpTimeout: Option[Duration],
-                              discoveryTimeout: Option[Duration])
+final case class UpnpSettings(
+    enabled: Boolean,
+    httpTimeout: Option[Duration],
+    discoveryTimeout: Option[Duration]
+)
 
 final case class DiscoverySetting(
     bootstrap: ArraySeq[InetSocketAddress],
@@ -146,21 +149,25 @@ final case class AlephiumConfig(
 object AlephiumConfig {
   import PureConfigUtils._
 
-  private final case class TempConsensusSetting(blockTargetTime: Duration,
-                                                numZerosAtLeastInHash: Int,
-                                                tipsPruneInterval: Int,
-                                                blockCacheCapacityPerChain: Int) {
+  final private case class TempConsensusSetting(
+      blockTargetTime: Duration,
+      numZerosAtLeastInHash: Int,
+      tipsPruneInterval: Int,
+      blockCacheCapacityPerChain: Int
+  ) {
     def toConsensusSetting(groupConfig: GroupConfig): ConsensusSetting = {
       val emission = Emission(groupConfig, blockTargetTime)
-      ConsensusSetting(blockTargetTime,
-                       numZerosAtLeastInHash,
-                       tipsPruneInterval,
-                       blockCacheCapacityPerChain,
-                       emission)
+      ConsensusSetting(
+        blockTargetTime,
+        numZerosAtLeastInHash,
+        tipsPruneInterval,
+        blockCacheCapacityPerChain,
+        emission
+      )
     }
   }
 
-  private final case class TempNetworkSetting(
+  final private case class TempNetworkSetting(
       networkType: NetworkType,
       pingFrequency: Duration,
       retryTimeout: Duration,
@@ -194,7 +201,7 @@ object AlephiumConfig {
     }
   }
 
-  private final case class TempAlephiumConfig(
+  final private case class TempAlephiumConfig(
       broker: BrokerSetting,
       consensus: TempConsensusSetting,
       mining: MiningSetting,

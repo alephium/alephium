@@ -34,9 +34,8 @@ class FlowMonitor(shutdown: => Unit) extends BaseActor with EventStream.Subscrib
     subscribeEvent(self, classOf[FlowMonitor.Command])
   }
 
-  override def receive: Receive = {
-    case FlowMonitor.Shutdown =>
-      log.info(s"Shutdown the system")
-      shutdown
+  override def receive: Receive = { case FlowMonitor.Shutdown =>
+    log.info(s"Shutdown the system")
+    shutdown
   }
 }

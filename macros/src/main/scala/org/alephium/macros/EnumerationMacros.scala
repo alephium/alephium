@@ -24,7 +24,8 @@ object EnumerationMacros {
   def sealedInstancesOf[A]: TreeSet[A] = macro sealedInstancesOf_impl[A]
 
   def sealedInstancesOf_impl[A: c.WeakTypeTag](
-      c: Context): c.Expr[scala.collection.immutable.TreeSet[A]] = {
+      c: Context
+  ): c.Expr[scala.collection.immutable.TreeSet[A]] = {
     import c.universe._
 
     val symbol = weakTypeOf[A].typeSymbol.asClass
@@ -34,7 +35,8 @@ object EnumerationMacros {
         sym
           .asInstanceOf[scala.reflect.internal.Symbols#Symbol]
           .sourceModule
-          .asInstanceOf[Symbol])
+          .asInstanceOf[Symbol]
+      )
     }
 
     if (!symbol.isClass || !symbol.isSealed) {

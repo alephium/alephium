@@ -53,13 +53,15 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) {
     ()
   }
 
-  def keys: Iterable[K] = m.synchronized {
-    m.keySet().asScala.toIndexedSeq
-  }
+  def keys: Iterable[K] =
+    m.synchronized {
+      m.keySet().asScala.toIndexedSeq
+    }
 
-  def values: Iterable[V] = m.synchronized {
-    m.values().asScala.toIndexedSeq
-  }
+  def values: Iterable[V] =
+    m.synchronized {
+      m.values().asScala.toIndexedSeq
+    }
 
   def entries: Iterable[Entry[K, V]] = m.entrySet().asScala
 }

@@ -49,7 +49,9 @@ private[crypto] trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Sign
     verify(message.toArray, signature.bytes.toArray, publicKey.bytes.toArray)
   }
 
-  protected def verify(message: Array[Byte],
-                       signature: Array[Byte],
-                       publicKey: Array[Byte]): Boolean
+  protected def verify(
+      message: Array[Byte],
+      signature: Array[Byte],
+      publicKey: Array[Byte]
+  ): Boolean
 }

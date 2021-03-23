@@ -43,9 +43,8 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec("CliqueCoordinatorSpec
 
     bootstrapper.expectMsg(Bootstrapper.ForwardConnection)
 
-    probs.foreach {
-      case (id, probe) =>
-        coordinator.tell(Message.Ack(id), probe.ref)
+    probs.foreach { case (id, probe) =>
+      coordinator.tell(Message.Ack(id), probe.ref)
     }
     probs.values.foreach(_.expectMsgType[CliqueCoordinator.Ready.type])
 

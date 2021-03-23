@@ -28,18 +28,23 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
     checkHeader(header, flow)
   }
 
-  def validateUntilDependencies(header: BlockHeader,
-                                flow: BlockFlow): HeaderValidationResult[Unit] = {
+  def validateUntilDependencies(
+      header: BlockHeader,
+      flow: BlockFlow
+  ): HeaderValidationResult[Unit] = {
     checkHeaderUntilDependencies(header, flow)
   }
 
-  def validateAfterDependencies(header: BlockHeader,
-                                flow: BlockFlow): HeaderValidationResult[Unit] = {
+  def validateAfterDependencies(
+      header: BlockHeader,
+      flow: BlockFlow
+  ): HeaderValidationResult[Unit] = {
     checkHeaderAfterDependencies(header, flow)
   }
 
   protected[validation] def validateGenesisHeader(
-      genesis: BlockHeader): HeaderValidationResult[Unit] = {
+      genesis: BlockHeader
+  ): HeaderValidationResult[Unit] = {
     for {
       _ <- checkGenesisTimeStamp(genesis)
       _ <- checkGenesisDependencies(genesis)
@@ -48,8 +53,10 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
     } yield ()
   }
 
-  protected[validation] def checkHeader(header: BlockHeader,
-                                        flow: BlockFlow): HeaderValidationResult[Unit] = {
+  protected[validation] def checkHeader(
+      header: BlockHeader,
+      flow: BlockFlow
+  ): HeaderValidationResult[Unit] = {
     for {
       _ <- checkHeaderUntilDependencies(header, flow)
       _ <- checkHeaderAfterDependencies(header, flow)
@@ -58,7 +65,8 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
 
   protected[validation] def checkHeaderUntilDependencies(
       header: BlockHeader,
-      flow: BlockFlow): HeaderValidationResult[Unit] = {
+      flow: BlockFlow
+  ): HeaderValidationResult[Unit] = {
     for {
       parent <- getParentHeader(flow, header) // parent should exist as checked in ChainHandler
       _      <- checkTimeStampIncreasing(header, parent)
@@ -73,7 +81,8 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
 
   protected[validation] def checkHeaderAfterDependencies(
       header: BlockHeader,
-      flow: BlockFlow): HeaderValidationResult[Unit] = {
+      flow: BlockFlow
+  ): HeaderValidationResult[Unit] = {
     for {
       _ <- checkFlow(header, flow)
     } yield ()
@@ -81,7 +90,8 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
 
   protected[validation] def getParentHeader(
       blockFlow: BlockFlow,
-      header: BlockHeader): HeaderValidationResult[BlockHeader] = {
+      header: BlockHeader
+  ): HeaderValidationResult[BlockHeader] = {
     ValidationStatus.from(blockFlow.getBlockHeader(header.parentHash))
   }
 
@@ -106,13 +116,16 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
 object HeaderValidation {
   import ValidationStatus._
 
-  def build(implicit brokerConfig: BrokerConfig,
-            consensusConfig: ConsensusConfig): HeaderValidation = new Impl()
+  def build(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig
+  ): HeaderValidation = new Impl()
 
   final class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
       extends HeaderValidation {
     protected[validation] def checkGenesisTimeStamp(
-        header: BlockHeader): HeaderValidationResult[Unit] = {
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
       if (header.timestamp != ALF.GenesisTimestamp) {
         invalidHeader(InvalidGenesisTimeStamp)
       } else {
@@ -120,7 +133,8 @@ object HeaderValidation {
       }
     }
     protected[validation] def checkGenesisDependencies(
-        header: BlockHeader): HeaderValidationResult[Unit] = {
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
       val deps = header.blockDeps.deps
       if (deps.length == brokerConfig.depsNum && deps.forall(_ == BlockHash.zero)) {
         validHeader(())
@@ -129,11 +143,13 @@ object HeaderValidation {
       }
     }
     protected[validation] def checkGenesisWorkAmount(
-        header: BlockHeader): HeaderValidationResult[Unit] = {
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
       validHeader(()) // we don't check work for genesis headers
     }
     protected[validation] def checkGenesisWorkTarget(
-        header: BlockHeader): HeaderValidationResult[Unit] = {
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
       if (header.target != consensusConfig.maxMiningTarget) {
         invalidHeader(InvalidGenesisWorkTarget)
       } else {
@@ -143,7 +159,8 @@ object HeaderValidation {
 
     protected[validation] def checkTimeStampIncreasing(
         header: BlockHeader,
-        parent: BlockHeader): HeaderValidationResult[Unit] = {
+        parent: BlockHeader
+    ): HeaderValidationResult[Unit] = {
       if (header.timestamp <= parent.timestamp) {
         invalidHeader(NoIncreasingTimeStamp)
       } else {
@@ -151,7 +168,8 @@ object HeaderValidation {
       }
     }
     protected[validation] def checkTimeStampDrift(
-        header: BlockHeader): HeaderValidationResult[Unit] = {
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
       if (TimeStamp.now() + consensusConfig.maxHeaderTimeStampDrift <= header.timestamp) {
         invalidHeader(TooAdvancedTimeStamp)
       } else {
@@ -173,25 +191,25 @@ object HeaderValidation {
 
     protected[validation] def checkDepsIndex(header: BlockHeader): HeaderValidationResult[Unit] = {
       val headerIndex = header.chainIndex
-      val ok1 = header.inDeps.forallWithIndex {
-        case (dep, index) =>
-          val depIndex = ChainIndex.from(dep)
-          if (index < headerIndex.from.value) {
-            depIndex.from.value == index
-          } else {
-            depIndex.from.value == index + 1
-          }
+      val ok1 = header.inDeps.forallWithIndex { case (dep, index) =>
+        val depIndex = ChainIndex.from(dep)
+        if (index < headerIndex.from.value) {
+          depIndex.from.value == index
+        } else {
+          depIndex.from.value == index + 1
+        }
       }
-      val ok2 = header.outDeps.forallWithIndex {
-        case (dep, index) =>
-          val depIndex = ChainIndex.from(dep)
-          depIndex.from == headerIndex.from && depIndex.to.value == index
+      val ok2 = header.outDeps.forallWithIndex { case (dep, index) =>
+        val depIndex = ChainIndex.from(dep)
+        depIndex.from == headerIndex.from && depIndex.to.value == index
       }
       if (ok1 && ok2) validHeader(()) else invalidHeader(InvalidDepsIndex)
     }
 
-    protected[validation] def checkDepsMissing(header: BlockHeader,
-                                               flow: BlockFlow): HeaderValidationResult[Unit] = {
+    protected[validation] def checkDepsMissing(
+        header: BlockHeader,
+        flow: BlockFlow
+    ): HeaderValidationResult[Unit] = {
       ValidationStatus.from(header.blockDeps.deps.filterNotE(flow.contains)).flatMap { missings =>
         if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
       }
@@ -199,14 +217,16 @@ object HeaderValidation {
 
     protected[validation] def checkWorkTarget(
         header: BlockHeader,
-        headerChain: BlockHeaderChain): HeaderValidationResult[Unit] = {
+        headerChain: BlockHeaderChain
+    ): HeaderValidationResult[Unit] = {
       ValidationStatus.from(headerChain.getHashTarget(header.parentHash)).flatMap { target =>
         if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
       }
     }
 
-    protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(
-        implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit] = {
+    protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit
+        brokerConfig: BrokerConfig
+    ): HeaderValidationResult[Unit] = {
       ValidationStatus.from(flow.checkFlowDeps(header)).flatMap { ok =>
         if (ok) validHeader(()) else invalidHeader(InvalidHeaderFlow)
       }

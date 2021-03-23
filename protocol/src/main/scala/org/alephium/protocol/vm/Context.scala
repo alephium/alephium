@@ -64,13 +64,17 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
     ContractOutputRef.unsafe(txId, output, nextOutputIndex)
 
-  def createContract(code: StatefulContract,
-                     initialBalances: Frame.BalancesPerLockup,
-                     initialFields: AVector[Val]): ExeResult[Unit] = {
+  def createContract(
+      code: StatefulContract,
+      initialBalances: Frame.BalancesPerLockup,
+      initialFields: AVector[Val]
+  ): ExeResult[Unit] = {
     val contractId = TxOutputRef.key(txId, nextOutputIndex)
-    val contractOutput = ContractOutput(initialBalances.alfAmount,
-                                        LockupScript.p2c(contractId),
-                                        initialBalances.tokenVector)
+    val contractOutput = ContractOutput(
+      initialBalances.alfAmount,
+      LockupScript.p2c(contractId),
+      initialBalances.tokenVector
+    )
     val outputRef = nextContractOutputRef(contractOutput)
     worldState
       .createContract(code, initialFields, outputRef, contractOutput)
@@ -82,18 +86,19 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def useContractAsset(contractId: ContractId): ExeResult[Frame.BalancesPerLockup] = {
     worldState
       .useContractAsset(contractId)
-      .map {
-        case (contractOutputRef, contractAsset) =>
-          contractInputs.addOne(contractOutputRef)
-          Frame.BalancesPerLockup.from(contractAsset)
+      .map { case (contractOutputRef, contractAsset) =>
+        contractInputs.addOne(contractOutputRef)
+        Frame.BalancesPerLockup.from(contractAsset)
       }
       .left
       .map(IOErrorLoadContract)
   }
 
-  def updateContractAsset(contractId: ContractId,
-                          outputRef: ContractOutputRef,
-                          output: ContractOutput): ExeResult[Unit] = {
+  def updateContractAsset(
+      contractId: ContractId,
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): ExeResult[Unit] = {
     worldState
       .updateContract(contractId, outputRef, output)
       .left
@@ -102,16 +107,19 @@ trait StatefulContext extends StatelessContext with ContractPool {
 }
 
 object StatefulContext {
-  def apply(tx: TransactionAbstract,
-            gasRemaining: GasBox,
-            worldState: WorldState.Cached): StatefulContext = {
+  def apply(
+      tx: TransactionAbstract,
+      gasRemaining: GasBox,
+      worldState: WorldState.Cached
+  ): StatefulContext = {
     new Impl(tx, worldState, gasRemaining)
   }
 
-  final class Impl(val tx: TransactionAbstract,
-                   val initWorldState: WorldState.Cached,
-                   var gasRemaining: GasBox)
-      extends StatefulContext {
+  final class Impl(
+      val tx: TransactionAbstract,
+      val initWorldState: WorldState.Cached,
+      var gasRemaining: GasBox
+  ) extends StatefulContext {
     override val worldState: WorldState.Staging = initWorldState.staging()
 
     override def txId: Hash = tx.id

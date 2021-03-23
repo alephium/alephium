@@ -42,11 +42,13 @@ class FlowUtilsSpec extends AlephiumSpec {
       val firstInput  = assets.head.referredOutput.asInstanceOf[AssetOutput]
       val firstOutput = firstInput.copy(amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe))
       FlowUtils.generateFullTx(worldState, tx, script).rightValue is
-        Transaction(unsignedTx,
-                    AVector.empty,
-                    firstOutput +: assets.tail.map(_.referredOutput),
-                    tx.inputSignatures,
-                    tx.contractSignatures)
+        Transaction(
+          unsignedTx,
+          AVector.empty,
+          firstOutput +: assets.tail.map(_.referredOutput),
+          tx.inputSignatures,
+          tx.contractSignatures
+        )
     }
   }
 

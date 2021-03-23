@@ -42,7 +42,8 @@ trait TapirSchemasLike {
   implicit val u256Schema: Schema[U256]                     = Schema(SInteger).format("uint256")
   implicit val inetAddressSchema: Schema[InetAddress]       = Schema(Schema.schemaForString.schemaType)
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(
-    Schema.schemaForString.schemaType)
+    Schema.schemaForString.schemaType
+  )
   implicit val cliqueIdSchema: Schema[CliqueId]          = Schema(Schema.schemaForString.schemaType)
   implicit val mnemonicSchema: Schema[Mnemonic]          = Schema(Schema.schemaForString.schemaType)
   implicit val mnemonicSizeSchema: Schema[Mnemonic.Size] = Schema(Schema.schemaForInt.schemaType)

@@ -29,8 +29,8 @@ final case class AllHandlers(
     txHandler: ActorRefT[TxHandler.Command],
     dependencyHandler: ActorRefT[DependencyHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]])(
-    implicit brokerConfig: BrokerConfig) {
+    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+)(implicit brokerConfig: BrokerConfig) {
   def orderedHandlers: Seq[ActorRefT[_]] = {
     (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
   }
@@ -48,30 +48,40 @@ final case class AllHandlers(
 
 object AllHandlers {
   def build(system: ActorSystem, blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
-      implicit brokerConfig: BrokerConfig,
+      implicit
+      brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
-      networkSetting: NetworkSetting): AllHandlers = {
+      networkSetting: NetworkSetting
+  ): AllHandlers = {
     build(system, blockFlow, eventBus, "")
   }
 
-  def build(system: ActorSystem,
-            blockFlow: BlockFlow,
-            eventBus: ActorRefT[EventBus.Message],
-            namePostfix: String)(implicit brokerConfig: BrokerConfig,
-                                 consensusConfig: ConsensusConfig,
-                                 networkSetting: NetworkSetting): AllHandlers = {
+  def build(
+      system: ActorSystem,
+      blockFlow: BlockFlow,
+      eventBus: ActorRefT[EventBus.Message],
+      namePostfix: String
+  )(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting
+  ): AllHandlers = {
     val flowProps = FlowHandler.props(blockFlow, eventBus)
     val flowHandler =
       ActorRefT.build[FlowHandler.Command](system, flowProps, s"FlowHandler$namePostfix")
     buildWithFlowHandler(system, blockFlow, flowHandler, namePostfix)
   }
 
-  def buildWithFlowHandler(system: ActorSystem,
-                           blockFlow: BlockFlow,
-                           flowHandler: ActorRefT[FlowHandler.Command],
-                           namePostfix: String)(implicit brokerConfig: BrokerConfig,
-                                                consensusConfig: ConsensusConfig,
-                                                networkSetting: NetworkSetting): AllHandlers = {
+  def buildWithFlowHandler(
+      system: ActorSystem,
+      blockFlow: BlockFlow,
+      flowHandler: ActorRefT[FlowHandler.Command],
+      namePostfix: String
+  )(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting
+  ): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, flowHandler, namePostfix)
@@ -79,21 +89,26 @@ object AllHandlers {
 
     val dependencyHandlerProps = DependencyHandler.props(blockFlow, blockHandlers, headerHandlers)
     val dependencyHandler = ActorRefT
-      .build[DependencyHandler.Command](system,
-                                        dependencyHandlerProps,
-                                        s"DependencyHandler$namePostfix")
+      .build[DependencyHandler.Command](
+        system,
+        dependencyHandlerProps,
+        s"DependencyHandler$namePostfix"
+      )
     flowHandler ! FlowHandler.SetHandler(dependencyHandler)
 
     AllHandlers(flowHandler, txHandler, dependencyHandler, blockHandlers, headerHandlers)
   }
 
-  private def buildBlockHandlers(system: ActorSystem,
-                                 blockFlow: BlockFlow,
-                                 flowHandler: ActorRefT[FlowHandler.Command],
-                                 namePostfix: String)(
-      implicit brokerConfig: BrokerConfig,
+  private def buildBlockHandlers(
+      system: ActorSystem,
+      blockFlow: BlockFlow,
+      flowHandler: ActorRefT[FlowHandler.Command],
+      namePostfix: String
+  )(implicit
+      brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
-      networkSetting: NetworkSetting): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
+      networkSetting: NetworkSetting
+  ): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
     val handlers = for {
       from <- 0 until brokerConfig.groups
       to   <- 0 until brokerConfig.groups
@@ -103,18 +118,22 @@ object AllHandlers {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
         BlockChainHandler.props(blockFlow, chainIndex, flowHandler),
-        s"BlockChainHandler-$from-$to$namePostfix")
+        s"BlockChainHandler-$from-$to$namePostfix"
+      )
       chainIndex -> handler
     }
     handlers.toMap
   }
 
-  private def buildHeaderHandlers(system: ActorSystem,
-                                  blockFlow: BlockFlow,
-                                  flowHandler: ActorRefT[FlowHandler.Command],
-                                  namePostfix: String)(
-      implicit brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
+  private def buildHeaderHandlers(
+      system: ActorSystem,
+      blockFlow: BlockFlow,
+      flowHandler: ActorRefT[FlowHandler.Command],
+      namePostfix: String
+  )(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig
+  ): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
     val headerHandlers = for {
       from <- 0 until brokerConfig.groups
       to   <- 0 until brokerConfig.groups
@@ -124,7 +143,8 @@ object AllHandlers {
       val headerHander = ActorRefT.build[HeaderChainHandler.Command](
         system,
         HeaderChainHandler.props(blockFlow, chainIndex, flowHandler),
-        s"HeaderChainHandler-$from-$to$namePostfix")
+        s"HeaderChainHandler-$from-$to$namePostfix"
+      )
       chainIndex -> headerHander
     }
     headerHandlers.toMap

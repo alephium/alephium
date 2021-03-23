@@ -133,8 +133,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield newTarget
   }
 
-  def getHeightedBlockHeaders(fromTs: TimeStamp,
-                              toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] =
+  def getHeightedBlockHeaders(
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(BlockHeader, Int)]] =
     for {
       height <- maxHeight
       result <- searchByTimestampHeight(height, AVector.empty, fromTs, toTs)
@@ -143,10 +145,12 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   //TODO Make it tailrec
   //TODO Use binary search with the height params to find quicklier all our blocks.
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def searchByTimestampHeight(height: Int,
-                                      prev: AVector[(BlockHeader, Int)],
-                                      fromTs: TimeStamp,
-                                      toTs: TimeStamp): IOResult[AVector[(BlockHeader, Int)]] = {
+  private def searchByTimestampHeight(
+      height: Int,
+      prev: AVector[(BlockHeader, Int)],
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(BlockHeader, Int)]] = {
     getHashes(height).flatMap { hashes =>
       hashes.mapE(getBlockHeader).flatMap { headers =>
         val filteredHeader =
@@ -183,9 +187,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   // heightFrom is exclusive, heightTo is inclusive
   def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     @tailrec
-    def iter(currentHeader: BlockHeader,
-             currentHeight: Int,
-             acc: AVector[BlockHash]): AVector[BlockHash] = {
+    def iter(
+        currentHeader: BlockHeader,
+        currentHeight: Int,
+        acc: AVector[BlockHash]
+    ): AVector[BlockHash] = {
       if (currentHeight <= heightFrom) {
         acc :+ currentHeader.hash
       } else {
@@ -204,16 +210,16 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 }
 
 object BlockHeaderChain {
-  def fromGenesisUnsafe(storages: Storages)(genesisHeader: BlockHeader)(
-      implicit brokerConfig: BrokerConfig,
-      consensusSetting: ConsensusSetting): BlockHeaderChain = {
+  def fromGenesisUnsafe(storages: Storages)(
+      genesisHeader: BlockHeader
+  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockHeaderChain = {
     val initialize = initializeGenesis(genesisHeader)(_)
     createUnsafe(genesisHeader, storages, initialize)
   }
 
-  def fromStorageUnsafe(storages: Storages)(genesisHeader: BlockHeader)(
-      implicit brokerConfig: BrokerConfig,
-      consensusSetting: ConsensusSetting): BlockHeaderChain = {
+  def fromStorageUnsafe(storages: Storages)(
+      genesisHeader: BlockHeader
+  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockHeaderChain = {
     createUnsafe(genesisHeader, storages, initializeFromStorage)
   }
 

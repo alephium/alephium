@@ -26,9 +26,11 @@ object LruCache {
     apply(maxCapacity, 32, 0.75f)
   }
 
-  def apply[K, V, E](maxCapacity: Int,
-                     initialCapacity: Int,
-                     loadFactor: Float): LruCache[K, V, E] = {
+  def apply[K, V, E](
+      maxCapacity: Int,
+      initialCapacity: Int,
+      loadFactor: Float
+  ): LruCache[K, V, E] = {
     val m = new Inner[K, V](maxCapacity, initialCapacity, loadFactor)
     new LruCache[K, V, E](m)
   }
@@ -73,9 +75,7 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
         refresh(key, value)
         Right(Some(value))
       case None =>
-        genValueOpt.map { valueOpt =>
-          valueOpt.map(value => { putInCache(key, value); value })
-        }
+        genValueOpt.map { valueOpt => valueOpt.map(value => { putInCache(key, value); value }) }
     }
   }
 
@@ -100,24 +100,28 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
     existsInCache(key) || genValue
   }
 
-  def getInCache(key: K): Option[V] = readOnly {
-    Option(m.get(key))
-  }
+  def getInCache(key: K): Option[V] =
+    readOnly {
+      Option(m.get(key))
+    }
 
-  private def existsInCache(key: K): Boolean = readOnly {
-    m.containsKey(key)
-  }
+  private def existsInCache(key: K): Boolean =
+    readOnly {
+      m.containsKey(key)
+    }
 
-  def putInCache(key: K, value: V): Unit = writeOnly {
-    m.put(key, value)
-    ()
-  }
+  def putInCache(key: K, value: V): Unit =
+    writeOnly {
+      m.put(key, value)
+      ()
+    }
 
-  private def refresh(key: K, value: V): Unit = writeOnly {
-    m.remove(key)
-    m.put(key, value)
-    ()
-  }
+  private def refresh(key: K, value: V): Unit =
+    writeOnly {
+      m.remove(key)
+      m.put(key, value)
+      ()
+    }
 
   def keys: Iterable[K] = m.keySet().asScala
 

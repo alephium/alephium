@@ -56,8 +56,8 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState
-  def blockchainBuilder: Block                                         => BlockChain
-  def blockheaderChainBuilder: BlockHeader                             => BlockHeaderChain
+  def blockchainBuilder: Block => BlockChain
+  def blockheaderChainBuilder: BlockHeader => BlockHeaderChain
 
   private val intraGroupChains: AVector[BlockChainWithState] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker) { groupShift =>
@@ -86,26 +86,26 @@ trait BlockFlowState extends FlowTipsUtil {
       }
     }
   private val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
-    AVector.tabulate(groups, groups) {
-      case (from, to) =>
-        if (brokerConfig.containsRaw(from)) {
-          val fromShift = from - brokerConfig.groupFrom
-          outBlockChains(fromShift)(to)
-        } else if (brokerConfig.containsRaw(to)) {
-          val toShift = to - brokerConfig.groupFrom
-          val fromIndex =
-            if (from < brokerConfig.groupFrom) from else from - brokerConfig.groupNumPerBroker
-          inBlockChains(toShift)(fromIndex)
-        } else {
-          val genesisHeader = genesisBlocks(from)(to).header
-          blockheaderChainBuilder(genesisHeader)
-        }
+    AVector.tabulate(groups, groups) { case (from, to) =>
+      if (brokerConfig.containsRaw(from)) {
+        val fromShift = from - brokerConfig.groupFrom
+        outBlockChains(fromShift)(to)
+      } else if (brokerConfig.containsRaw(to)) {
+        val toShift = to - brokerConfig.groupFrom
+        val fromIndex =
+          if (from < brokerConfig.groupFrom) from else from - brokerConfig.groupNumPerBroker
+        inBlockChains(toShift)(fromIndex)
+      } else {
+        val genesisHeader = genesisBlocks(from)(to).header
+        blockheaderChainBuilder(genesisHeader)
+      }
     }
 
   // Cache latest blocks for assisting merkle trie
   private val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
     LruCache[BlockHash, BlockCache, IOError](
-      consensusConfig.blockCacheCapacityPerChain * brokerConfig.depsNum)
+      consensusConfig.blockCacheCapacityPerChain * brokerConfig.depsNum
+    )
   }
 
   def getGroupCache(groupIndex: GroupIndex): LruCache[BlockHash, BlockCache, IOError] = {
@@ -132,22 +132,17 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   protected def aggregateHash[T](f: BlockHashPool => T)(op: (T, T) => T): T = {
-    blockHeaderChains.reduceBy { chains =>
-      chains.reduceBy(f)(op)
-    }(op)
+    blockHeaderChains.reduceBy { chains => chains.reduceBy(f)(op) }(op)
   }
 
   protected def aggregateHashE[T](f: BlockHashPool => IOResult[T])(op: (T, T) => T): IOResult[T] = {
-    blockHeaderChains.reduceByE { chains =>
-      chains.reduceByE(f)(op)
-    }(op)
+    blockHeaderChains.reduceByE { chains => chains.reduceByE(f)(op) }(op)
   }
 
-  protected def aggregateHeaderE[T](f: BlockHeaderPool => IOResult[T])(
-      op: (T, T)                                       => T): IOResult[T] = {
-    blockHeaderChains.reduceByE { chains =>
-      chains.reduceByE(f)(op)
-    }(op)
+  protected def aggregateHeaderE[T](
+      f: BlockHeaderPool => IOResult[T]
+  )(op: (T, T) => T): IOResult[T] = {
+    blockHeaderChains.reduceByE { chains => chains.reduceByE(f)(op) }(op)
   }
 
   def getBlockChain(hash: BlockHash): BlockChain
@@ -185,15 +180,19 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains(from.value)(to.value)
   }
 
-  protected def getPersistedWorldState(deps: BlockDeps,
-                                       groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
+  protected def getPersistedWorldState(
+      deps: BlockDeps,
+      groupIndex: GroupIndex
+  ): IOResult[WorldState.Persisted] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps.uncleHash(groupIndex)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
   }
 
-  protected def getCachedWorldState(deps: BlockDeps,
-                                    groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+  protected def getCachedWorldState(
+      deps: BlockDeps,
+      groupIndex: GroupIndex
+  ): IOResult[WorldState.Cached] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps.uncleHash(groupIndex)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
@@ -288,15 +287,19 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  private def ableToUse(output: TxOutput,
-                        lockupScript: LockupScript,
-                        currentTs: TimeStamp): Boolean = output match {
-    case o: AssetOutput    => o.lockupScript == lockupScript && o.lockTime <= currentTs
-    case _: ContractOutput => false
-  }
+  private def ableToUse(
+      output: TxOutput,
+      lockupScript: LockupScript,
+      currentTs: TimeStamp
+  ): Boolean =
+    output match {
+      case o: AssetOutput    => o.lockupScript == lockupScript && o.lockTime <= currentTs
+      case _: ContractOutput => false
+    }
 
   def getPersistedUtxos(
-      lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+      lockupScript: LockupScript
+  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
@@ -309,7 +312,8 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getUsableUtxos(
-      lockupScript: LockupScript): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+      lockupScript: LockupScript
+  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
     val currentTs = TimeStamp.now()
     getPersistedUtxos(lockupScript).map(_.filter(p => p._2.lockTime <= currentTs))
   }
@@ -319,18 +323,18 @@ trait BlockFlowState extends FlowTipsUtil {
     val currentTs = TimeStamp.now()
     getPersistedUtxos(lockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
-      val lockedBalance = utxos.fold(U256.Zero) {
-        case (acc, (_, output)) =>
-          if (output.lockTime > currentTs) acc addUnsafe output.amount else acc
+      val lockedBalance = utxos.fold(U256.Zero) { case (acc, (_, output)) =>
+        if (output.lockTime > currentTs) acc addUnsafe output.amount else acc
       }
       (balance, lockedBalance, utxos.length)
     }
   }
 
-  def getUtxosInCache(lockupScript: LockupScript,
-                      groupIndex: GroupIndex,
-                      persistedUtxos: AVector[(AssetOutputRef, AssetOutput)])
-    : IOResult[(AVector[TxOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
+  def getUtxosInCache(
+      lockupScript: LockupScript,
+      groupIndex: GroupIndex,
+      persistedUtxos: AVector[(AssetOutputRef, AssetOutput)]
+  ): IOResult[(AVector[TxOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
     val currentTs = TimeStamp.now()
     getBlocksForUpdates(groupIndex).map { blockCaches =>
       val usedUtxos = blockCaches.flatMap[TxOutputRef] { blockCache =>
@@ -338,28 +342,35 @@ trait BlockFlowState extends FlowTipsUtil {
       }
       val newUtxos = blockCaches.flatMap { blockCache =>
         AVector
-          .from(blockCache.relatedOutputs.view.filter(p =>
-            ableToUse(p._2, lockupScript, currentTs) && p._1.isAssetType && p._2.isAsset))
+          .from(
+            blockCache.relatedOutputs.view.filter(p =>
+              ableToUse(p._2, lockupScript, currentTs) && p._1.isAssetType && p._2.isAsset
+            )
+          )
           .asUnsafe[(AssetOutputRef, AssetOutput)]
       }
       (usedUtxos, newUtxos)
     }
   }
 
-  def prepareUnsignedTx(fromKey: PublicKey,
-                        toLockupScript: LockupScript,
-                        lockTimeOpt: Option[TimeStamp],
-                        amount: U256): IOResult[Either[String, UnsignedTransaction]] = {
+  def prepareUnsignedTx(
+      fromKey: PublicKey,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp],
+      amount: U256
+  ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {
-        selected <- UtxoUtils.select(utxos,
-                                     amount,
-                                     defaultGasFee,
-                                     defaultGasFeePerInput,
-                                     defaultGasFeePerOutput,
-                                     2) // sometime only 1 output, but 2 is always safe
+        selected <- UtxoUtils.select(
+          utxos,
+          amount,
+          defaultGasFee,
+          defaultGasFeePerInput,
+          defaultGasFeePerOutput,
+          2
+        ) // sometime only 1 output, but 2 is always safe
         gas <- GasBox
           .from(selected.gasFee, defaultGasPrice)
           .toRight(s"Invalid gas: ${selected.gasFee} / $defaultGasPrice")
@@ -395,10 +406,8 @@ trait BlockFlowState extends FlowTipsUtil {
           val toGroupConfirmations =
             getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
           Some(
-            TxStatus(chainStatus.index,
-                     confirmations,
-                     fromGroupConfirmations,
-                     toGroupConfirmations))
+            TxStatus(chainStatus.index, confirmations, fromGroupConfirmations, toGroupConfirmations)
+          )
         }
       }
     }
@@ -475,9 +484,10 @@ object BlockFlowState {
     def inputs: Set[TxOutputRef]                   = Set.empty
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
   }
-  final case class OutBlockCache(inputs: Set[TxOutputRef],
-                                 relatedOutputs: Map[TxOutputRef, TxOutput])
-      extends BlockCache
+  final case class OutBlockCache(
+      inputs: Set[TxOutputRef],
+      relatedOutputs: Map[TxOutputRef, TxOutput]
+  ) extends BlockCache
   final case class InOutBlockCache(outputs: Map[TxOutputRef, TxOutput], inputs: Set[TxOutputRef])
       extends BlockCache { // For blocks on intra-group chain
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
@@ -508,16 +518,18 @@ object BlockFlowState {
   }
 
   // This is only used for out blocks for a specific group
-  private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(
-      implicit brokerConfig: GroupConfig): Map[TxOutputRef, TxOutput] = {
+  private def convertRelatedOutputs(block: Block, groupIndex: GroupIndex)(implicit
+      brokerConfig: GroupConfig
+  ): Map[TxOutputRef, TxOutput] = {
     convertOutputs(block).filter {
       case (outputRef: AssetOutputRef, _) if outputRef.fromGroup == groupIndex => true
       case _                                                                   => false
     }
   }
 
-  def convertBlock(block: Block, groupIndex: GroupIndex)(
-      implicit brokerConfig: BrokerConfig): BlockCache = {
+  def convertBlock(block: Block, groupIndex: GroupIndex)(implicit
+      brokerConfig: BrokerConfig
+  ): BlockCache = {
     val index = block.chainIndex
     assume(index.relateTo(groupIndex))
     if (index.isIntraGroup) {
@@ -530,8 +542,9 @@ object BlockFlowState {
     }
   }
 
-  def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(
-      implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+  def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
+      brokerConfig: GroupConfig
+  ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
@@ -556,7 +569,8 @@ object BlockFlowState {
   def updateStateForInOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
-      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+      targetGroup: GroupIndex
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
       _ <- updateStateForOutputs(worldState, tx, targetGroup)
@@ -566,7 +580,8 @@ object BlockFlowState {
   def updateStateForOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
-      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+      targetGroup: GroupIndex
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
       _ <- updateStateForOutputs(worldState, tx, targetGroup)
@@ -576,7 +591,8 @@ object BlockFlowState {
   def updateStateForInBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
-      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+      targetGroup: GroupIndex
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     updateStateForOutputs(worldState, tx, targetGroup)
   }
 
@@ -602,7 +618,8 @@ object BlockFlowState {
   private def updateStateForOutputs(
       worldState: WorldState.Cached,
       tx: Transaction,
-      targetGroup: GroupIndex)(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+      targetGroup: GroupIndex
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
@@ -611,8 +628,10 @@ object BlockFlowState {
     }
   }
 
-  final case class TxStatus(index: TxIndex,
-                            chainConfirmations: Int,
-                            fromGroupConfirmations: Int,
-                            toGroupConfirmations: Int)
+  final case class TxStatus(
+      index: TxIndex,
+      chainConfirmations: Int,
+      fromGroupConfirmations: Int,
+      toGroupConfirmations: Int
+  )
 }

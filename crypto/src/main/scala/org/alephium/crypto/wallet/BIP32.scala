@@ -54,9 +54,11 @@ object BIP32 {
     ByteString.fromArrayUnsafe(out)
   }
 
-  final case class ExtendedPrivateKey protected[wallet] (privateKey: SecP256K1PrivateKey,
-                                                         chainCode: ByteString,
-                                                         path: AVector[Int]) {
+  final case class ExtendedPrivateKey protected[wallet] (
+      privateKey: SecP256K1PrivateKey,
+      chainCode: ByteString,
+      path: AVector[Int]
+  ) {
     def publicKey: SecP256K1PublicKey = privateKey.publicKey
 
     def extendedPublicKey: ExtendedPublicKey =
@@ -100,9 +102,11 @@ object BIP32 {
     }
   }
 
-  final case class ExtendedPublicKey protected[wallet] (publicKey: SecP256K1PublicKey,
-                                                        chainCode: ByteString,
-                                                        path: AVector[Int]) {
+  final case class ExtendedPublicKey protected[wallet] (
+      publicKey: SecP256K1PublicKey,
+      chainCode: ByteString,
+      path: AVector[Int]
+  ) {
     def derive(index: Int): Option[ExtendedPublicKey] = {
       assume(!isHardened(index))
       val i        = publicKey.bytes ++ Bytes.from(index)
@@ -111,7 +115,12 @@ object BIP32 {
       if (p.compareTo(SecP256K1.params.getN) >= 0) {
         None
       } else {
-        val ki = SecP256K1PrivateKey.unsafe(il).publicKey.unsafePoint.add(publicKey.unsafePoint) // safe by construction
+        val ki =
+          SecP256K1PrivateKey
+            .unsafe(il)
+            .publicKey
+            .unsafePoint
+            .add(publicKey.unsafePoint) // safe by construction
         if (ki.isInfinity) {
           None
         } else {

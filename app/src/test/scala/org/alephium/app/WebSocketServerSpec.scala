@@ -52,7 +52,9 @@ class WebSocketServerSpec
     val result = WebSocketServer.blockNotifyEncode(blockNotify)
 
     val depsString = AVector.fill(groupConfig.depsNum)(s""""${dep.toHexString}"""").mkString(",")
-    show(result) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":[$depsString]}"""
+    show(
+      result
+    ) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":[$depsString]}"""
   }
 
   behavior of "ws"
@@ -65,9 +67,7 @@ class WebSocketServerSpec
 
   it should "receive multiple events" in new RouteWS {
     checkWS {
-      (0 to 3).foreach { _ =>
-        sendEventAndCheck
-      }
+      (0 to 3).foreach { _ => sendEventAndCheck }
     }
   }
 
@@ -95,12 +95,14 @@ class WebSocketServerSpec
   trait WebSocketServerFixture extends ServerFixture {
 
     lazy val blockFlowProbe = TestProbe()
-    lazy val node = new NodeDummy(dummyIntraCliqueInfo,
-                                  dummyNeighborPeers,
-                                  dummyBlock,
-                                  blockFlowProbe.ref,
-                                  dummyTx,
-                                  storages)
+    lazy val node = new NodeDummy(
+      dummyIntraCliqueInfo,
+      dummyNeighborPeers,
+      dummyBlock,
+      blockFlowProbe.ref,
+      dummyTx,
+      storages
+    )
     lazy val server: WebSocketServer = WebSocketServer(node)
   }
 

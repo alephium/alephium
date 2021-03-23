@@ -47,17 +47,19 @@ object BuiltIn {
     override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq(instr)
   }
 
-  final case class SimpleStatelessBuiltIn(name: String,
-                                          argsType: Seq[Type],
-                                          returnType: Seq[Type],
-                                          instr: Instr[StatelessContext])
-      extends SimpleBuiltIn[StatelessContext]
+  final case class SimpleStatelessBuiltIn(
+      name: String,
+      argsType: Seq[Type],
+      returnType: Seq[Type],
+      instr: Instr[StatelessContext]
+  ) extends SimpleBuiltIn[StatelessContext]
 
-  final case class SimpleStatefulBuiltIn(name: String,
-                                         argsType: Seq[Type],
-                                         returnType: Seq[Type],
-                                         instr: Instr[StatefulContext])
-      extends SimpleBuiltIn[StatefulContext]
+  final case class SimpleStatefulBuiltIn(
+      name: String,
+      argsType: Seq[Type],
+      returnType: Seq[Type],
+      instr: Instr[StatefulContext]
+  ) extends SimpleBuiltIn[StatefulContext]
 
   sealed abstract class GenericStatelessBuiltIn(val name: String) extends BuiltIn[StatelessContext]
 
@@ -159,61 +161,79 @@ object BuiltIn {
     SimpleStatefulBuiltIn("approveAlf", Seq[Type](Type.Address, Type.U256), Seq.empty, ApproveAlf)
 
   val approveToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("approveToken",
-                          Seq[Type](Type.Address, Type.ByteVec, Type.U256),
-                          Seq.empty,
-                          ApproveToken)
+    SimpleStatefulBuiltIn(
+      "approveToken",
+      Seq[Type](Type.Address, Type.ByteVec, Type.U256),
+      Seq.empty,
+      ApproveToken
+    )
 
   val alfRemaining: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("alfRemaining", Seq(Type.Address), Seq(Type.U256), AlfRemaining)
 
   val tokenRemaining: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("tokenRemaining",
-                          Seq[Type](Type.Address, Type.ByteVec),
-                          Seq(Type.U256),
-                          TokenRemaining)
+    SimpleStatefulBuiltIn(
+      "tokenRemaining",
+      Seq[Type](Type.Address, Type.ByteVec),
+      Seq(Type.U256),
+      TokenRemaining
+    )
 
   val transferAlf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("transferAlf",
-                          Seq[Type](Type.Address, Type.Address, Type.U256),
-                          Seq.empty,
-                          TransferAlf)
+    SimpleStatefulBuiltIn(
+      "transferAlf",
+      Seq[Type](Type.Address, Type.Address, Type.U256),
+      Seq.empty,
+      TransferAlf
+    )
 
   val transferAlfFromSelf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("transferAlfFromSelf",
-                          Seq[Type](Type.Address, Type.U256),
-                          Seq.empty,
-                          TransferAlfFromSelf)
+    SimpleStatefulBuiltIn(
+      "transferAlfFromSelf",
+      Seq[Type](Type.Address, Type.U256),
+      Seq.empty,
+      TransferAlfFromSelf
+    )
 
   val transferAlfToSelf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("transferAlfToSelf",
-                          Seq[Type](Type.Address, Type.U256),
-                          Seq.empty,
-                          TransferAlfToSelf)
+    SimpleStatefulBuiltIn(
+      "transferAlfToSelf",
+      Seq[Type](Type.Address, Type.U256),
+      Seq.empty,
+      TransferAlfToSelf
+    )
 
   val transferToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("transferToken",
-                          Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U256),
-                          Seq.empty,
-                          TransferToken)
+    SimpleStatefulBuiltIn(
+      "transferToken",
+      Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U256),
+      Seq.empty,
+      TransferToken
+    )
 
   val transferTokenFromSelf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("transferTokenFromSelf",
-                          Seq[Type](Type.Address, Type.ByteVec, Type.U256),
-                          Seq.empty,
-                          TransferTokenFromSelf)
+    SimpleStatefulBuiltIn(
+      "transferTokenFromSelf",
+      Seq[Type](Type.Address, Type.ByteVec, Type.U256),
+      Seq.empty,
+      TransferTokenFromSelf
+    )
 
   val transferTokenToSelf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("transferTokenToSelf",
-                          Seq[Type](Type.Address, Type.ByteVec, Type.U256),
-                          Seq.empty,
-                          TransferTokenToSelf)
+    SimpleStatefulBuiltIn(
+      "transferTokenToSelf",
+      Seq[Type](Type.Address, Type.ByteVec, Type.U256),
+      Seq.empty,
+      TransferTokenToSelf
+    )
 
   val createContract: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("createContract",
-                          Seq[Type](Type.ByteVec, Type.ByteVec),
-                          Seq.empty,
-                          CreateContract)
+    SimpleStatefulBuiltIn(
+      "createContract",
+      Seq[Type](Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      CreateContract
+    )
 
   val selfAddress: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)

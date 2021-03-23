@@ -37,7 +37,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       ConsensusSetting(blockTargetTime, 18, 100, 25, emission)
     }
 
-    val chainInfo = mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
+    val chainInfo =
+      mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
     val threshold = consensusConfig.powAveragingWindow + 1
 
     def getHeight(hash: BlockHash): IOResult[Int] = Right(chainInfo(hash)._1)
@@ -49,8 +50,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
       val maxHeight: Int = getHeight(hash).rightValue
       val hashes = AVector
-        .from(chainInfo.filter {
-          case (_, (height, _)) => height > heightUntil && height <= maxHeight
+        .from(chainInfo.filter { case (_, (height, _)) =>
+          height > heightUntil && height <= maxHeight
         }.keys)
         .sortBy(getHeight(_).rightValue)
       Right(hashes)
@@ -58,8 +59,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     def setup(data: AVector[(BlockHash, TimeStamp)]): Unit = {
       assume(chainInfo.isEmpty)
-      data.foreachWithIndex {
-        case ((hash, timestamp), height) => chainInfo(hash) = height -> timestamp
+      data.foreachWithIndex { case ((hash, timestamp), height) =>
+        chainInfo(hash) = height -> timestamp
       }
     }
 
@@ -193,18 +194,14 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
   it should "simulate hashrate increasing" in new SimulationFixture {
     val finalTarget = Target.unsafe(initialTarget.value.divide(BigInteger.valueOf(100)))
-    (0 until 1000).foreach { _ =>
-      stepSimulation(finalTarget)
-    }
+    (0 until 1000).foreach { _ => stepSimulation(finalTarget) }
     val ratio = BigDecimal(initialTarget.value) / BigDecimal(currentTarget.value)
     checkRatio(ratio.toDouble, 100.0) is true
   }
 
   it should "simulate hashrate decreasing" in new SimulationFixture {
     val finalTarget = Target.unsafe(initialTarget.value.multiply(BigInteger.valueOf(100)))
-    (0 until 1000).foreach { _ =>
-      stepSimulation(finalTarget)
-    }
+    (0 until 1000).foreach { _ => stepSimulation(finalTarget) }
     val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
     checkRatio(ratio.toDouble, 100.0) is true
   }

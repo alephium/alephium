@@ -42,7 +42,8 @@ class DependencyHandlerSpec extends AlephiumActorSpec("DependencyHandlerSpec") {
           override def blockFlow: BlockFlow = Self.blockFlow
           override def receive: Receive     = _ => ()
         }
-      ))
+      )
+    )
     val state = stateActor.underlyingActor
   }
 
@@ -101,8 +102,10 @@ class DependencyHandlerSpec extends AlephiumActorSpec("DependencyHandlerSpec") {
     state.processing.isEmpty is true
 
     state.extractReadies().toSet is
-      Set[(FlowData, ActorRefT[ChainHandler.Event], DataOrigin)]((block1, broker, origin),
-                                                                 (block2, broker, origin))
+      Set[(FlowData, ActorRefT[ChainHandler.Event], DataOrigin)](
+        (block1, broker, origin),
+        (block2, broker, origin)
+      )
     state.readies.isEmpty is true
     state.processing is mutable.HashSet(block1.hash, block2.hash)
 

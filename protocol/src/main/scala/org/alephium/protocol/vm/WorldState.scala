@@ -37,10 +37,12 @@ trait WorldState[T] {
 
   def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
 
-  def createContract(code: StatefulContract,
-                     fields: AVector[Val],
-                     outputRef: ContractOutputRef,
-                     output: ContractOutput): IOResult[T]
+  def createContract(
+      code: StatefulContract,
+      fields: AVector[Val],
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): IOResult[T]
 
   def updateContract(key: Hash, fields: AVector[Val]): IOResult[T]
 
@@ -58,12 +60,8 @@ trait WorldState[T] {
 
   def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
     for {
-      fixedInputs <- tx.unsigned.inputs.mapE { input =>
-        getOutput(input.outputRef)
-      }
-      contractInputs <- tx.contractInputs.mapE { outputRef =>
-        getOutput(outputRef)
-      }
+      fixedInputs    <- tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
+      contractInputs <- tx.contractInputs.mapE { outputRef => getOutput(outputRef) }
     } yield (fixedInputs ++ contractInputs)
   }
 
@@ -93,7 +91,8 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
       outputRaw <- getOutput(state.contractOutputRef)
       output <- outputRaw match {
         case _: AssetOutput =>
-          val error = s"ContractOutput expected, but got AssetOutput for contract $contractId"
+          val error =
+            s"ContractOutput expected, but got AssetOutput for contract $contractId"
           Left(IOError.Other(new RuntimeException(error)))
         case o: ContractOutput =>
           Right(o)
@@ -108,10 +107,12 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
     } yield state.code.toObject(key, state)
   }
 
-  def createContract(code: StatefulContract,
-                     fields: AVector[Val],
-                     outputRef: ContractOutputRef,
-                     output: ContractOutput): IOResult[Unit]
+  def createContract(
+      code: StatefulContract,
+      fields: AVector[Val],
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): IOResult[Unit]
 
   def updateContract(key: Hash, fields: AVector[Val]): IOResult[Unit] = {
     for {
@@ -120,14 +121,14 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
     } yield newState
   }
 
-  def updateContract(key: Hash,
-                     outputRef: ContractOutputRef,
-                     output: ContractOutput): IOResult[Unit]
+  def updateContract(
+      key: Hash,
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): IOResult[Unit]
 
   def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
-    tx.unsigned.inputs.mapE { input =>
-      getOutput(input.outputRef)
-    }
+    tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
   }
 }
 
@@ -146,14 +147,16 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
     } yield output
   }
 
-  def useContractAsset(contractId: ContractId)
-    : IOResult[(ContractOutputRef, ContractOutput, ImmutableWorldState)] = {
+  def useContractAsset(
+      contractId: ContractId
+  ): IOResult[(ContractOutputRef, ContractOutput, ImmutableWorldState)] = {
     for {
       state     <- getContractState(contractId)
       outputRaw <- getOutput(state.contractOutputRef)
       output <- outputRaw match {
         case _: AssetOutput =>
-          val error = s"ContractOutput expected, but got AssetOutput for contract $contractId"
+          val error =
+            s"ContractOutput expected, but got AssetOutput for contract $contractId"
           Left(IOError.Other(new RuntimeException(error)))
         case o: ContractOutput =>
           Right(o)
@@ -168,10 +171,12 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
     } yield state.code.toObject(key, state)
   }
 
-  def createContract(code: StatefulContract,
-                     fields: AVector[Val],
-                     outputRef: ContractOutputRef,
-                     output: ContractOutput): IOResult[ImmutableWorldState]
+  def createContract(
+      code: StatefulContract,
+      fields: AVector[Val],
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): IOResult[ImmutableWorldState]
 
   def updateContract(key: Hash, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
     for {
@@ -181,9 +186,7 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
   }
 
   def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
-    tx.unsigned.inputs.mapE { input =>
-      getOutput(input.outputRef)
-    }
+    tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
   }
 }
 
@@ -205,18 +208,22 @@ object WorldState {
     }
 
     def getAssetOutputs(
-        outputRefPrefix: ByteString): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+        outputRefPrefix: ByteString
+    ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
       outputState
         .getAll(outputRefPrefix)
         .map(
-          _.filter(p => p._1.isAssetType && p._2.isAsset).asUnsafe[(AssetOutputRef, AssetOutput)])
+          _.filter(p => p._1.isAssetType && p._2.isAsset).asUnsafe[(AssetOutputRef, AssetOutput)]
+        )
     }
 
     def getContractOutputs(
-        outputRefPrefix: ByteString): IOResult[AVector[(ContractOutputRef, ContractOutput)]] = {
+        outputRefPrefix: ByteString
+    ): IOResult[AVector[(ContractOutputRef, ContractOutput)]] = {
       getAllOutputs(outputRefPrefix).map(
         _.filter(p => p._1.isContractType && !p._2.isAsset)
-          .asUnsafe[(ContractOutputRef, ContractOutput)])
+          .asUnsafe[(ContractOutputRef, ContractOutput)]
+      )
     }
 
     def getContractState(key: Hash): IOResult[ContractState] = {
@@ -231,15 +238,19 @@ object WorldState {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
-    private[WorldState] def putOutput(outputRef: TxOutputRef,
-                                      output: TxOutput): IOResult[Persisted] = {
+    private[WorldState] def putOutput(
+        outputRef: TxOutputRef,
+        output: TxOutput
+    ): IOResult[Persisted] = {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
-    def createContract(code: StatefulContract,
-                       fields: AVector[Val],
-                       outputRef: ContractOutputRef,
-                       output: ContractOutput): IOResult[Persisted] = {
+    def createContract(
+        code: StatefulContract,
+        fields: AVector[Val],
+        outputRef: ContractOutputRef,
+        output: ContractOutput
+    ): IOResult[Persisted] = {
       val state = ContractState(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
@@ -251,9 +262,11 @@ object WorldState {
       contractState.put(key, state).map(Persisted(outputState, _))
     }
 
-    def updateContract(key: Hash,
-                       outputRef: ContractOutputRef,
-                       output: ContractOutput): IOResult[Persisted] = {
+    def updateContract(
+        key: Hash,
+        outputRef: ContractOutputRef,
+        output: ContractOutput
+    ): IOResult[Persisted] = {
       for {
         state            <- getContractState(key)
         newOutputState   <- outputState.put(outputRef, output)
@@ -305,10 +318,12 @@ object WorldState {
       outputState.put(outputRef, output)
     }
 
-    def createContract(code: StatefulContract,
-                       fields: AVector[Val],
-                       outputRef: ContractOutputRef,
-                       output: ContractOutput): IOResult[Unit] = {
+    def createContract(
+        code: StatefulContract,
+        fields: AVector[Val],
+        outputRef: ContractOutputRef,
+        output: ContractOutput
+    ): IOResult[Unit] = {
       val state = ContractState(code, fields, outputRef)
       for {
         _ <- outputState.put(outputRef, output)
@@ -320,9 +335,11 @@ object WorldState {
       contractState.put(key, state)
     }
 
-    def updateContract(key: Hash,
-                       outputRef: ContractOutputRef,
-                       output: ContractOutput): IOResult[Unit] = {
+    def updateContract(
+        key: Hash,
+        outputRef: ContractOutputRef,
+        output: ContractOutput
+    ): IOResult[Unit] = {
       for {
         state <- getContractState(key)
         _     <- outputState.put(outputRef, output)

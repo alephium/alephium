@@ -68,16 +68,17 @@ trait ApiModelCodec {
 
   implicit val peerStatusEncoder: Encoder[PeerStatus] = {
     new Encoder[PeerStatus] {
-      final def apply(status: PeerStatus): Json = status match {
-        case ps @ PeerStatus.Banned(_) =>
-          Json.obj(
-            ("banned", ps.asJson)
-          )
-        case ps @ PeerStatus.Penalty(_) =>
-          Json.obj(
-            ("penalty", ps.asJson)
-          )
-      }
+      final def apply(status: PeerStatus): Json =
+        status match {
+          case ps @ PeerStatus.Banned(_) =>
+            Json.obj(
+              ("banned", ps.asJson)
+            )
+          case ps @ PeerStatus.Penalty(_) =>
+            Json.obj(
+              ("penalty", ps.asJson)
+            )
+        }
     }
   }
 
@@ -219,13 +220,15 @@ trait ApiModelCodec {
 
   implicit val cliqueEncoder: Encoder[InterCliqueInfo] =
     Encoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(info =>
-      (info.id, info.externalAddresses, info.groupNumPerBroker))
+      (info.id, info.externalAddresses, info.groupNumPerBroker)
+    )
   implicit val cliqueDecoder: Decoder[InterCliqueInfo] =
     Decoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(InterCliqueInfo.unsafe)
 
   implicit val peerInfoEncoder: Encoder[BrokerInfo] =
     Encoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(info =>
-      (info.cliqueId, info.brokerId, info.groupNumPerBroker, info.address))
+      (info.cliqueId, info.brokerId, info.groupNumPerBroker, info.address)
+    )
   implicit val peerInfoDecoder: Decoder[BrokerInfo] =
     Decoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(BrokerInfo.unsafe)
 
@@ -254,7 +257,8 @@ trait ApiModelCodec {
     Mnemonic
       .Size(size)
       .toRight(
-        s"Invalid mnemonic size: $size, expected: ${Mnemonic.Size.list.map(_.value).mkString(", ")}")
+        s"Invalid mnemonic size: $size, expected: ${Mnemonic.Size.list.map(_.value).mkString(", ")}"
+      )
   }
   implicit val mnemonicSizeCodec: Codec[Mnemonic.Size] =
     Codec.from(mnemonicSizeDecoder, mnemonicSizeEncoder)

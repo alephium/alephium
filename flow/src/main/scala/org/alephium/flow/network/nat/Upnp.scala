@@ -35,15 +35,15 @@ object Upnp extends StrictLogging {
   def getUpnpClient(setting: UpnpSettings): Option[UpnpClient] =
     try {
       setting.httpTimeout.foreach(duration =>
-        GatewayDevice.setHttpReadTimeout(duration.millis.toInt))
+        GatewayDevice.setHttpReadTimeout(duration.millis.toInt)
+      )
       val discovery = new GatewayDiscover()
       setting.discoveryTimeout.foreach(duration => discovery.setTimeout(duration.millis.toInt))
 
       val gatewayMapOpt = Option(discovery.discover()).map(_.asScala).map(_.toMap)
       gatewayMapOpt.flatMap { gatewayMap =>
-        gatewayMap.foreach {
-          case (address, _) =>
-            logger.debug(s"UPnP gateway device found on ${address.getHostAddress}")
+        gatewayMap.foreach { case (address, _) =>
+          logger.debug(s"UPnP gateway device found on ${address.getHostAddress}")
         }
         Option(discovery.getValidGateway).map(new UpnpClient(_))
       }
@@ -61,18 +61,21 @@ class UpnpClient(gateway: GatewayDevice) extends StrictLogging {
   def addPortMapping(externalPort: Int, internalPort: Int): Boolean = {
     try {
       Upnp.protocols.forall {
-        gateway.addPortMapping(externalPort,
-                               internalPort,
-                               localAddress.getHostAddress,
-                               _,
-                               Upnp.description)
+        gateway.addPortMapping(
+          externalPort,
+          internalPort,
+          localAddress.getHostAddress,
+          _,
+          Upnp.description
+        )
       }
     } catch {
       case t: Throwable =>
         logger.error(
           s"Unable to map external [${externalAddress.getHostAddress}]:$externalPort to" +
             s" internal [${localAddress.getHostAddress}]:$internalPort",
-          t)
+          t
+        )
         false
     }
   }

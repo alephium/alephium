@@ -38,7 +38,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
     expectMsg(TxHandler.AddSucceeded(tx.id))
 
     broadcastTxProbe.expectMsg(
-      CliqueManager.BroadCastTx(tx.toTemplate, txMessage(tx), chainIndex, dataOrigin))
+      CliqueManager.BroadCastTx(tx.toTemplate, txMessage(tx), chainIndex, dataOrigin)
+    )
   }
 
   it should "not broadcast invalid tx" in new Fixture {

@@ -37,10 +37,11 @@ object Base58 {
   private val zero = BigInt(0)
   private val base = BigInt(58)
 
-  @inline private def count(f: => Int, length: Int): Int = f match {
-    case -1 => length
-    case n  => n
-  }
+  @inline private def count(f: => Int, length: Int): Int =
+    f match {
+      case -1 => length
+      case n  => n
+    }
 
   def encode(bs: ByteString): String = {
     if (bs.isEmpty) {

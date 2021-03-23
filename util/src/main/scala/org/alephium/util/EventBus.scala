@@ -41,9 +41,7 @@ class EventBus() extends BaseActor {
 
   def receive: Receive = {
     case event: Event =>
-      subscribers.foreach { subscriber =>
-        subscriber ! event
-      }
+      subscribers.foreach { subscriber => subscriber ! event }
     case Subscribe =>
       val subscriber = sender()
       if (!subscribers.contains(subscriber)) { subscribers += subscriber }

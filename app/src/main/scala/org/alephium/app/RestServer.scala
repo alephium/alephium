@@ -55,10 +55,11 @@ class RestServer(
     miner: ActorRefT[Miner.Command],
     blocksExporter: BlocksExporter,
     walletServer: Option[WalletServer]
-)(implicit val apiConfig: ApiConfig,
-  val actorSystem: ActorSystem,
-  val executionContext: ExecutionContext)
-    extends Endpoints
+)(implicit
+    val apiConfig: ApiConfig,
+    val actorSystem: ActorSystem,
+    val executionContext: ExecutionContext
+) extends Endpoints
     with Service
     with StrictLogging {
 
@@ -100,7 +101,8 @@ class RestServer(
 
   private val getBlockflowRoute = getBlockflow.toRoute { timeInterval =>
     Future.successful(
-      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to)))
+      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
+    )
   }
 
   private val getBlockRoute = getBlock.toRoute { hash =>
@@ -120,29 +122,29 @@ class RestServer(
       brokerPeers <- node.misbehaviorManager.ask(MisbehaviorManager.GetPeers).mapTo[Peers]
     } yield {
       Right(
-        brokerPeers.peers.map {
-          case MisbehaviorManager.Peer(addr, misbehavior) =>
-            val status: PeerStatus = misbehavior match {
-              case MisbehaviorManager.Penalty(value) => PeerStatus.Penalty(value)
-              case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
-            }
-            PeerMisbehavior(addr, status)
+        brokerPeers.peers.map { case MisbehaviorManager.Peer(addr, misbehavior) =>
+          val status: PeerStatus = misbehavior match {
+            case MisbehaviorManager.Penalty(value) => PeerStatus.Penalty(value)
+            case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
+          }
+          PeerMisbehavior(addr, status)
         }
       )
     }
   }
 
-  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute {
-    case (from, to, height) =>
-      Future.successful(
-        serverUtils.getHashesAtHeight(blockFlow,
-                                      ChainIndex(from, to),
-                                      GetHashesAtHeight(from.value, to.value, height)))
+  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute { case (from, to, height) =>
+    Future.successful(
+      serverUtils.getHashesAtHeight(
+        blockFlow,
+        ChainIndex(from, to),
+        GetHashesAtHeight(from.value, to.value, height)
+      )
+    )
   }
 
-  private val getChainInfoRoute = getChainInfo.toRoute {
-    case (from, to) =>
-      Future.successful(serverUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
+  private val getChainInfoRoute = getChainInfo.toRoute { case (from, to) =>
+    Future.successful(serverUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
   }
 
   private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute {
@@ -153,17 +155,19 @@ class RestServer(
   private val buildTransactionRoute = buildTransaction.toRoute {
     case (fromKey, toAddress, lockTime, value) =>
       Future.successful(
-        serverUtils.buildTransaction(blockFlow,
-                                     BuildTransaction(fromKey, toAddress, lockTime, value)))
+        serverUtils.buildTransaction(
+          blockFlow,
+          BuildTransaction(fromKey, toAddress, lockTime, value)
+        )
+      )
   }
 
   private val sendTransactionRoute = sendTransaction.toRoute { transaction =>
     serverUtils.sendTransaction(txHandler, transaction)
   }
 
-  private val getTransactionStatusRoute = getTransactionStatus.toRoute {
-    case (txId, from, to) =>
-      Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, ChainIndex(from, to)))
+  private val getTransactionStatusRoute = getTransactionStatus.toRoute { case (txId, from, to) =>
+    Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, ChainIndex(from, to)))
   }
 
   private val minerActionRoute = minerAction.toRoute {
@@ -184,9 +188,7 @@ class RestServer(
     Future.successful {
       MinerAddresses
         .validate(minerAddresses.addresses)
-        .map { addresses =>
-          miner ! Miner.UpdateAddresses(addresses.addresses.map(_.lockupScript))
-        }
+        .map { addresses => miner ! Miner.UpdateAddresses(addresses.addresses.map(_.lockupScript)) }
         .left
         .map(ApiModel.Error.server)
     }
@@ -200,9 +202,7 @@ class RestServer(
     serverUtils.buildContract(blockFlow, query)
   }
 
-  private val compileRoute = compile.toRoute { query =>
-    serverUtils.compile(query)
-  }
+  private val compileRoute = compile.toRoute { query => serverUtils.compile(query) }
 
   private val exportBlocksRoute = exportBlocks.toRoute { exportFile =>
     //Run the export in background
@@ -210,7 +210,8 @@ class RestServer(
       blocksExporter
         .export(exportFile.filename)
         .left
-        .map(error => logger.error(error.getMessage)))
+        .map(error => logger.error(error.getMessage))
+    )
     //Just validate the filename and return success
     Future.successful {
       blocksExporter
@@ -312,26 +313,33 @@ class RestServer(
 }
 
 object RestServer {
-  def apply(node: Node,
-            miner: ActorRefT[Miner.Command],
-            blocksExporter: BlocksExporter,
-            walletServer: Option[WalletServer])(implicit system: ActorSystem,
-                                                apiConfig: ApiConfig,
-                                                executionContext: ExecutionContext): RestServer = {
+  def apply(
+      node: Node,
+      miner: ActorRefT[Miner.Command],
+      blocksExporter: BlocksExporter,
+      walletServer: Option[WalletServer]
+  )(implicit
+      system: ActorSystem,
+      apiConfig: ApiConfig,
+      executionContext: ExecutionContext
+  ): RestServer = {
     val restPort = node.config.network.restPort
     new RestServer(node, restPort, miner, blocksExporter, walletServer)
   }
 
-  def selfCliqueFrom(cliqueInfo: IntraCliqueInfo, consensus: ConsensusSetting, synced: Boolean)(
-      implicit groupConfig: GroupConfig,
-      networkType: NetworkType): SelfClique = {
+  def selfCliqueFrom(
+      cliqueInfo: IntraCliqueInfo,
+      consensus: ConsensusSetting,
+      synced: Boolean
+  )(implicit groupConfig: GroupConfig, networkType: NetworkType): SelfClique = {
 
     SelfClique(
       cliqueInfo.id,
       networkType,
       consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)),
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)
+      ),
       synced,
       cliqueInfo.groupNumPerBroker,
       groupConfig.groups
@@ -340,10 +348,12 @@ object RestServer {
 
   def interCliquePeerInfoFrom(syncStatus: InterCliqueManager.SyncStatus): InterCliquePeerInfo = {
     val peerId = syncStatus.peerId
-    InterCliquePeerInfo(peerId.cliqueId,
-                        peerId.brokerId,
-                        syncStatus.groupNumPerBroker,
-                        syncStatus.address,
-                        syncStatus.isSynced)
+    InterCliquePeerInfo(
+      peerId.cliqueId,
+      peerId.brokerId,
+      syncStatus.groupNumPerBroker,
+      syncStatus.address,
+      syncStatus.isSynced
+    )
   }
 }

@@ -51,10 +51,13 @@ class SecP256K1PrivateKey(val bytes: ByteString) extends PrivateKey {
 }
 
 object SecP256K1PrivateKey
-    extends RandomBytes.Companion[SecP256K1PrivateKey](bs => {
-      assume(bs.length == 32)
-      new SecP256K1PrivateKey(bs)
-    }, _.bytes) {
+    extends RandomBytes.Companion[SecP256K1PrivateKey](
+      bs => {
+        assume(bs.length == 32)
+        new SecP256K1PrivateKey(bs)
+      },
+      _.bytes
+    ) {
   override def length: Int = 32
 }
 
@@ -63,20 +66,26 @@ class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
 }
 
 object SecP256K1PublicKey
-    extends RandomBytes.Companion[SecP256K1PublicKey](bs => {
-      assume(bs.length == 33)
-      new SecP256K1PublicKey(bs)
-    }, _.bytes) {
+    extends RandomBytes.Companion[SecP256K1PublicKey](
+      bs => {
+        assume(bs.length == 33)
+        new SecP256K1PublicKey(bs)
+      },
+      _.bytes
+    ) {
   override def length: Int = 33
 }
 
 class SecP256K1Signature(val bytes: ByteString) extends Signature
 
 object SecP256K1Signature
-    extends RandomBytes.Companion[SecP256K1Signature](bs => {
-      assume(bs.length == 64)
-      new SecP256K1Signature(bs)
-    }, _.bytes) {
+    extends RandomBytes.Companion[SecP256K1Signature](
+      bs => {
+        assume(bs.length == 64)
+        new SecP256K1Signature(bs)
+      },
+      _.bytes
+    ) {
   override def length: Int = 64
 
   protected[crypto] def from(r: BigInteger, s: BigInteger): SecP256K1Signature = {
@@ -130,9 +139,11 @@ object SecP256K1
     if (isCanonical(s)) s else params.getN.subtract(s)
   }
 
-  override def verify(message: Array[Byte],
-                      signature: Array[Byte],
-                      publicKey: Array[Byte]): Boolean = {
+  override def verify(
+      message: Array[Byte],
+      signature: Array[Byte],
+      publicKey: Array[Byte]
+  ): Boolean = {
     val (r, s) = SecP256K1Signature.decode(signature)
     isCanonical(s) && {
       val signer         = new ECDSASigner

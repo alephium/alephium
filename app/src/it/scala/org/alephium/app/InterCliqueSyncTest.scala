@@ -47,9 +47,10 @@ object Injected {
 
   def noModification[T](ref: ActorRef): Injected[T] = apply[T](identity, ref)
 
-  def payload[T](injection: PartialFunction[Payload, Payload], ref: ActorRef)(
-      implicit groupConfig: GroupConfig,
-      networkConfig: NetworkConfig): Injected[T] = {
+  def payload[T](
+      injection: PartialFunction[Payload, Payload],
+      ref: ActorRef
+  )(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
     val injectionData: ByteString => ByteString = data => {
       val payload = Message.deserialize(data, networkConfig.networkType).toOption.get.payload
       if (injection.isDefinedAt(payload)) {
@@ -71,12 +72,14 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
-    "clique-1-node-clique-2-node") {
+    "clique-1-node-clique-2-node"
+  ) {
     test(1, 2)
   }
 
   it should "boot and sync two cliques of 2 and 1 nodes" in new Fixture(
-    "clique-2-node-clique-1-node") {
+    "clique-2-node-clique-1-node"
+  ) {
     test(2, 1)
   }
 
@@ -87,9 +90,11 @@ class InterCliqueSyncTest extends AlephiumSpec {
   class Fixture(name: String) extends TestFixture(name) {
 
     // scalastyle:off method.length
-    def test(nbOfNodesClique1: Int,
-             nbOfNodesClique2: Int,
-             connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply) = {
+    def test(
+        nbOfNodesClique1: Int,
+        nbOfNodesClique2: Int,
+        connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+    ) = {
       val fromTs            = TimeStamp.now()
       val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
       val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
@@ -112,9 +117,11 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
 
       val clique2 =
-        bootClique(nbOfNodes       = nbOfNodesClique2,
-                   bootstrap       = Some(new InetSocketAddress("localhost", masterPortClique1)),
-                   connectionBuild = connectionBuild)
+        bootClique(
+          nbOfNodes = nbOfNodesClique2,
+          bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)),
+          connectionBuild = connectionBuild
+        )
       val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
       Future.sequence(clique2.map(_.start())).futureValue
@@ -126,21 +133,30 @@ class InterCliqueSyncTest extends AlephiumSpec {
           val interCliquePeers =
             request[Seq[InterCliquePeerInfo]](
               getInterCliquePeerInfo,
-              restPort(server.config.network.bindAddress.getPort)).head
+              restPort(server.config.network.bindAddress.getPort)
+            ).head
           interCliquePeers.cliqueId is selfClique1.cliqueId
           interCliquePeers.isSynced is true
 
           val discoveredNeighbors =
-            request[Seq[BrokerInfo]](getDiscoveredNeighbors,
-                                     restPort(server.config.network.bindAddress.getPort))
+            request[Seq[BrokerInfo]](
+              getDiscoveredNeighbors,
+              restPort(server.config.network.bindAddress.getPort)
+            )
           discoveredNeighbors.length is (nbOfNodesClique1 + nbOfNodesClique2)
         }
       }
 
       val toTs = TimeStamp.now()
       eventually {
-        request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique1)).blocks.toSet is
-          request[FetchResponse](blockflowFetch(fromTs, toTs), restPort(masterPortClique2)).blocks.toSet
+        request[FetchResponse](
+          blockflowFetch(fromTs, toTs),
+          restPort(masterPortClique1)
+        ).blocks.toSet is
+          request[FetchResponse](
+            blockflowFetch(fromTs, toTs),
+            restPort(masterPortClique2)
+          ).blocks.toSet
       }
 
       clique1.foreach(_.stop().futureValue is ())
@@ -163,14 +179,18 @@ class InterCliqueSyncTest extends AlephiumSpec {
       bootClique(
         1,
         bootstrap = Some(
-          new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)),
-        connectionBuild = Injected.apply(modifier, _)).head
+          new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)
+        ),
+        connectionBuild = Injected.apply(modifier, _)
+      ).head
     server1.start().futureValue is ()
 
     eventually {
       val misbehaviors1 =
-        request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                          restPort(server0.config.network.bindAddress.getPort))
+        request[AVector[PeerMisbehavior]](
+          getMisbehaviors,
+          restPort(server0.config.network.bindAddress.getPort)
+        )
       misbehaviors1.map(_.status).exists {
         case PeerStatus.Banned(_) => true
         case _                    => false
@@ -182,8 +202,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
-    val injection: PartialFunction[Payload, Payload] = {
-      case Pong(x) => Pong(x + 1)
+    val injection: PartialFunction[Payload, Payload] = { case Pong(x) =>
+      Pong(x + 1)
     }
 
     val server0 = bootClique(1).head
@@ -193,14 +213,17 @@ class InterCliqueSyncTest extends AlephiumSpec {
       1,
       bootstrap =
         Some(new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)),
-      connectionBuild = Injected.payload(injection, _)).head
+      connectionBuild = Injected.payload(injection, _)
+    ).head
 
     server1.start().futureValue is ()
 
     eventually {
       val misbehaviors0 =
-        request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                          restPort(server0.config.network.bindAddress.getPort))
+        request[AVector[PeerMisbehavior]](
+          getMisbehaviors,
+          restPort(server0.config.network.bindAddress.getPort)
+        )
 
       misbehaviors0.map(_.status).exists {
         case PeerStatus.Banned(_) => true
@@ -224,14 +247,17 @@ class InterCliqueSyncTest extends AlephiumSpec {
       1,
       bootstrap =
         Some(new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)),
-      connectionBuild = Injected(injectionData, _)).head
+      connectionBuild = Injected(injectionData, _)
+    ).head
 
     server1.start().futureValue is ()
 
     eventually {
       val misbehaviors0 =
-        request[AVector[PeerMisbehavior]](getMisbehaviors,
-                                          restPort(server0.config.network.bindAddress.getPort))
+        request[AVector[PeerMisbehavior]](
+          getMisbehaviors,
+          restPort(server0.config.network.bindAddress.getPort)
+        )
       misbehaviors0.map(_.status).exists {
         case PeerStatus.Banned(_) => true
         case _                    => false

@@ -44,18 +44,22 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
 }
 
 object WorldStateRockDBStorage {
-  def apply(trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-            storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions): WorldStateRockDBStorage = {
+  def apply(
+      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      storage: RocksDBSource,
+      cf: ColumnFamily,
+      writeOptions: WriteOptions
+  ): WorldStateRockDBStorage = {
     new WorldStateRockDBStorage(trieStorage, storage, cf, writeOptions, Settings.readOptions)
   }
 
-  def apply(trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-            storage: RocksDBSource,
-            cf: ColumnFamily,
-            writeOptions: WriteOptions,
-            readOptions: ReadOptions): WorldStateRockDBStorage = {
+  def apply(
+      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      storage: RocksDBSource,
+      cf: ColumnFamily,
+      writeOptions: WriteOptions,
+      readOptions: ReadOptions
+  ): WorldStateRockDBStorage = {
     new WorldStateRockDBStorage(trieStorage, storage, cf, writeOptions, readOptions)
   }
 }
@@ -66,8 +70,10 @@ class WorldStateRockDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[BlockHash, WorldState.Hashes](storage,
-                                                                 cf,
-                                                                 writeOptions,
-                                                                 readOptions)
+) extends RocksDBKeyValueStorage[BlockHash, WorldState.Hashes](
+      storage,
+      cf,
+      writeOptions,
+      readOptions
+    )
     with WorldStateStorage

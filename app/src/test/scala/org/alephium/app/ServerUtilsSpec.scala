@@ -40,11 +40,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toAddress                          = Address.p2pkh(networkType, toPublicKey)
 
       val buildTransaction = serverUtils
-        .buildTransaction(blockFlow,
-                          BuildTransaction(fromPublicKey,
-                                           Address.p2pkh(networkType, toPublicKey),
-                                           None,
-                                           ALF.alf(1)))
+        .buildTransaction(
+          blockFlow,
+          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.alf(1))
+        )
         .rightValue
 
       val signature = SignatureSchema.sign(buildTransaction.txId.bytes, fromPrivateKey)
@@ -98,11 +97,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toAddress                          = Address.p2pkh(networkType, toPublicKey)
 
       val buildTransaction = serverUtils
-        .buildTransaction(blockFlow,
-                          BuildTransaction(fromPublicKey,
-                                           Address.p2pkh(networkType, toPublicKey),
-                                           None,
-                                           ALF.alf(1)))
+        .buildTransaction(
+          blockFlow,
+          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.alf(1))
+        )
         .rightValue
 
       val signature = SignatureSchema.sign(buildTransaction.txId.bytes, fromPrivateKey)

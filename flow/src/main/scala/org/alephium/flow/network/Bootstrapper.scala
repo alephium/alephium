@@ -29,9 +29,11 @@ object Bootstrapper {
   def props(
       tcpController: ActorRefT[TcpController.Command],
       cliqueManager: ActorRefT[CliqueManager.Command]
-  )(implicit brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting,
-    discoveryConfig: DiscoveryConfig): Props = {
+  )(implicit
+      brokerConfig: BrokerConfig,
+      networkSetting: NetworkSetting,
+      discoveryConfig: DiscoveryConfig
+  ): Props = {
     if (brokerConfig.brokerNum == 1) {
       assume(brokerConfig.groupNumPerBroker == brokerConfig.groups)
       val cliqueId  = CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes)
@@ -55,8 +57,8 @@ object Bootstrapper {
 class CliqueCoordinatorBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
     val cliqueManager: ActorRefT[CliqueManager.Command]
-)(
-    implicit brokerConfig: BrokerConfig,
+)(implicit
+    brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     discoveryConfig: DiscoveryConfig
 ) extends BootstrapperHandler {
@@ -87,10 +89,11 @@ class BrokerBootstrapper(
   override def receive: Receive = awaitInfoWithForward
 }
 
-class SingleNodeCliqueBootstrapper(val tcpController: ActorRefT[TcpController.Command],
-                                   val cliqueManager: ActorRefT[CliqueManager.Command],
-                                   intraCliqueInfo: IntraCliqueInfo)
-    extends BootstrapperHandler {
+class SingleNodeCliqueBootstrapper(
+    val tcpController: ActorRefT[TcpController.Command],
+    val cliqueManager: ActorRefT[CliqueManager.Command],
+    intraCliqueInfo: IntraCliqueInfo
+) extends BootstrapperHandler {
   log.debug("Start as single node clique bootstrapper")
   self ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)
 
@@ -118,13 +121,12 @@ trait BootstrapperHandler extends BaseActor with Stash {
     case _ => stash()
   }
 
-  def ready(cliqueInfo: IntraCliqueInfo): Receive = {
-    case Bootstrapper.GetIntraCliqueInfo => sender() ! cliqueInfo
+  def ready(cliqueInfo: IntraCliqueInfo): Receive = { case Bootstrapper.GetIntraCliqueInfo =>
+    sender() ! cliqueInfo
   }
 
-  def forwardConnection: Receive = {
-    case c: Tcp.Connected =>
-      log.debug(s"Forward connection to clique manager")
-      cliqueManager.ref.forward(c) // cliqueManager receives connection from TcpServer too
+  def forwardConnection: Receive = { case c: Tcp.Connected =>
+    log.debug(s"Forward connection to clique manager")
+    cliqueManager.ref.forward(c) // cliqueManager receives connection from TcpServer too
   }
 }

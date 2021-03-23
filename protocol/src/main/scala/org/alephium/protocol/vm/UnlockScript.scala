@@ -26,7 +26,7 @@ sealed trait UnlockScript
 
 object UnlockScript {
   val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH(_, _), t => (t.script, t.params))
-  val p2sSerde: Serde[P2S]   = Serde.forProduct1(P2S(_), t     => t.params)
+  val p2sSerde: Serde[P2S]   = Serde.forProduct1(P2S(_), t => t.params)
   implicit val serde: Serde[UnlockScript] = new Serde[UnlockScript] {
     override def serialize(input: UnlockScript): ByteString = {
       input match {

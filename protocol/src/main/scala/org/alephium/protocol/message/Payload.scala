@@ -29,9 +29,12 @@ sealed trait Payload
 
 object Payload {
   @SuppressWarnings(
-    Array("org.wartremover.warts.Product",
-          "org.wartremover.warts.Serializable",
-          "org.wartremover.warts.JavaSerializable"))
+    Array(
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable",
+      "org.wartremover.warts.JavaSerializable"
+    )
+  )
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
       case x: Hello        => (Hello, Hello.serialize(x))
@@ -51,33 +54,32 @@ object Payload {
   val deserializerCode: Deserializer[Code] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
-  def _deserialize(input: ByteString)(
-      implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
-    deserializerCode._deserialize(input).flatMap {
-      case Staging(code, rest) =>
-        code match {
-          case Hello        => Hello._deserialize(rest)
-          case Ping         => Ping._deserialize(rest)
-          case Pong         => Pong._deserialize(rest)
-          case SendBlocks   => SendBlocks._deserialize(rest)
-          case GetBlocks    => GetBlocks._deserialize(rest)
-          case SendHeaders  => SendHeaders._deserialize(rest)
-          case GetHeaders   => GetHeaders._deserialize(rest)
-          case SendTxs      => SendTxs._deserialize(rest)
-          case SyncRequest  => SyncRequest._deserialize(rest)
-          case SyncResponse => SyncResponse._deserialize(rest)
-        }
+  def _deserialize(
+      input: ByteString
+  )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
+    deserializerCode._deserialize(input).flatMap { case Staging(code, rest) =>
+      code match {
+        case Hello        => Hello._deserialize(rest)
+        case Ping         => Ping._deserialize(rest)
+        case Pong         => Pong._deserialize(rest)
+        case SendBlocks   => SendBlocks._deserialize(rest)
+        case GetBlocks    => GetBlocks._deserialize(rest)
+        case SendHeaders  => SendHeaders._deserialize(rest)
+        case GetHeaders   => GetHeaders._deserialize(rest)
+        case SendTxs      => SendTxs._deserialize(rest)
+        case SyncRequest  => SyncRequest._deserialize(rest)
+        case SyncResponse => SyncResponse._deserialize(rest)
+      }
     }
   }
 
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Payload] =
-    _deserialize(input).flatMap {
-      case Staging(output, rest) =>
-        if (rest.isEmpty) {
-          Right(output)
-        } else {
-          Left(SerdeError.redundant(input.size - rest.size, input.size))
-        }
+    _deserialize(input).flatMap { case Staging(output, rest) =>
+      if (rest.isEmpty) {
+        Right(output)
+      } else {
+        Left(SerdeError.redundant(input.size - rest.size, input.size))
+      }
     }
 
   sealed trait Code
@@ -96,14 +98,14 @@ object Payload {
   }
 
   sealed trait ValidatedSerding[T <: Payload] extends Serding[T] {
-    override def _deserialize(input: ByteString)(
-        implicit config: GroupConfig): SerdeResult[Staging[T]] = {
-      serde._deserialize(input).flatMap {
-        case Staging(message, rest) =>
-          validate(message) match {
-            case Right(_)    => Right(Staging(message, rest))
-            case Left(error) => Left(SerdeError.validation(error))
-          }
+    override def _deserialize(
+        input: ByteString
+    )(implicit config: GroupConfig): SerdeResult[Staging[T]] = {
+      serde._deserialize(input).flatMap { case Staging(message, rest) =>
+        validate(message) match {
+          case Right(_)    => Right(Staging(message, rest))
+          case Left(error) => Left(SerdeError.validation(error))
+        }
       }
     }
 
@@ -112,16 +114,18 @@ object Payload {
 
   object Code {
     private[message] val values: AVector[Code] =
-      AVector(Hello,
-              Ping,
-              Pong,
-              SendBlocks,
-              GetBlocks,
-              SendHeaders,
-              GetHeaders,
-              SendTxs,
-              SyncRequest,
-              SyncResponse)
+      AVector(
+        Hello,
+        Ping,
+        Pong,
+        SendBlocks,
+        GetBlocks,
+        SendHeaders,
+        GetHeaders,
+        SendTxs,
+        SyncRequest,
+        SyncResponse
+      )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
     def fromInt(code: Int): Option[Code] =
@@ -141,7 +145,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
   def unsafe(brokerInfo: InterBrokerInfo): T =
     unsafe(Protocol.version, System.currentTimeMillis(), brokerInfo)
 
-  private implicit val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
+  implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
   val serde: Serde[T] =
     Serde.forProduct3(unsafe, t => (t.version, t.timestamp, t.brokerInfo))
 

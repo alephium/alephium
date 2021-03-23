@@ -29,8 +29,8 @@ import org.alephium.util.{ActorRefT, AVector, Random, TimeStamp}
 
 class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   trait Fixture extends MinerState {
-    override implicit def brokerConfig: BrokerConfig  = config.broker
-    override implicit def miningConfig: MiningSetting = config.mining
+    implicit override def brokerConfig: BrokerConfig  = config.broker
+    implicit override def miningConfig: MiningSetting = config.mining
 
     val handlers: AllHandlers = TestUtils.createBlockHandlersProbe._1
     val probes                = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
@@ -41,10 +41,12 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
       BlockTemplate(flowTemplate.deps, flowTemplate.target, TimeStamp.now(), AVector.empty)
     }
 
-    override def startTask(fromShift: Int,
-                           to: Int,
-                           template: BlockTemplate,
-                           blockHandler: ActorRefT[BlockChainHandler.Command]): Unit = {
+    override def startTask(
+        fromShift: Int,
+        to: Int,
+        template: BlockTemplate,
+        blockHandler: ActorRefT[BlockChainHandler.Command]
+    ): Unit = {
       probes(fromShift)(to).ref ! template
     }
   }
@@ -70,8 +72,10 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   }
 
   it should "handle mining counts correctly" in new Fixture {
-    forAll(Gen.choose(0, brokerConfig.groupNumPerBroker - 1),
-           Gen.choose(0, brokerConfig.groups - 1)) { (fromShift, to) =>
+    forAll(
+      Gen.choose(0, brokerConfig.groupNumPerBroker - 1),
+      Gen.choose(0, brokerConfig.groups - 1)
+    ) { (fromShift, to) =>
       val oldCount   = getMiningCount(fromShift, to)
       val countDelta = Random.source.nextInt(Integer.MAX_VALUE)
       increaseCounts(fromShift, to, countDelta)

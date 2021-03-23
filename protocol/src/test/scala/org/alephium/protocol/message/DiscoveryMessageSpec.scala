@@ -65,7 +65,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
   }
 
   it should "support serde for all message types" in new DiscoveryConfigFixture
-  with DiscoveryMessageGenerators {
+    with DiscoveryMessageGenerators {
     def groups: Int            = 4
     def brokerNum: Int         = 4
     def groupNumPerBroker: Int = 1

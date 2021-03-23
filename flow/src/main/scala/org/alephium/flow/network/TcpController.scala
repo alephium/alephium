@@ -29,9 +29,10 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
-  def props(bindAddress: InetSocketAddress,
-            misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command])(
-      implicit networkSetting: NetworkSetting): Props =
+  def props(
+      bindAddress: InetSocketAddress,
+      misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command]
+  )(implicit networkSetting: NetworkSetting): Props =
     Props(new TcpController(bindAddress, misbehaviorManager))
 
   sealed trait Command
@@ -49,9 +50,10 @@ object TcpController {
   case object Bound extends Event
 }
 
-class TcpController(bindAddress: InetSocketAddress,
-                    misbehaviorManager: ActorRefT[MisbehaviorManager.Command])(
-    implicit networkSetting: NetworkSetting)
+class TcpController(
+    bindAddress: InetSocketAddress,
+    misbehaviorManager: ActorRefT[MisbehaviorManager.Command]
+)(implicit networkSetting: NetworkSetting)
     extends BaseActor
     with Stash
     with EventStream {
@@ -72,10 +74,12 @@ class TcpController(bindAddress: InetSocketAddress,
 
   def awaitStart: Receive = {
     case TcpController.Start(bootstrapper) =>
-      tcpManager ! Tcp.Bind(self,
-                            bindAddress,
-                            pullMode = true,
-                            options  = Seq(Tcp.SO.ReuseAddress(true)))
+      tcpManager ! Tcp.Bind(
+        self,
+        bindAddress,
+        pullMode = true,
+        options = Seq(Tcp.SO.ReuseAddress(true))
+      )
       context.become(binding(bootstrapper))
 
     case _ => stash()
@@ -133,9 +137,11 @@ class TcpController(bindAddress: InetSocketAddress,
       handleBannedPeer(bannedAddress)
   }
 
-  def confirmConnection(target: ActorRef,
-                        connected: Tcp.Connected,
-                        connection: ActorRefT[Tcp.Command]): Unit = {
+  def confirmConnection(
+      target: ActorRef,
+      connected: Tcp.Connected,
+      connection: ActorRefT[Tcp.Command]
+  ): Unit = {
     pendingOutboundConnections -= connected.remoteAddress
     confirmedConnections += connected.remoteAddress -> connection
     context watch connection.ref
@@ -147,14 +153,13 @@ class TcpController(bindAddress: InetSocketAddress,
   }
 
   def handleBannedPeer(bannedAddress: InetAddress): Unit = {
-    confirmedConnections.filterInPlace {
-      case (socketAddress, connection) =>
-        val shouldKeep = socketAddress.getAddress != bannedAddress
-        if (!shouldKeep) {
-          connection ! Tcp.Abort
-          log.debug(s"Closing connection with $bannedAddress")
-        }
-        shouldKeep
+    confirmedConnections.filterInPlace { case (socketAddress, connection) =>
+      val shouldKeep = socketAddress.getAddress != bannedAddress
+      if (!shouldKeep) {
+        connection ! Tcp.Abort
+        log.debug(s"Closing connection with $bannedAddress")
+      }
+      shouldKeep
     }
   }
 }

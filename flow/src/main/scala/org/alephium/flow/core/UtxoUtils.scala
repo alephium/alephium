@@ -42,23 +42,25 @@ object UtxoUtils {
   type Asset = (AssetOutputRef, AssetOutput)
   final case class Selected(assets: AVector[Asset], gasFee: U256)
 
-  private final case class State(smallers: AVector[Asset],
-                                 smallestGreater: Option[Asset],
-                                 matching: Option[Asset])
+  final private case class State(
+      smallers: AVector[Asset],
+      smallestGreater: Option[Asset],
+      matching: Option[Asset]
+  )
 
   private def sumAssets(assets: AVector[Asset]): U256 = {
-    assets.fold(U256.Zero) { (total, asset) =>
-      total.addUnsafe(asset._2.amount)
-    }
+    assets.fold(U256.Zero) { (total, asset) => total.addUnsafe(asset._2.amount) }
   }
 
   // to select a list of utxos of value (amount + gas fees for inputs and outputs)
-  def select(utxos: AVector[Asset],
-             amount: U256,
-             totalGasFee: U256,
-             gasFeePerInput: U256,
-             gasFeePerOutput: U256,
-             numOutputs: Int): Either[String, Selected] = {
+  def select(
+      utxos: AVector[Asset],
+      amount: U256,
+      totalGasFee: U256,
+      gasFeePerInput: U256,
+      gasFeePerOutput: U256,
+      numOutputs: Int
+  ): Either[String, Selected] = {
     require(numOutputs >= 0)
     for {
       outputGasFee <- gasFeePerOutput
@@ -69,11 +71,13 @@ object UtxoUtils {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def select(utxos: AVector[Asset],
-             amount: U256,
-             totalGasFee: U256,
-             gasFeePerInput: U256,
-             outputGasFee: U256): Either[String, Selected] = {
+  def select(
+      utxos: AVector[Asset],
+      amount: U256,
+      totalGasFee: U256,
+      gasFeePerInput: U256,
+      outputGasFee: U256
+  ): Either[String, Selected] = {
     for {
       totalAmount     <- (amount add totalGasFee).toRight(s"Amount overflow ($amount + $totalGasFee")
       candidateAssets <- select(utxos, totalAmount)
@@ -81,12 +85,15 @@ object UtxoUtils {
         inputFees <- gasFeePerInput mul U256.unsafe(candidateAssets.length)
         allGasFee <- inputFees add outputGasFee
       } yield allGasFee)
-        .toRight(s"Gas fee overflow ($gasFeePerInput * ${candidateAssets.length} + $outputGasFee)")
-      assets <- if (totalGasFee >= usedGasFee) {
-        Right(Selected(candidateAssets, totalGasFee))
-      } else {
-        select(utxos, amount, usedGasFee, gasFeePerInput, outputGasFee)
-      }
+        .toRight(
+          s"Gas fee overflow ($gasFeePerInput * ${candidateAssets.length} + $outputGasFee)"
+        )
+      assets <-
+        if (totalGasFee >= usedGasFee) {
+          Right(Selected(candidateAssets, totalGasFee))
+        } else {
+          select(utxos, amount, usedGasFee, gasFeePerInput, outputGasFee)
+        }
     } yield assets
   }
 
@@ -134,9 +141,11 @@ object UtxoUtils {
     iter(State(AVector.empty, None, None), initialAssets)
   }
 
-  private def reduceSmallerValue(assets: AVector[Asset],
-                                 currentValue: U256,
-                                 target: U256): AVector[Asset] = {
+  private def reduceSmallerValue(
+      assets: AVector[Asset],
+      currentValue: U256,
+      target: U256
+  ): AVector[Asset] = {
     @tailrec
     def iter(sorted: AVector[Asset], value: U256): AVector[Asset] = {
       sorted.headOption.flatMap(asset => value.sub(asset._2.amount)) match {

@@ -38,16 +38,17 @@ trait RandomBytes {
 
     assume(size >= 4)
 
-    (bytes(size - 4) & 0xFF) << 24 |
-      (bytes(size - 3) & 0xFF) << 16 |
-      (bytes(size - 2) & 0xFF) << 8 |
-      (bytes(size - 1) & 0xFF)
+    (bytes(size - 4) & 0xff) << 24 |
+      (bytes(size - 3) & 0xff) << 16 |
+      (bytes(size - 2) & 0xff) << 8 |
+      (bytes(size - 1) & 0xff)
   }
 
-  override def equals(obj: Any): Boolean = obj match {
-    case that: RandomBytes => bytes == that.bytes
-    case _                 => false
-  }
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case that: RandomBytes => bytes == that.bytes
+      case _                 => false
+    }
 
   override def toString: String = {
     val hex  = Hex.toHexString(bytes)
@@ -60,16 +61,17 @@ trait RandomBytes {
   def shortHex: String = toHexString.takeRight(8)
 
   // Only use this when length % 4 == 0
-  def toRandomIntUnsafe: Int = bytes.sliding(4, 4).foldLeft(0) {
-    case (acc, subBytes) => acc + Bytes.toIntUnsafe(subBytes)
-  }
+  def toRandomIntUnsafe: Int =
+    bytes.sliding(4, 4).foldLeft(0) { case (acc, subBytes) =>
+      acc + Bytes.toIntUnsafe(subBytes)
+    }
 }
 
 object RandomBytes {
   abstract class Companion[T](val unsafe: ByteString => T, val toBytes: T => ByteString) {
     lazy val zero: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0)))
 
-    lazy val allOne: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0xFF.toByte)))
+    lazy val allOne: T = unsafe(ByteString.fromArrayUnsafe(Array.fill[Byte](length)(0xff.toByte)))
 
     def length: Int
 

@@ -64,15 +64,14 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     expectMsg(TcpController.ConnectionDenied(connected, connection.ref))
 
     misbehaviorManager ! GetPeers
-    expectMsgPF() {
-      case Peers(peers) =>
-        peers.map {
-          case Peer(peerToTest, Banned(until)) =>
-            peerToTest is peer.getAddress
-            TimeStamp.now().isBefore(until) is true
-          case peer => throw new AssertionError(s"Wrong peer: $peer")
+    expectMsgPF() { case Peers(peers) =>
+      peers.map {
+        case Peer(peerToTest, Banned(until)) =>
+          peerToTest is peer.getAddress
+          TimeStamp.now().isBefore(until) is true
+        case peer => throw new AssertionError(s"Wrong peer: $peer")
 
-        }
+      }
     }
   }
 

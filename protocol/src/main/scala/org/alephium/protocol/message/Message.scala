@@ -53,30 +53,30 @@ object Message {
     serialize(apply(payload), networkType)
   }
 
-  def _deserialize(input: ByteString, networkType: NetworkType)(
-      implicit config: GroupConfig): SerdeResult[Staging[Message]] = {
-    MessageSerde.unwrap(input, networkType).flatMap {
-      case (checksum, length, rest) =>
-        for {
-          headerRest   <- serde._deserialize[Header](rest)
-          payloadBytes <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
-          _            <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
-          payload      <- deserializeExactPayload(payloadBytes.value)
-        } yield {
-          Staging(Message(headerRest.value, payload), payloadBytes.rest)
-        }
+  def _deserialize(input: ByteString, networkType: NetworkType)(implicit
+      config: GroupConfig
+  ): SerdeResult[Staging[Message]] = {
+    MessageSerde.unwrap(input, networkType).flatMap { case (checksum, length, rest) =>
+      for {
+        headerRest   <- serde._deserialize[Header](rest)
+        payloadBytes <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
+        _            <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
+        payload      <- deserializeExactPayload(payloadBytes.value)
+      } yield {
+        Staging(Message(headerRest.value, payload), payloadBytes.rest)
+      }
     }
   }
 
-  def deserialize(input: ByteString, networkType: NetworkType)(
-      implicit config: GroupConfig): SerdeResult[Message] = {
-    _deserialize(input, networkType).flatMap {
-      case Staging(message, rest) =>
-        if (rest.isEmpty) {
-          Right(message)
-        } else {
-          Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
-        }
+  def deserialize(input: ByteString, networkType: NetworkType)(implicit
+      config: GroupConfig
+  ): SerdeResult[Message] = {
+    _deserialize(input, networkType).flatMap { case Staging(message, rest) =>
+      if (rest.isEmpty) {
+        Right(message)
+      } else {
+        Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
+      }
     }
   }
 

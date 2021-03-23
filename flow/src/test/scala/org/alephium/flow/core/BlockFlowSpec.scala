@@ -74,10 +74,9 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "set proper initial bestDeps" in new FlowFixture {
-    val validation = blockFlow.bestDeps.zipWithIndex.forall {
-      case (bestDep, fromShift) =>
-        val mainGroup = GroupIndex.unsafe(brokerConfig.groupFrom + fromShift)
-        blockFlow.checkFlowDepsUnsafe(bestDep, mainGroup)
+    val validation = blockFlow.bestDeps.zipWithIndex.forall { case (bestDep, fromShift) =>
+      val mainGroup = GroupIndex.unsafe(brokerConfig.groupFrom + fromShift)
+      blockFlow.checkFlowDepsUnsafe(bestDep, mainGroup)
     }
     validation is true
   }
@@ -126,9 +125,7 @@ class BlockFlowSpec extends AlephiumSpec {
         i <- 0 to 1
         j <- 0 to 1
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
-      newBlocks2.foreach { block =>
-        addAndCheck(blockFlow, block, 4)
-      }
+      newBlocks2.foreach { block => addAndCheck(blockFlow, block, 4) }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
       newBlocks2.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
@@ -137,9 +134,7 @@ class BlockFlowSpec extends AlephiumSpec {
         i <- 0 to 1
         j <- 0 to 1
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
-      newBlocks3.foreach { block =>
-        addAndCheck(blockFlow, block, 8)
-      }
+      newBlocks3.foreach { block => addAndCheck(blockFlow, block, 8) }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
       newBlocks3.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
@@ -236,9 +231,7 @@ class BlockFlowSpec extends AlephiumSpec {
       i <- 0 to 1
       j <- 0 to 1
     } yield transferOnlyForIntraGroup(blockFlow0, ChainIndex.unsafe(i, j))
-    newBlocks1.foreach { block =>
-      addAndCheck(blockFlow0, block, 1)
-    }
+    newBlocks1.foreach { block => addAndCheck(blockFlow0, block, 1) }
     newBlocks1.map(_.hash).diff(blockFlow0.getAllTips.toArray).isEmpty is true
 
     val blockFlow1 = storageBlockFlow()
@@ -248,9 +241,7 @@ class BlockFlowSpec extends AlephiumSpec {
       i <- 0 to 1
       j <- 0 to 1
     } yield transferOnlyForIntraGroup(blockFlow1, ChainIndex.unsafe(i, j))
-    newBlocks2.foreach { block =>
-      addAndCheck(blockFlow1, block, 4)
-    }
+    newBlocks2.foreach { block => addAndCheck(blockFlow1, block, 4) }
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
@@ -274,12 +265,14 @@ class BlockFlowSpec extends AlephiumSpec {
       val locators0: AVector[AVector[BlockHash]] =
         AVector.tabulate(groupConfig.groups) { group =>
           if (group equals testToGroup) {
-            AVector(config.genesisBlocks(testFromGroup)(testToGroup).hash,
-                    hashes0(0),
-                    hashes0(1),
-                    hashes0(3),
-                    hashes0(4),
-                    hashes0(5))
+            AVector(
+              config.genesisBlocks(testFromGroup)(testToGroup).hash,
+              hashes0(0),
+              hashes0(1),
+              hashes0(3),
+              hashes0(4),
+              hashes0(5)
+            )
           } else {
             AVector(config.genesisBlocks(testFromGroup)(group).hash)
           }
@@ -335,8 +328,10 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "sanity check rewards" in new FlowFixture {
     val block = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(0, 0))
     block.nonCoinbase.nonEmpty is true
-    val minimalReward = Seq(consensusConfig.emission.lowHashRateInitialRewardPerChain,
-                            consensusConfig.emission.stableMaxRewardPerChain).min
+    val minimalReward = Seq(
+      consensusConfig.emission.lowHashRateInitialRewardPerChain,
+      consensusConfig.emission.stableMaxRewardPerChain
+    ).min
     (block.coinbase.alfAmountInOutputs.get > minimalReward) is true
   }
 
@@ -355,7 +350,8 @@ class BlockFlowSpec extends AlephiumSpec {
 
   it should "transfer token for inter-group transactions" in new FlowFixture { Test =>
     val anotherBroker = (brokerConfig.brokerId + 1 + Random.source.nextInt(
-      brokerConfig.brokerNum - 1)) % brokerConfig.brokerNum
+      brokerConfig.brokerNum - 1
+    )) % brokerConfig.brokerNum
     val newConfigFixture = new AlephiumConfigFixture {
       override val configValues = Map(
         ("alephium.broker.broker-id", anotherBroker)
@@ -371,7 +367,8 @@ class BlockFlowSpec extends AlephiumSpec {
     val blockFlow1 = BlockFlow.fromGenesisUnsafe(anotherConfig, anotherStorages)
 
     val fromGroup = Random.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
-    val toGroup   = Random.source.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
+    val toGroup =
+      Random.source.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
 
     val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
     block.nonCoinbase.nonEmpty is true
@@ -451,17 +448,14 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "return correct confirmations for genesis txs" in new FlowFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    blockFlow.genesisBlocks.foreachWithIndex {
-      case (blocks, from) =>
-        blocks.foreachWithIndex {
-          case (block, to) =>
-            block.transactions.foreachWithIndex {
-              case (tx, index) =>
-                from is to
-                blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
-                  Some(TxStatus(TxIndex(block.hash, index), 1, 1, 1))
-            }
+    blockFlow.genesisBlocks.foreachWithIndex { case (blocks, from) =>
+      blocks.foreachWithIndex { case (block, to) =>
+        block.transactions.foreachWithIndex { case (tx, index) =>
+          from is to
+          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+            Some(TxStatus(TxIndex(block.hash, index), 1, 1, 1))
         }
+      }
     }
 
     val newBlocks = for {
@@ -478,39 +472,36 @@ class BlockFlowSpec extends AlephiumSpec {
     def count(bool: Boolean): Int = if (bool) 1 else 0
 
     newBlocks0.foreach(addAndCheck(blockFlow, _))
-    blockFlow.genesisBlocks.foreachWithIndex {
-      case (blocks, from) =>
-        blocks.foreachWithIndex {
-          case (block, to) =>
-            block.transactions.foreachWithIndex {
-              case (tx, index) =>
-                val chainConfirmations = 1 +
-                  count(newIndexes0.contains(ChainIndex.unsafe(from, to)))
-                val fromConfirmations = 1 +
-                  count(newIndexes0.contains(ChainIndex.unsafe(from, from)))
-                val toConfirmations = 1 +
-                  count(newIndexes0.contains(ChainIndex.unsafe(to, to)))
-                blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
-                  Some(
-                    TxStatus(TxIndex(block.hash, index),
-                             chainConfirmations,
-                             fromConfirmations,
-                             toConfirmations))
-            }
+    blockFlow.genesisBlocks.foreachWithIndex { case (blocks, from) =>
+      blocks.foreachWithIndex { case (block, to) =>
+        block.transactions.foreachWithIndex { case (tx, index) =>
+          val chainConfirmations = 1 +
+            count(newIndexes0.contains(ChainIndex.unsafe(from, to)))
+          val fromConfirmations = 1 +
+            count(newIndexes0.contains(ChainIndex.unsafe(from, from)))
+          val toConfirmations = 1 +
+            count(newIndexes0.contains(ChainIndex.unsafe(to, to)))
+          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+            Some(
+              TxStatus(
+                TxIndex(block.hash, index),
+                chainConfirmations,
+                fromConfirmations,
+                toConfirmations
+              )
+            )
         }
+      }
     }
 
     newBlocks1.foreach(addAndCheck(blockFlow, _))
-    blockFlow.genesisBlocks.foreachWithIndex {
-      case (blocks, from) =>
-        blocks.foreachWithIndex {
-          case (block, to) =>
-            block.transactions.foreachWithIndex {
-              case (tx, index) =>
-                blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
-                  Some(TxStatus(TxIndex(block.hash, index), 2, 2, 2))
-            }
+    blockFlow.genesisBlocks.foreachWithIndex { case (blocks, from) =>
+      blocks.foreachWithIndex { case (block, to) =>
+        block.transactions.foreachWithIndex { case (tx, index) =>
+          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+            Some(TxStatus(TxIndex(block.hash, index), 2, 2, 2))
         }
+      }
     }
   }
 
@@ -564,9 +555,11 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
   }
 
-  def checkInBestDeps(groupIndex: GroupIndex,
-                      blockFlow: BlockFlow,
-                      blocks: IndexedSeq[Block]): Assertion = {
+  def checkInBestDeps(
+      groupIndex: GroupIndex,
+      blockFlow: BlockFlow,
+      blocks: IndexedSeq[Block]
+  ): Assertion = {
     val bestDeps = blockFlow.getBestDeps(groupIndex).deps
     blocks.exists { block =>
       bestDeps.contains(block.hash)

@@ -33,18 +33,24 @@ class Base58Spec extends AlephiumSpec {
     test("a3gV", hex"626262")
     test("aPEr", hex"636363")
     test("2cFupjhnEsSn59qHXstmK2ffpLv2", hex"73696d706c792061206c6f6e6720737472696e67")
-    test("1NS17iag9jJgTHD1VXjvLCEnZuQ3rJDE9L",
-         hex"00eb15231dfceb60925886b67d065299925915aeb172c06647")
+    test(
+      "1NS17iag9jJgTHD1VXjvLCEnZuQ3rJDE9L",
+      hex"00eb15231dfceb60925886b67d065299925915aeb172c06647"
+    )
     test("ABnLTmg", hex"516b6fcd0f")
     test("3SEo3LWLoPntC", hex"bf4f89001e670274dd")
     test("3EFU7m", hex"572e4794")
     test("EJDM8drfXA6uyA", hex"ecac89cad93923c02321")
     test("Rt5zm", hex"10c8511e")
     test("1111111111", hex"00000000000000000000")
-    test("5Hx15HFGyep2CfPxsJKe2fXJsCVn5DEiyoeGGF6JZjGbTRnqfiD",
-         hex"801184cd2cdd640ca42cfc3a091c51d549b2f016d454b2774019c2b2d2e08529fd206ec97e")
-    test("16UjcYNBG9GTK4uq2f7yYEbuifqCzoLMGS",
-         hex"003c176e659bea0f29a3e9bf7880c112b1b31b4dc826268187")
+    test(
+      "5Hx15HFGyep2CfPxsJKe2fXJsCVn5DEiyoeGGF6JZjGbTRnqfiD",
+      hex"801184cd2cdd640ca42cfc3a091c51d549b2f016d454b2774019c2b2d2e08529fd206ec97e"
+    )
+    test(
+      "16UjcYNBG9GTK4uq2f7yYEbuifqCzoLMGS",
+      hex"003c176e659bea0f29a3e9bf7880c112b1b31b4dc826268187"
+    )
   }
 
   it should "fail" in {

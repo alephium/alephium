@@ -33,7 +33,7 @@ import org.alephium.util._
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Configs extends StrictLogging {
   private def check(port: Int): Boolean = {
-    port > 0x0400 && port <= 0xFFFF
+    port > 0x0400 && port <= 0xffff
   }
 
   def validatePort(port: Int): Either[String, Unit] = {
@@ -149,19 +149,19 @@ object Configs extends StrictLogging {
     }
   }
 
-  def loadBlockFlow(balances: AVector[(LockupScript, U256)])(
-      implicit groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig): AVector[AVector[Block]] = {
-    AVector.tabulate(groupConfig.groups, groupConfig.groups) {
-      case (from, to) =>
-        val transactions = if (from == to) {
-          val balancesOI  = balances.filter(_._1.groupIndex.value == from)
-          val transaction = Transaction.genesis(balancesOI)
-          AVector(transaction)
-        } else {
-          AVector.empty[Transaction]
-        }
-        Block.genesis(ChainIndex.from(from, to).get, transactions)
+  def loadBlockFlow(balances: AVector[(LockupScript, U256)])(implicit
+      groupConfig: GroupConfig,
+      consensusConfig: ConsensusConfig
+  ): AVector[AVector[Block]] = {
+    AVector.tabulate(groupConfig.groups, groupConfig.groups) { case (from, to) =>
+      val transactions = if (from == to) {
+        val balancesOI  = balances.filter(_._1.groupIndex.value == from)
+        val transaction = Transaction.genesis(balancesOI)
+        AVector(transaction)
+      } else {
+        AVector.empty[Transaction]
+      }
+      Block.genesis(ChainIndex.from(from, to).get, transactions)
     }
   }
 }

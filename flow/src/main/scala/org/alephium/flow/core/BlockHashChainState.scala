@@ -46,9 +46,8 @@ trait BlockHashChainState {
       pairs <- state.tips.mapE(tip => getTimestamp(tip).map(tip -> _))
     } yield {
       numHashes = state.numHashes
-      pairs.foreach {
-        case (tip, timestamp) =>
-          tips.add(tip, timestamp)
+      pairs.foreach { case (tip, timestamp) =>
+        tips.add(tip, timestamp)
       }
     }
   }

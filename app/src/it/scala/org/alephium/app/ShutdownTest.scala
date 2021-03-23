@@ -34,9 +34,11 @@ class ShutdownTest extends AlephiumSpec {
     server.system.whenTerminated.futureValue is a[Terminated]
   }
 
-  it should "shutdown the clique when one node of the clique is down" in new TestFixture("2-nodes") {
+  it should "shutdown the clique when one node of the clique is down" in new TestFixture(
+    "2-nodes"
+  ) {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId      = 1)
+    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is ())
 
     Thread.sleep(1000) // wait until children are created

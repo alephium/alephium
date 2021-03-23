@@ -39,8 +39,9 @@ package object serde {
   def deserialize[T](input: ByteString)(implicit deserializer: Deserializer[T]): SerdeResult[T] =
     deserializer.deserialize(input)
 
-  def _deserialize[T](input: ByteString)(
-      implicit deserializer: Deserializer[T]): SerdeResult[Staging[T]] =
+  def _deserialize[T](
+      input: ByteString
+  )(implicit deserializer: Deserializer[T]): SerdeResult[Staging[T]] =
     deserializer._deserialize(input)
 
   implicit val boolSerde: Serde[Boolean] = BoolSerde
@@ -67,8 +68,9 @@ package object serde {
   implicit def avectorSerializer[T](implicit serializer: Serializer[T]): Serializer[AVector[T]] =
     new AVectorSerializer[T](serializer)
 
-  implicit def avectorDeserializer[T: ClassTag](
-      implicit deserializer: Deserializer[T]): Deserializer[AVector[T]] =
+  implicit def avectorDeserializer[T: ClassTag](implicit
+      deserializer: Deserializer[T]
+  ): Deserializer[AVector[T]] =
     new AVectorDeserializer[T](deserializer)
 
   implicit val boolAVectorSerde: Serde[AVector[Boolean]] = avectorSerde[Boolean]
@@ -108,8 +110,10 @@ package object serde {
   }
 
   implicit val inetSocketAddressSerde: Serde[InetSocketAddress] =
-    tuple2[InetAddress, Int].xfmap({ case (address, port) => createSocketAddress(address, port) },
-                                   sAddress => (sAddress.getAddress, sAddress.getPort))
+    tuple2[InetAddress, Int].xfmap(
+      { case (address, port) => createSocketAddress(address, port) },
+      sAddress => (sAddress.getAddress, sAddress.getPort)
+    )
 
   def createSocketAddress(inetAddress: InetAddress, port: Int): SerdeResult[InetSocketAddress] = {
     try Right(new InetSocketAddress(inetAddress, port))

@@ -20,8 +20,10 @@ import java.net.InetSocketAddress
 
 import org.alephium.protocol.model.CliqueId
 
-final case class InterCliquePeerInfo(cliqueId: CliqueId,
-                                     brokerId: Int,
-                                     groupNumPerBroker: Int,
-                                     address: InetSocketAddress,
-                                     isSynced: Boolean)
+final case class InterCliquePeerInfo(
+    cliqueId: CliqueId,
+    brokerId: Int,
+    groupNumPerBroker: Int,
+    address: InetSocketAddress,
+    isSynced: Boolean
+)

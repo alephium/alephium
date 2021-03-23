@@ -50,7 +50,9 @@ class BroadcastTxTest extends AlephiumSpec {
     server2.stop().futureValue is ()
   }
 
-  it should "broadcast tx between inter clique node" in new TestFixture("broadcast-tx-inter-clique") {
+  it should "broadcast tx between inter clique node" in new TestFixture(
+    "broadcast-tx-inter-clique"
+  ) {
 
     val clique1           = bootClique(nbOfNodes = 1)
     val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
@@ -59,8 +61,10 @@ class BroadcastTxTest extends AlephiumSpec {
     val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
 
     val clique2 =
-      bootClique(nbOfNodes = 1,
-                 bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)))
+      bootClique(
+        nbOfNodes = 1,
+        bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1))
+      )
     val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
     clique2.map(_.start()).foreach(_.futureValue is (()))
@@ -69,13 +73,16 @@ class BroadcastTxTest extends AlephiumSpec {
         val interCliquePeers =
           request[Seq[InterCliquePeerInfo]](
             getInterCliquePeerInfo,
-            restPort(server.config.network.bindAddress.getPort)).head
+            restPort(server.config.network.bindAddress.getPort)
+          ).head
         interCliquePeers.cliqueId is selfClique1.cliqueId
         interCliquePeers.isSynced is true
 
         val discoveredNeighbors =
-          request[Seq[BrokerInfo]](getDiscoveredNeighbors,
-                                   restPort(server.config.network.bindAddress.getPort))
+          request[Seq[BrokerInfo]](
+            getDiscoveredNeighbors,
+            restPort(server.config.network.bindAddress.getPort)
+          )
         discoveredNeighbors.length is 2
       }
     }
@@ -84,9 +91,11 @@ class BroadcastTxTest extends AlephiumSpec {
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
 
     eventually(
-      request[TxStatus](getTransactionStatus(tx), restPort(masterPortClique1)) is MemPooled)
+      request[TxStatus](getTransactionStatus(tx), restPort(masterPortClique1)) is MemPooled
+    )
     eventually(
-      request[TxStatus](getTransactionStatus(tx), restPort(masterPortClique2)) is MemPooled)
+      request[TxStatus](getTransactionStatus(tx), restPort(masterPortClique2)) is MemPooled
+    )
 
     clique1.foreach(_.stop().futureValue is ())
     clique2.foreach(_.stop().futureValue is ())

@@ -31,7 +31,8 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
       val txTemplates = block.transactions.map(_.toTemplate)
       val group =
         GroupIndex.unsafe(
-          brokerConfig.groupFrom + Random.source.nextInt(brokerConfig.groupNumPerBroker))
+          brokerConfig.groupFrom + Random.source.nextInt(brokerConfig.groupNumPerBroker)
+        )
       val pool  = MemPool.empty(group)
       val index = block.chainIndex
       if (index.from.equals(group)) {

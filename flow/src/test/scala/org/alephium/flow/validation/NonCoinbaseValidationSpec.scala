@@ -53,9 +53,11 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       }
     }
 
-    def checkBlockTx(tx: Transaction,
-                     preOutputs: AVector[AssetInputInfo],
-                     headerTs: TimeStamp = TimeStamp.now()): TxValidationResult[Unit] = {
+    def checkBlockTx(
+        tx: Transaction,
+        preOutputs: AVector[AssetInputInfo],
+        headerTs: TimeStamp = TimeStamp.now()
+    ): TxValidationResult[Unit] = {
       prepareWorldState(preOutputs)
       for {
         _ <- checkStateless(tx, checkDoubleSpending = true)
@@ -65,9 +67,10 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "pass valid transactions" in new Fixture {
-    forAll(transactionGenWithPreOutputs(1, 1, chainIndexGen = chainIndexGenForBroker(brokerConfig))) {
-      case (tx, preOutputs) =>
-        passCheck(checkBlockTx(tx, preOutputs))
+    forAll(
+      transactionGenWithPreOutputs(1, 1, chainIndexGen = chainIndexGenForBroker(brokerConfig))
+    ) { case (tx, preOutputs) =>
+      passCheck(checkBlockTx(tx, preOutputs))
     }
   }
 
@@ -81,7 +84,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       val outputNew       = output.copy(amount = output.amount + delta)
       tx.copy(
         unsigned =
-          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew))
+      )
     }
 
     def zeroAlfAmount(tx: Transaction): Transaction = {
@@ -89,7 +93,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       val outputNew       = output.copy(amount = 0)
       tx.copy(
         unsigned =
-          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew))
+      )
     }
 
     def zeroTokenAmount(tx: Transaction): Transaction = {
@@ -97,29 +102,28 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       val outputNew       = output.copy(tokens = AVector(Hash.generate -> U256.Zero))
       tx.copy(
         unsigned =
-          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+          tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew))
+      )
     }
   }
 
   it should "check empty inputs" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs(1, 1)) {
-      case (tx, preOutputs) =>
-        val unsignedNew = tx.unsigned.copy(inputs = AVector.empty)
-        val txNew       = tx.copy(unsigned        = unsignedNew)
-        failCheck(checkInputNum(txNew), NoInputs)
-        failValidation(validateMempoolTx(txNew, blockFlow), NoInputs)
-        failCheck(checkBlockTx(txNew, preOutputs), NoInputs)
+    forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
+      val unsignedNew = tx.unsigned.copy(inputs = AVector.empty)
+      val txNew       = tx.copy(unsigned = unsignedNew)
+      failCheck(checkInputNum(txNew), NoInputs)
+      failValidation(validateMempoolTx(txNew, blockFlow), NoInputs)
+      failCheck(checkBlockTx(txNew, preOutputs), NoInputs)
     }
   }
 
   it should "check empty outputs" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs(1, 1)) {
-      case (tx, preOutputs) =>
-        val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
-        val txNew       = tx.copy(unsigned              = unsignedNew)
-        failCheck(checkOutputNum(txNew), NoOutputs)
-        failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
-        failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
+    forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
+      val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
+      val txNew       = tx.copy(unsigned = unsignedNew)
+      failCheck(checkOutputNum(txNew), NoOutputs)
+      failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
+      failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
     }
   }
 
@@ -146,104 +150,99 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "check ALF balance overflow" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
-          val alfAmount = tx.alfAmountInOutputs.get
-          val delta     = U256.MaxValue - alfAmount + 1
-          val txNew     = modifyAlfAmount(tx, delta)
-          failCheck(checkOutputAmount(txNew), BalanceOverFlow)
-          failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
-          failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
-        }
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
+        val alfAmount = tx.alfAmountInOutputs.get
+        val delta     = U256.MaxValue - alfAmount + 1
+        val txNew     = modifyAlfAmount(tx, delta)
+        failCheck(checkOutputAmount(txNew), BalanceOverFlow)
+        failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
+        failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
+      }
     }
   }
 
   it should "check non-zero alf amount for outputs" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        whenever(tx.unsigned.fixedOutputs.nonEmpty) {
-          val txNew = zeroAlfAmount(tx)
-          failCheck(checkOutputAmount(txNew), AmountIsZero)
-          failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-          failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
-        }
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      whenever(tx.unsigned.fixedOutputs.nonEmpty) {
+        val txNew = zeroAlfAmount(tx)
+        failCheck(checkOutputAmount(txNew), AmountIsZero)
+        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
+        failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
+      }
     }
   }
 
   it should "check non-zero token amount for outputs" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        whenever(tx.unsigned.fixedOutputs.nonEmpty) {
-          val txNew = zeroTokenAmount(tx)
-          failCheck(checkOutputAmount(txNew), AmountIsZero)
-          failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-          failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
-        }
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      whenever(tx.unsigned.fixedOutputs.nonEmpty) {
+        val txNew = zeroTokenAmount(tx)
+        failCheck(checkOutputAmount(txNew), AmountIsZero)
+        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
+        failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
+      }
     }
   }
 
   it should "check the inputs indexes" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs(2, 5)) {
-      case (tx, preOutputs) =>
-        val chainIndex = tx.chainIndex
-        val inputs     = tx.unsigned.inputs
-        val localUnsignedGen =
-          for {
-            fromGroupNew <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
-            scriptHint   <- scriptHintGen(fromGroupNew)
-            selected     <- Gen.choose(0, inputs.length - 1)
-          } yield {
-            val input        = inputs(selected)
-            val outputRefNew = AssetOutputRef.unsafeWithScriptHint(scriptHint, input.outputRef.key)
-            val inputsNew    = inputs.replace(selected, input.copy(outputRef = outputRefNew))
-            tx.unsigned.copy(inputs = inputsNew)
-          }
-        forAll(localUnsignedGen) { unsignedNew =>
-          val txNew = tx.copy(unsigned = unsignedNew)
-          failCheck(checkChainIndex(txNew), InvalidInputGroupIndex)
-          failValidation(validateMempoolTx(txNew, blockFlow), InvalidInputGroupIndex)
-          failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
+    forAll(transactionGenWithPreOutputs(2, 5)) { case (tx, preOutputs) =>
+      val chainIndex = tx.chainIndex
+      val inputs     = tx.unsigned.inputs
+      val localUnsignedGen =
+        for {
+          fromGroupNew <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
+          scriptHint   <- scriptHintGen(fromGroupNew)
+          selected     <- Gen.choose(0, inputs.length - 1)
+        } yield {
+          val input        = inputs(selected)
+          val outputRefNew = AssetOutputRef.unsafeWithScriptHint(scriptHint, input.outputRef.key)
+          val inputsNew    = inputs.replace(selected, input.copy(outputRef = outputRefNew))
+          tx.unsigned.copy(inputs = inputsNew)
         }
+      forAll(localUnsignedGen) { unsignedNew =>
+        val txNew = tx.copy(unsigned = unsignedNew)
+        failCheck(checkChainIndex(txNew), InvalidInputGroupIndex)
+        failValidation(validateMempoolTx(txNew, blockFlow), InvalidInputGroupIndex)
+        failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
+      }
     }
   }
 
   it should "check the output indexes" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs(2, 5)) {
-      case (tx, preOutputs) =>
-        val chainIndex = tx.chainIndex
-        val outputs    = tx.unsigned.fixedOutputs
-        whenever(
-          !chainIndex.isIntraGroup && outputs.filter(_.toGroup equals chainIndex.to).length >= 2) {
-          val localUnsignedGen =
-            for {
-              toGroupNew      <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
-              lockupScriptNew <- p2pkhLockupGen(toGroupNew)
-              selected        <- Gen.choose(0, outputs.length - 1)
-            } yield {
-              val outputNew  = outputs(selected).copy(lockupScript = lockupScriptNew)
-              val outputsNew = outputs.replace(selected, outputNew)
-              tx.unsigned.copy(fixedOutputs = outputsNew)
-            }
-          forAll(localUnsignedGen) { unsignedNew =>
-            val txNew = tx.copy(unsigned = unsignedNew)
-            failCheck(checkChainIndex(txNew), InvalidOutputGroupIndex)
-            failValidation(validateMempoolTx(txNew, blockFlow), InvalidOutputGroupIndex)
-            failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
+    forAll(transactionGenWithPreOutputs(2, 5)) { case (tx, preOutputs) =>
+      val chainIndex = tx.chainIndex
+      val outputs    = tx.unsigned.fixedOutputs
+      whenever(
+        !chainIndex.isIntraGroup && outputs.filter(_.toGroup equals chainIndex.to).length >= 2
+      ) {
+        val localUnsignedGen =
+          for {
+            toGroupNew      <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
+            lockupScriptNew <- p2pkhLockupGen(toGroupNew)
+            selected        <- Gen.choose(0, outputs.length - 1)
+          } yield {
+            val outputNew  = outputs(selected).copy(lockupScript = lockupScriptNew)
+            val outputsNew = outputs.replace(selected, outputNew)
+            tx.unsigned.copy(fixedOutputs = outputsNew)
           }
+        forAll(localUnsignedGen) { unsignedNew =>
+          val txNew = tx.copy(unsigned = unsignedNew)
+          failCheck(checkChainIndex(txNew), InvalidOutputGroupIndex)
+          failValidation(validateMempoolTx(txNew, blockFlow), InvalidOutputGroupIndex)
+          failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
         }
+      }
     }
   }
 
   it should "check distinction of inputs" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs(1, 3)) {
-      case (tx, preOutputs) =>
-        val inputs      = tx.unsigned.inputs
-        val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
-        val txNew       = tx.copy(unsigned = unsignedNew)
-        failCheck(checkUniqueInputs(txNew, checkDoubleSpending = true), TxDoubleSpending)
-        failValidation(validateMempoolTx(txNew, blockFlow), TxDoubleSpending)
-        failCheck(checkBlockTx(txNew, preOutputs), TxDoubleSpending)
+    forAll(transactionGenWithPreOutputs(1, 3)) { case (tx, preOutputs) =>
+      val inputs      = tx.unsigned.inputs
+      val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
+      val txNew       = tx.copy(unsigned = unsignedNew)
+      failCheck(checkUniqueInputs(txNew, checkDoubleSpending = true), TxDoubleSpending)
+      failValidation(validateMempoolTx(txNew, blockFlow), TxDoubleSpending)
+      failCheck(checkBlockTx(txNew, preOutputs), TxDoubleSpending)
     }
   }
 
@@ -265,22 +264,21 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
       outputs.replace(index, outputNew)
     }
 
-    forAll(transactionGenWithPreOutputs(1, 3)) {
-      case (tx, preOutputs) =>
-        val outputIndex = Random.source.nextInt(tx.outputsLength)
-        if (tx.getOutput(outputIndex).isInstanceOf[AssetOutput]) {
-          val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
-            val outputsNew = modifyData0(tx.unsigned.fixedOutputs, outputIndex)
-            tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
-          } else {
-            val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
-            val outputsNew     = modifyData1(tx.generatedOutputs, correctedIndex)
-            tx.copy(generatedOutputs = outputsNew)
-          }
-          failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-          failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
-          failCheck(checkBlockTx(txNew, preOutputs), OutputDataSizeExceeded)
+    forAll(transactionGenWithPreOutputs(1, 3)) { case (tx, preOutputs) =>
+      val outputIndex = Random.source.nextInt(tx.outputsLength)
+      if (tx.getOutput(outputIndex).isInstanceOf[AssetOutput]) {
+        val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
+          val outputsNew = modifyData0(tx.unsigned.fixedOutputs, outputIndex)
+          tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
+        } else {
+          val correctedIndex = outputIndex - tx.unsigned.fixedOutputs.length
+          val outputsNew     = modifyData1(tx.generatedOutputs, correctedIndex)
+          tx.copy(generatedOutputs = outputsNew)
         }
+        failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
+        failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
+        failCheck(checkBlockTx(txNew, preOutputs), OutputDataSizeExceeded)
+      }
     }
   }
 
@@ -288,18 +286,20 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   trait StatefulFixture extends StatelessFixture {
     def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
-      AssetOutput(U256.Zero,
-                  LockupScript.p2pkh(Hash.zero),
-                  TimeStamp.zero,
-                  AVector(tokenId -> amount),
-                  ByteString.empty)
+      AssetOutput(
+        U256.Zero,
+        LockupScript.p2pkh(Hash.zero),
+        TimeStamp.zero,
+        AVector(tokenId -> amount),
+        ByteString.empty
+      )
     }
 
     def modifyTokenAmount(tx: Transaction, tokenId: TokenId, f: U256 => U256): Transaction = {
       val fixedOutputs = tx.unsigned.fixedOutputs
       val relatedOutputIndexes = fixedOutputs
-        .mapWithIndex {
-          case (output, index) => (index, output.tokens.exists(_._1 equals tokenId))
+        .mapWithIndex { case (output, index) =>
+          (index, output.tokens.exists(_._1 equals tokenId))
         }
         .map(_._1)
       val selected    = relatedOutputIndexes.sample()
@@ -317,9 +317,8 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
 
     def getTokenAmount(tx: Transaction, tokenId: TokenId): U256 = {
-      tx.unsigned.fixedOutputs.fold(U256.Zero) {
-        case (acc, output) =>
-          acc + output.tokens.filter(_._1 equals tokenId).map(_._2).reduce(_ + _)
+      tx.unsigned.fixedOutputs.fold(U256.Zero) { case (acc, output) =>
+        acc + output.tokens.filter(_._1 equals tokenId).map(_._2).reduce(_ + _)
       }
     }
 
@@ -336,10 +335,9 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "get previous outputs of tx inputs" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, inputInfos) =>
-        prepareWorldState(inputInfos)
-        getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput)
+    forAll(transactionGenWithPreOutputs()) { case (tx, inputInfos) =>
+      prepareWorldState(inputInfos)
+      getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput)
     }
   }
 
@@ -361,78 +359,73 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   }
 
   it should "test both ALF and token balances" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        passCheck(checkAlfBalance(tx, preOutputs.map(_.referredOutput)))
-        passCheck(checkTokenBalance(tx, preOutputs.map(_.referredOutput)))
-        passCheck(checkBlockTx(tx, preOutputs))
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      passCheck(checkAlfBalance(tx, preOutputs.map(_.referredOutput)))
+      passCheck(checkTokenBalance(tx, preOutputs.map(_.referredOutput)))
+      passCheck(checkBlockTx(tx, preOutputs))
     }
   }
 
   it should "validate ALF balances" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        val txNew = modifyAlfAmount(tx, 1)
-        failCheck(checkAlfBalance(txNew, preOutputs.map(_.referredOutput)), InvalidAlfBalance)
-        failCheck(checkBlockTx(txNew, preOutputs), InvalidAlfBalance)
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      val txNew = modifyAlfAmount(tx, 1)
+      failCheck(checkAlfBalance(txNew, preOutputs.map(_.referredOutput)), InvalidAlfBalance)
+      failCheck(checkBlockTx(txNew, preOutputs), InvalidAlfBalance)
     }
   }
 
   it should "test token balance overflow" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
-          val tokenId     = sampleToken(tx)
-          val tokenAmount = getTokenAmount(tx, tokenId)
-          val txNew       = modifyTokenAmount(tx, tokenId, U256.MaxValue - tokenAmount + 1 + _)
-          failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
-          failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
-        }
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
+        val tokenId     = sampleToken(tx)
+        val tokenAmount = getTokenAmount(tx, tokenId)
+        val txNew       = modifyTokenAmount(tx, tokenId, U256.MaxValue - tokenAmount + 1 + _)
+        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+        failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
+      }
     }
   }
 
   it should "validate token balances" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) {
-      case (tx, preOutputs) =>
-        val tokenId = sampleToken(tx)
-        val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
-        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
-        failCheck(checkBlockTx(txNew, preOutputs), InvalidTokenBalance)
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      val tokenId = sampleToken(tx)
+      val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
+      failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
+      failCheck(checkBlockTx(txNew, preOutputs), InvalidTokenBalance)
     }
   }
 
   it should "validate witnesses" in new StatefulFixture {
     import ModelGenerators.ScriptPair
-    forAll(transactionGenWithPreOutputs(1, 1)) {
-      case (tx, preOutputs) =>
-        val inputsState              = preOutputs.map(_.referredOutput)
-        val ScriptPair(_, unlock, _) = p2pkScriptGen(GroupIndex.unsafe(1)).sample.get
-        val unsigned                 = tx.unsigned
-        val inputs                   = unsigned.inputs
-        val preparedWorldState       = preOutputs
+    forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
+      val inputsState              = preOutputs.map(_.referredOutput)
+      val ScriptPair(_, unlock, _) = p2pkScriptGen(GroupIndex.unsafe(1)).sample.get
+      val unsigned                 = tx.unsigned
+      val inputs                   = unsigned.inputs
+      val preparedWorldState       = preOutputs
 
-        {
-          val txNew = tx.copy(inputSignatures = tx.inputSignatures.init)
-          failCheck(checkWitnesses(txNew, inputsState), NotEnoughSignature)
-          failCheck(checkBlockTx(txNew, preparedWorldState), NotEnoughSignature)
-        }
+      {
+        val txNew = tx.copy(inputSignatures = tx.inputSignatures.init)
+        failCheck(checkWitnesses(txNew, inputsState), NotEnoughSignature)
+        failCheck(checkBlockTx(txNew, preparedWorldState), NotEnoughSignature)
+      }
 
-        {
-          val (sampleIndex, sample) = inputs.sampleWithIndex()
-          val inputNew              = sample.copy(unlockScript = unlock)
-          val inputsNew             = inputs.replace(sampleIndex, inputNew)
-          val txNew                 = tx.copy(unsigned = unsigned.copy(inputs = inputsNew))
-          failCheck(checkWitnesses(txNew, inputsState), InvalidPublicKeyHash)
-        }
+      {
+        val (sampleIndex, sample) = inputs.sampleWithIndex()
+        val inputNew              = sample.copy(unlockScript = unlock)
+        val inputsNew             = inputs.replace(sampleIndex, inputNew)
+        val txNew                 = tx.copy(unsigned = unsigned.copy(inputs = inputsNew))
+        failCheck(checkWitnesses(txNew, inputsState), InvalidPublicKeyHash)
+      }
 
-        {
-          val signature        = Signature.generate
-          val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
-          val signaturesNew    = tx.inputSignatures.replace(sampleIndex, signature)
-          val txNew            = tx.copy(inputSignatures = signaturesNew)
-          failCheck(checkWitnesses(txNew, inputsState), InvalidSignature)
-          failCheck(checkBlockTx(txNew, preparedWorldState), InvalidSignature)
-        }
+      {
+        val signature        = Signature.generate
+        val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
+        val signaturesNew    = tx.inputSignatures.replace(sampleIndex, signature)
+        val txNew            = tx.copy(inputSignatures = signaturesNew)
+        failCheck(checkWitnesses(txNew, inputsState), InvalidSignature)
+        failCheck(checkBlockTx(txNew, preparedWorldState), InvalidSignature)
+      }
     }
   }
 }

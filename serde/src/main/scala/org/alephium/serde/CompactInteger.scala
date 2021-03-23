@@ -43,16 +43,20 @@ object CompactInteger {
       } else if (n < U32.unsafe(twoByteBound)) {
         ByteString(((n.v >> 8) + TwoByte.prefix).toByte, n.v.toByte)
       } else if (n < U32.unsafe(fourByteBound)) {
-        ByteString(((n.v >> 24) + FourByte.prefix).toByte,
-                   (n.v >> 16).toByte,
-                   (n.v >> 8).toByte,
-                   n.v.toByte)
+        ByteString(
+          ((n.v >> 24) + FourByte.prefix).toByte,
+          (n.v >> 16).toByte,
+          (n.v >> 8).toByte,
+          n.v.toByte
+        )
       } else {
-        ByteString(MultiByte.prefix.toByte,
-                   (n.v >> 24).toByte,
-                   (n.v >> 16).toByte,
-                   (n.v >> 8).toByte,
-                   n.v.toByte)
+        ByteString(
+          MultiByte.prefix.toByte,
+          (n.v >> 24).toByte,
+          (n.v >> 16).toByte,
+          (n.v >> 8).toByte,
+          n.v.toByte
+        )
       }
     }
 
@@ -77,9 +81,11 @@ object CompactInteger {
       } yield result
     }
 
-    private def decodeU32(mode: Mode,
-                          body: ByteString,
-                          rest: ByteString): SerdeResult[Staging[U32]] = {
+    private def decodeU32(
+        mode: Mode,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[U32]] = {
       mode match {
         case m: FixedWidth =>
           decodeInt(m, body, rest).map(_.mapValue(U32.unsafe))
@@ -90,27 +96,30 @@ object CompactInteger {
             Right(Staging(U32.unsafe(value), rest))
           } else {
             Left(
-              SerdeError.wrongFormat(s"Expect 4 bytes int, but get ${body.length - 1} bytes int"))
+              SerdeError.wrongFormat(s"Expect 4 bytes int, but get ${body.length - 1} bytes int")
+            )
           }
       }
     }
 
-    private def decodeInt(mode: FixedWidth,
-                          body: ByteString,
-                          rest: ByteString): SerdeResult[Staging[Int]] = {
+    private def decodeInt(
+        mode: FixedWidth,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[Int]] = {
       mode match {
         case SingleByte =>
           Right(Staging(body(0).toInt, rest))
         case TwoByte =>
           assume(body.length == 2)
-          val value = ((body(0) & Mode.maskMode) << 8) | (body(1) & 0xFF)
+          val value = ((body(0) & Mode.maskMode) << 8) | (body(1) & 0xff)
           Right(Staging(value, rest))
         case FourByte =>
           assume(body.length == 4)
           val value = ((body(0) & Mode.maskMode) << 24) |
-            ((body(1) & 0xFF) << 16) |
-            ((body(2) & 0xFF) << 8) |
-            body(3) & 0xFF
+            ((body(1) & 0xff) << 16) |
+            ((body(2) & 0xff) << 8) |
+            body(3) & 0xff
           Right(Staging(value, rest))
       }
     }
@@ -122,9 +131,11 @@ object CompactInteger {
       } yield result
     }
 
-    private def decodeU256(mode: Mode,
-                           body: ByteString,
-                           rest: ByteString): SerdeResult[Staging[U256]] = {
+    private def decodeU256(
+        mode: Mode,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[U256]] = {
       mode match {
         case m: FixedWidth =>
           decodeInt(m, body, rest).map(_.mapValue(n => U256.unsafe(Integer.toUnsignedLong(n))))
@@ -164,16 +175,20 @@ object CompactInteger {
       } else if (n < twoByteBound) {
         ByteString(((n >> 8) + TwoByte.prefix).toByte, n.toByte)
       } else if (n < fourByteBound) {
-        ByteString(((n >> 24) + FourByte.prefix).toByte,
-                   (n >> 16).toByte,
-                   (n >> 8).toByte,
-                   n.toByte)
+        ByteString(
+          ((n >> 24) + FourByte.prefix).toByte,
+          (n >> 16).toByte,
+          (n >> 8).toByte,
+          n.toByte
+        )
       } else {
-        ByteString(MultiByte.prefix.toByte,
-                   (n >> 24).toByte,
-                   (n >> 16).toByte,
-                   (n >> 8).toByte,
-                   n.toByte)
+        ByteString(
+          MultiByte.prefix.toByte,
+          (n >> 24).toByte,
+          (n >> 16).toByte,
+          (n >> 8).toByte,
+          n.toByte
+        )
       }
     }
 
@@ -183,16 +198,20 @@ object CompactInteger {
       } else if (n >= -twoByteBound) {
         ByteString(((n >> 8) ^ TwoByte.negPrefix).toByte, n.toByte)
       } else if (n >= -fourByteBound) {
-        ByteString(((n >> 24) ^ FourByte.negPrefix).toByte,
-                   (n >> 16).toByte,
-                   (n >> 8).toByte,
-                   n.toByte)
+        ByteString(
+          ((n >> 24) ^ FourByte.negPrefix).toByte,
+          (n >> 16).toByte,
+          (n >> 8).toByte,
+          n.toByte
+        )
       } else {
-        ByteString(MultiByte.prefix.toByte,
-                   (n >> 24).toByte,
-                   (n >> 16).toByte,
-                   (n >> 8).toByte,
-                   n.toByte)
+        ByteString(
+          MultiByte.prefix.toByte,
+          (n >> 24).toByte,
+          (n >> 16).toByte,
+          (n >> 8).toByte,
+          n.toByte
+        )
       }
     }
 
@@ -200,15 +219,17 @@ object CompactInteger {
       if (n >= -0x20000000 && n < 0x20000000) {
         encode(n.toInt)
       } else {
-        ByteString((4 | MultiByte.prefix).toByte,
-                   (n >> 56).toByte,
-                   (n >> 48).toByte,
-                   (n >> 40).toByte,
-                   (n >> 32).toByte,
-                   (n >> 24).toByte,
-                   (n >> 16).toByte,
-                   (n >> 8).toByte,
-                   n.toByte)
+        ByteString(
+          (4 | MultiByte.prefix).toByte,
+          (n >> 56).toByte,
+          (n >> 48).toByte,
+          (n >> 40).toByte,
+          (n >> 32).toByte,
+          (n >> 24).toByte,
+          (n >> 16).toByte,
+          (n >> 8).toByte,
+          n.toByte
+        )
       }
     }
 
@@ -230,9 +251,11 @@ object CompactInteger {
       } yield result
     }
 
-    private def decodeInt(mode: Mode,
-                          body: ByteString,
-                          rest: ByteString): SerdeResult[Staging[Int]] = {
+    private def decodeInt(
+        mode: Mode,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[Int]] = {
       mode match {
         case m: FixedWidth =>
           decodeInt(m, body, rest)
@@ -243,14 +266,17 @@ object CompactInteger {
             Right(Staging(value, rest))
           } else {
             Left(
-              SerdeError.wrongFormat(s"Expect 4 bytes int, but get ${body.length - 1} bytes int"))
+              SerdeError.wrongFormat(s"Expect 4 bytes int, but get ${body.length - 1} bytes int")
+            )
           }
       }
     }
 
-    private def decodeInt(mode: FixedWidth,
-                          body: ByteString,
-                          rest: ByteString): SerdeResult[Staging[Int]] = {
+    private def decodeInt(
+        mode: FixedWidth,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[Int]] = {
       val isPositive = (body(0) & signFlag) == 0
       if (isPositive) {
         decodePositiveInt(mode, body, rest)
@@ -259,42 +285,46 @@ object CompactInteger {
       }
     }
 
-    private def decodePositiveInt(mode: FixedWidth,
-                                  body: ByteString,
-                                  rest: ByteString): SerdeResult[Staging[Int]] = {
+    private def decodePositiveInt(
+        mode: FixedWidth,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[Int]] = {
       mode match {
         case SingleByte =>
           Right(Staging(body(0).toInt, rest))
         case TwoByte =>
           assume(body.length == 2)
-          val value = ((body(0) & Mode.maskMode) << 8) | (body(1) & 0xFF)
+          val value = ((body(0) & Mode.maskMode) << 8) | (body(1) & 0xff)
           Right(Staging(value, rest))
         case FourByte =>
           assume(body.length == 4)
           val value = ((body(0) & Mode.maskMode) << 24) |
-            ((body(1) & 0xFF) << 16) |
-            ((body(2) & 0xFF) << 8) |
-            body(3) & 0xFF
+            ((body(1) & 0xff) << 16) |
+            ((body(2) & 0xff) << 8) |
+            body(3) & 0xff
           Right(Staging(value, rest))
       }
     }
 
-    private def decodeNegativeInt(mode: FixedWidth,
-                                  body: ByteString,
-                                  rest: ByteString): SerdeResult[Staging[Int]] = {
+    private def decodeNegativeInt(
+        mode: FixedWidth,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[Int]] = {
       mode match {
         case SingleByte =>
           Right(Staging(body(0).toInt | Mode.maskModeNeg, rest))
         case TwoByte =>
           assume(body.length == 2)
-          val value = ((body(0) | Mode.maskModeNeg) << 8) | (body(1) & 0xFF)
+          val value = ((body(0) | Mode.maskModeNeg) << 8) | (body(1) & 0xff)
           Right(Staging(value, rest))
         case FourByte =>
           assume(body.length == 4)
           val value = ((body(0) | Mode.maskModeNeg) << 24) |
-            ((body(1) & 0xFF) << 16) |
-            ((body(2) & 0xFF) << 8) |
-            body(3) & 0xFF
+            ((body(1) & 0xff) << 16) |
+            ((body(2) & 0xff) << 8) |
+            body(3) & 0xff
           Right(Staging(value, rest))
       }
     }
@@ -306,9 +336,11 @@ object CompactInteger {
       } yield result
     }
 
-    private def decodeLong(mode: Mode,
-                           body: ByteString,
-                           rest: ByteString): SerdeResult[Staging[Long]] = {
+    private def decodeLong(
+        mode: Mode,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[Long]] = {
       mode match {
         case m: FixedWidth =>
           decodeInt(m, body, rest).map(_.mapValue(_.toLong))
@@ -319,7 +351,8 @@ object CompactInteger {
             Right(Staging(value, rest))
           } else {
             Left(
-              SerdeError.wrongFormat(s"Expect 9 bytes long, but get ${body.length - 1} bytes long"))
+              SerdeError.wrongFormat(s"Expect 9 bytes long, but get ${body.length - 1} bytes long")
+            )
           }
       }
     }
@@ -331,9 +364,11 @@ object CompactInteger {
       } yield result
     }
 
-    private def decodeI256(mode: Mode,
-                           body: ByteString,
-                           rest: ByteString): SerdeResult[Staging[I256]] = {
+    private def decodeI256(
+        mode: Mode,
+        body: ByteString,
+        rest: ByteString
+    ): SerdeResult[Staging[I256]] = {
       mode match {
         case m: FixedWidth =>
           decodeInt(m, body, rest).map(_.mapValue(n => I256.from(n)))
@@ -352,9 +387,9 @@ object CompactInteger {
   }
 
   object Mode {
-    val maskMode: Int    = 0x3F
-    val maskRest: Int    = 0xC0
-    val maskModeNeg: Int = 0xFFFFFFC0
+    val maskMode: Int    = 0x3f
+    val maskRest: Int    = 0xc0
+    val maskModeNeg: Int = 0xffffffc0
 
     def decode(bs: ByteString): SerdeResult[(Mode, ByteString, ByteString)] = {
       if (bs.isEmpty) {
@@ -369,9 +404,11 @@ object CompactInteger {
       }
     }
 
-    private def checkSize(bs: ByteString,
-                          expected: Int,
-                          mode: Mode): SerdeResult[(Mode, ByteString, ByteString)] = {
+    private def checkSize(
+        bs: ByteString,
+        expected: Int,
+        mode: Mode
+    ): SerdeResult[(Mode, ByteString, ByteString)] = {
       if (bs.length >= expected) {
         Right((mode, bs.take(expected), bs.drop(expected)))
       } else {
@@ -384,7 +421,7 @@ object CompactInteger {
 
   case object SingleByte extends FixedWidth {
     override val prefix: Int    = 0x00 // 0b00000000
-    override val negPrefix: Int = 0xC0 // 0b11000000
+    override val negPrefix: Int = 0xc0 // 0b11000000
   }
   case object TwoByte extends FixedWidth {
     override val prefix: Int    = 0x40 // 0b01000000
@@ -395,7 +432,7 @@ object CompactInteger {
     override val negPrefix: Int = 0x40 // 0b01000000
   }
   case object MultiByte extends Mode {
-    override val prefix: Int    = 0xC0 // 0b11000000
+    override val prefix: Int    = 0xc0 // 0b11000000
     override val negPrefix: Int = 0x00 // 0b00000000
   }
 }

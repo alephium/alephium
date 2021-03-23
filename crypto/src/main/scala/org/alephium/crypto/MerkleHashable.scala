@@ -29,7 +29,8 @@ trait MerkleHashable[Hash <: RandomBytes] {
 object MerkleHashable {
   def rootHash[Hash <: RandomBytes: ClassTag, T <: MerkleHashable[Hash]](
       hashAlgo: HashSchema[Hash],
-      nodes: AVector[T]): Hash = {
+      nodes: AVector[T]
+  ): Hash = {
     if (nodes.isEmpty) {
       hashAlgo.zero
     } else {
@@ -38,8 +39,10 @@ object MerkleHashable {
     }
   }
 
-  private[crypto] def rootHash[Hash <: RandomBytes](hashAlgo: HashSchema[Hash],
-                                                    buffer: Array[Hash]): Hash = {
+  private[crypto] def rootHash[Hash <: RandomBytes](
+      hashAlgo: HashSchema[Hash],
+      buffer: Array[Hash]
+  ): Hash = {
     assume(buffer.nonEmpty)
 
     @inline def updateDoubleLeaves(index: Int): Unit = {

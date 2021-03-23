@@ -33,10 +33,11 @@ class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
 
   def toOneDim(implicit config: GroupConfig): Int = from.value * config.groups + to.value
 
-  override def equals(obj: Any): Boolean = obj match {
-    case that: ChainIndex => from == that.from && to == that.to
-    case _                => false
-  }
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case that: ChainIndex => from == that.from && to == that.to
+      case _                => false
+    }
 
   override def hashCode(): Int = {
     from.value ^ to.value
@@ -56,8 +57,10 @@ object ChainIndex {
 
   def unsafe(index: Int)(implicit config: GroupConfig): ChainIndex = {
     assume(index >= 0 && index < config.chainNum)
-    new ChainIndex(GroupIndex.unsafe(index / config.groups),
-                   GroupIndex.unsafe(index % config.groups))
+    new ChainIndex(
+      GroupIndex.unsafe(index / config.groups),
+      GroupIndex.unsafe(index % config.groups)
+    )
   }
 
   def unsafe(from: Int, to: Int)(implicit config: GroupConfig): ChainIndex = {

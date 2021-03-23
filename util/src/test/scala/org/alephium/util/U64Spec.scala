@@ -35,10 +35,12 @@ class U64Spec extends AlephiumSpec {
     U64.from(U64.MaxValue.toBigInt.add(BigInteger.ONE)).isEmpty is true
   }
 
-  def test(op: (U64, U64)                       => Option[U64],
-           opUnsafe: (U64, U64)                 => U64,
-           opExpected: (BigInteger, BigInteger) => BigInteger,
-           condition: Long                      => Boolean = _ >= Long.MinValue): Unit = {
+  def test(
+      op: (U64, U64) => Option[U64],
+      opUnsafe: (U64, U64) => U64,
+      opExpected: (BigInteger, BigInteger) => BigInteger,
+      condition: Long => Boolean = _ >= Long.MinValue
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen

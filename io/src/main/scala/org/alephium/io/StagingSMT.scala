@@ -18,9 +18,10 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-final class StagingSMT[K, V](val underlying: CachedSMT[K, V],
-                             val caches: mutable.Map[K, Modified[V]])
-    extends CachedTrie[K, V, Modified[V]] {
+final class StagingSMT[K, V](
+    val underlying: CachedSMT[K, V],
+    val caches: mutable.Map[K, Modified[V]]
+) extends CachedTrie[K, V, Modified[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = underlying.getOpt(key)
 
   def rollback(): CachedSMT[K, V] = underlying

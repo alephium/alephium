@@ -30,25 +30,27 @@ import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object BrokerConnector {
-  def props(remoteAddress: InetSocketAddress,
-            connection: ActorRefT[Tcp.Command],
-            cliqueCoordinator: ActorRef)(implicit groupConfig: GroupConfig,
-                                         networkSetting: NetworkSetting): Props =
+  def props(
+      remoteAddress: InetSocketAddress,
+      connection: ActorRefT[Tcp.Command],
+      cliqueCoordinator: ActorRef
+  )(implicit groupConfig: GroupConfig, networkSetting: NetworkSetting): Props =
     Props(new BrokerConnector(remoteAddress, connection, cliqueCoordinator))
 
   sealed trait Command
   final case class Received(message: Message)             extends Command
   final case class Send(intraCliqueInfo: IntraCliqueInfo) extends Command
 
-  def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig,
-      networkSetting: NetworkSetting): Props =
+  def connectionProps(remoteAddress: InetSocketAddress, connection: ActorRefT[Tcp.Command])(implicit
+      groupConfig: GroupConfig,
+      networkSetting: NetworkSetting
+  ): Props =
     Props(new MyConnectionHandler(remoteAddress, connection))
 
-  class MyConnectionHandler(val remoteAddress: InetSocketAddress,
-                            val connection: ActorRefT[Tcp.Command])(
-      implicit groupConfig: GroupConfig,
-      val networkSetting: NetworkSetting)
+  class MyConnectionHandler(
+      val remoteAddress: InetSocketAddress,
+      val connection: ActorRefT[Tcp.Command]
+  )(implicit groupConfig: GroupConfig, val networkSetting: NetworkSetting)
       extends ConnectionHandler[Message] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Message]]] = {
       Message.tryDeserialize(data)
@@ -65,10 +67,11 @@ object BrokerConnector {
   }
 }
 
-class BrokerConnector(remoteAddress: InetSocketAddress,
-                      connection: ActorRefT[Tcp.Command],
-                      cliqueCoordinator: ActorRef)(implicit val groupConfig: GroupConfig,
-                                                   networkSetting: NetworkSetting)
+class BrokerConnector(
+    remoteAddress: InetSocketAddress,
+    connection: ActorRefT[Tcp.Command],
+    cliqueCoordinator: ActorRef
+)(implicit val groupConfig: GroupConfig, networkSetting: NetworkSetting)
     extends BaseActor
     with SerdeUtils
     with EventStream.Publisher {
@@ -78,23 +81,20 @@ class BrokerConnector(remoteAddress: InetSocketAddress,
     ActorRefT(context.actorOf(connectionProps(remoteAddress, connection)))
   context watch connectionHandler.ref
 
-  override def receive: Receive = {
-    case Received(peer: Message.Peer) =>
-      cliqueCoordinator ! peer.info
-      context become forwardCliqueInfo
+  override def receive: Receive = { case Received(peer: Message.Peer) =>
+    cliqueCoordinator ! peer.info
+    context become forwardCliqueInfo
   }
 
-  def forwardCliqueInfo: Receive = {
-    case Send(cliqueInfo) =>
-      val data = Message.serialize(Message.Clique(cliqueInfo))
-      connectionHandler ! ConnectionHandler.Send(data)
-      context become awaitAck
+  def forwardCliqueInfo: Receive = { case Send(cliqueInfo) =>
+    val data = Message.serialize(Message.Clique(cliqueInfo))
+    connectionHandler ! ConnectionHandler.Send(data)
+    context become awaitAck
   }
 
-  def awaitAck: Receive = {
-    case Received(ack) =>
-      cliqueCoordinator ! ack
-      context become forwardReady
+  def awaitAck: Receive = { case Received(ack) =>
+    cliqueCoordinator ! ack
+    context become forwardReady
   }
 
   def forwardReady: Receive = {

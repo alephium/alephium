@@ -35,10 +35,12 @@ class U32Spec extends AlephiumSpec {
     U32.from(U32.MaxValue.toBigInt.add(BigInteger.ONE)).isEmpty is true
   }
 
-  def test(op: (U32, U32)                       => Option[U32],
-           opUnsafe: (U32, U32)                 => U32,
-           opExpected: (BigInteger, BigInteger) => BigInteger,
-           condition: Int                       => Boolean = _ >= Int.MinValue): Unit = {
+  def test(
+      op: (U32, U32) => Option[U32],
+      opUnsafe: (U32, U32) => U32,
+      opExpected: (BigInteger, BigInteger) => BigInteger,
+      condition: Int => Boolean = _ >= Int.MinValue
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen

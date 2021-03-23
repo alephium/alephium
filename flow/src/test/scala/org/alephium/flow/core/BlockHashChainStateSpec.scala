@@ -68,8 +68,10 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
     chainState.setGenesisState(hashes(0), TimeStamp.zero)
     chainState.setGenesisState(hashes(1), TimeStamp.unsafe(1))
     checkState(2, Set(hashes(0), hashes(1)))
-    chainState.setGenesisState(hashes(2),
-                               TimeStamp.unsafe(1) + Test.consensusConfig.tipsPruneDuration)
+    chainState.setGenesisState(
+      hashes(2),
+      TimeStamp.unsafe(1) + Test.consensusConfig.tipsPruneDuration
+    )
     checkState(3, Set(hashes(1), hashes(2)))
   }
 }

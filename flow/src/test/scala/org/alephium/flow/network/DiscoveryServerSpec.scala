@@ -37,12 +37,13 @@ import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 object DiscoveryServerSpec {
 
-  def createConfig(groupSize: Int,
-                   port: Int,
-                   _peersPerGroup: Int,
-                   _scanFrequency: Duration  = Duration.unsafe(200),
-                   _expireDuration: Duration = Duration.ofHoursUnsafe(1))
-    : (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
+  def createConfig(
+      groupSize: Int,
+      port: Int,
+      _peersPerGroup: Int,
+      _scanFrequency: Duration = Duration.unsafe(200),
+      _expireDuration: Duration = Duration.ofHoursUnsafe(1)
+  ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
       val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
@@ -70,7 +71,7 @@ class DiscoveryServerSpec
     with Eventually {
   import DiscoveryServerSpec._
 
-  override implicit val patienceConfig =
+  implicit override val patienceConfig =
     PatienceConfig(timeout = Span(20, Seconds), interval = Span(2, Seconds))
 
   trait SimulationFixture { fixture =>
@@ -116,30 +117,32 @@ class DiscoveryServerSpec
 
     val cliqueNum = 16
     val cliques   = AVector.fill(cliqueNum)(generateClique())
-    val servers = cliques.flatMapWithIndex {
-      case ((clique, infos), index) =>
-        infos.map {
-          case (brokerInfo, config) =>
-            val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
-              ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
-            val server = {
-              if (index equals 0) {
-                TestActorRef[DiscoveryServer](
-                  DiscoveryServer
-                    .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig))
-              } else {
-                val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
-                TestActorRef[DiscoveryServer](
-                  DiscoveryServer
-                    .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(config,
-                                                                                     config,
-                                                                                     networkConfig))
-              }
-            }
-            server ! DiscoveryServer.SendCliqueInfo(clique)
-
-            server
+    val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
+      infos.map { case (brokerInfo, config) =>
+        val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
+          ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+        val server = {
+          if (index equals 0) {
+            TestActorRef[DiscoveryServer](
+              DiscoveryServer
+                .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig)
+            )
+          } else {
+            val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
+            TestActorRef[DiscoveryServer](
+              DiscoveryServer
+                .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(
+                  config,
+                  config,
+                  networkConfig
+                )
+            )
+          }
         }
+        server ! DiscoveryServer.SendCliqueInfo(clique)
+
+        server
+      }
     }
 
     eventually {
@@ -147,9 +150,8 @@ class DiscoveryServerSpec
         val probe = TestProbe()
         server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
 
-        probe.expectMsgPF() {
-          case DiscoveryServer.NeighborPeers(peers) =>
-            (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
+        probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
+          (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
         }
       }
     }
@@ -159,9 +161,11 @@ class DiscoveryServerSpec
     val newInfo = CliqueInfo.unsafe(
       CliqueId.generate,
       AVector.tabulate(groupConfig.groups)(i =>
-        Option(new InetSocketAddress(master.getAddress, master.getPort + i))),
+        Option(new InetSocketAddress(master.getAddress, master.getPort + i))
+      ),
       AVector.tabulate(groupConfig.groups)(i =>
-        new InetSocketAddress(master.getAddress, master.getPort + i)),
+        new InetSocketAddress(master.getAddress, master.getPort + i)
+      ),
       1
     )
     CliqueInfo.validate(newInfo)(groupConfig).isRight is true
@@ -180,19 +184,19 @@ class DiscoveryServerSpec
       val probe1 = TestProbe()
       server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
 
-      probe0.expectMsgPF() {
-        case DiscoveryServer.NeighborPeers(peers) =>
-          peers.length is 4 // 3 self clique peers + server1
-          peers.filter(_.cliqueId equals cliqueInfo0.id).toSet is cliqueInfo0.interBrokers.get.toSet
-          peers.filterNot(_.cliqueId equals cliqueInfo0.id) is AVector(
-            cliqueInfo1.interBrokers.get.head)
+      probe0.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
+        peers.length is 4 // 3 self clique peers + server1
+        peers.filter(_.cliqueId equals cliqueInfo0.id).toSet is cliqueInfo0.interBrokers.get.toSet
+        peers.filterNot(_.cliqueId equals cliqueInfo0.id) is AVector(
+          cliqueInfo1.interBrokers.get.head
+        )
       }
-      probe1.expectMsgPF() {
-        case DiscoveryServer.NeighborPeers(peers) =>
-          peers.length is 4 // 3 self clique peers + server0
-          peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
-          peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
-            cliqueInfo0.interBrokers.get.head)
+      probe1.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
+        peers.length is 4 // 3 self clique peers + server0
+        peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
+        peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
+          cliqueInfo0.interBrokers.get.head
+        )
       }
     }
   }
@@ -210,16 +214,15 @@ class DiscoveryServerSpec
       val probe1 = TestProbe()
       server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
 
-      probe0.expectMsgPF() {
-        case DiscoveryServer.NeighborPeers(peers) =>
-          peers.length is 3 // 3 self clique peers
+      probe0.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
+        peers.length is 3 // 3 self clique peers
       }
-      probe1.expectMsgPF() {
-        case DiscoveryServer.NeighborPeers(peers) =>
-          peers.length is 4 // 3 self clique peers + server0
-          peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
-          peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
-            cliqueInfo0.interBrokers.get.head)
+      probe1.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
+        peers.length is 4 // 3 self clique peers + server0
+        peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
+        peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
+          cliqueInfo0.interBrokers.get.head
+        )
       }
     }
   }
@@ -237,10 +240,13 @@ class DiscoveryServerSpec
     val message = DiscoveryMessage.from(
       cliqueInfo1.id,
       DiscoveryMessage.Ping(
-        Some(BrokerInfo.from(socketAddressGen.sample.get, cliqueInfo1.selfInterBrokerInfo))))(
-      config1)
-    server0 ! Udp.Received(DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
-                           address1)
+        Some(BrokerInfo.from(socketAddressGen.sample.get, cliqueInfo1.selfInterBrokerInfo))
+      )
+    )(config1)
+    server0 ! Udp.Received(
+      DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
+      address1
+    )
 
     eventually {
       misbehaviorManager0
@@ -269,11 +275,13 @@ class DiscoveryServerSpec
 
     val server0 =
       system.actorOf(
-        DiscoveryServer.props(address0, misbehaviorManager0)(brokerConfig, config0, networkConfig))
+        DiscoveryServer.props(address0, misbehaviorManager0)(brokerConfig, config0, networkConfig)
+      )
     val server1 =
       system.actorOf(
         DiscoveryServer
-          .props(address1, misbehaviorManager1, address0)(brokerConfig, config1, networkConfig))
+          .props(address1, misbehaviorManager1, address0)(brokerConfig, config1, networkConfig)
+      )
 
     val misbehaviorProbe = TestProbe()
     system.eventStream.subscribe(misbehaviorProbe.ref, classOf[MisbehaviorManager.InvalidMessage])

@@ -69,9 +69,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       checkData(timestamp, s"$long")
     }
 
-    forAll(negLongGen) { long =>
-      parseFail[TimeStamp](s"$long") is "expect positive timestamp"
-    }
+    forAll(negLongGen) { long => parseFail[TimeStamp](s"$long") is "expect positive timestamp" }
   }
 
   it should "encode/decode FetchRequest" in {
@@ -83,7 +81,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   it should "validate FetchRequest" in {
     parseFail[FetchRequest]("""{"fromTs":42,"toTs":1}""") is "`toTs` cannot be before `fromTs`"
-    parseFail[FetchRequest]("""{"fromTs":1,"toTs":100000}""") is s"interval cannot be greater than $blockflowFetchMaxAge"
+    parseFail[FetchRequest](
+      """{"fromTs":1,"toTs":100000}"""
+    ) is s"interval cannot be greater than $blockflowFetchMaxAge"
     parseFail[FetchRequest]("""{}""") is s"Attempt to decode value on failed cursor"
   }
 

@@ -76,9 +76,11 @@ class RocksDBBench {
     }
   }
 
-  def createDB(name: String,
-               databaseOptions: DBOptions,
-               columnOptions: ColumnFamilyOptions): RocksDBColumn = {
+  def createDB(
+      name: String,
+      databaseOptions: DBOptions,
+      columnOptions: ColumnFamilyOptions
+  ): RocksDBColumn = {
     val id   = Keccak256.generate.toHexString
     val path = tmpdir.resolve(s"bench-$name-$id")
 
@@ -93,21 +95,27 @@ class RocksDBBench {
     RocksDBColumn(storage, ColumnFamily.All)
   }
 
-  def createDBForBudget(name: String,
-                        compaction: Compaction,
-                        memoryBudgetPerCol: Long): RocksDBColumn =
-    createDB(name,
-             Settings.databaseOptionsForBudget(compaction, memoryBudgetPerCol),
-             Settings.columnOptionsForBudget(Compaction.SSD, memoryBudgetPerCol))
+  def createDBForBudget(
+      name: String,
+      compaction: Compaction,
+      memoryBudgetPerCol: Long
+  ): RocksDBColumn =
+    createDB(
+      name,
+      Settings.databaseOptionsForBudget(compaction, memoryBudgetPerCol),
+      Settings.columnOptionsForBudget(Compaction.SSD, memoryBudgetPerCol)
+    )
 
   @Benchmark
   def nothingSettings(): Unit = {
     val db: RocksDBColumn =
-      createDB("nothing",
-               new DBOptions()
-                 .setCreateIfMissing(true)
-                 .setCreateMissingColumnFamilies(true),
-               new ColumnFamilyOptions)
+      createDB(
+        "nothing",
+        new DBOptions()
+          .setCreateIfMissing(true)
+          .setCreateMissingColumnFamilies(true),
+        new ColumnFamilyOptions
+      )
 
     randomInsertAndLookup(db)
   }
@@ -115,9 +123,11 @@ class RocksDBBench {
   @Benchmark
   def ssdSettings(): Unit = {
     val db: RocksDBColumn =
-      createDB("ssd",
-               Settings.databaseOptions(Compaction.SSD),
-               Settings.columnOptions(Compaction.SSD))
+      createDB(
+        "ssd",
+        Settings.databaseOptions(Compaction.SSD),
+        Settings.columnOptions(Compaction.SSD)
+      )
 
     randomInsertAndLookup(db)
   }
@@ -143,9 +153,11 @@ class RocksDBBench {
   @Benchmark
   def hddSettings(): Unit = {
     val db: RocksDBColumn =
-      createDB("hdd",
-               Settings.databaseOptions(Compaction.HDD),
-               Settings.columnOptions(Compaction.HDD))
+      createDB(
+        "hdd",
+        Settings.databaseOptions(Compaction.HDD),
+        Settings.columnOptions(Compaction.HDD)
+      )
 
     randomInsertAndLookup(db)
   }

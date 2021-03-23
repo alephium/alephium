@@ -44,9 +44,7 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
       override def groupNumPerBroker: Int = 2
     }
 
-    val locators = AVector.tabulate(3 * 6) { k =>
-      AVector.fill(k)(BlockHash.generate)
-    }
+    val locators  = AVector.tabulate(3 * 6) { k => AVector.fill(k)(BlockHash.generate) }
     val flowEvent = FlowHandler.SyncLocators(brokerGroupInfo0, locators)
     flowEvent.filerFor(brokerGroupInfo0) is locators
     flowEvent.filerFor(brokerGroupInfo1) is locators.takeRight(2 * groupNum)

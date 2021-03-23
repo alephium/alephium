@@ -35,19 +35,26 @@ trait WalletEndpoints
     with TapirCodecs
     with WalletExamples {
 
-  private def jsonBody[T: Encoder: Decoder: Schema: Validator](
-      implicit examples: List[Example[T]]) = tapirJsonBody[T].examples(examples)
+  private def jsonBody[T: Encoder: Decoder: Schema: Validator](implicit
+      examples: List[Example[T]]
+  ) = tapirJsonBody[T].examples(examples)
 
   private val wallets = endpoint
     .in("wallets")
     .errorOut(
       oneOf[WalletApiError](
-        statusMapping(StatusCode.BadRequest,
-                      jsonBody[WalletApiError.BadRequest].description("Bad request")),
-        statusMapping(StatusCode.NotFound,
-                      jsonBody[WalletApiError.NotFound].description("Not Found")),
-        statusMapping(StatusCode.Unauthorized,
-                      jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
+        statusMapping(
+          StatusCode.BadRequest,
+          jsonBody[WalletApiError.BadRequest].description("Bad request")
+        ),
+        statusMapping(
+          StatusCode.NotFound,
+          jsonBody[WalletApiError.NotFound].description("Not Found")
+        ),
+        statusMapping(
+          StatusCode.Unauthorized,
+          jsonBody[WalletApiError.Unauthorized].description("Unauthorized")
+        )
       )
     )
     .tag("Wallets")
@@ -56,17 +63,24 @@ trait WalletEndpoints
     .in("wallets")
     .errorOut(
       oneOf[WalletApiError](
-        statusMapping(StatusCode.BadRequest,
-                      jsonBody[WalletApiError.BadRequest].description("Bad request")),
-        statusMapping(StatusCode.NotFound,
-                      jsonBody[WalletApiError.NotFound].description("Not Found")),
-        statusMapping(StatusCode.Unauthorized,
-                      jsonBody[WalletApiError.Unauthorized].description("Unauthorized"))
+        statusMapping(
+          StatusCode.BadRequest,
+          jsonBody[WalletApiError.BadRequest].description("Bad request")
+        ),
+        statusMapping(
+          StatusCode.NotFound,
+          jsonBody[WalletApiError.NotFound].description("Not Found")
+        ),
+        statusMapping(
+          StatusCode.Unauthorized,
+          jsonBody[WalletApiError.Unauthorized].description("Unauthorized")
+        )
       )
     )
     .tag("Miners")
     .description(
-      "This endpoint can only be called if the wallet was created with the `miner = true` flag")
+      "This endpoint can only be called if the wallet was created with the `miner = true` flag"
+    )
 
   val createWallet: Endpoint[WalletCreation, WalletApiError, WalletCreation.Result, Nothing] =
     wallets.post

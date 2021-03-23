@@ -24,18 +24,20 @@ import org.scalatest.concurrent.ScalaFutures._
 
 class ServiceSpec extends AlephiumSpec {
   trait Test extends Service {
-    override implicit protected def executionContext: ExecutionContext = Implicits.global
+    implicit override protected def executionContext: ExecutionContext = Implicits.global
 
     var startNum: Int = 0
     var stopNum: Int  = 0
 
-    override protected def startSelfOnce(): Future[Unit] = Future {
-      startNum += 1
-    }
+    override protected def startSelfOnce(): Future[Unit] =
+      Future {
+        startNum += 1
+      }
 
-    override protected def stopSelfOnce(): Future[Unit] = Future {
-      stopNum += 1
-    }
+    override protected def stopSelfOnce(): Future[Unit] =
+      Future {
+        stopNum += 1
+      }
   }
 
   it should "start&stop only once" in {

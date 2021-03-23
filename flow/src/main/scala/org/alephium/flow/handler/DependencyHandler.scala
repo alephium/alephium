@@ -29,9 +29,11 @@ import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector}
 
 object DependencyHandler {
-  def props(blockFlow: BlockFlow,
-            blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-            headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]): Props =
+  def props(
+      blockFlow: BlockFlow,
+      blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
+      headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+  ): Props =
     Props(new DependencyHandler(blockFlow, blockHandlers, headerHandlers))
 
   sealed trait Command
@@ -44,10 +46,11 @@ object DependencyHandler {
   final case class Pendings(datas: AVector[BlockHash]) extends Event
 }
 
-class DependencyHandler(val blockFlow: BlockFlow,
-                        blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-                        headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]])
-    extends DependencyHandlerState {
+class DependencyHandler(
+    val blockFlow: BlockFlow,
+    blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
+    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+) extends DependencyHandlerState {
   import DependencyHandler._
 
   override def receive: Receive = {
@@ -86,9 +89,11 @@ trait DependencyHandlerState extends IOBaseActor {
   val readies      = mutable.HashSet.empty[BlockHash]
   val processing   = mutable.HashSet.empty[BlockHash]
 
-  def addPendingData(data: FlowData,
-                     broker: ActorRefT[ChainHandler.Event],
-                     origin: DataOrigin): Unit = {
+  def addPendingData(
+      data: FlowData,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
     escapeIOError(blockFlow.contains(data.hash)) { existing =>
       if (!existing) {
         if (pending.contains(data.hash)) {

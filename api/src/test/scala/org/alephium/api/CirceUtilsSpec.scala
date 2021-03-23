@@ -44,9 +44,7 @@ class CirceUtilsSpec extends AlephiumSpec {
   }
 
   it should "encode/decode vectors" in {
-    forAll { ys: List[Int] =>
-      check(AVector.from(ys), ys.mkString("[", ",", "]"))
-    }
+    forAll { ys: List[Int] => check(AVector.from(ys), ys.mkString("[", ",", "]")) }
   }
 
   def addressJson(addr: String): String = s"""{"addr":"$addr","port":9000}"""

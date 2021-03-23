@@ -31,8 +31,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     checkBlock(block, flow)
   }
 
-  override def validateUntilDependencies(block: Block,
-                                         flow: BlockFlow): BlockValidationResult[Unit] = {
+  override def validateUntilDependencies(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
     checkBlockUntilDependencies(block, flow)
   }
 
@@ -42,13 +44,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   private[validation] def checkBlockUntilDependencies(
       block: Block,
-      flow: BlockFlow): BlockValidationResult[Unit] = {
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
     headerValidation.checkHeaderUntilDependencies(block.header, flow)
   }
 
   private[validation] def checkBlockAfterDependencies(
       block: Block,
-      flow: BlockFlow): BlockValidationResult[Unit] = {
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
     for {
       _ <- headerValidation.checkHeaderAfterDependencies(block.header, flow)
       _ <- checkBlockAfterHeader(block, flow)
@@ -62,8 +66,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     } yield ()
   }
 
-  private[validation] def checkBlockAfterHeader(block: Block,
-                                                flow: BlockFlow): BlockValidationResult[Unit] = {
+  private[validation] def checkBlockAfterHeader(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
@@ -97,11 +103,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   private[validation] def checkCoinbaseEasy(block: Block): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
-    if (unsigned.inputs.isEmpty &&
-        unsigned.fixedOutputs.length == 1 &&
-        coinbase.generatedOutputs.isEmpty &&
-        coinbase.inputSignatures.isEmpty &&
-        coinbase.contractSignatures.isEmpty) {
+    if (
+      unsigned.inputs.isEmpty &&
+      unsigned.fixedOutputs.length == 1 &&
+      coinbase.generatedOutputs.isEmpty &&
+      coinbase.inputSignatures.isEmpty &&
+      coinbase.contractSignatures.isEmpty
+    ) {
       validBlock(())
     } else {
       invalidBlock(InvalidCoinbaseFormat)
@@ -114,9 +122,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     val data       = coinbase.unsigned.fixedOutputs.head.additionalData
     _deserialize[CoinbaseFixedData](data) match {
       case Right(Staging(coinbaseFixedData, _)) =>
-        if (coinbaseFixedData.fromGroup == chainIndex.from.value.toByte &&
-            coinbaseFixedData.toGroup == chainIndex.to.value.toByte &&
-            coinbaseFixedData.blockTs == block.header.timestamp) {
+        if (
+          coinbaseFixedData.fromGroup == chainIndex.from.value.toByte &&
+          coinbaseFixedData.toGroup == chainIndex.to.value.toByte &&
+          coinbaseFixedData.blockTs == block.header.timestamp
+        ) {
           validBlock(())
         } else {
           invalidBlock(InvalidCoinbaseData)
@@ -143,8 +153,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
-  private[validation] def checkNonCoinbases(block: Block,
-                                            flow: BlockFlow): BlockValidationResult[Unit] = {
+  private[validation] def checkNonCoinbases(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
     val index = block.chainIndex
     assume(index.relateTo(brokerConfig))
 
@@ -152,9 +164,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       for {
         _          <- checkBlockDoubleSpending(block)
         worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
-        _ <- convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
-          nonCoinbaseValidation.checkBlockTx(block.transactions(index), block.header, worldState)
-        })
+        _ <-
+          convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
+            nonCoinbaseValidation.checkBlockTx(block.transactions(index), block.header, worldState)
+          })
       } yield ()
     } else {
       validBlock(())
@@ -175,8 +188,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
-  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(
-      implicit brokerConfig: BrokerConfig): BlockValidationResult[Unit] = {
+  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(implicit
+      brokerConfig: BrokerConfig
+  ): BlockValidationResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
       ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { ok =>
         if (ok) validBlock(()) else invalidBlock(InvalidFlowTxs)
@@ -188,8 +202,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 }
 
 object BlockValidation {
-  def build(implicit brokerConfig: BrokerConfig,
-            consensusConfig: ConsensusConfig): BlockValidation = new Impl()
+  def build(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfig: ConsensusConfig
+  ): BlockValidation = new Impl()
 
   class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
       extends BlockValidation {

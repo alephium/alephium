@@ -48,7 +48,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     case class Bootstrap(addresses: ArraySeq[InetSocketAddress])
 
     val expected = Bootstrap(
-      ArraySeq(new InetSocketAddress("localhost", 1234), new InetSocketAddress("localhost", 4321)))
+      ArraySeq(new InetSocketAddress("localhost", 1234), new InetSocketAddress("localhost", 4321))
+    )
 
     ConfigSource
       .string("""{ addresses = ["localhost:1234", "localhost:4321"] }""")
@@ -74,7 +75,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     config.minerAddresses is minerAddresses.map(str =>
-      Address.fromBase58(str, NetworkType.Devnet).get.lockupScript)
+      Address.fromBase58(str, NetworkType.Devnet).get.lockupScript
+    )
   }
 
   it should "fail to load if miner's addresses are wrong" in new AlephiumConfigFixture {
@@ -105,9 +107,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
     config.network.networkType is NetworkType.Testnet
     config.minerAddresses.length is config.broker.groups
-    config.minerAddresses.foreachWithIndex { (miner, i) =>
-      miner.groupIndex.value is i
-    }
+    config.minerAddresses.foreachWithIndex { (miner, i) => miner.groupIndex.value is i }
   }
 
   it should "generate miner's addresses if not set and network is `devnet`" in new AlephiumConfigFixture {
@@ -117,8 +117,6 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
     config.network.networkType is NetworkType.Devnet
     config.minerAddresses.length is config.broker.groups
-    config.minerAddresses.foreachWithIndex { (miner, i) =>
-      miner.groupIndex.value is i
-    }
+    config.minerAddresses.foreachWithIndex { (miner, i) => miner.groupIndex.value is i }
   }
 }

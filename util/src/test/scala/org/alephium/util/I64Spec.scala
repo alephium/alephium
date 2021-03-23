@@ -37,11 +37,13 @@ class I64Spec extends AlephiumSpec {
     I64.from(I64.MaxValue.toBigInt.add(BigInteger.ONE)).isEmpty is true
   }
 
-  def test(op: (I64, I64)                       => Option[I64],
-           opUnsafe: (I64, I64)                 => I64,
-           opExpected: (BigInteger, BigInteger) => BigInteger,
-           bcondition: Long                     => Boolean = _ >= Long.MinValue,
-           abcondition: (Long, Long)            => Boolean = _ + _ >= Long.MinValue): Unit = {
+  def test(
+      op: (I64, I64) => Option[I64],
+      opUnsafe: (I64, I64) => I64,
+      opExpected: (BigInteger, BigInteger) => BigInteger,
+      bcondition: Long => Boolean = _ >= Long.MinValue,
+      abcondition: (Long, Long) => Boolean = _ + _ >= Long.MinValue
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen
@@ -49,7 +51,12 @@ class I64Spec extends AlephiumSpec {
       val aI64          = I64.from(a)
       val bI64          = I64.from(b)
       lazy val expected = opExpected(aI64.toBigInt, bI64.toBigInt)
-      if (bcondition(b) && abcondition(a, b) && expected >= I64.MinValue.toBigInt && expected <= I64.MaxValue.toBigInt) {
+      if (
+        bcondition(b) && abcondition(
+          a,
+          b
+        ) && expected >= I64.MinValue.toBigInt && expected <= I64.MaxValue.toBigInt
+      ) {
         op(aI64, bI64).get.toBigInt is expected
         opUnsafe(aI64, bI64).toBigInt is expected
       } else {

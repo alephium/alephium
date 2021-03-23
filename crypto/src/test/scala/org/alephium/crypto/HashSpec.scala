@@ -23,8 +23,9 @@ import org.alephium.util.AlephiumSpec
 import org.alephium.util.Hex._
 
 class HashSpec extends AlephiumSpec {
-  def check[T <: RandomBytes](provider: HashSchema[T], tests: Seq[(String, ByteString)])(
-      implicit serde: Serde[T]): Unit = {
+  def check[T <: RandomBytes](provider: HashSchema[T], tests: Seq[(String, ByteString)])(implicit
+      serde: Serde[T]
+  ): Unit = {
     provider.getClass.getSimpleName should "hash correctly" in {
       for ((message, expected) <- tests) {
         val output = provider.hash(message)
@@ -54,7 +55,7 @@ class HashSpec extends AlephiumSpec {
       provider.xor(provider.allOne, provider.zero) is provider.allOne
       provider.xor(provider.allOne, provider.allOne) is provider.zero
       provider.zero.toRandomIntUnsafe is 0
-      provider.allOne.toRandomIntUnsafe is (0xFFFFFFFFL * 8).toInt
+      provider.allOne.toRandomIntUnsafe is (0xffffffffL * 8).toInt
     }
   }
 

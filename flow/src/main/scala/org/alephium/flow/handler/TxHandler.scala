@@ -31,8 +31,9 @@ import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.util.{AVector, BaseActor, EventStream}
 
 object TxHandler {
-  def props(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
-                                  networkSetting: NetworkSetting): Props =
+  def props(
+      blockFlow: BlockFlow
+  )(implicit groupConfig: GroupConfig, networkSetting: NetworkSetting): Props =
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
@@ -43,14 +44,15 @@ object TxHandler {
   final case class AddFailed(txId: Hash)    extends Event
 }
 
-class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
-                                      networkSetting: NetworkSetting)
-    extends BaseActor
+class TxHandler(blockFlow: BlockFlow)(implicit
+    groupConfig: GroupConfig,
+    networkSetting: NetworkSetting
+) extends BaseActor
     with EventStream.Publisher {
   private val nonCoinbaseValidation = NonCoinbaseValidation.build
 
-  override def receive: Receive = {
-    case TxHandler.AddTx(tx, origin) => handleTx(tx, origin)
+  override def receive: Receive = { case TxHandler.AddTx(tx, origin) =>
+    handleTx(tx, origin)
   }
 
   def handleTx(tx: TransactionTemplate, origin: DataOrigin): Unit = {
@@ -75,10 +77,12 @@ class TxHandler(blockFlow: BlockFlow)(implicit groupConfig: GroupConfig,
     }
   }
 
-  def handleValidTx(chainIndex: ChainIndex,
-                    tx: TransactionTemplate,
-                    mempool: MemPool,
-                    origin: DataOrigin): Unit = {
+  def handleValidTx(
+      chainIndex: ChainIndex,
+      tx: TransactionTemplate,
+      mempool: MemPool,
+      origin: DataOrigin
+  ): Unit = {
     val count = mempool.add(chainIndex, AVector(tx))
     log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, #$count txs added")
     val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)

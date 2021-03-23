@@ -80,7 +80,8 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
   it should "cleanup expired downloading accordingly" in new Fixture {
     val currentTs = TimeStamp.now()
     val downloadingTs = AVector.tabulate(randomHashes.length)(k =>
-      currentTs.minusUnsafe(Duration.ofMinutesUnsafe(k.toLong)))
+      currentTs.minusUnsafe(Duration.ofMinutesUnsafe(k.toLong))
+    )
 
     val downloadTrackObj = downloadTrack.underlyingActor
 

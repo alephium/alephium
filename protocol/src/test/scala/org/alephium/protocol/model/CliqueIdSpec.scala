@@ -26,8 +26,8 @@ class CliqueIdSpec extends AlephiumSpec with NoIndexModelGenerators {
       val output2 = id1.hammingDist(id0)
       val expected =
         (0 until CliqueId.length).map { i =>
-          val byte0 = id0.bytes(i) & 0xFF
-          val byte1 = id1.bytes(i) & 0xFF
+          val byte0 = id0.bytes(i) & 0xff
+          val byte1 = id1.bytes(i) & 0xff
           Integer.bitCount(byte0 ^ byte1)
         }.sum
 
