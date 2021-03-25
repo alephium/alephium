@@ -73,7 +73,7 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
     )
 
     whenReady(walletService.start().failed) { exception =>
-      exception is a[java.nio.file.AccessDeniedException]
+      exception is a[java.nio.file.FileSystemException]
     }
   }
 
