@@ -86,7 +86,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
       val bytes = DiscoveryMessage.serialize(msg, networkType)(peerFixture.discoveryConfig)
       val value =
         DiscoveryMessage
-          .deserialize(CliqueId.generate, bytes, networkType)
+          .deserialize(bytes, networkType)
           .toOption
           .get
       msg is value

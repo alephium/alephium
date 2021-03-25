@@ -73,7 +73,7 @@ class DiscoveryServerStateSpec
       socketProbe.expectMsgPF() { case send: Udp.Send =>
         val message =
           DiscoveryMessage
-            .deserialize(CliqueId.generate, send.payload, networkConfig.networkType)(
+            .deserialize(send.payload, networkConfig.networkType)(
               peerConfig,
               peerConfig
             )

@@ -100,9 +100,13 @@ trait TestFixtureLike
       val rest: ServerSocket  = ServerSocketChannel.open().socket()
       val ws: ServerSocket    = ServerSocketChannel.open().socket()
       try {
+        tcp.setReuseAddress(true)
         tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        udp.setReuseAddress(true)
         udp.bind(new InetSocketAddress("localhost", tcpPort))
+        rest.setReuseAddress(true)
         rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+        ws.setReuseAddress(true)
         ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
         usedPort.add(tcpPort)
         tcpPort
@@ -269,7 +273,7 @@ trait TestFixtureLike
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
-        ("alephium.mining.batch-delay", "100 milli"),
+        ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )

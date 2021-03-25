@@ -113,12 +113,7 @@ paths:
       tags:
       - Wallets
       summary: Create a new wallet
-      description: 'A new wallet will be created and respond with a mnemonic.
-
-        Make sure to keep that mnemonic safely as it will allows you to recover your
-        wallet.
-
-        Default mnemonic size is 24, (options: 12, 15, 18, 21, 24).'
+      description: 'A new wallet will be created and respond with a mnemonic. Make sure to keep that mnemonic safely as it will allows you to recover your wallet. Default mnemonic size is 24, (options: 12, 15, 18, 21, 24).'
       operationId: postWallets
       requestBody:
         content:
@@ -544,9 +539,8 @@ paths:
     post:
       tags:
       - Miners
-      summary: Derive your next miner addresse for each group
-      description: "\nYour wallet need to have been created with the miner flag set\
-        \ to true\n      "
+      summary: Derive your next miner addresses for each group
+      description: "Your wallet need to have been created with the miner flag set to true"
       operationId: postWalletsWallet_nameDerivenextmineraddresses
       parameters:
       - name: wallet_name

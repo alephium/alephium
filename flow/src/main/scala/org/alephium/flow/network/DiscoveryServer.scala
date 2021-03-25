@@ -154,13 +154,13 @@ class DiscoveryServer(
 
   def handleUdp: Receive = {
     case Udp.Received(data, remote) =>
-      DiscoveryMessage.deserialize(selfCliqueId, data, networkConfig.networkType) match {
+      DiscoveryMessage.deserialize(data, networkConfig.networkType) match {
         case Right(message: DiscoveryMessage) =>
           log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           handlePayload(remote)(message.payload)
         case Left(error) =>
           // TODO: handler error properly
-          log.debug(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
+          log.warning(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
       }
     case Terminated(_) =>
       logUdpFailure(s"Udp listener stopped, there might be network issue. Restarting udp ...")

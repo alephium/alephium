@@ -48,16 +48,10 @@ object DiscoveryMessage {
     def serialize(header: Header): ByteString =
       serde.serialize((header.version, header.publicKey, header.cliqueId))
 
-    def _deserialize(myCliqueId: CliqueId, input: ByteString)(implicit
-        config: DiscoveryConfig
-    ): SerdeResult[Staging[Header]] = {
+    def _deserialize(input: ByteString): SerdeResult[Staging[Header]] = {
       serde._deserialize(input).flatMap { case Staging((_version, publicKey, cliqueId), rest) =>
         if (_version == version) {
-          if (publicKey != config.discoveryPublicKey && cliqueId != myCliqueId) {
-            Right(Staging(Header(_version, publicKey, cliqueId), rest))
-          } else {
-            Left(SerdeError.validation(s"Peer's public key is the same as ours"))
-          }
+          Right(Staging(Header(_version, publicKey, cliqueId), rest))
         } else {
           Left(SerdeError.validation(s"Invalid version: got ${_version}, expect: $version"))
         }
@@ -198,7 +192,7 @@ object DiscoveryMessage {
     magic ++ checksum ++ length ++ signature ++ header ++ payload
   }
 
-  def deserialize(myCliqueId: CliqueId, input: ByteString, networkType: NetworkType)(implicit
+  def deserialize(input: ByteString, networkType: NetworkType)(implicit
       discoveryConfig: DiscoveryConfig,
       groupConfig: GroupConfig
   ): SerdeResult[DiscoveryMessage] = {
@@ -207,7 +201,7 @@ object DiscoveryMessage {
       .flatMap { case (checksum, length, rest) =>
         for {
           signaturePair <- _deserialize[Signature](rest)
-          headerRest    <- Header._deserialize(myCliqueId, signaturePair.rest)
+          headerRest    <- Header._deserialize(signaturePair.rest)
           payloadBytes  <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
           _             <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
           _ <- verifyPayloadSignature(

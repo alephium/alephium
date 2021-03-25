@@ -87,9 +87,11 @@ trait WalletEndpoints
       .in(jsonBody[WalletCreation])
       .out(jsonBody[WalletCreation.Result])
       .summary("Create a new wallet")
-      .description(s"""|A new wallet will be created and respond with a mnemonic.
-         |Make sure to keep that mnemonic safely as it will allows you to recover your wallet.
-         |Default mnemonic size is 24, (options: $mnemonicSizes).""".stripMargin)
+      .description(
+        "A new wallet will be created and respond with a mnemonic. " +
+          "Make sure to keep that mnemonic safely as it will allows you to recover your wallet. " +
+          s"Default mnemonic size is 24, (options: $mnemonicSizes)."
+      )
 
   val restoreWallet: Endpoint[WalletRestore, WalletApiError, WalletRestore.Result, Nothing] =
     wallets.put
@@ -164,9 +166,7 @@ trait WalletEndpoints
       .in(path[String]("wallet_name"))
       .in("deriveNextMinerAddresses")
       .out(jsonBody[AVector[AddressInfo]])
-      .summary("Derive your next miner addresse for each group")
-      .description(s"""
-        |Your wallet need to have been created with the miner flag set to true
-      """.stripMargin)
+      .summary("Derive your next miner addresses for each group")
+      .description(s"Your wallet need to have been created with the miner flag set to true")
 
 }

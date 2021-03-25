@@ -252,8 +252,8 @@ class RestServerSpec
 
       val timeout = Duration.ofMinutesUnsafe(1).asScala
 
-      val openapiFile =
-        Source.fromFile("../api/src/main/resources/openapi.yaml").getLines().mkString("\n")
+      val openapiPath       = ApiModel.getClass.getResource("/openapi.yaml")
+      val openapiFile       = Source.fromFile(openapiPath.getPath, "UTF-8").getLines().mkString("\n")
       val openapiFileAsJson = yaml.parser.parse(openapiFile).rightValue
       val expectedOpenapi   = removeExamples(openapiFileAsJson)
 
