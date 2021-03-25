@@ -210,6 +210,7 @@ trait DiscoveryServerState {
   }
 
   def ping(peerInfo: BrokerInfo): Unit = {
+    assume(peerInfo.peerId != selfPeerId)
     val remoteAddress = peerInfo.address
     send(remoteAddress, Ping(selfPeerInfoOpt))
     pendings += (peerInfo.peerId -> AwaitPong(remoteAddress, TimeStamp.now()))

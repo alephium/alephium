@@ -72,8 +72,11 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
       Duration.ofMinutesUnsafe(10)
     )
 
-    whenReady(walletService.start().failed) { exception =>
-      exception is a[java.nio.file.FileSystemException]
+    if (File.separatorChar equals '/') {
+      // This test only works on Unix system
+      whenReady(walletService.start().failed) { exception =>
+        exception is a[java.nio.file.FileSystemException]
+      }
     }
   }
 

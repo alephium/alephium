@@ -20,8 +20,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.scalatest.Assertion
 import org.scalatest.concurrent.Conductors
+import org.scalatest.time.{Seconds, Span}
 
 trait LockFixture extends AlephiumSpec with Conductors {
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = Span(5, Seconds), interval = Span(1, Seconds))
+
   trait WithLock {
     val locked: Array[Boolean] = Array.fill(10)(true)
 
