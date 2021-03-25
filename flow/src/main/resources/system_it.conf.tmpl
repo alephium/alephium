@@ -1,3 +1,69 @@
+alephium {
+  broker {
+    groups = 4
+    broker-num = 2
+    broker-id = 0
+  }
+
+  consensus {
+    tips-prune-interval = 100
+    block-cache-capacity-per-chain = 25
+  }
+
+  mining {
+    nonce-step = 400
+    batch-delay = 0 milli
+  }
+
+  network {
+    network-type = "testnet"
+
+    ping-frequency = 1 second
+    retry-timeout = 10 second
+    connection-buffer-capacity-in-byte = 100000000
+
+    upnp {
+      enabled = false
+    }
+
+    bind-address = "127.0.0.1:9972"
+    external-address = "127.0.0.1:9972"
+    internal-address = "127.0.0.1:9972"
+    coordinator-address = "127.0.0.1:9973"
+    num-of-sync-blocks-limit = 128
+
+    rest-port = 12973
+    ws-port = 11973
+  }
+
+  discovery {
+    bootstrap = []
+
+    peers-per-group = 16
+    scan-max-per-group = 8
+    scan-frequency = 90.seconds
+    scan-fast-frequency = 5.seconds
+    neighbors-per-group = 8
+  }
+
+  api {
+    network-interface = "127.0.0.1"
+    blockflow-fetch-max-age = 30 minutes
+    ask-timeout = 5 seconds
+  }
+
+  mempool {
+    tx-pool-capacity = 1000
+    tx-max-number-per-block = 1000
+  }
+
+  wallet {
+    port = 15973
+    secret-dir = ""
+    locking-timeout = 10 minutes
+  }
+}
+
 akka {
   loglevel = "DEBUG"
   loggers = ["akka.event.slf4j.Slf4jLogger"]
@@ -39,72 +105,5 @@ akka {
         so-reuse-address = true
       }
     }
-  }
-}
-
-alephium {
-  broker {
-    groups = 4
-    broker-num = 2
-    broker-id = 0
-  }
-
-  consensus {
-    tips-prune-interval = 100
-    block-cache-capacity-per-chain = 25
-  }
-
-  mining {
-    nonce-step = 400
-    batch-delay = 0 milli
-  }
-
-  network {
-    network-type = "testnet"
-
-    ping-frequency = 1 second
-    retry-timeout = 10 second
-    connection-buffer-capacity-in-byte = 100000000
-
-    upnp {
-      enabled = false
-    }
-
-    bind-address = "127.0.0.1:9972"
-    external-address = "127.0.0.1:9972"
-    internal-address = "127.0.0.1:9972"
-    coordinator-address = "127.0.0.1:9973"
-    num-of-sync-blocks-limit = 128
-
-    rpc-port = 0
-    ws-port = 0
-    rest-port = 0
-  }
-
-  discovery {
-    bootstrap = []
-
-    peers-per-group = 16
-    scan-max-per-group = 8
-    scan-frequency = 90.seconds
-    scan-fast-frequency = 5.seconds
-    neighbors-per-group = 8
-  }
-
-  api {
-    network-interface = "127.0.0.1"
-    blockflow-fetch-max-age = 30 minutes
-    ask-timeout = 5 seconds
-  }
-
-  mempool {
-    tx-pool-capacity = 1000
-    tx-max-number-per-block = 1000
-  }
-
-  wallet {
-    port = 15973
-    secret-dir = ""
-    locking-timeout = 10 minutes
   }
 }

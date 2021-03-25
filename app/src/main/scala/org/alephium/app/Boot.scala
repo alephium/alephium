@@ -88,7 +88,7 @@ class BootUp extends StrictLogging {
 
   def logConfig(): Unit = {
     val renderOptions =
-      ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
+      ConfigRenderOptions.defaults().setOriginComments(false).setComments(true).setJson(false)
     logger.debug(typesafeConfig.root().render(renderOptions))
 
     val digests = config.genesisBlocks.map(showBlocks).mkString("-")

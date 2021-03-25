@@ -34,7 +34,7 @@ import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Block, NetworkType, Target}
+import org.alephium.protocol.model.{Address, Block, NetworkType, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, U256}
 
@@ -85,9 +85,8 @@ final case class NetworkSetting(
     internalAddress: InetSocketAddress,
     coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
-    numOfSyncBlocksLimit: Int,
-    wsPort: Int,
     restPort: Int,
+    wsPort: Int,
     connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
   val isCoordinator: Boolean = internalAddress == coordinatorAddress
@@ -141,7 +140,7 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     genesisBalances: AVector[(LockupScript, U256)],
-    minerAddresses: AVector[LockupScript]
+    minerAddresses: AVector[Address]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
@@ -177,9 +176,8 @@ object AlephiumConfig {
       internalAddress: InetSocketAddress,
       coordinatorAddress: InetSocketAddress,
       externalAddress: Option[InetSocketAddress],
-      numOfSyncBlocksLimit: Int,
-      wsPort: Int,
-      restPort: Int
+      restPort: Int,
+      wsPort: Int
   ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
@@ -192,12 +190,10 @@ object AlephiumConfig {
         internalAddress,
         coordinatorAddress,
         externalAddress,
-        numOfSyncBlocksLimit,
-        wsPort,
         restPort,
+        wsPort,
         connectionBuild
       )
-
     }
   }
 

@@ -164,7 +164,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
             dependencyHandler ! DependencyHandler.FlowDataAdded(header)
             broker ! HeaderChainHandler.HeaderAdded(header.hash)
             minerOpt.foreach(_ ! Miner.UpdateTemplate)
-            logInfo(header)
+            log.info(show(header))
         }
       case Left(error) => handleIOError(error)
     }
@@ -188,7 +188,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
               case _: DataOrigin.FromClique =>
                 minerOpt.foreach(_ ! Miner.UpdateTemplate)
             }
-            logInfo(block.header)
+            log.info(show(block))
             notify(block)
         }
       }
@@ -201,16 +201,10 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
     }
   }
 
-  def logInfo(header: BlockHeader): Unit = {
+  def show(header: BlockHeader): String = {
     val total = blockFlow.numHashes
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
-    val heights = for {
-      i <- 0 until brokerConfig.groups
-      j <- 0 until brokerConfig.groups
-      height = blockFlow.getHashChain(ChainIndex.unsafe(i, j)).maxHeight.getOrElse(-1)
-    } yield s"$i-$j:$height"
-    val heightsInfo = heights.mkString(", ")
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
     val timeSpan = {
@@ -221,7 +215,10 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
           s"${span}ms"
       }
     }
-    log.info(s"$index; total: $total; ${chain
-      .show(header.hash)}; heights: $heightsInfo; targetRatio: $targetRatio, timeSpan: $timeSpan")
+    s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, timeSpan: $timeSpan"
+  }
+
+  def show(block: Block): String = {
+    show(block.header) + s" #tx: ${block.transactions.length}"
   }
 }

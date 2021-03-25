@@ -26,6 +26,8 @@ final case class Address(networkType: NetworkType, lockupScript: LockupScript) {
   def toBase58: String = networkType.prefix ++ Base58.encode(serialize(lockupScript))
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+
+  override def toString: String = toBase58
 }
 
 object Address {

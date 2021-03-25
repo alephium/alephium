@@ -77,6 +77,12 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
     send(handShakeMessage)
     val handshakeTimeoutTick = scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
 
+    def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
+      handshakeTimeoutTick.cancel()
+      publishEvent(misbehavior)
+      context.stop(self)
+    }
+
     val receive: Receive = {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
@@ -86,10 +92,11 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
         context become (exchanging orElse pingPong)
       case HandShakeTimeout =>
-        log.debug(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
-        publishEvent(MisbehaviorManager.RequestTimeout(remoteAddress))
-      case Received(_) =>
-        publishEvent(MisbehaviorManager.Spamming(remoteAddress))
+        log.warning(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
+        stop(MisbehaviorManager.RequestTimeout(remoteAddress))
+      case Received(message) =>
+        log.warning(s"Unexpected message from $brokerAlias, $message")
+        stop(MisbehaviorManager.Spamming(remoteAddress))
     }
     receive
   }
@@ -210,17 +217,17 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       ConnectionHandler.Send(Message.serialize(payload, networkSetting.networkType))
   }
 
-  def stop(): Unit = {
-    pingPongTickOpt.foreach(_.cancel())
-    brokerConnectionHandler ! ConnectionHandler.CloseConnection
-  }
-
   override def unhandled(message: Any): Unit =
     message match {
       case Terminated(_) =>
         context stop self
       case _ => super.unhandled(message)
     }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    pingPongTickOpt.foreach(_.cancel())
+  }
 }
 
 trait FlowDataHandler extends BaseActor with EventStream.Publisher {

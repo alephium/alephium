@@ -26,6 +26,8 @@ class MiningTest extends AlephiumSpec {
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
+    eventually(request[SelfClique](getSelfClique).synced is true)
+
     val selfClique = request[SelfClique](getSelfClique)
     val group      = request[Group](getGroup(address))
     val index      = group.group / selfClique.groupNumPerBroker

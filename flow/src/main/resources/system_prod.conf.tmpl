@@ -1,3 +1,75 @@
+alephium {
+  consensus {
+    tips-prune-interval = 100
+    block-cache-capacity-per-chain = 25
+  }
+
+  mining {
+    nonce-step = 10000
+    batch-delay = 0 milli
+  }
+
+  network {
+    # The frequency at which peers will ping each other to check for liveness.
+    ping-frequency = 300 second
+
+    # Timeout for establish a connection with peers
+    retry-timeout = 30 second
+
+    # Size of the outbound TCP buffer (in bytes).
+    connection-buffer-capacity-in-byte = 100000000
+
+    upnp {
+      # Enable UPNnP port forwarding (only works with UPnP compatible routers).
+      # Not helpful when you run the node in cloud
+      enabled = true
+    }
+
+    # The interface to which the TCP and UPD servers will be bound. (use 0.0.0.0 for all interfaces)
+    bind-address = "0.0.0.0:9973"
+
+    # Optional public address for the other nodes to find you
+    # If the external address is not set and UPnP works, you will get your external address via your IGD
+    # If the external address is set and UPnP is enable, UPnP will be ignored
+    external-address = null
+
+    # This is the address for the other nodes of your clique to connect to you
+    # For example, your clique has 2 nodes in a same LAN, then your 2 nodes can use private addresses to connect to each other
+    internal-address  = "127.0.0.1:9973"
+
+    # Each clique has a master node with brokerId == 0, of which the internal-address is the coordinator-address
+    coordinator-address    = "127.0.0.1:9973"
+
+    rest-port = 12973
+    ws-port = 11973
+  }
+
+  discovery {
+    peers-per-group = 16
+    scan-max-per-group = 8
+    scan-frequency = 90.seconds
+    scan-fast-frequency = 5.seconds
+    neighbors-per-group = 8
+  }
+
+  mempool {
+    tx-pool-capacity = 1000
+    tx-max-number-per-block = 1000
+  }
+
+  api {
+    network-interface = "127.0.0.1"
+    blockflow-fetch-max-age = 30 minutes
+    ask-timeout = 5 seconds
+  }
+
+  wallet {
+    port = 15973
+    secret-dir = ${HOME}"/.alephium-wallets"
+    locking-timeout = 10 minutes
+  }
+}
+
 akka {
   loglevel = "DEBUG"
   loggers = ["akka.event.slf4j.Slf4jLogger"]
@@ -39,62 +111,5 @@ akka {
         so-reuse-address = true
       }
     }
-  }
-}
-
-alephium {
-  consensus {
-    tips-prune-interval = 100
-    block-cache-capacity-per-chain = 25
-  }
-
-  mining {
-    nonce-step = 10000
-    batch-delay = 0 milli
-  }
-
-  network {
-    ping-frequency = 300 second
-    retry-timeout = 30 second
-    connection-buffer-capacity-in-byte = 100000000
-
-    upnp {
-      enabled = true
-    }
-
-    bind-address = "0.0.0.0:9973"
-    external-address = null
-    internal-address  = "127.0.0.1:9973"
-    coordinator-address    = "127.0.0.1:9973"
-    num-of-sync-blocks-limit = 128
-
-    rpc-port = 0
-    ws-port = 0
-    rest-port = 0
-  }
-
-  discovery {
-    peers-per-group = 16
-    scan-max-per-group = 8
-    scan-frequency = 90.seconds
-    scan-fast-frequency = 5.seconds
-    neighbors-per-group = 8
-  }
-
-  mempool {
-    tx-pool-capacity = 1000
-    tx-max-number-per-block = 1000
-  }
-
-  api {
-    network-interface = "127.0.0.1"
-    blockflow-fetch-max-age = 30 minutes
-    ask-timeout = 5 seconds
-  }
-
-  wallet {
-    port = 15973
-    secret-dir = ${HOME}"/.alephium-wallets"
-    locking-timeout = 10 minutes
   }
 }

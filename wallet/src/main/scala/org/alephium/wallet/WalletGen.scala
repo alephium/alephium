@@ -48,18 +48,22 @@ object WalletGen extends App {
   // scalastyle:off regex
   Seq[(NetworkType, Int)](NetworkType.Testnet -> 4, NetworkType.Devnet -> 3).foreach {
     case (networkType, groupNum) =>
-      println(networkType.name)
+      printLine(networkType.name)
       implicit val config: GroupConfig = new GroupConfig {
         override def groups: Int = groupNum
       }
       (0 until groupNum).foreach { g =>
-        println(s"group: $g")
+        printLine(s"group: $g")
         val (address, pubKey, priKey, mnemonic) = gen(networkType, GroupIndex.unsafe(g))
-        println(s"address: ${address.toBase58}")
-        println(s"pubKey: ${pubKey.toHexString}")
-        println(s"priKey: ${priKey.toHexString}")
-        println(s"mnemonic: ${mnemonic.toLongString}")
+        printLine(s"address: ${address.toBase58}")
+        printLine(s"pubKey: ${pubKey.toHexString}")
+        printLine(s"priKey: ${priKey.toHexString}")
+        printLine(s"mnemonic: ${mnemonic.toLongString}")
       }
-      println()
+      printLine("")
+  }
+
+  def printLine(text: String): Unit = {
+    print(text + "\n")
   }
 }
