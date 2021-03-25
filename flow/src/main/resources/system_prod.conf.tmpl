@@ -54,22 +54,22 @@ alephium {
   }
 
   network {
-    # Connected nodes will need to ping each other regularly
+    # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
 
     # Timeout for establish a connection with peers
     retry-timeout = 30 second
 
-    # Buffer size for TCP writting
+    # Size of the outbound TCP buffer (in bytes).
     connection-buffer-capacity-in-byte = 100000000
 
     upnp {
-      # Enable UPnP if your router/gateway supports it
+      # Enable UPNnP port forwarding (only works with UPnP compatible routers).
       # Not helpful when you run the node in cloud
       enabled = true
     }
 
-    # Network address for TCP/UDP
+    # The interface to which the TCP and UPD servers will be bound. (use 0.0.0.0 for all interfaces)
     bind-address = "0.0.0.0:9973"
 
     # Optional public address for the other nodes to find you
@@ -102,7 +102,7 @@ alephium {
   }
 
   api {
-    network-interface = "0.0.0.0"
+    network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
   }
