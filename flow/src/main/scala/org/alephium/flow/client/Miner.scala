@@ -53,11 +53,9 @@ object Miner extends LazyLogging {
       emissionConfig: EmissionConfig,
       miningConfig: MiningSetting
   ): Props = {
-    validateAddresses(addresses) match {
-      case Left(error) =>
-        logger.error(s"Invalid miner addresses: $addresses, due to $error")
-        sys.exit(1)
-      case _ => ()
+    validateAddresses(addresses).left.foreach { error =>
+      logger.error(s"Invalid miner addresses: ${addresses.toString}, due to $error")
+      sys.exit(1)
     }
 
     Props(new Miner(networkType, addresses.map(_.lockupScript), blockFlow, allHandlers))
