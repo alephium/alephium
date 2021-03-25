@@ -21,5 +21,5 @@ jobs:
       - name: Install rgn tools for linux
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: sudo apt-get install rng-tools haveged
-      - run: sbt it:scalafmtCheck it:scalastyle it:test
+      - run: sbt it:test
         shell: bash
