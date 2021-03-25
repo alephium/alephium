@@ -67,10 +67,9 @@ trait BlockHashPool {
 
   def getAllTips: AVector[BlockHash]
 
-  def show(hash: BlockHash): String = {
-    val shortHash = hash.shortHex
-    val hashNum   = numHashes - 1 // exclude genesis block
-    val height    = getHeight(hash).getOrElse(-1)
-    s"hash: $shortHash; height: $height/$hashNum"
+  def showHeight(hash: BlockHash): String = {
+    val hashNum = numHashes - 1 // exclude genesis block
+    val height  = getHeight(hash).getOrElse(-1)
+    s"height: $height/$hashNum"
   }
 }
