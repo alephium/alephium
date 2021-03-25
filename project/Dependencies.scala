@@ -66,6 +66,4 @@ object Dependencies {
   lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
   lazy val `sttp-akka-http-backend` =
     "com.softwaremill.sttp.client" %% "akka-http-backend" % Version.sttp
-
-  lazy val blake3 = "io.github.rctcwyvrn" % "blake3" % "1.3"
 }

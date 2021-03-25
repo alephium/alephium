@@ -17,7 +17,6 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import io.github.rctcwyvrn.blake3.{Blake3 => Blake3Java}
 
 import org.alephium.serde.RandomBytes
 

@@ -74,7 +74,7 @@ lazy val serde = project("serde")
 lazy val crypto = project("crypto")
   .dependsOn(util % "test->test;compile->compile", serde)
   .settings(
-    libraryDependencies += blake3
+    libraryDependencies ++= Seq(`circe-parser` % Test, `circe-generic` % Test)
   )
 
 lazy val io = project("io")
