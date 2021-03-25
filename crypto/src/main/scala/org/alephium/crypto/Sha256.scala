@@ -24,9 +24,8 @@ import org.alephium.serde.RandomBytes
 
 class Sha256(val bytes: ByteString) extends RandomBytes
 
-object Sha256 extends HashSchema[Sha256](HashSchema.unsafeSha256, _.bytes) {
-  override def length: Int = 32
+object Sha256 extends BCHashSchema[Sha256](HashSchema.unsafeSha256, _.bytes) {
+  def length: Int = 32
 
-  // TODO: optimize with queue of providers
-  override def provider: Digest = new SHA256Digest()
+  def provider(): Digest = new SHA256Digest()
 }

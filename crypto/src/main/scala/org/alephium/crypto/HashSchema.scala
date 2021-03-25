@@ -52,15 +52,7 @@ object HashSchema {
 
 abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
     extends RandomBytes.Companion[T](unsafe, toBytes) {
-  def provider: Digest
-
-  def hash(input: Seq[Byte]): T = {
-    val _hasher = provider // For Thread-safety
-    _hasher.update(input.toArray, 0, input.length)
-    val res = new Array[Byte](length)
-    _hasher.doFinal(res, 0)
-    unsafe(ByteString.fromArrayUnsafe(res))
-  }
+  def hash(input: Seq[Byte]): T
 
   def hash(input: String): T = {
     hash(ByteString.fromString(input))
@@ -89,4 +81,17 @@ abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
   }
 
   def random: T = generate
+}
+
+abstract class BCHashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
+    extends HashSchema[T](unsafe, toBytes) {
+  def provider(): Digest
+
+  def hash(input: Seq[Byte]): T = {
+    val hashser = provider() // For Thread-safety
+    hashser.update(input.toArray, 0, input.length)
+    val res = new Array[Byte](length)
+    hashser.doFinal(res, 0)
+    unsafe(ByteString.fromArrayUnsafe(res))
+  }
 }
