@@ -17,9 +17,9 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
+import io.github.rctcwyvrn.blake3.{Blake3 => Blake3Java}
 import org.bouncycastle.crypto.Digest
 
-import org.alephium.blake3jni.{Blake3Jni, Blake3LibLoader}
 import org.alephium.serde.RandomBytes
 
 class Blake3(val bytes: ByteString) extends RandomBytes {
@@ -27,41 +27,14 @@ class Blake3(val bytes: ByteString) extends RandomBytes {
 }
 
 object Blake3 extends HashSchema[Blake3](HashSchema.unsafeBlake3, _.bytes) {
-
-  Blake3LibLoader.loadLibrary();
-
   override def length: Int = 32
 
-  // TODO: optimize with queue of providers
-  override def provider: Digest = new Blake3Digest(length * 8)
+  override def provider: Digest = ???
 
-  //TODO Improve safety, code might throw errors, e.g. call `update` while hasher has been deleted
-  private class Blake3Digest(bitLength: Int) extends Digest {
-    private var hasher = Blake3Jni.allocate_hasher()
-    Blake3Jni.blake3_hasher_init(hasher)
-
-    override def getAlgorithmName(): String = "BLAKE3"
-
-    override def getDigestSize(): Int = bitLength / 8
-
-    override def update(in: Byte): Unit =
-      Blake3Jni.blake3_hasher_update(hasher, Array(in), 1)
-
-    override def update(in: Array[Byte], inOff: Int, len: Int): Unit =
-      Blake3Jni.blake3_hasher_update(hasher, in.drop(inOff), len)
-
-    override def doFinal(out: Array[Byte], outOff: Int): Int = {
-      val size = getDigestSize()
-      Blake3Jni.blake3_hasher_finalize(hasher, out, size)
-
-      Blake3Jni.delete_hasher(hasher)
-      size
-    }
-
-    override def reset(): Unit = {
-      Blake3Jni.delete_hasher(hasher)
-      hasher = Blake3Jni.allocate_hasher()
-      Blake3Jni.blake3_hasher_init(hasher)
-    }
+  override def hash(input: Seq[Byte]): Blake3 = {
+    val hasher = Blake3Java.newInstance() // For Thread-safety
+    hasher.update(input.toArray)
+    val res = hasher.digest()
+    unsafe(ByteString.fromArrayUnsafe(res))
   }
 }

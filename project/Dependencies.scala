@@ -67,5 +67,5 @@ object Dependencies {
   lazy val `sttp-akka-http-backend` =
     "com.softwaremill.sttp.client" %% "akka-http-backend" % Version.sttp
 
-  lazy val `blake3-jni` = "org.alephium" %% "blake3-jni" % "0.3.0"
+  lazy val blake3 = "io.github.rctcwyvrn" % "blake3" % "1.3"
 }

@@ -55,10 +55,10 @@ abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
   def provider: Digest
 
   def hash(input: Seq[Byte]): T = {
-    val _provider = provider
-    _provider.update(input.toArray, 0, input.length)
+    val _hasher = provider // For Thread-safety
+    _hasher.update(input.toArray, 0, input.length)
     val res = new Array[Byte](length)
-    _provider.doFinal(res, 0)
+    _hasher.doFinal(res, 0)
     unsafe(ByteString.fromArrayUnsafe(res))
   }
 
