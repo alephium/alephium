@@ -18,13 +18,15 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import scala.util.Random
+
 import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.setting.{AlephiumConfig, Platform}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{AVector, Random}
+import org.alephium.util.AVector
 
 @BenchmarkMode(Array(Mode.Throughput))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -39,8 +41,8 @@ class MiningBench {
   @Benchmark
   def mineGenesis(): Boolean = {
     val block = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
-    val i     = Random.source.nextInt(groupConfig.groups)
-    val j     = Random.source.nextInt(groupConfig.groups)
+    val i     = Random.nextInt(groupConfig.groups)
+    val j     = Random.nextInt(groupConfig.groups)
     PoW.checkMined(block, ChainIndex.unsafe(i, j))
   }
 }

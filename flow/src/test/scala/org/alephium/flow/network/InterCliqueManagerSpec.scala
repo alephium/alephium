@@ -17,6 +17,7 @@
 package org.alephium.flow.network
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 import akka.actor.ActorRef
 import akka.io.Tcp
@@ -133,7 +134,7 @@ class InterCliqueManagerSpec
     val blockFlowSynchronizer = TestProbe()
     val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
 
-    val parentName = s"InterCliqueManager-${Random.source.nextInt}"
+    val parentName = s"InterCliqueManager-${Random.nextInt()}"
     val interCliqueManager = TestActorRef[InterCliqueManager](
       InterCliqueManager.props(
         cliqueInfo,

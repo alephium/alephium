@@ -19,13 +19,15 @@ package org.alephium.wallet.service
 import java.io.File
 import java.nio.file.Paths
 
+import scala.util.Random
+
 import akka.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Random, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -64,7 +66,7 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
   }
 
   it should "fail to start if secret dir path is invalid" in new Fixure {
-    val path = s"/${Random.source.nextInt}"
+    val path = s"/${Random.nextInt()}"
     override lazy val walletService = WalletService(
       blockFlowClient,
       Paths.get(path),
@@ -144,7 +146,7 @@ class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
     val password     = "password"
     val mnemonicSize = Mnemonic.Size(12).get
     implicit val system: ActorSystem =
-      ActorSystem(s"wallet-service-spec-${Random.source.nextInt}")
+      ActorSystem(s"wallet-service-spec-${Random.nextInt()}")
     implicit val executionContext = system.dispatcher
     lazy val blockFlowClient =
       BlockFlowClient.apply(

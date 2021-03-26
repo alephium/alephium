@@ -16,6 +16,8 @@
 
 package org.alephium.flow.network.bootstrap
 
+import scala.util.Random
+
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
@@ -23,7 +25,6 @@ import akka.util.ByteString
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.serde.Staging
-import org.alephium.util.Random
 
 class BrokerConnectorSpec
     extends AlephiumFlowActorSpec("BrokerConnector")
@@ -37,7 +38,7 @@ class BrokerConnectorSpec
         BrokerConnector.props(socketAddressGen.sample.get, connection.ref, cliqueCoordinator.ref)
       )
 
-    val randomId      = Random.source.nextInt(brokerConfig.brokerNum)
+    val randomId      = Random.nextInt(brokerConfig.brokerNum)
     val randomAddress = socketAddressGen.sample.get
     val randomInfo =
       PeerInfo.unsafe(
@@ -45,8 +46,8 @@ class BrokerConnectorSpec
         brokerConfig.groupNumPerBroker,
         Some(randomAddress),
         randomAddress,
-        Random.source.nextInt,
-        Random.source.nextInt
+        Random.nextInt(),
+        Random.nextInt()
       )
 
     connection.expectMsgType[Tcp.Register]

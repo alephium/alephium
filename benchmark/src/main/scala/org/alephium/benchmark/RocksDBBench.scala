@@ -18,6 +18,8 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import scala.util.Random
+
 import org.openjdk.jmh.annotations._
 import org.rocksdb.{ColumnFamilyOptions, DBOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
@@ -25,7 +27,7 @@ import org.rocksdb.util.SizeUnit
 import org.alephium.crypto.Keccak256
 import org.alephium.io.{RocksDBColumn, RocksDBSource}
 import org.alephium.protocol.Hash
-import org.alephium.util.{Files, Random}
+import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.SingleShotTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -44,8 +46,8 @@ class RocksDBBench {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def randomInsertAndLookup(db: RocksDBColumn): Unit = {
     val random = {
-      Random.source.setSeed(0)
-      Random.source
+      Random.setSeed(0)
+      Random
     }
 
     // Insert N
