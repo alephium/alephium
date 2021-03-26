@@ -17,6 +17,7 @@
 package org.alephium.app
 
 import scala.concurrent.Future
+import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
@@ -132,7 +133,7 @@ object ServerFixture {
         .build[EventBus.Message](
           system,
           EventBus.props(),
-          s"EventBus-${UnsecureRandom.source.nextInt()}"
+          s"EventBus-${Random.nextInt()}"
         )
 
     val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))

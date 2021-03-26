@@ -23,6 +23,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.concurrent.{Await, Promise}
+import scala.util.Random
 import scala.util.control.NonFatal
 
 import akka.actor.ActorRef
@@ -90,7 +91,7 @@ trait TestFixtureLike
 
   val usedPort = mutable.Set.empty[Int]
   def generatePort: Int = {
-    val tcpPort = 40000 + UnsecureRandom.source.nextInt(5000) * 4
+    val tcpPort = 40000 + Random.nextInt(5000) * 4
 
     if (usedPort.contains(tcpPort)) {
       generatePort
@@ -327,7 +328,7 @@ trait TestFixtureLike
 
     val server: Server = new Server {
       implicit val system: ActorSystem =
-        ActorSystem(s"$name-${UnsecureRandom.source.nextInt()}", platformEnv.newConfig)
+        ActorSystem(s"$name-${Random.nextInt()}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
 
       val defaultNetwork = platformEnv.config.network

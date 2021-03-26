@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.util.Random
+
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
@@ -28,7 +30,7 @@ import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, UnsecureRandom, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
@@ -339,7 +341,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
   it should "transfer token inside a same group" in new FlowFixture {
     val testGroup =
-      UnsecureRandom.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
+      Random.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
     val block = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(testGroup, testGroup))
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
@@ -350,7 +352,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "transfer token for inter-group transactions" in new FlowFixture { Test =>
-    val anotherBroker = (brokerConfig.brokerId + 1 + UnsecureRandom.source.nextInt(
+    val anotherBroker = (brokerConfig.brokerId + 1 + Random.nextInt(
       brokerConfig.brokerNum - 1
     )) % brokerConfig.brokerNum
     val newConfigFixture = new AlephiumConfigFixture {
@@ -368,9 +370,9 @@ class BlockFlowSpec extends AlephiumSpec {
     val blockFlow1 = BlockFlow.fromGenesisUnsafe(anotherConfig, anotherStorages)
 
     val fromGroup =
-      UnsecureRandom.source.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
+      Random.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
     val toGroup =
-      UnsecureRandom.source.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
+      Random.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
 
     val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
     block.nonCoinbase.nonEmpty is true

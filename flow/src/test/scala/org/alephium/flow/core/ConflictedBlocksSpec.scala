@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 import org.alephium.protocol.{BlockHash, Signature}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Duration, UnsecureRandom, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp, UnsecureRandom}
 
 class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with GroupConfigFixture {
   val groups   = 3
