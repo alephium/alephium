@@ -235,6 +235,15 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       s"""{"Confirmed":{"blockHash":"${blockHash.toHexString}","blockIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}}"""
     checkData(status0, jsonRaw0)
 
+    checkData[PeerStatus](PeerStatus.Penalty(10), s"""{"type":"penalty","value":10}""")
+    checkData[PeerStatus](
+      PeerStatus.Banned(TimeStamp.unsafe(1L)),
+      s"""{"type":"banned","until":1}"""
+    )
+  }
+
+  it should "encode/decode PeerStatus" in {
+
     checkData(MemPooled: TxStatus, s"""{"MemPooled":{}}""")
     checkData(NotFound: TxStatus, s"""{"NotFound":{}}""")
   }

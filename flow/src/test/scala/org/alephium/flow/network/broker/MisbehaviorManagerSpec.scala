@@ -18,6 +18,7 @@ package org.alephium.flow.network.broker
 
 import akka.io.Tcp
 import akka.testkit.TestProbe
+import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.TcpController
@@ -34,7 +35,11 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
   it should "penalize peer" in new Fixture {
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! GetPeers
-    expectMsg(Peers(AVector(Peer(peer.getAddress, Penalty(20)))))
+    expectMsgPF() { case Peers(peers) =>
+      val Peer(address, Penalty(value, _)) = peers.head
+      address is peer.getAddress
+      value is 20
+    }
   }
 
   it should "confirm known peer" in new Fixture {
@@ -51,7 +56,11 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
   it should "ban and refuse peer that misbehaved " in new Fixture {
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! GetPeers
-    expectMsg(Peers(AVector(Peer(peer.getAddress, Penalty(20)))))
+    expectMsgPF() { case Peers(peers) =>
+      val Peer(address, Penalty(value, _)) = peers.head
+      address is peer.getAddress
+      value is 20
+    }
 
     misbehaviorManager ! Spamming(peer)
     misbehaviorManager ! Spamming(peer)
@@ -82,16 +91,29 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
 
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 
-    Thread.sleep(1)
+    eventually {
+      misbehaviorManager ! GetPeers
+      expectMsg(Peers(AVector.empty))
+    }
+  }
 
-    misbehaviorManager ! GetPeers
-    expectMsg(Peers(AVector(Peer(peer.getAddress, Penalty(0)))))
+  it should "forgive a penalty after some time" in new Fixture {
+    override val penaltyForgivness = Duration.zero
+
+    misbehaviorManager ! Spamming(peer)
+
+    eventually {
+      misbehaviorManager ! GetPeers
+      expectMsg(Peers(AVector.empty))
+    }
   }
 
   trait Fixture extends Generators {
-    val banDuration = Duration.ofHoursUnsafe(1)
+    val banDuration       = Duration.ofHoursUnsafe(1)
+    val penaltyForgivness = Duration.ofHoursUnsafe(1)
 
-    lazy val misbehaviorManager = system.actorOf(MisbehaviorManager.props(banDuration))
+    lazy val misbehaviorManager =
+      system.actorOf(MisbehaviorManager.props(banDuration, penaltyForgivness))
 
     val peer       = socketAddressGen.sample.get
     val local      = socketAddressGen.sample.get

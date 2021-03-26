@@ -79,7 +79,7 @@ object Node {
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
-      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness))
 
     val discoveryProps: Props =
       DiscoveryServer.props(

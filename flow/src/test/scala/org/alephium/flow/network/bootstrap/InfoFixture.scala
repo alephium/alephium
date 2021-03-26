@@ -20,6 +20,7 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol.model.ModelGenerators
+import org.alephium.util.TimeStamp
 
 trait InfoFixture extends ModelGenerators {
   lazy val intraCliqueInfoGen: Gen[IntraCliqueInfo] = {
@@ -41,7 +42,10 @@ trait InfoFixture extends ModelGenerators {
       score <- Gen.choose(0, 42)
     } yield {
       val peers = info.internalAddresses.map { address =>
-        MisbehaviorManager.Peer(address.getAddress, MisbehaviorManager.Penalty(score))
+        MisbehaviorManager.Peer(
+          address.getAddress,
+          MisbehaviorManager.Penalty(score, TimeStamp.now())
+        )
       }
       MisbehaviorManager.Peers(peers)
     }

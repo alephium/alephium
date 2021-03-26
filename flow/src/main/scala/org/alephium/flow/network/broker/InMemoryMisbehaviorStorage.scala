@@ -21,14 +21,14 @@ import java.net.InetAddress
 import scala.collection.mutable
 
 import org.alephium.flow.network.broker.MisbehaviorManager._
-import org.alephium.util.{discard, AVector, TimeStamp}
+import org.alephium.util.{discard, AVector, Duration, TimeStamp}
 
-class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
+class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends MisbehaviorStorage {
 
   private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
   def get(peer: InetAddress): Option[MisbehaviorStatus] = {
-    peers.get(peer).map { status => withUpdatedStatus(peer, status) { (_, status) => status } }
+    peers.get(peer).flatMap { status => withUpdatedStatus(peer, status) { (_, status) => status } }
   }
 
   def update(peer: InetAddress, penalty: Penalty): Unit = {
@@ -43,11 +43,10 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
     get(peer) match {
       case Some(status) =>
         status match {
-          case Banned(_)  => true
-          case Penalty(_) => false
+          case Banned(_)     => true
+          case Penalty(_, _) => false
         }
-      case None =>
-        false
+      case None => false
     }
   }
 
@@ -56,21 +55,23 @@ class InMemoryMisbehaviorStorage extends MisbehaviorStorage {
   }
 
   def list(): AVector[Peer] = {
-    AVector.from(peers.map { case (peer, status) =>
+    AVector.from(peers.flatMap { case (peer, status) =>
       withUpdatedStatus(peer, status) { (peer, newStatus) => Peer(peer, newStatus) }
     })
   }
 
   private def withUpdatedStatus[A](peer: InetAddress, status: MisbehaviorStatus)(
       f: (InetAddress, MisbehaviorStatus) => A
-  ): A = {
+  ): Option[A] = {
     status match {
       case Banned(until) if until < TimeStamp.now() =>
-        val newStatus = Penalty(0)
-        peers.addOne(peer -> status)
-        f(peer, newStatus)
+        peers.remove(peer)
+        None
+      case Penalty(_, ts) if TimeStamp.now().deltaUnsafe(ts) > penaltyForgivness =>
+        peers.remove(peer)
+        None
       case other =>
-        f(peer, other)
+        Some(f(peer, other))
     }
   }
 }

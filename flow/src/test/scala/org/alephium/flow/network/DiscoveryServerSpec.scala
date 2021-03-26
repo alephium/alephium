@@ -114,7 +114,7 @@ class DiscoveryServerSpec
     val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
       infos.map { case (brokerInfo, config) =>
         val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
-          ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+          ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness))
         val server = {
           if (index equals 0) {
             TestActorRef[DiscoveryServer](
@@ -271,9 +271,9 @@ class DiscoveryServerSpec
     val cliqueInfo1         = generateCliqueInfo(address1, config1)
     val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
     val misbehaviorManager0: ActorRefT[MisbehaviorManager.Command] =
-      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness))
     val misbehaviorManager1: ActorRefT[MisbehaviorManager.Command] =
-      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
+      ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness))
 
     val server0 =
       system.actorOf(
