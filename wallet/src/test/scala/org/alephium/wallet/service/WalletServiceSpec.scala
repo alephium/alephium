@@ -22,16 +22,15 @@ import java.nio.file.Paths
 import scala.util.Random
 
 import akka.actor.ActorSystem
-import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
+import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, U256}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
-class WalletServiceSpec extends AlephiumSpec with ScalaFutures {
+class WalletServiceSpec extends AlephiumFutureSpec {
 
   it should "handle a miner wallet" in new Fixure {
 

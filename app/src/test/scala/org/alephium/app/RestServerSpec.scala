@@ -27,7 +27,6 @@ import io.circe.{Json, JsonObject}
 import io.circe.syntax._
 import io.circe.yaml
 import org.scalatest.EitherValues
-import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.api.ApiModel
 import org.alephium.api.CirceUtils.avectorCodec
@@ -42,10 +41,9 @@ import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 
 class RestServerSpec
-    extends AlephiumSpec
+    extends AlephiumFutureSpec
     with ScalatestRouteTest
     with EitherValues
-    with ScalaFutures
     with NumericHelpers {
 
   it should "call GET /blockflow" in new RestServerFixture {

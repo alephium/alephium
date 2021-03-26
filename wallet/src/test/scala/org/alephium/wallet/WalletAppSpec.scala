@@ -29,7 +29,6 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.Json
 import io.circe.syntax._
-import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.CirceUtils
@@ -40,7 +39,7 @@ import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, NetworkType, TxGenerators}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, U256}
+import org.alephium.util.{AlephiumFutureSpec, AlephiumSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
@@ -52,7 +51,7 @@ class WalletAppSpec
     with WalletConfigFixture
     with ScalatestRouteTest
     with FailFastCirceSupport
-    with ScalaFutures {
+    with AlephiumFutureSpec {
   implicit val defaultTimeout = RouteTestTimeout(5.seconds)
 
   val blockFlowMock =
