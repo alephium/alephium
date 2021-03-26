@@ -142,8 +142,8 @@ class DiscoveryServer(
       scheduleScan()
       unstashAll()
       context.become(ready)
-    case Udp.CommandFailed(_) =>
-      logUdpFailure(s"Could not bind the UDP socket. Restarting udp ...")
+    case Udp.CommandFailed(command) =>
+      logUdpFailure(s"Could not bind the UDP socket. Restarting udp due to $command ...")
       scheduleOnce(self, RestartUdp, Duration.ofSecondsUnsafe(1))
     case RestartUdp => startBinding()
 
