@@ -285,7 +285,7 @@ class DiscoveryServerSpec
 
   trait Fixture extends BrokerConfigFixture.Default {
     implicit val patienceConfig =
-      PatienceConfig(timeout = Span(10, Seconds), interval = Span(1, Seconds))
+      PatienceConfig(timeout = Span(20, Seconds), interval = Span(1, Seconds))
 
     override val groups = Gen.choose(2, 10).sample.get
 

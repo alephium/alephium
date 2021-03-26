@@ -40,7 +40,7 @@ import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Second, Seconds, Span}
+import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
@@ -65,7 +65,7 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   implicit override val patienceConfig =
-    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
+    PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
