@@ -17,10 +17,10 @@
 package org.alephium.util
 
 import java.math.BigInteger
-import java.security.SecureRandom
 
 import scala.language.implicitConversions
 import scala.math.BigInt
+import scala.util.Random
 
 import org.scalacheck.Gen
 
@@ -39,7 +39,7 @@ trait NumericHelpers {
 
   implicit def bigInt(n: BigInteger): BigInt = BigInt(n)
 
-  private val random = SecureRandom.getInstanceStrong
+  private val random = Random.self
 
   // Generate a random Int in the range of [from, to]
   def nextInt(from: Int, to: Int): Int = random.nextInt(to - from + 1) + from

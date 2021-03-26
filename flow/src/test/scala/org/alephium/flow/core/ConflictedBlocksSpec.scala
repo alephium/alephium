@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 import org.alephium.protocol.{BlockHash, Signature}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Random, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, UnsecureRandom, TimeStamp}
 
 class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with GroupConfigFixture {
   val groups   = 3
@@ -40,7 +40,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
         AVector(transaction),
         Target.Max,
         TimeStamp.now(),
-        Random.nextNonNegative()
+        UnsecureRandom.nextNonNegative()
       )
     }
 
@@ -53,7 +53,7 @@ class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with Grou
         AVector.from(transactions),
         Target.Max,
         TimeStamp.now(),
-        Random.nextNonNegative()
+        UnsecureRandom.nextNonNegative()
       )
     }
 

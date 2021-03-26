@@ -25,7 +25,7 @@ import scala.io.Source
 import akka.util.ByteString
 
 import org.alephium.crypto.Sha256
-import org.alephium.util.{AVector, Bits, Random}
+import org.alephium.util.{AVector, Bits, SecureAndSlowRandom}
 
 //scalastyle:off magic.number
 
@@ -75,7 +75,7 @@ object Mnemonic {
     val typeIndex   = Size.list.indexWhere(_ == size)
     val entropySize = entropySizes(typeIndex)
     val rawEntropy  = Array.ofDim[Byte](entropySize)
-    Random.source.nextBytes(rawEntropy)
+    SecureAndSlowRandom.source.nextBytes(rawEntropy)
     val entropy = ByteString.fromArrayUnsafe(rawEntropy)
     fromEntropyUnsafe(entropy)
   }

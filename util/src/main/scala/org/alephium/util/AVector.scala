@@ -20,6 +20,7 @@ import scala.{specialized => sp}
 import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 import scala.runtime.Statics
+import scala.util.Random
 
 import org.alephium.macros.HPC
 
@@ -558,13 +559,13 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def sample(): A = {
     assume(nonEmpty)
-    val selected = Random.source.nextInt(length)
+    val selected = Random.nextInt(length)
     apply(selected)
   }
 
   def sampleWithIndex(): (Int, A) = {
     assume(nonEmpty)
-    val selected = Random.source.nextInt(length)
+    val selected = Random.nextInt(length)
     (selected, apply(selected))
   }
 

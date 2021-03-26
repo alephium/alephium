@@ -18,7 +18,7 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike, Transaction}
-import org.alephium.util.{AVector, LockFixture, Random}
+import org.alephium.util.{AVector, LockFixture, UnsecureRandom}
 
 class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGeneratorsLike {
   it should "initialize an empty pool" in {
@@ -31,7 +31,7 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
       val txTemplates = block.transactions.map(_.toTemplate)
       val group =
         GroupIndex.unsafe(
-          brokerConfig.groupFrom + Random.source.nextInt(brokerConfig.groupNumPerBroker)
+          brokerConfig.groupFrom + UnsecureRandom.source.nextInt(brokerConfig.groupNumPerBroker)
         )
       val pool  = MemPool.empty(group)
       val index = block.chainIndex

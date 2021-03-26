@@ -19,9 +19,41 @@ package org.alephium.util
 import java.security.SecureRandom
 
 import scala.annotation.tailrec
+import scala.util.Random
 
-object Random {
-  val source: SecureRandom = SecureRandom.getInstanceStrong
+object UnsecureRandom {
+  val source: Random = Random
+
+  @tailrec
+  def nextNonZeroInt(): Int = {
+    val random = source.nextInt()
+    if (random != 0) random else nextNonZeroInt()
+  }
+
+  def nextNonNegative(): Int = {
+    source.nextInt(Int.MaxValue)
+  }
+
+  def nextU256(): U256 = {
+    val buffer = new Array[Byte](32)
+    source.nextBytes(buffer)
+    U256.unsafe(buffer)
+  }
+
+  def nextI256(): I256 = {
+    val buffer = new Array[Byte](32)
+    source.nextBytes(buffer)
+    I256.unsafe(buffer)
+  }
+
+  def nextU256NonUniform(bound: U256): U256 = {
+    nextU256().modUnsafe(bound)
+  }
+
+}
+
+object SecureAndSlowRandom {
+  val source: SecureRandom = new SecureRandom()
 
   @tailrec
   def nextNonZeroInt(): Int = {

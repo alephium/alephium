@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.serde.Staging
-import org.alephium.util.Random
+import org.alephium.util.UnsecureRandom
 
 class BrokerConnectorSpec
     extends AlephiumFlowActorSpec("BrokerConnector")
@@ -37,7 +37,7 @@ class BrokerConnectorSpec
         BrokerConnector.props(socketAddressGen.sample.get, connection.ref, cliqueCoordinator.ref)
       )
 
-    val randomId      = Random.source.nextInt(brokerConfig.brokerNum)
+    val randomId      = UnsecureRandom.source.nextInt(brokerConfig.brokerNum)
     val randomAddress = socketAddressGen.sample.get
     val randomInfo =
       PeerInfo.unsafe(
@@ -45,8 +45,8 @@ class BrokerConnectorSpec
         brokerConfig.groupNumPerBroker,
         Some(randomAddress),
         randomAddress,
-        Random.source.nextInt,
-        Random.source.nextInt
+        UnsecureRandom.source.nextInt(),
+        UnsecureRandom.source.nextInt()
       )
 
     connection.expectMsgType[Tcp.Register]

@@ -133,7 +133,7 @@ class InterCliqueManagerSpec
     val blockFlowSynchronizer = TestProbe()
     val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
 
-    val parentName = s"InterCliqueManager-${Random.source.nextInt}"
+    val parentName = s"InterCliqueManager-${UnsecureRandom.source.nextInt()}"
     val interCliqueManager = TestActorRef[InterCliqueManager](
       InterCliqueManager.props(
         cliqueInfo,

@@ -129,7 +129,11 @@ object ServerFixture {
 
     val eventBus =
       ActorRefT
-        .build[EventBus.Message](system, EventBus.props(), s"EventBus-${Random.source.nextInt}")
+        .build[EventBus.Message](
+          system,
+          EventBus.props(),
+          s"EventBus-${UnsecureRandom.source.nextInt()}"
+        )
 
     val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)

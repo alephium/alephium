@@ -23,7 +23,7 @@ import scala.util.Try
 
 import akka.util.ByteString
 
-import org.alephium.util.Random
+import org.alephium.util.SecureAndSlowRandom
 
 object AES {
 
@@ -58,7 +58,7 @@ object AES {
 
   private def randomBytesOf(length: Int): Array[Byte] = {
     val array = Array.ofDim[Byte](length)
-    Random.source.nextBytes(array)
+    SecureAndSlowRandom.source.nextBytes(array)
     array
   }
 

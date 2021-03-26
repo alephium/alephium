@@ -18,9 +18,11 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import scala.util.Random
+
 import org.openjdk.jmh.annotations._
 
-import org.alephium.util.{AVector, Random}
+import org.alephium.util.AVector
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -35,14 +37,14 @@ class CollectionBench {
   @Benchmark
   def accessVector(): Int = {
     var sum = 0
-    (0 until N).foreach { _ => sum += vector(Random.source.nextInt(N)) }
+    (0 until N).foreach { _ => sum += vector(Random.nextInt(N)) }
     sum
   }
 
   @Benchmark
   def accessAVector(): Int = {
     var sum = 0
-    (0 until N).foreach { _ => sum += avector(Random.source.nextInt(N)) }
+    (0 until N).foreach { _ => sum += avector(Random.nextInt(N)) }
     sum
   }
 

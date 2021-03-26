@@ -75,7 +75,7 @@ object Miner extends LazyLogging {
       groupConfig: GroupConfig,
       miningConfig: MiningSetting
   ): Option[(Block, U256)] = {
-    val nonceStart = Random.nextU256NonUniform(U256.HalfMaxValue)
+    val nonceStart = UnsecureRandom.nextU256NonUniform(U256.HalfMaxValue)
     val nonceEnd   = nonceStart.addUnsafe(miningConfig.nonceStep)
 
     @tailrec

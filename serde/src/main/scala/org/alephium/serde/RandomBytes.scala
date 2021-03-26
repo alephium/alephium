@@ -17,10 +17,11 @@
 package org.alephium.serde
 
 import scala.collection.mutable
+import scala.util.Random
 
 import akka.util.ByteString
 
-import org.alephium.util.{Bytes, Hex, Random}
+import org.alephium.util.{Bytes, Hex}
 
 trait RandomBytes {
   def bytes: ByteString
@@ -93,7 +94,7 @@ object RandomBytes {
 
     def generate: T = {
       val xs = Array.ofDim[Byte](length)
-      Random.source.nextBytes(xs)
+      Random.nextBytes(xs)
       unsafe(ByteString.fromArrayUnsafe(xs))
     }
 
