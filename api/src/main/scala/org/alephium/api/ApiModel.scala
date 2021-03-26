@@ -158,6 +158,11 @@ trait ApiModelCodec {
 
   implicit val blockEntryCodec: Codec[BlockEntry] = deriveCodec[BlockEntry]
 
+  implicit val blockCandidateCodec: Codec[BlockCandidate] =
+    deriveCodec[BlockCandidate]
+
+  implicit val blockSolutionCodec: Codec[BlockSolution] = deriveCodec[BlockSolution]
+
   implicit val peerAddressCodec: Codec[PeerAddress] = deriveCodec[PeerAddress]
 
   implicit val selfCliqueCodec: Codec[SelfClique] = deriveCodec[SelfClique]

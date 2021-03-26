@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import akka.http.scaladsl.model.StatusCodes
+
 import org.alephium.api.model.SelfClique
 import org.alephium.util._
 
@@ -33,7 +35,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     server0.start().futureValue is ()
 
     Thread.sleep(2000) // wait until the server is fully operating
-    requestFailed(getSelfClique)
+    requestFailed(getSelfClique, statusCode = StatusCodes.InternalServerError)
 
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     server1.start().futureValue is ()

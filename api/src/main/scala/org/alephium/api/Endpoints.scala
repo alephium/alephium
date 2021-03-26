@@ -219,6 +219,19 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in(jsonBody[MinerAddresses])
       .summary("Update miner's addresses")
 
+  lazy val minerGetBlockCandidate: BaseEndpoint[ChainIndex, BlockCandidate] =
+    minersEndpoint.get
+      .in("block-candidate")
+      .in(chainIndexQuery)
+      .out(jsonBody[BlockCandidate])
+      .summary("Get the next block candidate for a chain")
+
+  lazy val minerNewBlock: BaseEndpoint[BlockSolution, Unit] =
+    minersEndpoint.post
+      .in("new-block")
+      .in(jsonBody[BlockSolution])
+      .summary("Post a block solution")
+
   val compile: BaseEndpoint[Compile, CompileResult] =
     contractsEndpoint.post
       .in("compile")

@@ -34,6 +34,7 @@ import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
+import org.alephium.flow.model.BlockTemplate
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
 import org.alephium.serde.serialize
@@ -239,6 +240,37 @@ class RestServerSpec
         "Server error",
         Some(s"Address ${dummyKeyAddress} doesn't belong to group 1")
       )
+    }
+  }
+
+  it should "call GET /miners/block-candidate" in new RestServerFixture {
+    var block: Option[BlockTemplate] = Some(dummyBlockTemplate)
+    val blockEntryTemplate           = RestServer.blockTempateToCandidate(dummyBlockTemplate)
+
+    minerProbe.setAutoPilot(new TestActor.AutoPilot {
+      def run(sender: ActorRef, msg: Any): TestActor.AutoPilot = {
+        msg match {
+          case Miner.GetBlockCandidate(_) =>
+            sender ! Miner.BlockCandidate(block)
+            block match {
+              case Some(_) =>
+                block = None
+                TestActor.KeepRunning
+              case None =>
+                TestActor.NoAutoPilot
+            }
+        }
+      }
+    })
+
+    Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.OK
+      responseAs[BlockCandidate] is blockEntryTemplate
+    }
+
+    //Miner return BlockCandidate(None)
+    Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
     }
   }
 
