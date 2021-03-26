@@ -22,7 +22,7 @@ class ED25519Spec extends AlephiumSpec {
   "ED25519" should "sign correctly" in {
     forAll { _message: IndexedSeq[Byte] =>
       val message  = AVector.from(_message)
-      val (sk, pk) = ED25519.generatePriPub()
+      val (sk, pk) = ED25519.secureGeneratePriPub()
       val sign     = ED25519.sign(message, sk)
       ED25519.verify(message, sign, pk) is true
     }
@@ -34,8 +34,8 @@ class ED25519Spec extends AlephiumSpec {
         val message1 = Blake2b.hash(_message1).bytes
         val message2 = Blake2b.hash(_message2).bytes
 
-        val (sk1, pk1) = ED25519.generatePriPub()
-        val (_, pk2)   = ED25519.generatePriPub()
+        val (sk1, pk1) = ED25519.secureGeneratePriPub()
+        val (_, pk2)   = ED25519.secureGeneratePriPub()
         val signature  = ED25519.sign(message1, sk1)
 
         ED25519.verify(message1, signature, pk1) is true

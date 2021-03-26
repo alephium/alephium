@@ -120,7 +120,7 @@ final case class DiscoverySetting(
     scanFastFrequency: Duration,
     neighborsPerGroup: Int
 ) extends DiscoveryConfig {
-  val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
+  val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
 }
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)

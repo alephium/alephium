@@ -54,8 +54,8 @@ class SecP256K1Spec extends AlephiumSpec {
         val message1 = Blake2b.hash(_message1).bytes
         val message2 = Blake2b.hash(_message2).bytes
 
-        val (sk1, pk1) = SecP256K1.generatePriPub()
-        val (_, pk2)   = SecP256K1.generatePriPub()
+        val (sk1, pk1) = SecP256K1.secureGeneratePriPub()
+        val (_, pk2)   = SecP256K1.secureGeneratePriPub()
         val signature  = SecP256K1.sign(message1, sk1)
 
         SecP256K1.verify(message1, signature, pk1) is true
