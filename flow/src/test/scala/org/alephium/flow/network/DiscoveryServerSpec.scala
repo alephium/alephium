@@ -73,9 +73,6 @@ class DiscoveryServerSpec
     with Eventually {
   import DiscoveryServerSpec._
 
-  implicit override val patienceConfig =
-    PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
-
   val usedPort = mutable.Set.empty[Int]
   def generatePort(): Int = {
     val port = 40000 + Random.nextInt(10000)
@@ -98,6 +95,9 @@ class DiscoveryServerSpec
   }
 
   trait SimulationFixture { fixture =>
+    implicit val patienceConfig =
+      PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
+
     def groups: Int
 
     def generateClique(): (CliqueInfo, AVector[(BrokerInfo, BrokerConfig with DiscoveryConfig)]) = {
@@ -209,14 +209,14 @@ class DiscoveryServerSpec
       server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
 
       probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
-        peers.length is 4 // 3 self clique peers + server1
+        peers.length is groups + 1 // self clique peers + server1
         peers.filter(_.cliqueId equals cliqueInfo0.id).toSet is cliqueInfo0.interBrokers.get.toSet
         peers.filterNot(_.cliqueId equals cliqueInfo0.id) is AVector(
           cliqueInfo1.interBrokers.get.head
         )
       }
       probe1.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
-        peers.length is 4 // 3 self clique peers + server0
+        peers.length is groups + 1 // 3 self clique peers + server0
         peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
         peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
           cliqueInfo0.interBrokers.get.head
@@ -239,10 +239,10 @@ class DiscoveryServerSpec
       server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
 
       probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
-        peers.length is 3 // 3 self clique peers
+        peers.length is groups // self clique peers
       }
       probe1.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
-        peers.length is 4 // 3 self clique peers + server0
+        peers.length is groups + 1 // self clique peers + server0
         peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
         peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
           cliqueInfo0.interBrokers.get.head
@@ -284,15 +284,19 @@ class DiscoveryServerSpec
   }
 
   trait Fixture extends BrokerConfigFixture.Default {
+    implicit val patienceConfig =
+      PatienceConfig(timeout = Span(10, Seconds), interval = Span(1, Seconds))
+
+    override val groups = Gen.choose(2, 10).sample.get
+
     val probeTimeout = Duration.ofSecondsUnsafe(5).asScala
 
-    val groups              = Gen.choose(2, 10).sample.get
     val port0               = generatePort()
     val (address0, config0) = createConfig(groups, port0, 2)
-    val cliqueInfo0         = generateCliqueInfo(address0, groupConfig)
+    val cliqueInfo0         = generateCliqueInfo(address0, config0)
     val port1               = generatePort()
     val (address1, config1) = createConfig(groups, port1, 2)
-    val cliqueInfo1         = generateCliqueInfo(address1, groupConfig)
+    val cliqueInfo1         = generateCliqueInfo(address1, config1)
     val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
     val misbehaviorManager0: ActorRefT[MisbehaviorManager.Command] =
       ActorRefT.build(system, MisbehaviorManager.props(ALF.BanDuration))
