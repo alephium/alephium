@@ -47,6 +47,13 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
         (timeInterval.from, timeInterval.to)
       )
 
+  private lazy val chainIndexQuery: EndpointInput[ChainIndex] =
+    query[GroupIndex]("fromGroup")
+      .and(query[GroupIndex]("toGroup"))
+      .map({ case (from, to) => ChainIndex(from, to) })(chainIndex =>
+        (chainIndex.from, chainIndex.to)
+      )
+
   private def jsonBody[T: Encoder: Decoder: Schema: Validator](implicit
       examples: List[Example[T]]
   ) =
@@ -144,30 +151,27 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .summary("Get the group of a address")
 
   //have to be lazy to let `groupConfig` being initialized
-  lazy val getHashesAtHeight: BaseEndpoint[(GroupIndex, GroupIndex, Int), HashesAtHeight] =
+  lazy val getHashesAtHeight: BaseEndpoint[(ChainIndex, Int), HashesAtHeight] =
     blockflowEndpoint.get
       .in("hashes")
-      .in(query[GroupIndex]("fromGroup"))
-      .in(query[GroupIndex]("toGroup"))
+      .in(chainIndexQuery)
       .in(query[Int]("height"))
       .out(jsonBody[HashesAtHeight])
       .summary("Get all block's hashes at given height for given groups")
 
   //have to be lazy to let `groupConfig` being initialized
-  lazy val getChainInfo: BaseEndpoint[(GroupIndex, GroupIndex), ChainInfo] =
+  lazy val getChainInfo: BaseEndpoint[ChainIndex, ChainInfo] =
     blockflowEndpoint.get
       .in("chains")
-      .in(query[GroupIndex]("fromGroup"))
-      .in(query[GroupIndex]("toGroup"))
+      .in(chainIndexQuery)
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
   //have to be lazy to let `groupConfig` being initialized
-  lazy val listUnconfirmedTransactions: BaseEndpoint[(GroupIndex, GroupIndex), AVector[Tx]] =
+  lazy val listUnconfirmedTransactions: BaseEndpoint[ChainIndex, AVector[Tx]] =
     transactionsEndpoint.get
       .in("unconfirmed")
-      .in(query[GroupIndex]("fromGroup"))
-      .in(query[GroupIndex]("toGroup"))
+      .in(chainIndexQuery)
       .out(jsonBody[AVector[Tx]])
       .summary("List unconfirmed transactions")
 
@@ -189,12 +193,11 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .out(jsonBody[TxResult])
       .summary("Send a signed transaction")
 
-  lazy val getTransactionStatus: BaseEndpoint[(Hash, GroupIndex, GroupIndex), TxStatus] =
+  lazy val getTransactionStatus: BaseEndpoint[(Hash, ChainIndex), TxStatus] =
     transactionsEndpoint.get
       .in("status")
       .in(query[Hash]("txId"))
-      .in(query[GroupIndex]("fromGroup"))
-      .in(query[GroupIndex]("toGroup"))
+      .in(chainIndexQuery)
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
@@ -215,6 +218,19 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in("addresses")
       .in(jsonBody[MinerAddresses])
       .summary("Update miner's addresses")
+
+  lazy val minerGetBlockCandidate: BaseEndpoint[ChainIndex, BlockCandidate] =
+    minersEndpoint.get
+      .in("block-candidate")
+      .in(chainIndexQuery)
+      .out(jsonBody[BlockCandidate])
+      .summary("Get the next block candidate for a chain")
+
+  lazy val minerNewBlock: BaseEndpoint[BlockSolution, Unit] =
+    minersEndpoint.post
+      .in("new-block")
+      .in(jsonBody[BlockSolution])
+      .summary("Post a block solution")
 
   val compile: BaseEndpoint[Compile, CompileResult] =
     contractsEndpoint.post

@@ -808,6 +808,17 @@ paths:
                   deps:
                   - 3bf667ece4614cb230053c0e061e5ed566b1fe5d0946a6655043c5811b853903
                   - 4925a27cc0aa6b95755f5f28254ef323a7dc7d721a2263efd1b555ba0dae1244
+                  transactions:
+                  - id: 65e7d7b73516fd28c63d1eab94b7bf9d6a16606bd0ecad28633605282353a1d8
+                    inputs:
+                    - outputRef:
+                        scriptHint: 23412
+                        key: da0e5d5f58fb26a22bf622ae9fef7ba33dcadc8fd23378e24fe0208baac9fd2d
+                      unlockScript: 00da277f0ada2ea680e1a08419600a52bbf7c0d5033d0f0b14b84804c5af6f75dd5b
+                    outputs:
+                    - amount: 1000000000000000000
+                      address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
+                      lockTime: 1234
         default:
           description: ''
           content:
@@ -845,6 +856,17 @@ paths:
                 deps:
                 - 3bf667ece4614cb230053c0e061e5ed566b1fe5d0946a6655043c5811b853903
                 - 4925a27cc0aa6b95755f5f28254ef323a7dc7d721a2263efd1b555ba0dae1244
+                transactions:
+                - id: 65e7d7b73516fd28c63d1eab94b7bf9d6a16606bd0ecad28633605282353a1d8
+                  inputs:
+                  - outputRef:
+                      scriptHint: 23412
+                      key: da0e5d5f58fb26a22bf622ae9fef7ba33dcadc8fd23378e24fe0208baac9fd2d
+                    unlockScript: 00da277f0ada2ea680e1a08419600a52bbf7c0d5033d0f0b14b84804c5af6f75dd5b
+                  outputs:
+                  - amount: 1000000000000000000
+                    address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
+                    lockTime: 1234
         default:
           description: ''
           content:
@@ -1366,6 +1388,84 @@ paths:
             example:
               addresses:
               - M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
+        required: true
+      responses:
+        '200':
+          description: ''
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: -32700
+                message: Parse error
+  /miners/block-candidate:
+    get:
+      tags:
+      - Miners
+      summary: Get the next block candidate for a chain
+      operationId: getMinersBlock-candidate
+      parameters:
+      - name: fromGroup
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: toGroup
+        in: query
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockCandidate'
+              example:
+                deps:
+                - 3c8bf5681af4c1c870910aec2a8ed8e99b2db90c0b4e5e3107814d35a56472c6
+                - 6ae8833d36b0c5c35ab6a68831b7c93357e01817cf84ddc6f9b5f95c53f9d66f
+                target: 1a400000
+                blockTs: 1616761194741
+                txsHash: 9f2c2da46e8c32cb87d4ccd33c14fb7c1fff1c8a375b4dcc66ce529d8f580b52
+                transactions:
+                - 0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: -32700
+                message: Parse error
+  /miners/new-block:
+    post:
+      tags:
+      - Miners
+      summary: Post a block solution
+      operationId: postMinersNew-block
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockSolution'
+            example:
+              blockDeps:
+              - b16c072cb72d1fa6fb26a49b6a490fe9975c51df840a4165d39cb306f6fbf4bc
+              timestamp: 1616761194741
+              fromGroup: 1
+              toGroup: 2
+              miningCount: 2
+              target: 1a400000
+              nonce: 2
+              txsHash: edb4f90e1d1b7608957772f80cc8bdf4ed9ae2feb4c845f53cb517882f4b03bc
+              transactions:
+              - 0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13
         required: true
       responses:
         '200':
@@ -1935,6 +2035,62 @@ components:
       type: object
       properties:
         addresses:
+          type: array
+          items:
+            type: string
+    BlockCandidate:
+      required:
+      - target
+      - blockTs
+      - txsHash
+      type: object
+      properties:
+        deps:
+          type: array
+          items:
+            type: string
+        target:
+          type: string
+        blockTs:
+          type: integer
+        txsHash:
+          type: string
+        transactions:
+          type: array
+          items:
+            type: string
+    BlockSolution:
+      required:
+      - timestamp
+      - fromGroup
+      - toGroup
+      - miningCount
+      - target
+      - nonce
+      - txsHash
+      type: object
+      properties:
+        blockDeps:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: integer
+        fromGroup:
+          type: integer
+        toGroup:
+          type: integer
+        miningCount:
+          type: integer
+          format: uint256
+        target:
+          type: string
+        nonce:
+          type: integer
+          format: uint256
+        txsHash:
+          type: string
+        transactions:
           type: array
           items:
             type: string

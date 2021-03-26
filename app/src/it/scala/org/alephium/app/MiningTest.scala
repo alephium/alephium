@@ -16,8 +16,13 @@
 
 package org.alephium.app
 
+import scala.annotation.tailrec
+
 import org.alephium.api.model._
-import org.alephium.protocol.model.defaultGasFee
+import org.alephium.flow.client.Miner
+import org.alephium.flow.model.BlockTemplate
+import org.alephium.protocol.model.{defaultGasFee, Block, ChainIndex, Target, Transaction}
+import org.alephium.serde._
 import org.alephium.util._
 
 class MiningTest extends AlephiumSpec {
@@ -54,6 +59,63 @@ class MiningTest extends AlephiumSpec {
 
     selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     server1.stop().futureValue is ()
+    server0.stop().futureValue is ()
+  }
+
+  it should "work with external miner" in new TestFixture("1-nodes-external-miner") {
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
+    Seq(server0.start()).foreach(_.futureValue is (()))
+
+    val selfClique = request[SelfClique](getSelfClique)
+    val group      = request[Group](getGroup(address))
+    val index      = group.group / selfClique.groupNumPerBroker
+    val restPort   = selfClique.nodes(index).restPort
+
+    request[Balance](getBalance(address), restPort) is initialBalance
+
+    startWS(defaultWsMasterPort)
+
+    val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
+
+    val candidate = request[BlockCandidate](blockCandidate(tx.fromGroup, tx.toGroup), restPort)
+    val template = BlockTemplate(
+      candidate.deps,
+      Target.unsafe(candidate.target),
+      candidate.blockTs,
+      candidate.txsHash,
+      candidate.transactions.map(tx => deserialize[Transaction](Hex.unsafe(tx)).toOption.get)
+    )
+
+    @tailrec
+    def mine(): (Block, U256) = {
+      Miner.mine(ChainIndex.unsafe(tx.fromGroup, tx.toGroup), template) match {
+        case Some(mined) => mined
+        case None        => mine()
+      }
+    }
+
+    val (block, miningCount) = mine()
+
+    val solution = BlockSolution(
+      block.blockDeps.inDeps ++ block.blockDeps.outDeps,
+      block.timestamp,
+      tx.fromGroup,
+      tx.toGroup,
+      miningCount,
+      block.target.bits,
+      block.header.nonce,
+      block.header.txsHash,
+      block.transactions.map(tx => Hex.toHexString(serialize(tx)))
+    )
+
+    unitRequest(newBlock(solution), restPort)
+
+    eventually {
+      val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
+      txStatus is a[Confirmed]
+    }
+
+    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     server0.stop().futureValue is ()
   }
 }

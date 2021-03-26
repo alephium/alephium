@@ -52,6 +52,12 @@ trait EndpointsExamples {
   private def blockHash                  = BlockHash.generate
   private val hexString                  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
 
+  private val tx = Tx(
+    hash,
+    AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
+    AVector(Output(amount = balance, address, Some(TimeStamp.unsafe(1234))))
+  )
+
   private val blockEntry = BlockEntry(
     blockHash,
     timestamp = TimeStamp.now(),
@@ -59,7 +65,27 @@ trait EndpointsExamples {
     chainTo = 2,
     height,
     deps = AVector(blockHash, blockHash),
-    transactions = None
+    transactions = Some(AVector(tx))
+  )
+
+  private val blockCandidate = BlockCandidate(
+    deps = AVector(blockHash, blockHash),
+    target = Target.onePhPerSecond.bits,
+    blockTs = TimeStamp.now(),
+    txsHash = hash,
+    transactions = AVector(hexString)
+  )
+
+  private val blockSolution = BlockSolution(
+    blockDeps = AVector(blockHash),
+    timestamp = TimeStamp.now(),
+    fromGroup = 1,
+    toGroup = 2,
+    miningCount = U256.Two,
+    target = Target.onePhPerSecond.bits,
+    nonce = U256.Two,
+    txsHash = hash,
+    transactions = AVector(hexString)
   )
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
@@ -106,11 +132,7 @@ trait EndpointsExamples {
   implicit val txsExamples: List[Example[AVector[Tx]]] =
     simpleExample(
       AVector(
-        Tx(
-          hash,
-          AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
-          AVector(Output(amount = balance, address, Some(TimeStamp.unsafe(1234))))
-        )
+        tx
       )
     )
 
@@ -119,6 +141,12 @@ trait EndpointsExamples {
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
+
+  implicit val blockEntryTemplateExamples: List[Example[BlockCandidate]] =
+    simpleExample(blockCandidate)
+
+  implicit val blockSolutionExamples: List[Example[BlockSolution]] =
+    simpleExample(blockSolution)
 
   implicit val balanceExamples: List[Example[Balance]] =
     simpleExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3))

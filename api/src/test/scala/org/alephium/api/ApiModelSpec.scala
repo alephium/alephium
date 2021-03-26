@@ -26,7 +26,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
-import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType}
+import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType, Target}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -237,5 +237,50 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
     checkData(MemPooled: TxStatus, s"""{"MemPooled":{}}""")
     checkData(NotFound: TxStatus, s"""{"NotFound":{}}""")
+  }
+
+  it should "encode/decode BlockCandidate" in {
+    val blockHash = BlockHash.generate
+    val target    = Target.onePhPerSecond
+    val ts        = TimeStamp.unsafe(1L)
+    val txsHash   = Hash.generate
+
+    val blockCandidate = BlockCandidate(
+      AVector(blockHash),
+      target.bits,
+      ts,
+      txsHash,
+      AVector.empty
+    )
+    val jsonRaw =
+      s"""{"deps":["${blockHash.toHexString}"],"target":"${Hex.toHexString(
+        target.bits
+      )}","blockTs":${ts.millis},"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+    checkData(blockCandidate, jsonRaw)
+  }
+
+  it should "encode/decode BlockSolution" in {
+    val blockHash = BlockHash.generate
+    val target    = Target.onePhPerSecond
+    val ts        = TimeStamp.unsafe(1L)
+    val txsHash   = Hash.generate
+
+    val blockSolution = BlockSolution(
+      AVector(blockHash),
+      ts,
+      1,
+      1,
+      U256.One,
+      target.bits,
+      U256.One,
+      txsHash,
+      AVector.empty
+    )
+    val jsonRaw =
+      s"""{"blockDeps":["${blockHash.toHexString}"],"timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":1,"target":"${Hex
+        .toHexString(
+          target.bits
+        )}","nonce":1,"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+    checkData(blockSolution, jsonRaw)
   }
 }

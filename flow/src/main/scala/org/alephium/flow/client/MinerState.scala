@@ -74,6 +74,17 @@ trait MinerState {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  protected def pickChainTasks(chainIndex: ChainIndex): Option[BlockTemplate] = {
+    val minCount   = miningCounts.map(_.min).min
+    val countBound = minCount.addUnsafe(miningConfig.nonceStep)
+    val fromShift  = chainIndex.from.value - brokerConfig.groupFrom
+    val to         = chainIndex.to.value
+    Option.when(miningCounts(fromShift)(to) <= countBound && !isRunning(fromShift, to)) {
+      pendingTasks(fromShift)(to)
+    }
+  }
+
   protected def startNewTasks(): Unit = {
     pickTasks().foreach { case (fromShift, to, template) =>
       val index        = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)

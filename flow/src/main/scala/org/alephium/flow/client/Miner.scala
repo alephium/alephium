@@ -66,10 +66,15 @@ object Miner extends LazyLogging {
   case object Stop                                                  extends Command
   case object UpdateTemplate                                        extends Command
   case object GetAddresses                                          extends Command
+  final case class GetBlockCandidate(index: ChainIndex)             extends Command
   final case class Mine(index: ChainIndex, template: BlockTemplate) extends Command
+  final case class NewBlockSolution(block: Block, chainIndex: ChainIndex, miningCount: U256)
+      extends Command
   final case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: U256)
       extends Command
   final case class UpdateAddresses(addresses: AVector[Address]) extends Command
+
+  final case class BlockCandidate(maybeBlock: Option[BlockTemplate])
 
   def mine(index: ChainIndex, template: BlockTemplate)(implicit
       groupConfig: GroupConfig,
@@ -139,31 +144,38 @@ class Miner(
     with MinerState {
   val handlers = allHandlers
 
-  def receive: Receive = handleAddresses orElse awaitStart
+  def receive: Receive = handleAddresses orElse handleMining()
 
-  def awaitStart: Receive = {
+  var miningStarted: Boolean = false
+
+  // scalastyle:off method.length
+  def handleMining(): Receive = {
     case Miner.Start =>
-      log.info("Start mining")
-      handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
-      updateTasks()
-      startNewTasks()
-      context become (handleMining orElse handleAddresses orElse awaitStop)
-    case event =>
-      log.debug(s"ignore miner event: $event")
-  }
+      if (!miningStarted) {
+        log.info("Start mining")
+        handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
+        updateTasks()
+        startNewTasks()
+        miningStarted = true
+      } else {
+        log.info("Mining already started")
+      }
 
-  def awaitStop: Receive = {
     case Miner.Stop =>
-      log.info("Stop mining")
-      handlers.flowHandler ! FlowHandler.UnRegister
-      postMinerStop()
-      context become (handleAddresses orElse awaitStart)
-    case cmd: Miner.Command =>
-      log.debug(s"ignore miner commands: $cmd")
-  }
-
-  def handleMining: Receive = {
+      if (miningStarted) {
+        log.info("Stop mining")
+        handlers.flowHandler ! FlowHandler.UnRegister
+        postMinerStop()
+        miningStarted = false
+      } else {
+        log.info("Mining already stopped")
+      }
     case Miner.Mine(index, template) => mine(index, template)
+    case Miner.NewBlockSolution(block, index, miningCount) =>
+      log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
+      val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
+      allHandlers.getBlockHandler(index) ! handlerMessage
+      self ! Miner.MiningResult(Some(block), index, miningCount)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       assume(brokerConfig.contains(chainIndex.from))
       val fromShift = chainIndex.from.value - brokerConfig.groupFrom
@@ -181,8 +193,10 @@ class Miner(
               s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress"
           )
         case None =>
-          setIdle(fromShift, to)
-          startNewTasks()
+          if (miningStarted) {
+            setIdle(fromShift, to)
+            startNewTasks()
+          }
       }
     case Miner.UpdateTemplate =>
       updateTasks()
@@ -191,9 +205,12 @@ class Miner(
       val fromShift  = chainIndex.from.value - brokerConfig.groupFrom
       val to         = chainIndex.to.value
       updateTasks()
-      setIdle(fromShift, to)
-      startNewTasks()
+      if (miningStarted) {
+        setIdle(fromShift, to)
+        startNewTasks()
+      }
   }
+  // scalastyle:on method.length
 
   def handleAddresses: Receive = {
     case Miner.UpdateAddresses(newAddresses) => {
@@ -205,7 +222,8 @@ class Miner(
           log.debug(s"Invalid new miner addresses: $newAddresses, due to $error")
       }
     }
-    case Miner.GetAddresses => sender() ! addresses
+    case Miner.GetAddresses             => sender() ! addresses
+    case Miner.GetBlockCandidate(index) => sender() ! Miner.BlockCandidate(pickChainTasks(index))
   }
 
   private def coinbase(
@@ -248,10 +266,7 @@ class Miner(
     val task = Future {
       Miner.mine(index, template) match {
         case Some((block, miningCount)) =>
-          log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
-          val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
-          allHandlers.getBlockHandler(index) ! handlerMessage
-          self ! Miner.MiningResult(Some(block), index, miningCount)
+          self ! Miner.NewBlockSolution(block, index, miningCount)
         case None =>
           self ! Miner.MiningResult(None, index, miningConfig.nonceStep)
       }

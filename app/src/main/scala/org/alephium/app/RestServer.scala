@@ -18,6 +18,7 @@ package org.alephium.app
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
+import scala.util.Try
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -37,6 +38,7 @@ import org.alephium.api.model._
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
+import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -45,7 +47,8 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{ActorRefT, AVector, Duration, Service}
+import org.alephium.serde._
+import org.alephium.util.{ActorRefT, AVector, Duration, Hex, Service, U256}
 import org.alephium.wallet.web.WalletServer
 
 // scalastyle:off method.length
@@ -133,23 +136,22 @@ class RestServer(
     }
   }
 
-  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute { case (from, to, height) =>
+  private val getHashesAtHeightRoute = getHashesAtHeight.toRoute { case (chainIndex, height) =>
     Future.successful(
       serverUtils.getHashesAtHeight(
         blockFlow,
-        ChainIndex(from, to),
-        GetHashesAtHeight(from.value, to.value, height)
+        chainIndex,
+        GetHashesAtHeight(chainIndex.from.value, chainIndex.to.value, height)
       )
     )
   }
 
-  private val getChainInfoRoute = getChainInfo.toRoute { case (from, to) =>
-    Future.successful(serverUtils.getChainInfo(blockFlow, ChainIndex(from, to)))
+  private val getChainInfoRoute = getChainInfo.toRoute { chainIndex =>
+    Future.successful(serverUtils.getChainInfo(blockFlow, chainIndex))
   }
 
-  private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute {
-    case (from, to) =>
-      Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, ChainIndex(from, to)))
+  private val listUnconfirmedTransactionsRoute = listUnconfirmedTransactions.toRoute { chainIndex =>
+    Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
   }
 
   private val buildTransactionRoute = buildTransaction.toRoute {
@@ -166,8 +168,8 @@ class RestServer(
     serverUtils.sendTransaction(txHandler, transaction)
   }
 
-  private val getTransactionStatusRoute = getTransactionStatus.toRoute { case (txId, from, to) =>
-    Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, ChainIndex(from, to)))
+  private val getTransactionStatusRoute = getTransactionStatus.toRoute { case (txId, chainIndex) =>
+    Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, chainIndex))
   }
 
   private val minerActionRoute = minerAction.toRoute {
@@ -182,6 +184,29 @@ class RestServer(
       .map { addresses =>
         Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
       }
+  }
+
+  private val minerGetBlockCandidateRoute = minerGetBlockCandidate.toRoute { chainIndex =>
+    miner
+      .ask(Miner.GetBlockCandidate(chainIndex))
+      .mapTo[Miner.BlockCandidate]
+      .map(_.maybeBlock match {
+        case Some(block) => Right(RestServer.blockTempateToCandidate(block))
+        case None =>
+          Left(ApiModel.Error.server("Cannot find block candidate for given chain index"))
+      })
+  }
+
+  private val minerNewBlockRoute = minerNewBlock.toRoute { solution =>
+    Future.successful(
+      RestServer.blockSolutionToBlock(solution).map { case (solution, chainIndex, miningCount) =>
+        miner ! Miner.NewBlockSolution(
+          solution,
+          chainIndex,
+          miningCount
+        )
+      }
+    )
   }
 
   private val minerUpdateAddressesRoute = minerUpdateAddresses.toRoute { minerAddresses =>
@@ -242,6 +267,8 @@ class RestServer(
     buildContract,
     minerAction,
     minerListAddresses,
+    minerGetBlockCandidate,
+    minerNewBlock,
     minerUpdateAddresses
   )
 
@@ -275,6 +302,8 @@ class RestServer(
       sendTransactionRoute ~
       getTransactionStatusRoute ~
       minerActionRoute ~
+      minerGetBlockCandidateRoute ~
+      minerNewBlockRoute ~
       minerListAddressesRoute ~
       minerUpdateAddressesRoute ~
       sendContractRoute ~
@@ -355,5 +384,40 @@ object RestServer {
       syncStatus.address,
       syncStatus.isSynced
     )
+  }
+
+  //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
+  def blockTempateToCandidate(template: BlockTemplate): BlockCandidate = {
+    BlockCandidate(
+      template.deps,
+      template.target.bits,
+      template.blockTs,
+      template.txsHash,
+      template.transactions.map(tx => Hex.toHexString(serialize(tx)))
+    )
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def blockSolutionToBlock(
+      solution: BlockSolution
+  )(implicit groupConfig: GroupConfig): Either[ApiModel.Error, (Block, ChainIndex, U256)] = {
+    Try {
+      val header = BlockHeader(
+        BlockDeps.build(solution.blockDeps),
+        solution.txsHash,
+        solution.timestamp,
+        Target(solution.target),
+        solution.nonce
+      )
+      val transactions =
+        solution.transactions.map(tx => deserialize[Transaction](Hex.unsafe(tx)).toOption.get)
+
+      val chainIndex = ChainIndex.unsafe(solution.fromGroup, solution.toGroup)
+
+      (Block(header, transactions), chainIndex, solution.miningCount)
+    }.toEither.left.map { error =>
+      //TODO improve error handling
+      ApiModel.Error.server(error.getMessage)
+    }
   }
 }

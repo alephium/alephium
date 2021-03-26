@@ -37,6 +37,7 @@ import akka.testkit.TestProbe
 import io.circe.{Codec, Decoder}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.parser.parse
+import io.circe.syntax._
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Second, Seconds, Span}
@@ -154,6 +155,9 @@ trait TestFixtureLike
   def httpPut(endpoint: String, maybeEntity: Option[String] = None) =
     httpRequest(HttpMethods.PUT, endpoint, maybeEntity)
 
+  def unitRequest(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Unit = {
+    discard(Http().singleRequest(request(port)).futureValue)
+  }
   def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
     val response = Http().singleRequest(request(port)).futureValue
 
@@ -166,9 +170,13 @@ trait TestFixtureLike
     }
   }
 
-  def requestFailed(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Assertion = {
+  def requestFailed(
+      request: Int => HttpRequest,
+      port: Int = defaultRestMasterPort,
+      statusCode: StatusCode
+  ): Assertion = {
     val response = Http().singleRequest(request(port)).futureValue
-    response.status is StatusCodes.InternalServerError
+    response.status is statusCode
   }
 
   def transfer(
@@ -446,6 +454,14 @@ trait TestFixtureLike
 
   val startMining = httpPost("/miners?action=start-mining")
   val stopMining  = httpPost("/miners?action=stop-mining")
+
+  def blockCandidate(from: Int, to: Int) =
+    httpGet(s"/miners/block-candidate?fromGroup=$from&toGroup=$to")
+
+  def newBlock(solution: BlockSolution) = {
+    val body = s"""${solution.asJson}"""
+    httpPost(s"/miners/new-block", Some(body))
+  }
 
   def exportBlocks(filename: String) =
     httpPost(s"/export-blocks", Some(s"""{"filename": "${filename}"}"""))
