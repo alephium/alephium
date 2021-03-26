@@ -18,8 +18,5 @@ jobs:
       - uses: olafurpg/setup-scala@v10
         with:
           java-version: ${{ matrix.java }}
-      - name: Install rgn tools for linux
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: sudo apt-get install rng-tools haveged
-      - run: sbt coverage test coverageReport
+      - run: sbt test
         shell: bash
