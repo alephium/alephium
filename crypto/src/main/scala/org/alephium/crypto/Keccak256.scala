@@ -26,9 +26,8 @@ class Keccak256(val bytes: ByteString) extends RandomBytes {
   def toByte32: Byte32 = Byte32.unsafe(bytes)
 }
 
-object Keccak256 extends HashSchema[Keccak256](HashSchema.unsafeKeccak256, _.bytes) {
-  override def length: Int = 32
+object Keccak256 extends BCHashSchema[Keccak256](HashSchema.unsafeKeccak256, _.bytes) {
+  def length: Int = 32
 
-  // TODO: optimize with queue of providers
-  override def provider: Digest = new KeccakDigest(length * 8)
+  def provider(): Digest = new KeccakDigest(length * 8)
 }

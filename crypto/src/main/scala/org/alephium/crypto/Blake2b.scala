@@ -26,8 +26,8 @@ class Blake2b(val bytes: ByteString) extends RandomBytes {
   def toByte32: Byte32 = Byte32.unsafe(bytes)
 }
 
-object Blake2b extends HashSchema[Blake2b](HashSchema.unsafeBlake2b, _.bytes) {
-  override def length: Int = 32
+object Blake2b extends BCHashSchema[Blake2b](HashSchema.unsafeBlake2b, _.bytes) {
+  def length: Int = 32
 
-  override def provider: Digest = new Blake2bDigest(length * 8)
+  def provider(): Digest = new Blake2bDigest(length * 8)
 }
