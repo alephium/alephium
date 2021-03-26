@@ -123,6 +123,11 @@ object SecP256K1
     (privateKey, privateKey.publicKey)
   }
 
+  override def secureGeneratePriPub(): (SecP256K1PrivateKey, SecP256K1PublicKey) = {
+    val privateKey = SecP256K1PrivateKey.secureGenerate
+    (privateKey, privateKey.publicKey)
+  }
+
   override def sign(message: Array[Byte], privateKey: Array[Byte]): SecP256K1Signature = {
     val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()))
     val d      = new BigInteger(1, privateKey)

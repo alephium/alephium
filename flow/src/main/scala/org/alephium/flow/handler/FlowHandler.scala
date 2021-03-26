@@ -207,7 +207,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
     val chain = blockFlow.getHeaderChain(header)
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
-    val timeSpan = {
+    val blockTime = {
       chain.getBlockHeader(header.parentHash) match {
         case Left(_) => "?ms"
         case Right(parentHeader) =>
@@ -215,7 +215,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
           s"${span}ms"
       }
     }
-    s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, timeSpan: $timeSpan"
+    s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
 
   def show(block: Block): String = {

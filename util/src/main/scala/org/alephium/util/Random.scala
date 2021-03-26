@@ -19,12 +19,13 @@ package org.alephium.util
 import java.security.SecureRandom
 
 import scala.annotation.tailrec
+import scala.util.Random
 
-object Random {
-  val source: SecureRandom = SecureRandom.getInstanceStrong
+trait AbstractRandom {
+  def source: java.util.Random
 
   @tailrec
-  def nextNonZeroInt(): Int = {
+  final def nextNonZeroInt(): Int = {
     val random = source.nextInt()
     if (random != 0) random else nextNonZeroInt()
   }
@@ -48,4 +49,12 @@ object Random {
   def nextU256NonUniform(bound: U256): U256 = {
     nextU256().modUnsafe(bound)
   }
+}
+
+object UnsecureRandom extends AbstractRandom {
+  val source: java.util.Random = Random.self
+}
+
+object SecureAndSlowRandom extends AbstractRandom {
+  val source: SecureRandom = new SecureRandom()
 }

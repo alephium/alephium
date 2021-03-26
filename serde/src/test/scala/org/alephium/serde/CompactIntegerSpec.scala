@@ -19,7 +19,7 @@ package org.alephium.serde
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.util.{AlephiumSpec, I256, Random, U256, U32}
+import org.alephium.util.{AlephiumSpec, I256, U256, U32, UnsecureRandom}
 
 class CompactIntegerSpec extends AlephiumSpec {
   it should "encode/decode U32 & U256" in {
@@ -47,7 +47,7 @@ class CompactIntegerSpec extends AlephiumSpec {
     forAll { n: Int => test(n) }
 
     forAll { _: Int =>
-      val u256 = Random.nextU256()
+      val u256 = UnsecureRandom.nextU256()
       decodeU256(encode(u256)) isE Staging(u256, ByteString.empty)
     }
   }
@@ -82,7 +82,7 @@ class CompactIntegerSpec extends AlephiumSpec {
     forAll { n: Int => test(n) }
 
     forAll { _: Int =>
-      val i256 = Random.nextI256()
+      val i256 = UnsecureRandom.nextI256()
       decodeI256(encode(i256)) isE Staging(i256, ByteString.empty)
     }
   }

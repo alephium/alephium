@@ -31,6 +31,8 @@ private[crypto] trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Sign
 
   def generatePriPub(): (D, Q)
 
+  def secureGeneratePriPub(): (D, Q)
+
   def sign(message: ByteString, privateKey: D): S = {
     sign(message.toArray, privateKey.bytes.toArray)
   }

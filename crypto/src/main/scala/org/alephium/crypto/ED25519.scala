@@ -75,6 +75,11 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
     (privateKey, privateKey.publicKey)
   }
 
+  override def secureGeneratePriPub(): (ED25519PrivateKey, ED25519PublicKey) = {
+    val privateKey = ED25519PrivateKey.secureGenerate
+    (privateKey, privateKey.publicKey)
+  }
+
   protected def sign(message: Array[Byte], privateKey: Array[Byte]): ED25519Signature = {
     val signature = Array.ofDim[Byte](ED25519Signature.length)
     bcEd25519.sign(privateKey, 0, message, 0, message.length, signature, 0)

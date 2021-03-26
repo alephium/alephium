@@ -23,6 +23,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.concurrent.{Await, Promise}
+import scala.util.Random
 import scala.util.control.NonFatal
 
 import akka.actor.ActorRef
@@ -40,7 +41,7 @@ import io.circe.parser.parse
 import io.circe.syntax._
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Second, Seconds, Span}
+import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
@@ -65,7 +66,7 @@ trait TestFixtureLike
     with ScalaFutures
     with Eventually {
   implicit override val patienceConfig =
-    PatienceConfig(timeout = Span(30, Seconds), interval = Span(1, Second))
+    PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
   implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
   implicit lazy val networkType: NetworkType = config.network.networkType
 
@@ -91,7 +92,7 @@ trait TestFixtureLike
 
   val usedPort = mutable.Set.empty[Int]
   def generatePort: Int = {
-    val tcpPort = 40000 + Random.source.nextInt(5000) * 4
+    val tcpPort = 40000 + Random.nextInt(5000) * 4
 
     if (usedPort.contains(tcpPort)) {
       generatePort
@@ -101,9 +102,13 @@ trait TestFixtureLike
       val rest: ServerSocket  = ServerSocketChannel.open().socket()
       val ws: ServerSocket    = ServerSocketChannel.open().socket()
       try {
+        tcp.setReuseAddress(true)
         tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        udp.setReuseAddress(true)
         udp.bind(new InetSocketAddress("localhost", tcpPort))
+        rest.setReuseAddress(true)
         rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+        ws.setReuseAddress(true)
         ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
         usedPort.add(tcpPort)
         tcpPort
@@ -277,7 +282,7 @@ trait TestFixtureLike
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
-        ("alephium.mining.batch-delay", "100 milli"),
+        ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )
@@ -331,7 +336,7 @@ trait TestFixtureLike
 
     val server: Server = new Server {
       implicit val system: ActorSystem =
-        ActorSystem(s"$name-${Random.source.nextInt}", platformEnv.newConfig)
+        ActorSystem(s"$name-${Random.nextInt()}", platformEnv.newConfig)
       implicit val executionContext = system.dispatcher
 
       val defaultNetwork = platformEnv.config.network

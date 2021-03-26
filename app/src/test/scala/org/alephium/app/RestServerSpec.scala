@@ -27,7 +27,6 @@ import io.circe.{Json, JsonObject}
 import io.circe.syntax._
 import io.circe.yaml
 import org.scalatest.EitherValues
-import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.api.ApiModel
 import org.alephium.api.CirceUtils.avectorCodec
@@ -43,10 +42,9 @@ import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 
 class RestServerSpec
-    extends AlephiumSpec
+    extends AlephiumFutureSpec
     with ScalatestRouteTest
     with EitherValues
-    with ScalaFutures
     with NumericHelpers {
 
   it should "call GET /blockflow" in new RestServerFixture {
@@ -284,8 +282,8 @@ class RestServerSpec
 
       val timeout = Duration.ofMinutesUnsafe(1).asScala
 
-      val openapiFile =
-        Source.fromFile("../api/src/main/resources/openapi.yaml").getLines().mkString("\n")
+      val openapiPath       = ApiModel.getClass.getResource("/openapi.yaml")
+      val openapiFile       = Source.fromFile(openapiPath.getPath, "UTF-8").getLines().mkString("\n")
       val openapiFileAsJson = yaml.parser.parse(openapiFile).rightValue
       val expectedOpenapi   = removeExamples(openapiFileAsJson)
 

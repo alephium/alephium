@@ -20,9 +20,7 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits
 
-import org.scalatest.concurrent.ScalaFutures._
-
-class ServiceSpec extends AlephiumSpec {
+class ServiceSpec extends AlephiumFutureSpec {
   trait Test extends Service {
     implicit override protected def executionContext: ExecutionContext = Implicits.global
 

@@ -16,6 +16,8 @@
 
 package org.alephium.flow.validation
 
+import scala.util.Random
+
 import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
@@ -26,7 +28,7 @@ import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory}
-import org.alephium.util.{AVector, Random, TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
@@ -265,7 +267,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
 
     forAll(transactionGenWithPreOutputs(1, 3)) { case (tx, preOutputs) =>
-      val outputIndex = Random.source.nextInt(tx.outputsLength)
+      val outputIndex = Random.nextInt(tx.outputsLength)
       if (tx.getOutput(outputIndex).isInstanceOf[AssetOutput]) {
         val txNew = if (outputIndex < tx.unsigned.fixedOutputs.length) {
           val outputsNew = modifyData0(tx.unsigned.fixedOutputs, outputIndex)

@@ -185,7 +185,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       publishEvent(MisbehaviorManager.RequestTimeout(remoteAddress))
       context stop self // stop it manually
     } else {
-      pingNonce = Random.nextNonZeroInt()
+      pingNonce = UnsecureRandom.nextNonZeroInt()
       send(Ping(pingNonce, System.currentTimeMillis()))
     }
   }

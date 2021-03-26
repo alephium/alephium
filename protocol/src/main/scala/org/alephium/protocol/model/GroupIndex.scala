@@ -27,7 +27,7 @@ class GroupIndex(val value: Int) extends AnyVal {
 
   @tailrec
   final def generateKey(implicit config: GroupConfig): (PrivateKey, PublicKey) = {
-    val (privateKey, publicKey) = SignatureSchema.generatePriPub()
+    val (privateKey, publicKey) = SignatureSchema.secureGeneratePriPub()
     val lockupScript            = LockupScript.p2pkh(Hash.hash(publicKey.bytes))
     if (lockupScript.groupIndex == this) {
       (privateKey, publicKey)
