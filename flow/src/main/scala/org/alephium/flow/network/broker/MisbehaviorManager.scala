@@ -26,8 +26,8 @@ import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 object MisbehaviorManager {
-  def props(banDuration: Duration, penaltyForgivness: Duration): Props =
-    Props(new MisbehaviorManager(banDuration, penaltyForgivness))
+  def props(banDuration: Duration, penaltyForgivness: Duration, penaltyFrequency: Duration): Props =
+    Props(new MisbehaviorManager(banDuration, penaltyForgivness, penaltyFrequency))
 
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -71,8 +71,11 @@ object MisbehaviorManager {
   final case class Banned(until: TimeStamp)                  extends MisbehaviorStatus
 }
 
-class MisbehaviorManager(banDuration: Duration, penaltyForgivness: Duration)
-    extends BaseActor
+class MisbehaviorManager(
+    banDuration: Duration,
+    penaltyForgivness: Duration,
+    penaltyFrequency: Duration
+) extends BaseActor
     with EventStream {
   import MisbehaviorManager._
 
@@ -94,9 +97,13 @@ class MisbehaviorManager(banDuration: Duration, penaltyForgivness: Duration)
           case Banned(until) =>
             log.warning(s"${peer} already banned until $until, re-banning")
             banAndPublish(peer)
-          case Penalty(current, _) =>
-            val newScore = current + misbehavior.penalty
-            handlePenalty(peer, newScore)
+          case Penalty(current, lastTs) =>
+            if (TimeStamp.now().deltaUnsafe(lastTs) < penaltyFrequency) {
+              log.debug("Already penalized the peer recently, ignoring that misbehavior")
+            } else {
+              val newScore = current + misbehavior.penalty
+              handlePenalty(peer, newScore)
+            }
         }
 
     }

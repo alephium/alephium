@@ -108,12 +108,39 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     }
   }
 
+  it should "not penalize to fast" in new Fixture {
+    override val penaltyFrequency = Duration.ofHoursUnsafe(1)
+
+    misbehaviorManager ! Spamming(peer)
+
+    eventually {
+      misbehaviorManager ! GetPeers
+      expectMsgPF() { case Peers(peers) =>
+        val Peer(address, Penalty(value, _)) = peers.head
+        address is peer.getAddress
+        value is 20
+      }
+    }
+
+    misbehaviorManager ! Spamming(peer)
+
+    eventually {
+      misbehaviorManager ! GetPeers
+      expectMsgPF() { case Peers(peers) =>
+        val Peer(address, Penalty(value, _)) = peers.head
+        address is peer.getAddress
+        value is 20
+      }
+    }
+  }
+
   trait Fixture extends Generators {
     val banDuration       = Duration.ofHoursUnsafe(1)
     val penaltyForgivness = Duration.ofHoursUnsafe(1)
+    val penaltyFrequency  = Duration.zero
 
     lazy val misbehaviorManager =
-      system.actorOf(MisbehaviorManager.props(banDuration, penaltyForgivness))
+      system.actorOf(MisbehaviorManager.props(banDuration, penaltyForgivness, penaltyFrequency))
 
     val peer       = socketAddressGen.sample.get
     val local      = socketAddressGen.sample.get
