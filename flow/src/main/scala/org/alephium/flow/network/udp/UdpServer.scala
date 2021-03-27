@@ -29,6 +29,8 @@ import akka.util.ByteString
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object UdpServer {
+  var sharedSelectionHandler: SelectionHandler = null
+
   def props(): Props = Props(new UdpServer())
 
   sealed trait Command
@@ -49,27 +51,35 @@ class UdpServer() extends BaseActor {
   import UdpServer._
 
   var discoveryServer: ActorRefT[UdpServer.Event] = _
-  var selector: Selector                          = _
   var channel: DatagramChannel                    = _
   var selectionKey: SelectionKey                  = _
 
   def receive: Receive = { case Bind(bindAddress) =>
     discoveryServer = ActorRefT[UdpServer.Event](sender())
     try {
-      selector = Selector.open()
       channel = DatagramChannel.open()
       channel.configureBlocking(false)
+      channel.socket().setReuseAddress(true)
       channel.socket().bind(bindAddress)
-      selectionKey = channel.register(selector, SelectionKey.OP_READ)
 
-      val dispatcher       = context.system.dispatchers.lookup(s"akka.io.pinned-dispatcher")
-      val selectionHandler = SelectionHandler(ActorRefT(self), selector, dispatcher, log)
-      selectionHandler.loop()
+      UdpServer.synchronized {
+        if (sharedSelectionHandler == null) {
+          val selector   = Selector.open()
+          val dispatcher = context.system.dispatchers.lookup(s"akka.io.pinned-dispatcher")
+
+          selectionKey = channel.register(selector, SelectionKey.OP_READ, self)
+          sharedSelectionHandler = SelectionHandler(selector, dispatcher)
+        } else {
+          selectionKey =
+            channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
+          sharedSelectionHandler.selector.wakeup()
+        }
+      }
 
       discoveryServer ! Bound(bindAddress)
       context.become(listening)
     } catch {
-      case NonFatal(e) =>
+      case e: Throwable =>
         log.warning(s"Failed in binding udp to [$bindAddress]: $e")
         discoveryServer ! UdpServer.BindFailed
     }
@@ -79,22 +89,39 @@ class UdpServer() extends BaseActor {
   def listening: Receive = {
     case send @ Send(message, remote) =>
       try {
-        val writtenBytes = channel.send(message.toByteBuffer, remote)
-        log.debug(s"Send $writtenBytes bytes to udp channel")
+        channel.send(message.toByteBuffer, remote)
+        ()
       } catch {
-        case NonFatal(e) => sender() ! SendFailed(send, e)
+        case NonFatal(e) =>
+          log.warning(s"error: $e")
+          sender() ! SendFailed(send, e)
+        case e: Throwable =>
+          log.warning(s"Fatal error: $e, closing UDP server")
       }
-    case Read =>
-      buffer.clear()
-      channel.receive(buffer) match {
-        case sender: InetSocketAddress =>
-          buffer.flip()
-          val data = ByteString(buffer)
-          discoveryServer ! UdpServer.Received(data, sender)
-        case _ => // null means no data received
-      }
+    case Read => read(3)
     case SelectFailure(e) =>
       log.warning(s"IO failure in udp selection: $e")
       context.stop(self)
+  }
+
+  def read(readsLeft: Int): Unit = {
+    buffer.clear()
+    channel.receive(buffer) match {
+      case sender: InetSocketAddress =>
+        buffer.flip()
+        val data = ByteString(buffer)
+        discoveryServer ! UdpServer.Received(data, sender)
+      case _ => // null means no data received
+    }
+    if (readsLeft > 0) read(readsLeft - 1)
+  }
+
+  override def postStop(): Unit = {
+    if (channel != null) {
+      channel.close()
+    }
+    if (selectionKey != null) {
+      selectionKey.cancel()
+    }
   }
 }

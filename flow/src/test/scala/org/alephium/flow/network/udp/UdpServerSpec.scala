@@ -26,13 +26,6 @@ import org.alephium.crypto.Blake2b
 import org.alephium.util.AlephiumActorSpec
 
 class UdpServerSpec extends AlephiumActorSpec("UdpServer") {
-  it should "bind to valid address" in new Fixture {
-    val (bindAddress, _) = createUdpServer()
-    val udpServer1       = TestActorRef[UdpServer](UdpServer.props())
-    udpServer1 ! UdpServer.Bind(bindAddress)
-    expectMsg(UdpServer.BindFailed)
-  }
-
   it should "read and write messages" in new Fixture {
     val (bindAddress0, udpServer0) = createUdpServer()
     val (bindAddress1, udpServer1) = createUdpServer()

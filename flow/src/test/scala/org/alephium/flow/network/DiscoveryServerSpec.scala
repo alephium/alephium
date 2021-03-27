@@ -23,7 +23,6 @@ import scala.collection.mutable
 import scala.util.Random
 import scala.util.control.NonFatal
 
-import akka.io.Udp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
@@ -31,6 +30,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.{ALF, Generators, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
@@ -139,12 +139,14 @@ class DiscoveryServerSpec
       }
     }
 
+    println(groups)
     eventually {
       servers.foreach { server =>
         val probe = TestProbe()
         server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
+          println(s"${peers.sumBy(_.groupNumPerBroker)}")
           (peers.sumBy(_.groupNumPerBroker) >= 4 * groups) is true
         }
       }
@@ -239,7 +241,7 @@ class DiscoveryServerSpec
         )
       )
     )(config1)
-    server0 ! Udp.Received(
+    server0 ! UdpServer.Received(
       DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
       address1
     )

@@ -16,21 +16,17 @@
 
 package org.alephium.flow.network.udp
 
-import java.io.IOException
 import java.nio.channels.Selector
 
 import scala.concurrent.ExecutionContext
 
-import akka.event.LoggingAdapter
-
-import org.alephium.util.ActorRefT
+import akka.actor.ActorRef
+import com.typesafe.scalalogging.LazyLogging
 
 case class SelectionHandler(
-    udpServer: ActorRefT[UdpServer.Command],
     selector: Selector,
-    executionContext: ExecutionContext,
-    log: LoggingAdapter
-) {
+    executionContext: ExecutionContext
+) extends LazyLogging {
   def select(): Unit = {
     selector.select()
     val selectedKeys = selector.selectedKeys().iterator()
@@ -38,20 +34,23 @@ case class SelectionHandler(
       val key = selectedKeys.next()
       selectedKeys.remove()
 
+      val udpServer = key.attachment().asInstanceOf[ActorRef]
       if (key.isReadable) {
         udpServer ! UdpServer.Read
       }
     }
   }
 
-  def loop(): Unit = {
-    executionContext.execute(() => {
-      if (selector.isOpen) {
-        try select()
-        catch {
-          case e: IOException => udpServer ! UdpServer.SelectFailure(e)
-        } finally loop()
-      }
-    })
+  def loop: Runnable = () => {
+    if (selector.isOpen) {
+      try select()
+      catch {
+        case e: Throwable =>
+          logger.error(s"Udp selection error: $e")
+          sys.exit(1)
+      } finally executionContext.execute(loop)
+    }
   }
+
+  executionContext.execute(loop)
 }
