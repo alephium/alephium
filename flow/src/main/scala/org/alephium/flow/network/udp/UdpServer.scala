@@ -115,4 +115,13 @@ class UdpServer() extends BaseActor {
     }
     if (readsLeft > 0) read(readsLeft - 1)
   }
+
+  override def postStop(): Unit = {
+    if (selectionKey != null) {
+      selectionKey.cancel()
+    }
+    if (channel != null) {
+      channel.close()
+    }
+  }
 }

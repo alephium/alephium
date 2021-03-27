@@ -37,7 +37,7 @@ final case class SelectionHandler(
       selectedKeys.remove()
 
       val udpServer = key.attachment().asInstanceOf[ActorRef]
-      if (key.isReadable) {
+      if (key.isValid && key.isReadable) {
         udpServer ! UdpServer.Read
       }
     }

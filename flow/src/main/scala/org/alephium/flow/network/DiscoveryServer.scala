@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{Cancellable, Props, Stash, Terminated, Timers}
+import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated, Timers}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
@@ -115,7 +115,7 @@ class DiscoveryServer(
 
   var scanScheduled: Option[Cancellable] = None
 
-  val udpServer: ActorRefT[UdpServer.Command] = ActorRefT(context.actorOf(UdpServer.props()))
+  val udpServer: ActorRef = context.actorOf(UdpServer.props())
 
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
