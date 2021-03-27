@@ -147,7 +147,6 @@ trait DiscoveryServerState {
   def appendPeer(peerInfo: BrokerInfo): Unit = {
     log.info(s"Adding a new peer: $peerInfo")
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
-    fetchNeighbors(peerInfo)
     publishNewPeer(peerInfo)
   }
 
