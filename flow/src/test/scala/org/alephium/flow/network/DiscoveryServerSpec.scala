@@ -23,7 +23,6 @@ import scala.collection.mutable
 import scala.util.Random
 import scala.util.control.NonFatal
 
-import akka.io.Udp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
@@ -31,6 +30,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.{ALF, Generators, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
@@ -76,7 +76,7 @@ class DiscoveryServerSpec
         candidates(Random.nextInt(candidates.size))
       }
       val groupNumPerBroker = groups / brokerNum
-      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("localhost", generatePort()))
+      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
       val clique =
         CliqueInfo.unsafe(CliqueId.generate, addresses.map(Some(_)), addresses, groupNumPerBroker)
 
@@ -239,7 +239,7 @@ class DiscoveryServerSpec
         )
       )
     )(config1)
-    server0 ! Udp.Received(
+    server0 ! UdpServer.Received(
       DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
       address1
     )
