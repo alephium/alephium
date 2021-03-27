@@ -16,11 +16,11 @@
 
 package org.alephium.flow.network.udp
 
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.{DatagramChannel, SelectionKey, Selector}
 
+import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
 import akka.actor.Props
@@ -29,7 +29,7 @@ import akka.util.ByteString
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object UdpServer {
-  var sharedSelectionHandler: SelectionHandler = null
+  var sharedSelectionHandler: SelectionHandler = _
 
   def props(): Props = Props(new UdpServer())
 
@@ -38,7 +38,6 @@ object UdpServer {
   final case class Send(message: ByteString, remote: InetSocketAddress) extends Command
   private[udp] case object Read                                         extends Command
   private[udp] case object Write                                        extends Command
-  final private[udp] case class SelectFailure(e: IOException)           extends Command
 
   sealed trait Event
   final case class Bound(address: InetSocketAddress)                     extends Event
@@ -89,22 +88,23 @@ class UdpServer() extends BaseActor {
   def listening: Receive = {
     case send @ Send(message, remote) =>
       try {
-        channel.send(message.toByteBuffer, remote)
+        buffer.clear()
+        message.copyToBuffer(buffer)
+        buffer.flip()
+        channel.send(buffer, remote)
         ()
       } catch {
         case NonFatal(e) =>
-          log.warning(s"error: $e")
           sender() ! SendFailed(send, e)
         case e: Throwable =>
           log.warning(s"Fatal error: $e, closing UDP server")
+          context.stop(self)
       }
     case Read => read(3)
-    case SelectFailure(e) =>
-      log.warning(s"IO failure in udp selection: $e")
-      context.stop(self)
   }
 
-  def read(readsLeft: Int): Unit = {
+  @tailrec
+  private def read(readsLeft: Int): Unit = {
     buffer.clear()
     channel.receive(buffer) match {
       case sender: InetSocketAddress =>
@@ -114,14 +114,5 @@ class UdpServer() extends BaseActor {
       case _ => // null means no data received
     }
     if (readsLeft > 0) read(readsLeft - 1)
-  }
-
-  override def postStop(): Unit = {
-    if (channel != null) {
-      channel.close()
-    }
-    if (selectionKey != null) {
-      selectionKey.cancel()
-    }
   }
 }

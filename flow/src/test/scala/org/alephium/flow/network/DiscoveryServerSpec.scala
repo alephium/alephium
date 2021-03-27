@@ -76,7 +76,7 @@ class DiscoveryServerSpec
         candidates(Random.nextInt(candidates.size))
       }
       val groupNumPerBroker = groups / brokerNum
-      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("localhost", generatePort()))
+      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
       val clique =
         CliqueInfo.unsafe(CliqueId.generate, addresses.map(Some(_)), addresses, groupNumPerBroker)
 
@@ -139,14 +139,12 @@ class DiscoveryServerSpec
       }
     }
 
-    println(groups)
     eventually {
       servers.foreach { server =>
         val probe = TestProbe()
         server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
-          println(s"${peers.sumBy(_.groupNumPerBroker)}")
           (peers.sumBy(_.groupNumPerBroker) >= 4 * groups) is true
         }
       }

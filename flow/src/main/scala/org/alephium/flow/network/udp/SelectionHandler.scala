@@ -23,10 +23,12 @@ import scala.concurrent.ExecutionContext
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.LazyLogging
 
-case class SelectionHandler(
+final case class SelectionHandler(
     selector: Selector,
     executionContext: ExecutionContext
 ) extends LazyLogging {
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def select(): Unit = {
     selector.select()
     val selectedKeys = selector.selectedKeys().iterator()
@@ -41,6 +43,7 @@ case class SelectionHandler(
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def loop: Runnable = () => {
     if (selector.isOpen) {
       try select()

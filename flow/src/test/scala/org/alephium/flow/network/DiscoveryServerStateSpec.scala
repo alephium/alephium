@@ -207,10 +207,13 @@ class DiscoveryServerStateSpec
     state.scan()
     expectPayload[Ping]
     socketProbe.expectNoMessage()
-    state.appendPeer {
+    val peer = {
       val info = brokerInfoGen.sample.get
       BrokerInfo.unsafe(info.cliqueId, info.brokerId, info.groupNumPerBroker, state.bootstrap.head)
     }
+    state.ping(peer)
+    expectPayload[Ping]
+    state.handlePong(peer)
     expectPayload[FindNode]
     state.scan()
     expectPayload[Ping]
