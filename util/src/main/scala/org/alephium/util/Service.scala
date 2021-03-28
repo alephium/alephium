@@ -67,6 +67,7 @@ trait Service {
     if (!stopped) {
       stopped = true
       try {
+        println(s"stopping ${this.getClass.getName}")
         stopPromise.completeWith {
           for {
             _ <- stopSelfOnce()

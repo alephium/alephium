@@ -24,7 +24,7 @@ object FlowMonitor {
   sealed trait Command extends EventStream.Event
   case object Shutdown extends Command
 
-  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
+  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(20)
 
   def props(shutdown: => Unit): Props = Props(new FlowMonitor(shutdown))
 }

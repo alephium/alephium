@@ -43,7 +43,7 @@ class SelectionHandler(
     executionContext: ExecutionContext
 ) extends Extension
     with LazyLogging {
-  private val timeout = Duration.ofSecondsUnsafe(10)
+  private val timeout = Duration.ofSecondsUnsafe(5)
   private val wakeUp  = new AtomicBoolean(false)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
