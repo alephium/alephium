@@ -23,7 +23,6 @@ import scala.collection.mutable
 import scala.util.Random
 import scala.util.control.NonFatal
 
-import akka.io.Udp
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
@@ -31,16 +30,14 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.protocol.{ALF, Generators, PrivateKey, PublicKey, SignatureSchema}
+import org.alephium.flow.network.udp.UdpServer
+import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
+import org.alephium.util.{ActorRefT, AVector, Duration, RefinedAlephiumActorSpec}
 
-class DiscoveryServerSpec
-    extends AlephiumActorSpec("DiscoveryServerSpec")
-    with ScalaFutures
-    with Eventually {
+class DiscoveryServerSpec extends RefinedAlephiumActorSpec with ScalaFutures with Eventually {
   import DiscoveryServerSpec._
 
   val usedPort = mutable.Set.empty[Int]
@@ -76,7 +73,7 @@ class DiscoveryServerSpec
         candidates(Random.nextInt(candidates.size))
       }
       val groupNumPerBroker = groups / brokerNum
-      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("localhost", generatePort()))
+      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
       val clique =
         CliqueInfo.unsafe(CliqueId.generate, addresses.map(Some(_)), addresses, groupNumPerBroker)
 
@@ -103,7 +100,7 @@ class DiscoveryServerSpec
     }
   }
 
-  it should "simulate large network" in new SimulationFixture { self =>
+  it should "simulate large network" in new ActorFixture with SimulationFixture { self =>
     val groups = 4
 
     val networkConfig = new NetworkConfig { val networkType = NetworkType.Testnet }
@@ -242,7 +239,7 @@ class DiscoveryServerSpec
         )
       )
     )(config1)
-    server0 ! Udp.Received(
+    server0 ! UdpServer.Received(
       DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
       address1
     )
@@ -258,7 +255,7 @@ class DiscoveryServerSpec
     }
   }
 
-  trait Fixture extends BrokerConfigFixture.Default {
+  trait Fixture extends BrokerConfigFixture.Default with ActorFixture {
     implicit val patienceConfig =
       PatienceConfig(timeout = Span(20, Seconds), interval = Span(1, Seconds))
 

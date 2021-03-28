@@ -52,6 +52,11 @@ trait BaseActor extends Actor with ActorLogging {
     scheduleCancellableOnce(receiver, message, delay)
     ()
   }
+
+  def terminateSystem(): Unit = {
+    context.system.terminate()
+    ()
+  }
 }
 
 object BaseActor {

@@ -22,7 +22,6 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
@@ -62,7 +61,7 @@ object BrokerConnector {
 
     override def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
       log.debug("Malicious behavior detected in bootstrap, shutdown the system")
-      publishEvent(FlowMonitor.Shutdown)
+      terminateSystem()
     }
   }
 }
@@ -110,6 +109,6 @@ class BrokerConnector(
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
     log.debug(s"Unexpected message, shutdown the system")
-    publishEvent(FlowMonitor.Shutdown)
+    terminateSystem()
   }
 }

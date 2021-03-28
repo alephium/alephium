@@ -21,14 +21,14 @@ import java.nio.file.{Files, Path, Paths}
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
-import org.alephium.util.{ActorRefT, AVector, Files => AFiles}
+import org.alephium.util.{AVector, Duration, Files => AFiles}
 
 object Boot extends App with StrictLogging {
   try {
@@ -48,17 +48,18 @@ object Boot extends App with StrictLogging {
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class BootUp extends StrictLogging {
-  val rootPath: Path                              = Platform.getRootPath()
-  val typesafeConfig: Config                      = Configs.parseConfigAndValidate(rootPath)
-  implicit val config: AlephiumConfig             = AlephiumConfig.loadOrThrow(typesafeConfig)
-  implicit val apiConfig: ApiConfig               = ApiConfig.loadOrThrow(typesafeConfig)
-  implicit val system: ActorSystem                = ActorSystem("Root", typesafeConfig)
-  implicit val executionContext: ExecutionContext = system.dispatcher
+  val rootPath: Path                  = Platform.getRootPath()
+  val typesafeConfig: Config          = Configs.parseConfigAndValidate(rootPath)
+  implicit val config: AlephiumConfig = AlephiumConfig.loadOrThrow(typesafeConfig)
+  implicit val apiConfig: ApiConfig   = ApiConfig.loadOrThrow(typesafeConfig)
+  val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
+  val httpSystem: ActorSystem         = ActorSystem("http", typesafeConfig)
 
-  val flowMonitor: ActorRefT[FlowMonitor.Command] =
-    ActorRefT.build(system, FlowMonitor.props(stop()), "FlowMonitor")
+  @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
+  implicit val executionContext: ExecutionContext =
+    scala.concurrent.ExecutionContext.Implicits.global
 
-  val server: Server = Server(rootPath)
+  val server: Server = Server(rootPath, flowSystem, httpSystem)
 
   def init(): Unit = {
     logConfig()
@@ -77,14 +78,21 @@ class BootUp extends StrictLogging {
     }))
   }
 
-  def stop(): Unit =
-    Await.result(
-      for {
-        _ <- server.stop()
-        _ <- system.terminate()
-      } yield (),
-      FlowMonitor.shutdownTimeout.asScala
-    )
+  CoordinatedShutdown(flowSystem).addTask(
+    CoordinatedShutdown.PhaseBeforeActorSystemTerminate,
+    "Shutdown services"
+  ) { () =>
+    for {
+      _ <- server.stop()
+      _ <- httpSystem.terminate()
+    } yield Done
+  }
+
+  val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
+  def stop(): Unit = {
+    Await.result(flowSystem.terminate(), shutdownTimeout.asScala)
+    ()
+  }
 
   def logConfig(): Unit = {
     val renderOptions =
