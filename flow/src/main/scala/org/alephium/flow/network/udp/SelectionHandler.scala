@@ -16,29 +16,36 @@
 
 package org.alephium.flow.network.udp
 
-import java.nio.channels.Selector
+import java.nio.channels.{SelectionKey, Selector}
 
 import scala.concurrent.ExecutionContext
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.LazyLogging
 
+import org.alephium.util.Duration
+
 final case class SelectionHandler(
     selector: Selector,
     executionContext: ExecutionContext
 ) extends LazyLogging {
+  private val timeout = Duration.ofSecondsUnsafe(10)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def select(): Unit = {
-    selector.select()
+    selector.select(timeout.millis)
     val selectedKeys = selector.selectedKeys().iterator()
     while (selectedKeys.hasNext) {
       val key = selectedKeys.next()
       selectedKeys.remove()
 
-      val udpServer = key.attachment().asInstanceOf[ActorRef]
-      if (key.isValid && key.isReadable) {
-        udpServer ! UdpServer.Read
+      if (key.isValid) {
+        val udpServer = key.attachment().asInstanceOf[ActorRef]
+        val readyOps  = key.readyOps()
+        key.interestOps(key.interestOps & ~readyOps) // prevent immediate reselection
+        if ((readyOps & SelectionKey.OP_READ) != 0) {
+          udpServer ! UdpServer.Read
+        }
       }
     }
   }

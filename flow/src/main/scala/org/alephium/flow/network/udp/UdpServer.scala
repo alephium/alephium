@@ -37,7 +37,6 @@ object UdpServer {
   final case class Bind(address: InetSocketAddress)                     extends Command
   final case class Send(message: ByteString, remote: InetSocketAddress) extends Command
   private[udp] case object Read                                         extends Command
-  private[udp] case object Write                                        extends Command
 
   sealed trait Event
   final case class Bound(address: InetSocketAddress)                     extends Event
@@ -100,7 +99,11 @@ class UdpServer() extends BaseActor {
           log.warning(s"Fatal error: $e, closing UDP server")
           context.stop(self)
       }
-    case Read => read(3)
+    case Read =>
+      read(3)
+      selectionKey.interestOps(SelectionKey.OP_READ)
+      sharedSelectionHandler.selector.wakeup()
+      ()
   }
 
   @tailrec
@@ -111,9 +114,9 @@ class UdpServer() extends BaseActor {
         buffer.flip()
         val data = ByteString(buffer)
         discoveryServer ! UdpServer.Received(data, sender)
+        if (readsLeft > 0) read(readsLeft - 1)
       case _ => // null means no data received
     }
-    if (readsLeft > 0) read(readsLeft - 1)
   }
 
   override def postStop(): Unit = {
