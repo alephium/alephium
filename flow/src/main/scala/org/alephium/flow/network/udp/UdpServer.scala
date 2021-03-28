@@ -63,11 +63,9 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
 
       UdpServer.synchronized {
         if (sharedSelectionHandler == null) {
-          val selector   = Selector.open()
-          val dispatcher = context.system.dispatchers.lookup(s"akka.io.pinned-dispatcher")
-
+          val selector = Selector.open()
           selectionKey = channel.register(selector, SelectionKey.OP_READ, self)
-          sharedSelectionHandler = SelectionHandler(selector, dispatcher)
+          sharedSelectionHandler = SelectionHandler(selector)(context.system)
         } else {
           selectionKey =
             channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
@@ -119,13 +117,13 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
         val data = ByteString(buffer)
         discoveryServer ! UdpServer.Received(data, sender)
         if (readsLeft > 0) read(readsLeft - 1)
-      case _ => // null means no data received
+      case _ => () // null means no data received
     }
   }
 
   override def postStop(): Unit = {
     if (selectionKey != null) {
-      selectionKey.cancel()
+      sharedSelectionHandler.execute(selectionKey.cancel())
     }
     if (channel != null) {
       channel.close()
