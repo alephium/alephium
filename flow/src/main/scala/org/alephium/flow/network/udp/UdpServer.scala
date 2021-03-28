@@ -24,6 +24,7 @@ import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
 import akka.actor.Props
+import akka.dispatch.{RequiresMessageQueue, UnboundedMessageQueueSemantics}
 import akka.util.ByteString
 
 import org.alephium.util.{ActorRefT, BaseActor}
@@ -45,7 +46,7 @@ object UdpServer {
   final case class SendFailed(send: Send, reason: Throwable)             extends Event
 }
 
-class UdpServer() extends BaseActor {
+class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQueueSemantics] {
   import UdpServer._
 
   var discoveryServer: ActorRefT[UdpServer.Event] = _
@@ -101,7 +102,10 @@ class UdpServer() extends BaseActor {
       }
     case Read =>
       read(3)
-      selectionKey.interestOps(SelectionKey.OP_READ)
+      sharedSelectionHandler.execute {
+        selectionKey.interestOps(SelectionKey.OP_READ)
+        ()
+      }
       sharedSelectionHandler.selector.wakeup()
       ()
   }

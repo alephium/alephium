@@ -62,5 +62,7 @@ final case class SelectionHandler(
     }
   }
 
+  def execute(f: => Unit): Unit = executionContext.execute(() => f)
+
   executionContext.execute(loop)
 }
