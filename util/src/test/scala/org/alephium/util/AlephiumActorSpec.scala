@@ -16,12 +16,14 @@
 
 package org.alephium.util
 
+import scala.concurrent.Await
 import scala.language.implicitConversions
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit, TestKitBase}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.concurrent.ScalaFutures
 
 class AlephiumActorSpec(val name: String) extends AlephiumActorSpecLike
 
@@ -40,6 +42,29 @@ trait AlephiumActorSpecLike
   override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
+}
+
+trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with ScalaFutures {
+  var _system: ActorSystem = _
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    if (_system != null) {
+      Await.result(_system.terminate(), Duration.ofSecondsUnsafe(10).asScala)
+      // scalastyle:off null
+      _system = null
+      // scalastyle:on null
+    }
+  }
+
+  trait ActorCreation {
+    implicit val system: ActorSystem =
+      ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.config))
+    Option(_system) is None
+    _system = system
+  }
+
+  trait ActorFixture extends ActorCreation with TestKitBase with ImplicitSender
 }
 
 object AlephiumActorSpec {

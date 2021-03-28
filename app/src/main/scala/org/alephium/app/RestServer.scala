@@ -48,7 +48,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{ActorRefT, AVector, Duration, Hex, Service, U256}
+import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
 
 // scalastyle:off method.length
@@ -68,7 +68,6 @@ class RestServer(
 
   private val blockFlow: BlockFlow                    = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
-  private val terminationHardDeadline                 = Duration.ofSecondsUnsafe(10).asScala
   lazy val blockflowFetchMaxAge                       = apiConfig.blockflowFetchMaxAge
 
   implicit val groupConfig: GroupConfig = node.config.broker
@@ -334,9 +333,9 @@ class RestServer(
   protected def stopSelfOnce(): Future[Unit] =
     for {
       httpBinding <- httpBindingPromise.future
-      httpStop    <- httpBinding.terminate(hardDeadline = terminationHardDeadline)
+      message     <- httpBinding.terminate(Duration.ofSecondsUnsafe(2).asScala)
     } yield {
-      logger.info(s"http unbound with message $httpStop.")
+      logger.info(s"http unbound with message $message")
       ()
     }
 }

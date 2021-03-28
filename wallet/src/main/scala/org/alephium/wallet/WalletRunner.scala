@@ -29,8 +29,11 @@ import org.alephium.util.{Duration, Service}
 import org.alephium.wallet.config.WalletConfig
 
 object Main extends App with Service with StrictLogging {
-  implicit val system: ActorSystem                = ActorSystem("wallet-app")
-  implicit val executionContext: ExecutionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem("wallet-app")
+
+  @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
+  implicit val executionContext: ExecutionContext =
+    scala.concurrent.ExecutionContext.Implicits.global
 
   val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
 

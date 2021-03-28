@@ -33,8 +33,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.circe._
 import io.circe.syntax._
 
-import org.alephium.api.ApiModelCodec
-import org.alephium.api.CirceUtils
+import org.alephium.api.{ApiModelCodec, CirceUtils}
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
@@ -57,8 +56,6 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   implicit val networkType: NetworkType = node.config.network.networkType
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
   lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
-
-  private val terminationHardDeadline = Duration.ofSecondsUnsafe(10).asScala
 
   private def wsFlow(
       eventBus: ActorRefT[EventBus.Message],
@@ -116,9 +113,9 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   protected def stopSelfOnce(): Future[Unit] = {
     for {
       wsBinding <- wsBindingPromise.future
-      wsStop    <- wsBinding.terminate(hardDeadline = terminationHardDeadline)
+      message   <- wsBinding.terminate(Duration.ofSecondsUnsafe(2).asScala)
     } yield {
-      logger.info(s"ws unbound with message $wsStop.")
+      logger.info(s"ws unbound with message $message")
       ()
     }
   }

@@ -146,7 +146,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val mnemonicSize = Mnemonic.Size(12).get
     implicit val system: ActorSystem =
       ActorSystem(s"wallet-service-spec-${Random.nextInt()}")
-    implicit val executionContext = system.dispatcher
+    implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
     lazy val blockFlowClient =
       BlockFlowClient.apply(
         config.blockflow.uri,

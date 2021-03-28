@@ -33,14 +33,15 @@ import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
 
 trait Server extends Service {
-  implicit def system: ActorSystem
+  def flowSystem: ActorSystem
+  def httpSystem: ActorSystem
   implicit def executionContext: ExecutionContext
 
   implicit def config: AlephiumConfig
   implicit def apiConfig: ApiConfig
   def storages: Storages
 
-  lazy val node: Node = Node.build(storages)
+  lazy val node: Node = Node.build(storages, flowSystem)
   lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
     val walletConfig: WalletConfig = WalletConfig(
       config.wallet.port,
@@ -55,14 +56,19 @@ trait Server extends Service {
       )
     )
 
-    new WalletApp(walletConfig)
+    new WalletApp(walletConfig)(httpSystem, executionContext)
   }
 
   def blocksExporter: BlocksExporter
 
   lazy val restServer: RestServer =
-    RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))
-  lazy val webSocketServer: WebSocketServer     = WebSocketServer(node)
+    RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))(
+      httpSystem,
+      apiConfig,
+      executionContext
+    )
+  lazy val webSocketServer: WebSocketServer =
+    WebSocketServer(node)(httpSystem, apiConfig, executionContext)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
@@ -70,7 +76,7 @@ trait Server extends Service {
       Miner
         .props(node)
         .withDispatcher("akka.actor.mining-dispatcher")
-    ActorRefT.build(system, props, s"Miner")
+    ActorRefT.build(flowSystem, props, s"Miner")
   }
 
   override lazy val subServices: ArraySeq[Service] = {
@@ -82,23 +88,25 @@ trait Server extends Service {
 }
 
 object Server {
-  def apply(rootPath: Path)(implicit
+  def apply(rootPath: Path, flowSystem: ActorSystem, httpSystem: ActorSystem)(implicit
       config: AlephiumConfig,
       apiConfig: ApiConfig,
-      system: ActorSystem,
       executionContext: ExecutionContext
   ): Server = {
-    new Impl(rootPath)
+    new Impl(rootPath, flowSystem, httpSystem)
   }
 
   def storageFolder(implicit config: AlephiumConfig): String = {
     s"db-${config.broker.brokerId}-${config.network.bindAddress.getPort}"
   }
 
-  final private class Impl(rootPath: Path)(implicit
+  final private class Impl(
+      rootPath: Path,
+      val flowSystem: ActorSystem,
+      val httpSystem: ActorSystem
+  )(implicit
       val config: AlephiumConfig,
       val apiConfig: ApiConfig,
-      val system: ActorSystem,
       val executionContext: ExecutionContext
   ) extends Server {
     val storages: Storages = {

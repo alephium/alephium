@@ -58,10 +58,12 @@ trait Service {
 
   protected def stopSelfOnce(): Future[Unit]
 
-  final def stop(): Future[Unit] =
+  def stop(): Future[Unit] =
     stopPromise.synchronized {
       if (started) stopAfterStarted() else Future.successful(())
     }
+
+  def stopSubServices(): Future[Unit] = Future.sequence(subServices.map(_.stop())).map(_ => ())
 
   private def stopAfterStarted(): Future[Unit] = {
     if (!stopped) {
@@ -70,7 +72,7 @@ trait Service {
         stopPromise.completeWith {
           for {
             _ <- stopSelfOnce()
-            _ <- Future.sequence(subServices.map(_.stop()))
+            _ <- stopSubServices()
           } yield ()
         }
       } catch {

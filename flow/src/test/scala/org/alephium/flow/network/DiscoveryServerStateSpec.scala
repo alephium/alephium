@@ -22,11 +22,11 @@ import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 import akka.event.LoggingAdapter
-import akka.io.Udp
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
+import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
@@ -62,7 +62,7 @@ class DiscoveryServerStateSpec
 
       lazy val selfCliqueInfo: CliqueInfo = cliqueInfoGen(config.groupNumPerBroker).sample.get
 
-      setSocket(ActorRefT[Udp.Command](socketProbe.ref))
+      setSocket(ActorRefT[UdpServer.Command](socketProbe.ref))
     }
     lazy val peerClique: CliqueInfo = cliqueInfoGen(config.groupNumPerBroker).sample.get
     lazy val peerInfo               = peerClique.interBrokers.get.sample()
@@ -70,10 +70,10 @@ class DiscoveryServerStateSpec
     def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
       val peerConfig =
         createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
-      socketProbe.expectMsgPF() { case send: Udp.Send =>
+      socketProbe.expectMsgPF() { case send: UdpServer.Send =>
         val message =
           DiscoveryMessage
-            .deserialize(send.payload, networkConfig.networkType)(
+            .deserialize(send.message, networkConfig.networkType)(
               peerConfig,
               peerConfig
             )
@@ -207,10 +207,13 @@ class DiscoveryServerStateSpec
     state.scan()
     expectPayload[Ping]
     socketProbe.expectNoMessage()
-    state.appendPeer {
+    val peer = {
       val info = brokerInfoGen.sample.get
       BrokerInfo.unsafe(info.cliqueId, info.brokerId, info.groupNumPerBroker, state.bootstrap.head)
     }
+    state.ping(peer)
+    expectPayload[Ping]
+    state.handlePong(peer)
     expectPayload[FindNode]
     state.scan()
     expectPayload[Ping]
