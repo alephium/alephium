@@ -77,7 +77,7 @@ akka {
     default-dispatcher {
       executor = "fork-join-executor"
       fork-join-executor {
-        parallelism-factor = 0.5
+        parallelism-factor = 2
       }
       throughput = 1
     }
@@ -86,7 +86,7 @@ akka {
       type = Dispatcher
       executor = "fork-join-executor"
       fork-join-executor {
-        parallelism-factor = 0.5
+        parallelism-factor = 1
       }
       throughput = 1
     }
