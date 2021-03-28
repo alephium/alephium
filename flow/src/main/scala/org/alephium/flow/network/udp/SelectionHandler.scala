@@ -16,18 +16,22 @@
 
 package org.alephium.flow.network.udp
 
-import java.nio.channels.{SelectionKey, Selector}
+import java.nio.channels.{CancelledKeyException, SelectionKey, Selector}
 import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.util.Duration
 
-object SelectionHandler {
-  def apply(selector: Selector)(implicit system: ActorSystem): SelectionHandler = {
+object SelectionHandler extends ExtensionId[SelectionHandler] with ExtensionIdProvider {
+  override def lookup(): ExtensionId[_ <: Extension] = SelectionHandler
+
+  override def createExtension(system: ExtendedActorSystem): SelectionHandler = {
+    val selector         = Selector.open()
     val dispatcher       = system.dispatchers.lookup(s"akka.io.pinned-dispatcher")
     val executionContext = SerializedExecutionContext(dispatcher)
     new SelectionHandler(selector, executionContext)
@@ -37,7 +41,8 @@ object SelectionHandler {
 class SelectionHandler(
     val selector: Selector,
     executionContext: ExecutionContext
-) extends LazyLogging {
+) extends Extension
+    with LazyLogging {
   private val timeout = Duration.ofSecondsUnsafe(10)
   private val wakeUp  = new AtomicBoolean(false)
 
@@ -76,7 +81,13 @@ class SelectionHandler(
   }
 
   def execute(f: => Unit): Unit = {
-    executionContext.execute(() => f)
+    executionContext.execute { () =>
+      try f
+      catch {
+        case _: CancelledKeyException => // ok, can be triggered while setting interest ops
+        case NonFatal(e)              => logger.error(s"Error during selector management task: $e")
+      }
+    }
     // if possible avoid syscall and trade off with LOCK CMPXCHG
     if (wakeUp.compareAndSet(false, true)) {
       selector.wakeup()

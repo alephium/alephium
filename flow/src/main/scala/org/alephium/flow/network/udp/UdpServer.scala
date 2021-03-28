@@ -18,7 +18,7 @@ package org.alephium.flow.network.udp
 
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
-import java.nio.channels.{DatagramChannel, SelectionKey, Selector}
+import java.nio.channels.{DatagramChannel, SelectionKey}
 
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
@@ -30,8 +30,6 @@ import akka.util.ByteString
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object UdpServer {
-  var sharedSelectionHandler: SelectionHandler = _
-
   def props(): Props = Props(new UdpServer())
 
   sealed trait Command
@@ -53,6 +51,8 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
   var channel: DatagramChannel                    = _
   var selectionKey: SelectionKey                  = _
 
+  val sharedSelectionHandler: SelectionHandler = SelectionHandler(context.system)
+
   def receive: Receive = { case Bind(bindAddress) =>
     discoveryServer = ActorRefT[UdpServer.Event](sender())
     try {
@@ -61,17 +61,8 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
       channel.socket().setReuseAddress(true)
       channel.socket().bind(bindAddress)
 
-      UdpServer.synchronized {
-        if (sharedSelectionHandler == null) {
-          val selector = Selector.open()
-          selectionKey = channel.register(selector, SelectionKey.OP_READ, self)
-          sharedSelectionHandler = SelectionHandler(selector)(context.system)
-        } else {
-          selectionKey =
-            channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
-          sharedSelectionHandler.selector.wakeup()
-        }
-      }
+      selectionKey = channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
+      sharedSelectionHandler.selector.wakeup()
 
       discoveryServer ! Bound(bindAddress)
       context.become(listening)
@@ -104,8 +95,6 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
         selectionKey.interestOps(SelectionKey.OP_READ)
         ()
       }
-      sharedSelectionHandler.selector.wakeup()
-      ()
   }
 
   @tailrec
@@ -122,11 +111,15 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
   }
 
   override def postStop(): Unit = {
+    print(s"Shutdown udp server\n")
     if (selectionKey != null) {
       sharedSelectionHandler.execute(selectionKey.cancel())
     }
     if (channel != null) {
-      channel.close()
+      try channel.close()
+      catch {
+        case e: Throwable => log.error(s"Failure in shutdown UdpServer: $e")
+      }
     }
   }
 }

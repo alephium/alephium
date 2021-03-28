@@ -31,16 +31,13 @@ import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
-import org.alephium.protocol.{ALF, Generators, PrivateKey, PublicKey, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
+import org.alephium.util.{ActorRefT, AVector, Duration, NewAlephiumActorSpec}
 
-class DiscoveryServerSpec
-    extends AlephiumActorSpec("DiscoveryServerSpec")
-    with ScalaFutures
-    with Eventually {
+class DiscoveryServerSpec extends NewAlephiumActorSpec with ScalaFutures with Eventually {
   import DiscoveryServerSpec._
 
   val usedPort = mutable.Set.empty[Int]
@@ -103,7 +100,7 @@ class DiscoveryServerSpec
     }
   }
 
-  it should "simulate large network" in new SimulationFixture { self =>
+  it should "simulate large network" in new ActorFixture with SimulationFixture { self =>
     val groups = 4
 
     val networkConfig = new NetworkConfig { val networkType = NetworkType.Testnet }
@@ -255,7 +252,7 @@ class DiscoveryServerSpec
     }
   }
 
-  trait Fixture extends BrokerConfigFixture.Default {
+  trait Fixture extends BrokerConfigFixture.Default with ActorFixture {
     implicit val patienceConfig =
       PatienceConfig(timeout = Span(20, Seconds), interval = Span(1, Seconds))
 
