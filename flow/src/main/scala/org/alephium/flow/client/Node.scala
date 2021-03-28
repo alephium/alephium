@@ -167,7 +167,7 @@ object Node {
           log.debug("All actors terminated")
           answerTo ! ()
         case toTerminate :: rest =>
-          log.warning(s"Terminate ${toTerminate.ref.path}")
+          log.debug(s"Terminate ${toTerminate.ref.path}")
           context watch toTerminate.ref
           context stop toTerminate.ref
           context become handle(toTerminate, rest, answerTo)
