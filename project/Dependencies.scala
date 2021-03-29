@@ -18,7 +18,7 @@ import sbt._
 
 object Version {
   lazy val akka        = "2.6.8"
-  lazy val `akka-http` = "10.1.12"
+  lazy val `akka-http` = "10.1.14"
   lazy val circe       = "0.13.0"
   lazy val metrics     = "4.0.6"
   lazy val tapir       = "0.16.16"
