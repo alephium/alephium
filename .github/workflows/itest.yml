@@ -11,8 +11,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-        java: [ adopt@1.8, adopt@1.11 ]
+        os: [ macos-latest, windows-latest, ubuntu-latest ]
+        java: [ adopt@1.11 ]
     steps:
       - uses: actions/checkout@v2
       - uses: olafurpg/setup-scala@v10
