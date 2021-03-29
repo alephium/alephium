@@ -113,7 +113,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   protected def stopSelfOnce(): Future[Unit] = {
     for {
       wsBinding <- wsBindingPromise.future
-      message   <- wsBinding.terminate(Duration.ofSecondsUnsafe(2).asScala)
+      message   <- wsBinding.terminate(Duration.ofSecondsUnsafe(5).asScala)
     } yield {
       logger.info(s"ws unbound with message $message")
       ()

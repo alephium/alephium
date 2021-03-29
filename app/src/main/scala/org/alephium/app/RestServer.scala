@@ -333,7 +333,7 @@ class RestServer(
   protected def stopSelfOnce(): Future[Unit] =
     for {
       httpBinding <- httpBindingPromise.future
-      message     <- httpBinding.terminate(Duration.ofSecondsUnsafe(2).asScala)
+      message     <- httpBinding.terminate(Duration.ofSecondsUnsafe(5).asScala)
     } yield {
       logger.info(s"http unbound with message $message")
       ()
