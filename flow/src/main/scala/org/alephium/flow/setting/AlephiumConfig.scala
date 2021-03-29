@@ -125,7 +125,7 @@ final case class DiscoverySetting(
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
 
-final case class WalletSetting(port: Int, secretDir: Path, lockingTimeout: Duration)
+final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
 
 object WalletSetting {
   final case class BlockFlow(host: String, port: Int, groups: Int)

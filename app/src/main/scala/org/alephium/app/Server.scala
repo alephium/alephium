@@ -43,7 +43,7 @@ trait Server extends Service {
   lazy val node: Node = Node.build(storages)
   lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
     val walletConfig: WalletConfig = WalletConfig(
-      config.wallet.port,
+      port = None,
       config.wallet.secretDir,
       config.network.networkType,
       config.wallet.lockingTimeout,

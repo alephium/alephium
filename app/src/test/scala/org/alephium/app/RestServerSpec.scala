@@ -322,7 +322,7 @@ class RestServerSpec
     )
     lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
     val walletConfig: WalletConfig = WalletConfig(
-      0,
+      None,
       (new java.io.File("")).toPath,
       NetworkType.Devnet,
       Duration.ofMinutesUnsafe(0),

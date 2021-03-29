@@ -65,18 +65,26 @@ class WalletApp(config: WalletConfig)(implicit
   override val subServices: ArraySeq[Service] = ArraySeq(walletService)
 
   protected def startSelfOnce(): Future[Unit] = {
-    for {
-      binding <- Http().bindAndHandle(routes, "localhost", config.port)
-    } yield {
-      bindingPromise.success(binding)
-      logger.info(s"Listening wallet http request on $binding")
+    config.port match {
+      case None => Future.successful(())
+      case Some(port) =>
+        for {
+          binding <- Http().bindAndHandle(routes, "localhost", port)
+        } yield {
+          bindingPromise.success(binding)
+          logger.info(s"Listening wallet http request on $binding")
+        }
     }
   }
 
   protected def stopSelfOnce(): Future[Unit] =
-    for {
-      _ <- bindingPromise.future.flatMap(_.unbind())
-    } yield {
-      logger.info("Wallet stopped")
+    config.port match {
+      case None => Future.successful(())
+      case Some(_) =>
+        for {
+          _ <- bindingPromise.future.flatMap(_.unbind())
+        } yield {
+          logger.info("Wallet stopped")
+        }
     }
 }

@@ -29,7 +29,7 @@ import org.alephium.protocol.model.NetworkType
 import org.alephium.util.Duration
 
 final case class WalletConfig(
-    port: Int,
+    port: Option[Int],
     secretDir: Path,
     networkType: NetworkType,
     lockingTimeout: Duration,

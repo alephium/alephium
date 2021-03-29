@@ -48,7 +48,7 @@ trait WalletConfigFixture {
   }
 
   lazy val config = WalletConfig(
-    walletPort,
+    Some(walletPort),
     tempSecretDir,
     networkType,
     lockingTimeout,
