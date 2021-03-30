@@ -753,8 +753,8 @@ paths:
               example:
               - peer: 1.2.3.4
                 status:
-                  penalty:
-                    value: 42
+                  type: penalty
+                  value: 42
         default:
           description: ''
           content:

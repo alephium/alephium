@@ -19,9 +19,11 @@ package org.alephium.flow.network.broker
 import java.net.InetAddress
 
 import org.alephium.flow.network.broker.MisbehaviorManager.{MisbehaviorStatus, Peer, Penalty}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait MisbehaviorStorage {
+
+  def penaltyForgivness: Duration
 
   def get(peer: InetAddress): Option[MisbehaviorStatus]
 

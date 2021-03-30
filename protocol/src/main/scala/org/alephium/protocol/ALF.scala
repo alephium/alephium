@@ -36,7 +36,10 @@ object ALF {
   val MaxTxOutputNum: Int    = 1024
   val MaxOutputDataSize: Int = 256
 
-  val BanDuration: Duration = Duration.ofDaysUnsafe(1)
+  //TODO Add those in conf file
+  val BanDuration: Duration       = Duration.ofDaysUnsafe(1)
+  val PenaltyForgivness: Duration = Duration.ofHoursUnsafe(1)
+  val PenaltyFrequency: Duration  = Duration.ofMinutesUnsafe(1)
 
   //scalastyle:on magic.number
 

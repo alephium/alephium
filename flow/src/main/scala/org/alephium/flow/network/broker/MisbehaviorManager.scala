@@ -26,8 +26,8 @@ import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 object MisbehaviorManager {
-  def props(banDuration: Duration): Props =
-    Props(new MisbehaviorManager(banDuration))
+  def props(banDuration: Duration, penaltyForgivness: Duration, penaltyFrequency: Duration): Props =
+    Props(new MisbehaviorManager(banDuration, penaltyForgivness, penaltyFrequency))
 
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -67,15 +67,22 @@ object MisbehaviorManager {
   final case class RequestTimeout(remoteAddress: InetSocketAddress) extends Uncertain
 
   sealed trait MisbehaviorStatus
-  final case class Penalty(value: Int)      extends MisbehaviorStatus
-  final case class Banned(until: TimeStamp) extends MisbehaviorStatus
+  final case class Penalty(value: Int, timestamp: TimeStamp) extends MisbehaviorStatus
+  final case class Banned(until: TimeStamp)                  extends MisbehaviorStatus
 }
 
-class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStream {
+class MisbehaviorManager(
+    banDuration: Duration,
+    penaltyForgivness: Duration,
+    penaltyFrequency: Duration
+) extends BaseActor
+    with EventStream {
   import MisbehaviorManager._
 
-  private val misbehaviorThreshold: Int              = 100
-  private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage()
+  private val misbehaviorThreshold: Int = 100
+  private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage(
+    penaltyForgivness
+  )
 
   override def preStart(): Unit = {
     subscribeEvent(self, classOf[MisbehaviorManager.Misbehavior])
@@ -90,9 +97,13 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
           case Banned(until) =>
             log.warning(s"${peer} already banned until $until, re-banning")
             banAndPublish(peer)
-          case Penalty(current) =>
-            val newScore = current + misbehavior.penalty
-            handlePenalty(peer, newScore)
+          case Penalty(current, lastTs) =>
+            if (TimeStamp.now().deltaUnsafe(lastTs) < penaltyFrequency) {
+              log.debug("Already penalized the peer recently, ignoring that misbehavior")
+            } else {
+              val newScore = current + misbehavior.penalty
+              handlePenalty(peer, newScore)
+            }
         }
 
     }
@@ -104,7 +115,7 @@ class MisbehaviorManager(banDuration: Duration) extends BaseActor with EventStre
       banAndPublish(peer)
     } else {
       log.debug(s"Punish $peer, new penalty: $penalty")
-      misbehaviorStorage.update(peer, Penalty(penalty))
+      misbehaviorStorage.update(peer, Penalty(penalty, TimeStamp.now()))
     }
   }
 

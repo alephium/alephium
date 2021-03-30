@@ -71,13 +71,9 @@ trait ApiModelCodec {
       final def apply(status: PeerStatus): Json =
         status match {
           case ps @ PeerStatus.Banned(_) =>
-            Json.obj(
-              ("banned", ps.asJson)
-            )
+            ps.asJson.deepMerge(Json.obj(("type", Json.fromString("banned"))))
           case ps @ PeerStatus.Penalty(_) =>
-            Json.obj(
-              ("penalty", ps.asJson)
-            )
+            ps.asJson.deepMerge(Json.obj(("type", Json.fromString("penalty"))))
         }
     }
   }
@@ -85,12 +81,22 @@ trait ApiModelCodec {
   implicit val peerStatusDecoder: Decoder[PeerStatus] = new Decoder[PeerStatus] {
     final def apply(c: HCursor): Decoder.Result[PeerStatus] = {
       val keys = c.keys.getOrElse(Nil)
-      if (keys.exists(_ == "banned")) {
-        c.downField("banned").as[PeerStatus.Banned]
-      } else if (keys.exists(_ == "penalty")) {
-        c.downField("penalty").as[PeerStatus.Penalty]
+      if (keys.exists(_ == "type")) {
+        c.downField("type")
+          .as[String]
+          .flatMap(_ match {
+            case "banned"  => c.as[PeerStatus.Banned]
+            case "penalty" => c.as[PeerStatus.Penalty]
+            case _ =>
+              Left(
+                DecodingFailure(
+                  "Can not decode 'type', expecting: 'penalty' or 'banned'",
+                  c.history
+                )
+              )
+          })
       } else {
-        Left(DecodingFailure("Can not decode, expecting: 'penalty' or 'banned' key", c.history))
+        Left(DecodingFailure("Can not decode, expecting 'type' key", c.history))
       }
     }
   }

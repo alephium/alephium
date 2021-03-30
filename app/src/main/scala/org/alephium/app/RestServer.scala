@@ -127,8 +127,8 @@ class RestServer(
       Right(
         brokerPeers.peers.map { case MisbehaviorManager.Peer(addr, misbehavior) =>
           val status: PeerStatus = misbehavior match {
-            case MisbehaviorManager.Penalty(value) => PeerStatus.Penalty(value)
-            case MisbehaviorManager.Banned(until)  => PeerStatus.Banned(until)
+            case MisbehaviorManager.Penalty(value, _) => PeerStatus.Penalty(value)
+            case MisbehaviorManager.Banned(until)     => PeerStatus.Banned(until)
           }
           PeerMisbehavior(addr, status)
         }
