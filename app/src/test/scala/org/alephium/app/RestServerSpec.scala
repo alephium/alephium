@@ -17,8 +17,9 @@
 package org.alephium.app
 
 import scala.io.Source
+import scala.util.Random
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.{TestActor, TestProbe}
@@ -34,8 +35,9 @@ import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
+import org.alephium.flow.network.CliqueManager
+import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType, Target}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
@@ -147,6 +149,15 @@ class RestServerSpec
       status is StatusCodes.OK
       responseAs[BuildTransactionResult] isnot dummyBuildTransactionResult
     }
+
+    selfCliqueSynced = false
+
+    Get(
+      s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1"
+    ) ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error.UnsyncedError
+    }
   }
 
   it should "call POST /transactions/send" in new RestServerFixture {
@@ -158,6 +169,13 @@ class RestServerSpec
     Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.OK
       responseAs[TxResult] is dummyTransferResult
+    }
+
+    selfCliqueSynced = false
+
+    Post(s"/transactions/send", entity) ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error.UnsyncedError
     }
   }
 
@@ -181,6 +199,13 @@ class RestServerSpec
       status is StatusCodes.OK
       responseAs[Boolean] is true
       minerProbe.expectMsg(Miner.Stop)
+    }
+
+    selfCliqueSynced = false
+
+    Post(s"/miners?action=start-mining") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error.UnsyncedError
     }
   }
 
@@ -270,6 +295,36 @@ class RestServerSpec
     Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
     }
+
+    selfCliqueSynced = false
+
+    Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error.UnsyncedError
+    }
+  }
+
+  it should "call POST /miners/new-block" in new RestServerFixture {
+
+    val blockHash = BlockHash.generate
+    val target    = Target.onePhPerSecond
+    val ts        = TimeStamp.unsafe(1L)
+    val txsHash   = Hash.generate
+
+    val body =
+      s"""{"blockDeps":["${blockHash.toHexString}"],"timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":1,"target":"${Hex
+        .toHexString(
+          target.bits
+        )}","nonce":1,"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+
+    val entity = HttpEntity(ContentTypes.`application/json`, body)
+
+    selfCliqueSynced = false
+
+    Post(s"/miners/new-block", entity) ~> server.route ~> check {
+      status is StatusCodes.BadRequest
+      responseAs[ApiModel.Error] is ApiModel.Error.UnsyncedError
+    }
   }
 
   it should "call GET /docs" in new RestServerFixture {
@@ -311,6 +366,18 @@ class RestServerSpec
     lazy val minerProbe = TestProbe()
     lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
 
+    var selfCliqueSynced = true
+    lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
+      ActorRefT.build(
+        system,
+        Props(new BaseActor {
+          override def receive: Receive = { case CliqueManager.IsSelfCliqueReady =>
+            sender() ! selfCliqueSynced
+          }
+        }),
+        s"clique-manager-${Random.nextInt()}"
+      )
+
     lazy val blockFlowProbe = TestProbe()
     lazy val node = new NodeDummy(
       dummyIntraCliqueInfo,
@@ -318,7 +385,8 @@ class RestServerSpec
       dummyBlock,
       blockFlowProbe.ref,
       dummyTx,
-      storages
+      storages,
+      cliqueManagerOpt = Some(cliqueManager)
     )
     lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
     val walletConfig: WalletConfig = WalletConfig(

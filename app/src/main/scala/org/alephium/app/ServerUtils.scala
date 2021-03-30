@@ -36,6 +36,8 @@ import org.alephium.util._
 
 // scalastyle:off number.of.methods
 class ServerUtils(networkType: NetworkType) {
+  import ServerUtils._
+
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
     val entriesEither = for {
       headers <- blockFlow.getHeightedBlockHeaders(fetchRequest.fromTs, fetchRequest.toTs)
@@ -411,6 +413,9 @@ class ServerUtils(networkType: NetworkType) {
   private def apiError(error: String): ApiModel.Error = ApiModel.Error.server(error)
   private def failed[T](error: IOError): Try[T]       = Left(apiError(error))
 
+}
+
+object ServerUtils {
   type Try[T]       = Either[ApiModel.Error, T]
   type FutureTry[T] = Future[Try[T]]
 }

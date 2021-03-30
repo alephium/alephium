@@ -33,6 +33,7 @@ import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.api.{ApiModel, Endpoints}
 import org.alephium.api.model._
+import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
@@ -74,6 +75,17 @@ class RestServer(
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val serverUtils: ServerUtils = new ServerUtils(networkType)
+
+  //TODO Do we want to cache the result once it's synced?
+  private def withSyncedClique[A](f: FutureTry[A]): FutureTry[A] = {
+    node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean].flatMap { synced =>
+      if (synced) {
+        f
+      } else {
+        Future.successful(Left(ApiModel.Error.UnsyncedError))
+      }
+    }
+  }
 
   private val getSelfCliqueRoute = getSelfClique.toRoute { _ =>
     for {
@@ -154,25 +166,33 @@ class RestServer(
 
   private val buildTransactionRoute = buildTransaction.toRoute {
     case (fromKey, toAddress, lockTime, value) =>
-      Future.successful(
-        serverUtils.buildTransaction(
-          blockFlow,
-          BuildTransaction(fromKey, toAddress, lockTime, value)
+      withSyncedClique {
+        Future.successful(
+          serverUtils.buildTransaction(
+            blockFlow,
+            BuildTransaction(fromKey, toAddress, lockTime, value)
+          )
         )
-      )
+      }
   }
 
   private val sendTransactionRoute = sendTransaction.toRoute { transaction =>
-    serverUtils.sendTransaction(txHandler, transaction)
+    withSyncedClique {
+      serverUtils.sendTransaction(txHandler, transaction)
+    }
   }
 
   private val getTransactionStatusRoute = getTransactionStatus.toRoute { case (txId, chainIndex) =>
     Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, chainIndex))
   }
 
-  private val minerActionRoute = minerAction.toRoute {
-    case MinerAction.StartMining => serverUtils.execute(miner ! Miner.Start)
-    case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
+  private val minerActionRoute = minerAction.toRoute { action =>
+    withSyncedClique {
+      action match {
+        case MinerAction.StartMining => serverUtils.execute(miner ! Miner.Start)
+        case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
+      }
+    }
   }
 
   private val minerListAddressesRoute = minerListAddresses.toRoute { _ =>
@@ -185,26 +205,30 @@ class RestServer(
   }
 
   private val minerGetBlockCandidateRoute = minerGetBlockCandidate.toRoute { chainIndex =>
-    miner
-      .ask(Miner.GetBlockCandidate(chainIndex))
-      .mapTo[Miner.BlockCandidate]
-      .map(_.maybeBlock match {
-        case Some(block) => Right(RestServer.blockTempateToCandidate(block))
-        case None =>
-          Left(ApiModel.Error.server("Cannot find block candidate for given chain index"))
-      })
+    withSyncedClique {
+      miner
+        .ask(Miner.GetBlockCandidate(chainIndex))
+        .mapTo[Miner.BlockCandidate]
+        .map(_.maybeBlock match {
+          case Some(block) => Right(RestServer.blockTempateToCandidate(block))
+          case None =>
+            Left(ApiModel.Error.server("Cannot find block candidate for given chain index"))
+        })
+    }
   }
 
   private val minerNewBlockRoute = minerNewBlock.toRoute { solution =>
-    Future.successful(
-      RestServer.blockSolutionToBlock(solution).map { case (solution, chainIndex, miningCount) =>
-        miner ! Miner.NewBlockSolution(
-          solution,
-          chainIndex,
-          miningCount
-        )
-      }
-    )
+    withSyncedClique {
+      Future.successful(
+        RestServer.blockSolutionToBlock(solution).map { case (solution, chainIndex, miningCount) =>
+          miner ! Miner.NewBlockSolution(
+            solution,
+            chainIndex,
+            miningCount
+          )
+        }
+      )
+    }
   }
 
   private val minerUpdateAddressesRoute = minerUpdateAddresses.toRoute { minerAddresses =>
@@ -218,7 +242,9 @@ class RestServer(
   }
 
   private val sendContractRoute = sendContract.toRoute { query =>
-    serverUtils.sendContract(txHandler, query)
+    withSyncedClique {
+      serverUtils.sendContract(txHandler, query)
+    }
   }
 
   private val buildContractRoute = buildContract.toRoute { query =>

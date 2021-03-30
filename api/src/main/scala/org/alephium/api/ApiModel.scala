@@ -48,6 +48,7 @@ object ApiModel {
     val InvalidParams: Error     = Error(-32602, "Invalid params")
     val InternalError: Error     = Error(-32603, "Internal error")
     val UnauthorizedError: Error = Error(-32604, "Unauthorized")
+    val UnsyncedError: Error     = Error(-32001, "Self clique not synced")
 
     def server(error: String): Error = Error(-32000, "Server error", Some(error))
     // scalastyle:on

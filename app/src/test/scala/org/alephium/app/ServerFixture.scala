@@ -122,7 +122,8 @@ object ServerFixture {
       block: Block,
       blockFlowProbe: ActorRef,
       dummyTx: Transaction,
-      storages: Storages
+      storages: Storages,
+      cliqueManagerOpt: Option[ActorRefT[CliqueManager.Command]] = None
   )(implicit val config: AlephiumConfig)
       extends Node {
     implicit val system: ActorSystem       = ActorSystem("NodeDummy")
@@ -144,7 +145,7 @@ object ServerFixture {
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)
 
     val selfCliqueSynced = true
-    val cliqueManager: ActorRefT[CliqueManager.Command] =
+    val cliqueManager: ActorRefT[CliqueManager.Command] = cliqueManagerOpt.getOrElse {
       ActorRefT.build(
         system,
         Props(new BaseActor {
@@ -154,6 +155,7 @@ object ServerFixture {
         }),
         "clique-manager"
       )
+    }
 
     val txHandlerRef =
       system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
