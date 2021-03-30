@@ -19,11 +19,10 @@ package org.alephium.flow.client
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
-import akka.util.Timeout
+import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.flow.{FlowMonitor, Utils}
+import org.alephium.flow.Utils
 import org.alephium.flow.core._
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.io.Storages
@@ -32,7 +31,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.protocol.ALF
-import org.alephium.util.{ActorRefT, BaseActor, EventBus, Service}
+import org.alephium.util.{ActorRefT, EventBus, Service}
 
 trait Node extends Service {
   implicit def config: AlephiumConfig
@@ -45,36 +44,31 @@ trait Node extends Service {
   def cliqueManager: ActorRefT[CliqueManager.Command]
   def eventBus: ActorRefT[EventBus.Message]
   def allHandlers: AllHandlers
-  def monitor: ActorRefT[Node.Command]
-
-  implicit override def executionContext: ExecutionContext = system.dispatcher
 
   override def subServices: ArraySeq[Service] = ArraySeq.empty
 
   override protected def startSelfOnce(): Future[Unit] = Future.successful(())
 
-  override protected def stopSelfOnce(): Future[Unit] = {
-    val timeout = Timeout(FlowMonitor.shutdownTimeout.asScala)
-    monitor.ask(Node.Stop)(timeout).mapTo[Unit]
-  }
+  override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
 }
 
 // scalastyle:off method.length
 object Node {
-  def build(storages: Storages)(implicit
-      actorSystem: ActorSystem,
-      _config: AlephiumConfig
-  ): Node = new Default(storages)
+  def build(storages: Storages, flowSystem: ActorSystem)(implicit
+      executionContext: ExecutionContext,
+      config: AlephiumConfig
+  ): Node = new Default(storages, flowSystem)
 
-  class Default(storages: Storages)(implicit actorSystem: ActorSystem, _config: AlephiumConfig)
-      extends Node
+  class Default(storages: Storages, flowSystem: ActorSystem)(implicit
+      val executionContext: ExecutionContext,
+      val config: AlephiumConfig
+  ) extends Node
       with StrictLogging {
-    implicit val system                  = actorSystem
-    val config                           = _config
-    implicit private val brokerConfig    = config.broker
-    implicit private val consensusConfig = config.consensus
-    implicit private val networkSetting  = config.network
-    implicit private val discoveryConfig = config.discovery
+    implicit override def system: ActorSystem = flowSystem
+    implicit private val brokerConfig         = config.broker
+    implicit private val consensusConfig      = config.consensus
+    implicit private val networkSetting       = config.network
+    implicit private val discoveryConfig      = config.discovery
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
@@ -116,9 +110,6 @@ object Node {
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
       ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")
-
-    val monitor: ActorRefT[Node.Command] =
-      ActorRefT.build(system, Monitor.props(this), "NodeMonitor")
   }
 
   def buildBlockFlowUnsafe(storages: Storages)(implicit config: AlephiumConfig): BlockFlow = {
@@ -138,48 +129,6 @@ object Node {
       )
       Utils.unsafe(nodeStateStorage.setInitialized())
       blockflow
-    }
-  }
-
-  sealed trait Command
-  case object Stop extends Command
-
-  object Monitor {
-    def props(node: Node): Props = Props(new Monitor(node))
-  }
-
-  class Monitor(node: Node) extends BaseActor {
-    private val orderedActors = Seq(
-      node.misbehaviorManager,
-      node.tcpController,
-      node.discoveryServer,
-      node.bootstrapper,
-      node.cliqueManager,
-      node.eventBus
-    ) ++ node.allHandlers.orderedHandlers
-
-    override def receive: Receive = { case Stop =>
-      log.info("Stopping the node")
-      terminate(orderedActors, sender())
-    }
-
-    @SuppressWarnings(Array("org.wartremover.warts.ListUnapply"))
-    def terminate(actors: Seq[ActorRefT[_]], answerTo: ActorRef): Unit = {
-      actors match {
-        case Nil =>
-          log.debug("All actors terminated")
-          answerTo ! ()
-        case toTerminate :: rest =>
-          log.debug(s"Terminate ${toTerminate.ref.path.toStringWithoutAddress}")
-          context watch toTerminate.ref
-          context stop toTerminate.ref
-          context become handle(toTerminate, rest, answerTo)
-      }
-    }
-
-    def handle(toTerminate: ActorRefT[_], rest: Seq[ActorRefT[_]], answerTo: ActorRef): Receive = {
-      case Terminated(actor) if actor == toTerminate.ref =>
-        terminate(rest, answerTo)
     }
   }
 }

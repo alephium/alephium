@@ -19,7 +19,6 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.broker.BrokerHandler
@@ -159,7 +158,7 @@ class IntraCliqueManager(
     brokers.foreach {
       case (_, (info, broker)) if broker == ActorRefT[BrokerHandler.Command](actor) =>
         log.error(s"Self clique node $info is not functioning, shutdown the system now")
-        publishEvent(FlowMonitor.Shutdown)
+        terminateSystem()
       case _ => ()
     }
   }

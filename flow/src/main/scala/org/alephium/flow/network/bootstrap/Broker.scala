@@ -22,7 +22,6 @@ import akka.actor.{Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
@@ -61,7 +60,7 @@ object Broker {
 
     override def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
       log.debug("Malicious behavior detected in bootstrap, shutdown the system")
-      publishEvent(FlowMonitor.Shutdown)
+      terminateSystem()
     }
   }
 }
@@ -103,7 +102,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
         ()
       } else {
         log.info(s"Cannot connect to ${c.remoteAddress}, shutdown the system")
-        publishEvent(FlowMonitor.Shutdown)
+        terminateSystem()
       }
   }
 
@@ -133,6 +132,6 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
     log.debug(s"Unexpected message, shutdown the system")
-    publishEvent(FlowMonitor.Shutdown)
+    terminateSystem()
   }
 }

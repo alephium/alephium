@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
@@ -125,8 +125,9 @@ object ServerFixture {
       storages: Storages
   )(implicit val config: AlephiumConfig)
       extends Node {
-    implicit val system: ActorSystem = ActorSystem("NodeDummy")
-    val blockFlow: BlockFlow         = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
+    implicit val system: ActorSystem       = ActorSystem("NodeDummy")
+    val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    val blockFlow: BlockFlow               = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] = ActorRefT(TestProbe().ref)
     val tcpController: ActorRefT[TcpController.Command]           = ActorRefT(TestProbe().ref)
@@ -168,9 +169,6 @@ object ServerFixture {
 
     val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
-
-    val monitorProbe                     = TestProbe()
-    val monitor: ActorRefT[Node.Command] = ActorRefT(monitorProbe.ref)
 
     override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
   }

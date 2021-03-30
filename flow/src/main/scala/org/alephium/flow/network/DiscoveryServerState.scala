@@ -22,8 +22,8 @@ import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 
 import akka.event.LoggingAdapter
-import akka.io.Udp
 
+import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
@@ -47,7 +47,7 @@ trait DiscoveryServerState {
 
   import DiscoveryServer._
 
-  private var socketOpt: Option[ActorRefT[Udp.Command]] = None
+  private var socketOpt: Option[ActorRefT[UdpServer.Command]] = None
 
   protected val table    = mutable.HashMap.empty[PeerId, PeerStatus]
   private val pendings   = mutable.HashMap.empty[PeerId, AwaitPong]
@@ -55,7 +55,7 @@ trait DiscoveryServerState {
 
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
-  def setSocket(s: ActorRefT[Udp.Command]): Unit = {
+  def setSocket(s: ActorRefT[UdpServer.Command]): Unit = {
     socketOpt = Some(s)
   }
 
@@ -147,7 +147,6 @@ trait DiscoveryServerState {
   def appendPeer(peerInfo: BrokerInfo): Unit = {
     log.info(s"Adding a new peer: $peerInfo")
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
-    fetchNeighbors(peerInfo)
     publishNewPeer(peerInfo)
   }
 
@@ -195,7 +194,8 @@ trait DiscoveryServerState {
       case Some(socket) =>
         log.debug(s"Send ${payload.getClass.getSimpleName} to $remote")
         val message = DiscoveryMessage.from(selfCliqueId, payload)
-        socket ! Udp.Send(DiscoveryMessage.serialize(message, networkConfig.networkType), remote)
+        val data    = DiscoveryMessage.serialize(message, networkConfig.networkType)
+        socket ! UdpServer.Send(data, remote)
       case None =>
         log.debug(
           s"Udp socket is not available, might be network issues. Ignoring sending $payload to $remote"

@@ -23,7 +23,6 @@ import scala.collection.mutable
 import akka.actor.{ActorRef, Props, Stash, Terminated}
 import akka.io.{IO, Tcp}
 
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
@@ -94,7 +93,7 @@ class TcpController(
       context.become(workFor(sender(), bootstrapper))
     case Tcp.CommandFailed(_: Tcp.Bind) =>
       log.error(s"Binding failed")
-      publishEvent(FlowMonitor.Shutdown)
+      terminateSystem()
     case TcpController.WorkFor(another) =>
       context become binding(another)
     case _ => stash()

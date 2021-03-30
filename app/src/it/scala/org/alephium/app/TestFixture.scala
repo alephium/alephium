@@ -22,12 +22,12 @@ import java.nio.channels.{DatagramChannel, ServerSocketChannel}
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.{Future, Promise}
 import scala.util.Random
 import scala.util.control.NonFatal
 
-import akka.actor.ActorRef
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
@@ -45,7 +45,6 @@ import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.flow.FlowMonitor
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
@@ -335,9 +334,11 @@ trait TestFixtureLike
       buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
 
     val server: Server = new Server {
-      implicit val system: ActorSystem =
-        ActorSystem(s"$name-${Random.nextInt()}", platformEnv.newConfig)
-      implicit val executionContext = system.dispatcher
+      val flowSystem: ActorSystem =
+        ActorSystem(s"flow-${Random.nextInt()}", platformEnv.newConfig)
+      val httpSystem: ActorSystem =
+        ActorSystem(s"http-${Random.nextInt()}", platformEnv.newConfig)
+      implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
 
       val defaultNetwork = platformEnv.config.network
       val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
@@ -349,18 +350,17 @@ trait TestFixtureLike
       override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)
 
-      ActorRefT.build(
-        system,
-        FlowMonitor.props(
-          Await.result(
-            for {
-              _ <- this.stop()
-              _ <- this.system.terminate()
-            } yield (),
-            FlowMonitor.shutdownTimeout.asScala
-          )
-        )
-      )
+      CoordinatedShutdown(flowSystem).addTask(
+        CoordinatedShutdown.PhaseBeforeActorSystemTerminate,
+        "Shutdown services"
+      ) { () =>
+        for {
+          _ <- this.stopSubServices()
+          _ <- httpSystem.terminate()
+        } yield Done
+      }
+
+      override def stop(): Future[Unit] = flowSystem.terminate().map(_ => ())
     }
 
     server
