@@ -1,5 +1,6 @@
 # Alephium
 
+
 This repository is the reference implementation of Alephium platform,
 which is a sharded blockchain to make programmable money scalable and secure.
 
