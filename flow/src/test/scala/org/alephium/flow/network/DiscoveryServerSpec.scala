@@ -52,26 +52,30 @@ class DiscoveryServerSpec
         val candidates = (1 to groups).filter(groups % _ equals 0)
         candidates(Random.nextInt(candidates.size))
       }
-      val groupNumPerBroker = groups / brokerNum
-      val addresses         = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
-      val clique =
-        CliqueInfo.unsafe(CliqueId.generate, addresses.map(Some(_)), addresses, groupNumPerBroker)
-
-      val brokers                                     = clique.interBrokers.get
+      val groupNumPerBroker                           = groups / brokerNum
+      val addresses                                   = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
       val (discoveryPrivateKey0, discoveryPublicKey0) = SignatureSchema.generatePriPub()
+      val clique =
+        CliqueInfo.unsafe(
+          CliqueId(discoveryPublicKey0),
+          addresses.map(Some(_)),
+          addresses,
+          groupNumPerBroker,
+          discoveryPrivateKey0
+        )
+
+      val brokers = clique.interBrokers.get
       val infos = brokers.map { brokerInfo =>
         val config: BrokerConfig with DiscoveryConfig = new BrokerConfig with DiscoveryConfig {
           val brokerId: Int  = brokerInfo.brokerId
           val brokerNum: Int = clique.brokerNum
           val groups: Int    = fixture.groups
 
-          val discoveryPrivateKey: PrivateKey = discoveryPrivateKey0
-          val discoveryPublicKey: PublicKey   = discoveryPublicKey0
-          val peersPerGroup: Int              = 3
-          val scanMaxPerGroup: Int            = 3
-          val scanFrequency: Duration         = Duration.ofMillisUnsafe(1000)
-          val scanFastFrequency: Duration     = Duration.ofMillisUnsafe(1000)
-          val neighborsPerGroup: Int          = 3
+          val peersPerGroup: Int          = 3
+          val scanMaxPerGroup: Int        = 3
+          val scanFrequency: Duration     = Duration.ofMillisUnsafe(1000)
+          val scanFastFrequency: Duration = Duration.ofMillisUnsafe(1000)
+          val neighborsPerGroup: Int      = 3
         }
         (brokerInfo, config)
       }
@@ -132,15 +136,17 @@ class DiscoveryServerSpec
   }
 
   def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
+    val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
     val newInfo = CliqueInfo.unsafe(
-      CliqueId.generate,
+      CliqueId(pubKey),
       AVector.tabulate(groupConfig.groups)(i =>
         Option(new InetSocketAddress(master.getAddress, master.getPort + i))
       ),
       AVector.tabulate(groupConfig.groups)(i =>
         new InetSocketAddress(master.getAddress, master.getPort + i)
       ),
-      1
+      1,
+      priKey
     )
     CliqueInfo.validate(newInfo)(groupConfig).isRight is true
     newInfo.coordinatorAddress is master
@@ -218,9 +224,9 @@ class DiscoveryServerSpec
           BrokerInfo.from(Generators.socketAddressGen.sample.get, cliqueInfo1.selfInterBrokerInfo)
         )
       )
-    )(config1)
+    )
     server0 ! UdpServer.Received(
-      DiscoveryMessage.serialize(message, networkConfig.networkType)(config1),
+      DiscoveryMessage.serialize(message, networkConfig.networkType, discoveryPrivateKey),
       address1
     )
 
@@ -240,6 +246,8 @@ class DiscoveryServerSpec
       PatienceConfig(timeout = Span(20, Seconds), interval = Span(1, Seconds))
 
     override val groups = Gen.choose(2, 10).sample.get
+
+    val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 
     val probeTimeout = Duration.ofSecondsUnsafe(5).asScala
 
@@ -287,7 +295,6 @@ object DiscoveryServerSpec {
   ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
-      val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 
       val peersPerGroup: Int          = _peersPerGroup
       val scanMaxPerGroup: Int        = _peersPerGroup

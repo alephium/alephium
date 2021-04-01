@@ -160,6 +160,7 @@ class DiscoveryServer(
         case Left(error) =>
           // TODO: handler error properly
           log.warning(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
+          misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
       }
     case UdpServer.SendFailed(send, reason) =>
       logUdpFailure(s"Failed in sending data to ${send.remote}: $reason")

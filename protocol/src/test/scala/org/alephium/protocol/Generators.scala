@@ -62,6 +62,9 @@ trait Generators extends NumericHelpers {
   def chainIndexFrom(groupIndex: GroupIndex)(implicit config: GroupConfig): Gen[ChainIndex] =
     Gen.choose(0, config.groups - 1).map(ChainIndex.unsafe(groupIndex.value, _))
 
+  lazy val keypairGen: Gen[(PrivateKey, PublicKey)] =
+    Gen.const(()).map(_ => SignatureSchema.secureGeneratePriPub())
+
   def keypairGen(
       groupIndex: GroupIndex
   )(implicit config: GroupConfig): Gen[(PrivateKey, PublicKey)] =
@@ -71,7 +74,14 @@ trait Generators extends NumericHelpers {
     keypairGen(groupIndex).map(_._2)
 
   def cliqueIdGen: Gen[CliqueId] =
-    Gen.const(()).map(_ => CliqueId.generate)
+    keypairGen.map { case (_, pub) =>
+      CliqueId(pub)
+    }
+
+  def cliqueIdPriKeyGen: Gen[(CliqueId, PrivateKey)] =
+    keypairGen.map { case (pri, pub) =>
+      (CliqueId(pub), pri)
+    }
 
   def groupNumPerBrokerGen(implicit config: GroupConfig): Gen[Int] =
     Gen.oneOf((1 to config.groups).filter(i => (config.groups % i) equals 0))
@@ -87,23 +97,25 @@ trait Generators extends NumericHelpers {
     for {
       groupNumPerBroker <- groupNumPerBrokerGen
       peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
-      cid               <- cliqueIdGen
+      cidPri            <- cliqueIdPriKeyGen
     } yield CliqueInfo.unsafe(
-      cid,
+      cidPri._1,
       AVector.from(peers.map(Option.apply)),
       AVector.from(peers),
-      groupNumPerBroker
+      groupNumPerBroker,
+      cidPri._2
     )
 
   def cliqueInfoGen(groupNumPerBroker: Int)(implicit config: GroupConfig): Gen[CliqueInfo] =
     for {
-      peers <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
-      cid   <- cliqueIdGen
+      peers  <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
+      cidPri <- cliqueIdPriKeyGen
     } yield CliqueInfo.unsafe(
-      cid,
+      cidPri._1,
       AVector.from(peers.map(Option.apply)),
       AVector.from(peers),
-      groupNumPerBroker
+      groupNumPerBroker,
+      cidPri._2
     )
 
   def interCliqueInfoGen(implicit config: GroupConfig): Gen[InterCliqueInfo] =

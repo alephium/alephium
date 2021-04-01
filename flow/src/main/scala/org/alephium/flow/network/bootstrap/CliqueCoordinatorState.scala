@@ -19,14 +19,17 @@ package org.alephium.flow.network.bootstrap
 import akka.actor.ActorRef
 
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
+import org.alephium.protocol.{PrivateKey, PublicKey}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.CliqueId
 import org.alephium.util.AVector
 
 trait CliqueCoordinatorState {
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
-  implicit def discoveryConfig: DiscoveryConfig
+
+  def discoveryPublicKey: PublicKey
+  def discoveryPrivateKey: PrivateKey
 
   val brokerNum        = brokerConfig.brokerNum
   val brokerInfos      = Array.fill[Option[PeerInfo]](brokerNum)(None)
@@ -67,9 +70,10 @@ trait CliqueCoordinatorState {
     }
     assume(infos.length * brokerConfig.groupNumPerBroker == brokerConfig.groups)
     IntraCliqueInfo.unsafe(
-      CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes),
+      CliqueId.unsafe(discoveryPublicKey.bytes),
       infos,
-      brokerConfig.groupNumPerBroker
+      brokerConfig.groupNumPerBroker,
+      discoveryPrivateKey
     )
   }
 

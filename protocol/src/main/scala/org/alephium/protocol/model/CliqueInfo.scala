@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
-import org.alephium.protocol.SafeSerdeImpl
+import org.alephium.protocol.{PrivateKey, SafeSerdeImpl}
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -29,7 +29,8 @@ final case class CliqueInfo private (
     id: CliqueId,
     externalAddresses: AVector[Option[InetSocketAddress]],
     internalAddresses: AVector[InetSocketAddress],
-    groupNumPerBroker: Int
+    groupNumPerBroker: Int,
+    priKey: PrivateKey
 ) { self =>
   def brokerNum: Int = internalAddresses.length
 
@@ -68,9 +69,9 @@ final case class CliqueInfo private (
 
 object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
   val _serde: Serde[CliqueInfo] =
-    Serde.forProduct4(
+    Serde.forProduct5(
       unsafe,
-      t => (t.id, t.externalAddresses, t.internalAddresses, t.groupNumPerBroker)
+      t => (t.id, t.externalAddresses, t.internalAddresses, t.groupNumPerBroker, t.priKey)
     )
 
   override def validate(info: CliqueInfo)(implicit config: GroupConfig): Either[String, Unit] = {
@@ -86,9 +87,10 @@ object CliqueInfo extends SafeSerdeImpl[CliqueInfo, GroupConfig] {
       id: CliqueId,
       externalAddresses: AVector[Option[InetSocketAddress]],
       internalAddresses: AVector[InetSocketAddress],
-      groupNumPerBroker: Int
+      groupNumPerBroker: Int,
+      priKey: PrivateKey
   ): CliqueInfo = {
-    new CliqueInfo(id, externalAddresses, internalAddresses, groupNumPerBroker)
+    new CliqueInfo(id, externalAddresses, internalAddresses, groupNumPerBroker, priKey)
   }
 }
 

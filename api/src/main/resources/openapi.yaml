@@ -668,7 +668,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SelfClique'
               example:
-                cliqueId: '623531643537373337613638383061656166393466643435383765353063313339'
+                cliqueId: d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28
                 networkType: mainnet
                 numZerosAtLeastInHash: 18
                 nodes:
@@ -735,7 +735,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/InterCliquePeerInfo'
               example:
-              - cliqueId: '623531643537373337613638383061656166393466643435383765353063313339'
+              - cliqueId: d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28
                 brokerId: 1
                 groupNumPerBroker: 1
                 address:
@@ -799,7 +799,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/BrokerInfo'
               example:
-              - cliqueId: '623531643537373337613638383061656166393466643435383765353063313339'
+              - cliqueId: d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28
                 brokerId: 1
                 groupNumPerBroker: 1
                 address:

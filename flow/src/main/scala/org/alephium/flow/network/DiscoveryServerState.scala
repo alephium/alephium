@@ -194,8 +194,10 @@ trait DiscoveryServerState {
       case Some(socket) =>
         log.debug(s"Send ${payload.getClass.getSimpleName} to $remote")
         val message = DiscoveryMessage.from(selfCliqueId, payload)
-        val data    = DiscoveryMessage.serialize(message, networkConfig.networkType)
-        socket ! UdpServer.Send(data, remote)
+        socket ! UdpServer.Send(
+          DiscoveryMessage.serialize(message, networkConfig.networkType, selfCliqueInfo.priKey),
+          remote
+        )
       case None =>
         log.debug(
           s"Udp socket is not available, might be network issues. Ignoring sending $payload to $remote"

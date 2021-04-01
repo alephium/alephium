@@ -40,7 +40,7 @@ trait EndpointsExamples {
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
   private val address                    = Address(networkType, lockupScript)
-  private val cliqueId                   = CliqueId.fromStringUnsafe("b51d57737a6880aeaf94fd4587e50c139")
+  private val cliqueId                   = CliqueId(publicKey)
   private val port                       = 12344
   private val wsPort                     = 12366
   private val restPort                   = 12377

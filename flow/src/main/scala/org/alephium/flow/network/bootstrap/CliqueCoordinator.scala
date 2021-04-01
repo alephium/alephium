@@ -21,15 +21,15 @@ import akka.io.Tcp
 
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
+import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object CliqueCoordinator {
   def props(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
       brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting,
-      discoveryConfig: DiscoveryConfig
+      networkSetting: NetworkSetting
   ): Props =
     Props(new CliqueCoordinator(bootstrapper))
 
@@ -44,11 +44,12 @@ object CliqueCoordinator {
 
 class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
     val brokerConfig: BrokerConfig,
-    val networkSetting: NetworkSetting,
-    val discoveryConfig: DiscoveryConfig
+    val networkSetting: NetworkSetting
 ) extends BaseActor
     with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers
+
+  val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
 
   def awaitBrokers: Receive = {
     case Tcp.Connected(remote, _) =>

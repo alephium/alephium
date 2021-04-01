@@ -20,8 +20,8 @@ import scala.language.existentials
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.{DiscoveryConfig, GroupConfig}
+import org.alephium.protocol.{PrivateKey, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -34,24 +34,24 @@ final case class DiscoveryMessage(
 object DiscoveryMessage {
   val version: Int = 0
 
-  def from(myCliqueId: CliqueId, payload: Payload)(implicit
-      config: DiscoveryConfig
-  ): DiscoveryMessage = {
-    val header = Header(version, config.discoveryPublicKey, myCliqueId)
+  def from(myCliqueId: CliqueId, payload: Payload): DiscoveryMessage = {
+    val header = Header(version, myCliqueId)
     DiscoveryMessage(header, payload)
   }
 
-  final case class Header(version: Int, publicKey: PublicKey, cliqueId: CliqueId)
+  final case class Header(version: Int, cliqueId: CliqueId) {
+    val publicKey: PublicKey = cliqueId.publicKey
+  }
   object Header {
-    private val serde = Serde.tuple3[Int, PublicKey, CliqueId]
+    private val serde = Serde.tuple2[Int, CliqueId]
 
     def serialize(header: Header): ByteString =
-      serde.serialize((header.version, header.publicKey, header.cliqueId))
+      serde.serialize((header.version, header.cliqueId))
 
     def _deserialize(input: ByteString): SerdeResult[Staging[Header]] = {
-      serde._deserialize(input).flatMap { case Staging((_version, publicKey, cliqueId), rest) =>
+      serde._deserialize(input).flatMap { case Staging((_version, cliqueId), rest) =>
         if (_version == version) {
-          Right(Staging(Header(_version, publicKey, cliqueId), rest))
+          Right(Staging(Header(_version, cliqueId), rest))
         } else {
           Left(SerdeError.validation(s"Invalid version: got ${_version}, expect: $version"))
         }
@@ -80,7 +80,7 @@ object DiscoveryMessage {
 
     def deserialize(
         input: ByteString
-    )(implicit discoveryConfig: DiscoveryConfig, groupConfig: GroupConfig): SerdeResult[Payload] = {
+    )(implicit groupConfig: GroupConfig): SerdeResult[Payload] = {
       deserializerCode._deserialize(input).flatMap { case Staging(cmd, rest) =>
         cmd match {
           case Ping      => Ping.deserialize(rest)
@@ -100,7 +100,7 @@ object DiscoveryMessage {
 
     def deserialize(
         input: ByteString
-    )(implicit discoveryConfig: DiscoveryConfig, groupConfig: GroupConfig): SerdeResult[Ping] = {
+    )(implicit groupConfig: GroupConfig): SerdeResult[Ping] = {
       serde
         .deserialize(input)
         .flatMap {
@@ -121,7 +121,7 @@ object DiscoveryMessage {
 
     def deserialize(
         input: ByteString
-    )(implicit discoveryConfig: DiscoveryConfig, groupConfig: GroupConfig): SerdeResult[Pong] = {
+    )(implicit groupConfig: GroupConfig): SerdeResult[Pong] = {
       BrokerInfo.deserialize(input).map(Pong.apply)
     }
   }
@@ -135,7 +135,7 @@ object DiscoveryMessage {
 
     def deserialize(
         input: ByteString
-    )(implicit discoveryConfig: DiscoveryConfig, groupConfig: GroupConfig): SerdeResult[FindNode] =
+    )(implicit groupConfig: GroupConfig): SerdeResult[FindNode] =
       serde.deserialize(input).map(FindNode(_))
   }
 
@@ -148,7 +148,6 @@ object DiscoveryMessage {
     implicit private val infoDeserializer = BrokerInfo._serde
     private val deserializer              = avectorDeserializer[BrokerInfo]
     def deserialize(input: ByteString)(implicit
-        discoveryConfig: DiscoveryConfig,
         groupConfig: GroupConfig
     ): SerdeResult[Neighbors] = {
       deserializer.deserialize(input).flatMap { peers =>
@@ -164,7 +163,7 @@ object DiscoveryMessage {
     def serialize(t: T): ByteString
     def deserialize(
         input: ByteString
-    )(implicit discoveryConfig: DiscoveryConfig, groupConfig: GroupConfig): SerdeResult[T]
+    )(implicit groupConfig: GroupConfig): SerdeResult[T]
   }
   object Code {
     val values: AVector[Code[_]] = AVector(Ping, Pong, FindNode, Neighbors)
@@ -178,14 +177,16 @@ object DiscoveryMessage {
   val deserializerCode: Deserializer[Code[_]] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid message code '$c'")
 
-  def serialize(message: DiscoveryMessage, networkType: NetworkType)(implicit
-      config: DiscoveryConfig
+  def serialize(
+      message: DiscoveryMessage,
+      networkType: NetworkType,
+      privateKey: PrivateKey
   ): ByteString = {
 
     val magic     = networkType.magicBytes
     val header    = Header.serialize(message.header)
     val payload   = Payload.serialize(message.payload)
-    val signature = SignatureSchema.sign(payload, config.discoveryPrivateKey).bytes
+    val signature = SignatureSchema.sign(payload, privateKey).bytes
     val checksum  = MessageSerde.checksum(payload)
     val length    = MessageSerde.length(payload)
 
@@ -193,7 +194,6 @@ object DiscoveryMessage {
   }
 
   def deserialize(input: ByteString, networkType: NetworkType)(implicit
-      discoveryConfig: DiscoveryConfig,
       groupConfig: GroupConfig
   ): SerdeResult[DiscoveryMessage] = {
     MessageSerde
@@ -230,7 +230,7 @@ object DiscoveryMessage {
 
   private def deserializeExactPayload(
       payloadBytes: ByteString
-  )(implicit discoveryConfig: DiscoveryConfig, config: GroupConfig) = {
+  )(implicit config: GroupConfig) = {
     Payload.deserialize(payloadBytes).left.map {
       case _: SerdeError.NotEnoughBytes =>
         SerdeError.wrongFormat("Cannot extract a correct payload from the length field")

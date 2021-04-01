@@ -25,7 +25,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.CirceUtils._
 import org.alephium.api.model._
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType, Target}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -36,9 +36,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   val zeroHash: String = BlockHash.zero.toHexString
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(BlockHash.zero, TimeStamp.unsafe(i.toLong), i, i, i, AVector(BlockHash.zero), None)
-  val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
+  val dummyAddress     = new InetSocketAddress("127.0.0.1", 9000)
+  val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
   val dummyCliqueInfo =
-    CliqueInfo.unsafe(CliqueId.generate, AVector(Option(dummyAddress)), AVector(dummyAddress), 1)
+    CliqueInfo.unsafe(
+      CliqueId.generate,
+      AVector(Option(dummyAddress)),
+      AVector(dummyAddress),
+      1,
+      priKey
+    )
   val dummyPeerInfo = BrokerInfo.unsafe(CliqueId.generate, 1, 3, dummyAddress)
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)

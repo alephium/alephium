@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.bootstrap
 
-import org.alephium.protocol.SafeSerdeImpl
+import org.alephium.protocol.{PrivateKey, SafeSerdeImpl}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.serde._
@@ -25,27 +25,34 @@ import org.alephium.util.AVector
 final case class IntraCliqueInfo private (
     id: CliqueId,
     peers: AVector[PeerInfo],
-    groupNumPerBroker: Int
+    groupNumPerBroker: Int,
+    priKey: PrivateKey
 ) {
   def cliqueInfo: CliqueInfo = {
     CliqueInfo.unsafe(
       id,
       peers.map(_.externalAddress),
       peers.map(_.internalAddress),
-      groupNumPerBroker
+      groupNumPerBroker,
+      priKey
     )
   }
 }
 
 object IntraCliqueInfo extends SafeSerdeImpl[IntraCliqueInfo, GroupConfig] {
-  def unsafe(id: CliqueId, peers: AVector[PeerInfo], groupNumPerBroker: Int): IntraCliqueInfo = {
-    new IntraCliqueInfo(id, peers, groupNumPerBroker)
+  def unsafe(
+      id: CliqueId,
+      peers: AVector[PeerInfo],
+      groupNumPerBroker: Int,
+      priKey: PrivateKey
+  ): IntraCliqueInfo = {
+    new IntraCliqueInfo(id, peers, groupNumPerBroker, priKey)
   }
 
   implicit private val peerSerde  = PeerInfo._serde
   implicit private val peersSerde = avectorSerde[PeerInfo]
   override val _serde: Serde[IntraCliqueInfo] =
-    Serde.forProduct3(unsafe, t => (t.id, t.peers, t.groupNumPerBroker))
+    Serde.forProduct4(unsafe, t => (t.id, t.peers, t.groupNumPerBroker, t.priKey))
 
   override def validate(
       info: IntraCliqueInfo
