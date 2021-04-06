@@ -210,14 +210,14 @@ class BlockFlowSpec extends AlephiumSpec {
         val chainIndex = ChainIndex.unsafe(mainGroup, 0)
         val block11    = tryToTransfer(blockFlow, chainIndex)
         val block12    = tryToTransfer(blockFlow, chainIndex)
-        blockFlow.mempools.foreach(_.size is 0)
+        blockFlow.grandPool.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block11, 1)
-        blockFlow.mempools.foreach(_.size is 0)
+        blockFlow.grandPool.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block12, 1)
 
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
-          blockFlow.getPool(chainIndex).size is 1 // the conflicted tx is kept
+          blockFlow.getMemPool(chainIndex).size is 1 // the conflicted tx is kept
           val template = blockFlow.prepareBlockFlow(chainIndex).toOption.get
           template.transactions.length is 0 // the conflicted tx will not be used
         }

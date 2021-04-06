@@ -59,7 +59,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     val fromGroup  = tx.fromGroup
     val toGroup    = tx.toGroup
     val chainIndex = ChainIndex(fromGroup, toGroup)
-    val mempool    = blockFlow.getPool(chainIndex)
+    val mempool    = blockFlow.getMemPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>

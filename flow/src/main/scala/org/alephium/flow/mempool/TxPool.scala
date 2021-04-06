@@ -20,7 +20,8 @@ import scala.collection.mutable
 
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.TransactionTemplate
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, RWLock, U256}
 
 /*
@@ -30,7 +31,12 @@ class TxPool private (
     pool: mutable.SortedMap[WeightedId, TransactionTemplate],
     weights: mutable.HashMap[Hash, U256],
     _capacity: Int
-) extends RWLock {
+) extends Pool
+    with RWLock {
+  val inputIndex: mutable.HashSet[AssetOutputRef]            = mutable.HashSet.empty
+  val outputIndex: mutable.HashMap[AssetOutputRef, TxOutput] = mutable.HashMap.empty
+  val addressIndex: mutable.HashMap[LockupScript, TxOutput]  = mutable.HashMap.empty
+
   def isFull: Boolean = pool.size == _capacity
 
   def size: Int = pool.size
@@ -103,8 +109,6 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    import org.alephium.util.Bytes.byteStringOrdering
-    implicit val hashOrd: Ordering[Hash] = Ordering.by(_.bytes)
     Ordering.by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight, weightedId.id)).reverse
   }
 }

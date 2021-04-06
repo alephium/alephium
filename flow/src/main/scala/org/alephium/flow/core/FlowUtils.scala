@@ -22,7 +22,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.mempool.{MemPool, MemPoolChanges, Normal, Reorg}
+import org.alephium.flow.mempool.{GrandPool, MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
@@ -39,17 +39,14 @@ trait FlowUtils
     with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
 
-  val mempools = AVector.tabulate(brokerConfig.groupNumPerBroker) { idx =>
-    val group = GroupIndex.unsafe(brokerConfig.groupFrom + idx)
-    MemPool.empty(group)
+  val grandPool = GrandPool.empty
+
+  def getMemPool(mainGroup: GroupIndex): MemPool = {
+    grandPool.getMemPool(mainGroup)
   }
 
-  def getPool(mainGroup: GroupIndex): MemPool = {
-    mempools(mainGroup.value - brokerConfig.groupFrom)
-  }
-
-  def getPool(chainIndex: ChainIndex): MemPool = {
-    mempools(chainIndex.from.value - brokerConfig.groupFrom)
+  def getMemPool(chainIndex: ChainIndex): MemPool = {
+    grandPool.getMemPool(chainIndex)
   }
 
   def calMemPoolChangesUnsafe(
@@ -78,13 +75,13 @@ trait FlowUtils
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
           val toGroupIndex = GroupIndex.unsafe(toGroup)
           val index        = ChainIndex(mainGroup, toGroupIndex)
-          sum + getPool(index).remove(index, txs.map(_.toTemplate))
+          sum + getMemPool(index).remove(index, txs.map(_.toTemplate))
         }
         if (removed > 0) {
           logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
         }
       case Reorg(toRemove, toAdd) =>
-        val (removed, added) = getPool(mainGroup).reorg(toRemove, toAdd)
+        val (removed, added) = getMemPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
     }
   }
@@ -98,7 +95,7 @@ trait FlowUtils
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
   def collectPooledTxs(chainIndex: ChainIndex): AVector[TransactionTemplate] = {
-    getPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
+    getMemPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
   }
 
   def filterValidInputsUnsafe(

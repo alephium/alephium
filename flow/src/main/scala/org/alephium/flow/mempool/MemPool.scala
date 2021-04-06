@@ -27,8 +27,9 @@ import org.alephium.util.{AVector, RWLock}
  *
  * Transactions should be ordered according to weights. The weight is calculated based on fees
  */
-class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit groupConfig: GroupConfig)
-    extends RWLock {
+class MemPool private (group: GroupIndex, pools: AVector[TxPool], val txIndexes: TxIndexes)(implicit
+    groupConfig: GroupConfig
+) extends RWLock {
   def getPool(index: ChainIndex): TxPool = {
     assume(group == index.from)
     pools(index.to.value)
@@ -58,12 +59,16 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool])(implicit group
 
   def add(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
     readOnly {
-      getPool(index).add(transactions)
+      val count = getPool(index).add(transactions)
+      transactions.foreach(txIndexes.add)
+      count
     }
 
   def remove(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
     readOnly {
-      getPool(index).remove(transactions)
+      val count = getPool(index).remove(transactions)
+      transactions.foreach(txIndexes.remove)
+      count
     }
 
   // Note: we lock the mem pool so that we could update all the transaction pools
@@ -96,6 +101,6 @@ object MemPool {
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
     val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
-    new MemPool(groupIndex, pools)
+    new MemPool(groupIndex, pools, TxIndexes.empty)
   }
 }

@@ -22,7 +22,11 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike, Transaction}
 import org.alephium.util.{AVector, LockFixture}
 
-class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGeneratorsLike {
+class MemPoolSpec
+    extends AlephiumFlowSpec
+    with TxIndexesSpec.Fixture
+    with LockFixture
+    with NoIndexModelGeneratorsLike {
   it should "initialize an empty pool" in {
     val pool = MemPool.empty(GroupIndex.unsafe(0))
     pool.size is 0
@@ -41,9 +45,11 @@ class MemPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGen
         txTemplates.foreach(pool.contains(index, _) is false)
         pool.add(index, txTemplates) is block.transactions.length
         pool.size is block.transactions.length
+        block.transactions.foreach(checkTx(pool.txIndexes, _))
         txTemplates.foreach(pool.contains(index, _) is true)
         pool.remove(index, txTemplates) is block.transactions.length
         pool.size is 0
+        pool.txIndexes is TxIndexes.empty
       } else {
         assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }
