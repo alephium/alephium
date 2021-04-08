@@ -117,9 +117,10 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     var toClose = false
 
     {
-      case Send(data)             => buffer(data)
-      case Tcp.WritingResumed     => writeFirst()
-      case Ack(ack) if ack < nack => acknowledge(ack)
+      case Send(data)                         => buffer(data)
+      case Tcp.WritingResumed                 => writeFirst()
+      case Tcp.CommandFailed(Tcp.Write(_, _)) => () // it's already buffering
+      case Ack(ack) if ack < nack             => acknowledge(ack)
       case Ack(ack) =>
         acknowledge(ack)
         if (storage.nonEmpty) {
