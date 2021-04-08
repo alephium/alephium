@@ -27,8 +27,6 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
-import sttp.tapir.docs.openapi.RichOpenAPIEndpoints
-import sttp.tapir.openapi.{OpenAPI, Server, ServerVariable}
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
@@ -54,7 +52,7 @@ import org.alephium.wallet.web.WalletServer
 // scalastyle:off method.length
 class RestServer(
     node: Node,
-    port: Int,
+    val port: Int,
     miner: ActorRefT[Miner.Command],
     blocksExporter: BlocksExporter,
     walletServer: Option[WalletServer]
@@ -63,6 +61,7 @@ class RestServer(
     val actorSystem: ActorSystem,
     val executionContext: ExecutionContext
 ) extends Endpoints
+    with Documentation
     with Service
     with StrictLogging {
 
@@ -245,45 +244,11 @@ class RestServer(
         .map(error => ApiModel.Error.server(error.getMessage))
     }
   }
-  private val walletDocs = walletServer.map(_.docs).getOrElse(List.empty)
-  private val blockflowDocs = List(
-    getSelfClique,
-    getInterCliquePeerInfo,
-    getDiscoveredNeighbors,
-    getMisbehaviors,
-    getBlockflow,
-    getBlock,
-    getBalance,
-    getGroup,
-    getHashesAtHeight,
-    getChainInfo,
-    listUnconfirmedTransactions,
-    buildTransaction,
-    sendTransaction,
-    getTransactionStatus,
-    sendContract,
-    compile,
-    buildContract,
-    minerAction,
-    minerListAddresses,
-    minerGetBlockCandidate,
-    minerNewBlock,
-    minerUpdateAddresses
-  )
 
-  private val docs: OpenAPI =
-    (walletDocs ++ blockflowDocs).toOpenAPI("Alephium API", "1.0")
-
-  private val servers = List(
-    Server("http://{host}:{port}")
-      .variables(
-        "host" -> ServerVariable(None, "localhost", None),
-        "port" -> ServerVariable(None, port.toString, None)
-      )
-  )
+  val walletEndpoints = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 
   private val swaggerUIRoute =
-    new SwaggerAkka(docs.servers(servers).toYaml, yamlName = "openapi.yaml").routes
+    new SwaggerAkka(openAPI.toYaml, yamlName = "openapi.yaml").routes
 
   private val blockFlowRoute: Route =
     getSelfCliqueRoute ~

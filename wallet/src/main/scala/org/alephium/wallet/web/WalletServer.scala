@@ -20,8 +20,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import sttp.tapir.Endpoint
-import sttp.tapir.docs.openapi._
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
@@ -30,6 +28,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.{Duration, U256}
+import org.alephium.wallet.WalletDocumentation
 import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
@@ -42,26 +41,12 @@ class WalletServer(
     val blockflowFetchMaxAge: Duration
 )(implicit groupConfig: GroupConfig, executionContext: ExecutionContext)
     extends WalletEndpoints
+    with WalletDocumentation
     with AkkaDecodeFailureHandler {
   import WalletServer.toApiError
 
-  val docs: List[Endpoint[_, _, _, _]] = List(
-    createWallet,
-    restoreWallet,
-    listWallets,
-    lockWallet,
-    unlockWallet,
-    getBalances,
-    transfer,
-    getAddresses,
-    getMinerAddresses,
-    deriveNextAddress,
-    deriveNextMinerAddresses,
-    changeActiveAddress
-  )
-
   val docsRoute: Route = new SwaggerAkka(
-    docs.toOpenAPI("Alephium Wallet", "1.0").toYaml,
+    walletOpenAPI.toYaml,
     yamlName = "openapi.yaml"
   ).routes
 

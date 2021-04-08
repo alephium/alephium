@@ -24,7 +24,21 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     scalastyle in Test := {},
     publish / skip := true
   )
-  .aggregate(macros, util, serde, io, crypto, api, rpc, app, benchmark, flow, protocol, wallet)
+  .aggregate(
+    macros,
+    util,
+    serde,
+    io,
+    crypto,
+    api,
+    rpc,
+    app,
+    benchmark,
+    flow,
+    protocol,
+    wallet,
+    tools
+  )
 
 def mainProject(id: String): Project =
   project(id).enablePlugins(JavaAppPackaging).dependsOn(flow)
@@ -136,6 +150,9 @@ lazy val app = mainProject("app")
     ),
     publish / skip := true
   )
+
+lazy val tools = mainProject("tools")
+  .dependsOn(app)
 
 lazy val benchmark = project("benchmark")
   .enablePlugins(JmhPlugin)
