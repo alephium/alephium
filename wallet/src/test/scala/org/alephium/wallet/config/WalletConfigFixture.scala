@@ -29,8 +29,9 @@ import org.alephium.wallet.config.WalletConfig
 trait WalletConfigFixture {
 
   val localhost: InetAddress = InetAddress.getLocalHost
-  val blockFlowPort          = SocketUtil.temporaryLocalPort(SocketUtil.Both)
-  val walletPort             = SocketUtil.temporaryLocalPort(SocketUtil.Both)
+  val tempAddresses          = SocketUtil.temporaryServerAddresses(2, "localhost")
+  val blockFlowPort          = tempAddresses(0).getPort
+  val walletPort             = tempAddresses(1).getPort
 
   val groupNum = 4
 
