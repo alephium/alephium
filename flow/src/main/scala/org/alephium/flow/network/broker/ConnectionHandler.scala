@@ -19,6 +19,7 @@ package org.alephium.flow.network.broker
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
@@ -39,7 +40,7 @@ object ConnectionHandler {
   )(implicit groupConfig: GroupConfig, networkSetting: NetworkSetting): Props =
     Props(new CliqueConnectionHandler(remoteAddress, connection, brokerHandler))
 
-  final case class Ack(id: Int) extends Tcp.Event
+  final case class Ack(id: Long) extends Tcp.Event
 
   sealed trait Command
   case object CloseConnection                extends Command
@@ -90,7 +91,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   def communicating: Receive = reading orElse writing orElse closed
 
-  def bufferedCommunicating(ack: Int): Receive = reading orElse bufferedWriting(ack) orElse closed
+  def bufferedCommunicating: Receive = reading orElse bufferedWriting orElse closed
 
   def reading: Receive = { case Tcp.Received(data) =>
     bufferInMessage(data)
@@ -99,47 +100,52 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   }
 
   def writing: Receive = {
-    case Send(data) =>
-      connection ! Tcp.Write(data, Ack(currentOffset))
-      buffer(data)
-    case Ack(ack) =>
-      acknowledge(ack)
-    case Tcp.CommandFailed(Tcp.Write(_, Ack(ack))) =>
-      log.debug(s"Writing failed $ack")
+    case Send(data) => send(data)
+
+    case Ack(_) => () // all are good
+
+    case Tcp.CommandFailed(Tcp.Write(data, Ack(id))) =>
+      log.debug(s"Failed in writing ${data.length} bytes to $remoteAddress")
       connection ! Tcp.ResumeWriting
-      context become bufferedCommunicating(ack)
+      buffer(data, id)
+      context become bufferedCommunicating
+
+    case Tcp.WritingResumed => () // might due to duplicated resume in buffer mode
+
     case Tcp.PeerClosed | CloseConnection =>
-      if (storage.isEmpty) connection ! Tcp.Close else context.become(closing orElse closed)
+      if (outMessageBuffer.isEmpty) {
+        connection ! Tcp.Close
+      } else {
+        context.become(closing orElse closed)
+      }
   }
 
-  def bufferedWriting(nack: Int): Receive = {
-    var toAck   = 10
-    var toClose = false
+  def bufferedWriting: Receive = {
+    case Send(data) => buffer(data)
 
-    {
-      case Send(data)                         => buffer(data)
-      case Tcp.WritingResumed                 => writeFirst()
-      case Tcp.CommandFailed(Tcp.Write(_, _)) => () // it's already buffering
-      case Ack(ack) if ack < nack             => acknowledge(ack)
-      case Ack(ack) =>
-        acknowledge(ack)
-        if (storage.nonEmpty) {
-          if (toAck > 0) {
-            // stay in ACK-based mode for a while
-            writeFirst()
-            toAck -= 1
-          } else {
-            // then return to NACK-based again
-            writeAll()
-            context.become(communicating)
-          }
-        } else if (toClose) {
-          connection ! Tcp.Close
-        } else {
-          context.become(communicating)
-        }
-      case Tcp.PeerClosed | CloseConnection => toClose = true
-    }
+    case Tcp.WritingResumed => writeFirst()
+
+    case Tcp.CommandFailed(Tcp.Write(data, Ack(ack))) =>
+      buffer(data, ack)
+      connection ! Tcp.ResumeWriting
+
+    case Tcp.CommandFailed(Tcp.ResumeWriting) => ()
+
+    case Ack(ack) =>
+      acknowledge(ack)
+      if (outMessageBuffer.nonEmpty) {
+        writeFirst()
+      } else {
+        context.become(communicating)
+      }
+
+    case Tcp.PeerClosed | CloseConnection =>
+      if (outMessageBuffer.isEmpty) {
+        connection ! Tcp.Close
+      } else {
+        writeAll()
+        context.become(closing orElse closed)
+      }
   }
 
   def closed: Receive = { case _: Tcp.ConnectionClosed | Terminated(_) =>
@@ -162,68 +168,55 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
     case Ack(ack) =>
       acknowledge(ack)
-      if (storage.isEmpty) {
+      if (outMessageBuffer.isEmpty) {
         connection ! Tcp.Close
       }
   }
 
-  override def postStop(): Unit = {
-    log.debug(s"transferred $transferred bytes from/to [$remoteAddress]")
+  final private[broker] var outMessageCount         = 0L
+  final private[broker] var outMessageBuffer        = mutable.TreeMap.empty[Long, ByteString]
+  final private[broker] var outMessageBufferedBytes = 0L
+
+  final val maxBufferCapacity = networkSetting.connectionBufferCapacityInByte
+
+  protected def send(data: ByteString): Unit = {
+    outMessageCount += 1
+    connection ! Tcp.Write(data, Ack(outMessageCount))
   }
 
-  final private[broker] var storageOffset = 0
-  final private[broker] var storage       = Vector.empty[ByteString]
-  final private[broker] var stored        = 0L
-  final private[broker] var transferred   = 0L
-
-  final val maxStored                 = networkSetting.connectionBufferCapacityInByte
-  final val highWatermark             = maxStored * 5 / 10
-  final val lowWatermark              = maxStored * 3 / 10
-  final private[broker] var suspended = false
-
-  private def currentOffset = storageOffset + storage.size
-
   protected def buffer(data: ByteString): Unit = {
-    storage :+= data
-    stored += data.size
+    outMessageCount += 1
+    buffer(data, outMessageCount)
+  }
 
-    if (stored > maxStored) {
-      log.warning(s"drop connection to [$remoteAddress] (buffer overrun)")
-      context.stop(self)
-
-    } else if (stored > highWatermark) {
-      log.debug(s"suspending reading at $currentOffset")
-      connection ! Tcp.SuspendReading
-      suspended = true
+  protected def buffer(data: ByteString, id: Long): Unit = {
+    val oldSize = outMessageBuffer.size
+    outMessageBuffer.addOne(id -> data)
+    val newSize = outMessageBuffer.size
+    if (newSize > oldSize) {
+      outMessageBufferedBytes += data.length
+      if (outMessageBufferedBytes > maxBufferCapacity) {
+        log.warning(s"Drop connection to [$remoteAddress] (buffer overrun)")
+        context.stop(self)
+      }
     }
   }
 
-  private def acknowledge(ack: Int): Unit = {
-    require(ack == storageOffset, s"received ack $ack at $storageOffset")
-    require(storage.nonEmpty, s"storage was empty at ack $ack")
-
-    val size = storage(0).size
-    stored -= size
-    transferred += size
-
-    storageOffset += 1
-    storage = storage.drop(1)
-
-    if (suspended && stored < lowWatermark) {
-      log.debug("resuming reading")
-      connection ! Tcp.ResumeReading
-      suspended = false
+  private def acknowledge(ack: Long): Unit = {
+    outMessageBuffer.remove(ack).foreach { data =>
+      outMessageBufferedBytes -= data.length
     }
   }
 
   private def writeFirst(): Unit = {
-    assume(storage.nonEmpty)
-    connection ! Tcp.Write(storage(0), Ack(storageOffset))
+    outMessageBuffer.headOption.foreach { case (id, data) =>
+      connection ! Tcp.Write(data, Ack(id))
+    }
   }
 
   private def writeAll(): Unit = {
-    for ((data, i) <- storage.zipWithIndex) {
-      connection ! Tcp.Write(data, Ack(storageOffset + i))
+    for ((id, data) <- outMessageBuffer) {
+      connection ! Tcp.Write(data, Ack(id))
     }
   }
 

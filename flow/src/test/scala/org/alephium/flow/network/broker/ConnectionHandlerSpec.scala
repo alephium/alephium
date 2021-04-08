@@ -17,7 +17,7 @@
 package org.alephium.flow.network.broker
 
 import akka.io.Tcp
-import akka.testkit.{EventFilter, SocketUtil, TestActorRef, TestProbe}
+import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -53,29 +53,30 @@ class ConnectionHandlerSpec
 
   it should "write data to connection" in new Fixture {
     connectionHandler ! ConnectionHandler.Send(messageBytes)
-    connection.expectMsg(Tcp.Write(messageBytes, Ack(0)))
+    connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
 
     connectionHandler ! ConnectionHandler.Send(messageBytes)
-    connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
+    connection.expectMsg(Tcp.Write(messageBytes, Ack(2)))
   }
 
   it should "buffer data when writing is failing" in new Fixture {
-    connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(1)))
+    connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(-1)))
     connection.expectMsg(Tcp.ResumeWriting)
-    connectionHandler.underlyingActor.storage.size is 0
+    connectionHandler.underlyingActor.outMessageBuffer.size is 1
+    connectionHandler.underlyingActor.outMessageCount is 0
 
-    EventFilter.warning(start = "Unhandled message", occurrences = 0).intercept {
-      connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(2)))
-      connection.expectNoMessage()
-      connectionHandler.underlyingActor.storage.size is 0
-    }
+    connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(0)))
+    connection.expectMsg(Tcp.ResumeWriting)
+    connectionHandler.underlyingActor.outMessageBuffer.size is 2
+    connectionHandler.underlyingActor.outMessageCount is 0
 
     connectionHandler ! ConnectionHandler.Send(messageBytes)
     connection.expectNoMessage()
-    connectionHandler.underlyingActor.storage.size is 1
+    connectionHandler.underlyingActor.outMessageBuffer.size is 3
+    connectionHandler.underlyingActor.outMessageCount is 1
 
     connectionHandler ! Tcp.WritingResumed
-    connection.expectMsg(Tcp.Write(messageBytes, Ack(0)))
+    connection.expectMsg(Tcp.Write(messageBytes, Ack(-1)))
   }
 
   it should "close connection" in new Fixture {
