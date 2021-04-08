@@ -269,7 +269,8 @@ val commonSettings = publishSettings ++ Seq(
   fork := true,
   javaOptions += "-Xss2m",
   Test / scalacOptions ++= Seq("-Xcheckinit", "-Wconf:cat=other-non-cooperative-equals:s"),
-  Test / envVars += "ALEPHIUM_ENV"            -> "test",
+  Test / envVars += "ALEPHIUM_ENV" -> "test",
+  Test / testOptions += Tests.Argument("-oD"),
   IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",
   libraryDependencies ++= Seq(
     `akka-test`,
