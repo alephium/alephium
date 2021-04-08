@@ -17,7 +17,7 @@
 package org.alephium.flow.network.broker
 
 import akka.io.Tcp
-import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
+import akka.testkit.{EventFilter, SocketUtil, TestActorRef, TestProbe}
 
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -63,6 +63,12 @@ class ConnectionHandlerSpec
     connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(1)))
     connection.expectMsg(Tcp.ResumeWriting)
     connectionHandler.underlyingActor.storage.size is 0
+
+    EventFilter.warning(start = "Unhandled message", occurrences = 0).intercept {
+      connectionHandler ! Tcp.CommandFailed(Tcp.Write(messageBytes, Ack(2)))
+      connection.expectNoMessage()
+      connectionHandler.underlyingActor.storage.size is 0
+    }
 
     connectionHandler ! ConnectionHandler.Send(messageBytes)
     connection.expectNoMessage()

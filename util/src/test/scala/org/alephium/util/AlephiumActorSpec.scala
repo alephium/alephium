@@ -71,8 +71,8 @@ object AlephiumActorSpec {
   val config: String =
     """
       |akka {
-      |  loglevel = "DEBUG"
-      |  loggers = ["akka.event.slf4j.Slf4jLogger"]
+      |  loglevel = "WARNING"
+      |  loggers = ["akka.testkit.TestEventListener"]
       |  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
       |
       |  io.tcp.trace-logging = off
