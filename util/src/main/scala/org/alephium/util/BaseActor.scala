@@ -26,6 +26,7 @@ trait BaseActor extends Actor with ActorLogging {
   }
 
   override def unhandled(message: Any): Unit = {
+    super.unhandled(message)
     log.warning(s"Unhandled message: $message")
   }
 
