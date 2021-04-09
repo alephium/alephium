@@ -93,6 +93,11 @@ class WalletServer(
           walletService.unlockWallet(wallet, walletUnlock.password).left.map(toApiError)
         )
       } ~
+      deleteWallet.toRoute { case (wallet, walletDeletion) =>
+        Future.successful(
+          walletService.deleteWallet(wallet, walletDeletion.password).left.map(toApiError)
+        )
+      } ~
       getBalances.toRoute { wallet =>
         walletService
           .getBalances(wallet)

@@ -77,6 +77,9 @@ trait WalletExamples {
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
     simpleExample(WalletUnlock(password))
 
+  implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
+    simpleExample(WalletDeletion(password))
+
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
 

@@ -117,6 +117,12 @@ trait WalletEndpoints
       .in(jsonBody[WalletUnlock])
       .summary("Unlock your wallet")
 
+  val deleteWallet: Endpoint[(String, WalletDeletion), ApiError, Unit, Nothing] =
+    wallets.delete
+      .in(path[String]("wallet_name"))
+      .in(jsonBody[WalletDeletion])
+      .summary("Delete your wallet file (can be recovered with your mnemonic)")
+
   val getBalances: Endpoint[String, ApiError, Balances, Nothing] =
     wallets.get
       .in(path[String]("wallet_name"))

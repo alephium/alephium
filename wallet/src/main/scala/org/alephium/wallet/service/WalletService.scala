@@ -59,6 +59,7 @@ trait WalletService extends Service {
 
   def lockWallet(wallet: String): Either[WalletError, Unit]
   def unlockWallet(wallet: String, password: String): Either[WalletError, Unit]
+  def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address, U256)]]]
   def getAddresses(wallet: String): Either[WalletError, (Address, AVector[Address])]
   def getMinerAddresses(
@@ -156,6 +157,12 @@ object WalletService {
       })
     }
 
+    def remove(filename: String): Unit = {
+      discard(storages.synchronized {
+        storages.remove(filename)
+      })
+    }
+
     def get(wallet: String): Option[SecretStorage] = {
       storages.synchronized {
         storages.get(wallet).map { storageTs =>
@@ -249,6 +256,17 @@ object WalletService {
     override def unlockWallet(wallet: String, password: String): Either[WalletError, Unit] =
       withWalletM(wallet) { secretStorage =>
         secretStorage.unlock(password).left.map(WalletError.from)
+      }(Left.apply)
+
+    override def deleteWallet(wallet: String, password: String): Either[WalletError, Unit] =
+      withWalletM(wallet) { secretStorage =>
+        secretStorage
+          .delete(password)
+          .map { _ =>
+            secretStorages.remove(wallet)
+          }
+          .left
+          .map(WalletError.from)
       }(Left.apply)
 
     override def getBalances(

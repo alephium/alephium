@@ -36,7 +36,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
   val passwordGen = hashGen.map(_.toHexString)
   val path        = Constants.path(NetworkType.Devnet)
 
-  it should "create/lock/unlock the secret storage" in {
+  it should "create/lock/unlock/delete the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) { case (seed, password, wrongPassword) =>
       val name  = Hash.generate.shortHex
       val file  = new File(s"$secretDir/$name")
@@ -67,6 +67,9 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
       secretStorage.unlock(password) is Right(())
       secretStorage.getCurrentPrivateKey() isE privateKey
+
+      secretStorage.delete(password) is Right(())
+      secretStorage.unlock(password) is Left(SecretStorage.SecretFileError)
     }
   }
 

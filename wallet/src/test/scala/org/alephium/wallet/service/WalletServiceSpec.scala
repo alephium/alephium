@@ -140,6 +140,22 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .map(_.toSet) isE AVector((walletName1, true), (walletName2, false)).toSet
   }
 
+  it should "delete a wallet" in new Fixure {
+
+    val (walletName, _) =
+      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
+
+    walletService
+      .listWallets()
+      .map(_.toSet) isE AVector((walletName, false)).toSet
+
+    walletService.deleteWallet(walletName, password)
+
+    walletService
+      .listWallets()
+      .map(_.toSet) isE AVector.empty[(String, Boolean)].toSet
+  }
+
   trait Fixure extends WalletConfigFixture {
 
     val password     = "password"

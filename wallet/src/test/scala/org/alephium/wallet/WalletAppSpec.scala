@@ -77,6 +77,7 @@ class WalletAppSpec
       .map(name => s""","walletName":"$name"""")
       .getOrElse("")}}"""
   val unlockJson                                = s"""{"password":"$password"}"""
+  val deleteJson                                = s"""{"password":"$password"}"""
   def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
@@ -87,6 +88,7 @@ class WalletAppSpec
   def restore(mnemonic: Mnemonic) = Put(s"/wallets", entity(restoreJson(mnemonic))) ~> routes
   def unlock()                    = Post(s"/wallets/${wallet}/unlock", entity(unlockJson)) ~> routes
   def lock()                      = Post(s"/wallets/${wallet}/lock") ~> routes
+  def delete()                    = Delete(s"/wallets/${wallet}", entity(deleteJson)) ~> routes
   def getBalance()                = Get(s"/wallets/${wallet}/balances") ~> routes
   def getAddresses()              = Get(s"/wallets/${wallet}/addresses") ~> routes
   def transfer(amount: Int) =
@@ -230,6 +232,16 @@ class WalletAppSpec
       status is StatusCodes.OK
     }
 
+    delete() ~> check {
+      status is StatusCodes.OK
+    }
+
+    delete() ~> check {
+      status is StatusCodes.NotFound
+      CirceUtils.print(
+        responseAs[Json]
+      ) is s"""{"resource":"$wallet","status":404,"detail":"$wallet not found"}"""
+    }
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())
   }
 }
