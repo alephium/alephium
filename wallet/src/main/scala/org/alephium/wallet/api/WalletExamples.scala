@@ -18,6 +18,7 @@ package org.alephium.wallet.api
 
 import sttp.tapir.EndpointIO.Example
 
+import org.alephium.api.ApiError
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, NetworkType}
@@ -103,12 +104,12 @@ trait WalletExamples {
   implicit val changeActiveAddressExamples: List[Example[ChangeActiveAddress]] =
     simpleExample(ChangeActiveAddress(address))
 
-  implicit val badRequestExamples: List[Example[WalletApiError.BadRequest]] =
-    simpleExample(WalletApiError.BadRequest("Something bad in the request"))
+  implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
+    simpleExample(ApiError.BadRequest("Something bad in the request"))
 
-  implicit val notFoundExamples: List[Example[WalletApiError.NotFound]] =
-    simpleExample(WalletApiError.NotFound("wallet-name"))
+  implicit val notFoundExamples: List[Example[ApiError.NotFound]] =
+    simpleExample(ApiError.NotFound("wallet-name"))
 
-  implicit val unauthorizedExamples: List[Example[WalletApiError.Unauthorized]] =
-    simpleExample(WalletApiError.Unauthorized("You shall not pass"))
+  implicit val unauthorizedExamples: List[Example[ApiError.Unauthorized]] =
+    simpleExample(ApiError.Unauthorized("You shall not pass"))
 }

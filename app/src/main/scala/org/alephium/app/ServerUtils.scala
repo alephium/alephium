@@ -20,7 +20,7 @@ import scala.concurrent._
 
 import akka.util.Timeout
 
-import org.alephium.api.ApiModel
+import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
@@ -408,14 +408,14 @@ class ServerUtils(networkType: NetworkType) {
     )
   }
 
-  private def apiError(error: IOError): ApiModel.Error =
-    ApiModel.Error.server(s"Failed in IO: $error")
-  private def apiError(error: String): ApiModel.Error = ApiModel.Error.server(error)
-  private def failed[T](error: IOError): Try[T]       = Left(apiError(error))
+  private def apiError(error: IOError): ApiError =
+    ApiError.BadRequest(s"Failed in IO: $error")
+  private def apiError(error: String): ApiError = ApiError.BadRequest(error)
+  private def failed[T](error: IOError): Try[T] = Left(apiError(error))
 
 }
 
 object ServerUtils {
-  type Try[T]       = Either[ApiModel.Error, T]
+  type Try[T]       = Either[ApiError, T]
   type FutureTry[T] = Future[Try[T]]
 }

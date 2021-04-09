@@ -210,7 +210,19 @@ trait EndpointsExamples {
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 
-  implicit val badRequestExamples: List[Example[ApiModel.Error]] =
-    simpleExample(ApiModel.Error(-32700, "Parse error"))
+  implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
+    simpleExample(ApiError.BadRequest("Something bad in the request"))
+
+  implicit val notFoundExamples: List[Example[ApiError.NotFound]] =
+    simpleExample(ApiError.NotFound("wallet-name"))
+
+  implicit val internalServerErrorExamples: List[Example[ApiError.InternalServerError]] =
+    simpleExample(ApiError.InternalServerError("Ouch"))
+
+  implicit val unauthorizedExamples: List[Example[ApiError.Unauthorized]] =
+    simpleExample(ApiError.Unauthorized("You shall not pass"))
+
+  implicit val serviceUnavailableExamples: List[Example[ApiError.ServiceUnavailable]] =
+    simpleExample(ApiError.ServiceUnavailable("Self clique unsynced"))
 }
 // scalastyle:on magic.number

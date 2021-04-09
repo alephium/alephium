@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api
+package org.alephium.api
 
 import io.circe.{Decoder, DecodingFailure, Encoder, HCursor, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
@@ -22,14 +22,14 @@ import sttp.model.StatusCode
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.SchemaType.{SObjectInfo, SProduct}
 
-sealed trait WalletApiError {
+sealed trait ApiError {
   def status: StatusCode
   def detail: String
 }
 
-object WalletApiError {
+object ApiError {
 
-  private def encodeApiError[A <: WalletApiError]: Encoder[A] =
+  private def encodeApiError[A <: ApiError]: Encoder[A] =
     new Encoder[A] {
       final def apply(apiError: A): Json =
         Json.obj(
@@ -38,7 +38,7 @@ object WalletApiError {
         )
     }
 
-  final case class Unauthorized(val detail: String) extends WalletApiError {
+  final case class Unauthorized(val detail: String) extends ApiError {
     final val status: StatusCode = StatusCode.Unauthorized
   }
 
@@ -62,7 +62,7 @@ object WalletApiError {
       )
   }
 
-  final case class BadRequest(val detail: String) extends WalletApiError {
+  final case class BadRequest(val detail: String) extends ApiError {
     final val status: StatusCode = StatusCode.BadRequest
   }
   object BadRequest {
@@ -84,7 +84,7 @@ object WalletApiError {
       )
   }
 
-  final case class NotFound(resource: String) extends WalletApiError {
+  final case class NotFound(resource: String) extends ApiError {
     final val status: StatusCode = StatusCode.NotFound
     final val detail: String     = s"$resource not found"
   }
@@ -109,28 +109,86 @@ object WalletApiError {
       )
   }
 
-  implicit val decoder: Decoder[WalletApiError] = new Decoder[WalletApiError] {
-    def dec(c: HCursor, status: StatusCode): Decoder.Result[WalletApiError] =
+  final case class ServiceUnavailable(val detail: String) extends ApiError {
+    final val status: StatusCode = StatusCode.ServiceUnavailable
+  }
+
+  object ServiceUnavailable {
+    implicit val encoder: Encoder[ServiceUnavailable] = new Encoder[ServiceUnavailable] {
+      val baseEncoder = deriveEncoder[ServiceUnavailable]
+      final def apply(serviceUnavailable: ServiceUnavailable): Json =
+        encodeApiError[ServiceUnavailable](serviceUnavailable).deepMerge(
+          baseEncoder(serviceUnavailable)
+        )
+    }
+
+    implicit val decoder: Decoder[ServiceUnavailable] = deriveDecoder
+    implicit val schema: Schema[ServiceUnavailable] =
+      Schema(
+        SProduct(
+          SObjectInfo("ServiceUnavailable"),
+          List(
+            FieldName("status") -> Schema.schemaForInt,
+            FieldName("detail") -> Schema.schemaForString
+          )
+        )
+      )
+  }
+
+  final case class InternalServerError(val detail: String) extends ApiError {
+    final val status: StatusCode = StatusCode.InternalServerError
+  }
+
+  object InternalServerError {
+    implicit val encoder: Encoder[InternalServerError] = new Encoder[InternalServerError] {
+      val baseEncoder = deriveEncoder[InternalServerError]
+      final def apply(internalServerError: InternalServerError): Json =
+        encodeApiError[InternalServerError](internalServerError).deepMerge(
+          baseEncoder(internalServerError)
+        )
+    }
+
+    implicit val decoder: Decoder[InternalServerError] = deriveDecoder
+    implicit val schema: Schema[InternalServerError] =
+      Schema(
+        SProduct(
+          SObjectInfo("InternalServerError"),
+          List(
+            FieldName("status") -> Schema.schemaForInt,
+            FieldName("detail") -> Schema.schemaForString
+          )
+        )
+      )
+  }
+
+  implicit val decoder: Decoder[ApiError] = new Decoder[ApiError] {
+    def dec(c: HCursor, status: StatusCode): Decoder.Result[ApiError] =
       status match {
-        case StatusCode.BadRequest   => BadRequest.decoder(c)
-        case StatusCode.NotFound     => NotFound.decoder(c)
-        case StatusCode.Unauthorized => Unauthorized.decoder(c)
-        case _                       => Left(DecodingFailure(s"$status not supported", c.history))
+        case StatusCode.BadRequest          => BadRequest.decoder(c)
+        case StatusCode.InternalServerError => InternalServerError.decoder(c)
+        case StatusCode.NotFound            => NotFound.decoder(c)
+        case StatusCode.ServiceUnavailable  => ServiceUnavailable.decoder(c)
+        case StatusCode.Unauthorized        => Unauthorized.decoder(c)
+        case _                              => Left(DecodingFailure(s"$status not supported", c.history))
       }
-    final def apply(c: HCursor): Decoder.Result[WalletApiError] =
+    final def apply(c: HCursor): Decoder.Result[ApiError] =
       for {
         statusAsInt <- c.downField("status").as[Int]
         apiError    <- dec(c, StatusCode(statusAsInt))
       } yield apiError
   }
 
-  implicit val encoder: Encoder[WalletApiError] = new Encoder[WalletApiError] {
-    final def apply(apiError: WalletApiError): Json =
+  implicit val encoder: Encoder[ApiError] = new Encoder[ApiError] {
+    final def apply(apiError: ApiError): Json =
       apiError match {
-        case badRequest: BadRequest     => BadRequest.encoder(badRequest)
-        case notFound: NotFound         => NotFound.encoder(notFound)
+        case badRequest: BadRequest => BadRequest.encoder(badRequest)
+        case internalServerError: InternalServerError =>
+          InternalServerError.encoder(internalServerError)
+        case notFound: NotFound => NotFound.encoder(notFound)
+        case serviceUnavailable: ServiceUnavailable =>
+          ServiceUnavailable.encoder(serviceUnavailable)
         case unauthorized: Unauthorized => Unauthorized.encoder(unauthorized)
-        case _                          => encodeApiError[WalletApiError](apiError)
+        case _                          => encodeApiError[ApiError](apiError)
       }
   }
 
@@ -141,10 +199,11 @@ object WalletApiError {
       "org.wartremover.warts.Serializable"
     )
   )
-  implicit val schema: Schema[WalletApiError] =
-    Schema.oneOf[WalletApiError, StatusCode](_.status, _.toString)(
-      StatusCode.BadRequest   -> BadRequest.schema,
-      StatusCode.NotFound     -> NotFound.schema,
-      StatusCode.Unauthorized -> Unauthorized.schema
+  implicit val schema: Schema[ApiError] =
+    Schema.oneOf[ApiError, StatusCode](_.status, _.toString)(
+      StatusCode.BadRequest         -> BadRequest.schema,
+      StatusCode.NotFound           -> NotFound.schema,
+      StatusCode.ServiceUnavailable -> ServiceUnavailable.schema,
+      StatusCode.Unauthorized       -> Unauthorized.schema
     )
 }

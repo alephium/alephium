@@ -663,15 +663,52 @@ paths:
                 synced: true
                 groupNumPerBroker: 1
                 groups: 2
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /infos/inter-clique-peer-info:
     get:
       tags:
@@ -695,15 +732,52 @@ paths:
                   addr: 1.2.3.4
                   port: 12344
                 isSynced: true
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /infos/discovered-neighbors:
     get:
       tags:
@@ -720,21 +794,58 @@ paths:
                 items:
                   $ref: '#/components/schemas/BrokerInfo'
               example:
-              - cliqueId: 89329865fd774d03aa17faf8bca8de0a0e3f38d3a925374e12e66a1c64917181ee
+              - cliqueId: bcc72e143462c5265c771bf1f0dc73d613bbd07754ee2934662a50d115dabbc3d4
                 brokerId: 1
                 groupNumPerBroker: 1
                 address:
                   addr: 1.2.3.4
                   port: 12344
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /infos/misbehaviors:
     get:
       tags:
@@ -755,15 +866,52 @@ paths:
                 status:
                   type: penalty
                   value: 42
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /blockflow:
     get:
       tags:
@@ -813,15 +961,52 @@ paths:
                     - amount: 1000000000000000000
                       address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
                       lockTime: 1234
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /blockflow/blocks/{block_hash}:
     get:
       tags:
@@ -842,34 +1027,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlockEntry'
               example:
-                hash: bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5
-                timestamp: 1611041396892
+                hash: 5fb4b535a78ea599a4528fa824ffd41749b1697d2a09c946c2ec9ea85c56e2f2
+                timestamp: 1617972779693
                 chainFrom: 1
                 chainTo: 2
                 height: 42
                 deps:
-                - 3bf667ece4614cb230053c0e061e5ed566b1fe5d0946a6655043c5811b853903
-                - 4925a27cc0aa6b95755f5f28254ef323a7dc7d721a2263efd1b555ba0dae1244
+                - 5e2ab311661e8af998376a4a589f6330a927bb0a410af65b6e701f8121d22851
+                - 2510c347694ec1df9327b9639a778f5782c0f0aacc7b5185c83e17061ad2e4e7
                 transactions:
-                - id: 65e7d7b73516fd28c63d1eab94b7bf9d6a16606bd0ecad28633605282353a1d8
+                - id: 798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef
                   inputs:
                   - outputRef:
                       scriptHint: 23412
-                      key: da0e5d5f58fb26a22bf622ae9fef7ba33dcadc8fd23378e24fe0208baac9fd2d
-                    unlockScript: 00da277f0ada2ea680e1a08419600a52bbf7c0d5033d0f0b14b84804c5af6f75dd5b
+                      key: b79a405d4035c8331014d8c584fb55e0019848b991dec6d3ddde778435ab5729
+                    unlockScript: 003b84c588651efae72b1b2cd28b049b0beb11d0a40f859076fcba69074fd4f17ea3
                   outputs:
                   - amount: 1000000000000000000
                     address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
                     lockTime: 1234
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /addresses/{address}/balance:
     get:
       tags:
@@ -893,15 +1115,52 @@ paths:
                 balance: 1000000000000000000
                 lockedBalance: 500000000000000000
                 utxoNum: 3
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /addresses/{address}/group:
     get:
       tags:
@@ -923,15 +1182,52 @@ paths:
                 $ref: '#/components/schemas/Group'
               example:
                 group: 2
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /blockflow/hashes:
     get:
       tags:
@@ -963,18 +1259,55 @@ paths:
                 $ref: '#/components/schemas/HashesAtHeight'
               example:
                 headers:
-                - 65547d75a7f9c01d99e1fb9aebef5397ac568052cf1568e5f1b3d116012b3556
-                - e9f92afb71c6d1281c70946fcc283b6e91d044fd8eceee49d62c98a919eaf215
-                - f79439d6394af0764927e3dd6fd274caae8d521f89eea17ff5c292d3f2b224d1
-        default:
-          description: ''
+                - f2052cffdf26f0f5005fe5f6bf92117fccf5c6c5275514ab367741f5c8dd957f
+                - e2962e506f1c59c221bbe85e7d192ffd25089401ad4ffeee8bb3bf231afdd3ef
+                - b3d170a0e6e4944889f0911ff70f59ada15f21ac9c52c1acde0bba181e864f35
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /blockflow/chains:
     get:
       tags:
@@ -1001,15 +1334,52 @@ paths:
                 $ref: '#/components/schemas/ChainInfo'
               example:
                 currentHeight: 42
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /transactions/unconfirmed:
     get:
       tags:
@@ -1047,15 +1417,52 @@ paths:
                 - amount: 1000000000000000000
                   address: M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
                   lockTime: 1234
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /transactions/build:
     get:
       tags:
@@ -1097,15 +1504,52 @@ paths:
                 txId: 3bd4d3492fd937ca0cc3f98d650c9d47c3fac99035dbf45c01754ea9af6bb0fe
                 fromGroup: 2
                 toGroup: 1
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /transactions/send:
     post:
       tags:
@@ -1132,15 +1576,52 @@ paths:
                 txId: 72322f8e5b5b4b8651a8392daff8e84eac6808009c9cf4439b798f9ee3c0365f
                 fromGroup: 2
                 toGroup: 1
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /transactions/status:
     get:
       tags:
@@ -1187,15 +1668,52 @@ paths:
                   summary: Cannot find tx with the id
                   value:
                     NotFound: {}
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /contracts/send:
     post:
       tags:
@@ -1221,18 +1739,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/TxResult'
               example:
-                txId: 72322f8e5b5b4b8651a8392daff8e84eac6808009c9cf4439b798f9ee3c0365f
+                txId: d1104367bc3c0c3dfaf78d8c312ecf71e4be53294be44fbc99113e14f2b55cba
                 fromGroup: 2
                 toGroup: 1
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /contracts/compile:
     post:
       tags:
@@ -1265,15 +1820,52 @@ paths:
                 $ref: '#/components/schemas/CompileResult'
               example:
                 code: 0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /contracts/build:
     post:
       tags:
@@ -1301,15 +1893,52 @@ paths:
                 hash: 13f67f272c339b578d169e13fe75ad4ecea00bf05a5041a50ce20df8eea83c1d
                 fromGroup: 2
                 toGroup: 1
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /miners:
     post:
       tags:
@@ -1335,15 +1964,52 @@ paths:
               schema:
                 type: boolean
               example: true
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /miners/addresses:
     get:
       tags:
@@ -1360,15 +2026,52 @@ paths:
               example:
                 addresses:
                 - M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
     put:
       tags:
       - Miners
@@ -1386,15 +2089,52 @@ paths:
       responses:
         '200':
           description: ''
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /miners/block-candidate:
     get:
       tags:
@@ -1428,15 +2168,52 @@ paths:
                 txsHash: 9f2c2da46e8c32cb87d4ccd33c14fb7c1fff1c8a375b4dcc66ce529d8f580b52
                 transactions:
                 - 0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
   /miners/new-block:
     post:
       tags:
@@ -1464,15 +2241,52 @@ paths:
       responses:
         '200':
           description: ''
-        default:
-          description: ''
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/BadRequest'
               example:
-                code: -32700
-                message: Parse error
+                detail: Something bad in the request
+                status: 400
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+              example:
+                detail: Ouch
+                status: 500
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+              example:
+                resource: wallet-name
+                status: 404
+                detail: wallet-name not found
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailable'
+              example:
+                detail: Self clique unsynced
+                status: 503
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthorized'
+              example:
+                detail: You shall not pass
+                status: 401
 components:
   schemas:
     WalletCreation:
@@ -1652,17 +2466,25 @@ components:
       properties:
         address:
           type: string
-    Error:
+    InternalServerError:
       required:
-      - code
-      - message
+      - status
+      - detail
       type: object
       properties:
-        code:
+        status:
           type: integer
-        message:
+        detail:
           type: string
-        data:
+    ServiceUnavailable:
+      required:
+      - status
+      - detail
+      type: object
+      properties:
+        status:
+          type: integer
+        detail:
           type: string
     SelfClique:
       required:

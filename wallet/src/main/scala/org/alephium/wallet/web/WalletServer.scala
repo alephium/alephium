@@ -24,12 +24,13 @@ import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
+import org.alephium.api.ApiError
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.{Duration, U256}
 import org.alephium.wallet.WalletDocumentation
-import org.alephium.wallet.api.{WalletApiError, WalletEndpoints}
+import org.alephium.wallet.api.WalletEndpoints
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.service.WalletService._
@@ -178,20 +179,21 @@ class WalletServer(
 }
 
 object WalletServer {
-  import WalletApiError._
-  def toApiError(walletError: WalletError): WalletApiError = {
+  import ApiError._
+  def toApiError(walletError: WalletError): ApiError = {
 
     def badRequest                 = BadRequest(walletError.message)
+    def internalServerError        = InternalServerError(walletError.message)
     def unauthorized               = Unauthorized(walletError.message)
     def notFound(filename: String) = NotFound(filename)
 
     walletError match {
       case _: InvalidWalletName         => badRequest
       case _: CannotCreateEncryptedFile => badRequest
-      case _: BlockFlowClientError      => badRequest
+      case _: BlockFlowClientError      => internalServerError
       case _: UnknownAddress            => badRequest
       case InvalidWalletFile            => badRequest
-      case UnexpectedError              => badRequest
+      case UnexpectedError              => internalServerError
       case WalletNotFound(file)         => notFound(file.getName())
 
       case WalletLocked        => unauthorized

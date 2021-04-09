@@ -18,6 +18,7 @@ package org.alephium.api
 
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.{Decoder, Encoder}
+import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
 import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
@@ -35,7 +36,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
   implicit def groupConfig: GroupConfig
 
-  type BaseEndpoint[A, B] = Endpoint[A, ApiModel.Error, B, Nothing]
+  type BaseEndpoint[A, B] = Endpoint[A, ApiError, B, Nothing]
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -61,7 +62,30 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
-      .errorOut(jsonBody[ApiModel.Error])
+      .errorOut(
+        oneOf[ApiError](
+          statusMapping(
+            StatusCode.BadRequest,
+            jsonBody[ApiError.BadRequest].description("Bad request")
+          ),
+          statusMapping(
+            StatusCode.InternalServerError,
+            jsonBody[ApiError.InternalServerError].description("Internal Server Error")
+          ),
+          statusMapping(
+            StatusCode.NotFound,
+            jsonBody[ApiError.NotFound].description("Not Found")
+          ),
+          statusMapping(
+            StatusCode.ServiceUnavailable,
+            jsonBody[ApiError.ServiceUnavailable].description("Service Unavailable")
+          ),
+          statusMapping(
+            StatusCode.Unauthorized,
+            jsonBody[ApiError.Unauthorized].description("Unauthorized")
+          )
+        )
+      )
 
   private val infosEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint

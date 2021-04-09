@@ -30,8 +30,7 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.Json
 import io.circe.syntax._
 
-import org.alephium.api.ApiModelCodec
-import org.alephium.api.CirceUtils
+import org.alephium.api.{ApiError, ApiModelCodec, CirceUtils}
 import org.alephium.api.CirceUtils.avectorDecoder
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
@@ -40,7 +39,6 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, NetworkType, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex, U256}
-import org.alephium.wallet.api.WalletApiError
 import org.alephium.wallet.api.model
 import org.alephium.wallet.circe.ModelCodecs
 import org.alephium.wallet.config.WalletConfigFixture
@@ -113,7 +111,7 @@ class WalletAppSpec
     }
 
     create(2) ~> check {
-      val error = responseAs[WalletApiError]
+      val error = responseAs[ApiError]
       error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24: DownField(mnemonicSize): {"password":"$password","mnemonicSize":2})"""
       status is StatusCodes.BadRequest
     }
@@ -175,7 +173,7 @@ class WalletAppSpec
 
     val negAmount = -10
     transfer(negAmount) ~> check {
-      val error = responseAs[WalletApiError]
+      val error = responseAs[ApiError]
       error.detail is s"""Invalid value for: body (Invalid U256: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
       status is StatusCodes.BadRequest
     }
