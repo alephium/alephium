@@ -16,12 +16,9 @@
 
 package org.alephium.flow.network
 
-import java.net.{DatagramSocket, InetSocketAddress}
-import java.nio.channels.DatagramChannel
+import java.net.InetSocketAddress
 
-import scala.collection.mutable
 import scala.util.Random
-import scala.util.control.NonFatal
 
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
@@ -35,31 +32,14 @@ import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Duration, RefinedAlephiumActorSpec}
+import org.alephium.util._
 
-class DiscoveryServerSpec extends RefinedAlephiumActorSpec with ScalaFutures with Eventually {
+class DiscoveryServerSpec
+    extends RefinedAlephiumActorSpec
+    with ScalaFutures
+    with Eventually
+    with SocketUtil {
   import DiscoveryServerSpec._
-
-  val usedPort = mutable.Set.empty[Int]
-  def generatePort(): Int = {
-    val port = 40000 + Random.nextInt(10000)
-
-    if (usedPort.contains(port)) {
-      generatePort()
-    } else {
-      val udp: DatagramSocket = DatagramChannel.open().socket()
-      try {
-        udp.setReuseAddress(true)
-        udp.bind(new InetSocketAddress("localhost", port))
-        usedPort.add(port)
-        port
-      } catch {
-        case NonFatal(_) => generatePort()
-      } finally {
-        udp.close()
-      }
-    }
-  }
 
   trait SimulationFixture { fixture =>
     implicit val patienceConfig =

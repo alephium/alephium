@@ -19,19 +19,16 @@ package org.alephium.wallet.config
 import java.net.InetAddress
 import java.nio.file.Files
 
-import akka.testkit.SocketUtil
-
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
-import org.alephium.util.Duration
+import org.alephium.util.{Duration, SocketUtil}
 import org.alephium.wallet.config.WalletConfig
 
-trait WalletConfigFixture {
+trait WalletConfigFixture extends SocketUtil {
 
   val localhost: InetAddress = InetAddress.getLocalHost
-  val tempAddresses          = SocketUtil.temporaryServerAddresses(2, "localhost")
-  val blockFlowPort          = tempAddresses(0).getPort
-  val walletPort             = tempAddresses(1).getPort
+  val blockFlowPort          = generatePort()
+  val walletPort             = generatePort()
 
   val groupNum = 4
 
