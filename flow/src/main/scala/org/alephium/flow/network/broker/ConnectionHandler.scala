@@ -105,7 +105,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     case Ack(_) => () // all are good
 
     case Tcp.CommandFailed(Tcp.Write(data, Ack(id))) =>
-      log.debug(s"Failed in writing ${data.length} bytes to $remoteAddress")
+      log.debug(s"Failed in writing ${data.length} bytes with ack $id to $remoteAddress")
       connection ! Tcp.ResumeWriting
       buffer(data, id)
       context become bufferedCommunicating
@@ -125,14 +125,15 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
     case Tcp.WritingResumed => writeFirst()
 
-    case Tcp.CommandFailed(Tcp.Write(data, Ack(ack))) =>
-      buffer(data, ack)
+    case Tcp.CommandFailed(Tcp.Write(data, Ack(id))) =>
+      log.debug(s"Failed in writing ${data.length} bytes with ack $id to $remoteAddress")
+      buffer(data, id)
       connection ! Tcp.ResumeWriting
 
     case Tcp.CommandFailed(Tcp.ResumeWriting) => ()
 
-    case Ack(ack) =>
-      acknowledge(ack)
+    case Ack(id) =>
+      acknowledge(id)
       if (outMessageBuffer.nonEmpty) {
         writeFirst()
       } else {
