@@ -18,9 +18,11 @@ package org.alephium.flow.mempool
 
 import scala.collection.mutable
 
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.TransactionTemplate
-import org.alephium.util.RWLock
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AVector, RWLock}
 
 class PendingPool(
     val txs: mutable.HashMap[Hash, TransactionTemplate],
@@ -38,6 +40,10 @@ class PendingPool(
       txs.remove(tx.id)
       indexes.remove(tx)
     }
+  }
+
+  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
+    ???
   }
 }
 

@@ -16,10 +16,12 @@
 
 package org.alephium.flow.mempool
 
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction, TransactionTemplate}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, RWLock}
 
 /*
@@ -27,7 +29,12 @@ import org.alephium.util.{AVector, RWLock}
  *
  * Transactions should be ordered according to weights. The weight is calculated based on fees
  */
-class MemPool private (group: GroupIndex, pools: AVector[TxPool], val txIndexes: TxIndexes)(implicit
+class MemPool private (
+    group: GroupIndex,
+    pools: AVector[TxPool],
+    val txIndexes: TxIndexes,
+    val pendingPool: PendingPool
+)(implicit
     groupConfig: GroupConfig
 ) extends RWLock {
   def getPool(index: ChainIndex): TxPool = {
@@ -90,6 +97,15 @@ class MemPool private (group: GroupIndex, pools: AVector[TxPool], val txIndexes:
       (removed, added)
     }
 
+  def getRelevantUtxos(
+      lockupScript: LockupScript,
+      utxosInBlock: AVector[AssetOutputInfo]
+  ): AVector[AssetOutputInfo] = readOnly {
+    val remainderUtxos = utxosInBlock.filterNot(txIndexes.isUsed)
+    val newUtxos       = txIndexes.getRelevantUtxos(lockupScript)
+    remainderUtxos ++ newUtxos
+  }
+
   def clear(): Unit =
     writeOnly {
       pools.foreach(_.clear())
@@ -101,6 +117,6 @@ object MemPool {
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
     val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
-    new MemPool(groupIndex, pools, TxIndexes.empty)
+    new MemPool(groupIndex, pools, TxIndexes.empty, PendingPool.empty)
   }
 }

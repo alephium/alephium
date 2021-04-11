@@ -18,8 +18,16 @@ package org.alephium.flow.mempool
 
 import scala.collection.mutable
 
-import org.alephium.protocol.model.{AssetOutputRef, TransactionTemplate, TxOutput, TxOutputRef}
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MempoolOutput}
+import org.alephium.protocol.model.{
+  AssetOutput,
+  AssetOutputRef,
+  TransactionTemplate,
+  TxOutput,
+  TxOutputRef
+}
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.AVector
 
 case class TxIndexes(
     inputIndex: mutable.HashSet[AssetOutputRef],
@@ -53,6 +61,21 @@ case class TxIndexes(
         case None => () // already removed
       }
     }
+  }
+
+  def isUsed(asset: AssetOutputInfo): Boolean = inputIndex.contains(asset.ref)
+
+  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
+    addressIndex
+      .get(lockupScript)
+      .map { refs =>
+        AVector.from(
+          refs.view.map(ref =>
+            AssetOutputInfo(ref, outputIndex(ref).asInstanceOf[AssetOutput], MempoolOutput)
+          )
+        )
+      }
+      .getOrElse(AVector.empty)
   }
 }
 

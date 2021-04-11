@@ -16,12 +16,14 @@
 
 package org.alephium.flow.mempool
 
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.AVector
 
-class GrandPool(val mempools: AVector[MemPool], val pendingPool: PendingPool)(implicit
+class GrandPool(val mempools: AVector[MemPool])(implicit
     val brokerConfig: BrokerConfig
 ) {
   def getMemPool(mainGroup: GroupIndex): MemPool = {
@@ -31,6 +33,14 @@ class GrandPool(val mempools: AVector[MemPool], val pendingPool: PendingPool)(im
   def getMemPool(chainIndex: ChainIndex): MemPool = {
     mempools(chainIndex.from.value - brokerConfig.groupFrom)
   }
+
+  def getRelevantUtxos(
+      groupIndex: GroupIndex,
+      lockupScript: LockupScript,
+      utxosInBlock: AVector[AssetOutputInfo]
+  ): AVector[AssetOutputInfo] = {
+    getMemPool(groupIndex).getRelevantUtxos(lockupScript, utxosInBlock)
+  }
 }
 
 object GrandPool {
@@ -39,6 +49,6 @@ object GrandPool {
       val group = GroupIndex.unsafe(brokerConfig.groupFrom + idx)
       MemPool.empty(group)
     }
-    new GrandPool(mempools, PendingPool.empty)
+    new GrandPool(mempools)
   }
 }

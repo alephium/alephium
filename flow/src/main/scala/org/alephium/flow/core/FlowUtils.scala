@@ -203,7 +203,10 @@ trait FlowUtils
     for {
       persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript)
       cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
-    } yield mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
+    } yield {
+      val utxosInBlock = mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
+      grandPool.getRelevantUtxos(groupIndex, lockupScript, utxosInBlock)
+    }
   }
 
   def getUsableUtxos(
