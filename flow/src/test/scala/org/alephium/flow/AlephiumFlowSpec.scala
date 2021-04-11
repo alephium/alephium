@@ -138,14 +138,14 @@ trait FlowFixture
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
     val unlockScript               = UnlockScript.p2pkh(publicKey)
     val balances                   = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
-    val total                      = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+    val total                      = balances.fold(U256.Zero)(_ addUnsafe _.output.amount)
     val toLockupScripts = AVector.fill(numReceivers) {
       val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
       val lockupScript                = LockupScript.p2pkh(toPublicKey)
       keyManager += lockupScript -> toPrivateKey
       lockupScript
     }
-    val inputs = balances.map(_._1).map(TxInput(_, unlockScript))
+    val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
 
     val gasFee = defaultGasPrice * minimalGas.toU256
     val (outputs, remaining) = if (gasFeeInTheAmount) {
@@ -184,13 +184,13 @@ trait FlowFixture
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
     val balances     = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
-    val total        = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+    val total        = balances.fold(U256.Zero)(_ addUnsafe _.output.amount)
 
     val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
     val lockupScript                = LockupScript.p2pkh(toPublicKey)
 
     keyManager += lockupScript -> toPrivateKey
-    val inputs     = balances.map(_._1).map(TxInput(_, unlockScript))
+    val inputs     = balances.map(_.ref).map(TxInput(_, unlockScript))
     val output     = TxOutput.asset(amount - defaultGasFee, lockupScript)
     val remaining  = TxOutput.asset(total - amount, fromLockupScript)
     val unsignedTx = UnsignedTransaction(txScriptOpt, inputs, AVector(output, remaining))
@@ -209,13 +209,13 @@ trait FlowFixture
     }
     balances.length is 2 // this function is used in this particular case
 
-    val total  = balances.fold(U256.Zero)(_ addUnsafe _._2.amount)
+    val total  = balances.fold(U256.Zero)(_ addUnsafe _.output.amount)
     val amount = ALF.alf(1)
 
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
 
-    val inputs     = balances.map(_._1).map(TxInput(_, unlockScript))
+    val inputs     = balances.map(_.ref).map(TxInput(_, unlockScript))
     val output     = TxOutput.asset(amount - defaultGasFee, lockupScript)
     val remaining  = TxOutput.asset(total - amount, fromLockupScript)
     val unsignedTx = UnsignedTransaction(None, inputs, AVector(output, remaining))
@@ -237,7 +237,7 @@ trait FlowFixture
     val fromLockupScript           = LockupScript.p2pkh(publicKey)
     val unlockScript               = UnlockScript.p2pkh(publicKey)
     val balances                   = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
-    val inputs                     = balances.map(_._1).map(TxInput(_, unlockScript))
+    val inputs                     = balances.map(_.ref).map(TxInput(_, unlockScript))
 
     val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
     val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
@@ -362,11 +362,11 @@ trait FlowFixture
       .getUsableUtxos(pubScript)
       .toOption
       .get
-      .sumBy(_._2.amount.v: BigInt) is expected.toBigInt
+      .sumBy(_.output.amount.v: BigInt) is expected.toBigInt
   }
 
   def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U256): Assertion = {
-    blockFlow.getUsableUtxos(pubScript).toOption.get.sumBy(_._2.amount.v: BigInt) is expected.v
+    blockFlow.getUsableUtxos(pubScript).toOption.get.sumBy(_.output.amount.v: BigInt) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -393,7 +393,7 @@ trait FlowFixture
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
     val query = blockFlow.getUsableUtxos(lockupScript)
-    U256.unsafe(query.toOption.get.sumBy(_._2.amount.v: BigInt).underlying())
+    U256.unsafe(query.toOption.get.sumBy(_.output.amount.v: BigInt).underlying())
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {
@@ -403,7 +403,7 @@ trait FlowFixture
 
     val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
-    val txOutputs = blockFlow.getUsableUtxos(pubScript).toOption.get.map(_._2)
+    val txOutputs = blockFlow.getUsableUtxos(pubScript).toOption.get.map(_.output)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 

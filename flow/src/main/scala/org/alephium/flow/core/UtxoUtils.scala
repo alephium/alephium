@@ -18,7 +18,6 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
-import org.alephium.protocol.model._
 import org.alephium.util._
 
 /*
@@ -39,7 +38,7 @@ import org.alephium.util._
  */
 object UtxoUtils {
 
-  type Asset = (AssetOutputRef, AssetOutput)
+  type Asset = FlowUtils.AssetOutputInfo
   final case class Selected(assets: AVector[Asset], gasFee: U256)
 
   final private case class State(
@@ -49,7 +48,7 @@ object UtxoUtils {
   )
 
   private def sumAssets(assets: AVector[Asset]): U256 = {
-    assets.fold(U256.Zero) { (total, asset) => total.addUnsafe(asset._2.amount) }
+    assets.fold(U256.Zero) { (total, asset) => total.addUnsafe(asset.output.amount) }
   }
 
   // to select a list of utxos of value (amount + gas fees for inputs and outputs)
@@ -122,14 +121,14 @@ object UtxoUtils {
       assets.headOption match {
         case None => state
         case Some(asset) =>
-          val amount = asset._2.amount
+          val amount = asset.output.amount
           if (amount == target) {
             state.copy(matching = Some(asset))
           } else if (amount < target) {
             iter(state.copy(smallers = state.smallers :+ asset), assets.tail)
           } else {
             state.smallestGreater match {
-              case Some(currentSmallerGreater) if amount >= currentSmallerGreater._2.amount =>
+              case Some(currentSmallerGreater) if amount >= currentSmallerGreater.output.amount =>
                 iter(state, assets.tail)
               case _ =>
                 iter(state.copy(smallestGreater = Some(asset)), assets.tail)
@@ -148,7 +147,7 @@ object UtxoUtils {
   ): AVector[Asset] = {
     @tailrec
     def iter(sorted: AVector[Asset], value: U256): AVector[Asset] = {
-      sorted.headOption.flatMap(asset => value.sub(asset._2.amount)) match {
+      sorted.headOption.flatMap(asset => value.sub(asset.output.amount)) match {
         case Some(newValue) =>
           if (newValue >= target) {
             iter(sorted.tail, newValue)
@@ -160,6 +159,6 @@ object UtxoUtils {
     }
 
     assume(currentValue > target)
-    iter(assets.sortBy(_._2.amount), currentValue)
+    iter(assets.sortBy(_.output.amount), currentValue)
   }
 }

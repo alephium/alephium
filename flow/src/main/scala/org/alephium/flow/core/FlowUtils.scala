@@ -23,6 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlowState.TxStatus
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool.{GrandPool, MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.setting.MemPoolSetting
@@ -173,28 +174,32 @@ trait FlowUtils
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
       lockupScript: LockupScript
-  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+  ): IOResult[AVector[AssetOutputInfo]] = {
     for {
       bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
       persistedUtxos <- bestWorldState
         .getAssetOutputs(lockupScript.assetHintBytes)
-        .map(_.filter(p => p._2.lockupScript == lockupScript))
+        .map(
+          _.filter(p => p._2.lockupScript == lockupScript).map(p =>
+            AssetOutputInfo(p._1, p._2, PersistedOutput)
+          )
+        )
     } yield persistedUtxos
   }
 
   def mergeUtxos(
-      persistedUtxos: AVector[(AssetOutputRef, AssetOutput)],
+      persistedUtxos: AVector[AssetOutputInfo],
       usedInCache: AVector[AssetOutputRef],
-      newInCache: AVector[(AssetOutputRef, AssetOutput)]
-  ): AVector[(AssetOutputRef, AssetOutput)] = {
-    persistedUtxos.filter(p => !usedInCache.contains(p._1)) ++ newInCache
+      newInCache: AVector[AssetOutputInfo]
+  ): AVector[AssetOutputInfo] = {
+    persistedUtxos.filter(p => !usedInCache.contains(p.ref)) ++ newInCache
   }
 
   def getRelevantUtxos(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
       lockupScript: LockupScript
-  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+  ): IOResult[AVector[AssetOutputInfo]] = {
     for {
       persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript)
       cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
@@ -203,7 +208,7 @@ trait FlowUtils
 
   def getUsableUtxos(
       lockupScript: LockupScript
-  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+  ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
     val bestDeps = getBestDeps(groupIndex)
@@ -214,10 +219,10 @@ trait FlowUtils
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
       lockupScript: LockupScript
-  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+  ): IOResult[AVector[AssetOutputInfo]] = {
     val currentTs = TimeStamp.now()
     getRelevantUtxos(groupIndex, bestDeps, lockupScript).map(
-      _.filter(p => p._2.lockTime <= currentTs)
+      _.filter(_.output.lockTime <= currentTs)
     )
   }
 
@@ -229,9 +234,9 @@ trait FlowUtils
 
     val currentTs = TimeStamp.now()
     getRelevantUtxos(groupIndex, bestDeps, lockupScript).map { utxos =>
-      val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
-      val lockedBalance = utxos.fold(U256.Zero) { case (acc, (_, output)) =>
-        if (output.lockTime > currentTs) acc addUnsafe output.amount else acc
+      val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
+      val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
+        if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
       }
       (balance, lockedBalance, utxos.length)
     }
@@ -260,7 +265,7 @@ trait FlowUtils
           .toRight(s"Invalid gas: ${selected.gasFee} / $defaultGasPrice")
         unsignedTx <- UnsignedTransaction
           .transferAlf(
-            selected.assets,
+            selected.assets.map(asset => (asset.ref, asset.output)),
             fromLockupScript,
             fromUnlockScript,
             toLockupScript,
@@ -369,24 +374,29 @@ trait FlowUtils
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
       lockupScript: LockupScript,
-      persistedUtxos: AVector[(AssetOutputRef, AssetOutput)]
-  ): IOResult[(AVector[AssetOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
+      persistedUtxos: AVector[AssetOutputInfo]
+  ): IOResult[(AVector[AssetOutputRef], AVector[AssetOutputInfo])] = {
     getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
       val usedUtxos = blockCaches.flatMap[AssetOutputRef] { blockCache =>
         AVector.from(
           blockCache.inputs.view
-            .filter(input => persistedUtxos.exists(_._1 == input))
+            .filter(input => persistedUtxos.exists(_.ref == input))
             .map(_.asInstanceOf[AssetOutputRef])
         )
       }
       val newUtxos = blockCaches.flatMap { blockCache =>
         AVector
           .from(
-            blockCache.relatedOutputs.view.filter(p =>
-              ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset
-            )
+            blockCache.relatedOutputs.view
+              .filter(p => ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset)
+              .map(p =>
+                AssetOutputInfo(
+                  p._1.asInstanceOf[AssetOutputRef],
+                  p._2.asInstanceOf[AssetOutput],
+                  UnpersistedBlockOutput
+                )
+              )
           )
-          .asUnsafe[(AssetOutputRef, AssetOutput)]
       }
       (usedUtxos, newUtxos)
     }
@@ -394,6 +404,14 @@ trait FlowUtils
 }
 
 object FlowUtils {
+  final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)
+
+  sealed trait OutputType
+  case object PersistedOutput        extends OutputType
+  case object UnpersistedBlockOutput extends OutputType
+  case object MempoolOutput          extends OutputType
+  case object PendingOutput          extends OutputType
+
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
     var output   = AVector.ofSize[T](txs.length)
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
