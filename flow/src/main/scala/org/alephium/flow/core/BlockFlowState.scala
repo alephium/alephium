@@ -265,9 +265,12 @@ trait BlockFlowState extends FlowTipsUtil {
     Utils.unsafe(getHashesForUpdates(groupIndex, deps))
   }
 
-  def getBlocksForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockCache]] = {
+  def getBlocksForUpdates(
+      groupIndex: GroupIndex,
+      deps: BlockDeps
+  ): IOResult[AVector[BlockCache]] = {
     for {
-      diff        <- getHashesForUpdates(groupIndex)
+      diff        <- getHashesForUpdates(groupIndex, deps)
       blockCaches <- diff.mapE(getBlockCache(groupIndex, _))
     } yield blockCaches
   }

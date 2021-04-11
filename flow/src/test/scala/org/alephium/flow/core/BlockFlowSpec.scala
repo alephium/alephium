@@ -59,7 +59,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
       val block4      = emptyBlock(blockFlow, chainIndex4)
@@ -170,7 +170,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
     }
   }
 
@@ -377,10 +377,10 @@ class BlockFlowSpec extends AlephiumSpec {
     val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow0, block, 1)
-    checkBalance(blockFlow0, fromGroup, genesisBalance)
+    checkBalance(blockFlow0, fromGroup, genesisBalance - ALF.alf(1))
     addAndCheck(blockFlow1, block, 1)
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
-    checkBalance(blockFlow1, pubScript, 0)
+    checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
 
     val fromGroupBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
     addAndCheck(blockFlow0, fromGroupBlock, 2)

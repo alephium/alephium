@@ -170,30 +170,65 @@ trait FlowUtils
   }
 
   def getPersistedUtxos(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
       lockupScript: LockupScript
   ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
-    val groupIndex = lockupScript.groupIndex
-    assume(brokerConfig.contains(groupIndex))
-
     for {
-      bestWorldState <- getBestPersistedWorldState(groupIndex)
+      bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
       persistedUtxos <- bestWorldState
         .getAssetOutputs(lockupScript.assetHintBytes)
         .map(_.filter(p => p._2.lockupScript == lockupScript))
     } yield persistedUtxos
   }
 
+  def mergeUtxos(
+      persistedUtxos: AVector[(AssetOutputRef, AssetOutput)],
+      usedInCache: AVector[AssetOutputRef],
+      newInCache: AVector[(AssetOutputRef, AssetOutput)]
+  ): AVector[(AssetOutputRef, AssetOutput)] = {
+    persistedUtxos.filter(p => !usedInCache.contains(p._1)) ++ newInCache
+  }
+
+  def getRelevantUtxos(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      lockupScript: LockupScript
+  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+    for {
+      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript)
+      cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
+    } yield mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
+  }
+
   def getUsableUtxos(
       lockupScript: LockupScript
   ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
+    val groupIndex = lockupScript.groupIndex
+    assume(brokerConfig.contains(groupIndex))
+    val bestDeps = getBestDeps(groupIndex)
+    getUsableUtxos(groupIndex, bestDeps, lockupScript)
+  }
+
+  def getUsableUtxos(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      lockupScript: LockupScript
+  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
     val currentTs = TimeStamp.now()
-    getPersistedUtxos(lockupScript).map(_.filter(p => p._2.lockTime <= currentTs))
+    getRelevantUtxos(groupIndex, bestDeps, lockupScript).map(
+      _.filter(p => p._2.lockTime <= currentTs)
+    )
   }
 
   // return the total balance, the locked balance, and the number of all utxos
   def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] = {
+    val groupIndex = lockupScript.groupIndex
+    assume(brokerConfig.contains(groupIndex))
+    val bestDeps = getBestDeps(groupIndex)
+
     val currentTs = TimeStamp.now()
-    getPersistedUtxos(lockupScript).map { utxos =>
+    getRelevantUtxos(groupIndex, bestDeps, lockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _._2.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, (_, output)) =>
         if (output.lockTime > currentTs) acc addUnsafe output.amount else acc
@@ -323,29 +358,32 @@ trait FlowUtils
 
   private def ableToUse(
       output: TxOutput,
-      lockupScript: LockupScript,
-      currentTs: TimeStamp
+      lockupScript: LockupScript
   ): Boolean =
     output match {
-      case o: AssetOutput    => o.lockupScript == lockupScript && o.lockTime <= currentTs
+      case o: AssetOutput    => o.lockupScript == lockupScript
       case _: ContractOutput => false
     }
 
   def getUtxosInCache(
-      lockupScript: LockupScript,
       groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      lockupScript: LockupScript,
       persistedUtxos: AVector[(AssetOutputRef, AssetOutput)]
-  ): IOResult[(AVector[TxOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
-    val currentTs = TimeStamp.now()
-    getBlocksForUpdates(groupIndex).map { blockCaches =>
-      val usedUtxos = blockCaches.flatMap[TxOutputRef] { blockCache =>
-        AVector.from(blockCache.inputs.view.filter(input => persistedUtxos.exists(_._1 == input)))
+  ): IOResult[(AVector[AssetOutputRef], AVector[(AssetOutputRef, AssetOutput)])] = {
+    getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
+      val usedUtxos = blockCaches.flatMap[AssetOutputRef] { blockCache =>
+        AVector.from(
+          blockCache.inputs.view
+            .filter(input => persistedUtxos.exists(_._1 == input))
+            .map(_.asInstanceOf[AssetOutputRef])
+        )
       }
       val newUtxos = blockCaches.flatMap { blockCache =>
         AVector
           .from(
             blockCache.relatedOutputs.view.filter(p =>
-              ableToUse(p._2, lockupScript, currentTs) && p._1.isAssetType && p._2.isAsset
+              ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset
             )
           )
           .asUnsafe[(AssetOutputRef, AssetOutput)]
