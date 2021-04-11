@@ -209,16 +209,34 @@ trait FlowUtils
     }
   }
 
+  // We call getUsableUtxosOnce multiple times until the resulted tx does not change
+  // In this way, we can guarantee that no concurrent utxos operations are making trouble
   def getUsableUtxos(
+      lockupScript: LockupScript
+  ): IOResult[AVector[AssetOutputInfo]] = {
+    def iter(lastTryOpt: Option[AVector[AssetOutputInfo]]): IOResult[AVector[AssetOutputInfo]] = {
+      getUsableUtxosOnce(lockupScript).flatMap { utxos =>
+        lastTryOpt match {
+          case Some(firstTry) =>
+            if (utxos.toSet == firstTry.toSet) Right(utxos) else iter(Some(utxos))
+          case None =>
+            iter(Some(utxos))
+        }
+      }
+    }
+    iter(None)
+  }
+
+  def getUsableUtxosOnce(
       lockupScript: LockupScript
   ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
     val bestDeps = getBestDeps(groupIndex)
-    getUsableUtxos(groupIndex, bestDeps, lockupScript)
+    getUsableUtxosOnce(groupIndex, bestDeps, lockupScript)
   }
 
-  def getUsableUtxos(
+  def getUsableUtxosOnce(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
       lockupScript: LockupScript
