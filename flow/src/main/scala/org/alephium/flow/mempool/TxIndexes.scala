@@ -19,13 +19,7 @@ package org.alephium.flow.mempool
 import scala.collection.mutable
 
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MempoolOutput}
-import org.alephium.protocol.model.{
-  AssetOutput,
-  AssetOutputRef,
-  TransactionTemplate,
-  TxOutput,
-  TxOutputRef
-}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.AVector
 

@@ -101,9 +101,12 @@ class MemPool private (
       lockupScript: LockupScript,
       utxosInBlock: AVector[AssetOutputInfo]
   ): AVector[AssetOutputInfo] = readOnly {
-    val remainderUtxos = utxosInBlock.filterNot(txIndexes.isUsed)
-    val newUtxos       = txIndexes.getRelevantUtxos(lockupScript)
-    remainderUtxos ++ newUtxos
+    val newUtxos =
+      txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.indexes.getRelevantUtxos(lockupScript)
+
+    (utxosInBlock ++ newUtxos).filterNot(asset =>
+      txIndexes.isUsed(asset) || pendingPool.indexes.isUsed(asset)
+    )
   }
 
   def clear(): Unit =
