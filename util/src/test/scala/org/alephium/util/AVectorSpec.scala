@@ -513,6 +513,13 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     (vc0 ++ vc1 ++ vc2).split() is AVector(vc0, vc1, vc2)
   }
 
+  it should "groupBy" in {
+    val vc0 = AVector(0, 1, 2)
+    vc0.groupBy(identity) is Map(0 -> AVector(0), 1 -> AVector(1), 2 -> AVector(2))
+    vc0.groupBy(_ => 1) is Map(1 -> AVector(0, 1, 2))
+    vc0.groupBy(_ % 2) is Map(0 -> AVector(0, 2), 1 -> AVector(1))
+  }
+
   it should "create matrix using tabulate" in new Fixture {
     forAll(sizeGen, sizeGen) { (n1, n2) =>
       val matrix = AVector.tabulate[Int](n1, n2)(_ + _)

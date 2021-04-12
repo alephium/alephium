@@ -71,6 +71,11 @@ trait FlowUtils
     if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
+  def updateGrandPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = {
+    updateMemPoolUnsafe(mainGroup, newDeps)
+    updatePendingPoolUnsafe(mainGroup, newDeps)
+  }
+
   def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = {
     val oldDeps = getBestDeps(mainGroup)
     calMemPoolChangesUnsafe(mainGroup, oldDeps, newDeps) match {
@@ -78,7 +83,7 @@ trait FlowUtils
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
           val toGroupIndex = GroupIndex.unsafe(toGroup)
           val index        = ChainIndex(mainGroup, toGroupIndex)
-          sum + getMemPool(index).remove(index, txs.map(_.toTemplate))
+          sum + getMemPool(mainGroup).remove(index, txs.map(_.toTemplate))
         }
         if (removed > 0) {
           logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
@@ -86,6 +91,12 @@ trait FlowUtils
       case Reorg(toRemove, toAdd) =>
         val (removed, added) = getMemPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
+    }
+  }
+
+  def updatePendingPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = Utils.unsafe {
+    getPersistedWorldState(newDeps, mainGroup).flatMap { worldState =>
+      getMemPool(mainGroup).updatePendingPool(worldState)
     }
   }
 

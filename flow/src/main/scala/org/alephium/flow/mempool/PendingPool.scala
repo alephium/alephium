@@ -19,10 +19,11 @@ package org.alephium.flow.mempool
 import scala.collection.mutable
 
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.TransactionTemplate
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, RWLock}
+import org.alephium.protocol.vm.{LockupScript, WorldState}
+import org.alephium.util.{AVector, EitherF, RWLock}
 
 class PendingPool(
     val txs: mutable.HashMap[Hash, TransactionTemplate],
@@ -35,6 +36,10 @@ class PendingPool(
     }
   }
 
+  def remove(txs: AVector[TransactionTemplate]): Unit = writeOnly {
+    txs.foreach(remove)
+  }
+
   def remove(tx: TransactionTemplate): Unit = writeOnly {
     if (txs.contains(tx.id)) {
       txs.remove(tx.id)
@@ -42,9 +47,19 @@ class PendingPool(
     }
   }
 
-  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
-    ???
+  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = readOnly {
+    indexes.getRelevantUtxos(lockupScript)
   }
+
+  def extractReadyTxs(worldState: WorldState.Persisted): IOResult[AVector[TransactionTemplate]] =
+    readOnly {
+      EitherF.foldTry(txs.values, AVector.empty[TransactionTemplate]) { case (acc, tx) =>
+        worldState.containsAllInputs(tx).map {
+          case true  => acc :+ tx
+          case false => acc
+        }
+      }
+    }
 }
 
 object PendingPool {

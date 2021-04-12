@@ -549,6 +549,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
+  def groupBy[K](f: A => K): Map[K, AVector[A]] = {
+    fold(Map.empty[K, AVector[A]]) { case (acc, elem) =>
+      val key = f(elem)
+      acc.get(key) match {
+        case Some(values) => acc + (key -> (values :+ elem))
+        case None         => acc + (key -> AVector(elem))
+      }
+    }
+  }
+
   def replace(i: Int, a: A): AVector[A] = {
     assume(i >= 0 && i < length)
     val arr = Array.ofDim[A](length)

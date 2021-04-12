@@ -18,10 +18,11 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction, TransactionTemplate}
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.{AVector, RWLock}
 
 /*
@@ -102,11 +103,22 @@ class MemPool private (
       utxosInBlock: AVector[AssetOutputInfo]
   ): AVector[AssetOutputInfo] = readOnly {
     val newUtxos =
-      txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.indexes.getRelevantUtxos(lockupScript)
+      txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.getRelevantUtxos(lockupScript)
 
     (utxosInBlock ++ newUtxos).filterNot(asset =>
       txIndexes.isUsed(asset) || pendingPool.indexes.isUsed(asset)
     )
+  }
+
+  def updatePendingPool(
+      worldState: WorldState.Persisted
+  ): IOResult[Unit] = {
+    pendingPool.extractReadyTxs(worldState).map { txs =>
+      txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
+        add(chainIndex, txss)
+      }
+      pendingPool.remove(txs)
+    }
   }
 
   def clear(): Unit =
