@@ -56,7 +56,7 @@ class RestServerSpec
     }
     Get(s"/blockflow?fromTs=10&toTs=0}") ~> server.route ~> check {
       status is StatusCodes.BadRequest
-      responseAs[ApiError] is ApiError.BadRequest(
+      responseAs[ApiError.BadRequest] is ApiError.BadRequest(
         """Invalid value for: query parameter toTs (For input string: "0}": 0})"""
       )
     }
@@ -120,7 +120,9 @@ class RestServerSpec
     }
     Get(s"/blockflow/chains?toGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
-      responseAs[ApiError] is ApiError.BadRequest(s"Invalid value for: query parameter fromGroup")
+      responseAs[ApiError.BadRequest] is ApiError.BadRequest(
+        s"Invalid value for: query parameter fromGroup"
+      )
     }
     Get(s"/blockflow/chains?fromGroup=1") ~> server.route ~> check {
       status is StatusCodes.BadRequest
@@ -160,7 +162,7 @@ class RestServerSpec
       s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1"
     ) ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
     }
   }
 
@@ -179,7 +181,7 @@ class RestServerSpec
 
     Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
     }
   }
 
@@ -209,7 +211,7 @@ class RestServerSpec
 
     Post(s"/miners?action=start-mining") ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
     }
   }
 
@@ -250,7 +252,7 @@ class RestServerSpec
       HttpEntity(ContentTypes.`application/json`, notEnoughAddressesBody)
     Put(s"/miners/addresses", notEnoughAddressesEntity) ~> server.route ~> check {
       status is StatusCodes.BadRequest
-      responseAs[ApiError] is ApiError.BadRequest(
+      responseAs[ApiError.BadRequest] is ApiError.BadRequest(
         s"Wrong number of addresses, expected ${config.broker.groups}, got 1"
       )
     }
@@ -260,7 +262,7 @@ class RestServerSpec
     val wrongGroupEntity = HttpEntity(ContentTypes.`application/json`, wrongGroupBody)
     Put(s"/miners/addresses", wrongGroupEntity) ~> server.route ~> check {
       status is StatusCodes.BadRequest
-      responseAs[ApiError] is ApiError.BadRequest(
+      responseAs[ApiError.BadRequest] is ApiError.BadRequest(
         s"Address ${dummyKeyAddress} doesn't belong to group 1"
       )
     }
@@ -294,7 +296,7 @@ class RestServerSpec
     //Miner return BlockCandidate(None)
     Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.InternalServerError
-      responseAs[ApiError] is ApiError.InternalServerError(
+      responseAs[ApiError.InternalServerError] is ApiError.InternalServerError(
         "Cannot compute block candidate for given chain index"
       )
     }
@@ -303,7 +305,7 @@ class RestServerSpec
 
     Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
     }
   }
 
@@ -326,7 +328,7 @@ class RestServerSpec
 
     Post(s"/miners/new-block", entity) ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
     }
   }
 

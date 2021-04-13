@@ -16,194 +16,106 @@
 
 package org.alephium.api
 
-import io.circe.{Decoder, DecodingFailure, Encoder, HCursor, Json}
+import io.circe.{Codec, Decoder, Encoder, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.model.StatusCode
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.SchemaType.{SObjectInfo, SProduct}
 
-sealed trait ApiError {
-  def status: StatusCode
+sealed trait ApiError[S <: StatusCode] {
   def detail: String
 }
 
 object ApiError {
 
-  private def encodeApiError[A <: ApiError]: Encoder[A] =
-    new Encoder[A] {
-      final def apply(apiError: A): Json =
-        Json.obj(
-          ("status", Json.fromInt(apiError.status.code)),
-          ("detail", Json.fromString(apiError.detail))
-        )
+  sealed abstract class Companion[S <: StatusCode, E <: ApiError[S]](val statusCode: S) {
+    def description: String = this.getClass.getSimpleName.dropRight(1)
+
+    def specificEncoder: Option[Encoder[E]] = None
+
+    lazy val encoder: Encoder[E] = new Encoder[E] {
+      val baseEncoder: Encoder[E] =
+        new Encoder[E] {
+          final def apply(apiError: E): Json =
+            Json.obj(
+              ("detail", Json.fromString(apiError.detail))
+            )
+        }
+
+      final def apply(e: E): Json =
+        specificEncoder match {
+          case None =>
+            baseEncoder(e)
+          case Some(specific) =>
+            baseEncoder(e).deepMerge(specific(e))
+        }
     }
 
-  final case class Unauthorized(val detail: String) extends ApiError {
-    final val status: StatusCode = StatusCode.Unauthorized
-  }
+    def decoder: Decoder[E]
 
-  object Unauthorized {
-    implicit val encoder: Encoder[Unauthorized] = new Encoder[Unauthorized] {
-      val baseEncoder = deriveEncoder[Unauthorized]
-      final def apply(unauthorized: Unauthorized): Json =
-        encodeApiError[Unauthorized](unauthorized).deepMerge(baseEncoder(unauthorized))
-    }
+    implicit lazy val codec: Codec[E] = Codec.from(decoder, encoder)
 
-    implicit val decoder: Decoder[Unauthorized] = deriveDecoder
-    implicit val schema: Schema[Unauthorized] =
+    def apiErrorSchema(
+        fields: List[(FieldName, Schema[_])]
+    ): Schema[E] = {
       Schema(
         SProduct(
-          SObjectInfo("Unauthorized"),
+          SObjectInfo(description),
           List(
-            FieldName("status") -> Schema.schemaForInt,
             FieldName("detail") -> Schema.schemaForString
-          )
+          ) ++ fields
         )
       )
-  }
-
-  final case class BadRequest(val detail: String) extends ApiError {
-    final val status: StatusCode = StatusCode.BadRequest
-  }
-  object BadRequest {
-    implicit val encoder: Encoder[BadRequest] = new Encoder[BadRequest] {
-      val baseEncoder = deriveEncoder[BadRequest]
-      final def apply(badRequest: BadRequest): Json =
-        encodeApiError[BadRequest](badRequest).deepMerge(baseEncoder(badRequest))
-    }
-    implicit val decoder: Decoder[BadRequest] = deriveDecoder
-    implicit val schema: Schema[BadRequest] =
-      Schema(
-        SProduct(
-          SObjectInfo("BadRequest"),
-          List(
-            FieldName("status") -> Schema.schemaForInt,
-            FieldName("detail") -> Schema.schemaForString
-          )
-        )
-      )
-  }
-
-  final case class NotFound(resource: String) extends ApiError {
-    final val status: StatusCode = StatusCode.NotFound
-    final val detail: String     = s"$resource not found"
-  }
-
-  object NotFound {
-    implicit val encoder: Encoder[NotFound] = new Encoder[NotFound] {
-      val baseEncoder = deriveEncoder[NotFound]
-      final def apply(notFound: NotFound): Json =
-        encodeApiError[NotFound](notFound).deepMerge(baseEncoder(notFound))
     }
 
-    implicit val decoder: Decoder[NotFound] = deriveDecoder
-    implicit val schema: Schema[NotFound] =
-      Schema(
-        SProduct(
-          SObjectInfo("NotFound"),
-          List(
-            FieldName("status") -> Schema.schemaForInt,
-            FieldName("detail") -> Schema.schemaForString
-          )
-        )
-      )
+    implicit lazy val schema: Schema[E] = apiErrorSchema(List.empty)
   }
 
-  final case class ServiceUnavailable(val detail: String) extends ApiError {
-    final val status: StatusCode = StatusCode.ServiceUnavailable
+  final case class Unauthorized(detail: String) extends ApiError[StatusCode.Unauthorized.type]
+
+  object Unauthorized
+      extends Companion[StatusCode.Unauthorized.type, Unauthorized](StatusCode.Unauthorized) {
+    val decoder = deriveDecoder[Unauthorized]
   }
 
-  object ServiceUnavailable {
-    implicit val encoder: Encoder[ServiceUnavailable] = new Encoder[ServiceUnavailable] {
-      val baseEncoder = deriveEncoder[ServiceUnavailable]
-      final def apply(serviceUnavailable: ServiceUnavailable): Json =
-        encodeApiError[ServiceUnavailable](serviceUnavailable).deepMerge(
-          baseEncoder(serviceUnavailable)
-        )
-    }
+  final case class BadRequest(detail: String) extends ApiError[StatusCode.BadRequest.type]
 
-    implicit val decoder: Decoder[ServiceUnavailable] = deriveDecoder
-    implicit val schema: Schema[ServiceUnavailable] =
-      Schema(
-        SProduct(
-          SObjectInfo("ServiceUnavailable"),
-          List(
-            FieldName("status") -> Schema.schemaForInt,
-            FieldName("detail") -> Schema.schemaForString
-          )
-        )
-      )
+  object BadRequest
+      extends Companion[StatusCode.BadRequest.type, BadRequest](StatusCode.BadRequest) {
+    val decoder = deriveDecoder[BadRequest]
   }
 
-  final case class InternalServerError(val detail: String) extends ApiError {
-    final val status: StatusCode = StatusCode.InternalServerError
+  final case class ServiceUnavailable(detail: String)
+      extends ApiError[StatusCode.ServiceUnavailable.type] {}
+
+  object ServiceUnavailable
+      extends Companion[StatusCode.ServiceUnavailable.type, ServiceUnavailable](
+        StatusCode.ServiceUnavailable
+      ) {
+    val decoder = deriveDecoder[ServiceUnavailable]
   }
 
-  object InternalServerError {
-    implicit val encoder: Encoder[InternalServerError] = new Encoder[InternalServerError] {
-      val baseEncoder = deriveEncoder[InternalServerError]
-      final def apply(internalServerError: InternalServerError): Json =
-        encodeApiError[InternalServerError](internalServerError).deepMerge(
-          baseEncoder(internalServerError)
-        )
-    }
+  final case class InternalServerError(detail: String)
+      extends ApiError[StatusCode.InternalServerError.type]
 
-    implicit val decoder: Decoder[InternalServerError] = deriveDecoder
-    implicit val schema: Schema[InternalServerError] =
-      Schema(
-        SProduct(
-          SObjectInfo("InternalServerError"),
-          List(
-            FieldName("status") -> Schema.schemaForInt,
-            FieldName("detail") -> Schema.schemaForString
-          )
-        )
-      )
+  object InternalServerError
+      extends Companion[StatusCode.InternalServerError.type, InternalServerError](
+        StatusCode.InternalServerError
+      ) {
+    val decoder = deriveDecoder[InternalServerError]
   }
 
-  implicit val decoder: Decoder[ApiError] = new Decoder[ApiError] {
-    def dec(c: HCursor, status: StatusCode): Decoder.Result[ApiError] =
-      status match {
-        case StatusCode.BadRequest          => BadRequest.decoder(c)
-        case StatusCode.InternalServerError => InternalServerError.decoder(c)
-        case StatusCode.NotFound            => NotFound.decoder(c)
-        case StatusCode.ServiceUnavailable  => ServiceUnavailable.decoder(c)
-        case StatusCode.Unauthorized        => Unauthorized.decoder(c)
-        case _                              => Left(DecodingFailure(s"$status not supported", c.history))
-      }
-    final def apply(c: HCursor): Decoder.Result[ApiError] =
-      for {
-        statusAsInt <- c.downField("status").as[Int]
-        apiError    <- dec(c, StatusCode(statusAsInt))
-      } yield apiError
+  final case class NotFound(resource: String) extends ApiError[StatusCode.NotFound.type] {
+    final val detail: String = s"$resource not found"
   }
 
-  implicit val encoder: Encoder[ApiError] = new Encoder[ApiError] {
-    final def apply(apiError: ApiError): Json =
-      apiError match {
-        case badRequest: BadRequest => BadRequest.encoder(badRequest)
-        case internalServerError: InternalServerError =>
-          InternalServerError.encoder(internalServerError)
-        case notFound: NotFound => NotFound.encoder(notFound)
-        case serviceUnavailable: ServiceUnavailable =>
-          ServiceUnavailable.encoder(serviceUnavailable)
-        case unauthorized: Unauthorized => Unauthorized.encoder(unauthorized)
-        case _                          => encodeApiError[ApiError](apiError)
-      }
-  }
+  object NotFound extends Companion[StatusCode.NotFound.type, NotFound](StatusCode.NotFound) {
+    val decoder                  = deriveDecoder[NotFound]
+    override val specificEncoder = Some(deriveEncoder[NotFound])
 
-  @SuppressWarnings(
-    Array(
-      "org.wartremover.warts.JavaSerializable",
-      "org.wartremover.warts.Product",
-      "org.wartremover.warts.Serializable"
+    implicit override lazy val schema: Schema[NotFound] = apiErrorSchema(
+      List(FieldName("resource") -> Schema.schemaForInt)
     )
-  )
-  implicit val schema: Schema[ApiError] =
-    Schema.oneOf[ApiError, StatusCode](_.status, _.toString)(
-      StatusCode.BadRequest         -> BadRequest.schema,
-      StatusCode.NotFound           -> NotFound.schema,
-      StatusCode.ServiceUnavailable -> ServiceUnavailable.schema,
-      StatusCode.Unauthorized       -> Unauthorized.schema
-    )
+  }
+
 }

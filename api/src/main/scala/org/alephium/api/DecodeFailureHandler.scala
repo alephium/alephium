@@ -25,11 +25,11 @@ import org.alephium.api.ApiError
 
 trait DecodeFailureHandler {
 
-  private val failureOutput: EndpointOutput[(StatusCode, ApiError)] =
-    statusCode.and(jsonBody[ApiError])
+  private val decodeFailureOutput: EndpointOutput[(StatusCode, ApiError.BadRequest)] =
+    statusCode.and(jsonBody[ApiError.BadRequest])
 
   private def myFailureResponse(statusCode: StatusCode, message: String): DecodeFailureHandling =
-    DecodeFailureHandling.response(failureOutput)(
+    DecodeFailureHandling.response(decodeFailureOutput)(
       (statusCode, ApiError.BadRequest(message))
     )
 

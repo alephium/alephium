@@ -27,6 +27,7 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
+import sttp.model.StatusCode
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
@@ -398,7 +399,9 @@ object RestServer {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def blockSolutionToBlock(
       solution: BlockSolution
-  )(implicit groupConfig: GroupConfig): Either[ApiError, (Block, ChainIndex, U256)] = {
+  )(implicit
+      groupConfig: GroupConfig
+  ): Either[ApiError[_ <: StatusCode], (Block, ChainIndex, U256)] = {
     Try {
       val header = BlockHeader(
         BlockDeps.build(solution.blockDeps),

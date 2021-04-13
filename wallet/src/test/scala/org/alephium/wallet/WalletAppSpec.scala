@@ -109,11 +109,11 @@ class WalletAppSpec
       status is StatusCodes.NotFound
       CirceUtils.print(
         responseAs[Json]
-      ) is s"""{"resource":"$wallet","status":404,"detail":"$wallet not found"}"""
+      ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
 
     create(2) ~> check {
-      val error = responseAs[ApiError]
+      val error = responseAs[ApiError.BadRequest]
       error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24: DownField(mnemonicSize): {"password":"$password","mnemonicSize":2})"""
       status is StatusCodes.BadRequest
     }
@@ -175,7 +175,7 @@ class WalletAppSpec
 
     val negAmount = -10
     transfer(negAmount) ~> check {
-      val error = responseAs[ApiError]
+      val error = responseAs[ApiError.BadRequest]
       error.detail is s"""Invalid value for: body (Invalid U256: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
       status is StatusCodes.BadRequest
     }
@@ -240,7 +240,7 @@ class WalletAppSpec
       status is StatusCodes.NotFound
       CirceUtils.print(
         responseAs[Json]
-      ) is s"""{"resource":"$wallet","status":404,"detail":"$wallet not found"}"""
+      ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())
   }

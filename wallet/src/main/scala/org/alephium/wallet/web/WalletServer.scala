@@ -185,7 +185,7 @@ class WalletServer(
 
 object WalletServer {
   import ApiError._
-  def toApiError(walletError: WalletError): ApiError = {
+  def toApiError(walletError: WalletError): ApiError[_] = {
 
     def badRequest                 = BadRequest(walletError.message)
     def internalServerError        = InternalServerError(walletError.message)
