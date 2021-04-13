@@ -30,7 +30,7 @@ import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
@@ -445,6 +445,80 @@ class BlockFlowSpec extends AlephiumSpec {
       .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
       .rightValue
       .isRight is true
+  }
+
+  it should "handle sequential txs" in new FlowFixture {
+    override val configValues                   = Map(("alephium.broker.broker-num", 1))
+    val fromGroup                               = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
+    val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
+    val fromLockup                              = LockupScript.p2pkh(fromPubKey)
+    val theMemPool                              = blockFlow.getMemPool(fromGroup)
+
+    var txCount = 0
+    def transfer(): TransactionTemplate = {
+      txCount += 1
+
+      val toGroup        = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
+      val chainIndex     = ChainIndex(fromGroup, toGroup)
+      val (_, toPubKey)  = toGroup.generateKey
+      val toLockupScript = LockupScript.p2pkh(toPubKey)
+      val unsignedTx = blockFlow
+        .prepareUnsignedTx(fromPubKey, toLockupScript, None, ALF.oneAlf)
+        .rightValue
+        .rightValue
+      val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
+
+      tx.chainIndex is chainIndex
+      theMemPool.addNewTx(chainIndex, tx)
+      theMemPool.contains(tx.chainIndex, tx.id) is true
+
+      val balance = initialAmount - (ALF.oneAlf + defaultGasFee).mulUnsafe(txCount)
+      blockFlow.getBalance(fromLockup).rightValue is ((balance, U256.Zero, 1))
+
+      tx
+    }
+
+    val tx0 = transfer()
+    val tx1 = transfer()
+    val tx2 = transfer()
+    theMemPool.pendingPool.contains(tx0.id) is false
+    theMemPool.pendingPool.contains(tx1.id) is true
+    theMemPool.pendingPool.contains(tx2.id) is true
+
+    val block0 = minePooledTxs(blockFlow, tx0.chainIndex)
+    addAndCheck(blockFlow, block0)
+    theMemPool.contains(tx0.chainIndex, tx0.id) is false
+    theMemPool.contains(tx1.chainIndex, tx1.id) is true
+
+    if (!tx0.chainIndex.isIntraGroup) {
+      theMemPool.pendingPool.contains(tx1.id) is true
+      theMemPool.pendingPool.contains(tx2.id) is true
+      val block = minePooledTxs(blockFlow, ChainIndex(fromGroup, fromGroup))
+      addAndCheck(blockFlow, block)
+      theMemPool.pendingPool.contains(tx1.id) is false
+      theMemPool.pendingPool.contains(tx2.id) is true
+    } else {
+      theMemPool.pendingPool.contains(tx1.id) is false
+      theMemPool.pendingPool.contains(tx2.id) is true
+    }
+
+    val block1 = minePooledTxs(blockFlow, tx1.chainIndex)
+    addAndCheck(blockFlow, block1)
+    theMemPool.contains(tx1.chainIndex, tx1.id) is false
+    theMemPool.contains(tx2.chainIndex, tx2.id) is true
+
+    if (!tx1.chainIndex.isIntraGroup) {
+      theMemPool.pendingPool.contains(tx2.id) is true
+      val block = minePooledTxs(blockFlow, ChainIndex(fromGroup, fromGroup))
+      addAndCheck(blockFlow, block)
+      theMemPool.pendingPool.contains(tx2.id) is false
+    } else {
+      theMemPool.pendingPool.contains(tx2.id) is false
+    }
+
+    val block2 = minePooledTxs(blockFlow, tx2.chainIndex)
+    addAndCheck(blockFlow, block2)
+    theMemPool.contains(tx2.chainIndex, tx2.id) is false
   }
 
   behavior of "confirmations"
