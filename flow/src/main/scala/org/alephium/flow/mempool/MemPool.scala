@@ -21,14 +21,7 @@ import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{
-  AssetOutputRef,
-  ChainIndex,
-  GroupIndex,
-  Transaction,
-  TransactionTemplate,
-  TxOutput
-}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.{AVector, RWLock}
 
@@ -72,14 +65,14 @@ class MemPool private (
       getPool(index).getAll
     }
 
-  def add(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
+  def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
     readOnly {
       val count = getPool(index).add(transactions)
       transactions.foreach(txIndexes.add)
       count
     }
 
-  def remove(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
+  def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
     readOnly {
       val count = getPool(index).remove(transactions)
       transactions.foreach(txIndexes.remove)
@@ -122,7 +115,7 @@ class MemPool private (
   ): IOResult[Unit] = {
     pendingPool.extractReadyTxs(worldState).map { txs =>
       txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
-        add(chainIndex, txss)
+        addToTxPool(chainIndex, txss)
       }
       pendingPool.remove(txs)
     }

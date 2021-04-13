@@ -84,7 +84,7 @@ trait FlowUtils
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
           val toGroupIndex = GroupIndex.unsafe(toGroup)
           val index        = ChainIndex(mainGroup, toGroupIndex)
-          sum + getMemPool(mainGroup).remove(index, txs.map(_.toTemplate))
+          sum + getMemPool(mainGroup).removeFromTxPool(index, txs.map(_.toTemplate))
         }
         if (removed > 0) {
           logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")

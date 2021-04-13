@@ -43,11 +43,11 @@ class MemPoolSpec
       val index = block.chainIndex
       if (index.from.equals(group)) {
         txTemplates.foreach(pool.contains(index, _) is false)
-        pool.add(index, txTemplates) is block.transactions.length
+        pool.addToTxPool(index, txTemplates) is block.transactions.length
         pool.size is block.transactions.length
         block.transactions.foreach(checkTx(pool.txIndexes, _))
         txTemplates.foreach(pool.contains(index, _) is true)
-        pool.remove(index, txTemplates) is block.transactions.length
+        pool.removeFromTxPool(index, txTemplates) is block.transactions.length
         pool.size is 0
         pool.txIndexes is TxIndexes.empty
       } else {
@@ -73,13 +73,13 @@ class MemPoolSpec
   }
 
   it should "use read lock for add" in new Fixture {
-    checkLockUsed(rwl)(0, pool.add(chainIndex, txTemplates), txNum)
+    checkLockUsed(rwl)(0, pool.addToTxPool(chainIndex, txTemplates), txNum)
     pool.clear()
-    checkNoWriteLock(rwl)(0, pool.add(chainIndex, txTemplates), txNum)
+    checkNoWriteLock(rwl)(0, pool.addToTxPool(chainIndex, txTemplates), txNum)
   }
 
   it should "use read lock for remove" in new Fixture {
-    checkReadLock(rwl)(1, pool.remove(chainIndex, txTemplates), 0)
+    checkReadLock(rwl)(1, pool.removeFromTxPool(chainIndex, txTemplates), 0)
   }
 
   it should "use write lock for reorg" in new Fixture {
