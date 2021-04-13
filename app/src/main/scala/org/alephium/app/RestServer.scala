@@ -27,11 +27,12 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
+import sttp.model.StatusCode
 import sttp.tapir.openapi.circe.yaml.RichOpenAPI
 import sttp.tapir.server.akkahttp._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
-import org.alephium.api.{ApiModel, Endpoints}
+import org.alephium.api.{ApiError, DecodeFailureHandler, Endpoints}
 import org.alephium.api.model._
 import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.{Miner, Node}
@@ -64,7 +65,13 @@ class RestServer(
 ) extends Endpoints
     with Documentation
     with Service
+    with DecodeFailureHandler
     with StrictLogging {
+
+  implicit private val akkaHttpServerOptions: AkkaHttpServerOptions =
+    AkkaHttpServerOptions.default.copy(
+      decodeFailureHandler = myDecodeFailureHandler
+    )
 
   private val blockFlow: BlockFlow                    = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
@@ -82,7 +89,7 @@ class RestServer(
       if (synced) {
         f
       } else {
-        Future.successful(Left(ApiModel.Error.UnsyncedError))
+        Future.successful(Left(ApiError.ServiceUnavailable("Self clique unsynced")))
       }
     }
   }
@@ -212,7 +219,9 @@ class RestServer(
         .map(_.maybeBlock match {
           case Some(block) => Right(RestServer.blockTempateToCandidate(block))
           case None =>
-            Left(ApiModel.Error.server("Cannot find block candidate for given chain index"))
+            Left(
+              ApiError.InternalServerError("Cannot compute block candidate for given chain index")
+            )
         })
     }
   }
@@ -237,7 +246,7 @@ class RestServer(
         .validateAddresses(minerAddresses.addresses)
         .map(_ => miner ! Miner.UpdateAddresses(minerAddresses.addresses))
         .left
-        .map(ApiModel.Error.server)
+        .map(ApiError.BadRequest(_))
     }
   }
 
@@ -267,7 +276,7 @@ class RestServer(
         .validateFilename(exportFile.filename)
         .map(_ => ())
         .left
-        .map(error => ApiModel.Error.server(error.getMessage))
+        .map(error => ApiError.BadRequest(error.getMessage))
     }
   }
 
@@ -390,7 +399,9 @@ object RestServer {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def blockSolutionToBlock(
       solution: BlockSolution
-  )(implicit groupConfig: GroupConfig): Either[ApiModel.Error, (Block, ChainIndex, U256)] = {
+  )(implicit
+      groupConfig: GroupConfig
+  ): Either[ApiError[_ <: StatusCode], (Block, ChainIndex, U256)] = {
     Try {
       val header = BlockHeader(
         BlockDeps.build(solution.blockDeps),
@@ -407,7 +418,7 @@ object RestServer {
       (Block(header, transactions), chainIndex, solution.miningCount)
     }.toEither.left.map { error =>
       //TODO improve error handling
-      ApiModel.Error.server(error.getMessage)
+      ApiError.BadRequest(error.getMessage)
     }
   }
 }

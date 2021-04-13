@@ -19,8 +19,9 @@ package org.alephium.app
 import scala.concurrent._
 
 import akka.util.Timeout
+import sttp.model.StatusCode
 
-import org.alephium.api.ApiModel
+import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
@@ -109,9 +110,9 @@ class ServerUtils(networkType: NetworkType) {
 
   def createTxTemplate(query: SendTransaction): Try[TransactionTemplate] = {
     for {
-      txByteString <- Hex.from(query.unsignedTx).toRight(apiError(s"Invalid hex"))
+      txByteString <- Hex.from(query.unsignedTx).toRight(badRequest(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        apiError(serdeError.getMessage)
+        badRequest(serdeError.getMessage)
       )
     } yield {
       TransactionTemplate(
@@ -145,7 +146,7 @@ class ServerUtils(networkType: NetworkType) {
       txId: Hash,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
-    blockFlow.getTxStatus(txId, chainIndex).left.map(apiError).map {
+    blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
       case Some(status) => convert(status)
       case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
     }
@@ -161,11 +162,11 @@ class ServerUtils(networkType: NetworkType) {
       block <- blockFlow
         .getBlock(query.hash)
         .left
-        .map(_ => apiError(s"Fail fetching block with header ${query.hash.toHexString}"))
+        .map(_ => failed(s"Fail fetching block with header ${query.hash.toHexString}"))
       height <- blockFlow
         .getHeight(block.header)
         .left
-        .map(error => apiError(s"Failed in IO: $error"))
+        .map(failedInIO)
     } yield BlockEntry.from(block, height, networkType)
 
   def getHashesAtHeight(
@@ -177,7 +178,7 @@ class ServerUtils(networkType: NetworkType) {
       hashes <- blockFlow
         .getHashes(chainIndex, query.height)
         .left
-        .map(_ => apiError("Failed in IO"))
+        .map(_ => failedInIO)
     } yield HashesAtHeight(hashes)
 
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
@@ -185,7 +186,7 @@ class ServerUtils(networkType: NetworkType) {
       maxHeight <- blockFlow
         .getMaxHeight(chainIndex)
         .left
-        .map(_ => apiError("Failed in IO"))
+        .map(_ => failedInIO)
     } yield ChainInfo(maxHeight)
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
@@ -198,7 +199,7 @@ class ServerUtils(networkType: NetworkType) {
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case _: TxHandler.AddFailed =>
-        Left(apiError("Failed in adding transaction"))
+        Left(failed("Failed in adding transaction"))
     }
   }
 
@@ -211,7 +212,7 @@ class ServerUtils(networkType: NetworkType) {
   ): Try[UnsignedTransaction] = {
     blockFlow.prepareUnsignedTx(fromKey, toLockupScript, lockTimeOpt, value) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
-      case Right(Left(error))                => Left(apiError(error))
+      case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
     }
   }
@@ -220,7 +221,7 @@ class ServerUtils(networkType: NetworkType) {
     if (group >= 0 && group < groupConfig.groups) {
       Right(())
     } else {
-      Left(apiError(s"Invalid group: $group"))
+      Left(badRequest(s"Invalid group: $group"))
     }
   }
 
@@ -233,7 +234,7 @@ class ServerUtils(networkType: NetworkType) {
     if (blockFlow.brokerConfig.contains(groupIndex)) {
       Right(())
     } else {
-      Left(apiError(s"Address ${Address(networkType, lockupScript)} belongs to other groups"))
+      Left(badRequest(s"Address ${Address(networkType, lockupScript)} belongs to other groups"))
     }
   }
 
@@ -247,7 +248,7 @@ class ServerUtils(networkType: NetworkType) {
     ) {
       Right(())
     } else {
-      Left(apiError(s"${hash.toHexString} belongs to other groups"))
+      Left(badRequest(s"${hash.toHexString} belongs to other groups"))
     }
   }
 
@@ -265,7 +266,7 @@ class ServerUtils(networkType: NetworkType) {
         ) {
           Right(())
         } else {
-          Left(apiError(s"$chainIndex belongs to other groups"))
+          Left(badRequest(s"$chainIndex belongs to other groups"))
         }
       }
     } yield chainIndex
@@ -353,16 +354,16 @@ class ServerUtils(networkType: NetworkType) {
     Future.successful((for {
       codeBytestring <- Hex
         .from(query.code)
-        .toRight(apiError("Cannot decode code hex string"))
+        .toRight(badRequest("Cannot decode code hex string"))
       script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
-        apiError(serdeError.getMessage)
+        badRequest(serdeError.getMessage)
       )
       utx <- unignedTxFromScript(
         blockFlow,
         script,
         LockupScript.p2pkh(query.fromKey),
         query.fromKey
-      ).left.map(error => apiError(error.toString))
+      ).left.map(error => badRequest(error.toString))
     } yield utx).map(BuildContractResult.from))
   }
 
@@ -373,9 +374,9 @@ class ServerUtils(networkType: NetworkType) {
       executionContext: ExecutionContext
   ): FutureTry[TxResult] = {
     (for {
-      txByteString <- Hex.from(query.tx).toRight(apiError(s"Invalid hex"))
+      txByteString <- Hex.from(query.tx).toRight(badRequest(s"Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        apiError(serdeError.getMessage)
+        badRequest(serdeError.getMessage)
       )
     } yield {
       TransactionTemplate(
@@ -404,18 +405,21 @@ class ServerUtils(networkType: NetworkType) {
         case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))
       }).map(script => CompileResult(Hex.toHexString(serialize(script))))
         .left
-        .map(error => apiError(error.toString))
+        .map(error => failed(error.toString))
     )
   }
 
-  private def apiError(error: IOError): ApiModel.Error =
-    ApiModel.Error.server(s"Failed in IO: $error")
-  private def apiError(error: String): ApiModel.Error = ApiModel.Error.server(error)
-  private def failed[T](error: IOError): Try[T]       = Left(apiError(error))
+  private def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
+  private def failed(error: String): ApiError[_ <: StatusCode] =
+    ApiError.InternalServerError(error)
+  private val failedInIO: ApiError[_ <: StatusCode] = ApiError.InternalServerError("Failed in IO")
+  private def failedInIO(error: IOError): ApiError[_ <: StatusCode] =
+    ApiError.InternalServerError(s"Failed in IO: $error")
+  private def failed[T](error: IOError): Try[T] = Left(failedInIO(error))
 
 }
 
 object ServerUtils {
-  type Try[T]       = Either[ApiModel.Error, T]
+  type Try[T]       = Either[ApiError[_ <: StatusCode], T]
   type FutureTry[T] = Future[Try[T]]
 }

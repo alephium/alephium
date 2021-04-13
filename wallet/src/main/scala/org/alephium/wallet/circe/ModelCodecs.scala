@@ -56,6 +56,8 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val walletUnlockCodec: Codec[WalletUnlock] = deriveCodec[WalletUnlock]
 
+  implicit val walletDeletionCodec: Codec[WalletDeletion] = deriveCodec[WalletDeletion]
+
   implicit val walletRestoreCodec: Codec[WalletRestore] = deriveCodec[WalletRestore]
 
   implicit val walletResultResultCodec: Codec[WalletRestore.Result] =

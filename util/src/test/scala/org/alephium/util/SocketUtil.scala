@@ -47,6 +47,8 @@ trait SocketUtil {
       } finally {
         tcp.close()
         udp.close()
+        require(tcp.isClosed)
+        require(udp.isClosed)
       }
     }
   }

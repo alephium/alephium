@@ -89,7 +89,7 @@ object BlockFlowClient {
           uri =>
             backend
               .send(endpoint.toSttpRequestUnsafe(uri).apply(params))
-              .map(_.body.map(f).left.map(_.message))
+              .map(_.body.map(f).left.map(_.detail))
         )
       }
 
@@ -128,6 +128,6 @@ object BlockFlowClient {
     private def fetchSelfClique(): Future[Either[String, SelfClique]] =
       backend
         .send(getSelfClique.toSttpRequestUnsafe(uri"${defaultUri.toString}").apply(()))
-        .map(_.body.left.map(_.message))
+        .map(_.body.left.map(_.detail))
   }
 }

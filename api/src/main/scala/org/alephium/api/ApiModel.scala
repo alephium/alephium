@@ -32,27 +32,6 @@ import org.alephium.util._
 // scalastyle:off number.of.methods
 // scalastyle:off number.of.types
 object ApiModel {
-
-  final case class Error(code: Int, message: String, data: Option[String])
-  object Error {
-    def apply(code: Int, message: String): Error = {
-      Error(code, message, None)
-    }
-
-    implicit val codec: Codec[Error] = deriveCodec[Error]
-
-    // scalastyle:off magic.number
-    val ParseError: Error        = Error(-32700, "Parse error")
-    val InvalidRequest: Error    = Error(-32600, "Invalid Request")
-    val MethodNotFound: Error    = Error(-32601, "Method not found")
-    val InvalidParams: Error     = Error(-32602, "Invalid params")
-    val InternalError: Error     = Error(-32603, "Internal error")
-    val UnauthorizedError: Error = Error(-32604, "Unauthorized")
-    val UnsyncedError: Error     = Error(-32001, "Self clique not synced")
-
-    def server(error: String): Error = Error(-32000, "Server error", Some(error))
-    // scalastyle:on
-  }
   trait PerChain {
     val fromGroup: Int
     val toGroup: Int

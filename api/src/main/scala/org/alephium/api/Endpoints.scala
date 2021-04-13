@@ -16,10 +16,14 @@
 
 package org.alephium.api
 
+import scala.reflect.ClassTag
+
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.{Decoder, Encoder}
+import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
+import sttp.tapir.EndpointOutput.StatusMapping
 import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
 
 import org.alephium.api.CirceUtils.avectorCodec
@@ -32,10 +36,11 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs with StrictLogging {
+  import Endpoints._
 
   implicit def groupConfig: GroupConfig
 
-  type BaseEndpoint[A, B] = Endpoint[A, ApiModel.Error, B, Nothing]
+  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_], B, Nothing]
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -54,14 +59,17 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
         (chainIndex.from, chainIndex.to)
       )
 
-  private def jsonBody[T: Encoder: Decoder: Schema: Validator](implicit
-      examples: List[Example[T]]
-  ) =
-    tapirJsonBody[T].examples(examples)
-
   private val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
-      .errorOut(jsonBody[ApiModel.Error])
+      .errorOut(
+        oneOf[ApiError[_]](
+          error(ApiError.BadRequest),
+          error(ApiError.InternalServerError),
+          error(ApiError.NotFound),
+          error(ApiError.ServiceUnavailable),
+          error(ApiError.Unauthorized)
+        )
+      )
 
   private val infosEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
@@ -258,4 +266,27 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
       .in("export-blocks")
       .in(jsonBody[ExportFile])
       .summary("exports all the blocks")
+}
+
+object Endpoints {
+  // scalastyle:off regex
+  def error[S <: StatusCode, T <: ApiError[S]: Decoder: Encoder: Schema: Validator](
+      apiError: ApiError.Companion[S, T]
+  )(implicit
+      examples: List[Example[T]],
+      ct: ClassTag[T]
+  ): StatusMapping[T] = {
+    statusMappingClassMatcher(
+      apiError.statusCode,
+      jsonBody[T].description(apiError.description),
+      ct.runtimeClass
+    )
+  }
+  // scalastyle:on regex
+
+  def jsonBody[T: Encoder: Decoder: Schema: Validator](implicit
+      examples: List[Example[T]]
+  ): EndpointIO.Body[String, T] = {
+    tapirJsonBody[T].examples(examples)
+  }
 }

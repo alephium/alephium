@@ -14,23 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api
+package org.alephium.api
 
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.json.circe.jsonBody
 import sttp.tapir.server.{DecodeFailureContext, DecodeFailureHandling, ServerDefaults}
 
-import org.alephium.wallet.api.WalletApiError
+import org.alephium.api.ApiError
 
 trait DecodeFailureHandler {
 
-  private val failureOutput: EndpointOutput[(StatusCode, WalletApiError)] =
-    statusCode.and(jsonBody[WalletApiError])
+  private val decodeFailureOutput: EndpointOutput[(StatusCode, ApiError.BadRequest)] =
+    statusCode.and(jsonBody[ApiError.BadRequest])
 
   private def myFailureResponse(statusCode: StatusCode, message: String): DecodeFailureHandling =
-    DecodeFailureHandling.response(failureOutput)(
-      (statusCode, WalletApiError.BadRequest(message))
+    DecodeFailureHandling.response(decodeFailureOutput)(
+      (statusCode, ApiError.BadRequest(message))
     )
 
   private def myFailureMessage(ctx: DecodeFailureContext): String = {

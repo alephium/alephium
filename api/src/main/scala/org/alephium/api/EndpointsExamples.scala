@@ -35,9 +35,12 @@ trait EndpointsExamples {
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
     LockupScript.fromBase58("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
-  private val unlockScript: UnlockScript = UnlockScript.p2pkh(PublicKey.generate)
+  private val publicKey = PublicKey
+    .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
+    .get
+  private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
   private val address                    = Address(networkType, lockupScript)
-  private val cliqueId                   = CliqueId.generate
+  private val cliqueId                   = CliqueId.fromStringUnsafe("b51d57737a6880aeaf94fd4587e50c139")
   private val port                       = 12344
   private val wsPort                     = 12366
   private val restPort                   = 12377
@@ -47,20 +50,32 @@ trait EndpointsExamples {
   private val peers                      = AVector(peerAddress)
   private val balance                    = ALF.alf(U256.unsafe(1)).get
   private val height                     = 42
-  private val signature                  = Signature.generate
-  private def hash                       = Hash.generate
-  private def blockHash                  = BlockHash.generate
-  private val hexString                  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  private val signature = Signature
+    .from(
+      Hex.unsafe(
+        "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+      )
+    )
+    .get
+  private def hash =
+    Hash.from(Hex.unsafe("798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef")).get
+  private def blockHash = BlockHash
+    .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
+    .get
+  private val hexString = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  private val ts        = TimeStamp.unsafe(1611041396892L)
+  private val txId =
+    Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
 
   private val tx = Tx(
-    hash,
+    txId,
     AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
-    AVector(Output(amount = balance, address, Some(TimeStamp.unsafe(1234))))
+    AVector(Output(amount = balance, address, Some(ts)))
   )
 
   private val blockEntry = BlockEntry(
     blockHash,
-    timestamp = TimeStamp.now(),
+    timestamp = ts,
     chainFrom = 1,
     chainTo = 2,
     height,
@@ -71,14 +86,14 @@ trait EndpointsExamples {
   private val blockCandidate = BlockCandidate(
     deps = AVector(blockHash, blockHash),
     target = Target.onePhPerSecond.bits,
-    blockTs = TimeStamp.now(),
+    blockTs = ts,
     txsHash = hash,
     transactions = AVector(hexString)
   )
 
   private val blockSolution = BlockSolution(
     blockDeps = AVector(blockHash),
-    timestamp = TimeStamp.now(),
+    timestamp = ts,
     fromGroup = 1,
     toGroup = 2,
     miningCount = U256.Two,
@@ -116,7 +131,7 @@ trait EndpointsExamples {
         InterCliquePeerInfo(
           cliqueId,
           brokerId = 1,
-          groupNumPerBroker = 2,
+          groupNumPerBroker = 1,
           inetSocketAddress,
           isSynced = true
         )
@@ -167,7 +182,7 @@ trait EndpointsExamples {
     simpleExample(SendTransaction(unsignedTx = hexString, signature))
 
   implicit val txResultExamples: List[Example[TxResult]] =
-    simpleExample(TxResult(txId = Hash.generate, fromGroup = 2, toGroup = 1))
+    simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))
 
   implicit val txStatusExamples: List[Example[TxStatus]] =
     List[Example[TxStatus]](
@@ -191,7 +206,7 @@ trait EndpointsExamples {
     simpleExample(CompileResult(code = hexString))
 
   implicit val buildContractExamples: List[Example[BuildContract]] =
-    simpleExample(BuildContract(fromKey = PublicKey.generate, code = hexString))
+    simpleExample(BuildContract(publicKey, code = hexString))
 
   implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
     simpleExample(
@@ -210,7 +225,19 @@ trait EndpointsExamples {
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 
-  implicit val badRequestExamples: List[Example[ApiModel.Error]] =
-    simpleExample(ApiModel.Error(-32700, "Parse error"))
+  implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
+    simpleExample(ApiError.BadRequest("Something bad in the request"))
+
+  implicit val notFoundExamples: List[Example[ApiError.NotFound]] =
+    simpleExample(ApiError.NotFound("wallet-name"))
+
+  implicit val internalServerErrorExamples: List[Example[ApiError.InternalServerError]] =
+    simpleExample(ApiError.InternalServerError("Ouch"))
+
+  implicit val unauthorizedExamples: List[Example[ApiError.Unauthorized]] =
+    simpleExample(ApiError.Unauthorized("You shall not pass"))
+
+  implicit val serviceUnavailableExamples: List[Example[ApiError.ServiceUnavailable]] =
+    simpleExample(ApiError.ServiceUnavailable("Self clique unsynced"))
 }
 // scalastyle:on magic.number

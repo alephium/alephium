@@ -17,9 +17,10 @@
 package org.alephium.wallet.storage
 
 import java.io.{File, FileNotFoundException, PrintWriter}
+import java.nio.file.Files
 
 import scala.io.Source
-import scala.util.Using
+import scala.util.{Try, Using}
 
 import akka.util.ByteString
 import io.circe.Codec
@@ -38,6 +39,7 @@ import org.alephium.wallet.Constants
 trait SecretStorage {
   def lock(): Unit
   def unlock(password: String): Either[SecretStorage.Error, Unit]
+  def delete(password: String): Either[SecretStorage.Error, Unit]
   def isLocked(): Boolean
   def isMiner(): Either[SecretStorage.Error, Boolean]
   def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
@@ -162,6 +164,15 @@ object SecretStorage {
         state <- stateFromFile(file, password, path)
       } yield {
         maybeState = Some(state)
+      }
+    }
+
+    override def delete(password: String): Either[Error, Unit] = {
+      for {
+        _   <- stateFromFile(file, password, path)
+        res <- Try(Files.delete(file.toPath())).toEither.left.map(_ => SecretFileError)
+      } yield {
+        res
       }
     }
 

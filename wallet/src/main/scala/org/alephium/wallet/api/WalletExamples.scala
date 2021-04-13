@@ -18,11 +18,12 @@ package org.alephium.wallet.api
 
 import sttp.tapir.EndpointIO.Example
 
+import org.alephium.api.ApiError
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{AVector, Hex, U256}
 import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -31,9 +32,42 @@ trait WalletExamples {
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
     LockupScript.fromBase58("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
-  private val address            = Address(networkType, lockupScript)
-  private val password           = "my-secret-password"
-  private val mnemonic           = Mnemonic.generate(Mnemonic.Size.list.last)
+  private val address  = Address(networkType, lockupScript)
+  private val password = "my-secret-password"
+  private val mnemonic =
+    Mnemonic
+      .fromWords(
+        AVector(
+          "vault",
+          "alarm",
+          "sad",
+          "mass",
+          "witness",
+          "property",
+          "virus",
+          "style",
+          "good",
+          "flower",
+          "rice",
+          "alpha",
+          "viable",
+          "evidence",
+          "run",
+          "glare",
+          "pretty",
+          "scout",
+          "evil",
+          "judge",
+          "enroll",
+          "refuse",
+          "another",
+          "lava"
+        )
+      )
+      .get
+  private val txId =
+    Hash.from(Hex.from("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69").get).get
+
   private val walletName         = "wallet-super-name"
   private val mnemonicPassphrase = "optional-mnemonic-passphrase"
   private val fromGroup          = 2
@@ -76,6 +110,9 @@ trait WalletExamples {
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
     simpleExample(WalletUnlock(password))
 
+  implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
+    simpleExample(WalletDeletion(password))
+
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
 
@@ -83,7 +120,7 @@ trait WalletExamples {
     simpleExample(Transfer(address, U256.Million))
 
   implicit val transferResultExamples: List[Example[Transfer.Result]] =
-    simpleExample(Transfer.Result(Hash.generate, fromGroup, toGroup))
+    simpleExample(Transfer.Result(txId, fromGroup, toGroup))
 
   implicit val addressesExamples: List[Example[Addresses]] =
     simpleExample(Addresses(address, AVector(address)))
@@ -103,12 +140,12 @@ trait WalletExamples {
   implicit val changeActiveAddressExamples: List[Example[ChangeActiveAddress]] =
     simpleExample(ChangeActiveAddress(address))
 
-  implicit val badRequestExamples: List[Example[WalletApiError.BadRequest]] =
-    simpleExample(WalletApiError.BadRequest("Something bad in the request"))
+  implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
+    simpleExample(ApiError.BadRequest("Something bad in the request"))
 
-  implicit val notFoundExamples: List[Example[WalletApiError.NotFound]] =
-    simpleExample(WalletApiError.NotFound("wallet-name"))
+  implicit val notFoundExamples: List[Example[ApiError.NotFound]] =
+    simpleExample(ApiError.NotFound("wallet-name"))
 
-  implicit val unauthorizedExamples: List[Example[WalletApiError.Unauthorized]] =
-    simpleExample(WalletApiError.Unauthorized("You shall not pass"))
+  implicit val unauthorizedExamples: List[Example[ApiError.Unauthorized]] =
+    simpleExample(ApiError.Unauthorized("You shall not pass"))
 }
