@@ -57,7 +57,9 @@ case class TxIndexes(
     }
   }
 
-  def isUsed(asset: AssetOutputInfo): Boolean = inputIndex.contains(asset.ref)
+  def isSpent(asset: AssetOutputInfo): Boolean = isSpent(asset.ref)
+
+  def isSpent(asset: AssetOutputRef): Boolean = inputIndex.contains(asset)
 
   def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
     addressIndex

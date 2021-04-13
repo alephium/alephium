@@ -65,6 +65,26 @@ class MemPool private (
       getPool(index).getAll
     }
 
+  def isSpent(outputRef: AssetOutputRef): Boolean = {
+    pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
+  }
+
+  def isUnspentInPool(outputRef: AssetOutputRef): Boolean = {
+    (txIndexes.outputIndex
+      .contains(outputRef) || pendingPool.indexes.outputIndex.contains(outputRef)) &&
+    (!txIndexes.inputIndex
+      .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
+  }
+
+  def addNewTx(index: ChainIndex, tx: TransactionTemplate): Unit = writeOnly {
+    if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
+      pendingPool.add(tx)
+    } else {
+      addToTxPool(index, AVector(tx))
+      ()
+    }
+  }
+
   def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
     readOnly {
       val count = getPool(index).add(transactions)
@@ -106,7 +126,7 @@ class MemPool private (
       txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.getRelevantUtxos(lockupScript)
 
     (utxosInBlock ++ newUtxos).filterNot(asset =>
-      txIndexes.isUsed(asset) || pendingPool.indexes.isUsed(asset)
+      txIndexes.isSpent(asset) || pendingPool.indexes.isSpent(asset)
     )
   }
 
