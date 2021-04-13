@@ -23,7 +23,7 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation}
+import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
@@ -37,7 +37,8 @@ object TxHandler {
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
-  final case class AddTx(tx: TransactionTemplate, origin: DataOrigin) extends Command
+  final case class AddMemPoolTx(tx: TransactionTemplate, origin: DataOrigin)   extends Command
+  final case class AddGrandPoolTx(tx: TransactionTemplate, origin: DataOrigin) extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: Hash) extends Event
@@ -51,17 +52,24 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     with EventStream.Publisher {
   private val nonCoinbaseValidation = NonCoinbaseValidation.build
 
-  override def receive: Receive = { case TxHandler.AddTx(tx, origin) =>
-    handleTx(tx, origin)
+  override def receive: Receive = {
+    case TxHandler.AddMemPoolTx(tx, origin) =>
+      handleTx(tx, origin, nonCoinbaseValidation.validateMempoolTxTemplate)
+    case TxHandler.AddGrandPoolTx(tx, origin) =>
+      handleTx(tx, origin, nonCoinbaseValidation.validateGrandPoolTxTemplate)
   }
 
-  def handleTx(tx: TransactionTemplate, origin: DataOrigin): Unit = {
+  def handleTx(
+      tx: TransactionTemplate,
+      origin: DataOrigin,
+      validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit]
+  ): Unit = {
     val fromGroup  = tx.fromGroup
     val toGroup    = tx.toGroup
     val chainIndex = ChainIndex(fromGroup, toGroup)
     val mempool    = blockFlow.getMemPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
-      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+      validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
           log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s")
           addFailed(tx)

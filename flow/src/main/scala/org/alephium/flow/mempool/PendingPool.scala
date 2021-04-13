@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.TransactionTemplate
+import org.alephium.protocol.model.{AssetOutputRef, TransactionTemplate, TxOutput}
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.{AVector, EitherF, RWLock}
 
@@ -29,6 +29,10 @@ class PendingPool(
     val txs: mutable.HashMap[Hash, TransactionTemplate],
     val indexes: TxIndexes
 ) extends RWLock {
+  def contains(txId: Hash): Boolean = readOnly {
+    txs.contains(txId)
+  }
+
   def add(tx: TransactionTemplate): Unit = writeOnly {
     if (!txs.contains(tx.id)) {
       txs.addOne(tx.id -> tx)
@@ -60,6 +64,11 @@ class PendingPool(
         }
       }
     }
+
+  // Left means the output is spent
+  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
+    indexes.getUtxo(outputRef)
+  }
 }
 
 object PendingPool {

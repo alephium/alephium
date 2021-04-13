@@ -194,7 +194,7 @@ class ServerUtils(networkType: NetworkType) {
       askTimeout: Timeout,
       executionContext: ExecutionContext
   ): FutureTry[TxResult] = {
-    val message = TxHandler.AddTx(tx, DataOrigin.Local)
+    val message = TxHandler.AddGrandPoolTx(tx, DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))

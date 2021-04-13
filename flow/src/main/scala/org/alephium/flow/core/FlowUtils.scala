@@ -34,6 +34,7 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, TimeStamp, U256}
 
+// scalastyle:off number.of.methods
 trait FlowUtils
     extends MultiChain
     with BlockFlowState
@@ -217,6 +218,31 @@ trait FlowUtils
     } yield {
       val utxosInBlock = mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
       grandPool.getRelevantUtxos(groupIndex, lockupScript, utxosInBlock)
+    }
+  }
+
+  def getPreOutputs(tx: TransactionAbstract): IOResult[Option[AVector[TxOutput]]] = {
+    val chainIndex = tx.chainIndex
+    val mainGroup  = chainIndex.from
+    val bestDeps   = getBestDeps(mainGroup)
+    for {
+      worldState <- getPersistedWorldState(bestDeps, mainGroup)
+      result <- tx.unsigned.inputs.foldE(Option(AVector.empty[TxOutput])) {
+        case (Some(outputs), input) =>
+          getPreOutput(mainGroup, worldState, input.outputRef).map(_.map(outputs :+ _))
+        case (None, _) => Right(None)
+      }
+    } yield result
+  }
+
+  def getPreOutput(
+      mainGroup: GroupIndex,
+      worldState: WorldState.Persisted,
+      outputRef: AssetOutputRef
+  ): IOResult[Option[TxOutput]] = {
+    getMemPool(mainGroup).getUtxo(outputRef) match {
+      case Some(output) => Right(Some(output))
+      case None         => worldState.getOutputOpt(outputRef)
     }
   }
 
@@ -434,6 +460,7 @@ trait FlowUtils
     }
   }
 }
+// scalastyle:on number.of.methods
 
 object FlowUtils {
   final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)

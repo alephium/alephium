@@ -21,7 +21,14 @@ import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, Transaction, TransactionTemplate}
+import org.alephium.protocol.model.{
+  AssetOutputRef,
+  ChainIndex,
+  GroupIndex,
+  Transaction,
+  TransactionTemplate,
+  TxOutput
+}
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.{AVector, RWLock}
 
@@ -52,7 +59,7 @@ class MemPool private (
 
   def contains(index: ChainIndex, txId: Hash): Boolean =
     readOnly {
-      getPool(index).contains(txId)
+      getPool(index).contains(txId) || pendingPool.contains(txId)
     }
 
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
@@ -118,6 +125,17 @@ class MemPool private (
         add(chainIndex, txss)
       }
       pendingPool.remove(txs)
+    }
+  }
+
+  def getUtxo(outputRef: AssetOutputRef): Option[TxOutput] = {
+    val result = pendingPool.getUtxo(outputRef).flatMap {
+      case Some(output) => Right(Some(output))
+      case None         => txIndexes.getUtxo(outputRef)
+    }
+    result match {
+      case Left(_)      => None // utxo is spent already
+      case Right(value) => value
     }
   }
 

@@ -71,6 +71,15 @@ case class TxIndexes(
       }
       .getOrElse(AVector.empty)
   }
+
+  // Left means the output is spent
+  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
+    if (inputIndex.contains(outputRef)) {
+      Left(())
+    } else {
+      Right(outputIndex.get(outputRef))
+    }
+  }
 }
 
 object TxIndexes {
