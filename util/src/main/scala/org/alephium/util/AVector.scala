@@ -24,6 +24,9 @@ import scala.util.Random
 
 import org.alephium.macros.HPC
 
+/*
+ * Immutable vector that is optimized for appending
+ */
 // scalastyle:off number.of.methods return
 @SuppressWarnings(Array("org.wartremover.warts.While"))
 abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>
