@@ -24,7 +24,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.{TestActor, TestProbe}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-import io.circe.{Json, JsonObject}
 import io.circe.syntax._
 import io.circe.yaml
 import org.scalatest.EitherValues
@@ -342,29 +341,15 @@ class RestServerSpec
 
       val timeout = Duration.ofMinutesUnsafe(1).asScala
 
-      val openapiPath       = ApiModel.getClass.getResource("/openapi.yaml")
-      val openapiFile       = Source.fromFile(openapiPath.getPath, "UTF-8").getLines().mkString("\n")
-      val openapiFileAsJson = yaml.parser.parse(openapiFile).rightValue
-      val expectedOpenapi   = removeExamples(openapiFileAsJson)
+      val openapiPath     = ApiModel.getClass.getResource("/openapi.yaml")
+      val openapiFile     = Source.fromFile(openapiPath.getPath, "UTF-8").getLines().mkString("\n")
+      val expectedOpenapi = yaml.parser.parse(openapiFile).rightValue
 
       val responseContent = response.entity.toStrict(timeout).futureValue.getData.utf8String
-      val responseJson    = yaml.parser.parse(responseContent).rightValue
-      val openapi         = removeExamples(responseJson)
+      val openapi         = yaml.parser.parse(responseContent).rightValue
 
       openapi is expectedOpenapi
     }
-  }
-
-  def removeExamples(json: Json): Json = {
-    removeField("examples", removeField("example", json))
-  }
-
-  def removeField(name: String, json: Json): Json = {
-    json.mapObject(obj => removeFieldObj(name, obj))
-  }
-
-  def removeFieldObj(name: String, jsonObject: JsonObject): JsonObject = {
-    jsonObject.remove(name).mapValues(value => removeField(name, value))
   }
 
   trait RestServerFixture extends ServerFixture {
