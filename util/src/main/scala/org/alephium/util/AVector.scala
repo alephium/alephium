@@ -72,7 +72,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def tail: AVector[A] = {
     assume(nonEmpty)
-    AVector.unsafe(elems, start + 1, end, appendable)
+    AVector.unsafe(elems, start + 1, end, false)
   }
 
   def apply(i: Int): A = {
@@ -106,7 +106,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     elems = arr
   }
 
-  def :+(elem: A): AVector[A] = {
+  def :+[B <: A](elem: B): AVector[A] = {
     if (appendable) {
       ensureSize(length + 1)
       elems(end) = elem
@@ -186,8 +186,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def slice(from: Int, until: Int): AVector[A] = {
     assume(from >= 0 && from <= until && until <= length)
 
-    val newAppendable = if (until == length) appendable else false
-    AVector.unsafe(elems, start + from, start + until, newAppendable)
+    AVector.unsafe(elems, start + from, start + until, false)
   }
 
   def take(n: Int): AVector[A] = {
@@ -632,11 +631,15 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     toIterable.toString()
   }
 
-  def as[@sp T >: A: ClassTag]: AVector[T] = map(identity)
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def as[@sp T >: A: ClassTag]: AVector[T] = {
+    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, false)
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def asUnsafe[T <: A: ClassTag]: AVector[T] =
-    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
+  def asUnsafe[T <: A: ClassTag]: AVector[T] = {
+    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, false)
+  }
 }
 // scalastyle:on
 

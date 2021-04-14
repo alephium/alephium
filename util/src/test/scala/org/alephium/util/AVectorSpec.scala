@@ -536,6 +536,20 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     vc.length is AVector.defaultSize
     vc.foreach(_ is AVector.defaultSize)
   }
+
+  it should "not share the underlying array" in new Fixture {
+    val vc0 = AVector(1, 2, 3)
+    val vc1 = vc0.tail
+    vc0.appendable is true
+    vc1.appendable is false
+
+    val vc2 = vc0 :+ 3
+    val vc3 = vc1 :+ 4
+    vc0.appendable is false
+    vc3.appendable is true
+    vc2 is AVector(1, 2, 3, 3)
+    vc3 is AVector(2, 3, 4)
+  }
 }
 
 class RefAVectorSpec extends AlephiumSpec {
