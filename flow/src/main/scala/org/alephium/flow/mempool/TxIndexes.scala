@@ -23,7 +23,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.AVector
 
-case class TxIndexes(
+final case class TxIndexes(
     inputIndex: mutable.HashSet[AssetOutputRef],
     outputIndex: mutable.HashMap[AssetOutputRef, TxOutput],
     addressIndex: mutable.HashMap[LockupScript, mutable.ArrayBuffer[AssetOutputRef]]
@@ -61,6 +61,7 @@ case class TxIndexes(
 
   def isSpent(asset: AssetOutputRef): Boolean = inputIndex.contains(asset)
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
     addressIndex
       .get(lockupScript)

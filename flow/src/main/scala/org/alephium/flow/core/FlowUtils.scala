@@ -259,14 +259,17 @@ trait FlowUtils
   def getUsableUtxos(
       lockupScript: LockupScript
   ): IOResult[AVector[AssetOutputInfo]] = {
+    @tailrec
     def iter(lastTryOpt: Option[AVector[AssetOutputInfo]]): IOResult[AVector[AssetOutputInfo]] = {
-      getUsableUtxosOnce(lockupScript).flatMap { utxos =>
-        lastTryOpt match {
-          case Some(firstTry) =>
-            if (utxos.toSet == firstTry.toSet) Right(utxos) else iter(Some(utxos))
-          case None =>
-            iter(Some(utxos))
-        }
+      getUsableUtxosOnce(lockupScript) match {
+        case Right(utxos) =>
+          lastTryOpt match {
+            case Some(firstTry) =>
+              if (utxos.toSet == firstTry.toSet) Right(utxos) else iter(Some(utxos))
+            case None =>
+              iter(Some(utxos))
+          }
+        case Left(error) => Left(error)
       }
     }
     iter(None)
