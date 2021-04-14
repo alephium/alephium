@@ -229,15 +229,15 @@ trait FlowUtils
     }
   }
 
-  def getPreOutputs(tx: TransactionAbstract): IOResult[Option[AVector[TxOutput]]] = {
+  def getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
     val chainIndex = tx.chainIndex
     val mainGroup  = chainIndex.from
     val bestDeps   = getBestDeps(mainGroup)
     for {
       worldState <- getPersistedWorldState(bestDeps, mainGroup)
-      result <- tx.unsigned.inputs.foldE(Option(AVector.empty[TxOutput])) {
+      result <- tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
         case (Some(outputs), input) =>
-          getPreOutput(mainGroup, worldState, input.outputRef).map(_.map(outputs :+ _))
+          getPreOutput(mainGroup, worldState, input).map(_.map(outputs :+ _))
         case (None, _) => Right(None)
       }
     } yield result
@@ -246,7 +246,7 @@ trait FlowUtils
   def getPreOutput(
       mainGroup: GroupIndex,
       worldState: WorldState.Persisted,
-      outputRef: AssetOutputRef
+      outputRef: TxOutputRef
   ): IOResult[Option[TxOutput]] = {
     getMemPool(mainGroup).getUtxo(outputRef) match {
       case Some(output) => Right(Some(output))

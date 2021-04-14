@@ -143,6 +143,11 @@ class MemPool private (
     }
   }
 
+  def getUtxo(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
+    case ref: AssetOutputRef => getUtxo(ref)
+    case _                   => None
+  }
+
   def getUtxo(outputRef: AssetOutputRef): Option[TxOutput] = {
     val result = pendingPool.getUtxo(outputRef).flatMap {
       case Some(output) => Right(Some(output))

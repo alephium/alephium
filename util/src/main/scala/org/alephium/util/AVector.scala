@@ -127,7 +127,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(arr)
   }
 
-  def ++(that: AVector[A]): AVector[A] = {
+  def ++[B <: A](that: AVector[B]): AVector[A] = {
     val newLength = length + that.length
     if (appendable) {
       ensureSize(newLength)
