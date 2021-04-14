@@ -140,7 +140,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       }
     case Received(SendTxs(txs)) =>
       log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.id))}")
-      txs.foreach(tx => allHandlers.txHandler ! TxHandler.AddMemPoolTx(tx, dataOrigin))
+      allHandlers.txHandler ! TxHandler.AddToSharedPool(txs, dataOrigin)
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }

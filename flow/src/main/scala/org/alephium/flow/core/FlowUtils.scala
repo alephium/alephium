@@ -72,13 +72,16 @@ trait FlowUtils
     if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
-  def updateGrandPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = {
-    updateMemPoolUnsafe(mainGroup, newDeps)
+  def updateGrandPoolUnsafe(
+      mainGroup: GroupIndex,
+      newDeps: BlockDeps,
+      oldDeps: BlockDeps
+  ): AVector[TransactionTemplate] = {
+    updateMemPoolUnsafe(mainGroup, newDeps, oldDeps)
     updatePendingPoolUnsafe(mainGroup, newDeps)
   }
 
-  def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = {
-    val oldDeps = getBestDeps(mainGroup)
+  def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps, oldDeps: BlockDeps): Unit = {
     calMemPoolChangesUnsafe(mainGroup, oldDeps, newDeps) match {
       case Normal(toRemove) =>
         val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
@@ -95,7 +98,12 @@ trait FlowUtils
     }
   }
 
-  def updatePendingPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps): Unit = Utils.unsafe {
+  // TODO: we could update this purely based on mempool, but we need to consider the tradeoffs
+  // it returns the list of txs added to shared pool
+  def updatePendingPoolUnsafe(
+      mainGroup: GroupIndex,
+      newDeps: BlockDeps
+  ): AVector[TransactionTemplate] = Utils.unsafe {
     getPersistedWorldState(newDeps, mainGroup).flatMap { worldState =>
       getMemPool(mainGroup).updatePendingPool(worldState)
     }
@@ -103,9 +111,9 @@ trait FlowUtils
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
-  def updateBestDeps(): IOResult[Unit]
+  def updateBestDeps(): IOResult[AVector[TransactionTemplate]]
 
-  def updateBestDepsUnsafe(): Unit
+  def updateBestDepsUnsafe(): AVector[TransactionTemplate]
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 

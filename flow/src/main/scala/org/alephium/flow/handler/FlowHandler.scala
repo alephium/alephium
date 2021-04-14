@@ -35,7 +35,10 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow, eventBus))
 
   sealed trait Command
-  final case class SetHandler(handler: ActorRefT[DependencyHandler.Command]) extends Command
+  final case class SetHandler(
+      dependencyHandler: ActorRefT[DependencyHandler.Command],
+      txHandler: ActorRefT[TxHandler.Command]
+  ) extends Command
   final case class AddHeader(
       header: BlockHeader,
       broker: ActorRefT[ChainHandler.Event],
@@ -89,10 +92,12 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
   import FlowHandler._
 
   private var dependencyHandler: ActorRefT[DependencyHandler.Command] = _
+  private var txHandler: ActorRefT[TxHandler.Command]                 = _
 
   override def receive: Receive = {
-    case SetHandler(handler) =>
-      dependencyHandler = handler
+    case SetHandler(_dependencyHandler, _txHandler) =>
+      dependencyHandler = _dependencyHandler
+      txHandler = _txHandler
       unstashAll()
       context become handleWith(None)
     case _ => stash()
@@ -158,10 +163,13 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
       case Right(true) =>
         log.debug(s"Blockheader ${header.shortHex} exists already")
       case Right(false) =>
-        blockFlow.add(header) match {
+        blockFlow.addNew(header) match {
           case Left(error) => handleIOError(error)
-          case Right(_) =>
+          case Right(newReadyTxs) =>
             dependencyHandler ! DependencyHandler.FlowDataAdded(header)
+            if (newReadyTxs.nonEmpty) {
+              txHandler ! TxHandler.Broadcast(newReadyTxs)
+            }
             broker ! HeaderChainHandler.HeaderAdded(header.hash)
             minerOpt.foreach(_ ! Miner.UpdateTemplate)
             log.info(show(header))
@@ -178,10 +186,13 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
   ): Unit = {
     escapeIOError(blockFlow.contains(block)) { isIncluded =>
       if (!isIncluded) {
-        blockFlow.add(block) match {
+        blockFlow.addNew(block) match {
           case Left(error) => handleIOError(error)
-          case Right(_) =>
+          case Right(newReadyTxs) =>
             dependencyHandler ! DependencyHandler.FlowDataAdded(block)
+            if (newReadyTxs.nonEmpty) {
+              txHandler ! TxHandler.Broadcast(newReadyTxs)
+            }
             broker ! BlockChainHandler.BlockAdded(block.hash)
             origin match {
               case DataOrigin.Local => ()

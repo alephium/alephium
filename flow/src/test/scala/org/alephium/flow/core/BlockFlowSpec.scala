@@ -202,14 +202,15 @@ class BlockFlowSpec extends AlephiumSpec {
     blocks3.foreach(addAndCheck(blockFlow, _, brokerConfig.chainNum * 2 + brokerConfig.depsNum + 1))
   }
 
-  it should "update mempool correctly" in new FlowFixture {
+  it should "update mempool when there are conflicted txs" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
       forAll(Gen.choose(brokerConfig.groupFrom, brokerConfig.groupUntil - 1)) { mainGroup =>
-        val blockFlow = genesisBlockFlow()
+        val blockFlow  = genesisBlockFlow()
+        val blockFlow1 = genesisBlockFlow()
 
         val chainIndex = ChainIndex.unsafe(mainGroup, 0)
-        val block11    = tryToTransfer(blockFlow, chainIndex)
-        val block12    = tryToTransfer(blockFlow, chainIndex)
+        val block11    = transfer(blockFlow, chainIndex)
+        val block12    = transfer(blockFlow1, chainIndex)
         blockFlow.grandPool.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block11, 1)
         blockFlow.grandPool.mempools.foreach(_.size is 0)

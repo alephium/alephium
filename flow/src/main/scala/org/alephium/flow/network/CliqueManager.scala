@@ -28,7 +28,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, BaseActor, EventStream}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
 
 object CliqueManager {
   def props(
@@ -50,7 +50,7 @@ object CliqueManager {
   ) extends Command
       with EventStream.Event
   final case class BroadCastTx(
-      tx: TransactionTemplate,
+      txs: AVector[TransactionTemplate],
       txMsg: ByteString,
       chainIndex: ChainIndex,
       origin: DataOrigin

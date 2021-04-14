@@ -133,12 +133,13 @@ class MemPool private (
 
   def updatePendingPool(
       worldState: WorldState.Persisted
-  ): IOResult[Unit] = {
+  ): IOResult[AVector[TransactionTemplate]] = {
     pendingPool.extractReadyTxs(worldState).map { txs =>
       txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
         addToTxPool(chainIndex, txss)
       }
       pendingPool.remove(txs)
+      txs
     }
   }
 
