@@ -76,12 +76,13 @@ class MemPool private (
       .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
   }
 
-  def addNewTx(index: ChainIndex, tx: TransactionTemplate): Unit = writeOnly {
+  def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = writeOnly {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
       pendingPool.add(tx)
+      MemPool.AddedToLocalPool
     } else {
       addToTxPool(index, AVector(tx))
-      ()
+      MemPool.AddedToSharedPool
     }
   }
 
@@ -165,4 +166,8 @@ object MemPool {
     val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
     new MemPool(groupIndex, pools, TxIndexes.empty, PendingPool.empty)
   }
+
+  sealed trait NewTxCategory
+  case object AddedToLocalPool  extends NewTxCategory
+  case object AddedToSharedPool extends NewTxCategory
 }

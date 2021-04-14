@@ -91,11 +91,14 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       mempool: MemPool,
       origin: DataOrigin
   ): Unit = {
-    val count = mempool.addNewTx(chainIndex, tx)
-    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, #$count txs added")
-    val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)
-    val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
-    publishEvent(event)
+    val result = mempool.addNewTx(chainIndex, tx)
+    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
+    if (result == MemPool.AddedToSharedPool) {
+      // We don't broadcast txs that is pending locally
+      val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)
+      val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
+      publishEvent(event)
+    }
     addSucceeded(tx)
   }
 
