@@ -62,7 +62,7 @@ class MemPool private (
 
   def getAll(index: ChainIndex): AVector[TransactionTemplate] =
     readOnly {
-      getPool(index).getAll
+      getPool(index).getAll() ++ pendingPool.getAll()
     }
 
   def isSpent(outputRef: AssetOutputRef): Boolean = {

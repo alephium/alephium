@@ -51,6 +51,10 @@ class PendingPool(
     }
   }
 
+  def getAll(): AVector[TransactionTemplate] = readOnly {
+    AVector.from(txs.values)
+  }
+
   def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = readOnly {
     indexes.getRelevantUtxos(lockupScript)
   }

@@ -53,7 +53,7 @@ class TxPool private (
       AVector.from(pool.values.take(maxNum))
     }
 
-  def getAll: AVector[TransactionTemplate] =
+  def getAll(): AVector[TransactionTemplate] =
     readOnly {
       AVector.from(pool.values)
     }
