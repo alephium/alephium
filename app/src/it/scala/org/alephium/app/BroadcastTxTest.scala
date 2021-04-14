@@ -50,7 +50,7 @@ class BroadcastTxTest extends AlephiumSpec {
     server2.stop().futureValue is ()
   }
 
-  it should "broadcast tx between inter clique node" in new TestFixture(
+  it should "broadcast sequential txs between inter clique node" in new TestFixture(
     "broadcast-tx-inter-clique"
   ) {
 
@@ -87,14 +87,33 @@ class BroadcastTxTest extends AlephiumSpec {
       }
     }
 
-    val tx =
+    val tx0 =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-
     eventually(
-      request[TxStatus](getTransactionStatus(tx), restPort(masterPortClique1)) is MemPooled
+      request[TxStatus](getTransactionStatus(tx0), restPort(masterPortClique1)) is MemPooled
     )
     eventually(
-      request[TxStatus](getTransactionStatus(tx), restPort(masterPortClique2)) is MemPooled
+      request[TxStatus](getTransactionStatus(tx0), restPort(masterPortClique2)) is MemPooled
+    )
+
+    val tx1 =
+      transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
+    eventually(
+      request[TxStatus](getTransactionStatus(tx1), restPort(masterPortClique1)) is MemPooled
+    )
+    eventually(
+      request[TxStatus](getTransactionStatus(tx1), restPort(masterPortClique2)) is NotFound
+    )
+
+    clique2.foreach { server =>
+      request[Boolean](startMining, restPort(server.config.network.bindAddress.getPort)) is true
+    }
+
+    eventually(
+      request[TxStatus](getTransactionStatus(tx0), restPort(masterPortClique1)) is a[Confirmed]
+    )
+    eventually(
+      request[TxStatus](getTransactionStatus(tx1), restPort(masterPortClique1)) is a[Confirmed]
     )
 
     clique1.foreach(_.stop().futureValue is ())
