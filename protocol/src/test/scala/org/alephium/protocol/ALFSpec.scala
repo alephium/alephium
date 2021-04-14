@@ -23,5 +23,9 @@ class ALFSpec extends AlephiumSpec {
     ALF.alf(1) is ALF.nanoAlf(1).mul(U256.Billion).get
     ALF.alf(1).toBigInt.longValue() is math.pow(10, 18).longValue()
     ALF.cent(1).mulUnsafe(U256.unsafe(100)) is ALF.alf(1)
+
+    ALF.oneAlf is ALF.alf(1)
+    ALF.oneNanoAlf is ALF.nanoAlf(1)
+    ALF.oneAlf is (ALF.oneNanoAlf.mulUnsafe(U256.unsafe(1000000000)))
   }
 }
