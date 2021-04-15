@@ -17,7 +17,7 @@
 package org.alephium.app
 
 import sttp.tapir.Endpoint
-import sttp.tapir.docs.openapi.RichOpenAPIEndpoints
+import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
 import sttp.tapir.openapi.{OpenAPI, Server, ServerVariable}
 
 import org.alephium.api.Endpoints
@@ -61,5 +61,7 @@ trait Documentation extends Endpoints {
   )
 
   lazy val openAPI: OpenAPI =
-    (walletEndpoints ++ blockflowEndpoints).toOpenAPI("Alephium API", "1.0").servers(servers)
+    OpenAPIDocsInterpreter
+      .toOpenAPI(walletEndpoints ++ blockflowEndpoints, "Alephium API", "1.0")
+      .servers(servers)
 }

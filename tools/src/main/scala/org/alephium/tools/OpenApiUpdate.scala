@@ -16,8 +16,7 @@
 
 package org.alephium.tools
 
-import sttp.tapir.openapi.circe.yaml.RichOpenAPI
-
+import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.app.Documentation
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
@@ -45,9 +44,9 @@ object OpenApiUpdate extends App {
 
     override val walletEndpoints = wallet.walletEndpoints
 
-    private val yaml = openAPI.toYaml.toString
+    private val json = openApiJson(openAPI)
 
     import java.io.PrintWriter
-    new PrintWriter("../api/src/main/resources/openapi.yaml") { write(yaml); close }
+    new PrintWriter("../api/src/main/resources/openapi.json") { write(json); close }
   }
 }

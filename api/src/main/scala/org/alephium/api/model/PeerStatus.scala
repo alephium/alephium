@@ -21,6 +21,8 @@ import org.alephium.util.TimeStamp
 sealed trait PeerStatus
 
 object PeerStatus {
-  final case class Penalty(value: Int)      extends PeerStatus
+  @upickle.implicits.key("penalty")
+  final case class Penalty(value: Int) extends PeerStatus
+  @upickle.implicits.key("banned")
   final case class Banned(until: TimeStamp) extends PeerStatus
 }

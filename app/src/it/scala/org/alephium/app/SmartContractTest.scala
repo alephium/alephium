@@ -16,9 +16,8 @@
 
 package org.alephium.app
 
-import io.circe.Json
-
 import org.alephium.api.model._
+import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.util._
@@ -48,7 +47,7 @@ class SmartContractTest extends AlephiumSpec {
           {
             "type": "$tpe",
             "address": "$address",
-            "code": ${Json.fromString(code)}
+            "code": ${ujson.Str(code)}
             ${state.map(s => s""","state": "$s"""").getOrElse("")}
           }"""),
         restPort
@@ -70,7 +69,7 @@ class SmartContractTest extends AlephiumSpec {
           {
             "tx": "${buildResult.unsignedTx}",
             "code": "${compileResult.code}",
-            "fromGroup": "${group.group}",
+            "fromGroup": ${group.group},
             "signature":"${signature.toHexString}"
           }"""),
         restPort

@@ -21,10 +21,8 @@ import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
-import io.circe.Encoder
-import io.circe.syntax._
 
-import org.alephium.api.{ApiModelCodec, CirceUtils}
+import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
@@ -37,6 +35,7 @@ import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
+import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -100,8 +99,8 @@ trait ServerFixture
 }
 
 object ServerFixture {
-  def show[T](t: T)(implicit encoder: Encoder[T]): String = {
-    CirceUtils.print(t.asJson)
+  def show[T: Writer](t: T): String = {
+    write(t)
   }
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {

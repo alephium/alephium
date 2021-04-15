@@ -16,7 +16,7 @@
 
 package org.alephium.wallet.web
 
-import sttp.client._
+import sttp.client3._
 import sttp.tapir.client.sttp._
 
 import org.alephium.api.Endpoints
@@ -26,13 +26,12 @@ import org.alephium.util.{AlephiumSpec, Duration, U256}
 
 class BlockFlowClientSpec() extends AlephiumSpec {
   it should "correclty create an sttp request" in new Fixture {
-    val request = buildTransaction
-      .toSttpRequestUnsafe(uri"http://localhost:1234")
+    val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://localhost:1234"))
       .apply((publicKey, toAddress, None, value))
     request.uri is uri"http://localhost:1234/transactions/build?fromKey=${publicKey.toHexString}&toAddress=${toAddress.toBase58}&value=${value.v}"
   }
 
-  trait Fixture extends Endpoints with LockupScriptGenerators {
+  trait Fixture extends Endpoints with LockupScriptGenerators with SttpClientInterpreter {
     implicit val groupConfig: GroupConfig = new GroupConfig { val groups = 4 }
     val networkType                       = NetworkType.Devnet
     val groupIndex                        = GroupIndex.unsafe(0)

@@ -69,7 +69,7 @@ class WalletApp(config: WalletConfig)(implicit
       case None => Future.successful(())
       case Some(port) =>
         for {
-          binding <- Http().bindAndHandle(routes, "localhost", port)
+          binding <- Http().newServerAt("localhost", port).bind(routes)
         } yield {
           bindingPromise.success(binding)
           logger.info(s"Listening wallet http request on $binding")

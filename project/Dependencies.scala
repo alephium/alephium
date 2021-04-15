@@ -17,29 +17,27 @@
 import sbt._
 
 object Version {
-  lazy val akka        = "2.6.8"
-  lazy val `akka-http` = "10.1.14"
-  lazy val circe       = "0.13.0"
+  lazy val akka        = "2.6.13"
+  lazy val `akka-http` = "10.2.4"
   lazy val metrics     = "4.0.6"
-  lazy val tapir       = "0.16.16"
-  lazy val sttp        = "2.2.5"
+  lazy val tapir       = "0.17.19"
+  lazy val sttp        = "3.2.3"
 }
 
 object Dependencies {
-  lazy val akka              = "com.typesafe.akka" %% "akka-actor"      % Version.akka
-  lazy val `akka-http`       = "com.typesafe.akka" %% "akka-http"       % Version.`akka-http`
-  lazy val `akka-http-circe` = "de.heikoseeberger" %% "akka-http-circe" % "1.32.0"
-  lazy val `akka-slf4j`      = "com.typesafe.akka" %% "akka-slf4j"      % Version.akka
-  lazy val `akka-stream`     = "com.typesafe.akka" %% "akka-stream"     % Version.akka
-  lazy val `akka-test`       = "com.typesafe.akka" %% "akka-testkit"    % Version.akka % Test
+  lazy val akka                = "com.typesafe.akka" %% "akka-actor"        % Version.akka
+  lazy val `akka-http`         = "com.typesafe.akka" %% "akka-http"         % Version.`akka-http`
+  lazy val `akka-http-upickle` = "de.heikoseeberger" %% "akka-http-upickle" % "1.36.0"
+  lazy val `akka-slf4j`        = "com.typesafe.akka" %% "akka-slf4j"        % Version.akka
+  lazy val `akka-stream`       = "com.typesafe.akka" %% "akka-stream"       % Version.akka
+  lazy val `akka-test`         = "com.typesafe.akka" %% "akka-testkit"      % Version.akka % Test
   lazy val `akka-http-test` =
     "com.typesafe.akka" %% "akka-http-testkit" % Version.`akka-http` % Test
-  lazy val `akka-http-cors`   = "ch.megard"         %% "akka-http-cors"      % "1.0.0"
+  lazy val `akka-http-cors`   = "ch.megard"         %% "akka-http-cors"      % "1.1.1"
   lazy val `akka-stream-test` = "com.typesafe.akka" %% "akka-stream-testkit" % Version.akka % Test
 
-  lazy val `circe-core`    = "io.circe"                   %% "circe-core"      % Version.circe
-  lazy val `circe-parser`  = "io.circe"                   %% "circe-parser"    % Version.circe
-  lazy val `circe-generic` = "io.circe"                   %% "circe-generic"   % Version.circe
+  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.3.8"
+
   lazy val pureconfig      = "com.github.pureconfig"      %% "pureconfig"      % "0.14.1"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk15on"  % "1.68"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.1"
@@ -56,14 +54,13 @@ object Dependencies {
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 
   lazy val `tapir-core`    = "com.softwaremill.sttp.tapir" %% "tapir-core"             % Version.tapir
-  lazy val `tapir-circe`   = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"       % Version.tapir
   lazy val `tapir-akka`    = "com.softwaremill.sttp.tapir" %% "tapir-akka-http-server" % Version.tapir
   lazy val `tapir-openapi` = "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs"     % Version.tapir
-  lazy val `tapir-openapi-circe` =
-    "com.softwaremill.sttp.tapir" %% "tapir-openapi-circe-yaml" % Version.tapir
+  lazy val `tapir-openapi-model` =
+    "com.softwaremill.sttp.tapir" %% "tapir-openapi-model" % Version.tapir
   lazy val `tapir-swagger-ui` =
     "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-akka-http" % Version.tapir
   lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
   lazy val `sttp-akka-http-backend` =
-    "com.softwaremill.sttp.client" %% "akka-http-backend" % Version.sttp
+    "com.softwaremill.sttp.client3" %% "akka-http-backend" % Version.sttp
 }

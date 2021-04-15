@@ -18,6 +18,8 @@ package org.alephium.api
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import scala.reflect.ClassTag
+
 import akka.util.ByteString
 import sttp.tapir.Schema
 import sttp.tapir.SchemaType.SInteger
@@ -29,18 +31,19 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TapirSchemasLike {
-  implicit def avectorSchema[T: Schema]: Schema[AVector[T]] = implicitly[Schema[T]].asArrayElement
-  implicit val addressSchema: Schema[Address]               = Schema(Schema.schemaForString.schemaType)
-  implicit val byteStringSchema: Schema[ByteString]         = Schema(Schema.schemaForString.schemaType)
-  implicit val pulblicKeySchema: Schema[PublicKey]          = Schema(Schema.schemaForString.schemaType)
-  implicit val groupIndexSchema: Schema[GroupIndex]         = Schema(Schema.schemaForInt.schemaType)
-  implicit val hashSchema: Schema[Hash]                     = Schema(Schema.schemaForString.schemaType)
-  implicit val blockHashSchema: Schema[BlockHash]           = Schema(Schema.schemaForString.schemaType)
-  implicit val pubScriptSchema: Schema[LockupScript]        = Schema(Schema.schemaForString.schemaType)
-  implicit val signatureSchema: Schema[Signature]           = Schema(Schema.schemaForString.schemaType)
-  implicit val timestampSchema: Schema[TimeStamp]           = Schema(Schema.schemaForLong.schemaType)
-  implicit val u256Schema: Schema[U256]                     = Schema(SInteger).format("uint256")
-  implicit val inetAddressSchema: Schema[InetAddress]       = Schema(Schema.schemaForString.schemaType)
+  implicit def avectorSchema[T: Schema: ClassTag]: Schema[AVector[T]] =
+    implicitly[Schema[T]].asArray.map(array => Some(AVector.from(array)))(_.toArray)
+  implicit val addressSchema: Schema[Address]         = Schema(Schema.schemaForString.schemaType)
+  implicit val byteStringSchema: Schema[ByteString]   = Schema(Schema.schemaForString.schemaType)
+  implicit val pulblicKeySchema: Schema[PublicKey]    = Schema(Schema.schemaForString.schemaType)
+  implicit val groupIndexSchema: Schema[GroupIndex]   = Schema(Schema.schemaForInt.schemaType)
+  implicit val hashSchema: Schema[Hash]               = Schema(Schema.schemaForString.schemaType)
+  implicit val blockHashSchema: Schema[BlockHash]     = Schema(Schema.schemaForString.schemaType)
+  implicit val pubScriptSchema: Schema[LockupScript]  = Schema(Schema.schemaForString.schemaType)
+  implicit val signatureSchema: Schema[Signature]     = Schema(Schema.schemaForString.schemaType)
+  implicit val timestampSchema: Schema[TimeStamp]     = Schema(Schema.schemaForLong.schemaType)
+  implicit val u256Schema: Schema[U256]               = Schema(SInteger).format("uint256")
+  implicit val inetAddressSchema: Schema[InetAddress] = Schema(Schema.schemaForString.schemaType)
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(
     Schema.schemaForString.schemaType
   )
