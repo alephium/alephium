@@ -63,6 +63,13 @@ trait ConflictedBlocks {
     val diffs = getHashesForUpdatesUnsafe(target, deps)
     getCache(target).filterConflicts(diffs, txs, getBlock)
   }
+
+  def isTxConflicted(
+      targetGroup: GroupIndex,
+      tx: TransactionTemplate
+  ): Boolean = {
+    getCache(targetGroup).isTxConflicted(tx)
+  }
 }
 
 object ConflictedBlocks {
@@ -171,6 +178,12 @@ object ConflictedBlocks {
         cacheAll(diffs, getBlock)
         txs.filterNot(tx => isConflicted(tx, diffs))
       }
+
+    def isTxConflicted(tx: TransactionTemplate): Boolean = {
+      this.synchronized {
+        tx.unsigned.inputs.exists(input => txCache.get(input.outputRef).exists(_.nonEmpty))
+      }
+    }
 
     private def uncacheOldTips(duration: Duration, hash: BlockHash): Unit = {
       if (blockCache.size >= cacheSizeBoundary) {

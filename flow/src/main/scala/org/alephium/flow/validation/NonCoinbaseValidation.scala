@@ -32,14 +32,15 @@ trait NonCoinbaseValidation {
 
   implicit def groupConfig: GroupConfig
 
-  def validateMempoolTxTemplate(
+  def validateTxTemplate(
       tx: TransactionTemplate,
-      flow: BlockFlow
+      flow: BlockFlow,
+      validate: (Transaction, BlockFlow) => TxValidationResult[Unit]
   ): TxValidationResult[Unit] = {
     tx.unsigned.scriptOpt match {
       case None =>
         val fullTx = FlowUtils.convertNonScriptTx(tx)
-        validateMempoolTx(fullTx, flow)
+        validate(fullTx, flow)
       case Some(script) =>
         for {
           chainIndex <- checkChainIndex(tx)
@@ -48,9 +49,16 @@ trait NonCoinbaseValidation {
             case Left(error)   => invalidTx(TxScriptExeFailed(error))
             case Right(result) => validTx(FlowUtils.convertSuccessfulTx(tx, result))
           }
-          _ <- validateMempoolTx(fullTx, flow)
+          _ <- validate(fullTx, flow)
         } yield ()
     }
+  }
+
+  def validateMempoolTxTemplate(
+      tx: TransactionTemplate,
+      flow: BlockFlow
+  ): TxValidationResult[Unit] = {
+    validateTxTemplate(tx, flow, validateMempoolTx)
   }
 
   def validateMempoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
@@ -58,6 +66,25 @@ trait NonCoinbaseValidation {
       _          <- checkStateless(tx, checkDoubleSpending = true)
       worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
       _          <- checkStateful(tx, TimeStamp.now(), worldState)
+    } yield ()
+  }
+
+  def validateGrandPoolTxTemplate(
+      tx: TransactionTemplate,
+      flow: BlockFlow
+  ): TxValidationResult[Unit] = {
+    validateTxTemplate(tx, flow, validateGrandPoolTx)
+  }
+
+  def validateGrandPoolTx(tx: Transaction, flow: BlockFlow): TxValidationResult[Unit] = {
+    for {
+      _ <- checkStateless(tx, checkDoubleSpending = true)
+      preOutputs <- flow.getPreOutputs(tx) match {
+        case Right(Some(outputs)) => Right(outputs)
+        case Right(None)          => Left(Right(NonExistInput))
+        case Left(error)          => Left(Left(error))
+      }
+      _ <- checkStatefulExceptTxScript(tx, TimeStamp.now(), preOutputs)
     } yield ()
   }
 
@@ -96,12 +123,21 @@ trait NonCoinbaseValidation {
   ): TxValidationResult[Unit] = {
     for {
       preOutputs   <- getPreOutputs(tx, worldState)
+      gasRemaining <- checkStatefulExceptTxScript(tx, headerTs, preOutputs)
+      _            <- checkTxScript(tx, gasRemaining, worldState)
+    } yield ()
+  }
+  protected[validation] def checkStatefulExceptTxScript(
+      tx: Transaction,
+      headerTs: TimeStamp,
+      preOutputs: AVector[TxOutput]
+  ): TxValidationResult[GasBox] = {
+    for {
       _            <- checkLockTime(preOutputs, headerTs)
       _            <- checkAlfBalance(tx, preOutputs)
       _            <- checkTokenBalance(tx, preOutputs)
       gasRemaining <- checkWitnesses(tx, preOutputs)
-      _            <- checkTxScript(tx, gasRemaining, worldState)
-    } yield ()
+    } yield gasRemaining
   }
 
   protected[validation] def getPreOutputs(

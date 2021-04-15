@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.TransactionTemplate
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, RWLock, U256}
 
 /*
@@ -28,14 +28,15 @@ import org.alephium.util.{AVector, RWLock, U256}
  */
 class TxPool private (
     pool: mutable.SortedMap[WeightedId, TransactionTemplate],
+    indexes: TxIndexes,
     weights: mutable.HashMap[Hash, U256],
-    _capacity: Int
-) extends RWLock {
-  def isFull: Boolean = pool.size == _capacity
+    val capacity: Int
+) extends Pool
+    with RWLock {
+
+  def isFull: Boolean = pool.size == capacity
 
   def size: Int = pool.size
-
-  def capacity: Int = _capacity
 
   def contains(txId: Hash): Boolean =
     readOnly {
@@ -47,7 +48,7 @@ class TxPool private (
       AVector.from(pool.values.take(maxNum))
     }
 
-  def getAll: AVector[TransactionTemplate] =
+  def getAll(): AVector[TransactionTemplate] =
     readOnly {
       AVector.from(pool.values)
     }
@@ -61,6 +62,7 @@ class TxPool private (
         } else {
           weights += tx.id                                -> tx.unsigned.gasPrice
           pool += WeightedId(tx.unsigned.gasPrice, tx.id) -> tx
+          indexes.add(tx)
           Right(())
         }
       }
@@ -76,6 +78,7 @@ class TxPool private (
           val weight = weights(tx.id)
           weights -= tx.id
           pool -= WeightedId(weight, tx.id)
+          indexes.remove(tx)
         }
       }
       val sizeAfter = size
@@ -90,7 +93,7 @@ class TxPool private (
 
 object TxPool {
   def empty(capacity: Int): TxPool =
-    new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
+    new TxPool(mutable.SortedMap.empty, TxIndexes.empty, mutable.HashMap.empty, capacity)
 
   final case class WeightedId(weight: U256, id: Hash) {
     override def equals(obj: Any): Boolean =
@@ -103,8 +106,6 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    import org.alephium.util.Bytes.byteStringOrdering
-    implicit val hashOrd: Ordering[Hash] = Ordering.by(_.bytes)
     Ordering.by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight, weightedId.id)).reverse
   }
 }

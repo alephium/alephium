@@ -67,11 +67,11 @@ class DiscoveryServerSpec
 
           val discoveryPrivateKey: PrivateKey = discoveryPrivateKey0
           val discoveryPublicKey: PublicKey   = discoveryPublicKey0
-          val peersPerGroup: Int              = 4
-          val scanMaxPerGroup: Int            = 4
+          val peersPerGroup: Int              = 3
+          val scanMaxPerGroup: Int            = 3
           val scanFrequency: Duration         = Duration.ofMillisUnsafe(1000)
           val scanFastFrequency: Duration     = Duration.ofMillisUnsafe(1000)
-          val neighborsPerGroup: Int          = 4
+          val neighborsPerGroup: Int          = 3
         }
         (brokerInfo, config)
       }
@@ -125,7 +125,7 @@ class DiscoveryServerSpec
         server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
-          (peers.sumBy(_.groupNumPerBroker) >= 4 * groups) is true
+          (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
         }
       }
     }

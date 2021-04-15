@@ -18,6 +18,7 @@ package org.alephium.flow.core
 
 import akka.util.ByteString
 
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput}
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -70,18 +71,17 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
   trait Fixture extends AlephiumConfigFixture {
 
-    def buildOutput(lockupScript: LockupScript, amount: U256): (AssetOutputRef, AssetOutput) = {
+    def buildOutput(lockupScript: LockupScript, amount: U256): AssetOutputInfo = {
       val output =
         AssetOutput(amount, lockupScript, TimeStamp.now(), AVector.empty, ByteString.empty)
       val ref = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
-      (ref, output)
+      AssetOutputInfo(ref, output, PersistedOutput)
     }
 
     val defaultLockupScript = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.get
 
-    def buildUtxos(amounts: Int*): AVector[(AssetOutputRef, AssetOutput)] = {
+    def buildUtxos(amounts: Int*): AVector[AssetOutputInfo] = {
       AVector.from(amounts.map { amount => buildOutput(defaultLockupScript, U256.unsafe(amount)) })
     }
-
   }
 }

@@ -513,6 +513,13 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     (vc0 ++ vc1 ++ vc2).split() is AVector(vc0, vc1, vc2)
   }
 
+  it should "groupBy" in {
+    val vc0 = AVector(0, 1, 2)
+    vc0.groupBy(identity) is Map(0 -> AVector(0), 1 -> AVector(1), 2 -> AVector(2))
+    vc0.groupBy(_ => 1) is Map(1 -> AVector(0, 1, 2))
+    vc0.groupBy(_ % 2) is Map(0 -> AVector(0, 2), 1 -> AVector(1))
+  }
+
   it should "create matrix using tabulate" in new Fixture {
     forAll(sizeGen, sizeGen) { (n1, n2) =>
       val matrix = AVector.tabulate[Int](n1, n2)(_ + _)
@@ -528,6 +535,20 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     val vc = AVector.fill(AVector.defaultSize)(AVector.defaultSize)
     vc.length is AVector.defaultSize
     vc.foreach(_ is AVector.defaultSize)
+  }
+
+  it should "not share the underlying array" in new Fixture {
+    val vc0 = AVector(1, 2, 3)
+    val vc1 = vc0.tail
+    vc0.appendable is true
+    vc1.appendable is false
+
+    val vc2 = vc0 :+ 3
+    val vc3 = vc1 :+ 4
+    vc0.appendable is false
+    vc3.appendable is true
+    vc2 is AVector(1, 2, 3, 3)
+    vc3 is AVector(2, 3, 4)
   }
 }
 

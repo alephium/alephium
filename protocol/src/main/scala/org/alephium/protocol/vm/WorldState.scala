@@ -27,6 +27,8 @@ import org.alephium.util.AVector
 trait WorldState[T] {
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
 
+  def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]]
+
   def existOutput(outputRef: TxOutputRef): IOResult[Boolean]
 
   def getContractState(key: Hash): IOResult[ContractState]
@@ -199,6 +201,10 @@ object WorldState {
       outputState.get(outputRef)
     }
 
+    def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
+      outputState.getOpt(outputRef)
+    }
+
     def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
       outputState.exist(outputRef)
     }
@@ -304,6 +310,10 @@ object WorldState {
 
     def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
       outputState.get(outputRef)
+    }
+
+    def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
+      outputState.getOpt(outputRef)
     }
 
     def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {

@@ -26,7 +26,7 @@ import org.alephium.wallet.config.WalletConfig
 
 trait WalletConfigFixture extends SocketUtil {
 
-  val localhost: InetAddress = InetAddress.getLocalHost
+  val localhost: InetAddress = InetAddress.getByName("127.0.0.1")
   val blockFlowPort          = generatePort()
   val walletPort             = generatePort()
 

@@ -18,9 +18,6 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp
 import akka.util.ByteString
@@ -99,7 +96,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
       val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
-      Future.sequence(clique1.map(_.start())).futureValue
+      clique1.map(_.start()).foreach(_.futureValue is ())
       startWS(wsPort(masterPortClique1))
 
       eventually(request[SelfClique](getSelfClique, restPort(masterPortClique1)).synced is true)
@@ -124,7 +121,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
         )
       val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
-      Future.sequence(clique2.map(_.start())).futureValue
+      clique2.map(_.start()).foreach(_.futureValue is ())
 
       eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
 

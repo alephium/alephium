@@ -42,6 +42,10 @@ trait BlockFlow
 
   def add(header: BlockHeader, weight: BigInteger): IOResult[Unit] = ???
 
+  def addNew(block: Block): IOResult[AVector[TransactionTemplate]]
+
+  def addNew(header: BlockHeader): IOResult[AVector[TransactionTemplate]]
+
   override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
     getSyncLocatorsUnsafe(brokerConfig)
   }
@@ -163,6 +167,10 @@ object BlockFlow extends StrictLogging {
   ) extends BlockFlow {
 
     def add(block: Block): IOResult[Unit] = {
+      addNew(block).map(_ => ())
+    }
+
+    def addNew(block: Block): IOResult[AVector[TransactionTemplate]] = {
       val index = block.chainIndex
       assume(index.relateTo(brokerConfig))
 
@@ -171,21 +179,25 @@ object BlockFlow extends StrictLogging {
         cacheForConflicts(block)
       }
       for {
-        weight <- calWeight(block)
-        _      <- getBlockChain(index).add(block, weight)
-        _      <- updateBestDeps()
-      } yield ()
+        weight       <- calWeight(block)
+        _            <- getBlockChain(index).add(block, weight)
+        newPooledTxs <- updateBestDeps()
+      } yield newPooledTxs
     }
 
     def add(header: BlockHeader): IOResult[Unit] = {
+      addNew(header).map(_ => ())
+    }
+
+    def addNew(header: BlockHeader): IOResult[AVector[TransactionTemplate]] = {
       val index = header.chainIndex
       assume(!index.relateTo(brokerConfig))
 
       for {
-        weight <- calWeight(header)
-        _      <- getHeaderChain(index).add(header, weight)
-        _      <- updateBestDeps()
-      } yield ()
+        weight       <- calWeight(header)
+        _            <- getHeaderChain(index).add(header, weight)
+        newPooledTxs <- updateBestDeps()
+      } yield newPooledTxs
     }
 
     private def calWeight(block: Block): IOResult[BigInteger] = {
@@ -278,12 +290,16 @@ object BlockFlow extends StrictLogging {
       flowTips2.toBlockDeps
     }
 
-    def updateBestDepsUnsafe(): Unit =
-      brokerConfig.groupFrom until brokerConfig.groupUntil foreach { mainGroup =>
+    def updateBestDepsUnsafe(): AVector[TransactionTemplate] =
+      (brokerConfig.groupFrom until brokerConfig.groupUntil).foldLeft(
+        AVector.empty[TransactionTemplate]
+      ) { case (acc, mainGroup) =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
-        val deps           = calBestDepsUnsafe(mainGroupIndex)
-        updateMemPoolUnsafe(mainGroupIndex, deps)
-        updateBestDeps(mainGroup, deps)
+        val oldDeps        = getBestDeps(mainGroupIndex)
+        val newDeps        = calBestDepsUnsafe(mainGroupIndex)
+        val result         = acc ++ updateGrandPoolUnsafe(mainGroupIndex, newDeps, oldDeps)
+        updateBestDeps(mainGroup, newDeps) // this update must go after pool updates
+        result
       }
 
     def updateBestDepsAfterLoadingUnsafe(): Unit =
@@ -292,7 +308,7 @@ object BlockFlow extends StrictLogging {
         updateBestDeps(mainGroup, deps)
       }
 
-    def updateBestDeps(): IOResult[Unit] = {
+    def updateBestDeps(): IOResult[AVector[TransactionTemplate]] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
   }

@@ -82,7 +82,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
 
     pool.add(AVector(tx1, tx2, tx3))
 
-    pool.getAll is AVector(tx2, tx3, tx1)
+    pool.getAll() is AVector(tx2, tx3, tx1)
 
     pool.collectForBlock(1) is AVector(tx2)
     pool.collectForBlock(2) is AVector(tx2, tx3)

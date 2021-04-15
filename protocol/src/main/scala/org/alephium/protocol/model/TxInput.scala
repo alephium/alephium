@@ -66,6 +66,8 @@ object AssetOutputRef {
   def unsafeWithScriptHint(scriptHint: ScriptHint, key: Hash): AssetOutputRef =
     unsafe(Hint.ofAsset(scriptHint), key)
 
+  def from(output: AssetOutput, key: Hash): AssetOutputRef = unsafe(output.hint, key)
+
   // Only use this to initialize Merkle tree of ouptuts
   def forSMT: AssetOutputRef = {
     val hint = Hint.ofAsset(ScriptHint.fromHash(0))

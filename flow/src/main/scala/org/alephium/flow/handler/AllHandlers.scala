@@ -94,7 +94,7 @@ object AllHandlers {
         dependencyHandlerProps,
         s"DependencyHandler$namePostfix"
       )
-    flowHandler ! FlowHandler.SetHandler(dependencyHandler)
+    flowHandler ! FlowHandler.SetHandler(dependencyHandler, txHandler)
 
     AllHandlers(flowHandler, txHandler, dependencyHandler, blockHandlers, headerHandlers)
   }

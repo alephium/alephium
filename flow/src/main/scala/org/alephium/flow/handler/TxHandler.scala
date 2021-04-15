@@ -23,7 +23,7 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation}
+import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
@@ -37,7 +37,11 @@ object TxHandler {
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
-  final case class AddTx(tx: TransactionTemplate, origin: DataOrigin) extends Command
+  final case class AddToSharedPool(txs: AVector[TransactionTemplate], origin: DataOrigin)
+      extends Command
+  final case class Broadcast(txs: AVector[TransactionTemplate]) extends Command
+  final case class AddToGrandPool(txs: AVector[TransactionTemplate], origin: DataOrigin)
+      extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: Hash) extends Event
@@ -51,22 +55,31 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     with EventStream.Publisher {
   private val nonCoinbaseValidation = NonCoinbaseValidation.build
 
-  override def receive: Receive = { case TxHandler.AddTx(tx, origin) =>
-    handleTx(tx, origin)
+  override def receive: Receive = {
+    case TxHandler.AddToSharedPool(txs, origin) =>
+      txs.foreach(handleTx(_, origin, nonCoinbaseValidation.validateMempoolTxTemplate))
+    case TxHandler.AddToGrandPool(txs, origin) =>
+      txs.foreach(handleTx(_, origin, nonCoinbaseValidation.validateGrandPoolTxTemplate))
+    case TxHandler.Broadcast(txs) =>
+      txs.groupBy(_.chainIndex).foreach { case (chainIndex, txs) =>
+        broadCast(chainIndex, txs, DataOrigin.Local)
+      }
   }
 
-  def handleTx(tx: TransactionTemplate, origin: DataOrigin): Unit = {
-    val fromGroup  = tx.fromGroup
-    val toGroup    = tx.toGroup
-    val chainIndex = ChainIndex(fromGroup, toGroup)
-    val mempool    = blockFlow.getPool(chainIndex)
+  def handleTx(
+      tx: TransactionTemplate,
+      origin: DataOrigin,
+      validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit]
+  ): Unit = {
+    val chainIndex = tx.chainIndex
+    val mempool    = blockFlow.getMemPool(chainIndex)
     if (!mempool.contains(chainIndex, tx)) {
-      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+      validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
           log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s")
           addFailed(tx)
         case Right(_) =>
-          handleValidTx(chainIndex, tx, mempool, origin)
+          handleValidTx(chainIndex, tx, mempool, origin, acknowledge = true)
         case Left(Left(e)) =>
           log.warning(s"IO failed in validating tx ${tx.id.shortHex} due to $e")
           addFailed(tx)
@@ -81,14 +94,28 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
       mempool: MemPool,
+      origin: DataOrigin,
+      acknowledge: Boolean
+  ): Unit = {
+    val result = mempool.addNewTx(chainIndex, tx)
+    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
+    if (result == MemPool.AddedToSharedPool) {
+      // We don't broadcast txs that are pending locally
+      broadCast(chainIndex, AVector(tx), origin)
+    }
+    if (acknowledge) {
+      addSucceeded(tx)
+    }
+  }
+
+  def broadCast(
+      chainIndex: ChainIndex,
+      txs: AVector[TransactionTemplate],
       origin: DataOrigin
   ): Unit = {
-    val count = mempool.add(chainIndex, AVector(tx))
-    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, #$count txs added")
-    val txMessage = Message.serialize(SendTxs(AVector(tx)), networkSetting.networkType)
-    val event     = CliqueManager.BroadCastTx(tx, txMessage, chainIndex, origin)
+    val txMessage = Message.serialize(SendTxs(txs), networkSetting.networkType)
+    val event     = CliqueManager.BroadCastTx(txs, txMessage, chainIndex, origin)
     publishEvent(event)
-    addSucceeded(tx)
   }
 
   def addSucceeded(tx: TransactionTemplate): Unit = {

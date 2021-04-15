@@ -38,7 +38,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
     expectMsg(TxHandler.AddSucceeded(tx.id))
 
     broadcastTxProbe.expectMsg(
-      CliqueManager.BroadCastTx(tx.toTemplate, txMessage(tx), chainIndex, dataOrigin)
+      CliqueManager.BroadCastTx(AVector(tx.toTemplate), txMessage(tx), chainIndex, dataOrigin)
     )
   }
 
@@ -66,7 +66,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
 
     def txMessage(tx: Transaction) =
       Message.serialize(SendTxs(AVector(tx.toTemplate)), networkSetting.networkType)
-    def addTx(tx: Transaction) = TxHandler.AddTx(tx.toTemplate, dataOrigin)
+    def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate), dataOrigin)
 
     val txHandler = system.actorOf(TxHandler.props(blockFlow)(brokerConfig, networkSetting))
 

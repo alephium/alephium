@@ -24,6 +24,9 @@ import scala.util.Random
 
 import org.alephium.macros.HPC
 
+/*
+ * Immutable vector that is optimized for appending
+ */
 // scalastyle:off number.of.methods return
 @SuppressWarnings(Array("org.wartremover.warts.While"))
 abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>
@@ -72,7 +75,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def tail: AVector[A] = {
     assume(nonEmpty)
-    AVector.unsafe(elems, start + 1, end, appendable)
+    AVector.unsafe(elems, start + 1, end, false)
   }
 
   def apply(i: Int): A = {
@@ -106,7 +109,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     elems = arr
   }
 
-  def :+(elem: A): AVector[A] = {
+  def :+[B <: A](elem: B): AVector[A] = {
     if (appendable) {
       ensureSize(length + 1)
       elems(end) = elem
@@ -127,7 +130,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(arr)
   }
 
-  def ++(that: AVector[A]): AVector[A] = {
+  def ++[B <: A](that: AVector[B]): AVector[A] = {
     val newLength = length + that.length
     if (appendable) {
       ensureSize(newLength)
@@ -186,8 +189,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   def slice(from: Int, until: Int): AVector[A] = {
     assume(from >= 0 && from <= until && until <= length)
 
-    val newAppendable = if (until == length) appendable else false
-    AVector.unsafe(elems, start + from, start + until, newAppendable)
+    AVector.unsafe(elems, start + from, start + until, false)
   }
 
   def take(n: Int): AVector[A] = {
@@ -549,6 +551,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     }
   }
 
+  def groupBy[K](f: A => K): Map[K, AVector[A]] = {
+    fold(Map.empty[K, AVector[A]]) { case (acc, elem) =>
+      val key = f(elem)
+      acc.get(key) match {
+        case Some(values) => acc + (key -> (values :+ elem))
+        case None         => acc + (key -> AVector(elem))
+      }
+    }
+  }
+
   def replace(i: Int, a: A): AVector[A] = {
     assume(i >= 0 && i < length)
     val arr = Array.ofDim[A](length)
@@ -622,11 +634,15 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     toIterable.toString()
   }
 
-  def as[@sp T >: A: ClassTag]: AVector[T] = map(identity)
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def as[@sp T >: A: ClassTag]: AVector[T] = {
+    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, false)
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def asUnsafe[T <: A: ClassTag]: AVector[T] =
-    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, appendable)
+  def asUnsafe[T <: A: ClassTag]: AVector[T] = {
+    AVector.unsafe(elems.asInstanceOf[Array[T]], start, end, false)
+  }
 }
 // scalastyle:on
 

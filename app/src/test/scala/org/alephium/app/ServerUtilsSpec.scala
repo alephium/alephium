@@ -42,7 +42,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.alf(1))
+          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.oneAlf)
         )
         .rightValue
 
@@ -53,10 +53,11 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
-      blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate))
+      blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate))
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
+        Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       block0.chainIndex is chainIndex
@@ -64,16 +65,16 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 0, 1)
+        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
 
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 2, 2, 2)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 0, 1)
+        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
     }
   }
 
@@ -99,7 +100,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.alf(1))
+          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.oneAlf)
         )
         .rightValue
 
@@ -110,9 +111,10 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
-      blockFlow.getPool(chainIndex).add(chainIndex, AVector(txTemplate))
+      blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate))
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
+        Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
       serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
@@ -120,24 +122,26 @@ class ServerUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE Balance(genesisBalance, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
+        Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE
+        Balance(ALF.oneAlf, 0, 1)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
+        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
 
       val block2 = emptyBlock(blockFlow, ChainIndex(chainIndex.to, chainIndex.to))
       addAndCheck(blockFlow, block2)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.alf(1) - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.alf(1), 0, 1)
+        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
     }
   }
 }

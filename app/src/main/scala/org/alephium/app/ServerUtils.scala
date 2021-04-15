@@ -70,7 +70,7 @@ class ServerUtils(networkType: NetworkType) {
   ): Try[AVector[Tx]] = {
     Right(
       blockFlow
-        .getPool(chainIndex)
+        .getMemPool(chainIndex)
         .getAll(chainIndex)
         .map(Tx.fromTemplate(_, networkType))
     )
@@ -153,7 +153,7 @@ class ServerUtils(networkType: NetworkType) {
   }
 
   def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
-    blockFlow.getPool(chainIndex).contains(chainIndex, txId)
+    blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
@@ -194,7 +194,7 @@ class ServerUtils(networkType: NetworkType) {
       askTimeout: Timeout,
       executionContext: ExecutionContext
   ): FutureTry[TxResult] = {
-    val message = TxHandler.AddTx(tx, DataOrigin.Local)
+    val message = TxHandler.AddToGrandPool(AVector(tx), DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
@@ -318,7 +318,7 @@ class ServerUtils(networkType: NetworkType) {
     val unlockScript = UnlockScript.p2pkh(publicKey)
     for {
       balances <- blockFlow.getUsableUtxos(lockupScript).left.map[ExeFailure](IOErrorLoadOutputs)
-      inputs = balances.map(_._1).map(TxInput(_, unlockScript))
+      inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
     } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
   }
 

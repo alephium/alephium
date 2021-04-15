@@ -30,7 +30,7 @@ import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
@@ -59,7 +59,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 
       val chainIndex4 = ChainIndex.unsafe(0, 0)
       val block4      = emptyBlock(blockFlow, chainIndex4)
@@ -170,7 +170,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 4)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
-      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
+      checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
     }
   }
 
@@ -202,22 +202,23 @@ class BlockFlowSpec extends AlephiumSpec {
     blocks3.foreach(addAndCheck(blockFlow, _, brokerConfig.chainNum * 2 + brokerConfig.depsNum + 1))
   }
 
-  it should "update mempool correctly" in new FlowFixture {
+  it should "update mempool when there are conflicted txs" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
       forAll(Gen.choose(brokerConfig.groupFrom, brokerConfig.groupUntil - 1)) { mainGroup =>
-        val blockFlow = genesisBlockFlow()
+        val blockFlow  = genesisBlockFlow()
+        val blockFlow1 = genesisBlockFlow()
 
         val chainIndex = ChainIndex.unsafe(mainGroup, 0)
-        val block11    = tryToTransfer(blockFlow, chainIndex)
-        val block12    = tryToTransfer(blockFlow, chainIndex)
-        blockFlow.mempools.foreach(_.size is 0)
+        val block11    = transfer(blockFlow, chainIndex)
+        val block12    = transfer(blockFlow1, chainIndex)
+        blockFlow.grandPool.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block11, 1)
-        blockFlow.mempools.foreach(_.size is 0)
+        blockFlow.grandPool.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block12, 1)
 
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
-          blockFlow.getPool(chainIndex).size is 1 // the conflicted tx is kept
+          blockFlow.getMemPool(chainIndex).size is 1 // the conflicted tx is kept
           val template = blockFlow.prepareBlockFlow(chainIndex).toOption.get
           template.transactions.length is 0 // the conflicted tx will not be used
         }
@@ -377,10 +378,10 @@ class BlockFlowSpec extends AlephiumSpec {
     val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow0, block, 1)
-    checkBalance(blockFlow0, fromGroup, genesisBalance)
+    checkBalance(blockFlow0, fromGroup, genesisBalance - ALF.alf(1))
     addAndCheck(blockFlow1, block, 1)
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
-    checkBalance(blockFlow1, pubScript, 0)
+    checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
 
     val fromGroupBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
     addAndCheck(blockFlow0, fromGroupBlock, 2)
@@ -445,6 +446,80 @@ class BlockFlowSpec extends AlephiumSpec {
       .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
       .rightValue
       .isRight is true
+  }
+
+  it should "handle sequential txs" in new FlowFixture {
+    override val configValues                   = Map(("alephium.broker.broker-num", 1))
+    val fromGroup                               = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
+    val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
+    val fromLockup                              = LockupScript.p2pkh(fromPubKey)
+    val theMemPool                              = blockFlow.getMemPool(fromGroup)
+
+    var txCount = 0
+    def transfer(): TransactionTemplate = {
+      txCount += 1
+
+      val toGroup        = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
+      val chainIndex     = ChainIndex(fromGroup, toGroup)
+      val (_, toPubKey)  = toGroup.generateKey
+      val toLockupScript = LockupScript.p2pkh(toPubKey)
+      val unsignedTx = blockFlow
+        .prepareUnsignedTx(fromPubKey, toLockupScript, None, ALF.oneAlf)
+        .rightValue
+        .rightValue
+      val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
+
+      tx.chainIndex is chainIndex
+      theMemPool.addNewTx(chainIndex, tx)
+      theMemPool.contains(tx.chainIndex, tx.id) is true
+
+      val balance = initialAmount - (ALF.oneAlf + defaultGasFee).mulUnsafe(txCount)
+      blockFlow.getBalance(fromLockup).rightValue is ((balance, U256.Zero, 1))
+
+      tx
+    }
+
+    val tx0 = transfer()
+    val tx1 = transfer()
+    val tx2 = transfer()
+    theMemPool.pendingPool.contains(tx0.id) is false
+    theMemPool.pendingPool.contains(tx1.id) is true
+    theMemPool.pendingPool.contains(tx2.id) is true
+
+    val block0 = minePooledTxs(blockFlow, tx0.chainIndex)
+    addAndCheck(blockFlow, block0)
+    theMemPool.contains(tx0.chainIndex, tx0.id) is false
+    theMemPool.contains(tx1.chainIndex, tx1.id) is true
+
+    if (!tx0.chainIndex.isIntraGroup) {
+      theMemPool.pendingPool.contains(tx1.id) is true
+      theMemPool.pendingPool.contains(tx2.id) is true
+      val block = minePooledTxs(blockFlow, ChainIndex(fromGroup, fromGroup))
+      addAndCheck(blockFlow, block)
+      theMemPool.pendingPool.contains(tx1.id) is false
+      theMemPool.pendingPool.contains(tx2.id) is true
+    } else {
+      theMemPool.pendingPool.contains(tx1.id) is false
+      theMemPool.pendingPool.contains(tx2.id) is true
+    }
+
+    val block1 = minePooledTxs(blockFlow, tx1.chainIndex)
+    addAndCheck(blockFlow, block1)
+    theMemPool.contains(tx1.chainIndex, tx1.id) is false
+    theMemPool.contains(tx2.chainIndex, tx2.id) is true
+
+    if (!tx1.chainIndex.isIntraGroup) {
+      theMemPool.pendingPool.contains(tx2.id) is true
+      val block = minePooledTxs(blockFlow, ChainIndex(fromGroup, fromGroup))
+      addAndCheck(blockFlow, block)
+      theMemPool.pendingPool.contains(tx2.id) is false
+    } else {
+      theMemPool.pendingPool.contains(tx2.id) is false
+    }
+
+    val block2 = minePooledTxs(blockFlow, tx2.chainIndex)
+    addAndCheck(blockFlow, block2)
+    theMemPool.contains(tx2.chainIndex, tx2.id) is false
   }
 
   behavior of "confirmations"
