@@ -35,10 +35,6 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.io.Tcp
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.TestProbe
-import io.circe.{Codec, Decoder}
-import io.circe.generic.semiauto.deriveCodec
-import io.circe.parser.parse
-import io.circe.syntax._
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
@@ -47,6 +43,7 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
+import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -164,18 +161,13 @@ trait TestFixtureLike
     response.status is StatusCodes.OK
   }
 
-  def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T =
+  def request[T: Reader](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
     eventually {
       val response = Http().singleRequest(request(port)).futureValue
 
-      (for {
-        json <- parse(Unmarshal(response.entity).to[String].futureValue)
-        t    <- json.as[T]
-      } yield t) match {
-        case Right(t)    => t
-        case Left(error) => throw new AssertionError(s"circe: $error")
-      }
+      read[T](Unmarshal(response.entity).to[String].futureValue)
     }
+  }
 
   def requestFailed(
       request: Int => HttpRequest,
@@ -221,9 +213,9 @@ trait TestFixtureLike
     confirmed.toGroupConfirmations > 1 is true
   }
 
-  implicit val walletResultResultCodec: Codec[WalletRestore.Result] =
-    deriveCodec[WalletRestore.Result]
-  implicit val transferResultCodec: Codec[Transfer.Result] = deriveCodec[Transfer.Result]
+  implicit val walletResultResultReadWriter: ReadWriter[WalletRestore.Result] =
+    macroRW[WalletRestore.Result]
+  implicit val transferResultReadWriter: ReadWriter[Transfer.Result] = macroRW[Transfer.Result]
 
   def transferFromWallet(toAddress: String, amount: U256, restPort: Int): Transfer.Result =
     eventually {
@@ -239,9 +231,8 @@ trait TestFixtureLike
     val timeout = Duration.ofMinutesUnsafe(2).asScala
     blockNotifyProbe.receiveOne(max = timeout) match {
       case TextMessage.Strict(text) =>
-        val json         = parse(text).toOption.get
-        val notification = json.as[NotificationUnsafe].toOption.get.asNotification.toOption.get
-        val blockEntry   = notification.params.as[BlockEntry].toOption.get
+        val notification = read[NotificationUnsafe](text).asNotification.toOption.get
+        val blockEntry   = read[BlockEntry](notification.params)
         if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) {
           ()
         } else {
@@ -467,7 +458,7 @@ trait TestFixtureLike
     httpGet(s"/miners/block-candidate?fromGroup=$from&toGroup=$to")
 
   def newBlock(solution: BlockSolution) = {
-    val body = s"""${solution.asJson}"""
+    val body = s"""${write(solution)}"""
     httpPost(s"/miners/new-block", Some(body))
   }
 

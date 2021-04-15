@@ -16,29 +16,21 @@
 
 package org.alephium.api
 
-import io.circe.{Codec, Decoder, Encoder}
-import io.circe.parser._
-import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.ApiError._
+import org.alephium.json.Json._
 import org.alephium.util._
 
 class ApiErrorSpec extends AlephiumSpec with EitherValues {
-  def show[T](t: T)(implicit encoder: Encoder[T]): String = CirceUtils.print(t.asJson)
 
-  def parseAs[A](jsonRaw: String)(implicit A: Decoder[A]): A = {
-    val json = parse(jsonRaw).toOption.get
-    json.as[A].toOption.get
+  def checkData[T: ReadWriter](data: T, jsonRaw: String): Assertion = {
+    write(data) is jsonRaw
+    read[T](jsonRaw) is data
   }
 
-  def checkData[T](data: T, jsonRaw: String)(implicit codec: Codec[T]): Assertion = {
-    show(data) is jsonRaw
-    parseAs[T](jsonRaw) is data
-  }
-
-  def parseFail[A](jsonRaw: String)(implicit A: Decoder[A]): String = {
-    parse(jsonRaw).toOption.get.as[A].left.value.message
+  def parseFail[A: Reader](jsonRaw: String): String = {
+    scala.util.Try(read[A](jsonRaw)).toEither.swap.toOption.get.getMessage
   }
 
   it should "encode/decode BadRequest" in {

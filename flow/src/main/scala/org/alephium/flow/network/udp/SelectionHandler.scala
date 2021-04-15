@@ -29,7 +29,7 @@ import org.alephium.util.Duration
 
 // This is modified from akk.io.SelectionHandler
 object SelectionHandler extends ExtensionId[SelectionHandler] with ExtensionIdProvider {
-  override def lookup(): ExtensionId[_ <: Extension] = SelectionHandler
+  override def lookup: ExtensionId[_ <: Extension] = SelectionHandler
 
   override def createExtension(system: ExtendedActorSystem): SelectionHandler = {
     val selector         = Selector.open()

@@ -18,12 +18,13 @@ package org.alephium.wallet.api.model
 
 import org.alephium.crypto.wallet.Mnemonic
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class WalletCreation(
     password: String,
-    walletName: Option[String],
-    isMiner: Option[Boolean],
-    mnemonicPassphrase: Option[String],
-    mnemonicSize: Option[Mnemonic.Size]
+    walletName: Option[String] = None,
+    isMiner: Option[Boolean] = None,
+    mnemonicPassphrase: Option[String] = None,
+    mnemonicSize: Option[Mnemonic.Size] = None
 )
 
 object WalletCreation {

@@ -23,15 +23,12 @@ import scala.io.Source
 import scala.util.{Try, Using}
 
 import akka.util.ByteString
-import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
-import io.circe.parser.decode
-import io.circe.syntax._
 
-import org.alephium.api.CirceUtils._
+import org.alephium.api.UtilJson._
 import org.alephium.crypto.AES
 import org.alephium.crypto.wallet.BIP32
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
+import org.alephium.json.Json._
 import org.alephium.serde.{deserialize, serialize, Serde}
 import org.alephium.util.AVector
 import org.alephium.wallet.Constants
@@ -96,13 +93,14 @@ object SecretStorage {
     def toAESEncrytped: AES.Encrypted = AES.Encrypted(encrypted, salt, iv)
   }
 
-  implicit private val codec: Codec[SecretFile] = deriveCodec[SecretFile]
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  implicit private val readWriter: ReadWriter[SecretFile] = macroRW[SecretFile]
 
   def load(file: File, path: AVector[Int]): Either[Error, SecretStorage] = {
     Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
-        _ <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
+        _ <- Try(read[SecretFile](rawFile)).toEither.left.map(_ => CannotParseFile)
       } yield {
         new Impl(file, None, path)
       }
@@ -255,7 +253,7 @@ object SecretStorage {
     Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
-        secretFile <- decode[SecretFile](rawFile).left.map(_ => CannotParseFile)
+        secretFile <- Try(read[SecretFile](rawFile)).toEither.left.map(_ => CannotParseFile)
         stateBytes <- AES
           .decrypt(secretFile.toAESEncrytped, password)
           .toEither
@@ -301,16 +299,10 @@ object SecretStorage {
         val encrypted = AES.encrypt(serialize(storedState), password)
         val secretFile =
           SecretFile(encrypted.encrypted, encrypted.salt, encrypted.iv, Constants.walletFileVersion)
-        outWriter.write(secretFileAsJson(secretFile))
+        outWriter.write(write(secretFile))
       }
       .toEither
       .left
       .map(_ => SecretFileError)
-  }
-
-  private def secretFileAsJson(secretFile: SecretFile) = {
-    // scalastyle:off regex
-    secretFile.asJson.noSpaces
-    // scalastyle:on
   }
 }

@@ -17,43 +17,28 @@
 package org.alephium.rpc.model
 
 import scala.concurrent.Future
-import scala.util.Success
+import scala.util.{Success, Try}
 
-import io.circe.{Decoder, Encoder, Json, JsonObject, Printer}
-import io.circe.parser._
-import io.circe.syntax._
 import org.scalatest.{Assertion, EitherValues, Inside}
 
+import org.alephium.json.Json._
 import org.alephium.util.AlephiumSpec
 
 class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
-  // scalastyle:off regex
-  implicit val printer: Printer = Printer.noSpaces.copy(dropNullValues = true)
-  // scalastyle:on
 
-  def print(json: Json): String = printer.print(json)
-
-  def show[T](data: T)(implicit encoder: Encoder[T]): String = {
-    print(data.asJson)
-  }
-
-  val dummy = Future.successful(JsonRPC.Response.Success(Json.Null, 0))
+  val dummy = Future.successful(JsonRPC.Response.Success(ujson.Null, 0))
 
   def handler(method: String): JsonRPC.Handler = Map((method, (_: JsonRPC.Request) => dummy))
 
-  def parseAs[A: Decoder](jsonRaw: String): A = {
-    val json = parse(jsonRaw).toOption.get
-    json.as[A].toOption.get
+  def parseNotification(jsonRaw: String): JsonRPC.Notification =
+    read[JsonRPC.Notification](jsonRaw)
+
+  def parseNotificationUnsafe(jsonRaw: String): JsonRPC.NotificationUnsafe = {
+    read[JsonRPC.NotificationUnsafe](jsonRaw)
   }
 
-  def parseNotification(jsonRaw: String): JsonRPC.Notification =
-    parseNotificationUnsafe(jsonRaw).asNotification.toOption.get
-
-  def parseNotificationUnsafe(jsonRaw: String): JsonRPC.NotificationUnsafe =
-    parseAs[JsonRPC.NotificationUnsafe](jsonRaw)
-
   def parseRequest(jsonRaw: String): JsonRPC.RequestUnsafe =
-    parseAs[JsonRPC.RequestUnsafe](jsonRaw)
+    read[JsonRPC.RequestUnsafe](jsonRaw)
 
   def requestRunFailure(request: JsonRPC.RequestUnsafe, error: JsonRPC.Error): Assertion = {
     val result = request.runWith(handler("foobar"))
@@ -63,86 +48,86 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
   def notificationFailure(notif: JsonRPC.NotificationUnsafe, error: JsonRPC.Error): Assertion =
     notif.asNotification.left.value is error
 
-  val jsonObjectEmpty   = JsonObject.empty.asJson
-  val jsonObjectWihNull = JsonObject(("foo", Json.Null), ("bar", Json.fromInt(42))).asJson
-  val jsonObject        = JsonObject(("foo", Json.fromInt(42))).asJson
+  val jsonObjectEmpty   = ujson.Obj()
+  val jsonObjectWihNull = ujson.Obj("foo" -> ujson.Null, "bar" -> ujson.Num(42))
+  val jsonObject        = ujson.Obj("foo" -> ujson.Num(42))
 
   it should "encode request" in {
     val request = JsonRPC.Request("foobar", jsonObjectEmpty, 1)
-    show(request) is """{"jsonrpc":"2.0","method":"foobar","params":{},"id":1}"""
+    write(request) is """{"method":"foobar","params":{},"id":1,"jsonrpc":"2.0"}"""
   }
 
   it should "encode request - drop nulls " in {
     val request = JsonRPC.Request("foobar", jsonObjectWihNull, 1)
-    show(request) is """{"jsonrpc":"2.0","method":"foobar","params":{"bar":42},"id":1}"""
+    write(request) is """{"method":"foobar","params":{"bar":42},"id":1,"jsonrpc":"2.0"}"""
   }
 
   it should "encode notification" in {
     val notification = JsonRPC.Notification("foobar", jsonObjectEmpty)
-    show(notification) is """{"jsonrpc":"2.0","method":"foobar","params":{}}"""
+    write(notification) is """{"method":"foobar","params":{},"jsonrpc":"2.0"}"""
   }
 
   it should "encode notification - drop nulls" in {
     val notification = JsonRPC.Notification("foobar", jsonObjectWihNull)
-    show(notification) is """{"jsonrpc":"2.0","method":"foobar","params":{"bar":42}}"""
+    write(notification) is """{"method":"foobar","params":{"bar":42},"jsonrpc":"2.0"}"""
   }
 
   it should "encode response - success" in {
-    val success: JsonRPC.Response = JsonRPC.Response.Success(Json.fromInt(42), 1)
-    show(success) is """{"jsonrpc":"2.0","result":42,"id":1}"""
+    val success: JsonRPC.Response = JsonRPC.Response.Success(ujson.Num(42), 1)
+    write(success) is """{"result":42,"id":1,"jsonrpc":"2.0"}"""
   }
 
   it should "encode response - success - drop nulls" in {
-    val success: JsonRPC.Response = JsonRPC.Response.Success(Json.Null, 1)
-    show(success) is """{"jsonrpc":"2.0","id":1}"""
+    val success: JsonRPC.Response = JsonRPC.Response.Success(ujson.Null, 1)
+    write(success) is """{"id":1,"jsonrpc":"2.0"}"""
   }
 
   it should "encode response - failure" in {
     val failure: JsonRPC.Response = JsonRPC.Response.Failure(JsonRPC.Error.InvalidRequest, Some(1))
-    show(
+    write(
       failure
-    ) is """{"jsonrpc":"2.0","error":{"code":-32600,"message":"Invalid Request"},"id":1}"""
+    ) is """{"error":{"code":-32600,"message":"Invalid Request"},"id":1,"jsonrpc":"2.0"}"""
   }
 
   it should "encode response - failure - no id" in {
     val failure: JsonRPC.Response = JsonRPC.Response.Failure(JsonRPC.Error.InvalidRequest, None)
-    show(failure) is """{"jsonrpc":"2.0","error":{"code":-32600,"message":"Invalid Request"}}"""
+    write(failure) is """{"error":{"code":-32600,"message":"Invalid Request"},"jsonrpc":"2.0"}"""
   }
 
   it should "parse notification" in {
     val notification =
-      parseNotification("""{"jsonrpc": "2.0", "method": "foobar", "params": {"foo": 42}}""")
+      parseNotification("""{ "method": "foobar", "params": {"foo": 42},"jsonrpc": "2.0"}""")
     notification.params is jsonObject
     notification.method is "foobar"
   }
 
   it should "parse notification with empty params" in {
-    val notification = parseNotification("""{"jsonrpc": "2.0", "method": "foobar", "params": {}}""")
+    val notification = parseNotification("""{ "method": "foobar", "params": {},"jsonrpc": "2.0"}""")
     notification.params is jsonObjectEmpty
     notification.method is "foobar"
   }
 
   it should "parse notification - fail on wrong rpc version" in {
-    val jsonRaw = """{"jsonrpc": "1.0", "method": "foobar", "params": {}}"""
+    val jsonRaw = """{ "method": "foobar", "params": {},"jsonrpc": "1.0"}"""
     val error   = parseNotificationUnsafe(jsonRaw).asNotification.left.value
     error is JsonRPC.Error.InvalidRequest
   }
 
   it should "parse notification - fail with no params" in {
-    val jsonRaw = """{"jsonrpc": "2.0", "method": "foobar"}"""
+    val jsonRaw = """{ "method": "foobar","jsonrpc": "2.0"}"""
     val error   = parseNotificationUnsafe(jsonRaw).asNotification.left.value
     error is JsonRPC.Error.InvalidParams
   }
 
   it should "parse notification - fail with null params" in {
     notificationFailure(
-      parseNotificationUnsafe("""{"jsonrpc": "2.0", "method": "foobar", "params": null}"""),
+      parseNotificationUnsafe("""{ "method": "foobar", "params": null,"jsonrpc": "2.0"}"""),
       JsonRPC.Error.InvalidParams
     )
   }
 
-  def checkRequestParams(jsonRaw: String, params: Json): Assertion = {
-    val request = parseAs[JsonRPC.RequestUnsafe](jsonRaw)
+  def checkRequestParams(jsonRaw: String, params: ujson.Value): Assertion = {
+    val request = read[JsonRPC.RequestUnsafe](jsonRaw)
 
     request.jsonrpc is JsonRPC.version
     request.method is "foobar"
@@ -154,52 +139,52 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
 
   it should "parse request with params" in {
     checkRequestParams(
-      """{"jsonrpc": "2.0", "method": "foobar", "id": 1, "params": {"foo": 42}}""",
+      """{ "method": "foobar", "id": 1, "params": {"foo": 42},"jsonrpc": "2.0"}""",
       jsonObject
     )
   }
 
   it should "parse request with empty params" in {
     checkRequestParams(
-      """{"jsonrpc": "2.0", "method": "foobar", "id": 1, "params": {}}""",
+      """{ "method": "foobar", "id": 1, "params": {},"jsonrpc": "2.0"}""",
       jsonObjectEmpty
     )
   }
 
   it should "parse request - fail on wrong rpc version" in {
     val request =
-      parseRequest("""{"jsonrpc": "1.0", "method": "foobar", "id": 1, "params": {"foo": 42}}""")
+      parseRequest("""{ "method": "foobar", "id": 1, "params": {"foo": 42},"jsonrpc": "1.0"}""")
     request.jsonrpc is "1.0"
     requestRunFailure(request, JsonRPC.Error.InvalidRequest)
   }
 
   it should "parse request - fail with null params" in {
     requestRunFailure(
-      parseRequest("""{"jsonrpc": "2.0", "method": "foobar", "id": 1, "params": null}"""),
+      parseRequest("""{ "method": "foobar", "id": 1, "params": null,"jsonrpc": "2.0"}"""),
       JsonRPC.Error.InvalidParams
     )
   }
 
   it should "parse request - fail with params as value" in {
     requestRunFailure(
-      parseRequest("""{"jsonrpc": "2.0", "method": "foobar", "id": 1, "params": 42}"""),
+      parseRequest("""{ "method": "foobar", "id": 1, "params": 42,"jsonrpc": "2.0"}"""),
       JsonRPC.Error.InvalidParams
     )
   }
 
   it should "parse response - success" in {
-    val jsonRaw  = """{"jsonrpc": "2.0", "result": 42, "id": 1}"""
-    val response = parse(jsonRaw).toOption.get.as[JsonRPC.Response].toOption.get
+    val jsonRaw  = """{"result": 42, "id": 1,"jsonrpc": "2.0"}"""
+    val response = read[JsonRPC.Response](jsonRaw)
 
     inside(response) { case JsonRPC.Response.Success(result, id) =>
-      result is Json.fromInt(42)
+      result is ujson.Num(42)
       id is 1
     }
   }
 
   it should "parse response - failure" in {
-    val jsonRaw  = """{"jsonrpc":"2.0","error":{"code":42,"message":"foo"},"id":1}"""
-    val response = parse(jsonRaw).toOption.get.as[JsonRPC.Response].toOption.get
+    val jsonRaw  = """{"error":{"code":42,"message":"foo"},"id":1,"jsonrpc":"2.0"}"""
+    val response = read[JsonRPC.Response](jsonRaw)
 
     inside(response) { case JsonRPC.Response.Failure(error, id) =>
       error is JsonRPC.Error.apply(42, "foo")
@@ -208,16 +193,16 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
   }
 
   it should "parse success" in {
-    val jsonRaw = """{"jsonrpc": "2.0", "result": 42, "id": 1}"""
-    val success = parse(jsonRaw).toOption.get.as[JsonRPC.Response.Success].toOption.get
+    val jsonRaw = """{"result": 42, "id": 1,"jsonrpc": "2.0"}"""
+    val success = read[JsonRPC.Response.Success](jsonRaw)
 
-    success.result is Json.fromInt(42)
+    success.result is ujson.Num(42)
     success.id is 1
   }
 
   it should "parse success - fail on wrong rpc version" in {
-    val jsonRaw = """{"jsonrpc": "1.0", "result": 42, "id": 1}"""
-    val error   = parse(jsonRaw).toOption.get.as[JsonRPC.Response].left.value
-    error.message is "Invalid JSON-RPC version '1.0'"
+    val jsonRaw = """{"result": 42, "id": 1,"jsonrpc": "1.0"}"""
+    val error   = Try(read[JsonRPC.Response](jsonRaw)).toEither.left.value
+    error.getMessage is "Invalid JSON-RPC version '1.0' at index 39"
   }
 }

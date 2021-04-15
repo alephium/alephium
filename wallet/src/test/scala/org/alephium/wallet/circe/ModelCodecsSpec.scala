@@ -14,14 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.circe
+package org.alephium.wallet.json
 
-import io.circe._
-import io.circe.syntax._
 import org.scalatest.Assertion
 
-import org.alephium.api.CirceUtils._
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -31,21 +29,20 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
   val networkType          = NetworkType.Mainnet
-  val address            = Address.p2pkh(networkType, PublicKey.generate)
-  val group              = 1
-  val balance            = U256.One
-  val hash               = Hash.generate
-  val password           = "password"
-  val walletName         = "wallet-name"
-  val mnemonicPassphrase = "mnemonic-passphrase"
-  val mnemonicSize       = Mnemonic.Size.list.last
-  val mnemonic           = Mnemonic.generate(mnemonicSize)
-  val bool               = true
+  val address              = Address.p2pkh(networkType, PublicKey.generate)
+  val group                = 1
+  val balance              = U256.One
+  val hash                 = Hash.generate
+  val password             = "password"
+  val walletName           = "wallet-name"
+  val mnemonicPassphrase   = "mnemonic-passphrase"
+  val mnemonicSize         = Mnemonic.Size.list.last
+  val mnemonic             = Mnemonic.generate(mnemonicSize)
+  val bool                 = true
 
-  def check[T: Codec](input: T, rawJson: String): Assertion = {
-    val json = input.asJson
-    print(json) is rawJson
-    json.as[T] isE input
+  def check[T: ReadWriter](input: T, rawJson: String): Assertion = {
+    write(input) is rawJson
+    read[T](rawJson) is input
   }
 
   it should "Addresses" in {
@@ -67,14 +64,14 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Balances.AddressBalance" in {
-    val json           = s"""{"address":"$address","balance":$balance}"""
+    val json           = s"""{"address":"$address","balance":"$balance"}"""
     val addressBalance = Balances.AddressBalance(address, balance)
     check(addressBalance, json)
   }
 
   it should "Balances" in {
     val json =
-      s"""{"totalBalance":$balance,"balances":[{"address":"$address","balance":$balance}]}"""
+      s"""{"totalBalance":"$balance","balances":[{"address":"$address","balance":"$balance"}]}"""
     val balances = Balances(balance, AVector(Balances.AddressBalance(address, balance)))
     check(balances, json)
   }
@@ -86,7 +83,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Transfer" in {
-    val json     = s"""{"address":"$address","amount":$balance}"""
+    val json     = s"""{"address":"$address","amount":"$balance"}"""
     val transfer = Transfer(address, balance)
     check(transfer, json)
   }

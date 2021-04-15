@@ -20,11 +20,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import sttp.tapir.openapi.circe.yaml.RichOpenAPI
-import sttp.tapir.server.akkahttp.RichAkkaHttpEndpoint
+import sttp.tapir.server.akkahttp.AkkaHttpServerInterpreter._
 import sttp.tapir.swagger.akkahttp.SwaggerAkka
 
 import org.alephium.api.ApiError
+import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
@@ -47,13 +47,13 @@ class WalletServer(
   import WalletServer.toApiError
 
   val docsRoute: Route = new SwaggerAkka(
-    walletOpenAPI.toYaml,
-    yamlName = "openapi.yaml"
+    openApiJson(walletOpenAPI),
+    yamlName = "openapi.json"
   ).routes
 
   // scalastyle:off method.length
   def route: Route =
-    createWallet.toRoute { walletCreation =>
+    toRoute(createWallet) { walletCreation =>
       Future.successful(
         walletService
           .createWallet(
@@ -70,7 +70,7 @@ class WalletServer(
           .map(toApiError)
       )
     } ~
-      restoreWallet.toRoute { walletRestore =>
+      toRoute(restoreWallet) { walletRestore =>
         Future.successful(
           walletService
             .restoreWallet(
@@ -85,20 +85,20 @@ class WalletServer(
             .map(toApiError)
         )
       } ~
-      lockWallet.toRoute { wallet =>
+      toRoute(lockWallet) { wallet =>
         Future.successful(walletService.lockWallet(wallet).left.map(toApiError))
       } ~
-      unlockWallet.toRoute { case (wallet, walletUnlock) =>
+      toRoute(unlockWallet) { case (wallet, walletUnlock) =>
         Future.successful(
           walletService.unlockWallet(wallet, walletUnlock.password).left.map(toApiError)
         )
       } ~
-      deleteWallet.toRoute { case (wallet, walletDeletion) =>
+      toRoute(deleteWallet) { case (wallet, walletDeletion) =>
         Future.successful(
           walletService.deleteWallet(wallet, walletDeletion.password).left.map(toApiError)
         )
       } ~
-      getBalances.toRoute { wallet =>
+      toRoute(getBalances) { wallet =>
         walletService
           .getBalances(wallet)
           .map(_.map { balances =>
@@ -111,7 +111,7 @@ class WalletServer(
             model.Balances(totalBalance, balancesPerAddress)
           }.left.map(toApiError))
       } ~
-      getAddresses.toRoute { wallet =>
+      toRoute(getAddresses) { wallet =>
         Future.successful(
           walletService
             .getAddresses(wallet)
@@ -122,7 +122,7 @@ class WalletServer(
             .map(toApiError)
         )
       } ~
-      getMinerAddresses.toRoute { wallet =>
+      toRoute(getMinerAddresses) { wallet =>
         Future.successful(
           walletService
             .getMinerAddresses(wallet)
@@ -139,14 +139,14 @@ class WalletServer(
             .map(toApiError)
         )
       } ~
-      transfer.toRoute { case (wallet, tr) =>
+      toRoute(transfer) { case (wallet, tr) =>
         walletService
           .transfer(wallet, tr.address, tr.amount)
           .map(_.map { case (txId, fromGroup, toGroup) =>
             model.Transfer.Result(txId, fromGroup, toGroup)
           }.left.map(toApiError))
       } ~
-      deriveNextAddress.toRoute { wallet =>
+      toRoute(deriveNextAddress) { wallet =>
         Future.successful(
           walletService
             .deriveNextAddress(wallet)
@@ -154,7 +154,7 @@ class WalletServer(
             .map(toApiError)
         )
       } ~
-      deriveNextMinerAddresses.toRoute { wallet =>
+      toRoute(deriveNextMinerAddresses) { wallet =>
         Future.successful(
           walletService
             .deriveNextMinerAddresses(wallet)
@@ -163,7 +163,7 @@ class WalletServer(
             .map(toApiError)
         )
       } ~
-      changeActiveAddress.toRoute { case (wallet, change) =>
+      toRoute(changeActiveAddress) { case (wallet, change) =>
         Future.successful(
           walletService
             .changeActiveAddress(wallet, change.address)
@@ -171,7 +171,7 @@ class WalletServer(
             .map(toApiError)
         )
       } ~
-      listWallets.toRoute { _ =>
+      toRoute(listWallets) { _ =>
         Future.successful(
           walletService
             .listWallets()

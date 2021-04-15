@@ -16,14 +16,16 @@
 
 package org.alephium.api
 
-import akka.util.ByteString
-import io.circe._
-import io.circe.generic.semiauto._
-import io.circe.syntax._
+import java.net.InetSocketAddress
 
-import org.alephium.api.CirceUtils._
+import akka.util.ByteString
+import upickle.core.Abort
+
+import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.json.Json._
+import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.serde.RandomBytes
@@ -38,237 +40,205 @@ object ApiModel {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ApiModelCodec {
 
   def blockflowFetchMaxAge: Duration
   implicit def networkType: NetworkType
 
-  implicit val peerStatusBannedCodec: Codec[PeerStatus.Banned]   = deriveCodec[PeerStatus.Banned]
-  implicit val peerStatusPenaltyCodec: Codec[PeerStatus.Penalty] = deriveCodec[PeerStatus.Penalty]
+  implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
+  implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
 
-  implicit val peerStatusEncoder: Encoder[PeerStatus] = {
-    new Encoder[PeerStatus] {
-      final def apply(status: PeerStatus): Json =
-        status match {
-          case ps @ PeerStatus.Banned(_) =>
-            ps.asJson.deepMerge(Json.obj(("type", Json.fromString("banned"))))
-          case ps @ PeerStatus.Penalty(_) =>
-            ps.asJson.deepMerge(Json.obj(("type", Json.fromString("penalty"))))
-        }
-    }
+  implicit val peerStatusRW: RW[PeerStatus] = RW.merge(peerStatusBannedRW, peerStatusPenaltyRW)
+
+  implicit val peerMisbehaviorRW: RW[PeerMisbehavior] = macroRW
+
+  implicit val u256Writer: Writer[U256] = javaBigIntegerWriter.comap[U256](_.toBigInt)
+  implicit val u256Reader: Reader[U256] = javaBigIntegerReader.map { u256 =>
+    U256.from(u256).getOrElse(throw new Abort(s"Invalid U256: $u256"))
   }
 
-  implicit val peerStatusDecoder: Decoder[PeerStatus] = new Decoder[PeerStatus] {
-    final def apply(c: HCursor): Decoder.Result[PeerStatus] = {
-      val keys = c.keys.getOrElse(Nil)
-      if (keys.exists(_ == "type")) {
-        c.downField("type")
-          .as[String]
-          .flatMap(_ match {
-            case "banned"  => c.as[PeerStatus.Banned]
-            case "penalty" => c.as[PeerStatus.Penalty]
-            case _ =>
-              Left(
-                DecodingFailure(
-                  "Can not decode 'type', expecting: 'penalty' or 'banned'",
-                  c.history
-                )
-              )
-          })
+  implicit val publicKeyWriter: Writer[PublicKey] = bytesWriter
+  implicit val publicKeyReader: Reader[PublicKey] = bytesReader(PublicKey.from)
+
+  implicit val signatureWriter: Writer[Signature] = bytesWriter
+  implicit val signatureReader: Reader[Signature] = bytesReader(Signature.from)
+
+  implicit val hashWriter: Writer[Hash] = StringWriter.comap[Hash](
+    _.toHexString
+  )
+  implicit val hashReader: Reader[Hash] =
+    byteStringReader.map(Hash.from(_).getOrElse(throw new Abort("cannot decode hash")))
+
+  implicit val blockHashWriter: Writer[BlockHash] = StringWriter.comap[BlockHash](
+    _.toHexString
+  )
+  implicit val blockHashReader: Reader[BlockHash] =
+    byteStringReader.map(BlockHash.from(_).getOrElse(throw new Abort("cannot decode block hash")))
+
+  implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
+  implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
+    Address
+      .fromBase58(input, networkType)
+      .getOrElse(
+        throw new Abort(s"Unable to decode address from $input")
+      )
+  }
+
+  implicit val cliqueIdWriter: Writer[CliqueId] = StringWriter.comap[CliqueId](_.toHexString)
+  implicit val cliqueIdReader: Reader[CliqueId] = StringReader.map { s =>
+    Hex.from(s).flatMap(CliqueId.from).getOrElse(throw new Abort("invalid clique id"))
+  }
+
+  implicit val networkTypeWriter: Writer[NetworkType] = StringWriter.comap(_.name)
+  implicit val networkTypeReader: Reader[NetworkType] = StringReader.map { s =>
+    NetworkType.fromName(s).getOrElse(throw new Abort("Invalid network type."))
+  }
+
+  implicit val fetchResponseRW: RW[FetchResponse] = macroRW
+
+  implicit val outputRefRW: RW[OutputRef] = macroRW
+
+  implicit val outputRW: RW[Output] = macroRW
+
+  //macro failed on Input for unknwown reason
+  implicit val inputRW: ReadWriter[Input] = readwriter[ujson.Value].bimap[Input](
+    { input =>
+      input.unlockScript match {
+        case Some(unlockScript) =>
+          ujson
+            .Obj("outputRef" -> writeJs(input.outputRef), "unlockScript" -> writeJs(unlockScript))
+        case None => ujson.Obj("outputRef" -> writeJs(input.outputRef))
+      }
+    },
+    json => Input(read[OutputRef](json("outputRef")), readOpt[ByteString](json("unlockScript")))
+  )
+
+  implicit val txRW: RW[Tx] = macroRW
+
+  implicit val exportFileRW: RW[ExportFile] = macroRW
+
+  implicit val blockEntryRW: RW[BlockEntry] = macroRW
+
+  implicit val blockCandidateRW: RW[BlockCandidate] = macroRW
+
+  implicit val blockSolutionRW: RW[BlockSolution] = macroRW
+
+  implicit val peerAddressRW: RW[PeerAddress] = macroRW
+
+  implicit val selfCliqueRW: RW[SelfClique] = macroRW
+
+  implicit val neighborPeersRW: RW[NeighborPeers] = macroRW
+
+  implicit val getBalanceRW: RW[GetBalance] = macroRW
+
+  implicit val getGroupRW: RW[GetGroup] = macroRW
+
+  implicit val balanceRW: RW[Balance] = macroRW
+
+  implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
+
+  implicit val groupRW: RW[Group] = macroRW
+
+  implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
+
+  implicit val sendTransactionRW: RW[SendTransaction] = macroRW
+
+  implicit val txStatusRW: RW[TxStatus] =
+    RW.merge(macroRW[Confirmed], macroRW[MemPooled.type], macroRW[NotFound.type])
+
+  implicit val buildContractRW: RW[BuildContract] = macroRW
+
+  implicit val buildContractResultRW: RW[BuildContractResult] = macroRW
+
+  implicit val sendContractRW: RW[SendContract] = macroRW
+
+  implicit val compileRW: RW[Compile] = macroRW
+
+  implicit val compileResultRW: RW[CompileResult] = macroRW
+
+  implicit val txResultRW: RW[TxResult] = macroRW
+
+  implicit val getHashesAtHeightRW: RW[GetHashesAtHeight] = macroRW
+
+  implicit val hashesAtHeightRW: RW[HashesAtHeight] = macroRW
+
+  implicit val getChainInfoRW: RW[GetChainInfo] = macroRW
+
+  implicit val chainInfoRW: RW[ChainInfo] = macroRW
+
+  implicit val getBlockRW: RW[GetBlock] = macroRW
+
+  implicit val minerActionRW: RW[MinerAction] = readwriter[String].bimap(
+    {
+      case MinerAction.StartMining => "start-mining"
+      case MinerAction.StopMining  => "stop-mining"
+    },
+    {
+      case "start-mining" => MinerAction.StartMining
+      case "stop-mining"  => MinerAction.StopMining
+      case other          => throw new Abort(s"Invalid miner action: $other")
+    }
+  )
+
+  implicit val minerAddressesRW: RW[MinerAddresses] = macroRW
+
+  implicit val peerInfoRW: ReadWriter[BrokerInfo] = {
+    readwriter[ujson.Value].bimap[BrokerInfo](
+      peer =>
+        ujson.Obj(
+          "cliqueId"          -> writeJs(peer.cliqueId),
+          "brokerId"          -> writeJs(peer.brokerId),
+          "groupNumPerBroker" -> writeJs(peer.groupNumPerBroker),
+          "address"           -> writeJs(peer.address)
+        ),
+      json =>
+        BrokerInfo.unsafe(
+          read[CliqueId](json("cliqueId")),
+          read[Int](json("brokerId")),
+          read[Int](json("groupNumPerBroker")),
+          read[InetSocketAddress](json("address"))
+        )
+    )
+  }
+
+  implicit val interCliqueSyncedStatusRW: RW[InterCliquePeerInfo] = macroRW
+
+  implicit val fetchRequestRW: RW[FetchRequest] = macroRW[FetchRequest].bimap[FetchRequest](
+    identity,
+    { fetchRequest =>
+      if (fetchRequest.toTs < fetchRequest.fromTs) {
+        throw Abort("`toTs` cannot be before `fromTs`")
+      } else if ((fetchRequest.toTs -- fetchRequest.fromTs).exists(_ > blockflowFetchMaxAge)) {
+        throw Abort(s"interval cannot be greater than ${blockflowFetchMaxAge}")
       } else {
-        Left(DecodingFailure("Can not decode, expecting 'type' key", c.history))
+        fetchRequest
       }
     }
-  }
+  )
 
-  implicit val peerStatusCodec: Codec[PeerStatus] =
-    Codec.from(peerStatusDecoder, peerStatusEncoder)
-
-  implicit val peerMisbehaviorCodec: Codec[PeerMisbehavior] = deriveCodec[PeerMisbehavior]
-
-  implicit val u256Encoder: Encoder[U256] = Encoder.encodeJavaBigInteger.contramap[U256](_.toBigInt)
-  implicit val u256Decoder: Decoder[U256] = Decoder.decodeJavaBigInteger.emap { u256 =>
-    U256.from(u256).toRight(s"Invalid U256: $u256")
-  }
-  implicit val u256Codec: Codec[U256] = Codec.from(u256Decoder, u256Encoder)
-
-  implicit val publicKeyEncoder: Encoder[PublicKey] = bytesEncoder
-  implicit val publicKeyDecoder: Decoder[PublicKey] = bytesDecoder(PublicKey.from)
-  implicit val publicKeyCodec: Codec[PublicKey] =
-    Codec.from(publicKeyDecoder, publicKeyEncoder)
-
-  implicit val signatureEncoder: Encoder[Signature] = bytesEncoder
-  implicit val signatureDecoder: Decoder[Signature] = bytesDecoder(Signature.from)
-
-  implicit val hashEncoder: Encoder[Hash] = hash => Json.fromString(hash.toHexString)
-  implicit val hashDecoder: Decoder[Hash] =
-    byteStringDecoder.emap(Hash.from(_).toRight("cannot decode hash"))
-  implicit val hashCodec: Codec[Hash] = Codec.from(hashDecoder, hashEncoder)
-
-  implicit val blockHashEncoder: Encoder[BlockHash] = hash => Json.fromString(hash.toHexString)
-  implicit val blockHashDecoder: Decoder[BlockHash] =
-    byteStringDecoder.emap(BlockHash.from(_).toRight("cannot decode block hash"))
-  implicit val blockHashCodec: Codec[BlockHash] = Codec.from(blockHashDecoder, blockHashEncoder)
-
-  lazy val addressEncoder: Encoder[Address] =
-    Encoder.encodeString.contramap[Address](_.toBase58)
-  lazy val addressDecoder: Decoder[Address] =
-    Decoder.decodeString.emap { input =>
-      Address
-        .fromBase58(input, networkType)
-        .toRight(s"Unable to decode address from $input")
+  implicit val mnemonicSizeRW: RW[Mnemonic.Size] = readwriter[Int].bimap(
+    _.value,
+    { size =>
+      Mnemonic
+        .Size(size)
+        .getOrElse(
+          throw Abort(
+            s"Invalid mnemonic size: $size, expected: ${Mnemonic.Size.list.map(_.value).mkString(", ")}"
+          )
+        )
     }
-  implicit lazy val addressCodec: Codec[Address] = Codec.from(addressDecoder, addressEncoder)
+  )
 
-  implicit val cliqueIdEncoder: Encoder[CliqueId] = Encoder.encodeString.contramap(_.toHexString)
-  implicit val cliqueIdDecoder: Decoder[CliqueId] = Decoder.decodeString.emap(createCliqueId)
-  implicit val cliqueIdCodec: Codec[CliqueId]     = Codec.from(cliqueIdDecoder, cliqueIdEncoder)
+  private def bytesWriter[T <: RandomBytes]: Writer[T] =
+    StringWriter.comap[T](_.toHexString)
 
-  implicit val networkTypeEncoder: Encoder[NetworkType] = Encoder.encodeString.contramap(_.name)
-  implicit val networkTypeDecoder: Decoder[NetworkType] =
-    Decoder.decodeString.emap(NetworkType.fromName(_).toRight("Invalid network type."))
-  implicit val networkTypeCodec: Codec[NetworkType] =
-    Codec.from(networkTypeDecoder, networkTypeEncoder)
-
-  implicit val fetchResponseCodec: Codec[FetchResponse] = deriveCodec[FetchResponse]
-
-  implicit val outputRefCodec: Codec[OutputRef] = deriveCodec[OutputRef]
-
-  implicit val inputCodec: Codec[Input] = deriveCodec[Input]
-
-  implicit val outputCodec: Codec[Output] = deriveCodec[Output]
-
-  implicit val txCodec: Codec[Tx] = deriveCodec[Tx]
-
-  implicit val exportFile: Codec[ExportFile] = deriveCodec[ExportFile]
-
-  implicit val blockEntryCodec: Codec[BlockEntry] = deriveCodec[BlockEntry]
-
-  implicit val blockCandidateCodec: Codec[BlockCandidate] =
-    deriveCodec[BlockCandidate]
-
-  implicit val blockSolutionCodec: Codec[BlockSolution] = deriveCodec[BlockSolution]
-
-  implicit val peerAddressCodec: Codec[PeerAddress] = deriveCodec[PeerAddress]
-
-  implicit val selfCliqueCodec: Codec[SelfClique] = deriveCodec[SelfClique]
-
-  implicit val neighborPeersCodec: Codec[NeighborPeers] = deriveCodec[NeighborPeers]
-
-  implicit val getBalanceCodec: Codec[GetBalance] = deriveCodec[GetBalance]
-
-  implicit val getGroupCodec: Codec[GetGroup] = deriveCodec[GetGroup]
-
-  implicit val balanceCodec: Codec[Balance] = deriveCodec[Balance]
-
-  implicit val buildTransactionCodec: Codec[BuildTransaction] = deriveCodec[BuildTransaction]
-
-  implicit val groupCodec: Codec[Group] = deriveCodec[Group]
-
-  implicit val buildTransactionResultCodec: Codec[BuildTransactionResult] =
-    deriveCodec[BuildTransactionResult]
-
-  implicit val sendTransactionCodec: Codec[SendTransaction] = deriveCodec[SendTransaction]
-
-  implicit val txStatusCodec: Codec[TxStatus] = deriveCodec[TxStatus]
-
-  implicit val buildContractCodec: Codec[BuildContract] = deriveCodec[BuildContract]
-
-  implicit val buildContractResultCodec: Codec[BuildContractResult] =
-    deriveCodec[BuildContractResult]
-
-  implicit val sendContractCodec: Codec[SendContract] = deriveCodec[SendContract]
-
-  implicit val compileResult: Codec[Compile] = deriveCodec[Compile]
-
-  implicit val compileResultCodec: Codec[CompileResult] = deriveCodec[CompileResult]
-
-  implicit val txResultCodec: Codec[TxResult] = deriveCodec[TxResult]
-
-  implicit val getHashesAtHeightCodec: Codec[GetHashesAtHeight] = deriveCodec[GetHashesAtHeight]
-
-  implicit val hashesAtHeightCodec: Codec[HashesAtHeight] = deriveCodec[HashesAtHeight]
-
-  implicit val getChainInfoCodec: Codec[GetChainInfo] = deriveCodec[GetChainInfo]
-
-  implicit val chainInfoCodec: Codec[ChainInfo] = deriveCodec[ChainInfo]
-
-  implicit val getBlockCodec: Codec[GetBlock] = deriveCodec[GetBlock]
-
-  implicit val minerActionDecoder: Decoder[MinerAction] = Decoder[String].emap {
-    case "start-mining" => Right(MinerAction.StartMining)
-    case "stop-mining"  => Right(MinerAction.StopMining)
-    case other          => Left(s"Invalid miner action: $other")
-  }
-  implicit val minerActionEncoder: Encoder[MinerAction] = Encoder[String].contramap {
-    case MinerAction.StartMining => "start-mining"
-    case MinerAction.StopMining  => "stop-mining"
-  }
-  implicit val minerActionCodec: Codec[MinerAction] =
-    Codec.from(minerActionDecoder, minerActionEncoder)
-
-  implicit val minerAddressesCodec: Codec[MinerAddresses] = deriveCodec[MinerAddresses]
-
-  implicit val cliqueEncoder: Encoder[InterCliqueInfo] =
-    Encoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(info =>
-      (info.id, info.externalAddresses, info.groupNumPerBroker)
-    )
-  implicit val cliqueDecoder: Decoder[InterCliqueInfo] =
-    Decoder.forProduct3("id", "externalAddresses", "groupNumPerBroker")(InterCliqueInfo.unsafe)
-
-  implicit val peerInfoEncoder: Encoder[BrokerInfo] =
-    Encoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(info =>
-      (info.cliqueId, info.brokerId, info.groupNumPerBroker, info.address)
-    )
-  implicit val peerInfoDecoder: Decoder[BrokerInfo] =
-    Decoder.forProduct4("cliqueId", "brokerId", "groupNumPerBroker", "address")(BrokerInfo.unsafe)
-
-  implicit val interCliqueSyncedStatusCodec: Codec[InterCliquePeerInfo] =
-    deriveCodec[InterCliquePeerInfo]
-
-  lazy val fetchRequestDecoder: Decoder[FetchRequest] =
-    deriveDecoder[FetchRequest]
-      .ensure(
-        fetchRequest => fetchRequest.fromTs <= fetchRequest.toTs,
-        "`toTs` cannot be before `fromTs`"
-      )
-      .ensure(
-        fetchRequest =>
-          (fetchRequest.toTs -- fetchRequest.fromTs)
-            .exists(_ <= blockflowFetchMaxAge),
-        s"interval cannot be greater than ${blockflowFetchMaxAge}"
-      )
-  val fetchRequestEncoder: Encoder[FetchRequest] = deriveEncoder[FetchRequest]
-  implicit lazy val fetchRequestCodec: Codec[FetchRequest] =
-    Codec.from(fetchRequestDecoder, fetchRequestEncoder)
-
-  implicit val mnemonicSizeEncoder: Encoder[Mnemonic.Size] =
-    Encoder.encodeInt.contramap[Mnemonic.Size](_.value)
-  implicit val mnemonicSizeDecoder: Decoder[Mnemonic.Size] = Decoder.decodeInt.emap { size =>
-    Mnemonic
-      .Size(size)
-      .toRight(
-        s"Invalid mnemonic size: $size, expected: ${Mnemonic.Size.list.map(_.value).mkString(", ")}"
-      )
-  }
-  implicit val mnemonicSizeCodec: Codec[Mnemonic.Size] =
-    Codec.from(mnemonicSizeDecoder, mnemonicSizeEncoder)
-
-  private def bytesEncoder[T <: RandomBytes]: Encoder[T] =
-    Encoder.encodeString.contramap[T](_.toHexString)
-  private def bytesDecoder[T](from: ByteString => Option[T]): Decoder[T] =
-    Decoder.decodeString.emap { input =>
+  private def bytesReader[T <: RandomBytes](from: ByteString => Option[T]): Reader[T] =
+    StringReader.map { input =>
       val keyOpt = for {
         bs  <- Hex.from(input)
         key <- from(bs)
       } yield key
-      keyOpt.toRight(s"Unable to decode key from $input")
+      keyOpt.getOrElse(throw Abort(s"Unable to decode key from $input"))
     }
-
-  private def createCliqueId(s: String): Either[String, CliqueId] = {
-    Hex.from(s).flatMap(CliqueId.from) match {
-      case Some(id) => Right(id)
-      case None     => Left("invalid clique id")
-    }
-  }
 }
