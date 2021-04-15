@@ -22,7 +22,7 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.api.CirceUtils._
+import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Message, Payload, Pong}

@@ -26,29 +26,33 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import io.circe.Json
-import io.circe.syntax._
+import de.heikoseeberger.akkahttpupickle.UpickleCustomizationSupport
 
-import org.alephium.api.{ApiError, ApiModelCodec, CirceUtils}
-import org.alephium.api.CirceUtils.avectorDecoder
+import org.alephium.api.{ApiError, ApiModelCodec}
+import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.json.Json
+import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, NetworkType, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model
-import org.alephium.wallet.circe.ModelCodecs
 import org.alephium.wallet.config.WalletConfigFixture
+import org.alephium.wallet.json.ModelCodecs
 
 class WalletAppSpec
     extends AlephiumFutureSpec
     with ModelCodecs
     with WalletConfigFixture
     with ScalatestRouteTest
-    with FailFastCirceSupport {
+    with UpickleCustomizationSupport {
+  override type Api = Json.type
+
+  override def api: Api = Json
+
   implicit val defaultTimeout = RouteTestTimeout(5.seconds)
 
   val blockFlowMock =
@@ -78,10 +82,10 @@ class WalletAppSpec
       .getOrElse("")}}"""
   val unlockJson                                = s"""{"password":"$password"}"""
   val deleteJson                                = s"""{"password":"$password"}"""
-  def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":$amount}"""
+  def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":"$amount"}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
-    s"""{"password":"$password","mnemonic":${mnemonic.asJson}}"""
+    s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""
 
   def create(size: Int, maybeName: Option[String] = None) =
     Post(s"/wallets", entity(creationJson(size, maybeName))) ~> routes
@@ -107,14 +111,12 @@ class WalletAppSpec
 
     unlock() ~> check {
       status is StatusCodes.NotFound
-      CirceUtils.print(
-        responseAs[Json]
-      ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
+      write(responseAs[ujson.Value]) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
 
     create(2) ~> check {
       val error = responseAs[ApiError.BadRequest]
-      error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24: DownField(mnemonicSize): {"password":"$password","mnemonicSize":2})"""
+      error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24 at index 94: decoding failure)"""
       status is StatusCodes.BadRequest
     }
 
@@ -176,7 +178,7 @@ class WalletAppSpec
     val negAmount = -10
     transfer(negAmount) ~> check {
       val error = responseAs[ApiError.BadRequest]
-      error.detail is s"""Invalid value for: body (Invalid U256: $negAmount: DownField(amount): {"address":"$transferAddress","amount":$negAmount})"""
+      error.detail.contains(s"""Invalid value for: body (Invalid U256: $negAmount""") is true
       status is StatusCodes.BadRequest
     }
 
@@ -220,7 +222,7 @@ class WalletAppSpec
       status is StatusCodes.PermanentRedirect
     }
 
-    Get(s"/docs/openapi.yaml") ~> routes ~> check {
+    Get(s"/docs/openapi.json") ~> routes ~> check {
       status is StatusCodes.OK
     }
 
@@ -238,10 +240,11 @@ class WalletAppSpec
 
     delete() ~> check {
       status is StatusCodes.NotFound
-      CirceUtils.print(
-        responseAs[Json]
+      write(
+        responseAs[ujson.Value]
       ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
+
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())
   }
 }
@@ -251,9 +254,13 @@ object WalletAppSpec extends {
   class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(implicit
       val groupConfig: GroupConfig,
       system: ActorSystem
-  ) extends FailFastCirceSupport
+  ) extends UpickleCustomizationSupport
       with TxGenerators
       with ApiModelCodec {
+
+    override type Api = Json.type
+
+    override def api: Api = Json
 
     private val cliqueId = CliqueId.generate
     private val peer     = PeerAddress(address, port, port)
@@ -294,6 +301,6 @@ object WalletAppSpec extends {
           }
         }
 
-    val server = Http().bindAndHandle(routes, address.getHostAddress, port)
+    val server = Http().newServerAt(address.getHostAddress, port).bind(routes)
   }
 }

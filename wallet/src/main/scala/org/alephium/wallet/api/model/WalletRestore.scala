@@ -18,12 +18,13 @@ package org.alephium.wallet.api.model
 
 import org.alephium.crypto.wallet.Mnemonic
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class WalletRestore(
     password: String,
     mnemonic: Mnemonic,
-    isMiner: Option[Boolean],
-    walletName: Option[String],
-    mnemonicPassphrase: Option[String]
+    isMiner: Option[Boolean] = None,
+    walletName: Option[String] = None,
+    mnemonicPassphrase: Option[String] = None
 )
 object WalletRestore {
   final case class Result(walletName: String)

@@ -21,10 +21,11 @@ import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{TimeStamp, U256}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildTransaction(
     fromKey: PublicKey,
     toAddress: Address,
-    lockTime: Option[TimeStamp],
+    lockTime: Option[TimeStamp] = None,
     value: U256
 ) {
   def fromAddress(networkType: NetworkType): Address =

@@ -19,34 +19,45 @@ package org.alephium.api
 import scala.reflect.ClassTag
 
 import com.typesafe.scalalogging.StrictLogging
-import io.circe.{Decoder, Encoder}
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
 import sttp.tapir.EndpointOutput.StatusMapping
-import sttp.tapir.json.circe.{jsonBody => tapirJsonBody}
+import sttp.tapir.generic.auto._
 
-import org.alephium.api.CirceUtils.avectorCodec
 import org.alephium.api.TapirCodecs
-import org.alephium.api.TapirSchemas._
+import org.alephium.api.TapirSchemasLike
+import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
+import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs with StrictLogging {
+trait Endpoints
+    extends ApiModelCodec
+    with EndpointsExamples
+    with TapirCodecs
+    with TapirSchemasLike
+    with StrictLogging {
   import Endpoints._
 
   implicit def groupConfig: GroupConfig
 
-  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_], B, Nothing]
+  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_], B, Any]
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
       .and(query[TimeStamp]("toTs"))
       .validate(
-        Validator.custom({ case (from, to) => from <= to }, "`fromTs` must be before `toTs`")
+        Validator.custom({ case (from, to) =>
+          if (from > to) {
+            List(ValidationError.Custom((from, to), "`fromTs` must be before `toTs`"))
+          } else {
+            List.empty
+          }
+        })
       )
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to)
@@ -270,7 +281,7 @@ trait Endpoints extends ApiModelCodec with EndpointsExamples with TapirCodecs wi
 
 object Endpoints {
   // scalastyle:off regex
-  def error[S <: StatusCode, T <: ApiError[S]: Decoder: Encoder: Schema: Validator](
+  def error[S <: StatusCode, T <: ApiError[S]: ReadWriter: Schema](
       apiError: ApiError.Companion[S, T]
   )(implicit
       examples: List[Example[T]],
@@ -284,9 +295,9 @@ object Endpoints {
   }
   // scalastyle:on regex
 
-  def jsonBody[T: Encoder: Decoder: Schema: Validator](implicit
+  def jsonBody[T: ReadWriter: Schema](implicit
       examples: List[Example[T]]
   ): EndpointIO.Body[String, T] = {
-    tapirJsonBody[T].examples(examples)
+    alfJsonBody[T].examples(examples)
   }
 }

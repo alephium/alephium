@@ -23,18 +23,18 @@ import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.{TestActor, TestProbe}
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
-import io.circe.syntax._
-import io.circe.yaml
+import de.heikoseeberger.akkahttpupickle.UpickleCustomizationSupport
 import org.scalatest.EitherValues
 
 import org.alephium.api.{ApiError, ApiModel}
-import org.alephium.api.CirceUtils.avectorCodec
+import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.network.CliqueManager
+import org.alephium.json.Json
+import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType, Target}
 import org.alephium.serde.serialize
@@ -46,7 +46,12 @@ class RestServerSpec
     extends AlephiumFutureSpec
     with ScalatestRouteTest
     with EitherValues
-    with NumericHelpers {
+    with NumericHelpers
+    with UpickleCustomizationSupport {
+
+  override type Api = Json.type
+
+  override def api: Api = Json
 
   it should "call GET /blockflow" in new RestServerFixture {
     Get(s"/blockflow?fromTs=0&toTs=0") ~> server.route ~> check {
@@ -237,7 +242,7 @@ class RestServerSpec
     val newAddresses = AVector.tabulate(config.broker.groups)(i =>
       addressStringGen(GroupIndex.unsafe(i)).sample.get._1
     )
-    val body   = s"""{"addresses":${newAddresses.asJson}}"""
+    val body   = s"""{"addresses":${writeJs(newAddresses)}}"""
     val entity = HttpEntity(ContentTypes.`application/json`, body)
 
     Put(s"/miners/addresses", entity) ~> server.route ~> check {
@@ -257,7 +262,7 @@ class RestServerSpec
     }
 
     val wrongGroup       = AVector.tabulate(config.broker.groups)(_ => dummyKeyAddress)
-    val wrongGroupBody   = s"""{"addresses":${wrongGroup.asJson}}"""
+    val wrongGroupBody   = s"""{"addresses":${writeJs(wrongGroup)}}"""
     val wrongGroupEntity = HttpEntity(ContentTypes.`application/json`, wrongGroupBody)
     Put(s"/miners/addresses", wrongGroupEntity) ~> server.route ~> check {
       status is StatusCodes.BadRequest
@@ -316,10 +321,10 @@ class RestServerSpec
     val txsHash   = Hash.generate
 
     val body =
-      s"""{"blockDeps":["${blockHash.toHexString}"],"timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":1,"target":"${Hex
+      s"""{"blockDeps":["${blockHash.toHexString}"],"timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
         .toHexString(
           target.bits
-        )}","nonce":1,"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+        )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""
 
     val entity = HttpEntity(ContentTypes.`application/json`, body)
 
@@ -336,19 +341,25 @@ class RestServerSpec
       status is StatusCodes.PermanentRedirect
     }
 
-    Get(s"/docs/openapi.yaml") ~> server.route ~> check {
+    Get(s"/docs/openapi.json") ~> server.route ~> check {
       status is StatusCodes.OK
 
       val timeout = Duration.ofMinutesUnsafe(1).asScala
 
-      val openapiPath     = ApiModel.getClass.getResource("/openapi.yaml")
-      val openapiFile     = Source.fromFile(openapiPath.getPath, "UTF-8").getLines().mkString("\n")
-      val expectedOpenapi = yaml.parser.parse(openapiFile).rightValue
+      val openapiPath = ApiModel.getClass.getResource("/openapi.json")
+      val expectedOpenapi =
+        read[ujson.Value](
+          Source.fromFile(openapiPath.getPath, "UTF-8").getLines().toSeq.mkString("\n")
+        )
 
-      val responseContent = response.entity.toStrict(timeout).futureValue.getData.utf8String
-      val openapi         = yaml.parser.parse(responseContent).rightValue
+      val openapi =
+        read[ujson.Value](response.entity.toStrict(timeout).futureValue.getData.utf8String)
 
-      openapi is expectedOpenapi
+      Get(s"/docs") ~> server.route ~> check {
+        status is StatusCodes.PermanentRedirect
+        openapi is expectedOpenapi
+      }
+
     }
   }
 

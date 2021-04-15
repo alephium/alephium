@@ -35,6 +35,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     app,
     benchmark,
     flow,
+    json,
     protocol,
     wallet,
     tools
@@ -86,10 +87,7 @@ lazy val serde = project("serde")
   .dependsOn(util % "test->test;compile->compile")
 
 lazy val crypto = project("crypto")
-  .dependsOn(util % "test->test;compile->compile", serde)
-  .settings(
-    libraryDependencies ++= Seq(`circe-parser` % Test, `circe-generic` % Test)
-  )
+  .dependsOn(util % "test->test;compile->compile", serde, json % "test->test")
 
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
@@ -101,32 +99,29 @@ lazy val rpc = project("rpc")
   .settings(
     libraryDependencies ++= Seq(
       `akka-http`,
-      `akka-http-circe`,
+      `akka-http-upickle`,
       `akka-stream`,
-      `circe-parser`,
-      `circe-generic`,
       `scala-logging`,
       `akka-test`,
       `akka-http-test`
     ),
     publish / skip := true
   )
-  .dependsOn(util % "test->test;compile->compile")
+  .dependsOn(json, util % "test->test;compile->compile")
 
 lazy val api = project("api")
-  .dependsOn(protocol, crypto, serde, util % "test->test;compile->compile")
+  .dependsOn(json, protocol, crypto, serde, util % "test->test;compile->compile")
   .settings(
     libraryDependencies ++= Seq(
-      `circe-core`,
-      `circe-generic`,
       `scala-logging`,
       `tapir-core`,
-      `tapir-circe`
+      `tapir-openapi`,
+      `tapir-openapi-model`
     )
   )
 
 lazy val app = mainProject("app")
-  .dependsOn(api, rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
+  .dependsOn(json, api, rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
   .settings(
     mainClass in assembly := Some("org.alephium.app.Boot"),
     assemblyJarName in assembly := s"alephium-${version.value}.jar",
@@ -142,13 +137,18 @@ lazy val app = mainProject("app")
       `akka-http-test`,
       `akka-stream-test`,
       `tapir-core`,
-      `tapir-circe`,
       `tapir-akka`,
       `tapir-openapi`,
-      `tapir-openapi-circe`,
       `tapir-swagger-ui`
     ),
     publish / skip := true
+  )
+
+lazy val json = project("json")
+  .settings(
+    libraryDependencies ++= Seq(
+      upickle
+    )
   )
 
 lazy val tools = mainProject("tools")
@@ -186,20 +186,16 @@ lazy val protocol = project("protocol")
   )
 
 lazy val wallet = project("wallet")
-  .dependsOn(api, crypto, util % "test->test", protocol % "compile->compile;test->test")
+  .dependsOn(json, api, crypto, util % "test->test", protocol % "compile->compile;test->test")
   .settings(
     libraryDependencies ++= Seq(
       `akka-http`,
-      `akka-http-circe`,
+      `akka-http-upickle`,
       `akka-http-test`,
       `scala-logging`,
-      `circe-core`,
-      `circe-generic`,
       `tapir-core`,
-      `tapir-circe`,
       `tapir-akka`,
       `tapir-openapi`,
-      `tapir-openapi-circe`,
       `tapir-swagger-ui`,
       `tapir-client`,
       `sttp-akka-http-backend`,
@@ -235,7 +231,6 @@ val commonSettings = publishSettings ++ Seq(
     "-feature",
     "-unchecked",
     "-Xsource:3",
-    "-Xfatal-warnings",
     "-Xlint:adapted-args",
     "-Xlint:constant",
     "-Xlint:delayedinit-select",
@@ -251,6 +246,7 @@ val commonSettings = publishSettings ++ Seq(
     "-Xlint:stars-align",
     "-Xlint:type-parameter-shadow",
     "-Xlint:nonlocal-return",
+    "-Xfatal-warnings",
     "-Ywarn-dead-code",
     "-Ywarn-extra-implicit",
     "-Ywarn-numeric-widen",
