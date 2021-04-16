@@ -76,6 +76,8 @@ final case class MiningSetting(nonceStep: U256, batchDelay: Duration)
 
 final case class NetworkSetting(
     networkType: NetworkType,
+    maxOutboundConnectionsPerGroup: Int,
+    maxInboundConnectionsPerGroup: Int,
     pingFrequency: Duration,
     retryTimeout: Duration,
     connectionBufferCapacityInByte: Long,
@@ -165,6 +167,8 @@ object AlephiumConfig {
 
   final private case class TempNetworkSetting(
       networkType: NetworkType,
+      maxOutboundConnectionsPerGroup: Int,
+      maxInboundConnectionsPerGroup: Int,
       pingFrequency: Duration,
       retryTimeout: Duration,
       connectionBufferCapacityInByte: Long,
@@ -179,6 +183,8 @@ object AlephiumConfig {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
         networkType,
+        maxOutboundConnectionsPerGroup,
+        maxInboundConnectionsPerGroup,
         pingFrequency,
         retryTimeout,
         connectionBufferCapacityInByte,

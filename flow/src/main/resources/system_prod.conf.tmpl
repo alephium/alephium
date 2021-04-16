@@ -10,6 +10,9 @@ alephium {
   }
 
   network {
+    max-outbound-connections-per-group = 10
+    max-inbound-connections-per-group = 40
+
     # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
 
