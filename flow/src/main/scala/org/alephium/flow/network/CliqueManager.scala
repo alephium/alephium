@@ -96,7 +96,7 @@ class CliqueManager(
 
   def awaitIntraCliqueReady(intraCliqueManager: ActorRef, cliqueInfo: CliqueInfo): Receive = {
     case IntraCliqueManager.Ready =>
-      log.debug(s"Intra clique manager is ready")
+      log.info(s"Intra clique manager is ready")
       val props = InterCliqueManager.props(
         cliqueInfo,
         blockflow,

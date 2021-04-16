@@ -20,9 +20,6 @@ import org.alephium.util.Duration
 
 // scalastyle:off magic.number
 package object network {
-  val maxOutboundConnectionsPerGroup: Int = 10
-  val maxInboundConnectionsPerGroup: Int  = 40
-
   val fastScanPeriod: Duration = Duration.ofMinutesUnsafe(1)
 
   val syncFrequency: Duration        = Duration.ofSecondsUnsafe(2)
