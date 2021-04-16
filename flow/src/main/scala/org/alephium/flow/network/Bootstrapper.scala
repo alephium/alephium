@@ -21,7 +21,8 @@ import akka.io.Tcp
 
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
+import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.CliqueId
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
@@ -31,15 +32,20 @@ object Bootstrapper {
       cliqueManager: ActorRefT[CliqueManager.Command]
   )(implicit
       brokerConfig: BrokerConfig,
-      networkSetting: NetworkSetting,
-      discoveryConfig: DiscoveryConfig
+      networkSetting: NetworkSetting
   ): Props = {
     if (brokerConfig.brokerNum == 1) {
+      val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
       assume(brokerConfig.groupNumPerBroker == brokerConfig.groups)
-      val cliqueId  = CliqueId.unsafe(discoveryConfig.discoveryPublicKey.bytes)
+      val cliqueId  = CliqueId(discoveryPublicKey)
       val peerInfos = AVector(PeerInfo.self)
       val intraCliqueInfo =
-        IntraCliqueInfo.unsafe(cliqueId, peerInfos, brokerConfig.groupNumPerBroker)
+        IntraCliqueInfo.unsafe(
+          cliqueId,
+          peerInfos,
+          brokerConfig.groupNumPerBroker,
+          discoveryPrivateKey
+        )
       Props(new SingleNodeCliqueBootstrapper(tcpController, cliqueManager, intraCliqueInfo))
     } else if (networkSetting.isCoordinator) {
       Props(new CliqueCoordinatorBootstrapper(tcpController, cliqueManager))
@@ -59,8 +65,7 @@ class CliqueCoordinatorBootstrapper(
     val cliqueManager: ActorRefT[CliqueManager.Command]
 )(implicit
     brokerConfig: BrokerConfig,
-    networkSetting: NetworkSetting,
-    discoveryConfig: DiscoveryConfig
+    networkSetting: NetworkSetting
 ) extends BootstrapperHandler {
   log.debug("Start as CliqueCoordinator")
 

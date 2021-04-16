@@ -37,7 +37,7 @@ trait AlephiumActorSpecLike
   def name: String
 
   implicit lazy val system: ActorSystem =
-    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.config))
+    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
 
   override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
@@ -59,7 +59,7 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
 
   trait ActorCreation {
     implicit val system: ActorSystem =
-      ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.config))
+      ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
     Option(_system) is None
     _system = system
   }
@@ -68,10 +68,13 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
 }
 
 object AlephiumActorSpec {
-  val config: String =
-    """
+  lazy val warningConfig = config("WARNING")
+  lazy val debugConfig   = config("DEBUG")
+
+  def config(logLevel: String): String =
+    s"""
       |akka {
-      |  loglevel = "WARNING"
+      |  loglevel = "$logLevel"
       |  loggers = ["akka.testkit.TestEventListener"]
       |  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
       |

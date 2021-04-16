@@ -19,29 +19,31 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.macros.HPC.cfor
+import org.alephium.protocol.PublicKey
 import org.alephium.serde.RandomBytes
+import org.alephium.util.Bytes.byteStringOrdering
 
 /** 160bits identifier of a Peer * */
-class CliqueId private (val bytes: ByteString) extends RandomBytes {
+class CliqueId(val publicKey: PublicKey) extends RandomBytes with Ordered[CliqueId] {
+  val bytes: ByteString = publicKey.bytes
   def hammingDist(another: CliqueId): Int = {
     CliqueId.hammingDist(this, another)
   }
+
+  override def compare(that: CliqueId): Int = byteStringOrdering.compare(this.bytes, that.bytes)
 }
 
 object CliqueId
     extends RandomBytes.Companion[CliqueId](
       bs => {
         assume(bs.size == cliqueIdLength)
-        new CliqueId(bs)
+        new CliqueId(PublicKey.unsafe(bs))
       },
       _.bytes
     ) {
   override def length: Int = cliqueIdLength
 
-  def fromStringUnsafe(s: String): CliqueId = {
-    val bytes = ByteString.fromString(s)
-    unsafe(bytes)
-  }
+  def apply(publicKey: PublicKey): CliqueId = new CliqueId(publicKey)
 
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   def hammingDist(cliqueId0: CliqueId, cliqueId1: CliqueId): Int = {

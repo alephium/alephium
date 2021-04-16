@@ -18,13 +18,15 @@ package org.alephium.protocol.message
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.Generators
-import org.alephium.protocol.config.{CliqueConfig, DiscoveryConfig}
+import org.alephium.protocol.{Generators, PublicKey}
+import org.alephium.protocol.config.CliqueConfig
 import org.alephium.protocol.model.CliqueId
 import org.alephium.util.AVector
 
 trait DiscoveryMessageGenerators extends Generators {
   import DiscoveryMessage._
+
+  def discoveryPublicKey: PublicKey
 
   lazy val findNodeGen: Gen[FindNode] = for {
     target <- cliqueIdGen
@@ -42,11 +44,10 @@ trait DiscoveryMessageGenerators extends Generators {
     } yield Neighbors(AVector.from(infos))
 
   def messageGen(implicit
-      discoveryConfig: DiscoveryConfig,
       cliqueConfig: CliqueConfig
   ): Gen[DiscoveryMessage] =
     for {
-      cliqueId <- Gen.const(()).map(_ => CliqueId.generate)
+      cliqueId <- Gen.const(()).map(_ => CliqueId(discoveryPublicKey))
       payload  <- Gen.oneOf[Payload](findNodeGen, pingGen, pongGen, neighborsGen)
     } yield DiscoveryMessage.from(cliqueId, payload)
 }

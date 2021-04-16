@@ -32,7 +32,7 @@ trait InfoFixture extends ModelGenerators {
       val peers = info.internalAddresses.mapWithIndex { (address, id) =>
         PeerInfo.unsafe(id, info.groupNumPerBroker, Some(address), address, restPort, wsPort)
       }
-      IntraCliqueInfo.unsafe(info.id, peers, info.groupNumPerBroker)
+      IntraCliqueInfo.unsafe(info.id, peers, info.groupNumPerBroker, info.priKey)
     }
   }
 

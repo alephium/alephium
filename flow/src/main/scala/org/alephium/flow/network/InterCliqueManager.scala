@@ -84,11 +84,13 @@ class InterCliqueManager(
     allHandlers: AllHandlers,
     discoveryServer: ActorRefT[DiscoveryServer.Command],
     blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
-)(implicit val brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
+)(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseActor
     with EventStream.Subscriber
     with InterCliqueManagerState {
   import InterCliqueManager._
+
+  def selfCliqueId: CliqueId = selfCliqueInfo.id
 
   override def preStart(): Unit = {
     super.preStart()
@@ -104,7 +106,7 @@ class InterCliqueManager(
 
   def handleConnection: Receive = {
     case Tcp.Connected(remoteAddress, _) =>
-      if (checkForInConnection(maxInboundConnectionsPerGroup)) {
+      if (checkForInConnection(networkSetting.maxInboundConnectionsPerGroup)) {
         log.info(s"Connected to $remoteAddress")
         val props =
           InboundBrokerHandler.props(
@@ -123,12 +125,7 @@ class InterCliqueManager(
         sender() ! Tcp.Close
       }
     case CliqueManager.HandShaked(brokerInfo, connectionType) =>
-      if (checkForConnection(brokerInfo, connectionType)) {
-        log.debug(s"Start syncing with inter-clique node: $brokerInfo")
-        addBroker(brokerInfo, connectionType, ActorRefT(sender()))
-      } else {
-        context stop sender()
-      }
+      handleNewBroker(brokerInfo, connectionType)
     case CliqueManager.Synced(brokerInfo) =>
       log.debug(s"No new blocks from $brokerInfo")
       setSynced(brokerInfo)
@@ -173,7 +170,9 @@ class InterCliqueManager(
   }
 
   def connect(broker: BrokerInfo): Unit = {
-    if (checkForOutConnection(broker, maxOutboundConnectionsPerGroup)) connectUnsafe(broker)
+    if (checkForOutConnection(broker, networkSetting.maxOutboundConnectionsPerGroup)) {
+      connectUnsafe(broker)
+    }
   }
 
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
@@ -191,16 +190,13 @@ class InterCliqueManager(
     context.watchWith(out, PeerDisconnected(brokerInfo.address))
     ()
   }
-
-  def checkForConnection(brokerInfo: BrokerInfo, connectionType: ConnectionType): Boolean =
-    connectionType match {
-      case InboundConnection  => checkForInConnection(brokerInfo, maxInboundConnectionsPerGroup)
-      case OutboundConnection => checkForOutConnection(brokerInfo, maxOutboundConnectionsPerGroup)
-    }
 }
 
-trait InterCliqueManagerState {
+trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   import InterCliqueManager._
+
+  def selfCliqueId: CliqueId
+  def networkSetting: NetworkSetting
 
   def log: LoggingAdapter
   implicit def brokerConfig: BrokerConfig
@@ -215,6 +211,7 @@ trait InterCliqueManagerState {
   ): Unit = {
     val peerId = brokerInfo.peerId
     if (!brokers.contains(peerId)) {
+      log.debug(s"Start syncing with inter-clique node: $brokerInfo")
       brokers += peerId -> BrokerState(brokerInfo, connectionType, broker, isSynced = false)
     } else {
       log.debug(s"Ignore another connection from $peerId")
@@ -275,6 +272,12 @@ trait InterCliqueManagerState {
     brokers.filterInPlace { case (_, state) => state.info.address != peer }
   }
 
+  def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {
+    (brokerConfig.groupFrom until brokerConfig.groupUntil).exists { group =>
+      getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
+    }
+  }
+
   def checkForOutConnection(
       brokerInfo: BrokerInfo,
       maxOutboundConnectionsPerGroup: Int
@@ -287,18 +290,80 @@ trait InterCliqueManagerState {
     }
   }
 
-  def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {
-    (brokerConfig.groupFrom until brokerConfig.groupUntil).exists { group =>
-      getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
+  def handleNewBroker(brokerInfo: BrokerInfo, connectionType: ConnectionType): Unit = {
+    if (brokerConfig.intersect(brokerInfo)) {
+      brokers.get(brokerInfo.peerId) match {
+        case None =>
+          handleNewConnection(brokerInfo, connectionType)
+        case Some(existedBroker) =>
+          handleDoubleConnection(brokerInfo, connectionType, existedBroker)
+      }
+    } else {
+      log.warning(s"New peer connection with invalid group info: $brokerInfo")
+      publishEvent(MisbehaviorManager.InvalidGroup(brokerInfo.address))
+      context.stop(sender())
     }
   }
 
-  def checkForInConnection(brokerInfo: BrokerInfo, maxInboundConnectionsPerGroup: Int): Boolean = {
-    brokerConfig.intersect(brokerInfo) && !containsBroker(brokerInfo) && {
-      val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
-      (groupFrom until groupUntil).exists { group =>
-        getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
+  def handleNewConnection(brokerInfo: BrokerInfo, connectionType: ConnectionType): Unit =
+    connectionType match {
+      case InboundConnection =>
+        handleNewInConnection(brokerInfo, networkSetting.maxInboundConnectionsPerGroup)
+      case OutboundConnection =>
+        handleNewOutConnection(brokerInfo, networkSetting.maxOutboundConnectionsPerGroup)
+    }
+
+  def handleNewInConnection(
+      brokerInfo: BrokerInfo,
+      maxInboundConnectionsPerGroup: Int
+  ): Unit = {
+    val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
+    val available = (groupFrom until groupUntil).exists { group =>
+      getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
+    }
+    if (available) {
+      addBroker(brokerInfo, InboundConnection, ActorRefT(sender()))
+    } else {
+      log.warning(s"Too many inbound connections, ignore the one from $brokerInfo")
+    }
+  }
+
+  def handleNewOutConnection(
+      brokerInfo: BrokerInfo,
+      maxOutboundConnectionsPerGroup: Int
+  ): Unit = {
+    val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
+    val available = (groupFrom until groupUntil).exists { group =>
+      getOutConnectionPerGroup(GroupIndex.unsafe(group)) < maxOutboundConnectionsPerGroup
+    }
+    if (available) {
+      addBroker(brokerInfo, OutboundConnection, ActorRefT(sender()))
+    } else {
+      log.debug(s"Too many outbound connections, ignore the one from $brokerInfo")
+    }
+  }
+
+  def handleDoubleConnection(
+      brokerInfo: BrokerInfo,
+      connectionType: ConnectionType,
+      existedBroker: BrokerState
+  ): Unit = {
+    assume(brokerInfo.peerId == existedBroker.info.peerId)
+    if (connectionType != existedBroker.connectionType) {
+      if (
+        (selfCliqueId < brokerInfo.cliqueId && existedBroker.connectionType == OutboundConnection) ||
+        (selfCliqueId > brokerInfo.cliqueId && existedBroker.connectionType == InboundConnection)
+      ) { // keep the existed connection
+        log.debug(s"Ignore valid double connection")
+        context.stop(sender())
+      } else { // replace the existed connection
+        log.debug(s"Replace the existed connection")
+        brokers.remove(existedBroker.info.peerId)
+        context.stop(existedBroker.actor.ref)
+        addBroker(brokerInfo, connectionType, ActorRefT(sender()))
       }
+    } else {
+      log.debug(s"Invalid double connection from ${brokerInfo.peerId}")
     }
   }
 }

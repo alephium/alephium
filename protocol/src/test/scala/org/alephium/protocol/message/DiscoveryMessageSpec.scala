@@ -19,7 +19,7 @@ package org.alephium.protocol.message
 import java.net.InetSocketAddress
 
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.{PrivateKey, PublicKey, SignatureSchema}
+import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, NetworkType}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
@@ -43,6 +43,8 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     def brokerInfo: BrokerInfo
     def isCoordinator: Boolean
 
+    val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
+
     implicit val brokerConfig: BrokerConfig = new BrokerConfig {
       override def brokerId: Int = 1
 
@@ -52,9 +54,6 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     }
 
     implicit val discoveryConfig: DiscoveryConfig = new DiscoveryConfig {
-      val (privateKey, publicKey)         = SignatureSchema.generatePriPub()
-      def discoveryPrivateKey: PrivateKey = privateKey
-      def discoveryPublicKey: PublicKey   = publicKey
 
       val peersPerGroup: Int          = 1
       val scanMaxPerGroup: Int        = 1
@@ -82,8 +81,12 @@ class DiscoveryMessageSpec extends AlephiumSpec {
         BrokerInfo.unsafe(CliqueId.generate, 0, groupNumPerBroker, publicAddress)
       def isCoordinator: Boolean = false
     }
-    forAll(messageGen(peerFixture.discoveryConfig, peerFixture.brokerConfig)) { msg =>
-      val bytes = DiscoveryMessage.serialize(msg, networkType)(peerFixture.discoveryConfig)
+    forAll(messageGen(peerFixture.brokerConfig)) { msg =>
+      val bytes = DiscoveryMessage.serialize(
+        msg,
+        networkType,
+        discoveryPrivateKey
+      )
       val value =
         DiscoveryMessage
           .deserialize(bytes, networkType)

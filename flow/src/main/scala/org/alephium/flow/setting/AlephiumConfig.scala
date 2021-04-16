@@ -31,7 +31,6 @@ import pureconfig.error._
 import pureconfig.generic.auto._
 
 import org.alephium.flow.network.nat.Upnp
-import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkType, Target}
@@ -77,6 +76,8 @@ final case class MiningSetting(nonceStep: U256, batchDelay: Duration)
 
 final case class NetworkSetting(
     networkType: NetworkType,
+    maxOutboundConnectionsPerGroup: Int,
+    maxInboundConnectionsPerGroup: Int,
     pingFrequency: Duration,
     retryTimeout: Duration,
     connectionBufferCapacityInByte: Long,
@@ -119,9 +120,7 @@ final case class DiscoverySetting(
     scanFrequency: Duration,
     scanFastFrequency: Duration,
     neighborsPerGroup: Int
-) extends DiscoveryConfig {
-  val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
-}
+) extends DiscoveryConfig
 
 final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
 
@@ -168,6 +167,8 @@ object AlephiumConfig {
 
   final private case class TempNetworkSetting(
       networkType: NetworkType,
+      maxOutboundConnectionsPerGroup: Int,
+      maxInboundConnectionsPerGroup: Int,
       pingFrequency: Duration,
       retryTimeout: Duration,
       connectionBufferCapacityInByte: Long,
@@ -182,6 +183,8 @@ object AlephiumConfig {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
         networkType,
+        maxOutboundConnectionsPerGroup,
+        maxInboundConnectionsPerGroup,
         pingFrequency,
         retryTimeout,
         connectionBufferCapacityInByte,

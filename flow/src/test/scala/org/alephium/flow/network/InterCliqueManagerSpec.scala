@@ -19,10 +19,11 @@ package org.alephium.flow.network
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
 import akka.io.Tcp
-import akka.testkit.{TestActorRef, TestProbe}
+import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
@@ -37,19 +38,15 @@ class InterCliqueManagerSpec
     extends AlephiumActorSpec("InterCliqueManagerSpec")
     with Generators
     with ScalaFutures {
+  implicit override lazy val system: ActorSystem =
+    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
 
   implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
-  it should "forward clique info to discovery server on start" in new Fixture {
-    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-  }
-
   it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
-
-    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-
     val connection = TestProbe()
     connection.send(interCliqueManager, Tcp.Connected(peer, socketAddressGen.sample.get))
+    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
     eventually {
       connection.send(interCliqueManager, CliqueManager.HandShaked(peerInfo, InboundConnection))
@@ -65,9 +62,6 @@ class InterCliqueManagerSpec
   }
 
   it should "publish `PeerDisconnected` on outbound peer disconnection" in new Fixture {
-
-    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-
     interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
 
     eventually {
@@ -78,6 +72,7 @@ class InterCliqueManagerSpec
       system.stop(connection)
     }
 
+    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
     discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peerInfo.address))
 
     getPeers() is Seq.empty
@@ -94,48 +89,111 @@ class InterCliqueManagerSpec
       badBroker,
       maxOutboundConnectionsPerGroup
     ) is false
-    interCliqueManagerActor.checkForInConnection(badBroker, maxInboundConnectionsPerGroup) is false
+    EventFilter
+      .warning(start = "New peer connection with invalid group info", occurrences = 1)
+      .intercept {
+        interCliqueManagerActor.handleNewBroker(badBroker, InboundConnection)
+      }
   }
 
   it should "not re-add existing brokers" in new Fixture {
     val broker = relevantBrokerInfo()
-    interCliqueManagerActor.checkForOutConnection(broker, maxOutboundConnectionsPerGroup) is true
-    interCliqueManagerActor.addBroker(broker, OutboundConnection, TestProbe().ref)
-    interCliqueManagerActor.checkForOutConnection(broker, maxOutboundConnectionsPerGroup) is false
+    interCliqueManagerActor.addBroker(broker, OutboundConnection, ActorRefT(TestProbe().ref))
+    EventFilter.debug(start = "Ignore another connection", occurrences = 1).intercept {
+      interCliqueManagerActor.addBroker(broker, OutboundConnection, ActorRefT(TestProbe().ref))
+    }
   }
 
   it should "not accept incoming connection when the number of inbound connections is large" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.max-inbound-connections-per-group", 1)
+    )
+
     val broker = relevantBrokerInfo()
-    interCliqueManagerActor.checkForInConnection(broker, maxInboundConnectionsPerGroup) is true
-    interCliqueManagerActor.checkForInConnection(broker, 0) is false
+    EventFilter.warning(start = "Too many inbound connections", occurrences = 0).intercept {
+      interCliqueManagerActor.handleNewBroker(broker, InboundConnection)
+    }
 
     val newBroker = newBrokerInfo(broker)
-    interCliqueManagerActor.addBroker(broker, InboundConnection, TestProbe().ref)
-    interCliqueManagerActor.checkForInConnection(newBroker, 1) is false
-    interCliqueManagerActor.checkForInConnection(newBroker, 2) is true
+    EventFilter.warning(start = "Too many inbound connections", occurrences = 1).intercept {
+      interCliqueManagerActor.handleNewBroker(newBroker, InboundConnection)
+    }
   }
 
   it should "not accept outbound connection when the number of outbound connections is large" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.max-outbound-connections-per-group", 1)
+    )
+
     val broker = relevantBrokerInfo()
-    interCliqueManagerActor.checkForOutConnection(broker, maxOutboundConnectionsPerGroup) is true
-    interCliqueManagerActor.checkForOutConnection(broker, 0) is false
+    EventFilter.debug(start = "Too many outbound connections", occurrences = 0).intercept {
+      interCliqueManagerActor.handleNewBroker(broker, OutboundConnection)
+    }
 
     val newBroker = newBrokerInfo(broker)
-    interCliqueManagerActor.addBroker(broker, OutboundConnection, TestProbe().ref)
-    interCliqueManagerActor.checkForOutConnection(newBroker, 1) is false
-    interCliqueManagerActor.checkForOutConnection(newBroker, 2) is true
+    EventFilter.debug(start = "Too many outbound connections", occurrences = 1).intercept {
+      interCliqueManagerActor.handleNewBroker(newBroker, OutboundConnection)
+    }
+  }
+
+  it should "deal with double connection (1)" in new Fixture {
+    val broker = relevantBrokerInfo()
+
+    val probe0 = TestProbe()
+    watch(probe0.ref)
+    probe0.send(interCliqueManager, CliqueManager.HandShaked(broker, InboundConnection))
+    interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
+
+    val probe1 = TestProbe()
+    watch(probe1.ref)
+    probe1.send(interCliqueManager, CliqueManager.HandShaked(broker, OutboundConnection))
+
+    if (cliqueInfo.id < broker.cliqueId) {
+      // we should kill the inbound connection, and keep the outbound connection
+      expectTerminated(probe0.ref)
+      interCliqueManagerActor.brokers(broker.peerId).connectionType is OutboundConnection
+    } else {
+      // we should kill the inbound connection, and keep the inbound connection
+      expectTerminated(probe1.ref)
+      interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
+    }
+  }
+
+  it should "deal with double connection (2)" in new Fixture {
+    val broker = relevantBrokerInfo()
+
+    val probe0 = TestProbe()
+    watch(probe0.ref)
+    probe0.send(interCliqueManager, CliqueManager.HandShaked(broker, OutboundConnection))
+    interCliqueManagerActor.brokers(broker.peerId).connectionType is OutboundConnection
+
+    val probe1 = TestProbe()
+    watch(probe1.ref)
+    probe1.send(interCliqueManager, CliqueManager.HandShaked(broker, InboundConnection))
+
+    if (cliqueInfo.id < broker.cliqueId) {
+      // we should kill the inbound connection, and keep the outbound connection
+      expectTerminated(probe1.ref)
+      interCliqueManagerActor.brokers(broker.peerId).connectionType is OutboundConnection
+    } else {
+      // we should kill the inbound connection, and keep the inbound connection
+      expectTerminated(probe0.ref)
+      interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
+    }
   }
 
   trait Fixture extends FlowFixture with Generators {
+    lazy val maxOutboundConnectionsPerGroup: Int = config.network.maxOutboundConnectionsPerGroup
+    lazy val maxInboundConnectionsPerGroup: Int  = config.network.maxInboundConnectionsPerGroup
 
-    val cliqueInfo = cliqueInfoGen.sample.get
+    lazy val cliqueInfo = cliqueInfoGen.sample.get
 
-    val discoveryServer       = TestProbe()
-    val blockFlowSynchronizer = TestProbe()
-    val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
+    lazy val discoveryServer       = TestProbe()
+    lazy val blockFlowSynchronizer = TestProbe()
+    lazy val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
 
-    val parentName = s"InterCliqueManager-${Random.nextInt()}"
-    val interCliqueManager = TestActorRef[InterCliqueManager](
+    lazy val parentName = s"InterCliqueManager-${Random.nextInt()}"
+    lazy val interCliqueManager = TestActorRef[InterCliqueManager](
       InterCliqueManager.props(
         cliqueInfo,
         blockFlow,
@@ -145,7 +203,7 @@ class InterCliqueManagerSpec
       ),
       parentName
     )
-    val interCliqueManagerActor = interCliqueManager.underlyingActor
+    lazy val interCliqueManagerActor = interCliqueManager.underlyingActor
 
     lazy val peer = socketAddressGen.sample.get
 

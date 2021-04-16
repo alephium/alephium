@@ -74,7 +74,6 @@ class DiscoveryServerStateSpec
         val message =
           DiscoveryMessage
             .deserialize(send.message, networkConfig.networkType)(
-              peerConfig,
               peerConfig
             )
             .toOption

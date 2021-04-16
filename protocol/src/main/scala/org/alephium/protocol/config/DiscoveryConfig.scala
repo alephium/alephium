@@ -16,15 +16,10 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.{PrivateKey, PublicKey}
 import org.alephium.util.Duration
 
 // TODO: refactor this as two configs
 trait DiscoveryConfig {
-  def discoveryPrivateKey: PrivateKey
-
-  def discoveryPublicKey: PublicKey
-
   /* Maximum number of peers to track. */
   def peersPerGroup: Int
 
