@@ -167,9 +167,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
           case Left(error) => handleIOError(error)
           case Right(newReadyTxs) =>
             dependencyHandler ! DependencyHandler.FlowDataAdded(header)
-            if (newReadyTxs.nonEmpty) {
-              txHandler ! TxHandler.Broadcast(newReadyTxs)
-            }
+            broadcastReadyTxs(newReadyTxs)
             broker ! HeaderChainHandler.HeaderAdded(header.hash)
             minerOpt.foreach(_ ! Miner.UpdateTemplate)
             log.info(show(header))
@@ -190,9 +188,7 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
           case Left(error) => handleIOError(error)
           case Right(newReadyTxs) =>
             dependencyHandler ! DependencyHandler.FlowDataAdded(block)
-            if (newReadyTxs.nonEmpty) {
-              txHandler ! TxHandler.Broadcast(newReadyTxs)
-            }
+            broadcastReadyTxs(newReadyTxs)
             broker ! BlockChainHandler.BlockAdded(block.hash)
             origin match {
               case DataOrigin.Local => ()
@@ -209,6 +205,18 @@ class FlowHandler(blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(i
   def notify(block: Block): Unit = {
     escapeIOError(blockFlow.getHeight(block)) { height =>
       eventBus ! BlockNotify(block.header, height)
+    }
+  }
+
+  def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
+    if (txs.nonEmpty) {
+      // TODO: maybe broadcast it based on peer sync status
+      // delay this broadcast so that peers have download this block
+      scheduleOnce(
+        txHandler.ref,
+        TxHandler.Broadcast(txs),
+        Duration.ofSecondsUnsafe(2)
+      )
     }
   }
 
