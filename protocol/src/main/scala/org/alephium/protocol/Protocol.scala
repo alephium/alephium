@@ -16,6 +16,10 @@
 
 package org.alephium.protocol
 
+import akka.util.ByteString
+
+import org.alephium.util.Bytes
+
 object Protocol {
-  val version: Int = 0
+  val version: Int = Bytes.toIntUnsafe(ByteString(0, 0, 7, 3))
 }

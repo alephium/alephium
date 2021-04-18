@@ -20,7 +20,7 @@ import scala.language.existentials
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{PrivateKey, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{PrivateKey, Protocol, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -32,7 +32,7 @@ final case class DiscoveryMessage(
 )
 
 object DiscoveryMessage {
-  val version: Int = 0
+  val version: Int = Protocol.version
 
   def from(myCliqueId: CliqueId, payload: Payload): DiscoveryMessage = {
     val header = Header(version, myCliqueId)
