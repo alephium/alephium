@@ -34,6 +34,7 @@ In order to persist your data (blocks, wallets, ...), two volumes/mounts can be 
 - `/alephium-home/.alephium-wallets` inside the container is where the wallets are stored.
 
 Create these folders on the host:
+
 ```
 mkdir ./alephium-data ./alephium-wallets && chown nobody ./alephium-data ./alephium-wallets
 ```
@@ -47,3 +48,5 @@ Mount them as volumes inside the container:
 ```
 
 All good, your data will survive accross restarts!
+
+For more configuration, check the [Testnet Guide](https://github.com/alephium/alephium/wiki/Testnet-Guide) on the wiki.
