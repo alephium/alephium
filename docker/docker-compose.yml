@@ -1,0 +1,26 @@
+version: "3.3"
+
+services:
+
+  alephium:
+    image: alephium/alephium:latest
+    build:
+      context: .
+      args:
+        RELEASE: "0.7.3"
+
+    restart: unless-stopped
+    ports:
+      - 9973:9973/tcp
+      - 9973:9973/udp
+      - 10973:10973
+      - 11973:11973
+      - 12973:12973
+    security_opt:
+      - no-new-privileges:true
+# Set volumes or mounts to avoid loosing data/wallets.
+# Hint: mounts must be chown'ed to nobody:
+# mkdir ./alephium-data ./alephium-wallets && chown nobody ./alephium-data ./alephium-wallets
+#    volumes:
+#      - ./alephium-data:/alephium-home/.alephium
+#      - ./alephium-wallets:/alephium-home/.alephium-wallets
