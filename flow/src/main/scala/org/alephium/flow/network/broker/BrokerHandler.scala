@@ -181,7 +181,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
 
   def sendPing(): Unit = {
     if (pingNonce != 0) {
-      log.debug("No Pong message received in time")
+      log.info(s"No Pong message received in time from $remoteAddress, stopping the brokerHandler")
       publishEvent(MisbehaviorManager.RequestTimeout(remoteAddress))
       context stop self // stop it manually
     } else {
@@ -220,6 +220,9 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
   override def unhandled(message: Any): Unit =
     message match {
       case Terminated(_) =>
+        log.info(
+          s"Connection handler for $remoteAddress is terminated. Stopping the broker handler."
+        )
         context stop self
       case _ => super.unhandled(message)
     }
