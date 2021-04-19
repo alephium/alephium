@@ -159,20 +159,23 @@ trait TestFixtureLike
   def httpPut(endpoint: String, maybeEntity: Option[String] = None) =
     httpRequest(HttpMethods.PUT, endpoint, maybeEntity)
 
-  def unitRequest(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Unit = {
-    discard(Http().singleRequest(request(port)).futureValue)
-  }
-  def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
+  def unitRequest(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Assertion = {
     val response = Http().singleRequest(request(port)).futureValue
-
-    (for {
-      json <- parse(Unmarshal(response.entity).to[String].futureValue)
-      t    <- json.as[T]
-    } yield t) match {
-      case Right(t)    => t
-      case Left(error) => throw new AssertionError(s"circe: $error")
-    }
+    response.status is StatusCodes.OK
   }
+
+  def request[T: Decoder](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T =
+    eventually {
+      val response = Http().singleRequest(request(port)).futureValue
+
+      (for {
+        json <- parse(Unmarshal(response.entity).to[String].futureValue)
+        t    <- json.as[T]
+      } yield t) match {
+        case Right(t)    => t
+        case Left(error) => throw new AssertionError(s"circe: $error")
+      }
+    }
 
   def requestFailed(
       request: Int => HttpRequest,
