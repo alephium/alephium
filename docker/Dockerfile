@@ -17,8 +17,17 @@ EXPOSE 12973
 EXPOSE 11973
 # rpc
 EXPOSE 10973
-# p2p??
+# p2p
 EXPOSE 9973
 
+# This folder stores config (user.conf), logs and chain's data
+# Loosing it is not dramatic, is mostly means re-synching the chain's data
+VOLUME /alephium-home/.alephium
+
+# This folder stores the wallets.
+# Loosing it will result is loosing wallets. Please treat it with caution.
+VOLUME /alephium-home/.alephium-wallets
+
 USER nobody
+
 ENTRYPOINT java -jar /alephium.jar
