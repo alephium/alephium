@@ -18,5 +18,3 @@ jobs:
       - uses: olafurpg/setup-scala@v10
         with:
           java-version: ${{ matrix.java }}
-      - run: sbt it:test
-        shell: bash

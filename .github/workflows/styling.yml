@@ -14,4 +14,3 @@ jobs:
       - uses: olafurpg/setup-java@v10
         with:
           java-version: 11
-      - run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck it:scalafmtCheck scalastyle test:scalastyle it:scalastyle doc
