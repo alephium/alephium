@@ -73,8 +73,8 @@ class DiscoveryServerSpec
 
           val peersPerGroup: Int          = 3
           val scanMaxPerGroup: Int        = 3
-          val scanFrequency: Duration     = Duration.ofMillisUnsafe(1000)
-          val scanFastFrequency: Duration = Duration.ofMillisUnsafe(1000)
+          val scanFrequency: Duration     = Duration.ofMillisUnsafe(2000)
+          val scanFastFrequency: Duration = Duration.ofMillisUnsafe(2000)
           val neighborsPerGroup: Int      = 3
         }
         (brokerInfo, config)
