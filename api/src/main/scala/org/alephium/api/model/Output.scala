@@ -19,7 +19,8 @@ package org.alephium.api.model
 import org.alephium.protocol.model.{Address, AssetOutput, ContractOutput, NetworkType, TxOutput}
 import org.alephium.util.{TimeStamp, U256}
 
-final case class Output(amount: U256, address: Address, lockTime: Option[TimeStamp])
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class Output(amount: U256, address: Address, lockTime: Option[TimeStamp] = None)
 object Output {
   def from(output: TxOutput, networkType: NetworkType): Output = {
     val lockTime = output match {

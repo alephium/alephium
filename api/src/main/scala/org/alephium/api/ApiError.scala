@@ -16,44 +16,46 @@
 
 package org.alephium.api
 
-import io.circe.{Codec, Decoder, Encoder, Json}
-import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import scala.annotation.nowarn
+
 import sttp.model.StatusCode
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.SchemaType.{SObjectInfo, SProduct}
+
+import org.alephium.json.Json._
 
 sealed trait ApiError[S <: StatusCode] {
   def detail: String
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 object ApiError {
 
   sealed abstract class Companion[S <: StatusCode, E <: ApiError[S]](val statusCode: S) {
     def description: String = this.getClass.getSimpleName.dropRight(1)
 
-    def specificEncoder: Option[Encoder[E]] = None
-
-    lazy val encoder: Encoder[E] = new Encoder[E] {
-      val baseEncoder: Encoder[E] =
-        new Encoder[E] {
-          final def apply(apiError: E): Json =
-            Json.obj(
-              ("detail", Json.fromString(apiError.detail))
-            )
-        }
-
-      final def apply(e: E): Json =
-        specificEncoder match {
-          case None =>
-            baseEncoder(e)
-          case Some(specific) =>
-            baseEncoder(e).deepMerge(specific(e))
-        }
+    @nowarn
+    def specificFields(e: E): Option[ujson.Obj] = {
+      None
     }
 
-    def decoder: Decoder[E]
+    lazy val writerE: Writer[E] = {
+      writer[ujson.Value].comap { apiError =>
+        val base = "detail" -> ujson.Str(apiError.detail)
+        specificFields(apiError) match {
+          case None         => ujson.Obj(base)
+          case Some(fields) => ujson.Obj(fields.value.addOne(base))
+        }
+      }
+    }
 
-    implicit lazy val codec: Codec[E] = Codec.from(decoder, encoder)
+    def apply(detail: String): E
+
+    def readerE: Reader[E]
+
+    implicit lazy val readWriter: ReadWriter[E] = {
+      ReadWriter.join(readerE, writerE)
+    }
 
     def apiErrorSchema(
         fields: List[(FieldName, Schema[_])]
@@ -75,14 +77,16 @@ object ApiError {
 
   object Unauthorized
       extends Companion[StatusCode.Unauthorized.type, Unauthorized](StatusCode.Unauthorized) {
-    val decoder = deriveDecoder[Unauthorized]
+    def readerE: Reader[Unauthorized] =
+      reader[ujson.Value].map(json => Unauthorized(read[String](json("detail"))))
   }
 
   final case class BadRequest(detail: String) extends ApiError[StatusCode.BadRequest.type]
 
   object BadRequest
       extends Companion[StatusCode.BadRequest.type, BadRequest](StatusCode.BadRequest) {
-    val decoder = deriveDecoder[BadRequest]
+    def readerE: Reader[BadRequest] =
+      reader[ujson.Value].map(json => BadRequest(read[String](json("detail"))))
   }
 
   final case class ServiceUnavailable(detail: String)
@@ -92,7 +96,8 @@ object ApiError {
       extends Companion[StatusCode.ServiceUnavailable.type, ServiceUnavailable](
         StatusCode.ServiceUnavailable
       ) {
-    val decoder = deriveDecoder[ServiceUnavailable]
+    def readerE: Reader[ServiceUnavailable] =
+      reader[ujson.Value].map(json => ServiceUnavailable(read[String](json("detail"))))
   }
 
   final case class InternalServerError(detail: String)
@@ -102,7 +107,8 @@ object ApiError {
       extends Companion[StatusCode.InternalServerError.type, InternalServerError](
         StatusCode.InternalServerError
       ) {
-    val decoder = deriveDecoder[InternalServerError]
+    def readerE: Reader[InternalServerError] =
+      reader[ujson.Value].map(json => InternalServerError(read[String](json("detail"))))
   }
 
   final case class NotFound(resource: String) extends ApiError[StatusCode.NotFound.type] {
@@ -110,8 +116,13 @@ object ApiError {
   }
 
   object NotFound extends Companion[StatusCode.NotFound.type, NotFound](StatusCode.NotFound) {
-    val decoder                  = deriveDecoder[NotFound]
-    override val specificEncoder = Some(deriveEncoder[NotFound])
+    def readerE: Reader[NotFound] =
+      reader[ujson.Value].map(json => NotFound(read[String](json("resource"))))
+    override def specificFields(notFound: NotFound): Option[ujson.Obj] = Some(
+      ujson.Obj(
+        "resource" -> ujson.Str(notFound.resource)
+      )
+    )
 
     implicit override lazy val schema: Schema[NotFound] = apiErrorSchema(
       List(FieldName("resource") -> Schema.schemaForInt)

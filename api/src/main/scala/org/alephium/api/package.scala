@@ -14,26 +14,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium
 
-import akka.util.ByteString
+import scala.util.{Failure, Success, Try}
 
-import org.alephium.protocol.model.{ContractOutputRef, TxInput, TxOutputRef}
-import org.alephium.protocol.vm.UnlockScript
-import org.alephium.serde.serialize
+import sttp.tapir._
+import sttp.tapir.Codec.JsonCodec
+import sttp.tapir.DecodeResult.{Error, Value}
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Input(outputRef: OutputRef, unlockScript: Option[ByteString] = None)
+import org.alephium.json.Json._
 
-object Input {
-  def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Input = {
-    Input(OutputRef.from(outputRef), Some(serialize(unlockScript)))
-  }
+//we need to redefine this, because `tapir-upickle` is depening only on `upickle.default`
+package object api {
+  def alfJsonBody[T: ReadWriter: Schema]: EndpointIO.Body[String, T] =
+    anyFromUtf8StringBody(readWriterCodec[T])
 
-  def from(input: TxInput): Input = {
-    Input(input.outputRef, input.unlockScript)
-  }
+  implicit def readWriterCodec[T: ReadWriter: Schema]: JsonCodec[T] =
+    Codec.json[T] { s =>
+      Try(read[T](s)) match {
+        case Success(v) => Value(v)
+        case Failure(e) => Error("decoding failure", e)
+      }
+    } { t => write(t) }
 
-  def from(input: ContractOutputRef): Input =
-    Input(OutputRef.from(input), unlockScript = None)
 }

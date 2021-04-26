@@ -17,7 +17,7 @@
 package org.alephium.wallet
 
 import sttp.tapir.Endpoint
-import sttp.tapir.docs.openapi._
+import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
 import sttp.tapir.openapi.OpenAPI
 
 import org.alephium.wallet.api.WalletEndpoints
@@ -40,5 +40,6 @@ trait WalletDocumentation extends WalletEndpoints {
     changeActiveAddress
   )
 
-  lazy val walletOpenAPI: OpenAPI = walletEndpoints.toOpenAPI("Alephium Wallet", "1.0")
+  lazy val walletOpenAPI: OpenAPI =
+    OpenAPIDocsInterpreter.toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
 }

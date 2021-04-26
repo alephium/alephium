@@ -30,14 +30,13 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
-import io.circe._
-import io.circe.syntax._
 
-import org.alephium.api.{ApiModelCodec, CirceUtils}
+import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.rpc.model.JsonRPC._
@@ -72,7 +71,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   private def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {
     path("events") {
       cors()(get {
-        extractUpgradeToWebSocket { upgrade =>
+        extractWebSocketUpgrade { upgrade =>
           val (actor, source) = Websocket.actorRef
           eventBus.tell(EventBus.Subscribe, actor)
           val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
@@ -82,7 +81,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
     }
   }
 
-  private def doBlockNotify(blockNotify: BlockNotify): Json =
+  private def doBlockNotify(blockNotify: BlockNotify): ujson.Value =
     blockNotifyEncode(blockNotify)
 
   private def handleEvent(event: EventBus.Event): TextMessage = {
@@ -90,7 +89,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
       case bn @ FlowHandler.BlockNotify(_, _) =>
         val params       = doBlockNotify(bn)
         val notification = Notification("block_notify", params)
-        TextMessage(CirceUtils.print(notification.asJson))
+        TextMessage(write(notification))
     }
   }
 
@@ -103,7 +102,8 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   protected def startSelfOnce(): Future[Unit] = {
     for {
       wsBinding <- Http()
-        .bindAndHandle(wsRoute, apiConfig.networkInterface.getHostAddress, wsPort)
+        .newServerAt(apiConfig.networkInterface.getHostAddress, wsPort)
+        .bind(wsRoute)
     } yield {
       logger.info(s"Listening ws request on $wsBinding")
       wsBindingPromise.success(wsBinding)
@@ -138,8 +138,10 @@ object WebSocketServer {
     BlockEntry.from(blockNotify.header, blockNotify.height)
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit encoder: Encoder[BlockEntry]): Json =
-    blockEntryfrom(blockNotify).asJson
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit
+      writer: Writer[BlockEntry]
+  ): ujson.Value =
+    writeJs(blockEntryfrom(blockNotify))
 
   object Websocket {
 

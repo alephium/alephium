@@ -20,11 +20,11 @@ import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestProbe
-import io.circe.parser._
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
@@ -114,8 +114,7 @@ class WebSocketServerSpec
       node.eventBus ! blockNotify
       val TextMessage.Strict(message) = client.expectMessage()
 
-      val json         = parse(message).toOption.get
-      val notification = json.as[NotificationUnsafe].toOption.get.asNotification.toOption.get
+      val notification = read[NotificationUnsafe](message).asNotification.toOption.get
 
       notification.method is "block_notify"
     }

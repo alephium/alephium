@@ -20,6 +20,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{Block, BlockHeader, NetworkType}
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,
@@ -27,7 +28,7 @@ final case class BlockEntry(
     chainTo: Int,
     height: Int,
     deps: AVector[BlockHash],
-    transactions: Option[AVector[Tx]]
+    transactions: Option[AVector[Tx]] = None
 )
 object BlockEntry {
   def from(header: BlockHeader, height: Int): BlockEntry = {

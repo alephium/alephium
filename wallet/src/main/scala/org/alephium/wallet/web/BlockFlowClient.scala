@@ -20,8 +20,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
-import sttp.client._
-import sttp.client.akkahttp.AkkaHttpBackend
+import sttp.client3._
+import sttp.client3.akkahttp.AkkaHttpBackend
 import sttp.model.{Uri => SttpUri}
 import sttp.tapir.client.sttp._
 
@@ -64,7 +64,8 @@ object BlockFlowClient {
       actorSystem: ActorSystem,
       executionContext: ExecutionContext
   ) extends BlockFlowClient
-      with Endpoints {
+      with Endpoints
+      with SttpClientInterpreter {
 
     private val backend = AkkaHttpBackend.usingActorSystem(actorSystem)
 
@@ -88,7 +89,7 @@ object BlockFlowClient {
           error => Future.successful(Left(error)),
           uri =>
             backend
-              .send(endpoint.toSttpRequestUnsafe(uri).apply(params))
+              .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
               .map(_.body.map(f).left.map(_.detail))
         )
       }
@@ -127,7 +128,9 @@ object BlockFlowClient {
 
     private def fetchSelfClique(): Future[Either[String, SelfClique]] =
       backend
-        .send(getSelfClique.toSttpRequestUnsafe(uri"${defaultUri.toString}").apply(()))
+        .send(
+          toRequestThrowDecodeFailures(getSelfClique, Some(uri"${defaultUri.toString}")).apply(())
+        )
         .map(_.body.left.map(_.detail))
   }
 }

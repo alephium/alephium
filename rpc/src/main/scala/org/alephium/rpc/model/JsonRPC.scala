@@ -17,29 +17,66 @@
 package org.alephium.rpc.model
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
 
 import com.typesafe.scalalogging.StrictLogging
-import io.circe._
-import io.circe.generic.semiauto._
-import io.circe.syntax._
+
+import org.alephium.json.Json._
 
 /* Ref: https://www.jsonrpc.org/specification
  *
  * The only difference is that the type for response we use here is Option[Long]
  */
 
+@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 object JsonRPC extends StrictLogging {
   type Handler = Map[String, Request => Future[Response]]
 
   val versionKey: String = "jsonrpc"
   val version: String    = "2.0"
 
-  private def paramsCheck(json: Json): Boolean = json.isObject || json.isArray
-  private def versionSet(json: Json): Json =
-    json.mapObject(_.+:(versionKey -> Json.fromString(version)))
+  private def paramsCheck(json: ujson.Value): Boolean = json match {
+    case ujson.Obj(_) | ujson.Arr(_) => true
+    case _                           => false
+  }
+  private def versionSet(json: ujson.Value): ujson.Value = {
+    json match {
+      case ujson.Obj(obj) => obj.addOne(versionKey -> ujson.Str(version))
+      case other          => other
+    }
+  }
+
+  private def writerWithVersion[A](tmpWriter: Writer[A]): Writer[A] = writer[ujson.Value].comap {
+    request =>
+      versionSet(writeJs(request)(tmpWriter))
+  }
 
   final case class Error(code: Int, message: String, data: Option[String])
   object Error {
+    implicit val errorReadWriter: ReadWriter[Error] = {
+      readwriter[ujson.Value].bimap[Error](
+        { error =>
+          error.data match {
+            case None =>
+              ujson.Obj("code" -> writeJs(error.code), "message" -> ujson.Str(error.message))
+            case Some(data) =>
+              ujson.Obj(
+                "code"    -> writeJs(error.code),
+                "message" -> ujson.Str(error.message),
+                "data"    -> ujson.Str(data)
+              )
+          }
+        },
+        { json =>
+          Error(
+            read[Int](json("code")),
+            read[String](json("message")),
+            readOpt[String](json("data"))
+          )
+        }
+      )
+    }
+
     def apply(code: Int, message: String): Error = {
       Error(code, message, None)
     }
@@ -61,7 +98,7 @@ object JsonRPC extends StrictLogging {
   final case class RequestUnsafe(
       jsonrpc: String,
       method: String,
-      params: Json,
+      params: ujson.Value,
       id: Long
   ) extends WithId {
     def runWith(handler: Handler): Future[Response] = {
@@ -80,25 +117,36 @@ object JsonRPC extends StrictLogging {
     }
   }
   object RequestUnsafe {
-    implicit val decoder: Decoder[RequestUnsafe] = deriveDecoder[RequestUnsafe]
+    def apply(jsonrpc: String, method: String, params: ujson.Value, id: Long): RequestUnsafe = {
+      new RequestUnsafe(jsonrpc, method, dropNullValues(params), id)
+    }
+    implicit val requestUnsafeReader: Reader[RequestUnsafe] = macroR[RequestUnsafe]
   }
 
-  final case class Request(method: String, params: Json, id: Long) extends WithId {
-    def paramsAs[A: Decoder]: Either[Response.Failure, A] =
-      params.as[A] match {
-        case Right(a) => Right(a)
-        case Left(decodingFailure) =>
+  final case class Request private (method: String, params: ujson.Value, id: Long) extends WithId {
+    def paramsAs[A: Reader]: Either[Response.Failure, A] =
+      Try(read[A](params)) match {
+        case Success(a) => Right(a)
+        case Failure(readingFailure) =>
           logger.debug(
-            s"Unable to decode JsonRPC request parameters. ($method@$id: $decodingFailure)"
+            s"Unable to read JsonRPC request parameters. ($method@$id: $readingFailure)"
           )
           Left(Response.failed(this, Error.InvalidParams))
       }
   }
   object Request {
-    implicit val encoder: Encoder[Request] = deriveEncoder[Request].mapJson(versionSet)
+    def apply(method: String, params: ujson.Value, id: Long): Request = {
+      new Request(method, dropNullValues(params), id)
+    }
+    implicit val requestWriter: Writer[Request] = writerWithVersion(macroW[Request])
   }
 
-  final case class NotificationUnsafe(jsonrpc: String, method: String, params: Option[Json]) {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  final case class NotificationUnsafe(
+      jsonrpc: String,
+      method: String,
+      params: Option[ujson.Value] = None
+  ) {
     def asNotification: Either[Error, Notification] =
       if (jsonrpc == JsonRPC.version) {
         params match {
@@ -111,12 +159,26 @@ object JsonRPC extends StrictLogging {
       }
   }
   object NotificationUnsafe {
-    implicit val decoder: Decoder[NotificationUnsafe] = deriveDecoder[NotificationUnsafe]
+    def apply(jsonrpc: String, method: String, params: Option[ujson.Value]): NotificationUnsafe = {
+      new NotificationUnsafe(jsonrpc, method, params.map(dropNullValues))
+    }
+    implicit val notificationUnsafeReader: Reader[NotificationUnsafe] =
+      reader[ujson.Value].map[NotificationUnsafe] { json =>
+        NotificationUnsafe(
+          read[String](json("jsonrpc")),
+          read[String](json("method")),
+          readOpt[ujson.Value](json("params"))
+        )
+      }
   }
 
-  final case class Notification(method: String, params: Json)
+  final case class Notification private (method: String, params: ujson.Value)
   object Notification {
-    implicit val encoder: Encoder[Notification] = deriveEncoder[Notification].mapJson(versionSet)
+    def apply(method: String, params: ujson.Value): Notification = {
+      new Notification(method, dropNullValues(params))
+    }
+    implicit val notificationWriter: Writer[Notification] = writerWithVersion(macroW[Notification])
+    implicit val notificationRead: Reader[Notification]   = macroR[Notification]
   }
 
   sealed trait Response
@@ -124,41 +186,53 @@ object JsonRPC extends StrictLogging {
     def failed[T <: WithId](request: T, error: Error): Failure = Failure(error, Some(request.id))
     def failed(error: Error): Failure                          = Failure(error, None)
     def failed(error: String): Failure                         = failed(Error.server(error))
-    def successful[T <: WithId](request: T): Success           = Success(Json.True, request.id)
-    def successful[T <: WithId, R](request: T, result: R)(implicit encoder: Encoder[R]): Success =
-      Success(result.asJson, request.id)
+    def successful[T <: WithId](request: T): Success           = Success(ujson.True, request.id)
+    def successful[T <: WithId, R](request: T, result: R)(implicit writer: Writer[R]): Success =
+      Success(writeJs(result), request.id)
 
-    final case class Success(result: Json, id: Long) extends Response
+    final case class Success private (result: ujson.Value, id: Long) extends Response
     object Success {
-      implicit val codec: Codec[Success] = deriveCodec[Success]
+      def apply(result: ujson.Value, id: Long): Success = {
+        new Success(dropNullValues(result), id)
+      }
+      implicit val succesReadWriter: ReadWriter[Success] = readwriter[ujson.Value].bimap[Success](
+        success =>
+          success.result match {
+            case ujson.Null => ujson.Obj("id" -> writeJs(success.id))
+            case _          => ujson.Obj("result" -> success.result, "id" -> writeJs(success.id))
+          },
+        json => Success(read[ujson.Value](json("result")), read[Long](json("id")))
+      )
     }
     final case class Failure(error: Error, id: Option[Long]) extends Response
     object Failure {
-      import io.circe.generic.auto._ // Note: I hate this!
-      implicit val codec: Codec[Failure] = deriveCodec[Failure]
+      implicit val failureReadWriter: ReadWriter[Failure] = readwriter[ujson.Value].bimap[Failure](
+        failure =>
+          failure.id match {
+            case Some(id) => ujson.Obj("error" -> writeJs(failure.error), "id" -> writeJs(id))
+            case None     => ujson.Obj("error" -> writeJs(failure.error))
+          },
+        json => Failure(read[Error](json("error")), read[Option[Long]](json("id")))
+      )
     }
 
-    implicit val decoder: Decoder[Response] = new Decoder[Response] {
-      final def apply(cursor: HCursor): Decoder.Result[Response] = {
-        cursor.get[String](versionKey) match {
-          case Right(v) if v == version =>
-            if (cursor.keys.exists(_.exists(_ == "result"))) {
-              Success.codec(cursor)
-            } else {
-              Failure.codec(cursor)
-            }
-          case Right(v)    => Left(DecodingFailure(s"Invalid JSON-RPC version '$v'", cursor.history))
-          case Left(error) => Left(error)
+    implicit val responseReader: Reader[Response] = reader[ujson.Value].map { json =>
+      val v = read[String](json(versionKey))
+      if (v == version) {
+        Try(read[ujson.Value](json("result"))) match {
+          case scala.util.Success(_) => read[Success](json)
+          case scala.util.Failure(_) => read[Failure](json)
         }
+      } else {
+        throw upickle.core.Abort(s"Invalid JSON-RPC version '$v'")
       }
     }
 
-    implicit val encoder: Encoder[Response] = {
-      val product: Encoder[Response] = Encoder.instance {
-        case x @ Success(_, _) => x.asJson
-        case x @ Failure(_, _) => x.asJson
+    implicit val responseWriter: Writer[Response] = {
+      writer[ujson.Value].comap {
+        case x @ Success(_, _) => versionSet(writeJs(x))
+        case x @ Failure(_, _) => versionSet(writeJs(x))
       }
-      product.mapJson(versionSet)
     }
   }
 }

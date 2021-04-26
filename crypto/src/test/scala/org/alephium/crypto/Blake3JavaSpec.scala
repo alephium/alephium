@@ -18,6 +18,7 @@ package org.alephium.crypto
 
 import scala.io.Source
 
+import org.alephium.json.Json._
 import org.alephium.util.AlephiumSpec
 
 class Blake3JavaSpec extends AlephiumSpec {
@@ -52,12 +53,9 @@ class Blake3JavaSpec extends AlephiumSpec {
 }
 
 object Blake3Spec {
-  import io.circe.Decoder
-  import io.circe.parser.parse
-  import io.circe.generic.semiauto.deriveDecoder
 
   case class TestCase(input_len: Int, hash: String, keyed_hash: String, derive_key: String)
-  implicit val testCaseDecoder: Decoder[TestCase] = deriveDecoder[TestCase]
+  implicit val testCaseDecoder: Reader[TestCase] = macroR[TestCase]
 
   case class TestVectors(
       _comment: String,
@@ -65,14 +63,14 @@ object Blake3Spec {
       context_string: String,
       cases: Seq[TestCase]
   )
-  implicit val testVectorsDecoder: Decoder[TestVectors] = deriveDecoder[TestVectors]
+  implicit val testVectorsDecoder: Reader[TestVectors] = macroR[TestVectors]
 
   private val testVectorsJsonFile: String = {
     val path = getClass.getResource("/test_vectors.json").getPath
     Source.fromFile(path.toString).getLines().mkString("")
   }
 
-  val testVectors = parse(testVectorsJsonFile).toOption.get.as[TestVectors].toOption.get
+  val testVectors = read[TestVectors](testVectorsJsonFile)
 
   def makeTestInput(size: Int): Array[Byte] =
     Array.ofDim[Byte](size).zipWithIndex.map { case (_, i) =>

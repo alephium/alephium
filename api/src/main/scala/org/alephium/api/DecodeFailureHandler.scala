@@ -16,21 +16,19 @@
 
 package org.alephium.api
 
-import sttp.model.StatusCode
 import sttp.tapir._
-import sttp.tapir.json.circe.jsonBody
-import sttp.tapir.server.{DecodeFailureContext, DecodeFailureHandling, ServerDefaults}
+import sttp.tapir.server._
 
-import org.alephium.api.ApiError
+import org.alephium.api.{alfJsonBody, ApiError}
 
 trait DecodeFailureHandler {
 
-  private val decodeFailureOutput: EndpointOutput[(StatusCode, ApiError.BadRequest)] =
-    statusCode.and(jsonBody[ApiError.BadRequest])
-
-  private def myFailureResponse(statusCode: StatusCode, message: String): DecodeFailureHandling =
-    DecodeFailureHandling.response(decodeFailureOutput)(
-      (statusCode, ApiError.BadRequest(message))
+  private def myFailureResponse(
+      response: DefaultDecodeFailureResponse,
+      message: String
+  ): DecodeFailureHandling =
+    DecodeFailureHandling.response(ServerDefaults.failureOutput(alfJsonBody[ApiError.BadRequest]))(
+      (response, ApiError.BadRequest(message))
     )
 
   private def myFailureMessage(ctx: DecodeFailureContext): String = {
@@ -47,8 +45,8 @@ trait DecodeFailureHandler {
   }
   val myDecodeFailureHandler = ServerDefaults.decodeFailureHandler.copy(
     response = myFailureResponse,
-    respondWithStatusCode = ServerDefaults.FailureHandling
-      .respondWithStatusCode(
+    respond = ServerDefaults.FailureHandling
+      .respond(
         _,
         badRequestOnPathErrorIfPathShapeMatches = true,
         badRequestOnPathInvalidIfPathShapeMatches = true
