@@ -39,7 +39,8 @@ object InterCliqueManager {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       discoveryServer: ActorRefT[DiscoveryServer.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+      numBootstrapNodes: Int
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
       new InterCliqueManager(
@@ -47,20 +48,24 @@ object InterCliqueManager {
         blockflow,
         allHandlers,
         discoveryServer,
-        blockFlowSynchronizer
+        blockFlowSynchronizer,
+        numBootstrapNodes
       )
     )
   //scalastyle:on
 
   sealed trait Command              extends CliqueManager.Command
   final case object GetSyncStatuses extends Command
+  final case object IsSynced        extends Command
 
+  sealed trait Event
+  final case class SyncedResult(isSynced: Boolean) extends Event
   final case class SyncStatus(
       peerId: PeerId,
       address: InetSocketAddress,
       isSynced: Boolean,
       groupNumPerBroker: Int
-  )
+  ) extends Event
 
   final case class BrokerState(
       info: BrokerInfo,
@@ -83,7 +88,8 @@ class InterCliqueManager(
     blockflow: BlockFlow,
     allHandlers: AllHandlers,
     discoveryServer: ActorRefT[DiscoveryServer.Command],
-    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+    numBootstrapNodes: Int
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseActor
     with EventStream.Subscriber
@@ -162,6 +168,12 @@ class InterCliqueManager(
         )
       }
       sender() ! syncStatuses
+
+    case IsSynced =>
+      val syncedCount = brokers.count(_._2.isSynced)
+      val isSynced =
+        syncedCount >= (brokers.size + 1) / 2 && syncedCount >= (numBootstrapNodes + 1) / 2
+      sender() ! SyncedResult(isSynced)
 
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")

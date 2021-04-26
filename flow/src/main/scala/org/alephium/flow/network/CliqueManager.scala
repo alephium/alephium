@@ -35,9 +35,18 @@ object CliqueManager {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       discoveryServer: ActorRefT[DiscoveryServer.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+      numBootstrapNodes: Int
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
-    Props(new CliqueManager(blockflow, allHandlers, discoveryServer, blockFlowSynchronizer))
+    Props(
+      new CliqueManager(
+        blockflow,
+        allHandlers,
+        discoveryServer,
+        blockFlowSynchronizer,
+        numBootstrapNodes
+      )
+    )
 
   trait Command
   final case class Start(cliqueInfo: CliqueInfo) extends Command
@@ -66,7 +75,8 @@ class CliqueManager(
     blockflow: BlockFlow,
     allHandlers: AllHandlers,
     discoveryServer: ActorRefT[DiscoveryServer.Command],
-    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+    numBootstrapNodes: Int
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
     with Stash
@@ -102,7 +112,8 @@ class CliqueManager(
         blockflow,
         allHandlers,
         discoveryServer,
-        blockFlowSynchronizer
+        blockFlowSynchronizer,
+        numBootstrapNodes
       )
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
@@ -126,7 +137,7 @@ class CliqueManager(
     case message: CliqueManager.BroadCastTx =>
       interCliqueManager ! message
 
-    case message @ InterCliqueManager.GetSyncStatuses =>
+    case message: InterCliqueManager.Command =>
       interCliqueManager.forward(message)
 
     case c: Tcp.Connected =>
