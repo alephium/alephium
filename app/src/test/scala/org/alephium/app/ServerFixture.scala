@@ -30,7 +30,13 @@ import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
+import org.alephium.flow.network.{
+  Bootstrapper,
+  CliqueManager,
+  DiscoveryServer,
+  InterCliqueManager,
+  TcpController
+}
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
@@ -143,13 +149,17 @@ object ServerFixture {
     val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)
 
-    val selfCliqueSynced = true
+    val selfCliqueSynced  = true
+    val interCliqueSynced = true
     val cliqueManager: ActorRefT[CliqueManager.Command] = cliqueManagerOpt.getOrElse {
       ActorRefT.build(
         system,
         Props(new BaseActor {
-          override def receive: Receive = { case CliqueManager.IsSelfCliqueReady =>
-            sender() ! selfCliqueSynced
+          override def receive: Receive = {
+            case CliqueManager.IsSelfCliqueReady =>
+              sender() ! selfCliqueSynced
+            case InterCliqueManager.IsSynced =>
+              sender() ! InterCliqueManager.SyncedResult(interCliqueSynced)
           }
         }),
         "clique-manager"

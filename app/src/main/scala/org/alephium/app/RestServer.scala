@@ -86,13 +86,16 @@ class RestServer(
 
   //TODO Do we want to cache the result once it's synced?
   private def withSyncedClique[A](f: FutureTry[A]): FutureTry[A] = {
-    node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean].flatMap { synced =>
-      if (synced) {
-        f
-      } else {
-        Future.successful(Left(ApiError.ServiceUnavailable("Self clique unsynced")))
+    node.cliqueManager
+      .ask(InterCliqueManager.IsSynced)
+      .mapTo[InterCliqueManager.SyncedResult]
+      .flatMap { synced =>
+        if (synced.isSynced) {
+          f
+        } else {
+          Future.successful(Left(ApiError.ServiceUnavailable("The clique is not synced")))
+        }
       }
-    }
   }
 
   private val getSelfCliqueRoute = toRoute(getSelfClique) { _ =>
