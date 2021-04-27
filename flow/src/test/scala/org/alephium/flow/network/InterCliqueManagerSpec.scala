@@ -182,6 +182,45 @@ class InterCliqueManagerSpec
     }
   }
 
+  trait SyncFixture extends Fixture {
+    def checkSynced(expected: Boolean) = {
+      interCliqueManager ! InterCliqueManager.IsSynced
+      expectMsg(InterCliqueManager.SyncedResult(expected))
+    }
+
+    def addAndCheckSynced(expected: Boolean) = {
+      val broker = relevantBrokerInfo()
+      interCliqueManager ! CliqueManager.HandShaked(broker, InboundConnection)
+      interCliqueManager ! CliqueManager.Synced(broker)
+
+      interCliqueManager ! InterCliqueManager.IsSynced
+      expectMsg(InterCliqueManager.SyncedResult(expected))
+    }
+  }
+
+  it should "return synced for node when numBootstrapNodes is 0" in new SyncFixture {
+    override lazy val numBootstrapNodes: Int = 0
+    checkSynced(true)
+  }
+
+  it should "check if the node is synced when numBootstrapNodes is 1" in new SyncFixture {
+    override lazy val numBootstrapNodes: Int = 1
+    checkSynced(false)
+    addAndCheckSynced(true)
+  }
+
+  it should "check if the node is synced when numBootstrapNodes is 2" in new SyncFixture {
+    override lazy val numBootstrapNodes: Int = 2
+    checkSynced(false)
+    addAndCheckSynced(true)
+  }
+
+  it should "check if the node is synced when numBootstrapNodes is 3" in new SyncFixture {
+    override lazy val numBootstrapNodes: Int = 3
+    addAndCheckSynced(false)
+    addAndCheckSynced(true)
+  }
+
   trait Fixture extends FlowFixture with Generators {
     lazy val maxOutboundConnectionsPerGroup: Int = config.network.maxOutboundConnectionsPerGroup
     lazy val maxInboundConnectionsPerGroup: Int  = config.network.maxInboundConnectionsPerGroup
@@ -192,14 +231,16 @@ class InterCliqueManagerSpec
     lazy val blockFlowSynchronizer = TestProbe()
     lazy val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
 
-    lazy val parentName = s"InterCliqueManager-${Random.nextInt()}"
+    lazy val parentName        = s"InterCliqueManager-${Random.nextInt()}"
+    lazy val numBootstrapNodes = 1
     lazy val interCliqueManager = TestActorRef[InterCliqueManager](
       InterCliqueManager.props(
         cliqueInfo,
         blockFlow,
         allHandlers,
         ActorRefT(discoveryServer.ref),
-        ActorRefT(blockFlowSynchronizer.ref)
+        ActorRefT(blockFlowSynchronizer.ref),
+        numBootstrapNodes
       ),
       parentName
     )

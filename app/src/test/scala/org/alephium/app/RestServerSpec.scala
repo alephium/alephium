@@ -32,7 +32,7 @@ import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.BlockTemplate
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.json.Json
 import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash}
@@ -160,13 +160,15 @@ class RestServerSpec
       responseAs[BuildTransactionResult] isnot dummyBuildTransactionResult
     }
 
-    selfCliqueSynced = false
+    interCliqueSynced = false
 
     Get(
       s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddres&value=1"
     ) ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+        "The clique is not synced"
+      )
     }
   }
 
@@ -181,11 +183,13 @@ class RestServerSpec
       responseAs[TxResult] is dummyTransferResult
     }
 
-    selfCliqueSynced = false
+    interCliqueSynced = false
 
     Post(s"/transactions/send", entity) ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+        "The clique is not synced"
+      )
     }
   }
 
@@ -211,11 +215,13 @@ class RestServerSpec
       minerProbe.expectMsg(Miner.Stop)
     }
 
-    selfCliqueSynced = false
+    interCliqueSynced = false
 
     Post(s"/miners?action=start-mining") ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+        "The clique is not synced"
+      )
     }
   }
 
@@ -305,11 +311,13 @@ class RestServerSpec
       )
     }
 
-    selfCliqueSynced = false
+    interCliqueSynced = false
 
     Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+        "The clique is not synced"
+      )
     }
   }
 
@@ -328,11 +336,13 @@ class RestServerSpec
 
     val entity = HttpEntity(ContentTypes.`application/json`, body)
 
-    selfCliqueSynced = false
+    interCliqueSynced = false
 
     Post(s"/miners/new-block", entity) ~> server.route ~> check {
       status is StatusCodes.ServiceUnavailable
-      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable("Self clique unsynced")
+      responseAs[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+        "The clique is not synced"
+      )
     }
   }
 
@@ -367,13 +377,17 @@ class RestServerSpec
     lazy val minerProbe = TestProbe()
     lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
 
-    var selfCliqueSynced = true
+    var selfCliqueSynced  = true
+    var interCliqueSynced = true
     lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(
         system,
         Props(new BaseActor {
-          override def receive: Receive = { case CliqueManager.IsSelfCliqueReady =>
-            sender() ! selfCliqueSynced
+          override def receive: Receive = {
+            case CliqueManager.IsSelfCliqueReady =>
+              sender() ! selfCliqueSynced
+            case InterCliqueManager.IsSynced =>
+              sender() ! InterCliqueManager.SyncedResult(interCliqueSynced)
           }
         }),
         s"clique-manager-${Random.nextInt()}"

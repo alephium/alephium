@@ -104,7 +104,13 @@ object Node {
     lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(
         system,
-        CliqueManager.props(blockFlow, allHandlers, discoveryServer, blockFlowSynchronizer),
+        CliqueManager.props(
+          blockFlow,
+          allHandlers,
+          discoveryServer,
+          blockFlowSynchronizer,
+          discoveryConfig.bootstrap.length
+        ),
         "CliqueManager"
       )
 
