@@ -38,7 +38,7 @@ object Dependencies {
 
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.3.8"
 
-  lazy val pureconfig      = "com.github.pureconfig"      %% "pureconfig"      % "0.14.1"
+  lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.0"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk15on"  % "1.68"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.1"
   lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.2.3"

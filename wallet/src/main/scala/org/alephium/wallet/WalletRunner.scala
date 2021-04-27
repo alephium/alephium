@@ -23,7 +23,7 @@ import scala.util.{Failure, Success}
 import akka.actor.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
-import pureconfig.ConfigSource
+import net.ceedubs.ficus.Ficus._
 
 import org.alephium.util.{Duration, Service}
 import org.alephium.wallet.config.WalletConfig
@@ -37,11 +37,7 @@ object Main extends App with Service with StrictLogging {
 
   val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
 
-  val walletConfig: WalletConfig =
-    ConfigSource
-      .fromConfig(typesafeConfig)
-      .load[WalletConfig]
-      .getOrElse(throw new RuntimeException(s"Cannot load wallet config"))
+  val walletConfig: WalletConfig = typesafeConfig.as[WalletConfig]
 
   val walletApp: WalletApp = new WalletApp(walletConfig)
 

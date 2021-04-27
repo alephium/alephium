@@ -34,7 +34,7 @@ import org.alephium.util.AVector
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class MiningBench {
 
-  val config: AlephiumConfig                    = AlephiumConfig.load(Platform.getRootPath()).toOption.get
+  val config: AlephiumConfig                    = AlephiumConfig.load(Platform.getRootPath(), "alephium")
   implicit val groupConfig: GroupConfig         = config.broker
   implicit val consensusConfig: ConsensusConfig = config.consensus
 

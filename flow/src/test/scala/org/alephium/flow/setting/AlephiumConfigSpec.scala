@@ -21,11 +21,11 @@ import java.net.InetSocketAddress
 import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters._
 
+import com.typesafe.config.{ConfigException, ConfigFactory}
 import com.typesafe.config.ConfigValueFactory
-import pureconfig.ConfigSource
-import pureconfig.error._
-import pureconfig.generic.auto._
+import net.ceedubs.ficus.Ficus._
 
+import org.alephium.conf._
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
@@ -43,25 +43,25 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "load bootstrap config" in {
-    import PureConfigUtils._
 
     case class Bootstrap(addresses: ArraySeq[InetSocketAddress])
 
-    val expected = Bootstrap(
+    val expected =
       ArraySeq(new InetSocketAddress("localhost", 1234), new InetSocketAddress("localhost", 4321))
-    )
 
-    ConfigSource
-      .string("""{ addresses = ["localhost:1234", "localhost:4321"] }""")
-      .load[Bootstrap] isE expected
+    ConfigFactory
+      .parseString("""{ addresses = ["localhost:1234", "localhost:4321"] }""")
+      .as[ArraySeq[InetSocketAddress]]("addresses")(inetSocketAddressesReader) is expected
 
-    ConfigSource
-      .string("""{ addresses = "localhost:1234,localhost:4321" }""")
-      .load[Bootstrap] isE expected
+    ConfigFactory
+      .parseString("""{ addresses = "localhost:1234,localhost:4321" }""")
+      .as[ArraySeq[InetSocketAddress]]("addresses")(inetSocketAddressesReader) is expected
 
-    ConfigSource
-      .string("""{ addresses = "" }""")
-      .load[Bootstrap] isE Bootstrap(ArraySeq.empty)
+    ConfigFactory
+      .parseString("""{ addresses = "" }""")
+      .as[ArraySeq[InetSocketAddress]]("addresses")(
+        inetSocketAddressesReader
+      ) is ArraySeq.empty
   }
 
   it should "load miner's addresses" in new AlephiumConfigFixture {
@@ -89,7 +89,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ("alephium.miner-addresses", ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava))
     )
 
-    AlephiumConfig.load(newConfig.getConfig("alephium")).leftValue is a[ConfigReaderFailures]
+    assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))
   }
 
   it should "fail to load if `mainnet` is set but no miner's addresses" in new AlephiumConfigFixture {
@@ -97,7 +97,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ("alephium.network.network-type", "mainnet")
     )
 
-    AlephiumConfig.load(newConfig.getConfig("alephium")).leftValue is a[ConfigReaderFailures]
+    assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))
   }
 
   it should "generate miner's addresses if not set and network is `testnet`" in new AlephiumConfigFixture {

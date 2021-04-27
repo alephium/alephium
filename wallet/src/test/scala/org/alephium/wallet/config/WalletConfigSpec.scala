@@ -17,19 +17,15 @@
 package org.alephium.wallet.config
 
 import com.typesafe.config.{Config, ConfigFactory}
-import pureconfig.ConfigSource
+import net.ceedubs.ficus.Ficus._
 
 import org.alephium.util.AlephiumSpec
 
 class WalletConfigSpec() extends AlephiumSpec {
   it should "load wallet config" in {
 
-    val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
+    val typesafeConfig: Config = ConfigFactory.load()
 
-    ConfigSource
-      .fromConfig(typesafeConfig)
-      .load[WalletConfig]
-      .toOption
-      .isDefined is true
+    typesafeConfig.as[WalletConfig]("wallet")
   }
 }

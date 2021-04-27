@@ -36,6 +36,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     benchmark,
     flow,
     json,
+    conf,
     protocol,
     wallet,
     tools
@@ -151,6 +152,14 @@ lazy val json = project("json")
     )
   )
 
+lazy val conf = project("conf")
+  .dependsOn(util)
+  .settings(
+    libraryDependencies ++= Seq(
+      ficus
+    )
+  )
+
 lazy val tools = mainProject("tools")
   .dependsOn(app)
 
@@ -163,7 +172,7 @@ lazy val benchmark = project("benchmark")
   )
 
 lazy val flow = project("flow")
-  .dependsOn(crypto, io, serde, util % "test->test")
+  .dependsOn(conf, crypto, io, serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
       akka,
@@ -180,13 +189,12 @@ lazy val protocol = project("protocol")
   .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
-      fastparse,
-      pureconfig
+      fastparse
     )
   )
 
 lazy val wallet = project("wallet")
-  .dependsOn(json, api, crypto, util % "test->test", protocol % "compile->compile;test->test")
+  .dependsOn(conf, json, api, crypto, util % "test->test", protocol % "compile->compile;test->test")
   .settings(
     libraryDependencies ++= Seq(
       `akka-http`,

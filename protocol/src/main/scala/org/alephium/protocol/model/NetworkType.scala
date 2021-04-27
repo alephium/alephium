@@ -17,8 +17,6 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
-import pureconfig.ConfigReader
-import pureconfig.generic.semiauto.deriveEnumerationReader
 
 import org.alephium.protocol.Hash
 import org.alephium.serde.intSerde
@@ -45,8 +43,6 @@ object NetworkType {
   }
 
   val all: AVector[NetworkType] = AVector(Mainnet, Testnet, Devnet)
-
-  implicit val networkTypeReader: ConfigReader[NetworkType] = deriveEnumerationReader[NetworkType]
 
   def fromName(name: String): Option[NetworkType] = all.find(_.name == name)
 

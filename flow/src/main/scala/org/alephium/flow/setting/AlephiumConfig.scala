@@ -25,11 +25,10 @@ import scala.collection.immutable.ArraySeq
 import akka.actor.ActorRef
 import akka.io.Tcp
 import com.typesafe.config.Config
-import pureconfig.{ConfigReader, ConfigSource}
-import pureconfig.ConfigReader.Result
-import pureconfig.error._
-import pureconfig.generic.auto._
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ValueReader
 
+import org.alephium.conf._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
@@ -145,7 +144,70 @@ final case class AlephiumConfig(
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
 }
 object AlephiumConfig {
-  import PureConfigUtils._
+  import ConfigUtils._
+
+  implicit private val brokerSettingValueReader: ValueReader[BrokerSetting] =
+    valueReader { implicit cfg =>
+      BrokerSetting(
+        as[Int]("groups"),
+        as[Int]("brokerNum"),
+        as[Int]("brokerId")
+      )
+    }
+
+  implicit private val miningSettingValueReader: ValueReader[MiningSetting] =
+    valueReader { implicit cfg =>
+      MiningSetting(
+        as[U256]("nonceStep"),
+        as[Duration]("batchDelay")
+      )
+    }
+
+  implicit private val upnSettingsValueReader: ValueReader[UpnpSettings] =
+    valueReader { implicit cfg =>
+      UpnpSettings(
+        as[Boolean]("enabled"),
+        as[Option[Duration]]("httpTimeout"),
+        as[Option[Duration]]("discoveryTimeout")
+      )
+    }
+
+  implicit private val discoverySettingValueReader: ValueReader[DiscoverySetting] =
+    valueReader { implicit cfg =>
+      DiscoverySetting(
+        as[ArraySeq[InetSocketAddress]]("bootstrap"),
+        as[Int]("peersPerGroup"),
+        as[Int]("scanMaxPerGroup"),
+        as[Duration]("scanFrequency"),
+        as[Duration]("scanFastFrequency"),
+        as[Int]("neighborsPerGroup")
+      )
+    }
+
+  implicit private val memPoolSettingValueReader: ValueReader[MemPoolSetting] =
+    valueReader { implicit cfg =>
+      MemPoolSetting(
+        as[Int]("txPoolCapacity"),
+        as[Int]("txMaxNumberPerBlock")
+      )
+    }
+
+  implicit val blockFlowValueReader: ValueReader[WalletSetting.BlockFlow] =
+    valueReader { implicit cfg =>
+      WalletSetting.BlockFlow(
+        as[String]("host"),
+        as[Int]("port"),
+        as[Int]("groups")
+      )
+    }
+
+  implicit val walletSettingValueReader: ValueReader[WalletSetting] =
+    valueReader { implicit cfg =>
+      WalletSetting(
+        as[Path]("secretDir"),
+        as[Duration]("lockingTimeout")
+      )
+    }
 
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
@@ -210,7 +272,7 @@ object AlephiumConfig {
       wallet: WalletSetting,
       minerAddresses: Option[Seq[String]]
   ) {
-    lazy val toAlephiumConfig: Either[FailureReason, AlephiumConfig] = {
+    lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(minerAddresses, network.networkType, broker).map { minerAddresses =>
         val consensusExtracted = consensus.toConsensusSetting(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
@@ -225,20 +287,57 @@ object AlephiumConfig {
           Genesis(network.networkType),
           minerAddresses
         )
+      } match {
+        case Right(value) => value
+        case Left(error)  => throw error
       }
     }
   }
 
-  implicit val alephiumConfigReader: ConfigReader[AlephiumConfig] =
-    ConfigReader[TempAlephiumConfig].emap(_.toAlephiumConfig)
+  implicit private val tempConsensusSettingValueReader: ValueReader[TempConsensusSetting] =
+    valueReader { implicit cfg =>
+      TempConsensusSetting(
+        as[Duration]("blockTargetTime"),
+        as[Int]("numZerosAtLeastInHash"),
+        as[Int]("tipsPruneInterval"),
+        as[Int]("blockCacheCapacityPerChain")
+      )
+    }
 
-  def source(config: Config): ConfigSource = {
-    val path          = "alephium"
-    val configLocated = if (config.hasPath(path)) config.getConfig(path) else config
-    ConfigSource.fromConfig(configLocated)
-  }
+  implicit private val tempNetworkSettingValueReader: ValueReader[TempNetworkSetting] =
+    valueReader { implicit cfg =>
+      TempNetworkSetting(
+        as[NetworkType]("networkType"),
+        as[Int]("maxOutboundConnectionsPerGroup"),
+        as[Int]("maxInboundConnectionsPerGroup"),
+        as[Duration]("pingFrequency"),
+        as[Duration]("retryTimeout"),
+        as[Long]("connectionBufferCapacityInByte"),
+        as[UpnpSettings]("upnp"),
+        as[InetSocketAddress]("bindAddress"),
+        as[InetSocketAddress]("internalAddress"),
+        as[InetSocketAddress]("coordinatorAddress"),
+        as[Option[InetSocketAddress]]("externalAddress"),
+        as[Int]("restPort"),
+        as[Int]("wsPort")
+      )
+    }
 
-  def load(rootPath: Path): Result[AlephiumConfig] = load(Configs.parseConfig(rootPath))
-  def load(config: Config): Result[AlephiumConfig] = source(config).load[AlephiumConfig]
-  def loadOrThrow(config: Config): AlephiumConfig  = source(config).loadOrThrow[AlephiumConfig]
+  implicit val alephiumValueReader: ValueReader[AlephiumConfig] =
+    valueReader { implicit cfg =>
+      TempAlephiumConfig(
+        as[BrokerSetting]("broker"),
+        as[TempConsensusSetting]("consensus"),
+        as[MiningSetting]("mining"),
+        as[TempNetworkSetting]("network"),
+        as[DiscoverySetting]("discovery"),
+        as[MemPoolSetting]("mempool"),
+        as[WalletSetting]("wallet"),
+        as[Option[Seq[String]]]("minerAddresses")
+      ).toAlephiumConfig
+    }
+
+  def load(rootPath: Path, path: String): AlephiumConfig = load(Configs.parseConfig(rootPath), path)
+  def load(config: Config, path: String): AlephiumConfig = config.as[AlephiumConfig](path)
+  def load(config: Config): AlephiumConfig               = config.as[AlephiumConfig]("alephium")
 }

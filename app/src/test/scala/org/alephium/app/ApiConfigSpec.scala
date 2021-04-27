@@ -27,6 +27,6 @@ class ApiConfigSpec extends AlephiumSpec {
     val path   = getClass.getResource(s"/system_test.conf.tmpl").getPath
     val file   = new File(path)
     val config = ConfigFactory.parseFile(file)
-    ApiConfig.load(config.getConfig("alephium.api")).isRight is true
+    ApiConfig.load(config)
   }
 }

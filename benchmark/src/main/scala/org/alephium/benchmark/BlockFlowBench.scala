@@ -33,7 +33,7 @@ import org.alephium.protocol.model.{BlockDeps, GroupIndex}
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class BlockFlowBench {
   val rootPath: Path                  = Platform.getRootPath()
-  implicit val config: AlephiumConfig = AlephiumConfig.load(rootPath).toOption.get
+  implicit val config: AlephiumConfig = AlephiumConfig.load(rootPath, "alephium")
   private val storages: Storages = {
     val dbFolder = "db"
     Storages.createUnsafe(rootPath, dbFolder, RocksDBSource.Settings.writeOptions)(config.broker)

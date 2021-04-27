@@ -19,11 +19,10 @@ package org.alephium.app
 import java.net.InetAddress
 
 import com.typesafe.config.Config
-import pureconfig.ConfigReader.Result
-import pureconfig.ConfigSource
-import pureconfig.generic.auto._
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.flow.setting.PureConfigUtils._
+import org.alephium.conf._
 import org.alephium.util.Duration
 
 final case class ApiConfig(
@@ -33,12 +32,16 @@ final case class ApiConfig(
 )
 
 object ApiConfig {
-  def source(config: Config): ConfigSource = {
-    val path          = "alephium.api"
-    val configLocated = if (config.hasPath(path)) config.getConfig(path) else config
-    ConfigSource.fromConfig(configLocated)
-  }
 
-  def load(config: Config): Result[ApiConfig] = source(config).load[ApiConfig]
-  def loadOrThrow(config: Config): ApiConfig  = source(config).loadOrThrow[ApiConfig]
+  implicit private val apiConfigValueReader: ValueReader[ApiConfig] =
+    valueReader { implicit cfg =>
+      ApiConfig(
+        as[InetAddress]("networkInterface"),
+        as[Duration]("blockflowFetchMaxAge"),
+        as[Duration]("askTimeout")
+      )
+    }
+
+  def load(config: Config, path: String): ApiConfig = config.as[ApiConfig](path)
+  def load(config: Config): ApiConfig               = config.as[ApiConfig]("alephium.api")
 }

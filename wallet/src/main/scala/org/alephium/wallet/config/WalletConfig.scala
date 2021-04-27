@@ -18,13 +18,12 @@ package org.alephium.wallet.config
 
 import java.nio.file.Path
 
-import scala.concurrent.duration.FiniteDuration
-
 import akka.http.scaladsl.model.Uri
-import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
-import pureconfig.generic.semiauto._
+import com.typesafe.config.ConfigException
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ValueReader
 
+import org.alephium.conf._
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.Duration
 
@@ -41,19 +40,32 @@ object WalletConfig {
     val uri: Uri = Uri(s"http://$host:$port")
   }
 
-  implicit val durationConfig: ConfigReader[Duration] =
-    ConfigReader[FiniteDuration].emap { dt =>
-      val millis = dt.toMillis
-      if (millis >= 0) {
-        Right(Duration.ofMillisUnsafe(millis))
-      } else {
-        Left(CannotConvert(dt.toString, "alephium Duration", "negative duration"))
-      }
-    }
+  implicit val networkTypeReader: ValueReader[NetworkType] = ValueReader[String].map { name =>
+    NetworkType
+      .fromName(name)
+      .getOrElse(throw new ConfigException.BadValue("", s"invalid network type: $name"))
+  }
 
   object BlockFlow {
-    implicit val blockFlowReader: ConfigReader[BlockFlow] = deriveReader[BlockFlow]
-  }
-  implicit val walletConfigReader: ConfigReader[WalletConfig] = deriveReader[WalletConfig]
 
+    implicit val blockFlowReader: ValueReader[BlockFlow] =
+      valueReader { implicit cfg =>
+        BlockFlow(
+          as[String]("host"),
+          as[Int]("port"),
+          as[Int]("groups"),
+          as[Duration]("blockflowFetchMaxAge")
+        )
+      }
+  }
+  implicit val walletConfigReader: ValueReader[WalletConfig] =
+    valueReader { implicit cfg =>
+      WalletConfig(
+        as[Option[Int]]("port"),
+        as[Path]("secretDir"),
+        as[NetworkType]("networkType"),
+        as[Duration]("lockingTimeout"),
+        as[WalletConfig.BlockFlow]("blockflow")
+      )
+    }
 }

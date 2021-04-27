@@ -50,8 +50,8 @@ object Boot extends App with StrictLogging {
 class BootUp extends StrictLogging {
   val rootPath: Path                  = Platform.getRootPath()
   val typesafeConfig: Config          = Configs.parseConfigAndValidate(rootPath)
-  implicit val config: AlephiumConfig = AlephiumConfig.loadOrThrow(typesafeConfig)
-  implicit val apiConfig: ApiConfig   = ApiConfig.loadOrThrow(typesafeConfig)
+  implicit val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
+  implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
   val httpSystem: ActorSystem         = ActorSystem("http", typesafeConfig)
 

@@ -70,7 +70,7 @@ trait TestFixtureLike
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
-  implicit lazy val apiConfig                = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val apiConfig                = ApiConfig.load(newConfig)
   implicit lazy val networkType: NetworkType = config.network.networkType
 
   lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
@@ -287,7 +287,7 @@ trait TestFixtureLike
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       )
       implicit override lazy val config = {
-        val tmp = AlephiumConfig.load(newConfig).toOption.get
+        val tmp = AlephiumConfig.load(newConfig)
         bootstrap match {
           case Some(address) =>
             tmp.copy(discovery = tmp.discovery.copy(bootstrap = ArraySeq(address)))
@@ -345,7 +345,7 @@ trait TestFixtureLike
       val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
 
       implicit val config    = platformEnv.config.copy(network = network)
-      implicit val apiConfig = ApiConfig.load(platformEnv.newConfig).toOption.get
+      implicit val apiConfig = ApiConfig.load(platformEnv.newConfig)
       val storages           = platformEnv.storages
 
       override lazy val blocksExporter: BlocksExporter =

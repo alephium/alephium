@@ -48,7 +48,7 @@ trait ServerFixture
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NoIndexModelGeneratorsLike {
-  implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig).toOption.get
+  implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig)
   implicit lazy val networkType: NetworkType = config.network.networkType
 
   val now = TimeStamp.now()
