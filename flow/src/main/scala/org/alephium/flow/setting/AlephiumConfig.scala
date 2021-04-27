@@ -45,6 +45,7 @@ final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) exten
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 final case class ConsensusSetting(
     blockTargetTime: Duration,
+    uncleDependencyGapTime: Duration,
     numZerosAtLeastInHash: Int,
     tipsPruneInterval: Int,
     blockCacheCapacityPerChain: Int,
@@ -149,6 +150,7 @@ object AlephiumConfig {
 
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
+      uncleDependencyGapTime: Option[Duration],
       numZerosAtLeastInHash: Int,
       tipsPruneInterval: Int,
       blockCacheCapacityPerChain: Int
@@ -157,6 +159,7 @@ object AlephiumConfig {
       val emission = Emission(groupConfig, blockTargetTime)
       ConsensusSetting(
         blockTargetTime,
+        uncleDependencyGapTime.getOrElse(blockTargetTime),
         numZerosAtLeastInHash,
         tipsPruneInterval,
         blockCacheCapacityPerChain,

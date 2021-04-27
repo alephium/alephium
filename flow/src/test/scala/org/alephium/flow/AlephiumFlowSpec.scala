@@ -27,7 +27,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation}
-import org.alephium.protocol.{ALF, BlockHash, Hash, PrivateKey, PublicKey}
+import org.alephium.protocol._
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -279,7 +279,9 @@ trait FlowFixture
     val coinbaseTx =
       Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
 
-    mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
+    val loosenDeps =
+      blockFlow.looseUncleDependencies(BlockDeps.unsafe(deps), chainIndex, TimeStamp.now())
+    mine(chainIndex, loosenDeps.rightValue, txs :+ coinbaseTx, blockTs)
   }
 
   def mineWithoutCoinbase(

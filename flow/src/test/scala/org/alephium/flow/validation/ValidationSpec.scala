@@ -31,9 +31,10 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
 
     val newTarget = Target.unsafe(block.target.value.divide(4))
     val newConsensusConfig = new ConsensusConfig {
-      override def blockTargetTime: Duration = ???
-      override def maxMiningTarget: Target   = newTarget
-      override def emission: Emission        = ???
+      override def blockTargetTime: Duration        = ???
+      override def uncleDependencyGapTime: Duration = ???
+      override def maxMiningTarget: Target          = newTarget
+      override def emission: Emission               = ???
     }
     Validation.preValidate(AVector(block))(newConsensusConfig) is false
 

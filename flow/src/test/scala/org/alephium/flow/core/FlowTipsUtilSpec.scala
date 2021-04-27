@@ -31,40 +31,43 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       to     <- 0 until groups0
       target <- 0 until groups0
     } {
-      val genesis   = blockFlow.genesisBlocks(from)(to).header
-      val lightTips = blockFlow.getLightTipsUnsafe(genesis, GroupIndex.unsafe(target))
-      lightTips.inTips.toSeq is (0 until groups0)
-        .filter(_ != target)
-        .map(blockFlow.bestGenesisHashes.apply)
-      lightTips.outTip is blockFlow.bestGenesisHashes(target)
+      val genesis = blockFlow.genesisBlocks(from)(to).header
+
+      if ((from equals to) || (from equals target)) {
+        val lightTips = blockFlow.getLightTipsUnsafe(genesis, GroupIndex.unsafe(target))
+        lightTips.inTips.toSeq is (0 until groups0)
+          .filter(_ != target)
+          .map(blockFlow.initialGenesisHashes.apply)
+        lightTips.outTip is blockFlow.initialGenesisHashes(target)
+      } else {
+        assertThrows[AssertionError](
+          blockFlow.getLightTipsUnsafe(genesis, GroupIndex.unsafe(target))
+        )
+      }
     }
   }
 
   it should "compute light tips for new blocks" in new Fixture {
-    val newBlocks = for {
-      from   <- 0 until groups0
-      to     <- 0 until groups0
-      target <- 0 until groups0
-    } yield {
+    val newBlocks = IndexedSeq.tabulate(groups0, groups0, groups0) { case (from, to, target) =>
       val chainIndex = ChainIndex.unsafe(from, to)
       val block      = emptyBlock(blockFlow, chainIndex)
-      val lightTips  = blockFlow.getLightTipsUnsafe(block.header, GroupIndex.unsafe(target))
 
-      lightTips.inTips.toSeq is (0 until groups0)
-        .filter(_ != target)
-        .map { k => if (k equals from) block.hash else blockFlow.bestGenesisHashes(k) }
-      lightTips.outTip is
-        (if (target equals from) block.hash else blockFlow.bestGenesisHashes(target))
+      if ((from equals to) || (from equals target)) {
+        val lightTips = blockFlow.getLightTipsUnsafe(block.header, GroupIndex.unsafe(target))
+        lightTips.inTips.toSeq is (0 until groups0)
+          .filter(_ != target)
+          .map { k => if (k equals from) block.hash else blockFlow.initialGenesisHashes(k) }
+        lightTips.outTip is
+          (if (target equals from) block.hash else blockFlow.initialGenesisHashes(target))
+      }
 
       block
     }
 
-    newBlocks.foreach(addAndCheck(blockFlow, _))
-    val bestNewHashes =
-      newBlocks
-        .grouped(groups0 * groups0)
-        .map(_.map(_.hash).max(blockFlow.blockHashOrdering))
-        .toSeq
+    newBlocks.foreach(_.foreach(_.foreach(addAndCheck(blockFlow, _))))
+    val bestNewHashes = Seq.tabulate(groups0) { g =>
+      newBlocks(g)(g).map(_.hash).max(blockFlow.blockHashOrdering)
+    }
 
     for {
       from   <- 0 until groups0
@@ -73,12 +76,14 @@ class FlowTipsUtilSpec extends AlephiumSpec {
     } {
       val chainIndex = ChainIndex.unsafe(from, to)
       val block      = emptyBlock(blockFlow, chainIndex)
-      val lightTips  = blockFlow.getLightTipsUnsafe(block.header, GroupIndex.unsafe(target))
 
-      lightTips.inTips.toSeq is (0 until groups0)
-        .filter(_ != target)
-        .map { k => if (k equals from) block.hash else bestNewHashes(k) }
-      lightTips.outTip is (if (target equals from) block.hash else bestNewHashes(target))
+      if ((from equals to) || (from equals target)) {
+        val lightTips = blockFlow.getLightTipsUnsafe(block.header, GroupIndex.unsafe(target))
+        lightTips.inTips.toSeq is (0 until groups0)
+          .filter(_ != target)
+          .map { k => if (k equals from) block.hash else bestNewHashes(k) }
+        lightTips.outTip is (if (target equals from) block.hash else bestNewHashes(target))
+      }
     }
   }
 
@@ -88,50 +93,53 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       to     <- 0 until groups0
       target <- 0 until groups0
     } {
-      val genesis  = blockFlow.genesisBlocks(from)(to).header
-      val flowTips = blockFlow.getFlowTipsUnsafe(genesis, GroupIndex.unsafe(target))
-      flowTips.targetGroup.value is target
-      flowTips.inTips.toSeq is (0 until groups0)
-        .filter(_ != target)
-        .map(blockFlow.bestGenesisHashes.apply)
-      flowTips.outTips is blockFlow.genesisBlocks(target).map(_.hash)
+      val genesis = blockFlow.genesisBlocks(from)(to).header
+
+      if ((from equals to) || (from equals target)) {
+        val flowTips = blockFlow.getFlowTipsUnsafe(genesis, GroupIndex.unsafe(target))
+        flowTips.targetGroup.value is target
+        flowTips.inTips.toSeq is (0 until groups0)
+          .filter(_ != target)
+          .map(blockFlow.initialGenesisHashes.apply)
+        flowTips.outTips is blockFlow.genesisBlocks(target).map(_.hash)
+      } else {
+        assertThrows[AssertionError](
+          blockFlow.getFlowTipsUnsafe(genesis, GroupIndex.unsafe(target))
+        )
+      }
     }
   }
 
   it should "compute flow tips for new blocks" in new Fixture {
-    val newBlocks0 = for {
-      from <- 0 until groups0
-      to   <- 0 until groups0
-      _    <- 0 until groups0
-    } yield {
+    val newBlocks0 = IndexedSeq.tabulate(groups0, groups0, groups0) { case (from, to, _) =>
       val chainIndex = ChainIndex.unsafe(from, to)
       emptyBlock(blockFlow, chainIndex)
     }
-    newBlocks0.foreach(addAndCheck(blockFlow, _))
-    val bestNewHashes0 =
-      newBlocks0
-        .grouped(groups0 * groups0)
-        .map(_.map(_.hash).max(blockFlow.blockHashOrdering))
-        .toSeq
+    newBlocks0.foreach(_.foreach(_.foreach(addAndCheck(blockFlow, _))))
+    val bestNewHashes0 = Seq.tabulate(groups0) { g =>
+      newBlocks0(g)(g).map(_.hash).max(blockFlow.blockHashOrdering)
+    }
 
     for {
       from   <- 0 until groups0
       to     <- 0 until groups0
       target <- 0 until groups0
     } yield {
-      val block    = newBlocks0(from * groups0 * groups0 + to * groups0 + target)
-      val flowTips = blockFlow.getFlowTipsUnsafe(block.header, GroupIndex.unsafe(target))
+      val block = newBlocks0(from)(to)(target)
 
-      block.chainIndex is ChainIndex.unsafe(from, to)
-      flowTips.inTips.toSeq is (0 until groups0)
-        .filter(_ != target)
-        .map { k => if (k equals from) block.hash else blockFlow.bestGenesisHashes(k) }
-      val outTipsExpected = if (target equals from) {
-        block.header.outTips
-      } else {
-        blockFlow.genesisBlocks(target).map(_.hash)
+      if ((from equals to) || (from equals target)) {
+        val flowTips = blockFlow.getFlowTipsUnsafe(block.header, GroupIndex.unsafe(target))
+        block.chainIndex is ChainIndex.unsafe(from, to)
+        flowTips.inTips.toSeq is (0 until groups0)
+          .filter(_ != target)
+          .map { k => if (k equals from) block.hash else blockFlow.initialGenesisHashes(k) }
+        val outTipsExpected = if (target equals from) {
+          block.header.outTips
+        } else {
+          blockFlow.genesisBlocks(target).map(_.hash)
+        }
+        flowTips.outTips is outTipsExpected
       }
-      flowTips.outTips is outTipsExpected
     }
 
     val newBlocks1 = for {
@@ -149,23 +157,25 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       to     <- 0 until groups0
       target <- 0 until groups0
     } {
-      val block    = newBlocks1(from * groups0 * groups0 + to * groups0 + target)
-      val flowTips = blockFlow.getFlowTipsUnsafe(block.header, GroupIndex.unsafe(target))
+      val block = newBlocks1(from * groups0 * groups0 + to * groups0 + target)
 
       block.chainIndex is ChainIndex.unsafe(from, to)
-      flowTips.inTips.toSeq is (0 until groups0)
-        .filter(_ != target)
-        .map { k => if (k equals from) block.hash else bestNewHashes0(k) }
-      val outTipsExpected = if (target equals from) {
-        block.header.outTips
-      } else {
-        val bestHash       = bestNewHashes0(target)
-        val bestChainIndex = ChainIndex.from(bestHash)
-        val genesisDeps    = blockFlow.genesisBlocks(target).map(_.hash)
-        bestChainIndex.from.value is target
-        genesisDeps.replace(bestChainIndex.to.value, bestHash)
+      if ((from equals to) || (from equals target)) {
+        val flowTips = blockFlow.getFlowTipsUnsafe(block.header, GroupIndex.unsafe(target))
+        flowTips.inTips.toSeq is (0 until groups0)
+          .filter(_ != target)
+          .map { k => if (k equals from) block.hash else bestNewHashes0(k) }
+        val outTipsExpected = if (target equals from) {
+          block.header.outTips
+        } else {
+          val bestHash       = bestNewHashes0(target)
+          val bestChainIndex = ChainIndex.from(bestHash)
+          val genesisDeps    = blockFlow.genesisBlocks(target).map(_.hash)
+          bestChainIndex.from.value is target
+          genesisDeps.replace(bestChainIndex.to.value, bestHash)
+        }
+        flowTips.outTips is outTipsExpected
       }
-      flowTips.outTips is outTipsExpected
     }
   }
 }
