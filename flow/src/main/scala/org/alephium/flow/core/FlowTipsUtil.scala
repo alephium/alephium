@@ -30,7 +30,7 @@ trait FlowTipsUtil {
   implicit def brokerConfig: BrokerConfig
 
   def groups: Int
-  def bestGenesisHashes: AVector[BlockHash]
+  def initialGenesisHashes: AVector[BlockHash]
   def genesisHashes: AVector[AVector[BlockHash]]
 
   def getBlockUnsafe(hash: BlockHash): Block
@@ -75,7 +75,7 @@ trait FlowTipsUtil {
 
   def getGroupTip(header: BlockHeader, targetGroup: GroupIndex): BlockHash = {
     if (header.isGenesis) {
-      bestGenesisHashes(targetGroup.value)
+      genesisHashes(targetGroup.value)(targetGroup.value)
     } else {
       header.getGroupTip(targetGroup)
     }
@@ -139,6 +139,8 @@ trait FlowTipsUtil {
   }
 
   private[core] def getFlowTipsUnsafe(header: BlockHeader, targetGroup: GroupIndex): FlowTips = {
+    assume(header.chainIndex.isIntraGroup || header.chainIndex.from == targetGroup)
+
     val FlowTips.Light(inTips, targetTip) = getLightTipsUnsafe(header, targetGroup)
     val targetTips                        = getOutTipsUnsafe(targetTip, inclusive = true)
 
@@ -174,12 +176,14 @@ trait FlowTipsUtil {
       header: BlockHeader,
       targetGroup: GroupIndex
   ): FlowTips.Light = {
+    assume(header.chainIndex.isIntraGroup || header.chainIndex.from == targetGroup)
+
     if (header.isGenesis) {
       val inTips = AVector.tabulate(groups - 1) { i =>
         val g = if (i < targetGroup.value) i else i + 1
-        bestGenesisHashes(g)
+        initialGenesisHashes(g)
       }
-      val targetTip = bestGenesisHashes(targetGroup.value)
+      val targetTip = initialGenesisHashes(targetGroup.value)
       FlowTips.Light(inTips, targetTip)
     } else {
       val inTips = AVector.tabulate(groups - 1) { i =>

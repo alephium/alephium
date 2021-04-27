@@ -183,7 +183,43 @@ trait FlowUtils
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       candidates   <- collectTransactions(chainIndex, bestDeps)
       fullTxs      <- executeTxTemplates(chainIndex, bestDeps, candidates)
-    } yield BlockFlowTemplate(chainIndex, bestDeps.deps, target, parentHeader.timestamp, fullTxs)
+      loosenDeps <- looseUncleDependencies(
+        bestDeps,
+        chainIndex,
+        FlowUtils.nextTimeStamp(parentHeader.timestamp)
+      )
+    } yield {
+      BlockFlowTemplate(chainIndex, loosenDeps, target, parentHeader.timestamp, fullTxs)
+    }
+  }
+
+  def looseUncleDependencies(
+      bestDeps: BlockDeps,
+      chainIndex: ChainIndex,
+      currentTs: TimeStamp
+  ): IOResult[AVector[BlockHash]] = {
+    val thresholdTs = currentTs.minusUnsafe(consensusConfig.uncleDependencyGapTime)
+    bestDeps.deps.mapWithIndexE {
+      case (hash, k) if k != (groups - 1 + chainIndex.to.value) =>
+        val hashIndex = ChainIndex.from(hash)
+        val chain     = getHeaderChain(hashIndex)
+        looseDependency(hash, chain, thresholdTs)
+      case (hash, _) => Right(hash)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def looseDependency(
+      hash: BlockHash,
+      headerChain: BlockHeaderChain,
+      thresholdTs: TimeStamp
+  ): IOResult[BlockHash] = {
+    headerChain.getTimestamp(hash).flatMap {
+      case timeStamp if timeStamp <= thresholdTs =>
+        Right(hash)
+      case _ =>
+        headerChain.getParentHash(hash).flatMap(looseDependency(_, headerChain, thresholdTs))
+    }
   }
 
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
@@ -546,6 +582,15 @@ object FlowUtils {
     StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
       case Left(_)       => convertFailedScriptTx(worldState, tx)
       case Right(result) => Right(FlowUtils.convertSuccessfulTx(tx, result))
+    }
+  }
+
+  def nextTimeStamp(parentTs: TimeStamp): TimeStamp = {
+    val resultTs = TimeStamp.now()
+    if (resultTs <= parentTs) {
+      parentTs.plusMillisUnsafe(1)
+    } else {
+      resultTs
     }
   }
 }

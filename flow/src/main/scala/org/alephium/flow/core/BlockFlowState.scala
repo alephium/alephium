@@ -27,7 +27,6 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
-import org.alephium.util.Bytes.byteStringOrdering
 
 // scalastyle:off number.of.methods
 trait BlockFlowState extends FlowTipsUtil {
@@ -39,15 +38,15 @@ trait BlockFlowState extends FlowTipsUtil {
   def genesisBlocks: AVector[AVector[Block]]
 
   lazy val genesisHashes: AVector[AVector[BlockHash]] = genesisBlocks.map(_.map(_.hash))
-  lazy val bestGenesisHashes: AVector[BlockHash]      = genesisHashes.map(_.maxBy(_.bytes))
+  lazy val initialGenesisHashes: AVector[BlockHash]   = genesisHashes.mapWithIndex(_.apply(_))
 
   protected[core] val bestDeps = Array.tabulate(brokerConfig.groupNumPerBroker) { fromShift =>
     val mainGroup = brokerConfig.groupFrom + fromShift
     val deps1 = AVector.tabulate(groups - 1) { i =>
       if (i < mainGroup) {
-        bestGenesisHashes(i)
+        genesisHashes(i)(i)
       } else {
-        bestGenesisHashes(i + 1)
+        genesisHashes(i + 1)(i + 1)
       }
     }
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
@@ -58,7 +57,7 @@ trait BlockFlowState extends FlowTipsUtil {
   def blockchainBuilder: Block => BlockChain
   def blockheaderChainBuilder: BlockHeader => BlockHeaderChain
 
-  private val intraGroupChains: AVector[BlockChainWithState] = {
+  protected val intraGroupChains: AVector[BlockChainWithState] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker) { groupShift =>
       val group        = brokerConfig.groupFrom + groupShift
       val genesisBlock = genesisBlocks(group)(group)

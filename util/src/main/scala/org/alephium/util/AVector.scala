@@ -276,6 +276,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.tabulate(length) { i => f(apply(i), i) }
   }
 
+  def mapWithIndexE[L, B: ClassTag](f: (A, Int) => Either[L, B]): Either[L, AVector[B]] = {
+    val res = AVector.tabulate(length) { i =>
+      f(apply(i), i) match {
+        case Left(l)  => return Left(l)
+        case Right(r) => r
+      }
+    }
+    Right(res)
+  }
+
   def filter(p: A => Boolean): AVector[A] = {
     filterImpl(p, true)
   }
