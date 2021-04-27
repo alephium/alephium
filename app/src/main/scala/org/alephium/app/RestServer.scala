@@ -89,8 +89,8 @@ class RestServer(
     node.cliqueManager
       .ask(InterCliqueManager.IsSynced)
       .mapTo[InterCliqueManager.SyncedResult]
-      .flatMap { synced =>
-        if (synced.isSynced) {
+      .flatMap { result =>
+        if (result.isSynced) {
           f
         } else {
           Future.successful(Left(ApiError.ServiceUnavailable("The clique is not synced")))
