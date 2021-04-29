@@ -21,6 +21,7 @@ import java.nio.file.Path
 import akka.http.scaladsl.model.Uri
 import com.typesafe.config.ConfigException
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
@@ -46,18 +47,6 @@ object WalletConfig {
       .getOrElse(throw new ConfigException.BadValue("", s"invalid network type: $name"))
   }
 
-  object BlockFlow {
-
-    implicit val blockFlowReader: ValueReader[BlockFlow] =
-      valueReader { implicit cfg =>
-        BlockFlow(
-          as[String]("host"),
-          as[Int]("port"),
-          as[Int]("groups"),
-          as[Duration]("blockflowFetchMaxAge")
-        )
-      }
-  }
   implicit val walletConfigReader: ValueReader[WalletConfig] =
     valueReader { implicit cfg =>
       WalletConfig(

@@ -27,20 +27,22 @@ import scala.util.{Failure, Success, Try}
 
 import com.typesafe.config.{Config, ConfigException}
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import net.ceedubs.ficus.readers.CollectionReaders.traversableReader
-import net.ceedubs.ficus.readers.ValueReader
-import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 
 import org.alephium.util.{Duration, U256}
 
 package object conf {
+
+  implicit val nameMapper: NameMapper = HyphenNameMapper
 
   def valueReader[A](f: Cfg => A): ValueReader[A] = ValueReader.relative { config =>
     f(Cfg(config))
   }
 
   def as[A: ValueReader](path: String)(implicit config: Cfg): A = {
-    config.as[A](hyphenCase.map(path))
+    config.as[A](nameMapper.map(path))
   }
 
   implicit val pathValueReader: ValueReader[Path] = ValueReader[String].map { path =>
@@ -127,8 +129,8 @@ package object conf {
 }
 
 final private class Cfg private (config: Config) {
-  def as[A: ValueReader](path: String): A = {
-    config.as[A](hyphenCase.map(path))
+  def as[A: ValueReader](path: String)(implicit nameMapper: NameMapper): A = {
+    config.as[A](nameMapper.map(path))
   }
 }
 private object Cfg {

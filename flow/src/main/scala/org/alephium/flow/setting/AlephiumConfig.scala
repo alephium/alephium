@@ -26,6 +26,7 @@ import akka.actor.ActorRef
 import akka.io.Tcp
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
@@ -146,69 +147,6 @@ final case class AlephiumConfig(
 object AlephiumConfig {
   import ConfigUtils._
 
-  implicit private val brokerSettingValueReader: ValueReader[BrokerSetting] =
-    valueReader { implicit cfg =>
-      BrokerSetting(
-        as[Int]("groups"),
-        as[Int]("brokerNum"),
-        as[Int]("brokerId")
-      )
-    }
-
-  implicit private val miningSettingValueReader: ValueReader[MiningSetting] =
-    valueReader { implicit cfg =>
-      MiningSetting(
-        as[U256]("nonceStep"),
-        as[Duration]("batchDelay")
-      )
-    }
-
-  implicit private val upnSettingsValueReader: ValueReader[UpnpSettings] =
-    valueReader { implicit cfg =>
-      UpnpSettings(
-        as[Boolean]("enabled"),
-        as[Option[Duration]]("httpTimeout"),
-        as[Option[Duration]]("discoveryTimeout")
-      )
-    }
-
-  implicit private val discoverySettingValueReader: ValueReader[DiscoverySetting] =
-    valueReader { implicit cfg =>
-      DiscoverySetting(
-        as[ArraySeq[InetSocketAddress]]("bootstrap"),
-        as[Int]("peersPerGroup"),
-        as[Int]("scanMaxPerGroup"),
-        as[Duration]("scanFrequency"),
-        as[Duration]("scanFastFrequency"),
-        as[Int]("neighborsPerGroup")
-      )
-    }
-
-  implicit private val memPoolSettingValueReader: ValueReader[MemPoolSetting] =
-    valueReader { implicit cfg =>
-      MemPoolSetting(
-        as[Int]("txPoolCapacity"),
-        as[Int]("txMaxNumberPerBlock")
-      )
-    }
-
-  implicit val blockFlowValueReader: ValueReader[WalletSetting.BlockFlow] =
-    valueReader { implicit cfg =>
-      WalletSetting.BlockFlow(
-        as[String]("host"),
-        as[Int]("port"),
-        as[Int]("groups")
-      )
-    }
-
-  implicit val walletSettingValueReader: ValueReader[WalletSetting] =
-    valueReader { implicit cfg =>
-      WalletSetting(
-        as[Path]("secretDir"),
-        as[Duration]("lockingTimeout")
-      )
-    }
-
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
       numZerosAtLeastInHash: Int,
@@ -293,35 +231,6 @@ object AlephiumConfig {
       }
     }
   }
-
-  implicit private val tempConsensusSettingValueReader: ValueReader[TempConsensusSetting] =
-    valueReader { implicit cfg =>
-      TempConsensusSetting(
-        as[Duration]("blockTargetTime"),
-        as[Int]("numZerosAtLeastInHash"),
-        as[Int]("tipsPruneInterval"),
-        as[Int]("blockCacheCapacityPerChain")
-      )
-    }
-
-  implicit private val tempNetworkSettingValueReader: ValueReader[TempNetworkSetting] =
-    valueReader { implicit cfg =>
-      TempNetworkSetting(
-        as[NetworkType]("networkType"),
-        as[Int]("maxOutboundConnectionsPerGroup"),
-        as[Int]("maxInboundConnectionsPerGroup"),
-        as[Duration]("pingFrequency"),
-        as[Duration]("retryTimeout"),
-        as[Long]("connectionBufferCapacityInByte"),
-        as[UpnpSettings]("upnp"),
-        as[InetSocketAddress]("bindAddress"),
-        as[InetSocketAddress]("internalAddress"),
-        as[InetSocketAddress]("coordinatorAddress"),
-        as[Option[InetSocketAddress]]("externalAddress"),
-        as[Int]("restPort"),
-        as[Int]("wsPort")
-      )
-    }
 
   implicit val alephiumValueReader: ValueReader[AlephiumConfig] =
     valueReader { implicit cfg =>
