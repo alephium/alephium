@@ -34,7 +34,6 @@ import org.alephium.wallet.service.WalletService
 
 trait Server extends Service {
   def flowSystem: ActorSystem
-  def httpSystem: ActorSystem
   implicit def executionContext: ExecutionContext
 
   implicit def config: AlephiumConfig
@@ -56,19 +55,18 @@ trait Server extends Service {
       )
     )
 
-    new WalletApp(walletConfig)(httpSystem, executionContext)
+    new WalletApp(walletConfig)(executionContext)
   }
 
   def blocksExporter: BlocksExporter
 
   lazy val restServer: RestServer =
     RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))(
-      httpSystem,
       apiConfig,
       executionContext
     )
   lazy val webSocketServer: WebSocketServer =
-    WebSocketServer(node)(httpSystem, apiConfig, executionContext)
+    WebSocketServer(node)(flowSystem, apiConfig, executionContext)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
@@ -88,12 +86,12 @@ trait Server extends Service {
 }
 
 object Server {
-  def apply(rootPath: Path, flowSystem: ActorSystem, httpSystem: ActorSystem)(implicit
+  def apply(rootPath: Path, flowSystem: ActorSystem)(implicit
       config: AlephiumConfig,
       apiConfig: ApiConfig,
       executionContext: ExecutionContext
   ): Server = {
-    new Impl(rootPath, flowSystem, httpSystem)
+    new Impl(rootPath, flowSystem)
   }
 
   def storageFolder(implicit config: AlephiumConfig): String = {
@@ -102,8 +100,7 @@ object Server {
 
   final private class Impl(
       rootPath: Path,
-      val flowSystem: ActorSystem,
-      val httpSystem: ActorSystem
+      val flowSystem: ActorSystem
   )(implicit
       val config: AlephiumConfig,
       val apiConfig: ApiConfig,

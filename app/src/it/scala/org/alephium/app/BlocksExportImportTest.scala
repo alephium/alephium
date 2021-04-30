@@ -16,8 +16,6 @@
 
 package org.alephium.app
 
-import akka.http.scaladsl.Http
-
 import org.alephium.util._
 
 class BlocksExportImportTest extends AlephiumSpec {
@@ -37,7 +35,7 @@ class BlocksExportImportTest extends AlephiumSpec {
 
     request[Boolean](stopMining) is true
 
-    Http().singleRequest(exportBlocks(filename)(defaultRestMasterPort)).futureValue
+    unitRequest(exportBlocks(filename))
 
     server.stop().futureValue is ()
 

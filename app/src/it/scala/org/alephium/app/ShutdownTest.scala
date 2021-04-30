@@ -33,7 +33,6 @@ class ShutdownTest extends AlephiumSpec {
     try {
       val server = bootNode(publicPort = defaultMasterPort, brokerId = 0)
       server.restServer // need to call it as restServer is lazy val
-      server.httpSystem.whenTerminated.futureValue is a[Terminated]
       server.flowSystem.whenTerminated.futureValue is a[Terminated]
     } catch {
       case _: IllegalStateException =>
@@ -51,7 +50,6 @@ class ShutdownTest extends AlephiumSpec {
     eventually(request[SelfClique](getSelfClique).synced is true)
 
     server0.stop().futureValue is ()
-    server1.httpSystem.whenTerminated.futureValue is a[Terminated]
     server1.flowSystem.whenTerminated.futureValue is a[Terminated]
   }
 }

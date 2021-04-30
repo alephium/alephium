@@ -18,11 +18,8 @@ package org.alephium.wallet.web
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model._
-import sttp.client3._
-import sttp.client3.akkahttp.AkkaHttpBackend
-import sttp.model.{Uri => SttpUri}
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
+import sttp.model.Uri
 import sttp.tapir.client.sttp._
 
 import org.alephium.api.Endpoints
@@ -50,7 +47,6 @@ trait BlockFlowClient {
 object BlockFlowClient {
   def apply(defaultUri: Uri, networkType: NetworkType, blockflowFetchMaxAge: Duration)(implicit
       groupConfig: GroupConfig,
-      actorSystem: ActorSystem,
       executionContext: ExecutionContext
   ): BlockFlowClient =
     new Impl(defaultUri, networkType, blockflowFetchMaxAge)
@@ -61,21 +57,20 @@ object BlockFlowClient {
       val blockflowFetchMaxAge: Duration
   )(implicit
       val groupConfig: GroupConfig,
-      actorSystem: ActorSystem,
       executionContext: ExecutionContext
   ) extends BlockFlowClient
       with Endpoints
       with SttpClientInterpreter {
 
-    private val backend = AkkaHttpBackend.usingActorSystem(actorSystem)
+    private val backend = AsyncHttpClientFutureBackend()
 
-    private def uriFromGroup(fromGroup: GroupIndex): Future[Either[String, SttpUri]] =
+    private def uriFromGroup(fromGroup: GroupIndex): Future[Either[String, Uri]] =
       fetchSelfClique().map { selfCliqueEither =>
         for {
           selfClique <- selfCliqueEither
         } yield {
           val peer = selfClique.peer(fromGroup)
-          uri"http://${peer.address.getHostAddress}:${peer.restPort}"
+          Uri(peer.address.getHostAddress, peer.restPort)
         }
       }
 
@@ -126,11 +121,12 @@ object BlockFlowClient {
       )(identity)
     }
 
-    private def fetchSelfClique(): Future[Either[String, SelfClique]] =
+    private def fetchSelfClique(): Future[Either[String, SelfClique]] = {
       backend
         .send(
-          toRequestThrowDecodeFailures(getSelfClique, Some(uri"${defaultUri.toString}")).apply(())
+          toRequestThrowDecodeFailures(getSelfClique, Some(defaultUri)).apply(())
         )
         .map(_.body.left.map(_.detail))
+    }
   }
 }

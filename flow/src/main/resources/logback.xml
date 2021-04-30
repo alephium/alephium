@@ -45,6 +45,8 @@
         </encoder>
     </appender>
 
+    <logger name="io.netty" level="WARN"/>
+
     <root>
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ERRFILE"/>

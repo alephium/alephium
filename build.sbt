@@ -99,12 +99,8 @@ lazy val io = project("io")
 lazy val rpc = project("rpc")
   .settings(
     libraryDependencies ++= Seq(
-      `akka-http`,
-      `akka-http-upickle`,
-      `akka-stream`,
       `scala-logging`,
-      `akka-test`,
-      `akka-http-test`
+      `akka-test`
     ),
     publish / skip := true
   )
@@ -122,7 +118,16 @@ lazy val api = project("api")
   )
 
 lazy val app = mainProject("app")
-  .dependsOn(json, api, rpc, util % "it,test->test", flow, flow % "it,test->test", wallet)
+  .dependsOn(
+    json,
+    api,
+    rpc,
+    http % "compile->compile;test->test",
+    util % "it,test->test",
+    flow,
+    flow % "it,test->test",
+    wallet
+  )
   .settings(
     mainClass in assembly := Some("org.alephium.app.Boot"),
     assemblyJarName in assembly := s"alephium-${version.value}.jar",
@@ -131,14 +136,16 @@ lazy val app = mainProject("app")
       case "logback.xml" => MergeStrategy.first
       case PathList("META-INF", "maven", "org.webjars", "swagger-ui", xs @ _*) =>
         MergeStrategy.first
+      case PathList("META-INF", "io.netty.versions.properties", xs @ _*) =>
+        MergeStrategy.first
+      case "module-info.class" =>
+        MergeStrategy.discard
       case other => (assemblyMergeStrategy in assembly).value(other)
     },
     libraryDependencies ++= Seq(
-      `akka-http-cors`,
-      `akka-http-test`,
-      `akka-stream-test`,
+      vertx,
       `tapir-core`,
-      `tapir-akka`,
+      `tapir-vertx`,
       `tapir-openapi`,
       `tapir-swagger-ui`
     ),
@@ -157,6 +164,15 @@ lazy val conf = project("conf")
   .settings(
     libraryDependencies ++= Seq(
       ficus
+    )
+  )
+
+lazy val http = project("http")
+  .dependsOn(api, json)
+  .settings(
+    libraryDependencies ++= Seq(
+      `tapir-vertx`,
+      `sttp-backend`
     )
   )
 
@@ -194,19 +210,25 @@ lazy val protocol = project("protocol")
   )
 
 lazy val wallet = project("wallet")
-  .dependsOn(conf, json, api, crypto, util % "test->test", protocol % "compile->compile;test->test")
+  .dependsOn(
+    conf,
+    json,
+    api,
+    crypto,
+    http     % "compile->compile;test->test",
+    util     % "test->test",
+    protocol % "compile->compile;test->test"
+  )
   .settings(
     libraryDependencies ++= Seq(
-      `akka-http`,
-      `akka-http-upickle`,
-      `akka-http-test`,
+      vertx,
+      `tapir-vertx`,
       `scala-logging`,
       `tapir-core`,
-      `tapir-akka`,
       `tapir-openapi`,
       `tapir-swagger-ui`,
       `tapir-client`,
-      `sttp-akka-http-backend`,
+      `sttp-backend`,
       `scala-logging`,
       logback
     ),

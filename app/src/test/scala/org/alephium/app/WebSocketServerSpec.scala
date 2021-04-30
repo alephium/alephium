@@ -16,12 +16,15 @@
 
 package org.alephium.app
 
-import akka.http.scaladsl.model.ws.TextMessage
-import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import akka.stream.testkit.scaladsl.TestSink
+import scala.concurrent.ExecutionContext
+
+import akka.actor.ActorSystem
 import akka.testkit.TestProbe
+import io.vertx.core.Vertx
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Minutes, Span}
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.json.Json._
@@ -33,11 +36,12 @@ import org.alephium.util._
 class WebSocketServerSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
-    with ScalatestRouteTest
     with EitherValues
     with ScalaFutures
     with NumericHelpers {
   import ServerFixture._
+
+  implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   behavior of "http"
 
@@ -72,30 +76,11 @@ class WebSocketServerSpec
     }
   }
 
-  it should "complete on `complete` command" in new AlephiumActorSpec("Websocket") {
-    val (actorRef, source) = WebSocketServer.Websocket.actorRef
-    val sinkProbe          = source.runWith(TestSink.probe[String])
-    val message            = "Hello"
-    actorRef ! message
-    actorRef ! WebSocketServer.Websocket.Completed
-    sinkProbe.request(1).expectNext(message).expectComplete()
-  }
-
-  it should "stop on `Failed` command" in new AlephiumActorSpec("Websocket") {
-    val (actorRef, source) = WebSocketServer.Websocket.actorRef
-    val sinkProbe          = source.runWith(TestSink.probe[String])
-    val message            = "Hello"
-    actorRef ! message
-    actorRef ! WebSocketServer.Websocket.Failed
-    sinkProbe.request(1).expectNextOrError() match {
-      case Right(hello) => hello is message
-      case Left(error)  => error.getMessage is "failure on events websocket"
-    }
-  }
-
   trait WebSocketServerFixture extends ServerFixture {
 
-    lazy val blockFlowProbe = TestProbe()
+    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
+    implicit val system: ActorSystem                = ActorSystem("websocket-server-spec")
+    lazy val blockFlowProbe                         = TestProbe()
     lazy val node = new NodeDummy(
       dummyIntraCliqueInfo,
       dummyNeighborPeers,
@@ -108,22 +93,39 @@ class WebSocketServerSpec
   }
 
   trait RouteWS extends WebSocketServerFixture {
-    val client = WSProbe()
+
+    private val vertx      = Vertx.vertx()
+    private val httpClient = vertx.createHttpClient()
+    val port               = node.config.network.wsPort
+    val blockNotifyProbe   = TestProbe()
 
     val blockNotify = BlockNotify(blockGen.sample.get.header, height = 0)
     def sendEventAndCheck: Assertion = {
       node.eventBus ! blockNotify
-      val TextMessage.Strict(message) = client.expectMessage()
 
-      val notification = read[NotificationUnsafe](message).asNotification.toOption.get
-
-      notification.method is "block_notify"
+      blockNotifyProbe.expectMsgPF() { case message: String =>
+        val notification = read[NotificationUnsafe](message).asNotification.toOption.get
+        notification.method is "block_notify"
+      }
     }
 
     def checkWS[A](f: => A): A =
-      WS("/events", client.flow) ~> server.wsRoute ~> check {
-        isWebSocketUpgrade is true
+      try {
+        server.start().futureValue
+
+        httpClient
+          .webSocket(port, "localhost", "/events")
+          .asScala
+          .map { ws =>
+            ws.textMessageHandler { blockNotify =>
+              blockNotifyProbe.ref ! blockNotify
+            }
+          }
+          .futureValue
+
         f
+      } finally {
+        server.stop().futureValue
       }
   }
 }

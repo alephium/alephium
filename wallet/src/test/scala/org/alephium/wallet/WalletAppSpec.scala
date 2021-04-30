@@ -18,27 +18,24 @@ package org.alephium.wallet
 
 import java.net.InetAddress
 
-import scala.concurrent.duration._
-
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import de.heikoseeberger.akkahttpupickle.UpickleCustomizationSupport
+import io.vertx.core.Vertx
+import io.vertx.ext.web._
+import io.vertx.ext.web.handler.BodyHandler
+import org.scalatest.concurrent.ScalaFutures
+import sttp.model.StatusCode
 
 import org.alephium.api.{ApiError, ApiModelCodec}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.json.Json
+import org.alephium.http.HttpFixture._
+import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, CliqueId, NetworkType, TxGenerators}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex, U256}
+import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.json.ModelCodecs
@@ -47,22 +44,17 @@ class WalletAppSpec
     extends AlephiumFutureSpec
     with ModelCodecs
     with WalletConfigFixture
-    with ScalatestRouteTest
-    with UpickleCustomizationSupport {
-  override type Api = Json.type
+    with HttpRouteFixture {
 
-  override def api: Api = Json
-
-  implicit val defaultTimeout = RouteTestTimeout(5.seconds)
+  implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
   val blockFlowMock =
     new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
-  val blockflowBinding = blockFlowMock.server.futureValue
 
   val walletApp: WalletApp =
     new WalletApp(config)
 
-  val routes: Route = walletApp.routes
+  val port: Int = config.port.get
 
   walletApp.start().futureValue is ()
 
@@ -88,219 +80,218 @@ class WalletAppSpec
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""
 
   def create(size: Int, maybeName: Option[String] = None) =
-    Post(s"/wallets", entity(creationJson(size, maybeName))) ~> routes
-  def restore(mnemonic: Mnemonic) = Put(s"/wallets", entity(restoreJson(mnemonic))) ~> routes
-  def unlock()                    = Post(s"/wallets/${wallet}/unlock", entity(unlockJson)) ~> routes
-  def lock()                      = Post(s"/wallets/${wallet}/lock") ~> routes
-  def delete()                    = Delete(s"/wallets/${wallet}", entity(deleteJson)) ~> routes
-  def getBalance()                = Get(s"/wallets/${wallet}/balances") ~> routes
-  def getAddresses()              = Get(s"/wallets/${wallet}/addresses") ~> routes
-  def transfer(amount: Int) =
-    Post(s"/wallets/${wallet}/transfer", entity(transferJson(amount))) ~> routes
-  def deriveNextAddress() = Post(s"/wallets/${wallet}/deriveNextAddress") ~> routes
+    Post("/wallets", creationJson(size, maybeName))
+  def restore(mnemonic: Mnemonic) = Put("/wallets", restoreJson(mnemonic))
+  def unlock()                    = Post(s"/wallets/$wallet/unlock", unlockJson)
+  def lock()                      = Post(s"/wallets/$wallet/lock")
+  def delete()                    = Delete(s"/wallets/$wallet", deleteJson)
+  def getBalance()                = Get(s"/wallets/$wallet/balances")
+  def getAddresses()              = Get(s"/wallets/$wallet/addresses")
+  def transfer(amount: Int)       = Post(s"/wallets/$wallet/transfer", transferJson(amount))
+  def deriveNextAddress()         = Post(s"/wallets/$wallet/deriveNextAddress")
   def changeActiveAddress(address: Address) =
-    Post(
-      s"/wallets/${wallet}/changeActiveAddress",
-      entity(changeActiveAddressJson(address))
-    ) ~> routes
-  def listWallets() = Get(s"/wallets") ~> routes
-
-  def entity(json: String) = HttpEntity(ContentTypes.`application/json`, json)
+    Post(s"/wallets/$wallet/changeActiveAddress", changeActiveAddressJson(address))
+  def listWallets() = Get("/wallets")
 
   it should "work" in {
 
-    unlock() ~> check {
-      status is StatusCodes.NotFound
-      write(responseAs[ujson.Value]) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
+    unlock() check { response =>
+      response.code is StatusCode.NotFound
+      response.body.leftValue is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
 
-    create(2) ~> check {
-      val error = responseAs[ApiError.BadRequest]
+    create(2) check { response =>
+      val error = response.as[ApiError.BadRequest]
       error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24 at index 94: decoding failure)"""
-      status is StatusCodes.BadRequest
+      response.code is StatusCode.BadRequest
     }
 
-    create(24) ~> check {
-      val result = responseAs[model.WalletCreation.Result]
+    create(24) check { response =>
+      val result = response.as[model.WalletCreation.Result]
       mnemonic = result.mnemonic
       wallet = result.walletName
-      status is StatusCodes.OK
+      response.code is StatusCode.Ok
     }
 
-    listWallets() ~> check {
-      val walletStatus = responseAs[AVector[model.WalletStatus]].head
+    listWallets() check { response =>
+      val walletStatus = response.as[AVector[model.WalletStatus]].head
       walletStatus.walletName is wallet
       walletStatus.locked is false
       wallet is walletStatus.walletName
-      status is StatusCodes.OK
+      response.code is StatusCode.Ok
     }
 
     //Lock is idempotent
     (0 to 10).foreach { _ =>
-      lock() ~> check {
-        status is StatusCodes.OK
+      lock() check { response =>
+        response.code is StatusCode.Ok
       }
     }
 
-    getBalance() ~> check {
-      status is StatusCodes.Unauthorized
+    getBalance() check { response =>
+      response.code is StatusCode.Unauthorized
     }
 
-    getAddresses() ~> check {
-      status is StatusCodes.Unauthorized
+    getAddresses() check { response =>
+      response.code is StatusCode.Unauthorized
     }
 
-    transfer(transferAmount) ~> check {
-      status is StatusCodes.Unauthorized
+    transfer(transferAmount) check { response =>
+      response.code is StatusCode.Unauthorized
     }
 
     unlock()
 
-    getAddresses() ~> check {
-      addresses = responseAs[model.Addresses]
+    getAddresses() check { response =>
+      addresses = response.as[model.Addresses]
       address = addresses.activeAddress
-      status is StatusCodes.OK
+      response.code is StatusCode.Ok
     }
 
-    getBalance() ~> check {
-      responseAs[model.Balances] is model.Balances(
+    getBalance() check { response =>
+      response.as[model.Balances] is model.Balances(
         balanceAmount,
         AVector(model.Balances.AddressBalance(address, balanceAmount))
       )
-      status is StatusCodes.OK
+      response.code is StatusCode.Ok
     }
 
-    transfer(transferAmount) ~> check {
-      status is StatusCodes.OK
-      responseAs[model.Transfer.Result]
+    transfer(transferAmount) check { response =>
+      response.as[model.Transfer.Result]
+      response.code is StatusCode.Ok
     }
 
     val negAmount = -10
-    transfer(negAmount) ~> check {
-      val error = responseAs[ApiError.BadRequest]
+    transfer(negAmount) check { response =>
+      val error = response.as[ApiError.BadRequest]
       error.detail.contains(s"""Invalid value for: body (Invalid U256: $negAmount""") is true
-      status is StatusCodes.BadRequest
+      response.code is StatusCode.BadRequest
     }
 
-    deriveNextAddress() ~> check {
-      address = responseAs[Address]
+    deriveNextAddress() check { response =>
+      address = response.as[Address]
       addresses = model.Addresses(address, addresses.addresses :+ address)
-      status is StatusCodes.OK
+      response.code is StatusCode.Ok
     }
 
-    getAddresses() ~> check {
-      responseAs[model.Addresses] is addresses
-      status is StatusCodes.OK
+    getAddresses() check { response =>
+      response.as[model.Addresses] is addresses
+      response.code is StatusCode.Ok
     }
 
     address = addresses.addresses.head
     addresses = addresses.copy(activeAddress = address)
 
-    changeActiveAddress(address) ~> check {
-      status is StatusCodes.OK
+    changeActiveAddress(address) check { response =>
+      response.code is StatusCode.Ok
     }
 
-    getAddresses() ~> check {
-      responseAs[model.Addresses] is addresses
-      status is StatusCodes.OK
+    getAddresses() check { response =>
+      response.as[model.Addresses] is addresses
+      response.code is StatusCode.Ok
     }
 
     val newMnemonic = Mnemonic.generate(24).get
-    restore(newMnemonic) ~> check {
-      wallet = responseAs[model.WalletRestore.Result].walletName
-      status is StatusCodes.OK
+    restore(newMnemonic) check { response =>
+      wallet = response.as[model.WalletRestore.Result].walletName
+      response.code is StatusCode.Ok
     }
 
-    listWallets() ~> check {
-      val walletStatuses = responseAs[AVector[model.WalletStatus]]
+    listWallets() check { response =>
+      val walletStatuses = response.as[AVector[model.WalletStatus]]
       walletStatuses.length is 2
       walletStatuses.map(_.walletName).contains(wallet)
-      status is StatusCodes.OK
+      response.code is StatusCode.Ok
     }
 
-    Get(s"/docs") ~> routes ~> check {
-      status is StatusCodes.PermanentRedirect
+    Get("/docs") check { response =>
+      response.code is StatusCode.Ok
     }
 
-    Get(s"/docs/openapi.json") ~> routes ~> check {
-      status is StatusCodes.OK
+    Get("/docs/openapi.json") check { response =>
+      response.code is StatusCode.Ok
     }
 
-    create(24, Some("bad!name")) ~> check {
-      status is StatusCodes.BadRequest
+    create(24, Some("bad!name")) check { response =>
+      response.code is StatusCode.BadRequest
     }
 
-    create(24, Some("correct_wallet-name")) ~> check {
-      status is StatusCodes.OK
+    create(24, Some("correct_wallet-name")) check { response =>
+      response.code is StatusCode.Ok
     }
 
-    delete() ~> check {
-      status is StatusCodes.OK
+    delete() check { response =>
+      response.code is StatusCode.Ok
     }
 
-    delete() ~> check {
-      status is StatusCodes.NotFound
+    delete() check { response =>
+      response.code is StatusCode.NotFound
       write(
-        responseAs[ujson.Value]
+        response.as[ujson.Value]
       ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
 
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())
+    walletApp.stop().futureValue is ()
   }
 }
 
 object WalletAppSpec extends {
 
   class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(implicit
-      val groupConfig: GroupConfig,
-      system: ActorSystem
-  ) extends UpickleCustomizationSupport
-      with TxGenerators
-      with ApiModelCodec {
-
-    override type Api = Json.type
-
-    override def api: Api = Json
+      val groupConfig: GroupConfig
+  ) extends TxGenerators
+      with ApiModelCodec
+      with ScalaFutures {
 
     private val cliqueId = CliqueId.generate
     private val peer     = PeerAddress(address, port, port)
 
     val blockflowFetchMaxAge = Duration.unsafe(1000)
 
-    val routes: Route =
-      path("transactions" / "build") {
-        get {
-          parameters("fromKey".as[String]) { _ =>
-            parameters("toAddress".as[String]) { _ =>
-              parameters("value".as[Int]) { _ =>
-                val unsignedTx = transactionGen().sample.get.unsigned
-                complete(
-                  BuildTransactionResult(
-                    Hex.toHexString(serialize(unsignedTx)),
-                    unsignedTx.hash,
-                    unsignedTx.fromGroup.value,
-                    unsignedTx.toGroup.value
-                  )
-                )
-              }
-            }
-          }
-        }
-      } ~
-        path("transactions" / "send") {
-          post {
-            entity(as[SendTransaction]) { _ => complete(TxResult(Hash.generate, 0, 0)) }
-          }
-        } ~
-        path("infos" / "self-clique") {
-          complete(SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peer, peer), true, 1, 2))
-        } ~
-        path("addresses" / Segment / "balance") { _ =>
-          get {
-            complete(Balance(42, 21, 1))
-          }
-        }
+    private val vertx  = Vertx.vertx()
+    private val router = Router.router(vertx)
 
-    val server = Http().newServerAt(address.getHostAddress, port).bind(routes)
+    def complete[A: Writer](ctx: RoutingContext, a: A): Unit = {
+      discard(
+        ctx.request
+          .response()
+          .putHeader("content-type", "application/json")
+          .end(write(a))
+      )
+    }
+
+    router.route().path("/transactions/build").handler { ctx =>
+      val _          = ctx.request.getParam("fromKey")
+      val _          = ctx.request.getParam("toAddress")
+      val _          = ctx.request.getParam("value")
+      val unsignedTx = transactionGen().sample.get.unsigned
+
+      complete(
+        ctx,
+        BuildTransactionResult(
+          Hex.toHexString(serialize(unsignedTx)),
+          unsignedTx.hash,
+          unsignedTx.fromGroup.value,
+          unsignedTx.toGroup.value
+        )
+      )
+    }
+
+    router.route().path("/transactions/send").handler(BodyHandler.create()).handler { ctx =>
+      val _ = read[SendTransaction](ctx.getBodyAsString())
+      complete(ctx, TxResult(Hash.generate, 0, 0))
+    }
+
+    router.route().path("/infos/self-clique").handler { ctx =>
+      complete(ctx, SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peer, peer), true, 1, 2))
+    }
+
+    router.route().path("/addresses/:address/balance").handler { ctx =>
+      complete(ctx, Balance(42, 21, 1))
+    }
+
+    private val server = vertx.createHttpServer().requestHandler(router)
+    server.listen(port, address.getHostAddress)
   }
 }

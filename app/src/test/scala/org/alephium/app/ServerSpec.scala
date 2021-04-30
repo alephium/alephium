@@ -34,11 +34,10 @@ class ServerSpec extends AlephiumSpec with ScalaFutures {
     implicit val config: AlephiumConfig = AlephiumConfig.load(rawConfig)
     implicit val apiConfig: ApiConfig   = ApiConfig.load(rawConfig)
     val flowSystem: ActorSystem         = ActorSystem("flow", rawConfig)
-    val httpSystem: ActorSystem         = ActorSystem("http", rawConfig)
     implicit val executionContext: ExecutionContext =
       scala.concurrent.ExecutionContext.Implicits.global
 
-    val server = Server(rootPath, flowSystem, httpSystem)
+    val server = Server(rootPath, flowSystem)
 
     server.start().futureValue is ()
     server.stop().futureValue is ()

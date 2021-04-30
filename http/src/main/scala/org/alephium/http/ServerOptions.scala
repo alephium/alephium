@@ -14,14 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.web
+package org.alephium.http
 
-import sttp.tapir.server.akkahttp.AkkaHttpServerOptions
+import scala.concurrent.ExecutionContext
+
+import sttp.tapir.server.vertx.VertxFutureEndpointOptions
 
 import org.alephium.api.DecodeFailureHandler
 
-trait AkkaDecodeFailureHandler extends DecodeFailureHandler {
-  implicit val akkaHttpServerOptions: AkkaHttpServerOptions = AkkaHttpServerOptions.default.copy(
-    decodeFailureHandler = myDecodeFailureHandler
-  )
+trait ServerOptions extends DecodeFailureHandler {
+  implicit def executionContext:ExecutionContext
+
+  implicit lazy val serverOptions: VertxFutureEndpointOptions =
+    VertxFutureEndpointOptions(
+      decodeFailureHandler = myDecodeFailureHandler,
+      specificExecutionContext = Some(executionContext)
+    )
 }

@@ -9,7 +9,7 @@
         </encoder>
     </appender>
 
-    <logger name="akka.http.impl.engine.client" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
 
     <root>
         <appender-ref ref="CONSOLE"/>

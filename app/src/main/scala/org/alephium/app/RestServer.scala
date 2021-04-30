@@ -20,19 +20,18 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 import scala.util.Try
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
 import akka.util.Timeout
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
+import io.vertx.core.Vertx
+import io.vertx.core.http.HttpServer
+import io.vertx.ext.web._
+import io.vertx.ext.web.handler.CorsHandler
 import sttp.model.StatusCode
-import sttp.tapir.server.akkahttp._
-import sttp.tapir.server.akkahttp.AkkaHttpServerInterpreter._
-import sttp.tapir.swagger.akkahttp.SwaggerAkka
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
+import sttp.tapir.swagger.vertx.SwaggerVertx
 
-import org.alephium.api.{ApiError, DecodeFailureHandler, Endpoints}
+import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model._
 import org.alephium.app.ServerUtils.FutureTry
@@ -45,6 +44,7 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.http.ServerOptions
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -61,18 +61,12 @@ class RestServer(
     walletServer: Option[WalletServer]
 )(implicit
     val apiConfig: ApiConfig,
-    val actorSystem: ActorSystem,
     val executionContext: ExecutionContext
 ) extends Endpoints
     with Documentation
     with Service
-    with DecodeFailureHandler
+    with ServerOptions
     with StrictLogging {
-
-  implicit private val akkaHttpServerOptions: AkkaHttpServerOptions =
-    AkkaHttpServerOptions.default.copy(
-      decodeFailureHandler = myDecodeFailureHandler
-    )
 
   private val blockFlow: BlockFlow                    = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
@@ -287,61 +281,69 @@ class RestServer(
 
   val walletEndpoints = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 
-  private val swaggerUIRoute =
-    new SwaggerAkka(openApiJson(openAPI), yamlName = "openapi.json").routes
+  private val swaggerUiRoute =
+    new SwaggerVertx(openApiJson(openAPI), yamlName = "openapi.json").route
 
-  private val blockFlowRoute: Route =
-    getSelfCliqueRoute ~
-      getInterCliquePeerInfoRoute ~
-      getDiscoveredNeighborsRoute ~
-      getMisbehaviorsRoute ~
-      getBlockflowRoute ~
-      getBlockRoute ~
-      getBalanceRoute ~
-      getGroupRoute ~
-      getHashesAtHeightRoute ~
-      getChainInfoRoute ~
-      listUnconfirmedTransactionsRoute ~
-      buildTransactionRoute ~
-      sendTransactionRoute ~
-      getTransactionStatusRoute ~
-      minerActionRoute ~
-      minerGetBlockCandidateRoute ~
-      minerNewBlockRoute ~
-      minerListAddressesRoute ~
-      minerUpdateAddressesRoute ~
-      sendContractRoute ~
-      compileRoute ~
-      exportBlocksRoute ~
-      buildContractRoute ~
-      swaggerUIRoute
+  private val blockFlowRoute: AVector[Router => Route] = AVector(
+    getSelfCliqueRoute,
+    getInterCliquePeerInfoRoute,
+    getDiscoveredNeighborsRoute,
+    getMisbehaviorsRoute,
+    getBlockflowRoute,
+    getBlockRoute,
+    getBalanceRoute,
+    getGroupRoute,
+    getHashesAtHeightRoute,
+    getChainInfoRoute,
+    listUnconfirmedTransactionsRoute,
+    buildTransactionRoute,
+    sendTransactionRoute,
+    getTransactionStatusRoute,
+    minerActionRoute,
+    minerGetBlockCandidateRoute,
+    minerNewBlockRoute,
+    minerListAddressesRoute,
+    minerUpdateAddressesRoute,
+    sendContractRoute,
+    compileRoute,
+    exportBlocksRoute,
+    buildContractRoute,
+    swaggerUiRoute
+  )
 
-  val route: Route =
-    cors()(
-      walletServer.map(wallet => blockFlowRoute ~ wallet.route).getOrElse(blockFlowRoute)
-    )
-
-  private val httpBindingPromise: Promise[Http.ServerBinding] = Promise()
+  val routes: AVector[Router => Route] =
+    walletServer.map(wallet => wallet.routes).getOrElse(AVector.empty) ++ blockFlowRoute
 
   override def subServices: ArraySeq[Service] = ArraySeq(node)
 
+  private val vertx  = Vertx.vertx()
+  private val router = Router.router(vertx)
+  vertx
+    .fileSystem()
+    .existsBlocking(
+      "META-INF/resources/webjars/swagger-ui/"
+    ) // Fix swagger ui being not found on the first call
+  private val server = vertx.createHttpServer().requestHandler(router)
+
+  routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
+
+  private val httpBindingPromise: Promise[HttpServer] = Promise()
+
   protected def startSelfOnce(): Future[Unit] = {
     for {
-      httpBinding <- Http()
-        .newServerAt(apiConfig.networkInterface.getHostAddress, port)
-        .bind(route)
+      httpBinding <- server.listen(port, apiConfig.networkInterface.getHostAddress).asScala
     } yield {
-      logger.info(s"Listening http request on $httpBinding")
+      logger.info(s"Listening http request on ${httpBinding.actualPort}")
       httpBindingPromise.success(httpBinding)
     }
   }
 
   protected def stopSelfOnce(): Future[Unit] =
     for {
-      httpBinding <- httpBindingPromise.future
-      message     <- httpBinding.terminate(Duration.ofSecondsUnsafe(5).asScala)
+      binding <- httpBindingPromise.future
+      _       <- binding.close().asScala
     } yield {
-      logger.info(s"http unbound with message $message")
+      logger.info(s"http unbound")
       ()
     }
 }
@@ -353,7 +355,6 @@ object RestServer {
       blocksExporter: BlocksExporter,
       walletServer: Option[WalletServer]
   )(implicit
-      system: ActorSystem,
       apiConfig: ApiConfig,
       executionContext: ExecutionContext
   ): RestServer = {

@@ -53,13 +53,12 @@ class BootUp extends StrictLogging {
   implicit val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
-  val httpSystem: ActorSystem         = ActorSystem("http", typesafeConfig)
 
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
 
-  val server: Server = Server(rootPath, flowSystem, httpSystem)
+  val server: Server = Server(rootPath, flowSystem)
 
   def init(): Unit = {
     logConfig()
@@ -84,7 +83,6 @@ class BootUp extends StrictLogging {
   ) { () =>
     for {
       _ <- server.stop()
-      _ <- httpSystem.terminate()
     } yield Done
   }
 

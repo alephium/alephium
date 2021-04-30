@@ -35,9 +35,9 @@ object Main extends App with Service with StrictLogging {
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
 
-  val typesafeConfig: Config = ConfigFactory.load().getConfig("wallet")
+  val typesafeConfig: Config = ConfigFactory.load()
 
-  val walletConfig: WalletConfig = typesafeConfig.as[WalletConfig]
+  val walletConfig: WalletConfig = typesafeConfig.as[WalletConfig]("wallet")
 
   val walletApp: WalletApp = new WalletApp(walletConfig)
 

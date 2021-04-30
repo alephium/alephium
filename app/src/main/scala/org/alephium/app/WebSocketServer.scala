@@ -17,19 +17,16 @@
 package org.alephium.app
 
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 import scala.concurrent._
 
-import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.TextMessage
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.stream.{CompletionStrategy, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.typesafe.scalalogging.StrictLogging
+import io.vertx.core.Vertx
+import io.vertx.core.eventbus.{EventBus => VertxEventBus}
+import io.vertx.core.http.HttpServer
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
@@ -40,7 +37,7 @@ import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{ActorRefT, Duration, EventBus, Service}
+import org.alephium.util.{BaseActor, EventBus, Service}
 
 class WebSocketServer(node: Node, wsPort: Int)(implicit
     val system: ActorSystem,
@@ -56,74 +53,48 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
   lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
 
-  private def wsFlow(
-      eventBus: ActorRefT[EventBus.Message],
-      actor: ActorRef,
-      source: Source[Nothing, NotUsed]
-  ): Flow[Any, TextMessage, Unit] = {
-    Flow
-      .fromSinkAndSourceCoupled(Sink.ignore, source.map(handleEvent))
-      .watchTermination() { (_, termination) =>
-        termination.onComplete(_ => eventBus.tell(EventBus.Unsubscribe, actor))
-      }
-  }
+  private val vertx         = Vertx.vertx()
+  private val vertxEventBus = vertx.eventBus()
+  private val server        = vertx.createHttpServer()
 
-  private def routeWs(eventBus: ActorRefT[EventBus.Message]): Route = {
-    path("events") {
-      cors()(get {
-        extractWebSocketUpgrade { upgrade =>
-          val (actor, source) = Websocket.actorRef
-          eventBus.tell(EventBus.Subscribe, actor)
-          val response = upgrade.handleMessages(wsFlow(eventBus, actor, source))
-          complete(response)
-        }
-      })
+  private val eventHandler = system.actorOf(EventHandler.props(vertxEventBus))
+
+  node.eventBus.tell(EventBus.Subscribe, eventHandler)
+
+  server.webSocketHandler { webSocket =>
+    webSocket.closeHandler(_ => eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID()))
+
+    if (!webSocket.path().equals("/events")) {
+      webSocket.reject();
+    } else {
+      eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
     }
   }
 
-  private def doBlockNotify(blockNotify: BlockNotify): ujson.Value =
-    blockNotifyEncode(blockNotify)
-
-  private def handleEvent(event: EventBus.Event): TextMessage = {
-    event match {
-      case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params       = doBlockNotify(bn)
-        val notification = Notification("block_notify", params)
-        TextMessage(write(notification))
-    }
-  }
-
-  val wsRoute: Route = routeWs(node.eventBus)
-
-  private val wsBindingPromise: Promise[Http.ServerBinding] = Promise()
+  private val wsBindingPromise: Promise[HttpServer] = Promise()
 
   override def subServices: ArraySeq[Service] = ArraySeq(node)
 
   protected def startSelfOnce(): Future[Unit] = {
     for {
-      wsBinding <- Http()
-        .newServerAt(apiConfig.networkInterface.getHostAddress, wsPort)
-        .bind(wsRoute)
+      wsBinding <- server.listen(wsPort, apiConfig.networkInterface.getHostAddress).asScala
     } yield {
-      logger.info(s"Listening ws request on $wsBinding")
+      logger.info(s"Listening ws request on ${wsBinding.actualPort}")
       wsBindingPromise.success(wsBinding)
     }
   }
 
   protected def stopSelfOnce(): Future[Unit] = {
     for {
-      wsBinding <- wsBindingPromise.future
-      message   <- wsBinding.terminate(Duration.ofSecondsUnsafe(5).asScala)
+      _ <- wsBindingPromise.future.flatMap(_.close().asScala)
     } yield {
-      logger.info(s"ws unbound with message $message")
+      logger.info(s"ws unbound")
       ()
     }
   }
 }
 
 object WebSocketServer {
-
-  val bufferSize: Int = 64
 
   def apply(node: Node)(implicit
       system: ActorSystem,
@@ -134,6 +105,48 @@ object WebSocketServer {
     new WebSocketServer(node, wsPort)
   }
 
+  object EventHandler {
+    def props(
+        vertxEventBus: VertxEventBus
+    )(implicit networkType: NetworkType, apiConfig: ApiConfig): Props = {
+      Props(new EventHandler(vertxEventBus))
+    }
+
+    final case class Subscribe(address: String)
+    final case class Unsubscribe(address: String)
+
+  }
+  class EventHandler(vertxEventBus: VertxEventBus)(implicit
+      val networkType: NetworkType,
+      apiConfig: ApiConfig
+  ) extends BaseActor
+      with ApiModelCodec {
+
+    lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
+
+    private val subscribers: mutable.HashSet[String] = mutable.HashSet.empty
+
+    def receive: Receive = {
+      case event: EventBus.Event =>
+        subscribers.foreach { subscriber => vertxEventBus.send(subscriber, handleEvent(event)) }
+      case EventHandler.Subscribe(subscriber) =>
+        vertxEventBus.localConsumer(subscriber)
+        if (!subscribers.contains(subscriber)) { subscribers += subscriber }
+      case EventHandler.Unsubscribe(subscriber) =>
+        if (subscribers.contains(subscriber)) { subscribers -= subscriber }
+    }
+  }
+
+  def handleEvent(event: EventBus.Event)(implicit
+      writer: Writer[BlockEntry]
+  ): String = {
+    event match {
+      case bn @ FlowHandler.BlockNotify(_, _) =>
+        val params       = blockNotifyEncode(bn)
+        val notification = Notification("block_notify", params)
+        write(notification)
+    }
+  }
   private def blockEntryfrom(blockNotify: BlockNotify): BlockEntry = {
     BlockEntry.from(blockNotify.header, blockNotify.height)
   }
@@ -142,25 +155,4 @@ object WebSocketServer {
       writer: Writer[BlockEntry]
   ): ujson.Value =
     writeJs(blockEntryfrom(blockNotify))
-
-  object Websocket {
-
-    case object Completed
-    case object Failed
-
-    def actorRef(implicit system: ActorSystem): (ActorRef, Source[Nothing, NotUsed]) =
-      Source
-        .actorRef(
-          { case Websocket.Completed =>
-            CompletionStrategy.draining
-          },
-          { case Websocket.Failed =>
-            new Throwable("failure on events websocket")
-          },
-          bufferSize,
-          OverflowStrategy.fail
-        )
-        .preMaterialize()
-
-  }
 }

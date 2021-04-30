@@ -71,7 +71,7 @@ trait ServerFixture
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(0)
   ).sample.get
-  lazy val (dummyToAddres, dummyToKey, _) = addressStringGen(GroupIndex.unsafe(1)).sample.get
+  lazy val (dummyToAddress, dummyToKey, _) = addressStringGen(GroupIndex.unsafe(1)).sample.get
 
   lazy val dummyHashesAtHeight = HashesAtHeight(AVector.empty)
   lazy val dummyChainInfo      = ChainInfo(0)

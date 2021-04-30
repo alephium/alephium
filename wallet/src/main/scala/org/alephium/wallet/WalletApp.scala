@@ -21,20 +21,20 @@ import java.nio.file.Paths
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.StrictLogging
+import io.vertx.core.Vertx
+import io.vertx.core.http.HttpServer
+import io.vertx.ext.web._
+import io.vertx.ext.web.handler.CorsHandler
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.util.Service
+import org.alephium.util.{AVector, Service}
 import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.web._
 
 class WalletApp(config: WalletConfig)(implicit
-    actorSystem: ActorSystem,
     val executionContext: ExecutionContext
 ) extends Service
     with StrictLogging {
@@ -58,18 +58,27 @@ class WalletApp(config: WalletConfig)(implicit
   val walletServer: WalletServer =
     new WalletServer(walletService, config.networkType, config.blockflow.blockflowFetchMaxAge)
 
-  val routes: Route = walletServer.route ~ walletServer.docsRoute
+  val routes: AVector[Router => Route] = walletServer.routes :+ walletServer.docsRoute
 
-  private val bindingPromise: Promise[Http.ServerBinding] = Promise()
+  private val bindingPromise: Promise[HttpServer] = Promise()
 
   override val subServices: ArraySeq[Service] = ArraySeq(walletService)
 
   protected def startSelfOnce(): Future[Unit] = {
+    val vertx  = Vertx.vertx()
+    val router = Router.router(vertx)
+    vertx
+      .fileSystem()
+      .existsBlocking(
+        "META-INF/resources/webjars/swagger-ui/"
+      ) // Fix swagger ui being not found on the first call
+    val server: HttpServer = vertx.createHttpServer().requestHandler(router)
     config.port match {
       case None => Future.successful(())
       case Some(port) =>
+        routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
         for {
-          binding <- Http().newServerAt("localhost", port).bind(routes)
+          binding <- server.listen(port, "localhost").asScala
         } yield {
           bindingPromise.success(binding)
           logger.info(s"Listening wallet http request on $binding")
@@ -82,7 +91,8 @@ class WalletApp(config: WalletConfig)(implicit
       case None => Future.successful(())
       case Some(_) =>
         for {
-          _ <- bindingPromise.future.flatMap(_.unbind())
+          binding <- bindingPromise.future
+          _       <- binding.close().asScala
         } yield {
           logger.info("Wallet stopped")
         }

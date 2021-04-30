@@ -22,29 +22,27 @@ import java.nio.channels.{DatagramChannel, ServerSocketChannel}
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 import scala.util.control.NonFatal
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.ws._
-import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.io.Tcp
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.testkit.TestProbe
-import de.heikoseeberger.akkahttpupickle.UpickleCustomizationSupport
+import io.vertx.core.Vertx
+import io.vertx.core.http.WebSocketBase
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
+import sttp.model.StatusCode
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
-import org.alephium.json.Json
+import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
@@ -61,12 +59,12 @@ trait TestFixtureLike
     with AlephiumConfigFixture
     with NumericHelpers
     with ApiModelCodec
-    with UpickleCustomizationSupport
+    with HttpFixture
     with ScalaFutures
     with Eventually {
-  override type Api = Json.type
 
-  override def api: Api = Json
+  private val vertx      = Vertx.vertx()
+  private val httpClient = vertx.createHttpClient()
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -136,43 +134,20 @@ trait TestFixtureLike
 
   val blockNotifyProbe = TestProbe()
 
-  def httpRequest(
-      method: HttpMethod,
-      endpoint: String,
-      maybeEntity: Option[String] = None,
-      maybeHeader: Option[HttpHeader] = None
-  ): Int => HttpRequest = { port =>
-    val request = HttpRequest(method, uri = s"http://localhost:${port}$endpoint")
-
-    val requestWithEntity = maybeEntity match {
-      case Some(entity) => request.withEntity(HttpEntity(ContentTypes.`application/json`, entity))
-      case None         => request
-    }
-
-    val res = maybeHeader match {
-      case Some(header) => requestWithEntity.addHeader(header)
-      case None         => requestWithEntity
-    }
-    res
-  }
-
-  def httpGet(endpoint: String, maybeEntity: Option[String] = None) =
-    httpRequest(HttpMethods.GET, endpoint, maybeEntity)
-  def httpPost(endpoint: String, maybeEntity: Option[String] = None) =
-    httpRequest(HttpMethods.POST, endpoint, maybeEntity)
-  def httpPut(endpoint: String, maybeEntity: Option[String] = None) =
-    httpRequest(HttpMethods.PUT, endpoint, maybeEntity)
-
   def unitRequest(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Assertion = {
-    val response = Http().singleRequest(request(port)).futureValue
-    response.status is StatusCodes.OK
+    val response = request(port).send(backend)
+    response.code is StatusCode.Ok
   }
 
   def request[T: Reader](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
     eventually {
-      val response = Http().singleRequest(request(port)).futureValue
+      val response = request(port).send(backend)
 
-      Unmarshal(response.entity).to[T].futureValue
+      val body = response.body match {
+        case Right(r) => r
+        case Left(l)  => l
+      }
+      read[T](body)
     }
   }
 
@@ -181,8 +156,8 @@ trait TestFixtureLike
       port: Int = defaultRestMasterPort,
       statusCode: StatusCode
   ): Assertion = {
-    val response = Http().singleRequest(request(port)).futureValue
-    response.status is statusCode
+    val response = request(port).send(backend)
+    response.code is statusCode
   }
 
   def transfer(
@@ -233,11 +208,10 @@ trait TestFixtureLike
       res
     }
 
-  @tailrec
   final def awaitNewBlock(from: Int, to: Int): Unit = {
     val timeout = Duration.ofMinutesUnsafe(2).asScala
     blockNotifyProbe.receiveOne(max = timeout) match {
-      case TextMessage.Strict(text) =>
+      case text: String =>
         val notification = read[NotificationUnsafe](text).asNotification.toOption.get
         val blockEntry   = read[BlockEntry](notification.params)
         if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) {
@@ -253,7 +227,7 @@ trait TestFixtureLike
     assume(number > 0)
     val timeout = Duration.ofMinutesUnsafe(2).asScala
     blockNotifyProbe.receiveOne(max = timeout) match {
-      case TextMessage.Strict(_) =>
+      case _: String =>
         if (number <= 1) {
           ()
         } else {
@@ -339,7 +313,7 @@ trait TestFixtureLike
         ActorSystem(s"flow-${Random.nextInt()}", platformEnv.newConfig)
       val httpSystem: ActorSystem =
         ActorSystem(s"http-${Random.nextInt()}", platformEnv.newConfig)
-      implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
+      implicit val executionContext = ExecutionContext.Implicits.global
 
       val defaultNetwork = platformEnv.config.network
       val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
@@ -367,19 +341,13 @@ trait TestFixtureLike
     server
   }
 
-  def startWS(port: Int): Promise[Option[Message]] = {
-    val flow: Flow[Message, Message, Promise[Option[Message]]] =
-      Flow.fromSinkAndSourceMat(
-        Sink.foreach[Message] { blockNotify => blockNotifyProbe.ref ! blockNotify },
-        Source.empty
-          .concatMat(Source.maybe[Message])(Keep.right)
-      )(Keep.right)
-
-    val (_, promise) =
-      Http()
-        .singleWebSocketRequest(WebSocketRequest(s"ws://127.0.0.1:${port}/events"), flow)
-
-    promise
+  def startWS(port: Int): Future[WebSocketBase] = {
+    implicit val executionContext = ExecutionContext.Implicits.global
+    httpClient.webSocket(port, "127.0.0.1", "/events").asScala.map { ws =>
+      ws.textMessageHandler { blockNotify =>
+        blockNotifyProbe.ref ! blockNotify
+      }
+    }
   }
 
   def jsonRpc(method: String, params: String): String =
