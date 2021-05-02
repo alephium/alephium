@@ -20,7 +20,8 @@ import java.math.BigInteger
 
 import org.scalatest.Assertion
 
-import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.protocol.mining.HashRate
+import org.alephium.util.{AlephiumSpec, Duration, Hex}
 
 class TargetSpec extends AlephiumSpec {
   it should "check special values" in {
@@ -33,9 +34,9 @@ class TargetSpec extends AlephiumSpec {
       .toHexString is "12ffffff"
     Target.Max.toHexString is "20ffffff"
 
-    Target.onePhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
-    Target.oneEhPerSecond.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
-    Target.a128EhPerSecond.value is Target.maxBigInt.divide(
+    Target.onePhPerBlock.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
+    Target.oneEhPerBlock.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
+    Target.a128EhPerBlock.value is Target.maxBigInt.divide(
       BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
     )
   }
@@ -59,5 +60,21 @@ class TargetSpec extends AlephiumSpec {
     checkGeneric("00123456", "00000000")
     checkGeneric("01123456", "01120000")
     checkGeneric("02123456", "02123400")
+  }
+
+  it should "convert from hashrate correctly" in {
+    (2 until 256).foreach { k =>
+      val hashrate = HashRate.unsafe(BigInteger.ONE.shiftLeft(k))
+      val target   = Target.from(hashrate, Duration.ofSecondsUnsafe(1))
+      HashRate.from(target, Duration.ofSecondsUnsafe(1)) is hashrate
+    }
+  }
+
+  it should "scale correctly according to block time" in {
+    val target0 = Target.from(HashRate.onePhPerSecond, Duration.ofSecondsUnsafe(1))
+    val target1 = Target.from(HashRate.onePhPerSecond, Duration.ofSecondsUnsafe(2))
+    val target2 = Target.from(HashRate.onePhPerSecond, Duration.ofMillisUnsafe(500))
+    target1.value is target0.value.divide(2)
+    target2.value is target0.value.multiply(2)
   }
 }

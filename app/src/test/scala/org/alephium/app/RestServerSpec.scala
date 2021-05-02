@@ -325,7 +325,7 @@ class RestServerSpec
 
     val blockHash    = BlockHash.generate
     val depStateHash = Hash.generate
-    val target       = Target.onePhPerSecond
+    val target       = Target.onePhPerBlock
     val ts           = TimeStamp.unsafe(1L)
     val txsHash      = Hash.generate
 
