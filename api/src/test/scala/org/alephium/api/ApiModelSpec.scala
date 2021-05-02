@@ -251,7 +251,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode BlockCandidate" in {
     val blockHash    = BlockHash.generate
     val depStateHash = Hash.generate
-    val target       = Target.onePhPerSecond
+    val target       = Target.onePhPerBlock
     val ts           = TimeStamp.unsafe(1L)
     val txsHash      = Hash.generate
 
@@ -274,7 +274,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode BlockSolution" in {
     val blockHash    = BlockHash.generate
     val depStateHash = Hash.generate
-    val target       = Target.onePhPerSecond
+    val target       = Target.onePhPerBlock
     val ts           = TimeStamp.unsafe(1L)
     val txsHash      = Hash.generate
 

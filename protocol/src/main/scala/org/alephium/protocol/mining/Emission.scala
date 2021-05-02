@@ -25,9 +25,10 @@ import org.alephium.util.{Duration, TimeStamp, U256}
 
 class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   // scalastyle:off magic.number
-  val yearsUntilStable: Int               = 4
-  val blocksInAboutOneYear: Long          = Duration.ofDaysUnsafe(365L).millis / blockTargetTime.millis
-  val blocksToStableMaxReward: Long       = blocksInAboutOneYear * yearsUntilStable
+  val yearsUntilStable: Int = 4
+  val blocksInAboutOneYearPerChain: Long =
+    Duration.ofDaysUnsafe(365L).millis / blockTargetTime.millis
+  val blocksToStableMaxReward: Long       = blocksInAboutOneYearPerChain * yearsUntilStable
   val durationToStableMaxReward: Duration = blockTargetTime.timesUnsafe(blocksToStableMaxReward)
   // scalastyle:on magic.number
 
@@ -35,9 +36,9 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   val stableMaxRewardPerChain: U256          = share(Emission.stableMaxReward)
   val lowHashRateInitialRewardPerChain: U256 = share(Emission.lowHashRateInitialReward)
 
-  val onePhPerSecondDivided: Target  = share(Target.onePhPerSecond)
-  val oneEhPerSecondDivided: Target  = share(Target.oneEhPerSecond)
-  val a128EhPerSecondDivided: Target = share(Target.a128EhPerSecond)
+  val onePhPerSecondDivided: Target  = share(Target.from(HashRate.onePhPerSecond, blockTargetTime))
+  val oneEhPerSecondDivided: Target  = share(Target.from(HashRate.oneEhPerSecond, blockTargetTime))
+  val a128EhPerSecondDivided: Target = share(Target.from(HashRate.a128EhPerSecond, blockTargetTime))
 
   val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
     .subUnsafe(stableMaxRewardPerChain)
@@ -45,7 +46,7 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     .divUnsafe(U256.unsafe(yearsUntilStable))
     .toBigInt
     .longValue()
-  val blocksToDropAboutOneCent: Long        = blocksInAboutOneYear / yearlyCentsDropUntilStable
+  val blocksToDropAboutOneCent: Long        = blocksInAboutOneYearPerChain / yearlyCentsDropUntilStable
   val durationToDropAboutOnceCent: Duration = blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
 
   def share(amount: U256): U256 =

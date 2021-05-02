@@ -48,14 +48,14 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "compute correct constants" in new Fixture {
-    emission.blocksInAboutOneYear is 492750
+    emission.blocksInAboutOneYearPerChain is 492750
     emission.durationToStableMaxReward is Duration.ofHoursUnsafe(4 * 365 * 24)
 
-    val maxRewards = emission.blocksInAboutOneYear.mulUnsafe(Emission.initialMaxReward)
+    val maxRewards = emission.blocksInAboutOneYearPerChain.mulUnsafe(Emission.initialMaxReward)
     val maxRate    = getInflationRate(maxRewards)
     (maxRate > 0.029 && maxRate < 0.03) is true
 
-    val stableRewards = emission.blocksInAboutOneYear.mulUnsafe(Emission.stableMaxReward)
+    val stableRewards = emission.blocksInAboutOneYearPerChain.mulUnsafe(Emission.stableMaxReward)
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
   }
