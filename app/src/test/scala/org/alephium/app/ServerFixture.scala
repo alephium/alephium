@@ -63,7 +63,7 @@ trait ServerFixture
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
   lazy val dummyBlockTemplate =
-    BlockTemplate(AVector.empty, Target.onePhPerSecond, now, AVector.empty)
+    BlockTemplate(AVector.empty, Target.onePhPerBlock, now, AVector.empty)
   lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
   lazy val dummyBalance       = Balance(U256.Zero, U256.Zero, 0)
   lazy val dummyGroup         = Group(0)

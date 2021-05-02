@@ -20,8 +20,9 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
+import org.alephium.protocol.mining.HashRate
 import org.alephium.serde._
-import org.alephium.util.{Bytes, Hex, Number}
+import org.alephium.util.{Bytes, Duration, Hex, Number}
 
 /*
  * value = mantissa * 256 ^ (exponent - 3)
@@ -54,6 +55,14 @@ object Target {
     new Target(toCompactBitsUnsafe(value))
   }
 
+  // scalastyle:off magic.number
+  def from(hashRate: HashRate, blockTime: Duration): Target = {
+    val hashNeeded =
+      hashRate.value.multiply(BigInteger.valueOf(blockTime.millis)).divide(BigInteger.valueOf(1000))
+    Target.unsafe(Target.maxBigInt.divide(hashNeeded))
+  }
+  // scalastyle:on magic.number
+
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def fromCompactBitsUnsafe(bits: ByteString): BigInteger = {
     assume(bits.length == 4)
@@ -77,7 +86,7 @@ object Target {
     ByteString(size.toByte) ++ mantissa.tail
   }
 
-  val onePhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 50))
-  val oneEhPerSecond: Target  = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 60))
-  val a128EhPerSecond: Target = Target.unsafe(BigInteger.ONE.shiftLeft(256 - 67))
+  val onePhPerBlock: Target  = from(HashRate.onePhPerSecond, Duration.ofSecondsUnsafe(1))
+  val oneEhPerBlock: Target  = from(HashRate.oneEhPerSecond, Duration.ofSecondsUnsafe(1))
+  val a128EhPerBlock: Target = from(HashRate.a128EhPerSecond, Duration.ofSecondsUnsafe(1))
 }

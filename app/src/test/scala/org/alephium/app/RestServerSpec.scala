@@ -324,7 +324,7 @@ class RestServerSpec
   it should "call POST /miners/new-block" in new RestServerFixture {
 
     val blockHash = BlockHash.generate
-    val target    = Target.onePhPerSecond
+    val target    = Target.onePhPerBlock
     val ts        = TimeStamp.unsafe(1L)
     val txsHash   = Hash.generate
 

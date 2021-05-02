@@ -85,7 +85,7 @@ trait EndpointsExamples {
 
   private val blockCandidate = BlockCandidate(
     deps = AVector(blockHash, blockHash),
-    target = Target.onePhPerSecond.bits,
+    target = Target.onePhPerBlock.bits,
     blockTs = ts,
     txsHash = hash,
     transactions = AVector(hexString)
@@ -97,7 +97,7 @@ trait EndpointsExamples {
     fromGroup = 1,
     toGroup = 2,
     miningCount = U256.Two,
-    target = Target.onePhPerSecond.bits,
+    target = Target.onePhPerBlock.bits,
     nonce = U256.Two,
     txsHash = hash,
     transactions = AVector(hexString)
