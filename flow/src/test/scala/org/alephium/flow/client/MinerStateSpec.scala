@@ -40,7 +40,13 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
       val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
       val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-      BlockTemplate(flowTemplate.deps, flowTemplate.target, TimeStamp.now(), AVector.empty)
+      BlockTemplate(
+        flowTemplate.deps,
+        flowTemplate.depStateHash,
+        flowTemplate.target,
+        TimeStamp.now(),
+        AVector.empty
+      )
     }
 
     override def startTask(

@@ -23,6 +23,7 @@ import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockCandidate(
     deps: AVector[BlockHash],
+    depStateHash: Hash,
     target: ByteString,
     blockTs: TimeStamp,
     txsHash: Hash,

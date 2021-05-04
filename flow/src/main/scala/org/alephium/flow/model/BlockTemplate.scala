@@ -23,23 +23,25 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockTemplate(
     deps: AVector[BlockHash],
+    depStateHash: Hash,
     target: Target,
     blockTs: TimeStamp,
     txsHash: Hash,
     transactions: AVector[Transaction]
 ) {
   def buildHeader(nonce: U256)(implicit config: GroupConfig): BlockHeader =
-    BlockHeader(BlockDeps.build(deps), txsHash, blockTs, target, nonce)
+    BlockHeader(BlockDeps.build(deps), depStateHash, txsHash, blockTs, target, nonce)
 }
 
 object BlockTemplate {
   def apply(
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       target: Target,
       blockTs: TimeStamp,
       transactions: AVector[Transaction]
   ): BlockTemplate = {
     val txsHash = Block.calTxsHash(transactions)
-    BlockTemplate(deps, target, blockTs, txsHash, transactions)
+    BlockTemplate(deps, depStateHash, target, blockTs, txsHash, transactions)
   }
 }

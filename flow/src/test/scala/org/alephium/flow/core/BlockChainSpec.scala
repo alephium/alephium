@@ -23,14 +23,14 @@ import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
   trait Fixture extends AlephiumConfigFixture {
     lazy val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
-    lazy val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
+    lazy val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash), Hash.zero)
     lazy val chainGen = chainGenOf(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {

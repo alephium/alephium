@@ -21,7 +21,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, BlockHash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
@@ -68,6 +68,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block0 =
       Block.from(
         AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+        Hash.zero,
         AVector.empty,
         consensusConfig.maxMiningTarget,
         TimeStamp.zero,
@@ -169,7 +170,13 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val newDeps2 = block2.header.blockDeps.deps
       .replace(brokerConfig.groups - 1, block0.hash)
       .replace(brokerConfig.groups, block1.hash)
-    val block3 = mine(chainIndex, newDeps2, block2.transactions, block2.header.timestamp)
+    val block3 = mine(
+      chainIndex,
+      newDeps2,
+      block2.header.depStateHash,
+      block2.transactions,
+      block2.header.timestamp
+    )
 
     blockFlow.isConflicted(block3.header.outDeps, blockFlow.getBlockUnsafe) is true
     blockValidation.validate(block3, blockFlow) is Left(Right(InvalidFlowTxs))
@@ -179,7 +186,13 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       .replace(brokerConfig.groups - 1, block0.hash)
       .replace(brokerConfig.groups, block1.hash)
     val block5 =
-      mine(ChainIndex.unsafe(0, 1), newDeps4, block4.transactions, block4.header.timestamp)
+      mine(
+        ChainIndex.unsafe(0, 1),
+        newDeps4,
+        block4.header.depStateHash,
+        block4.transactions,
+        block4.header.timestamp
+      )
 
     blockFlow.isConflicted(block5.header.outDeps, blockFlow.getBlockUnsafe) is true
     blockValidation.validate(block5, blockFlow) is Left(Right(InvalidFlowTxs))

@@ -42,6 +42,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for at least 2 user group when adding blocks sequentially" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     if (brokerConfig.groups >= 2) {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block1      = transfer(blockFlow, chainIndex1)
@@ -51,7 +53,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block2      = emptyBlock(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block2.header, 2)
+      addAndCheck(blockFlow, block2, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block2)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
@@ -84,17 +86,14 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "compute cached blocks" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     val newBlocks = for {
       i <- 0 to 1
       j <- 0 to 1
     } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
     newBlocks.foreach { block =>
-      val index = block.chainIndex
-      if (index.relateTo(GroupIndex.unsafe(0))) {
-        addAndCheck(blockFlow, block, 1)
-      } else {
-        addAndCheck(blockFlow, block.header, 1)
-      }
+      addAndCheck(blockFlow, block, 1)
     }
 
     val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).toOption.get
@@ -144,6 +143,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for 2 user group when there is a fork" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     if (brokerConfig.groups >= 2) {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block11     = transfer(blockFlow, chainIndex1)
@@ -161,8 +162,8 @@ class BlockFlowSpec extends AlephiumSpec {
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block21     = emptyBlock(blockFlow, chainIndex2)
       val block22     = emptyBlock(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block21.header, 3)
-      addAndCheck(blockFlow, block22.header, 3)
+      addAndCheck(blockFlow, block21, 3)
+      addAndCheck(blockFlow, block22, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block21, block22))
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 

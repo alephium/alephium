@@ -42,9 +42,10 @@ class WebSocketServerSpec
   behavior of "http"
 
   it should "encode BlockNotify" in new ServerFixture {
-    val dep         = BlockHash.hash("foo")
-    val deps        = AVector.fill(groupConfig.depsNum)(dep)
-    val header      = BlockHeader.unsafe(deps, Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
+    val dep  = BlockHash.hash("foo")
+    val deps = AVector.fill(groupConfig.depsNum)(dep)
+    val header =
+      BlockHeader.unsafe(deps, Hash.zero, Hash.hash("bar"), TimeStamp.zero, Target.Max, 2)
     val blockNotify = BlockNotify(header, 1)
     val headerHash  = header.hash.toHexString
     val chainIndex  = header.chainIndex

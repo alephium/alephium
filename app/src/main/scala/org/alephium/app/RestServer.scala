@@ -395,6 +395,7 @@ object RestServer {
   def blockTempateToCandidate(template: BlockTemplate): BlockCandidate = {
     BlockCandidate(
       template.deps,
+      template.depStateHash,
       template.target.bits,
       template.blockTs,
       template.txsHash,
@@ -411,6 +412,7 @@ object RestServer {
     Try {
       val header = BlockHeader(
         BlockDeps.build(solution.blockDeps),
+        solution.depStateHash,
         solution.txsHash,
         solution.timestamp,
         Target(solution.target),
