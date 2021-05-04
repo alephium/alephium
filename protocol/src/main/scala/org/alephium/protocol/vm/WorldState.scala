@@ -419,6 +419,8 @@ object WorldState {
     def toCachedWorldState(storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]): Cached = {
       toPersistedWorldState(storage).cached()
     }
+
+    def stateHash: Hash = Hash.hash(outputStateHash.bytes ++ contractStateHash.bytes)
   }
   object Hashes {
     implicit val serde: Serde[Hashes] =

@@ -336,7 +336,7 @@ trait BlockGenerators extends TxGenerators {
   implicit def consensusConfig: ConsensusConfig
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
-    blockGenOf(chainIndex, AVector.fill(2 * groupConfig.groups - 1)(BlockHash.zero))
+    blockGenOf(chainIndex, AVector.fill(2 * groupConfig.groups - 1)(BlockHash.zero), Hash.zero)
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)
@@ -350,6 +350,7 @@ trait BlockGenerators extends TxGenerators {
   private def gen(
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       txs: AVector[Transaction]
   ): Block = {
     val blockTs = TimeStamp.now()
@@ -363,18 +364,25 @@ trait BlockGenerators extends TxGenerators {
     val txsWithCoinbase = txs :+ coinbase
     @tailrec
     def iter(nonce: Long): Block = {
-      val block = Block.from(deps, txsWithCoinbase, consensusConfig.maxMiningTarget, blockTs, nonce)
+      val block = Block.from(
+        deps,
+        depStateHash,
+        txsWithCoinbase,
+        consensusConfig.maxMiningTarget,
+        blockTs,
+        nonce
+      )
       if (block.chainIndex equals chainIndex) block else iter(nonce + 1)
     }
 
     iter(0L)
   }
 
-  def blockGenOf(chainIndex: ChainIndex, deps: AVector[BlockHash]): Gen[Block] =
+  def blockGenOf(chainIndex: ChainIndex, deps: AVector[BlockHash], depStateHash: Hash): Gen[Block] =
     for {
       txNum <- Gen.choose(1, 5)
       txs   <- Gen.listOfN(txNum, transactionGen(chainIndexGen = Gen.const(chainIndex)))
-    } yield gen(chainIndex, deps, AVector.from(txs))
+    } yield gen(chainIndex, deps, depStateHash, AVector.from(txs))
 
   def chainGenOf(chainIndex: ChainIndex, length: Int, block: Block): Gen[AVector[Block]] =
     chainGenOf(chainIndex, length, block.hash)
@@ -403,8 +411,8 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
   lazy val blockGen: Gen[Block] =
     chainIndexGen.flatMap(blockGen(_))
 
-  def blockGenOf(deps: AVector[BlockHash]): Gen[Block] =
-    chainIndexGen.flatMap(blockGenOf(_, deps))
+  def blockGenOf(deps: AVector[BlockHash], depStateHash: Hash): Gen[Block] =
+    chainIndexGen.flatMap(blockGenOf(_, deps, depStateHash))
 
   def chainGenOf(length: Int, block: Block): Gen[AVector[Block]] =
     chainIndexGen.flatMap(chainGenOf(_, length, block))

@@ -178,7 +178,7 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains(from.value)(to.value)
   }
 
-  protected def getPersistedWorldState(
+  private[flow] def getPersistedWorldState(
       deps: BlockDeps,
       groupIndex: GroupIndex
   ): IOResult[WorldState.Persisted] = {

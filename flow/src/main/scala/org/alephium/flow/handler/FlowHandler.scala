@@ -21,7 +21,7 @@ import akka.actor.{Props, Stash}
 import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
@@ -59,6 +59,7 @@ object FlowHandler {
   final case class BlockFlowTemplate(
       index: ChainIndex,
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       target: Target,
       parentTs: TimeStamp,
       transactions: AVector[Transaction]

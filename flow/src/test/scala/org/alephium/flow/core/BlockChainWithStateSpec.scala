@@ -26,7 +26,7 @@ import org.alephium.util.AVector
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   trait Fixture {
     val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
-    val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash))
+    val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash), Hash.zero)
     val chainGen = chainGenOf(4, genesis)
     val heightDB = storages.nodeStateStorage.heightIndexStorage(ChainIndex.unsafe(0, 0))
     val stateDB  = storages.nodeStateStorage.chainStateStorage(ChainIndex.unsafe(0, 0))

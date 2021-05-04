@@ -236,7 +236,14 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
           deps.replace(k, newDep.sample.get)
         }
         val modified =
-          mineHeader(header.chainIndex, newDeps, header.txsHash, header.timestamp, header.target)
+          mineHeader(
+            header.chainIndex,
+            newDeps,
+            Hash.zero,
+            header.txsHash,
+            header.timestamp,
+            header.target
+          )
         failValidation(modified, MissingDeps(AVector.from(depIndexes.sorted.map(newDeps.apply))))
       }
     }

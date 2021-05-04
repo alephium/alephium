@@ -270,7 +270,9 @@ trait FlowFixture
   def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val depStateHash =
+      blockFlow.getPersistedWorldState(deps, chainIndex.from).rightValue.toHashes.stateHash
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val txs              = prepareTxs(blockFlow, chainIndex)
@@ -279,9 +281,8 @@ trait FlowFixture
     val coinbaseTx =
       Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
 
-    val loosenDeps =
-      blockFlow.looseUncleDependencies(BlockDeps.unsafe(deps), chainIndex, TimeStamp.now())
-    mine(chainIndex, loosenDeps.rightValue, txs :+ coinbaseTx, blockTs)
+    val loosenDeps = blockFlow.looseUncleDependencies(deps, chainIndex, TimeStamp.now())
+    mine(chainIndex, loosenDeps.rightValue, depStateHash, txs :+ coinbaseTx, blockTs)
   }
 
   def mineWithoutCoinbase(
@@ -289,29 +290,33 @@ trait FlowFixture
       txs: AVector[Transaction],
       blockTs: TimeStamp
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from).deps
+    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val depStateHash =
+      blockFlow.getPersistedWorldState(deps, chainIndex.from).rightValue.toHashes.stateHash
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val coinbaseTx =
       Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
 
-    mine(chainIndex, deps, txs :+ coinbaseTx, blockTs)
+    mine(chainIndex, deps.deps, depStateHash, txs :+ coinbaseTx, blockTs)
   }
 
   def mine(
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
       target: Target = consensusConfig.maxMiningTarget
   ): Block = {
     val txsHash = Block.calTxsHash(txs)
-    Block(mineHeader(chainIndex, deps, txsHash, blockTs, target), txs)
+    Block(mineHeader(chainIndex, deps, depStateHash, txsHash, blockTs, target), txs)
   }
 
   def mineHeader(
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       txsHash: Hash,
       blockTs: TimeStamp,
       target: Target = consensusConfig.maxMiningTarget
@@ -320,7 +325,7 @@ trait FlowFixture
 
     @tailrec
     def iter(nonce: U256): BlockHeader = {
-      val header = BlockHeader(blockDeps, txsHash, blockTs, target, nonce)
+      val header = BlockHeader(blockDeps, depStateHash, txsHash, blockTs, target, nonce)
       if (PoW.checkMined(header, chainIndex)) header else iter(nonce.addOneUnsafe())
     }
 

@@ -249,33 +249,38 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BlockCandidate" in {
-    val blockHash = BlockHash.generate
-    val target    = Target.onePhPerSecond
-    val ts        = TimeStamp.unsafe(1L)
-    val txsHash   = Hash.generate
+    val blockHash    = BlockHash.generate
+    val depStateHash = Hash.generate
+    val target       = Target.onePhPerSecond
+    val ts           = TimeStamp.unsafe(1L)
+    val txsHash      = Hash.generate
 
     val blockCandidate = BlockCandidate(
       AVector(blockHash),
+      depStateHash,
       target.bits,
       ts,
       txsHash,
       AVector.empty
     )
     val jsonRaw =
-      s"""{"deps":["${blockHash.toHexString}"],"target":"${Hex.toHexString(
-        target.bits
-      )}","blockTs":${ts.millis},"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+      s"""{"deps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","target":"${Hex
+        .toHexString(
+          target.bits
+        )}","blockTs":${ts.millis},"txsHash":"${txsHash.toHexString}","transactions":[]}"""
     checkData(blockCandidate, jsonRaw)
   }
 
   it should "encode/decode BlockSolution" in {
-    val blockHash = BlockHash.generate
-    val target    = Target.onePhPerSecond
-    val ts        = TimeStamp.unsafe(1L)
-    val txsHash   = Hash.generate
+    val blockHash    = BlockHash.generate
+    val depStateHash = Hash.generate
+    val target       = Target.onePhPerSecond
+    val ts           = TimeStamp.unsafe(1L)
+    val txsHash      = Hash.generate
 
     val blockSolution = BlockSolution(
       AVector(blockHash),
+      depStateHash,
       ts,
       1,
       1,
@@ -286,7 +291,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       AVector.empty
     )
     val jsonRaw =
-      s"""{"blockDeps":["${blockHash.toHexString}"],"timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
+      s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
         .toHexString(
           target.bits
         )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""

@@ -71,6 +71,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         BlockHeader.unsafe(
           AVector.fill(groupConfig.depsNum)(BlockHash.zero),
           Hash.zero,
+          Hash.zero,
           TimeStamp.now(),
           Target.Max,
           0
@@ -103,6 +104,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val header: BlockHeader =
         BlockHeader.unsafe(
           AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+          Hash.zero,
           Hash.zero,
           TimeStamp.now(),
           Target.Max,

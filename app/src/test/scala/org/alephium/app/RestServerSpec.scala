@@ -323,13 +323,14 @@ class RestServerSpec
 
   it should "call POST /miners/new-block" in new RestServerFixture {
 
-    val blockHash = BlockHash.generate
-    val target    = Target.onePhPerSecond
-    val ts        = TimeStamp.unsafe(1L)
-    val txsHash   = Hash.generate
+    val blockHash    = BlockHash.generate
+    val depStateHash = Hash.generate
+    val target       = Target.onePhPerSecond
+    val ts           = TimeStamp.unsafe(1L)
+    val txsHash      = Hash.generate
 
     val body =
-      s"""{"blockDeps":["${blockHash.toHexString}"],"timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
+      s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
         .toHexString(
           target.bits
         )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""

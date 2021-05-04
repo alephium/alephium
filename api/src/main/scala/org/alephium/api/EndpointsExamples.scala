@@ -85,6 +85,7 @@ trait EndpointsExamples {
 
   private val blockCandidate = BlockCandidate(
     deps = AVector(blockHash, blockHash),
+    depStateHash = hash,
     target = Target.onePhPerSecond.bits,
     blockTs = ts,
     txsHash = hash,
@@ -93,6 +94,7 @@ trait EndpointsExamples {
 
   private val blockSolution = BlockSolution(
     blockDeps = AVector(blockHash),
+    depStateHash = hash,
     timestamp = ts,
     fromGroup = 1,
     toGroup = 2,

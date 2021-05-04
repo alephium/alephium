@@ -23,6 +23,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockSolution(
     blockDeps: AVector[BlockHash],
+    depStateHash: Hash,
     timestamp: TimeStamp,
     fromGroup: Int,
     toGroup: Int,

@@ -246,6 +246,7 @@ class Miner(
     val coinbaseTx   = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
     BlockTemplate(
       flowTemplate.deps,
+      flowTemplate.depStateHash,
       flowTemplate.target,
       blockTs,
       flowTemplate.transactions :+ coinbaseTx

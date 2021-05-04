@@ -26,6 +26,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockHeader(
     blockDeps: BlockDeps,
+    depStateHash: Hash,
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target,
@@ -92,13 +93,16 @@ object BlockHeader {
   implicit private val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
 
   implicit val serde: Serde[BlockHeader] =
-    Serde.forProduct5(apply, bh => (bh.blockDeps, bh.txsHash, bh.timestamp, bh.target, bh.nonce))
+    Serde.forProduct6(
+      apply,
+      bh => (bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target, bh.nonce)
+    )
 
   def genesis(txsHash: Hash, target: Target, nonce: U256)(implicit
       config: GroupConfig
   ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
-    BlockHeader(deps, txsHash, ALF.GenesisTimestamp, target, nonce)
+    BlockHeader(deps, Hash.zero, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 
   def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit
@@ -117,12 +121,13 @@ object BlockHeader {
 
   def unsafe(
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       txsHash: Hash,
       timestamp: TimeStamp,
       target: Target,
       nonce: U256
   )(implicit config: GroupConfig): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
-    BlockHeader(blockDeps, txsHash, timestamp, target, nonce)
+    BlockHeader(blockDeps, depStateHash, txsHash, timestamp, target, nonce)
   }
 }

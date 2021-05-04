@@ -66,8 +66,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -142,8 +142,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -234,8 +234,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -298,8 +298,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -375,8 +375,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -452,8 +452,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -532,8 +532,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -622,8 +622,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -699,8 +699,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -784,8 +784,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -857,8 +857,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -938,8 +938,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1015,8 +1015,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1104,8 +1104,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1206,8 +1206,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1307,8 +1307,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1406,8 +1406,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1551,8 +1551,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1680,8 +1680,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1782,8 +1782,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -1882,8 +1882,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2002,8 +2002,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2110,8 +2110,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2239,8 +2239,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2368,8 +2368,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2474,8 +2474,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2611,8 +2611,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2719,8 +2719,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2825,8 +2825,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -2932,8 +2932,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -3038,8 +3038,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -3130,8 +3130,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -3223,8 +3223,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -3296,6 +3296,7 @@
                     "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                     "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
                   ],
+                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "target": "1a400000",
                   "blockTs": 1611041396892,
                   "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
@@ -3340,8 +3341,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -3392,6 +3393,7 @@
                 "blockDeps": [
                   "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
                 ],
+                "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                 "timestamp": 1611041396892,
                 "fromGroup": 1,
                 "toGroup": 2,
@@ -3445,8 +3447,8 @@
                   "$ref": "#/components/schemas/NotFound"
                 },
                 "example": {
-                  "detail": "wallet-name not found",
-                  "resource": "wallet-name"
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
                 }
               }
             }
@@ -4335,6 +4337,7 @@
       },
       "BlockCandidate": {
         "required": [
+          "depStateHash",
           "target",
           "blockTs",
           "txsHash"
@@ -4346,6 +4349,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "depStateHash": {
+            "type": "string"
           },
           "target": {
             "type": "string"
@@ -4366,6 +4372,7 @@
       },
       "BlockSolution": {
         "required": [
+          "depStateHash",
           "timestamp",
           "fromGroup",
           "toGroup",
@@ -4381,6 +4388,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "depStateHash": {
+            "type": "string"
           },
           "timestamp": {
             "type": "integer"

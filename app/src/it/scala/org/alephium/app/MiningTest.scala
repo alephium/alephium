@@ -80,6 +80,7 @@ class MiningTest extends AlephiumSpec {
     val candidate = request[BlockCandidate](blockCandidate(tx.fromGroup, tx.toGroup), restPort)
     val template = BlockTemplate(
       candidate.deps,
+      candidate.depStateHash,
       Target.unsafe(candidate.target),
       candidate.blockTs,
       candidate.txsHash,
@@ -98,6 +99,7 @@ class MiningTest extends AlephiumSpec {
 
     val solution = BlockSolution(
       block.blockDeps.inDeps ++ block.blockDeps.outDeps,
+      block.header.depStateHash,
       block.timestamp,
       tx.fromGroup,
       tx.toGroup,
