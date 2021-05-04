@@ -2,7 +2,8 @@ FROM adoptopenjdk/openjdk11:jre
 # Uncomment the next line and comment the previous one if you want to usee GraalVM instaed of OpenJDK
 # FROM ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2
 
-ARG RELEASE=0.7.3
+# RELEASE is set via the docker-compose.yml file
+ARG RELEASE=latest
 
 RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/alephium-${RELEASE}.jar -o /alephium.jar && \
   mkdir -p /alephium-home && usermod -d /alephium-home nobody && chown nobody /alephium-home && \
@@ -15,8 +16,6 @@ RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/a
 EXPOSE 12973
 # ws
 EXPOSE 11973
-# rpc
-EXPOSE 10973
 # p2p
 EXPOSE 9973
 
