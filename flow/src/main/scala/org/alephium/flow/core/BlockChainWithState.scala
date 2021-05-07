@@ -22,7 +22,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.vm.WorldState
@@ -32,6 +32,10 @@ trait BlockChainWithState extends BlockChain {
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
     worldStateStorage.getPersistedWorldState(hash)
+  }
+
+  def getWorldStateHash(hash: BlockHash): IOResult[Hash] = {
+    worldStateStorage.getWorldStateHash(hash)
   }
 
   def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {

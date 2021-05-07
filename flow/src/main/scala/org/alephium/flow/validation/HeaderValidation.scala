@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
@@ -48,6 +48,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
     for {
       _ <- checkGenesisTimeStamp(genesis)
       _ <- checkGenesisDependencies(genesis)
+      _ <- checkGenesisDepStateHash(genesis)
       _ <- checkGenesisWorkAmount(genesis)
       _ <- checkGenesisWorkTarget(genesis)
     } yield ()
@@ -76,6 +77,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       _      <- checkWorkAmount(header)
       _      <- checkWorkTarget(header, flow.getHeaderChain(header))
       _      <- checkDepsMissing(header, flow)
+      _      <- checkDepStateHash(header, flow)
     } yield ()
   }
 
@@ -100,6 +102,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   // format: off
   protected[validation] def checkGenesisTimeStamp(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisDependencies(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkGenesisDepStateHash(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkTarget(header: BlockHeader): HeaderValidationResult[Unit]
 
@@ -109,6 +112,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   protected[validation] def checkDepsNum(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkDepsIndex(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkDepsMissing(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
+  protected[validation] def checkDepStateHash(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain): HeaderValidationResult[Unit]
   protected[validation] def checkUncleDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
@@ -142,6 +146,15 @@ object HeaderValidation {
         validHeader(())
       } else {
         invalidHeader(InvalidGenesisDeps)
+      }
+    }
+    protected[validation] def checkGenesisDepStateHash(
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
+      if (header.depStateHash == Hash.zero) {
+        validHeader(())
+      } else {
+        invalidHeader(InvalidGenesisDepStateHash)
       }
     }
     protected[validation] def checkGenesisWorkAmount(
@@ -215,6 +228,25 @@ object HeaderValidation {
     ): HeaderValidationResult[Unit] = {
       ValidationStatus.from(header.blockDeps.deps.filterNotE(flow.contains)).flatMap { missings =>
         if (missings.isEmpty) validHeader(()) else invalidHeader(MissingDeps(missings))
+      }
+    }
+
+    protected[validation] def checkDepStateHash(
+        header: BlockHeader,
+        flow: BlockFlow
+    ): HeaderValidationResult[Unit] = {
+      if (brokerConfig.contains(header.chainIndex.from)) {
+        ValidationStatus
+          .from(flow.getDepStateHash(header))
+          .flatMap { stateHash =>
+            if (stateHash == header.depStateHash) {
+              validHeader(())
+            } else {
+              invalidHeader(InvalidDepStateHash)
+            }
+          }
+      } else {
+        validHeader(())
       }
     }
 

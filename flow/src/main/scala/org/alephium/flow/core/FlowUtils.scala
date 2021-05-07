@@ -188,8 +188,7 @@ trait FlowUtils
         chainIndex,
         FlowUtils.nextTimeStamp(parentHeader.timestamp)
       )
-      depStateHash <- getPersistedWorldState(BlockDeps.unsafe(loosenDeps), chainIndex.from)
-        .map(_.toHashes.stateHash)
+      depStateHash <- getDepStateHash(BlockDeps.unsafe(loosenDeps), chainIndex.from)
     } yield {
       BlockFlowTemplate(
         chainIndex,

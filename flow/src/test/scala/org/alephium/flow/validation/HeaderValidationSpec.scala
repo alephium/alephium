@@ -99,6 +99,13 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     }
   }
 
+  it should "check genesis state hash to be zero" in new GenesisFixture {
+    genesis.depStateHash is Hash.zero
+
+    val modified = genesis.copy(depStateHash = Hash.generate)
+    failValidation(modified, InvalidGenesisDepStateHash)
+  }
+
   it should "allow arbitrary genesis PoW work" in new GenesisFixture {
     forAll(posLongGen) { nonce =>
       val modified = genesis.copy(nonce = nonce)
@@ -247,5 +254,13 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
         failValidation(modified, MissingDeps(AVector.from(depIndexes.sorted.map(newDeps.apply))))
       }
     }
+  }
+
+  it should "check state hash" in new HeaderFixture {
+    val modified0 = header.copy(depStateHash = Hash.zero)
+    failValidation(updateNonce(modified0), InvalidDepStateHash)
+
+    val modified1 = header.copy(depStateHash = Hash.generate)
+    failValidation(updateNonce(modified1), InvalidDepStateHash)
   }
 }
