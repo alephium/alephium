@@ -18,7 +18,7 @@ package org.alephium.flow.model
 
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, Target, Transaction}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockTemplate(
@@ -30,7 +30,7 @@ final case class BlockTemplate(
     transactions: AVector[Transaction]
 ) {
   def buildHeader(nonce: U256)(implicit config: GroupConfig): BlockHeader =
-    BlockHeader(BlockDeps.build(deps), depStateHash, txsHash, blockTs, target, nonce)
+    BlockHeader.unsafe(BlockDeps.build(deps), depStateHash, txsHash, blockTs, target, nonce)
 }
 
 object BlockTemplate {

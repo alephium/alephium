@@ -25,6 +25,7 @@ import org.alephium.serde.{u256Serde => _, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockHeader(
+    version: Byte,
     blockDeps: BlockDeps,
     depStateHash: Hash,
     txsHash: Hash,
@@ -33,6 +34,10 @@ final case class BlockHeader(
     nonce: U256
 ) extends FlowData {
   lazy val hash: BlockHash = PoW.hash(this)
+
+  def isPoLWEnabled: Boolean = (version & 0x80) != 0
+
+  def unmaskedVersion: Byte = (version & 0x7f).toByte
 
   lazy val chainIndex: ChainIndex = {
     val groups = (blockDeps.length + 1) / 2
@@ -93,16 +98,17 @@ object BlockHeader {
   implicit private val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
 
   implicit val serde: Serde[BlockHeader] =
-    Serde.forProduct6(
+    Serde.forProduct7(
       apply,
-      bh => (bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target, bh.nonce)
+      bh =>
+        (bh.version, bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target, bh.nonce)
     )
 
   def genesis(txsHash: Hash, target: Target, nonce: U256)(implicit
       config: GroupConfig
   ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
-    BlockHeader(deps, Hash.zero, txsHash, ALF.GenesisTimestamp, target, nonce)
+    BlockHeader(defaultBlockVersion, deps, Hash.zero, txsHash, ALF.GenesisTimestamp, target, nonce)
   }
 
   def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit
@@ -119,7 +125,7 @@ object BlockHeader {
     iter(U256.Zero)
   }
 
-  def unsafe(
+  def unsafeWithRawDeps(
       deps: AVector[BlockHash],
       depStateHash: Hash,
       txsHash: Hash,
@@ -128,6 +134,17 @@ object BlockHeader {
       nonce: U256
   )(implicit config: GroupConfig): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
-    BlockHeader(blockDeps, depStateHash, txsHash, timestamp, target, nonce)
+    BlockHeader(defaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target, nonce)
+  }
+
+  def unsafe(
+      deps: BlockDeps,
+      depStateHash: Hash,
+      txsHash: Hash,
+      timestamp: TimeStamp,
+      target: Target,
+      nonce: U256
+  )(implicit config: GroupConfig): BlockHeader = {
+    unsafeWithRawDeps(deps.deps, depStateHash, txsHash, timestamp, target, nonce)
   }
 }

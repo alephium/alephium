@@ -411,7 +411,7 @@ object RestServer {
       groupConfig: GroupConfig
   ): Either[ApiError[_ <: StatusCode], (Block, ChainIndex, U256)] = {
     Try {
-      val header = BlockHeader(
+      val header = BlockHeader.unsafe(
         BlockDeps.build(solution.blockDeps),
         solution.depStateHash,
         solution.txsHash,

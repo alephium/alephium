@@ -69,6 +69,17 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     passValidation(genesis)
   }
 
+  it should "check genesis version" in new GenesisFixture {
+    genesis.version is genesisBlockVersion
+
+    forAll { byte: Byte =>
+      whenever(byte != genesisBlockVersion) {
+        val header = genesis.copy(version = byte)
+        failValidation(headerValidator.validateGenesisHeader(header), InvalidGenesisVersion)
+      }
+    }
+  }
+
   it should "check genesis timestamp" in new GenesisFixture {
     genesis.timestamp is ALF.GenesisTimestamp
 
@@ -172,6 +183,21 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
 
   it should "validate correct header" in new HeaderFixture {
     passValidation(header)
+  }
+
+  it should "check header version" in new HeaderFixture {
+    val modified0 = updateNonce(header.copy(version = defaultBlockVersion))
+    passValidation(modified0)
+
+    val modified1 = updateNonce(header.copy(version = defaultBlockVersionWithPoLW))
+    passValidation(modified1)
+
+    forAll { byte: Byte =>
+      whenever(byte != defaultBlockVersion && byte != defaultBlockVersionWithPoLW) {
+        val modified = updateNonce(header.copy(version = byte))
+        failValidation(modified, InvalidBlockVersion)
+      }
+    }
   }
 
   it should "check header timestamp increasing" in new HeaderFixture {

@@ -334,7 +334,7 @@ trait FlowFixture
 
     @tailrec
     def iter(nonce: U256): BlockHeader = {
-      val header = BlockHeader(blockDeps, depStateHash, txsHash, blockTs, target, nonce)
+      val header = BlockHeader.unsafe(blockDeps, depStateHash, txsHash, blockTs, target, nonce)
       if (PoW.checkMined(header, chainIndex)) header else iter(nonce.addOneUnsafe())
     }
 

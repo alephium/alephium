@@ -36,7 +36,7 @@ class TxOrderBench {
   }
   val txNum: Int = 2000
   val header: BlockHeader =
-    BlockHeader.unsafe(
+    BlockHeader.unsafeWithRawDeps(
       AVector.fill(groupConfig.depsNum)(BlockHash.zero),
       Hash.zero,
       Hash.zero,

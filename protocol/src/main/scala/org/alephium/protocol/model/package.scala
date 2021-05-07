@@ -21,6 +21,10 @@ import org.alephium.util.{Duration, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
 package object model {
+  val genesisBlockVersion: Byte         = 0.toByte
+  val defaultBlockVersion: Byte         = 0.toByte
+  val defaultBlockVersionWithPoLW: Byte = (defaultBlockVersion | 0x80).toByte
+
   val cliqueIdLength: Int = PublicKey.length
 
   // TODO: use proper lockup period before mainnet launch
