@@ -31,11 +31,13 @@ sealed trait InvalidHeaderStatus extends InvalidBlockStatus
 
 // TBD: final case object InvalidBlockSize               extends InvalidBlockStatus
 final case object InvalidGroup                           extends InvalidBlockStatus
+final case object InvalidGenesisVersion                  extends InvalidHeaderStatus
 final case object InvalidGenesisTimeStamp                extends InvalidHeaderStatus
 final case object InvalidGenesisDeps                     extends InvalidHeaderStatus
 final case object InvalidGenesisDepStateHash             extends InvalidHeaderStatus
 final case object InvalidGenesisWorkAmount               extends InvalidHeaderStatus
 final case object InvalidGenesisWorkTarget               extends InvalidHeaderStatus
+final case object InvalidBlockVersion                    extends InvalidHeaderStatus
 final case object NoIncreasingTimeStamp                  extends InvalidHeaderStatus
 final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
 final case object InvalidWorkAmount                      extends InvalidHeaderStatus

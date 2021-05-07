@@ -20,7 +20,12 @@ import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{BlockHeader, ChainIndex}
+import org.alephium.protocol.model.{
+  defaultBlockVersion,
+  genesisBlockVersion,
+  BlockHeader,
+  ChainIndex
+}
 import org.alephium.util.TimeStamp
 
 trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
@@ -46,6 +51,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       genesis: BlockHeader
   ): HeaderValidationResult[Unit] = {
     for {
+      _ <- checkGenesisVersion(genesis)
       _ <- checkGenesisTimeStamp(genesis)
       _ <- checkGenesisDependencies(genesis)
       _ <- checkGenesisDepStateHash(genesis)
@@ -69,6 +75,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       flow: BlockFlow
   ): HeaderValidationResult[Unit] = {
     for {
+      _      <- checkVersion(header)
       parent <- getParentHeader(flow, header) // parent should exist as checked in ChainHandler
       _      <- checkTimeStampIncreasing(header, parent)
       _      <- checkTimeStampDrift(header)
@@ -100,12 +107,14 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
 
   // format off for the sake of reading and checking rules
   // format: off
+  protected[validation] def checkGenesisVersion(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisTimeStamp(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisDependencies(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisDepStateHash(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkTarget(header: BlockHeader): HeaderValidationResult[Unit]
 
+  protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampIncreasing(header: BlockHeader, parent: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampDrift(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
@@ -129,6 +138,15 @@ object HeaderValidation {
 
   final class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
       extends HeaderValidation {
+    protected[validation] def checkGenesisVersion(
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
+      if (header.version == genesisBlockVersion) {
+        validHeader(())
+      } else {
+        invalidHeader(InvalidGenesisVersion)
+      }
+    }
     protected[validation] def checkGenesisTimeStamp(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
@@ -169,6 +187,14 @@ object HeaderValidation {
         invalidHeader(InvalidGenesisWorkTarget)
       } else {
         validHeader(())
+      }
+    }
+
+    protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit] = {
+      if (header.unmaskedVersion == defaultBlockVersion) {
+        validHeader(())
+      } else {
+        invalidHeader(InvalidBlockVersion)
       }
     }
 

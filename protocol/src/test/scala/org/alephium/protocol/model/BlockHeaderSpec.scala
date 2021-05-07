@@ -71,4 +71,22 @@ class BlockHeaderSpec
     assertThrows[AssertionError](genesis.outTips)
     assertThrows[AssertionError](genesis.uncleHash(GroupIndex.unsafe(0)))
   }
+
+  it should "handle version properly" in {
+    defaultBlockVersion is 0.toByte
+    defaultBlockVersionWithPoLW is 0x80.toByte
+
+    val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
+    genesis.version is 0.toByte
+    genesis.isPoLWEnabled is false
+    genesis.unmaskedVersion is 0.toByte
+
+    val header0 = genesis.copy(version = defaultBlockVersion)
+    header0.isPoLWEnabled is false
+    header0.unmaskedVersion is defaultBlockVersion
+
+    val header1 = genesis.copy(version = defaultBlockVersionWithPoLW)
+    header1.isPoLWEnabled is true
+    header1.unmaskedVersion is defaultBlockVersion
+  }
 }

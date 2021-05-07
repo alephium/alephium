@@ -68,7 +68,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "be random" in {
     def gen(): Block = {
       val header: BlockHeader =
-        BlockHeader.unsafe(
+        BlockHeader.unsafeWithRawDeps(
           AVector.fill(groupConfig.depsNum)(BlockHash.zero),
           Hash.zero,
           Hash.zero,
@@ -102,7 +102,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "put non-script txs in the last" in {
     forAll(posLongGen, posLongGen) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
-        BlockHeader.unsafe(
+        BlockHeader.unsafeWithRawDeps(
           AVector.fill(groupConfig.depsNum)(BlockHash.zero),
           Hash.zero,
           Hash.zero,

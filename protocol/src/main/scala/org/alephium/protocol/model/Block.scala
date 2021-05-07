@@ -88,7 +88,7 @@ object Block {
   )(implicit config: GroupConfig): Block = {
     val txsHash     = calTxsHash(transactions)
     val blockDeps   = BlockDeps.build(deps)
-    val blockHeader = BlockHeader(blockDeps, depStateHash, txsHash, timeStamp, target, nonce)
+    val blockHeader = BlockHeader.unsafe(blockDeps, depStateHash, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
 
