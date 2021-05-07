@@ -171,9 +171,9 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       .replace(brokerConfig.groups - 1, block0.hash)
       .replace(brokerConfig.groups, block1.hash)
     val block3 = mine(
+      blockFlow,
       chainIndex,
       newDeps2,
-      block2.header.depStateHash,
       block2.transactions,
       block2.header.timestamp
     )
@@ -187,9 +187,9 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       .replace(brokerConfig.groups, block1.hash)
     val block5 =
       mine(
+        blockFlow,
         ChainIndex.unsafe(0, 1),
         newDeps4,
-        block4.header.depStateHash,
         block4.transactions,
         block4.header.timestamp
       )
@@ -230,7 +230,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   it should "validate old blocks" in new DoubleSpendingFixture {
     val block0     = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val newBlockTs = ALF.GenesisTimestamp.plusSecondsUnsafe(1)
-    val block1     = mineWithoutCoinbase(chainIndex, block0.nonCoinbase, newBlockTs)
+    val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
 
     val newOutTips = block1.header.outDeps
     val intraDep   = block1.header.intraDep

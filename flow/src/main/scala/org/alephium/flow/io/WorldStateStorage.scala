@@ -34,6 +34,10 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
     get(hash).map(_.toPersistedWorldState(trieStorage))
   }
 
+  def getWorldStateHash(hash: BlockHash): IOResult[Hash] = {
+    get(hash).map(_.stateHash)
+  }
+
   def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
     get(hash).map(_.toCachedWorldState(trieStorage))
   }

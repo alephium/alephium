@@ -22,7 +22,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -185,6 +185,16 @@ trait BlockFlowState extends FlowTipsUtil {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps.uncleHash(groupIndex)
     getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
+  }
+
+  private[flow] def getDepStateHash(header: BlockHeader): IOResult[Hash] = {
+    val groupIndex = header.chainIndex.from
+    getDepStateHash(header.blockDeps, groupIndex)
+  }
+
+  private[flow] def getDepStateHash(deps: BlockDeps, groupIndex: GroupIndex): IOResult[Hash] = {
+    val intraGroupDep = deps.getOutDep(groupIndex)
+    getBlockChainWithState(groupIndex).getWorldStateHash(intraGroupDep)
   }
 
   protected def getCachedWorldState(
