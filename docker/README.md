@@ -26,6 +26,12 @@ The provided [docker-compose.yml](./docker-compose.yml] file can also be used to
 docker-compose up -d alephium
 ```
 
+The default config connects your container to the testnet, and makes the API available to [http://localhost:12973/docs](http://localhost:12973/docs):
+
+```
+curl http://localhost:12973/infos/self-clique
+```
+
 # Configuration
 
 In order to persist your data (blocks, wallets, ...), two volumes/mounts can be used.
