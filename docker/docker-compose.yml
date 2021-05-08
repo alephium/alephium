@@ -1,0 +1,31 @@
+version: "3.3"
+
+services:
+
+  alephium:
+    image: alephium/alephium:latest
+    build:
+      context: .
+      args:
+        RELEASE: "0.7.5"
+
+    restart: unless-stopped
+    ports:
+# 9973 (udp and tcp) is used for external p2p connection and must be exposed
+      - 9973:9973/tcp
+      - 9973:9973/udp
+# ws and http port might not be widely exposed, but to your internal clique/apps/network only.
+# Defaults are set to not open these two ports publicly. Configure this with caution.
+      - 127.0.0.1:11973:11973
+      - 127.0.0.1:12973:12973
+    security_opt:
+      - no-new-privileges:true
+# Set volumes or mounts to avoid loosing data/wallets.
+# Hint: mounts must be chown'ed to nobody:
+# mkdir ./alephium-data ./alephium-wallets && chown nobody ./alephium-data ./alephium-wallets
+    volumes:
+      # The provided file user-testnet.conf is a minimal default config to connect your container to the testnet.
+      - ./user-testnet.conf:/alephium-home/.alephium/user.conf
+#      - ./alephium-data:/alephium-home/.alephium
+#      - ./alephium-wallets:/alephium-home/.alephium-wallets
+# 
