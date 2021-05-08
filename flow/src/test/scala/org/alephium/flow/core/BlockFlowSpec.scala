@@ -42,6 +42,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for at least 2 user group when adding blocks sequentially" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     if (brokerConfig.groups >= 2) {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block1      = transfer(blockFlow, chainIndex1)
@@ -51,7 +53,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block2      = emptyBlock(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block2.header, 2)
+      addAndCheck(blockFlow, block2, 2)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block2)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
@@ -84,25 +86,22 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "compute cached blocks" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     val newBlocks = for {
       i <- 0 to 1
       j <- 0 to 1
     } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
     newBlocks.foreach { block =>
-      val index = block.chainIndex
-      if (index.relateTo(GroupIndex.unsafe(0))) {
-        addAndCheck(blockFlow, block, 1)
-      } else {
-        addAndCheck(blockFlow, block.header, 1)
-      }
+      addAndCheck(blockFlow, block, 1)
     }
 
     val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).toOption.get
-    val expected =
-      if (blockFlow.blockHashOrdering.lt(newBlocks(2).hash, newBlocks(3).hash)) 1 else 2
-    cache0.length is expected
+    cache0.length is 1
     cache0.contains(newBlocks(0).hash) is false
     cache0.contains(newBlocks(1).hash) is true
+    cache0.contains(newBlocks(2).hash) is false
+    cache0.contains(newBlocks(3).hash) is false
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in new FlowFixture {
@@ -144,6 +143,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "work for 2 user group when there is a fork" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     if (brokerConfig.groups >= 2) {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block11     = transfer(blockFlow, chainIndex1)
@@ -161,8 +162,8 @@ class BlockFlowSpec extends AlephiumSpec {
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block21     = emptyBlock(blockFlow, chainIndex2)
       val block22     = emptyBlock(blockFlow, chainIndex2)
-      addAndCheck(blockFlow, block21.header, 3)
-      addAndCheck(blockFlow, block22.header, 3)
+      addAndCheck(blockFlow, block21, 3)
+      addAndCheck(blockFlow, block22, 3)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block21, block22))
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
 
@@ -381,12 +382,13 @@ class BlockFlowSpec extends AlephiumSpec {
     checkBalance(blockFlow0, fromGroup, genesisBalance - ALF.alf(1))
     addAndCheck(blockFlow1, block, 1)
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
-    checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
+    checkBalance(blockFlow1, pubScript, 0)
 
     val fromGroupBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
     addAndCheck(blockFlow0, fromGroupBlock, 2)
     addAndCheck(blockFlow1, fromGroupBlock.header, 2)
     checkBalance(blockFlow0, fromGroup, genesisBalance - ALF.alf(1))
+    checkBalance(blockFlow1, pubScript, ALF.alf(1) - defaultGasFee)
 
     val toGroupBlock = emptyBlock(blockFlow1, ChainIndex.unsafe(toGroup, toGroup))
     addAndCheck(blockFlow1, toGroupBlock, 3)
@@ -628,6 +630,57 @@ class BlockFlowSpec extends AlephiumSpec {
       blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
         Some(TxStatus(TxIndex(block0.hash, 0), 1, 1, 1))
     }
+  }
+
+  it should "not include new block as dependency when dependency gap time is large" in new FlowFixture {
+    override val configValues =
+      Map(
+        ("alephium.consensus.uncle-dependency-gap-time", "5 seconds"),
+        ("alephium.broker.broker-num", 1)
+      )
+
+    val blocks0 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks0.foreach(addAndCheck(blockFlow, _, 1))
+
+    val blocks1 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks1.foreach(addAndCheck(blockFlow, _, 2))
+    blocks0.zip(blocks1).foreach { case (block0, block1) =>
+      val chainIndex = block0.chainIndex
+      block1.blockDeps.inDeps is block0.blockDeps.inDeps
+      block1.blockDeps.outDeps(chainIndex.to.value) is block0.hash
+      block1.blockDeps.outDeps.take(chainIndex.to.value) is
+        block0.blockDeps.outDeps.take(chainIndex.to.value)
+      block1.blockDeps.outDeps.drop(chainIndex.to.value + 1) is
+        block0.blockDeps.outDeps.drop(chainIndex.to.value + 1)
+    }
+  }
+
+  it should "include new block as dependency when gap time is past" in new FlowFixture {
+    override val configValues =
+      Map(
+        ("alephium.consensus.uncle-dependency-gap-time", "5 seconds"),
+        ("alephium.broker.broker-num", 1)
+      )
+
+    val blocks0 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks0.foreach(addAndCheck(blockFlow, _, 1))
+
+    Thread.sleep(5000)
+
+    val blocks1 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks1.foreach(addAndCheck(blockFlow, _, brokerConfig.depsNum + 1))
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

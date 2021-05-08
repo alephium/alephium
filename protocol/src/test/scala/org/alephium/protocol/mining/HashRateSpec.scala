@@ -14,17 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.protocol.mining
+
+import java.math.BigInteger
 
 import org.alephium.protocol.model.Target
-import org.alephium.util.Duration
+import org.alephium.util.{AlephiumSpec, Duration}
 
-trait ConsensusConfig extends EmissionConfig {
-  def blockTargetTime: Duration
-  def uncleDependencyGapTime: Duration
-  def maxMiningTarget: Target
+class HashRateSpec extends AlephiumSpec {
+  it should "check special values" in {
+    HashRate.onePhPerSecond.value is BigInteger.valueOf(1024).pow(5)
+    HashRate.oneEhPerSecond.value is BigInteger.valueOf(1024).pow(6)
+    HashRate.a128EhPerSecond.value is
+      BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
+  }
 
-  // scalastyle:off magic.number
-  val maxHeaderTimeStampDrift: Duration = Duration.ofSecondsUnsafe(15) // same as geth
-  // scalastyle:on magic.number
+  it should "convert from target correctly" in {
+    (1 until 255).foreach { k =>
+      val target   = Target.unsafe(BigInteger.ONE.shiftLeft(k))
+      val hashrate = HashRate.from(target, Duration.ofSecondsUnsafe(1))
+      Target.from(hashrate, Duration.ofSecondsUnsafe(1)) is target
+    }
+  }
 }

@@ -259,8 +259,12 @@ object BlockFlow extends StrictLogging {
         }
     }
 
+    def getBestIntraGroupTip(): BlockHash = {
+      intraGroupChains.reduceBy(_.getBestTipUnsafe)(blockHashOrdering.max)
+    }
+
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {
-      val bestTip    = getBestTipUnsafe
+      val bestTip    = getBestIntraGroupTip()
       val bestIndex  = ChainIndex.from(bestTip)
       val flowTips0  = getFlowTipsUnsafe(bestTip, group)
       val weight0    = calWeightUnsafe(flowTips0, group)
@@ -277,11 +281,8 @@ object BlockFlow extends StrictLogging {
       val (flowTips2, _) = groupOrder
         .filter(g => g != group.value && g != bestIndex.from.value)
         .fold(flowTips1 -> weight1) { case ((tipsCur, weightCur), _l) =>
-          val l = GroupIndex.unsafe(_l)
-          val toTry = (0 until groups).foldLeft(AVector.empty[BlockHash]) { (acc, _r) =>
-            val r = GroupIndex.unsafe(_r)
-            acc ++ getHashChain(l, r).getAllTips
-          }
+          val l        = GroupIndex.unsafe(_l)
+          val toTry    = getHashChain(l, l).getAllTips
           val groupTip = if (_l < group.value) tipsCur.inTips(_l) else tipsCur.inTips(_l - 1)
           tryExtendUnsafe(tipsCur, weightCur, group, groupTip, toTry)
         }

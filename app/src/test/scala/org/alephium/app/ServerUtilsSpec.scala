@@ -125,7 +125,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
         Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
       serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE
-        Balance(ALF.oneAlf, 0, 1)
+        Balance(0, 0, 0)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)

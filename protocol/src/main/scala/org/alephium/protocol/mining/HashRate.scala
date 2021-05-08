@@ -14,28 +14,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.protocol.mining
 
-import org.alephium.protocol.mining.Emission
+import java.math.BigInteger
+
 import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
-trait ConsensusConfigFixture {
-  def groupConfig: GroupConfig
+// unit: hash per second
+final case class HashRate private (value: BigInteger)
 
-  def consensusConfig: ConsensusConfig
-}
+object HashRate {
+  def unsafe(value: BigInteger): HashRate = new HashRate(value)
 
-object ConsensusConfigFixture {
-  trait Default extends ConsensusConfigFixture with GroupConfigFixture.Default {
-    implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
-      override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-
-      def uncleDependencyGapTime: Duration = blockTargetTime
-
-      override val maxMiningTarget: Target = Target.Max
-
-      override val emission: Emission = Emission(groupConfig, blockTargetTime)
-    }
+  // scalastyle:off magic.number
+  def from(target: Target, blockTime: Duration): HashRate = {
+    val hashDone = Target.maxBigInt.divide(target.value)
+    unsafe(hashDone.multiply(BigInteger.valueOf(1000)).divide(BigInteger.valueOf(blockTime.millis)))
   }
+
+  val onePhPerSecond: HashRate  = unsafe(BigInteger.ONE.shiftLeft(50))
+  val oneEhPerSecond: HashRate  = unsafe(BigInteger.ONE.shiftLeft(60))
+  val a128EhPerSecond: HashRate = unsafe(BigInteger.ONE.shiftLeft(67))
+  // scalastyle:on magic.number
 }

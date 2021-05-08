@@ -80,6 +80,7 @@ object Block {
 
   def from(
       deps: AVector[BlockHash],
+      depStateHash: Hash,
       transactions: AVector[Transaction],
       target: Target,
       timeStamp: TimeStamp,
@@ -87,7 +88,7 @@ object Block {
   )(implicit config: GroupConfig): Block = {
     val txsHash     = calTxsHash(transactions)
     val blockDeps   = BlockDeps.build(deps)
-    val blockHeader = BlockHeader(blockDeps, txsHash, timeStamp, target, nonce)
+    val blockHeader = BlockHeader(blockDeps, depStateHash, txsHash, timeStamp, target, nonce)
     Block(blockHeader, transactions)
   }
 

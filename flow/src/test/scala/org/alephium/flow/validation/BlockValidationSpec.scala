@@ -21,7 +21,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, BlockHash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
@@ -68,6 +68,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block0 =
       Block.from(
         AVector.fill(groupConfig.depsNum)(BlockHash.zero),
+        Hash.zero,
         AVector.empty,
         consensusConfig.maxMiningTarget,
         TimeStamp.zero,
@@ -157,7 +158,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     blockValidation.validate(block1, blockFlow) is Left(Right(BlockDoubleSpending))
   }
 
-  it should "check double spending in block dependencies" in new DoubleSpendingFixture {
+  it should "check double spending in block dependencies (1)" in new DoubleSpendingFixture {
     val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val block1 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
 
@@ -166,13 +167,64 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     blockFlow.isConflicted(AVector(block1.hash, block0.hash), blockFlow.getBlockUnsafe) is true
 
     val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val newDeps = block2.header.blockDeps.deps
+    val newDeps2 = block2.header.blockDeps.deps
       .replace(brokerConfig.groups - 1, block0.hash)
       .replace(brokerConfig.groups, block1.hash)
-    val block3 = mine(chainIndex, newDeps, block2.transactions, block2.header.timestamp)
+    val block3 = mine(
+      chainIndex,
+      newDeps2,
+      block2.header.depStateHash,
+      block2.transactions,
+      block2.header.timestamp
+    )
 
     blockFlow.isConflicted(block3.header.outDeps, blockFlow.getBlockUnsafe) is true
     blockValidation.validate(block3, blockFlow) is Left(Right(InvalidFlowTxs))
+
+    val block4 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    val newDeps4 = block4.header.blockDeps.deps
+      .replace(brokerConfig.groups - 1, block0.hash)
+      .replace(brokerConfig.groups, block1.hash)
+    val block5 =
+      mine(
+        ChainIndex.unsafe(0, 1),
+        newDeps4,
+        block4.header.depStateHash,
+        block4.transactions,
+        block4.header.timestamp
+      )
+
+    blockFlow.isConflicted(block5.header.outDeps, blockFlow.getBlockUnsafe) is true
+    blockValidation.validate(block5, blockFlow) is Left(Right(InvalidFlowTxs))
+  }
+
+  it should "check double spending in block dependencies (2)" in new DoubleSpendingFixture {
+    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block0)
+
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block1)
+
+    val block2 = mine(blockFlow, ChainIndex.unsafe(0, 0))((_, _) => block0.nonCoinbase)
+    block2.nonCoinbaseLength is 1
+    blockValidation.validate(block2, blockFlow) is Left(Right(InvalidFlowTxs))
+
+    val block3 = mine(blockFlow, ChainIndex.unsafe(0, 1))((_, _) => block0.nonCoinbase)
+    block3.nonCoinbaseLength is 1
+    blockValidation.validate(block3, blockFlow) is Left(Right(InvalidFlowTxs))
+  }
+
+  it should "check double spending in block dependencies (3)" in new DoubleSpendingFixture {
+    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block0)
+
+    val block1 = mine(blockFlow, ChainIndex.unsafe(0, 0))((_, _) => block0.nonCoinbase)
+    block1.nonCoinbaseLength is 1
+    blockValidation.validate(block1, blockFlow) is Left(Right(InvalidFlowTxs))
+
+    val block2 = mine(blockFlow, ChainIndex.unsafe(0, 1))((_, _) => block0.nonCoinbase)
+    block2.nonCoinbaseLength is 1
+    blockValidation.validate(block2, blockFlow) is Left(Right(InvalidFlowTxs))
   }
 
   it should "validate old blocks" in new DoubleSpendingFixture {

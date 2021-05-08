@@ -39,6 +39,7 @@ class TxOrderBench {
     BlockHeader.unsafe(
       AVector.fill(groupConfig.depsNum)(BlockHash.zero),
       Hash.zero,
+      Hash.zero,
       TimeStamp.zero,
       Target.Max,
       U256.Zero
