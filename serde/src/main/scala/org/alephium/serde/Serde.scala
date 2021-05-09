@@ -291,7 +291,13 @@ object Serde extends ProductSerde {
     }
 
     def _deserializeArray(n: Int, input: ByteString): SerdeResult[Staging[Array[T]]] = {
-      _deserializeArray(input, 0, Array.ofDim[T](n))
+      if (n < 0) {
+        Left(SerdeError.validation(s"Negative array size: $n"))
+      } else if (n > input.length) { // might cause memory issues if n is too large
+        Left(SerdeError.validation(s"Malicious array size: $n"))
+      } else {
+        _deserializeArray(input, 0, Array.ofDim[T](n))
+      }
     }
 
     def _deserializeAVector(n: Int, input: ByteString): SerdeResult[Staging[AVector[T]]] = {
@@ -312,7 +318,8 @@ object Serde extends ProductSerde {
         deserialize0(input, identity)
     }
 
-  private[serde] def fixedSizeSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[AVector[T]] =
+  private[serde] def fixedSizeSerde[T: ClassTag](size: Int, serde: Serde[T]): Serde[AVector[T]] = {
+    assume(size >= 0)
     new BatchDeserializer[T](serde) with Serde[AVector[T]] {
       override def serialize(input: AVector[T]): ByteString = {
         input.map(serde.serialize).fold(ByteString.empty)(_ ++ _)
@@ -322,6 +329,7 @@ object Serde extends ProductSerde {
         _deserializeAVector(size, input)
       }
     }
+  }
 
   private[serde] class AVectorSerializer[T](serializer: Serializer[T])
       extends Serializer[AVector[T]] {

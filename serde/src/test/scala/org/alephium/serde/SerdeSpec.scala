@@ -139,6 +139,13 @@ class SerdeSpec extends AlephiumSpec {
     }
   }
 
+  it should "return error for invalid array size" in {
+    deserialize[AVector[Byte]](serialize[Int](-100)).leftValue is
+      SerdeError.validation(s"Negative array size: -100")
+    deserialize[AVector[Byte]](serialize[Int](1)).leftValue is
+      SerdeError.validation(s"Malicious array size: 1")
+  }
+
   "Serde for option" should "work" in {
     forAll(Gen.option(Gen.choose(0, Int.MaxValue))) { input =>
       deserialize[Option[Int]](serialize(input)) isE input
