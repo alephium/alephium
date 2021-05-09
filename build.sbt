@@ -149,7 +149,48 @@ lazy val app = mainProject("app")
       `tapir-openapi`,
       `tapir-swagger-ui`
     ),
-    publish / skip := true
+    publish / skip := true,
+    dockerfile in docker := {
+      val artifact: File = assembly.value
+      val artifactTargetPath = s"/${artifact.name}"
+
+      val alephiumHome = "/alephium-home"
+
+      new Dockerfile {
+        from("adoptopenjdk/openjdk11:jre")
+
+        add(artifact, artifactTargetPath)
+
+        runRaw(s"mkdir -p $alephiumHome && usermod -d $alephiumHome nobody && chown nobody $alephiumHome")
+        workDir(alephiumHome)
+
+        runRaw("mkdir -p .alephium && chown nobody .alephium")
+        runRaw("mkdir -p .alephium-wallets && chown nobody .alephium-wallets")
+        runRaw("""echo 'alephium.network.network-type = "testnet"' > .alephium/user.conf""")
+        runRaw("""echo 'alephium.discovery.bootstrap = ["bootstrap0.alephium.org:9973"]' >> .alephium/user.conf""")
+
+        expose(12973)  // http
+        expose(11973)  // ws
+        expose(9973)   // p2p
+
+        volume("/alephium-home/.alephium")
+        volume("/alephium-home/.alephium-wallets")
+
+        user("nobody")
+
+        entryPoint("java", "-jar", artifactTargetPath)
+      }
+    },
+    docker / imageNames := {
+      val baseImageName = "liuhongchao/alephium"
+      val versionTag = version.value.replace('+', '_')
+      Seq(
+        Some(ImageName(baseImageName + ":" + versionTag)),
+        git.gitHeadCommit.value.map { commitId =>
+          ImageName(baseImageName + ":" + commitId)
+        }
+      ).flatten
+    }
   )
 
 lazy val json = project("json")

@@ -3,7 +3,8 @@ version: "3.3"
 services:
 
   alephium:
-    image: alephium/alephium:latest
+    #image: alephium/alephium:latest
+    image: liuhongchao/alephium:5e09d6199edcea3f5129bc40ae65bfacba34e889
     build:
       context: .
       args:
