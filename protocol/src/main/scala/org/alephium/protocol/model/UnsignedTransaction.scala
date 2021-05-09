@@ -87,6 +87,13 @@ object UnsignedTransaction {
     UnsignedTransaction(None, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
+  def coinbase(
+      inputs: AVector[TxInput],
+      fixedOutputs: AVector[AssetOutput]
+  ): UnsignedTransaction = {
+    UnsignedTransaction(None, minimalGas, defaultGasPrice, inputs, fixedOutputs)
+  }
+
   def transferAlf(
       inputs: AVector[(AssetOutputRef, AssetOutput)],
       fromLockupScript: LockupScript,

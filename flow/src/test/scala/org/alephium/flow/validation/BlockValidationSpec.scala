@@ -84,35 +84,35 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val coinbase1     = coinbase(block0.chainIndex, 0, lockupScript)
     val testSignature = AVector(SignatureSchema.sign(coinbase1.unsigned.hash.bytes, privateKey))
     val block1        = block0.copy(transactions = AVector(coinbase1))
-    passCheck(checkCoinbaseEasy(block1))
+    passCheck(checkCoinbaseEasy(block1, 0, 1))
 
     val coinbase2 = Transaction.from(AVector(input0), AVector(output0), emptySignatures)
     val block2    = block0.copy(transactions = AVector(coinbase2))
-    failCheck(checkCoinbaseEasy(block2), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block2, 0, 1), InvalidCoinbaseFormat)
 
     val coinbase3 = Transaction.from(emptyInputs, emptyOutputs, testSignature)
     val block3    = block0.copy(transactions = AVector(coinbase3))
-    failCheck(checkCoinbaseEasy(block3), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block3, 0, 1), InvalidCoinbaseFormat)
 
     val coinbase4 = Transaction.from(emptyInputs, AVector(output0), testSignature)
     val block4    = block0.copy(transactions = AVector(coinbase4))
-    failCheck(checkCoinbaseEasy(block4), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block4, 0, 1), InvalidCoinbaseFormat)
 
     val coinbase5 = Transaction.from(AVector(input0), AVector(output0), emptySignatures)
     val block5    = block0.copy(transactions = AVector(coinbase5))
-    failCheck(checkCoinbaseEasy(block5), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block5, 0, 1), InvalidCoinbaseFormat)
 
     val coinbase6 = Transaction.from(emptyInputs, emptyOutputs, emptySignatures)
     val block6    = block0.copy(transactions = AVector(coinbase6))
-    failCheck(checkCoinbaseEasy(block6), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block6, 0, 1), InvalidCoinbaseFormat)
 
     val coinbase7 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), testSignature)
     val block7    = block0.copy(transactions = AVector(coinbase7))
-    failCheck(checkCoinbaseEasy(block7), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block7, 0, 1), InvalidCoinbaseFormat)
 
     val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
     val block8    = block0.copy(transactions = AVector(coinbase8))
-    failCheck(checkCoinbaseEasy(block8), InvalidCoinbaseFormat)
+    failCheck(checkCoinbaseEasy(block8, 0, 1), InvalidCoinbaseFormat)
   }
 
   it should "check coinbase data" in new Fixture {
@@ -125,7 +125,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   it should "check coinbase reward" in new Fixture {
     val block = blockGenOf(brokerConfig).filter(_.nonCoinbase.nonEmpty).sample.get
-    passCheck(checkCoinbaseReward(block))
+    passCheck(checkCoinbase(block, blockFlow))
 
     val miningReward      = consensusConfig.emission.miningReward(block.header)
     val coinbaseOutputNew = block.coinbase.unsigned.fixedOutputs.head.copy(amount = miningReward)
@@ -134,7 +134,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     )
     val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
     val blockNew = block.copy(transactions = txsNew)
-    failCheck(checkCoinbaseReward(blockNew), InvalidCoinbaseReward)
+    failCheck(checkCoinbase(blockNew, blockFlow), InvalidCoinbaseReward)
   }
 
   trait DoubleSpendingFixture extends FlowFixture {

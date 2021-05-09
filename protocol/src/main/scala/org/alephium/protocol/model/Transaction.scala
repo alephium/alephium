@@ -246,13 +246,13 @@ object Transaction {
 
     val txOutput =
       AssetOutput(
-        reward.addUnsafe(gasFee),
+        reward.addUnsafe(gasFee).subUnsafe(defaultGasFee),
         lockupScript,
         lockTime,
         tokens = AVector.empty,
         outputData
       )
-    val unsigned = UnsignedTransaction(AVector.empty, AVector(txOutput))
+    val unsigned = UnsignedTransaction.coinbase(AVector.empty, AVector(txOutput))
     Transaction(
       unsigned,
       contractInputs = AVector.empty,

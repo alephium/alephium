@@ -83,6 +83,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       _      <- checkDepsIndex(header)
       _      <- checkWorkAmount(header)
       _      <- checkWorkTarget(header, flow.getHeaderChain(header))
+      _      <- checkPoLW(header)
       _      <- checkDepsMissing(header, flow)
       _      <- checkDepStateHash(header, flow)
     } yield ()
@@ -123,6 +124,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   protected[validation] def checkDepsMissing(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkDepStateHash(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain): HeaderValidationResult[Unit]
+  protected[validation] def checkPoLW(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkUncleDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   // format: on
@@ -282,6 +284,16 @@ object HeaderValidation {
     ): HeaderValidationResult[Unit] = {
       ValidationStatus.from(headerChain.getHashTarget(header.parentHash)).flatMap { target =>
         if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
+      }
+    }
+
+    protected[validation] def checkPoLW(
+        header: BlockHeader
+    ): HeaderValidationResult[Unit] = {
+      if (header.isPoLWEnabled && !consensusConfig.emission.canEnablePoLW(header.target)) {
+        invalidHeader(CannotEnablePoLW)
+      } else {
+        validHeader(())
       }
     }
 

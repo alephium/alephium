@@ -24,6 +24,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
@@ -62,8 +63,19 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     ): TxValidationResult[Unit] = {
       prepareWorldState(preOutputs)
       for {
-        _ <- checkStateless(tx, checkDoubleSpending = true)
-        _ <- checkStateful(tx, headerTs, cachedWorldState)
+        chainIndex <- getChainIndex(tx)
+        _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
+        _          <- checkStateful(chainIndex, tx, headerTs, cachedWorldState, None)
+      } yield ()
+    }
+
+    def validateMempoolTx(
+        tx: Transaction,
+        flow: BlockFlow
+    ): TxValidationResult[Unit] = {
+      for {
+        chainIndex <- getChainIndex(tx)
+        _          <- validateMempoolTx(chainIndex, tx, flow)
       } yield ()
     }
   }
@@ -203,7 +215,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
         }
       forAll(localUnsignedGen) { unsignedNew =>
         val txNew = tx.copy(unsigned = unsignedNew)
-        failCheck(checkChainIndex(txNew), InvalidInputGroupIndex)
+        failCheck(getChainIndex(txNew), InvalidInputGroupIndex)
         failValidation(validateMempoolTx(txNew, blockFlow), InvalidInputGroupIndex)
         failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
       }
@@ -229,7 +241,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
           }
         forAll(localUnsignedGen) { unsignedNew =>
           val txNew = tx.copy(unsigned = unsignedNew)
-          failCheck(checkChainIndex(txNew), InvalidOutputGroupIndex)
+          failCheck(getChainIndex(txNew), InvalidOutputGroupIndex)
           failValidation(validateMempoolTx(txNew, blockFlow), InvalidOutputGroupIndex)
           failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
         }
@@ -362,7 +374,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
 
   it should "test both ALF and token balances" in new StatefulFixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      passCheck(checkAlfBalance(tx, preOutputs.map(_.referredOutput)))
+      passCheck(checkAlfBalance(tx, preOutputs.map(_.referredOutput), None))
       passCheck(checkTokenBalance(tx, preOutputs.map(_.referredOutput)))
       passCheck(checkBlockTx(tx, preOutputs))
     }
@@ -371,7 +383,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
   it should "validate ALF balances" in new StatefulFixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       val txNew = modifyAlfAmount(tx, 1)
-      failCheck(checkAlfBalance(txNew, preOutputs.map(_.referredOutput)), InvalidAlfBalance)
+      failCheck(checkAlfBalance(txNew, preOutputs.map(_.referredOutput), None), InvalidAlfBalance)
       failCheck(checkBlockTx(txNew, preOutputs), InvalidAlfBalance)
     }
   }
