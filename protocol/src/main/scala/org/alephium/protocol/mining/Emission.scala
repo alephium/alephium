@@ -100,6 +100,14 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
       U256.Zero
     }
   }
+
+  def canEnablePoLW(target: Target): Boolean = {
+    target < oneEhPerSecondDivided
+  }
+
+  def burntAmountUnsafe(target: Target): U256 = {
+    ???
+  }
 }
 
 object Emission {

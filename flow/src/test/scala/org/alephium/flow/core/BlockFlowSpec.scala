@@ -336,7 +336,7 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfig.emission.lowHashRateInitialRewardPerChain,
       consensusConfig.emission.stableMaxRewardPerChain
     ).min
-    (block.coinbase.alfAmountInOutputs.get > minimalReward) is true
+    (block.coinbase.alfAmountInOutputs.get > minimalReward.subUnsafe(defaultGasFee)) is true
   }
 
   behavior of "Balance"

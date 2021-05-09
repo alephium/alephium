@@ -42,6 +42,7 @@ final case object NoIncreasingTimeStamp                  extends InvalidHeaderSt
 final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
 final case object InvalidWorkAmount                      extends InvalidHeaderStatus
 final case object InvalidWorkTarget                      extends InvalidHeaderStatus
+final case object CannotEnablePoLW                       extends InvalidHeaderStatus
 final case object InvalidUncleTimeStamp                  extends InvalidHeaderStatus
 final case object InvalidHeaderFlow                      extends InvalidHeaderStatus
 final case object InvalidDepsNum                         extends InvalidHeaderStatus

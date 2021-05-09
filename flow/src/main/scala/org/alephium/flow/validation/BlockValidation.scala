@@ -18,8 +18,9 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.{Block, CoinbaseFixedData, TxOutputRef}
+import org.alephium.protocol.model._
 import org.alephium.serde._
+import org.alephium.util.U256
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
@@ -73,10 +74,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
-      _ <- checkCoinbase(block)
       _ <- checkMerkleRoot(block)
       _ <- checkFlow(block, flow)
       _ <- checkNonCoinbases(block, flow)
+      _ <- checkCoinbase(block, flow) // validate non-coinbase first for gas fee
     } yield ()
   }
 
@@ -92,20 +93,82 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (block.transactions.nonEmpty) validBlock(()) else invalidBlock(EmptyTransactionList)
   }
 
-  private[validation] def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
+  private[validation] def checkCoinbase(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    if (block.header.isPoLWEnabled) {
+      checkCoinbaseWithPoLW(block, flow)
+    } else {
+      checkCoinbaseWithoutPoLW(block, flow)
+    }
+  }
+
+  private[validation] def checkCoinbaseWithoutPoLW(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    val reward    = consensusConfig.emission.miningReward(block.header)
+    val netReward = reward.addUnsafe(block.gasFee)
+    checkCoinbase(block, flow, 0, 1, netReward)
+  }
+
+  private[validation] def checkCoinbaseWithPoLW(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    val reward      = consensusConfig.emission.miningReward(block.header)
+    val burntAmount = consensusConfig.emission.burntAmountUnsafe(block.target)
+    val netReward   = reward.addUnsafe(block.gasFee).subUnsafe(burntAmount)
+    checkCoinbase(block, flow, 1, 2, netReward)
+  }
+
+  private[validation] def checkCoinbase(
+      block: Block,
+      flow: BlockFlow,
+      inputNum: Int,
+      outputNum: Int,
+      netReward: U256
+  ): BlockValidationResult[Unit] = {
     for {
-      _ <- checkCoinbaseEasy(block)
+      _ <- checkCoinbaseEasy(block, inputNum, outputNum)
       _ <- checkCoinbaseData(block)
-      _ <- checkCoinbaseReward(block)
+      _ <- checkCoinbaseAsTx(block, flow, netReward)
     } yield ()
   }
 
-  private[validation] def checkCoinbaseEasy(block: Block): BlockValidationResult[Unit] = {
+  private[validation] def checkCoinbaseAsTx(
+      block: Block,
+      flow: BlockFlow,
+      netReward: U256
+  ): BlockValidationResult[Unit] = {
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      for {
+        worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
+        _ <- convert(
+          nonCoinbaseValidation.checkCoinbase(block.coinbase, block.header, worldState, netReward)
+        )
+      } yield ()
+    } else {
+      validBlock(())
+    }
+  }
+
+  private[validation] def checkCoinbaseEasy(
+      block: Block,
+      inputsNum: Int,
+      outputsNum: Int
+  ): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
     val unsigned = coinbase.unsigned
     if (
-      unsigned.inputs.isEmpty &&
-      unsigned.fixedOutputs.length == 1 &&
+      unsigned.scriptOpt.isEmpty &&
+      unsigned.startGas == minimalGas &&
+      unsigned.gasPrice == defaultGasPrice &&
+      unsigned.inputs.length == inputsNum &&
+      unsigned.fixedOutputs.length == outputsNum &&
+      unsigned.fixedOutputs(0).tokens.isEmpty &&
+      coinbase.contractInputs.isEmpty &&
       coinbase.generatedOutputs.isEmpty &&
       coinbase.inputSignatures.isEmpty &&
       coinbase.contractSignatures.isEmpty
@@ -135,15 +198,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
-  private[validation] def checkCoinbaseReward(block: Block): BlockValidationResult[Unit] = {
-    val reward = consensusConfig.emission.miningReward(block.header)
-    if (block.coinbaseReward == reward.addUnsafe(block.gasFee)) {
-      validBlock(())
-    } else {
-      invalidBlock(InvalidCoinbaseReward)
-    }
-  }
-
   // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
     if (block.header.txsHash == Block.calTxsHash(block.transactions)) {
@@ -157,16 +211,21 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       block: Block,
       flow: BlockFlow
   ): BlockValidationResult[Unit] = {
-    val index = block.chainIndex
-    assume(index.relateTo(brokerConfig))
+    val chainIndex = block.chainIndex
+    assume(chainIndex.relateTo(brokerConfig))
 
-    if (brokerConfig.contains(index.from)) {
+    if (brokerConfig.contains(chainIndex.from)) {
       for {
         _          <- checkBlockDoubleSpending(block)
         worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
         _ <-
           convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
-            nonCoinbaseValidation.checkBlockTx(block.transactions(index), block.header, worldState)
+            nonCoinbaseValidation.checkBlockTx(
+              chainIndex,
+              block.transactions(index),
+              block.header,
+              worldState
+            )
           })
       } yield ()
     } else {
