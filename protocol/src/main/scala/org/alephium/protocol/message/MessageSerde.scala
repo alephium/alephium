@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.NetworkType
 import org.alephium.serde._
-import org.alephium.util.Hex
+import org.alephium.util.{Bytes, Hex}
 
 object MessageSerde {
 
@@ -31,7 +31,7 @@ object MessageSerde {
     Hash.hash(data).bytes.take(checksumLength)
 
   def length(data: ByteString): ByteString =
-    intSerde.serialize(data.length)
+    Bytes.from(data.length)
 
   def unwrap[M](
       input: ByteString,
@@ -40,27 +40,35 @@ object MessageSerde {
     for {
       rest         <- checkMagicBytes(input, networkType)
       checksumRest <- extractChecksum(rest)
-      lengthRest   <- intSerde._deserialize(checksumRest.rest)
+      lengthRest <- extractPayloadLength(
+        checksumRest.rest
+      ) // don't use intSerde due to potential notEnoughBytes
     } yield {
       (checksumRest.value, lengthRest.value, lengthRest.rest)
     }
   }
 
-  private def extractChecksum(bytes: ByteString): SerdeResult[Staging[ByteString]] = {
+  def extractBytes(bytes: ByteString, length: Int): SerdeResult[Staging[ByteString]] = {
     Either.cond(
-      bytes.length >= checksumLength,
-      bytes.splitAt(checksumLength) match { case (checksum, rest) => Staging(checksum, rest) },
-      SerdeError.notEnoughBytes(checksumLength, bytes.length)
+      bytes.length >= length,
+      bytes.splitAt(length) match { case (data, rest) => Staging(data, rest) },
+      SerdeError.notEnoughBytes(length, bytes.length)
     )
   }
 
-  def extractPayloadBytes(length: Int, data: ByteString): SerdeResult[Staging[ByteString]] = {
+  private def extractChecksum(bytes: ByteString): SerdeResult[Staging[ByteString]] = {
+    extractBytes(bytes, checksumLength)
+  }
+
+  private def extractPayloadLength(bytes: ByteString): SerdeResult[Staging[Int]] = {
+    extractBytes(bytes, 4).map(_.mapValue(Bytes.toIntUnsafe))
+  }
+
+  def extractMessageBytes(length: Int, data: ByteString): SerdeResult[Staging[ByteString]] = {
     if (length < 0) {
       Left(SerdeError.wrongFormat(s"Negative length: $length"))
-    } else if (data.length < length) {
-      Left(SerdeError.notEnoughBytes(length, data.length))
     } else {
-      Right(data.splitAt(length) match { case (payload, rest) => Staging(payload, rest) })
+      extractBytes(data, length)
     }
   }
 

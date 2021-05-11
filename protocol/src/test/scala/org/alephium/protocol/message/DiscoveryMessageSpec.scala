@@ -87,12 +87,8 @@ class DiscoveryMessageSpec extends AlephiumSpec {
         networkType,
         discoveryPrivateKey
       )
-      val value =
-        DiscoveryMessage
-          .deserialize(bytes, networkType)
-          .toOption
-          .get
-      msg is value
+      val value = DiscoveryMessage.deserialize(bytes, networkType)
+      msg is value.rightValue
     }
   }
 }

@@ -19,13 +19,13 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.serde.intSerde
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Bytes}
 
 sealed trait NetworkType {
   def name: String
   def prefix: String
-  lazy val magicBytes: ByteString = intSerde.serialize(Hash.hash("ALF" ++ prefix).toRandomIntUnsafe)
+
+  lazy val magicBytes: ByteString = Bytes.from(Hash.hash("ALF" ++ prefix).toRandomIntUnsafe)
 }
 
 object NetworkType {

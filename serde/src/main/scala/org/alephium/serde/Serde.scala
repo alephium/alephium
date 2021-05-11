@@ -102,7 +102,7 @@ trait FixedSizeSerde[T] extends Serde[T] {
     } else if (input.size > serdeSize) {
       Left(SerdeError.redundant(serdeSize, input.size))
     } else {
-      Left(SerdeError.notEnoughBytes(serdeSize, input.size))
+      Left(SerdeError.incompleteData(serdeSize, input.size))
     }
 
   override def _deserialize(input: ByteString): SerdeResult[Staging[T]] =
@@ -110,7 +110,7 @@ trait FixedSizeSerde[T] extends Serde[T] {
       val (init, rest) = input.splitAt(serdeSize)
       deserialize(init).map(Staging(_, rest))
     } else {
-      Left(SerdeError.notEnoughBytes(serdeSize, input.size))
+      Left(SerdeError.incompleteData(serdeSize, input.size))
     }
 }
 
@@ -183,7 +183,7 @@ object Serde extends ProductSerde {
         if (rest.size >= size) {
           Right(rest.splitAt(size) match { case (value, rest) => Staging(value, rest) })
         } else {
-          Left(SerdeError.notEnoughBytes(size, rest.size))
+          Left(SerdeError.incompleteData(size, rest.size))
         }
       }
     }
