@@ -18,7 +18,7 @@ package org.alephium.protocol.mining
 
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData, Target}
 import org.alephium.serde._
 
 object PoW {
@@ -30,8 +30,12 @@ object PoW {
   }
 
   def checkWork(data: FlowData): Boolean = {
+    checkWork(data, data.target)
+  }
+
+  def checkWork(data: FlowData, target: Target): Boolean = {
     val current = BigInt(1, data.hash.bytes.toArray)
-    current.compareTo(data.target.value) <= 0
+    current.compareTo(target.value) <= 0
   }
 
   def checkMined(data: FlowData, index: ChainIndex): Boolean = {

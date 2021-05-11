@@ -118,7 +118,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       flow: BlockFlow
   ): BlockValidationResult[Unit] = {
     val reward      = consensusConfig.emission.miningReward(block.header)
-    val burntAmount = consensusConfig.emission.burntAmountUnsafe(block.target)
+    val burntAmount = consensusConfig.emission.burntAmountUnsafe(block.target, reward)
     val netReward   = reward.addUnsafe(block.gasFee).subUnsafe(burntAmount)
     checkCoinbase(block, flow, 1, 2, netReward)
   }

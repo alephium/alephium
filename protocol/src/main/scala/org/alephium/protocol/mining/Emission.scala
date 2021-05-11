@@ -105,8 +105,28 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     target < oneEhPerSecondDivided
   }
 
-  def burntAmountUnsafe(target: Target): U256 = {
-    ???
+  def burntAmountUnsafe(target: Target, miningReward: U256): U256 = {
+    assume(canEnablePoLW(target))
+    val amount = miningReward.toBigInt
+      .multiply(oneEhPerSecondDivided.value.subtract(target.value))
+      .divide(oneEhPerSecondDivided.value)
+      .multiply(BigInteger.valueOf(3))
+      .divide(BigInteger.valueOf(4))
+    U256.unsafe(amount)
+  }
+
+  val oneEhPerSecondDividedHashRate: HashRate =
+    HashRate.from(oneEhPerSecondDivided, blockTargetTime)
+
+  def poLWTargetUnsafe(target: Target): Target = {
+    assume(canEnablePoLW(target))
+    val hashRate = HashRate.from(target, blockTargetTime)
+    val powHashRate =
+      hashRate.value
+        .add(oneEhPerSecondDivided.value.multiply(BigInteger.valueOf(7)))
+        .divide(BigInteger.valueOf(8))
+    val powTarget = Target.from(HashRate.unsafe(powHashRate), blockTargetTime)
+    powTarget
   }
 }
 
