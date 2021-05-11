@@ -23,7 +23,7 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.{InvalidTxStatus, NonCoinbaseValidation, TxValidationResult}
+import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
@@ -53,7 +53,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     networkSetting: NetworkSetting
 ) extends BaseActor
     with EventStream.Publisher {
-  private val nonCoinbaseValidation = NonCoinbaseValidation.build
+  private val nonCoinbaseValidation = TxValidation.build
 
   override def receive: Receive = {
     case TxHandler.AddToSharedPool(txs, origin) =>

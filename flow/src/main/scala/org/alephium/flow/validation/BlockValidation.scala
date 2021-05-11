@@ -26,7 +26,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
 
   def headerValidation: HeaderValidation
-  def nonCoinbaseValidation: NonCoinbaseValidation
+  def nonCoinbaseValidation: TxValidation
 
   override def validate(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
     checkBlock(block, flow)
@@ -273,7 +273,7 @@ object BlockValidation {
 
   class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
       extends BlockValidation {
-    override def headerValidation: HeaderValidation           = HeaderValidation.build
-    override def nonCoinbaseValidation: NonCoinbaseValidation = NonCoinbaseValidation.build
+    override def headerValidation: HeaderValidation  = HeaderValidation.build
+    override def nonCoinbaseValidation: TxValidation = TxValidation.build
   }
 }
