@@ -290,7 +290,8 @@ object NonCoinbaseValidation {
         case output: AssetOutput => expected.relateTo(output.toGroup)
         case _                   => true
       }
-      val ok4 = tx.unsigned.fixedOutputs.exists(_.toGroup == expected.to)
+      // when the transaction in for intra group, the fixedOutputs might be empty
+      val ok4 = expected.isIntraGroup || tx.unsigned.fixedOutputs.exists(_.toGroup == expected.to)
       if (!ok1) {
         invalidTx(InvalidInputGroupIndex)
       } else if ((!ok2) || (!ok3) || (!ok4)) {
@@ -398,7 +399,7 @@ object NonCoinbaseValidation {
       val result = for {
         outputSum <- tx.alfAmountInOutputs
         allOutSum <- outputSum.add(tx.gasFeeUnsafe) // safe after gas bound check
-      } yield allOutSum <= inputSum
+      } yield allOutSum == inputSum
       result match {
         case Some(true)  => validTx(())
         case Some(false) => invalidTx(InvalidAlfBalance)
@@ -418,7 +419,7 @@ object NonCoinbaseValidation {
           outputBalances <- computeTokenBalances(tx.allOutputs)
           _ <- {
             val ok = outputBalances.forall { case (tokenId, balance) =>
-              (inputBalances.contains(tokenId) && inputBalances(tokenId) >= balance)
+              inputBalances.contains(tokenId) && inputBalances(tokenId) == balance
             }
             if (ok) validTx(()) else invalidTx(InvalidTokenBalance)
           }

@@ -190,7 +190,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     passValidation(modified0)
 
     val modified1 = updateNonce(header.copy(version = defaultBlockVersionWithPoLW))
-    passValidation(modified1)
+    assertThrows[AssertionError](passValidation(modified1))
 
     forAll { byte: Byte =>
       whenever(byte != defaultBlockVersion && byte != defaultBlockVersionWithPoLW) {

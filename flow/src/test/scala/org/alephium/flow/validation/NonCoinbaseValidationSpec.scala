@@ -121,16 +121,6 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     }
   }
 
-  it should "check empty inputs" in new StatelessFixture {
-    forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
-      val unsignedNew = tx.unsigned.copy(inputs = AVector.empty)
-      val txNew       = tx.copy(unsigned = unsignedNew)
-      failCheck(checkInputNum(txNew), NoInputs)
-      failValidation(validateMempoolTx(txNew, blockFlow), NoInputs)
-      failCheck(checkBlockTx(txNew, preOutputs), NoInputs)
-    }
-  }
-
   it should "check empty outputs" in new StatelessFixture {
     forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)

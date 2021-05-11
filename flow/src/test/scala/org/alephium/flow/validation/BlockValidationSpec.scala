@@ -124,7 +124,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   }
 
   it should "check coinbase reward" in new Fixture {
-    val block = blockGenOf(brokerConfig).filter(_.nonCoinbase.nonEmpty).sample.get
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
     passCheck(checkCoinbase(block, blockFlow))
 
     val miningReward      = consensusConfig.emission.miningReward(block.header)
