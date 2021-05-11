@@ -221,7 +221,16 @@ object HeaderValidation {
     }
 
     protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (PoW.checkWork(header)) validHeader(()) else invalidHeader(InvalidWorkAmount)
+      if (header.isPoLWEnabled) {
+        val powTarget = consensusConfig.emission.poLWTargetUnsafe(header.target)
+        if (PoW.checkWork(header, powTarget)) {
+          validHeader(())
+        } else {
+          invalidHeader(InvalidPoLWWorkAmount)
+        }
+      } else {
+        if (PoW.checkWork(header)) validHeader(()) else invalidHeader(InvalidWorkAmount)
+      }
     }
 
     protected[validation] def checkDepsNum(header: BlockHeader): HeaderValidationResult[Unit] = {

@@ -41,6 +41,7 @@ final case object InvalidBlockVersion                    extends InvalidHeaderSt
 final case object NoIncreasingTimeStamp                  extends InvalidHeaderStatus
 final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
 final case object InvalidWorkAmount                      extends InvalidHeaderStatus
+final case object InvalidPoLWWorkAmount                  extends InvalidHeaderStatus
 final case object InvalidWorkTarget                      extends InvalidHeaderStatus
 final case object CannotEnablePoLW                       extends InvalidHeaderStatus
 final case object InvalidUncleTimeStamp                  extends InvalidHeaderStatus
