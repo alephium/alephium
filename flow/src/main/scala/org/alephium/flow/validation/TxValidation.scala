@@ -27,7 +27,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{OutOfGas => _, _}
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
-trait NonCoinbaseValidation {
+trait TxValidation {
   import ValidationStatus._
 
   implicit def groupConfig: GroupConfig
@@ -208,12 +208,12 @@ trait NonCoinbaseValidation {
 }
 
 // Note: only non-coinbase transactions are validated here
-object NonCoinbaseValidation {
+object TxValidation {
   import ValidationStatus._
 
-  def build(implicit groupConfig: GroupConfig): NonCoinbaseValidation = new Impl()
+  def build(implicit groupConfig: GroupConfig): TxValidation = new Impl()
 
-  class Impl(implicit val groupConfig: GroupConfig) extends NonCoinbaseValidation {
+  class Impl(implicit val groupConfig: GroupConfig) extends TxValidation {
     protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
       val inputNum = tx.unsigned.inputs.length
       // inputNum can be 0 due to coinbase tx

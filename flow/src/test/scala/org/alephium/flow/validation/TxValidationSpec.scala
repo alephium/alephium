@@ -31,7 +31,7 @@ import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
+class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
     result.isRight is true
   }
@@ -48,7 +48,7 @@ class NonCoinbaseValidationSpec extends AlephiumFlowSpec with NoIndexModelGenera
     result.left.value isE error
   }
 
-  class Fixture extends NonCoinbaseValidation.Impl with VMFactory {
+  class Fixture extends TxValidation.Impl with VMFactory {
     // TODO: prepare blockflow to test checkMempool
     def prepareWorldState(inputInfos: AVector[AssetInputInfo]): Unit = {
       inputInfos.foreach { inputInfo =>
