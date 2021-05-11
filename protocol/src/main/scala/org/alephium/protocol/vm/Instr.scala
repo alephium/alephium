@@ -54,7 +54,7 @@ object Instr {
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
     override def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatelessContext]]] = {
       for {
-        code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
+        code <- input.headOption.toRight(SerdeError.incompleteData(1, 0))
         instrCompanion <- getStatelessCompanion(code).toRight(
           SerdeError.validation(s"Instruction - invalid code $code")
         )
@@ -68,7 +68,7 @@ object Instr {
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
     override def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatefulContext]]] = {
       for {
-        code <- input.headOption.toRight(SerdeError.notEnoughBytes(1, 0))
+        code <- input.headOption.toRight(SerdeError.incompleteData(1, 0))
         instrCompanion <- getStatefulCompanion(code).toRight(
           SerdeError.validation(s"Instruction - invalid code $code")
         )

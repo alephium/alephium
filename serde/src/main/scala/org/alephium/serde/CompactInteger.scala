@@ -393,7 +393,7 @@ object CompactInteger {
 
     def decode(bs: ByteString): SerdeResult[(Mode, ByteString, ByteString)] = {
       if (bs.isEmpty) {
-        Left(SerdeError.notEnoughBytes(1, 0))
+        Left(SerdeError.incompleteData(1, 0))
       } else {
         (bs(0) & maskRest) match {
           case SingleByte.prefix => Right((SingleByte, bs.take(1), bs.drop(1)))
@@ -412,7 +412,7 @@ object CompactInteger {
       if (bs.length >= expected) {
         Right((mode, bs.take(expected), bs.drop(expected)))
       } else {
-        Left(SerdeError.notEnoughBytes(expected, bs.size))
+        Left(SerdeError.incompleteData(expected, bs.size))
       }
     }
   }

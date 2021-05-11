@@ -19,7 +19,9 @@ package org.alephium.flow.network.bootstrap
 import akka.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.message.MessageSerde
 import org.alephium.serde._
+import org.alephium.util.Bytes
 
 sealed trait Message
 
@@ -29,26 +31,38 @@ object Message {
   final case class Ack(id: Int)                  extends Message
   case object Ready                              extends Message
 
-  def serialize(input: Message): ByteString =
-    input match {
+  def serialize(input: Message): ByteString = {
+    val data = input match {
       case Peer(info)   => ByteString(0) ++ PeerInfo.serialize(info)
       case Clique(info) => ByteString(1) ++ IntraCliqueInfo.serialize(info)
       case Ack(id)      => ByteString(2) ++ intSerde.serialize(id)
       case Ready        => ByteString(3)
     }
+    Bytes.from(data.length) ++ data
+  }
 
   def deserialize(
       input: ByteString
   )(implicit groupConfig: GroupConfig): SerdeResult[Staging[Message]] = {
+    for {
+      lengthRest  <- MessageSerde.extractBytes(input, 4).map(_.mapValue(Bytes.toIntUnsafe))
+      messageRest <- MessageSerde.extractMessageBytes(lengthRest.value, lengthRest.rest)
+      message     <- deserializeBody(messageRest.value)
+    } yield Staging(message, messageRest.rest)
+  }
+
+  def deserializeBody(
+      input: ByteString
+  )(implicit groupConfig: GroupConfig): SerdeResult[Message] = {
     byteSerde._deserialize(input).flatMap { case Staging(byte, rest) =>
       if (byte == 0) {
-        PeerInfo._deserialize(rest).map(_.mapValue(Peer(_)))
+        PeerInfo.deserialize(rest).map(Peer)
       } else if (byte == 1) {
-        IntraCliqueInfo._deserialize(rest).map(_.mapValue(Clique(_)))
+        IntraCliqueInfo.deserialize(rest).map(Clique)
       } else if (byte == 2) {
-        intSerde._deserialize(rest).map(_.mapValue(Ack(_)))
+        intSerde.deserialize(rest).map(Ack)
       } else if (byte == 3) {
-        Right(Staging(Ready, rest))
+        Right(Ready)
       } else {
         Left(SerdeError.wrongFormat(s"Invalid bootstrap message code: $byte"))
       }

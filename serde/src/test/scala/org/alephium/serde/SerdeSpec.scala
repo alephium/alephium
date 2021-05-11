@@ -35,9 +35,9 @@ class SerdeSpec extends AlephiumSpec {
       forAll { inputs: Array[Byte] =>
         lazy val exception = serde.deserialize(ByteString(inputs)).left.value
         if (inputs.length < serde.serdeSize) {
-          exception is a[SerdeError.NotEnoughBytes]
+          exception is SerdeError.WrongFormat(s"Too few bytes: expected 1, got 0")
         } else if (inputs.length > serde.serdeSize) {
-          exception is a[SerdeError.WrongFormat]
+          exception is SerdeError.WrongFormat(s"Too many bytes: expected 1, got ${inputs.length}")
         }
       }
     }
@@ -120,7 +120,7 @@ class SerdeSpec extends AlephiumSpec {
       {
         val serde     = Serde.fixedSizeSerde(input.length + 1, byteSerde)
         val exception = serde.deserialize(ByteString(input.toArray)).left.value
-        exception is a[SerdeError.NotEnoughBytes]
+        exception is a[SerdeError.Validation]
       }
 
       if (input.nonEmpty) {

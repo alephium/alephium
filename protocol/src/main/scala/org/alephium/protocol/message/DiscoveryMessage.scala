@@ -186,11 +186,12 @@ object DiscoveryMessage {
     val magic     = networkType.magicBytes
     val header    = Header.serialize(message.header)
     val payload   = Payload.serialize(message.payload)
-    val signature = SignatureSchema.sign(payload, privateKey).bytes
-    val checksum  = MessageSerde.checksum(payload)
-    val length    = MessageSerde.length(payload)
+    val signature = SignatureSchema.sign(header ++ payload, privateKey).bytes
+    val data      = signature ++ header ++ payload
+    val checksum  = MessageSerde.checksum(data)
+    val length    = MessageSerde.length(data)
 
-    magic ++ checksum ++ length ++ signature ++ header ++ payload
+    magic ++ checksum ++ length ++ data
   }
 
   def deserialize(input: ByteString, networkType: NetworkType)(implicit
@@ -200,16 +201,16 @@ object DiscoveryMessage {
       .unwrap(input, networkType)
       .flatMap { case (checksum, length, rest) =>
         for {
-          signaturePair <- _deserialize[Signature](rest)
+          messageRest   <- MessageSerde.extractMessageBytes(length, rest)
+          _             <- MessageSerde.checkChecksum(checksum, messageRest.value)
+          signaturePair <- _deserialize[Signature](messageRest.value)
           headerRest    <- Header._deserialize(signaturePair.rest)
-          payloadBytes  <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
-          _             <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
           _ <- verifyPayloadSignature(
-            payloadBytes.value,
+            signaturePair.rest,
             signaturePair.value,
             headerRest.value.publicKey
           )
-          payload <- deserializeExactPayload(payloadBytes.value)
+          payload <- deserializeExactPayload(headerRest.rest)
         } yield {
           DiscoveryMessage(headerRest.value, payload)
         }
@@ -217,11 +218,11 @@ object DiscoveryMessage {
   }
 
   private def verifyPayloadSignature(
-      payload: ByteString,
+      message: ByteString,
       signature: Signature,
       publicKey: PublicKey
   ) = {
-    if (SignatureSchema.verify(payload, signature, publicKey)) {
+    if (SignatureSchema.verify(message, signature, publicKey)) {
       Right(())
     } else {
       Left(SerdeError.validation(s"Invalid signature"))

@@ -43,10 +43,11 @@ object Message {
     val magic    = networkType.magicBytes
     val header   = serde.serialize[Header](message.header)
     val payload  = Payload.serialize(message.payload)
-    val checksum = MessageSerde.checksum(payload)
-    val length   = MessageSerde.length(payload)
+    val data     = header ++ payload
+    val checksum = MessageSerde.checksum(data)
+    val length   = MessageSerde.length(data)
 
-    magic ++ checksum ++ length ++ header ++ payload
+    magic ++ checksum ++ length ++ data
   }
 
   def serialize[T <: Payload](payload: T, networkType: NetworkType): ByteString = {
@@ -58,12 +59,12 @@ object Message {
   ): SerdeResult[Staging[Message]] = {
     MessageSerde.unwrap(input, networkType).flatMap { case (checksum, length, rest) =>
       for {
-        headerRest   <- serde._deserialize[Header](rest)
-        payloadBytes <- MessageSerde.extractPayloadBytes(length, headerRest.rest)
-        _            <- MessageSerde.checkChecksum(checksum, payloadBytes.value)
-        payload      <- deserializeExactPayload(payloadBytes.value)
+        messageRest <- MessageSerde.extractMessageBytes(length, rest)
+        _           <- MessageSerde.checkChecksum(checksum, messageRest.value)
+        headerRest  <- serde._deserialize[Header](messageRest.value)
+        payload     <- Payload.deserialize(headerRest.rest)
       } yield {
-        Staging(Message(headerRest.value, payload), payloadBytes.rest)
+        Staging(Message(headerRest.value, payload), messageRest.rest)
       }
     }
   }
@@ -77,14 +78,6 @@ object Message {
       } else {
         Left(SerdeError.wrongFormat(s"Too many bytes: #${rest.length} left"))
       }
-    }
-  }
-
-  private def deserializeExactPayload(payloadBytes: ByteString)(implicit config: GroupConfig) = {
-    Payload.deserialize(payloadBytes).left.map {
-      case _: SerdeError.NotEnoughBytes =>
-        SerdeError.wrongFormat("Cannot extract a correct payload from the length field")
-      case error => error
     }
   }
 }

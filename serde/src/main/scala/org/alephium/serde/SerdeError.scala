@@ -24,8 +24,12 @@ object SerdeError {
   final case class Validation(message: String)     extends SerdeError(message)
   final case class Other(message: String)          extends SerdeError(message)
 
+  // this is returned when deserializing with partial bytes
   def notEnoughBytes(expected: Int, got: Int): NotEnoughBytes =
     NotEnoughBytes(s"Too few bytes: expected $expected, got $got")
+
+  def incompleteData(expected: Int, got: Int): WrongFormat =
+    WrongFormat(s"Too few bytes: expected $expected, got $got")
 
   def redundant(expected: Int, got: Int): WrongFormat =
     WrongFormat(s"Too many bytes: expected $expected, got $got")
