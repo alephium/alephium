@@ -97,10 +97,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       block: Block,
       flow: BlockFlow
   ): BlockValidationResult[Unit] = {
-    if (block.header.isPoLWEnabled) {
+    val result = if (block.header.isPoLWEnabled) {
       checkCoinbaseWithPoLW(block, flow)
     } else {
       checkCoinbaseWithoutPoLW(block, flow)
+    }
+
+    result match {
+      case Left(Right(ExistInvalidTx(InvalidAlfBalance))) => Left(Right(InvalidCoinbaseReward))
+      case result                                         => result
     }
   }
 
