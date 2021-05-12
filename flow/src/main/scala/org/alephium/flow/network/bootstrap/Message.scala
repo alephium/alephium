@@ -45,7 +45,7 @@ object Message {
       input: ByteString
   )(implicit groupConfig: GroupConfig): SerdeResult[Staging[Message]] = {
     for {
-      lengthRest  <- MessageSerde.extractBytes(input, 4).map(_.mapValue(Bytes.toIntUnsafe))
+      lengthRest  <- MessageSerde.extractLength(input)
       messageRest <- MessageSerde.extractMessageBytes(lengthRest.value, lengthRest.rest)
       message     <- deserializeBody(messageRest.value)
     } yield Staging(message, messageRest.rest)

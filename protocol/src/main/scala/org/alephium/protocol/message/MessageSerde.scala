@@ -40,7 +40,7 @@ object MessageSerde {
     for {
       rest         <- checkMagicBytes(input, networkType)
       checksumRest <- extractChecksum(rest)
-      lengthRest <- extractPayloadLength(
+      lengthRest <- extractLength(
         checksumRest.rest
       ) // don't use intSerde due to potential notEnoughBytes
     } yield {
@@ -56,11 +56,11 @@ object MessageSerde {
     )
   }
 
-  private def extractChecksum(bytes: ByteString): SerdeResult[Staging[ByteString]] = {
+  def extractChecksum(bytes: ByteString): SerdeResult[Staging[ByteString]] = {
     extractBytes(bytes, checksumLength)
   }
 
-  private def extractPayloadLength(bytes: ByteString): SerdeResult[Staging[Int]] = {
+  def extractLength(bytes: ByteString): SerdeResult[Staging[Int]] = {
     extractBytes(bytes, 4).map(_.mapValue(Bytes.toIntUnsafe))
   }
 
