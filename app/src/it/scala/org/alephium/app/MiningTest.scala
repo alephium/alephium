@@ -28,7 +28,7 @@ import org.alephium.util._
 class MiningTest extends AlephiumSpec {
   it should "work with 2 nodes" in new TestFixture("2-nodes") {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
+    val server1 = bootNode(publicPort = generatePort(), brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
 
     eventually(request[SelfClique](getSelfClique).synced is true)

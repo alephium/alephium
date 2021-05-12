@@ -24,9 +24,20 @@ import org.alephium.protocol.{ALF, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Env, Number, U256}
+import org.alephium.util.{AVector, Env, Number, SocketUtil, U256}
 
-trait AlephiumConfigFixture {
+trait AlephiumConfigFixture extends SocketUtil {
+
+  private val restPort   = generatePort()
+  private val wsPort     = generatePort()
+  private val walletPort = generatePort()
+
+  val portValues: Map[String, Any] = Map(
+    ("alephium.network.rest-port", restPort),
+    ("alephium.network.ws-port", wsPort),
+    ("alephium.wallet.port", walletPort)
+  )
+
   val configValues: Map[String, Any] = Map.empty
 
   val genesisBalance: U256 = ALF.alf(Number.million)
@@ -35,7 +46,9 @@ trait AlephiumConfigFixture {
   lazy val rootPath = Platform.getRootPath(env)
 
   lazy val newConfig = ConfigFactory
-    .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)
+    .parseMap(
+      (portValues ++ configValues).view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava
+    )
     .withFallback(Configs.parseConfig(rootPath))
 
   lazy val groups0 = newConfig.getInt("alephium.broker.groups")

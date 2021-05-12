@@ -24,7 +24,7 @@ import org.alephium.util._
 
 class BroadcastTxTest extends AlephiumSpec {
   it should "broadcast tx between intra clique node" in new TestFixture("broadcast-tx-2-nodes") {
-    val port2   = generatePort
+    val port2   = generatePort()
     val server1 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     val server2 = bootNode(publicPort = port2, brokerId = 1)
     Seq(server1.start(), server2.start()).foreach(_.futureValue is (()))

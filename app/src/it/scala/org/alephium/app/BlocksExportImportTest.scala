@@ -39,7 +39,7 @@ class BlocksExportImportTest extends AlephiumSpec {
 
     server.stop().futureValue is ()
 
-    val newPort   = generatePort
+    val newPort   = generatePort()
     val newServer = bootNode(publicPort = newPort, brokerId = 0, brokerNum = 1)
 
     newServer.start().futureValue is ()

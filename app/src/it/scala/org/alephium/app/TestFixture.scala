@@ -16,15 +16,12 @@
 
 package org.alephium.app
 
-import java.net.{DatagramSocket, InetSocketAddress, ServerSocket}
-import java.nio.channels.{DatagramChannel, ServerSocketChannel}
+import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
-import scala.util.control.NonFatal
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
@@ -91,46 +88,13 @@ trait TestFixtureLike
   val initialBalance = Balance(genesisBalance, 0, 1)
   val transferAmount = ALF.alf(1)
 
-  val usedPort = mutable.Set.empty[Int]
-  def generatePort: Int = {
-    val tcpPort = 40000 + Random.nextInt(5000) * 4
-
-    if (usedPort.contains(tcpPort)) {
-      generatePort
-    } else {
-      val tcp: ServerSocket   = ServerSocketChannel.open().socket()
-      val udp: DatagramSocket = DatagramChannel.open().socket()
-      val rest: ServerSocket  = ServerSocketChannel.open().socket()
-      val ws: ServerSocket    = ServerSocketChannel.open().socket()
-      try {
-        tcp.setReuseAddress(true)
-        tcp.bind(new InetSocketAddress("localhost", tcpPort))
-        udp.setReuseAddress(true)
-        udp.bind(new InetSocketAddress("localhost", tcpPort))
-        rest.setReuseAddress(true)
-        rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
-        ws.setReuseAddress(true)
-        ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
-        usedPort.add(tcpPort)
-        tcpPort
-      } catch {
-        case NonFatal(_) => generatePort
-      } finally {
-        tcp.close()
-        udp.close()
-        rest.close()
-        ws.close()
-      }
-    }
-  }
-
   def wsPort(port: Int)   = port - 1
   def restPort(port: Int) = port - 2
 
-  val defaultMasterPort     = generatePort
+  val defaultMasterPort     = generatePort()
   val defaultRestMasterPort = restPort(defaultMasterPort)
   val defaultWsMasterPort   = wsPort(defaultMasterPort)
-  val defaultWalletPort     = generatePort
+  val defaultWalletPort     = generatePort()
 
   val blockNotifyProbe = TestProbe()
 
@@ -278,15 +242,15 @@ trait TestFixtureLike
       bootstrap: Option[InetSocketAddress] = None,
       connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
   ): Seq[Server] = {
-    val masterPort = generatePort
+    val masterPort = generatePort()
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
-      val publicPort = if (brokerId equals 0) masterPort else generatePort
+      val publicPort = if (brokerId equals 0) masterPort else generatePort()
       bootNode(
         publicPort = publicPort,
         masterPort = masterPort,
         brokerId = brokerId,
-        walletPort = generatePort,
+        walletPort = generatePort(),
         bootstrap = bootstrap,
         brokerNum = nbOfNodes,
         connectionBuild = connectionBuild
