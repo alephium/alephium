@@ -82,6 +82,12 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     check(changeActiveAddress, json)
   }
 
+  it should "DeriveNextAddress.Result" in {
+    val json                    = s"""{"address":"$address"}"""
+    val deriveNextAddressResult = DeriveNextAddress.Result(address)
+    check(deriveNextAddressResult, json)
+  }
+
   it should "Transfer" in {
     val json     = s"""{"address":"$address","amount":"$balance"}"""
     val transfer = Transfer(address, balance)

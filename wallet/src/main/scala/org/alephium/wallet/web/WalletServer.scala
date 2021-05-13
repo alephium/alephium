@@ -151,6 +151,7 @@ class WalletServer(
       Future.successful(
         walletService
           .deriveNextAddress(wallet)
+          .map(model.DeriveNextAddress.Result(_))
           .left
           .map(toApiError)
       )
@@ -177,6 +178,15 @@ class WalletServer(
         walletService
           .listWallets()
           .map(_.map { case (name, locked) => model.WalletStatus(name, locked) })
+          .left
+          .map(toApiError)
+      )
+    },
+    toRoute(getWallet) { wallet =>
+      Future.successful(
+        walletService
+          .getWallet(wallet)
+          .map { case (name, locked) => model.WalletStatus(name, locked) }
           .left
           .map(toApiError)
       )

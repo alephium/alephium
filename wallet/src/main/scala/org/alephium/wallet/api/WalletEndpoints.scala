@@ -22,7 +22,6 @@ import sttp.tapir.generic.auto._
 import org.alephium.api.{ApiError, TapirCodecs, TapirSchemasLike}
 import org.alephium.api.Endpoints.{error, jsonBody}
 import org.alephium.api.UtilJson._
-import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.json
@@ -44,8 +43,13 @@ trait WalletEndpoints
     )
     .tag("Wallets")
 
-  private val minerWallets = endpoint
+  private val wallet =
+    wallets
+      .in(path[String]("wallet_name"))
+
+  private val minerWallet = endpoint
     .in("wallets")
+    .in(path[String]("wallet_name"))
     .errorOut(
       oneOf[ApiError[_]](
         error(ApiError.BadRequest),
@@ -82,72 +86,67 @@ trait WalletEndpoints
       .out(jsonBody[AVector[WalletStatus]])
       .summary("List available wallets")
 
+  val getWallet: BaseEndpoint[String, WalletStatus] =
+    wallet.get
+      .out(jsonBody[WalletStatus])
+      .summary("Get wallet's status")
+
   val lockWallet: BaseEndpoint[String, Unit] =
-    wallets.post
-      .in(path[String]("wallet_name"))
+    wallet.post
       .in("lock")
       .summary("Lock your wallet")
 
   val unlockWallet: BaseEndpoint[(String, WalletUnlock), Unit] =
-    wallets.post
-      .in(path[String]("wallet_name"))
+    wallet.post
       .in("unlock")
       .in(jsonBody[WalletUnlock])
       .summary("Unlock your wallet")
 
   val deleteWallet: BaseEndpoint[(String, WalletDeletion), Unit] =
-    wallets.delete
-      .in(path[String]("wallet_name"))
+    wallet.delete
       .in(jsonBody[WalletDeletion])
       .summary("Delete your wallet file (can be recovered with your mnemonic)")
 
   val getBalances: BaseEndpoint[String, Balances] =
-    wallets.get
-      .in(path[String]("wallet_name"))
+    wallet.get
       .in("balances")
       .out(jsonBody[Balances])
       .summary("Get your total balance")
 
   val transfer: BaseEndpoint[(String, Transfer), Transfer.Result] =
-    wallets.post
-      .in(path[String]("wallet_name"))
+    wallet.post
       .in("transfer")
       .in(jsonBody[Transfer])
       .out(jsonBody[Transfer.Result])
       .summary("Transfer ALF")
 
   val getAddresses: BaseEndpoint[String, Addresses] =
-    wallets.get
-      .in(path[String]("wallet_name"))
+    wallet.get
       .in("addresses")
       .out(jsonBody[Addresses])
       .summary("List all your wallet's addresses")
 
-  val deriveNextAddress: BaseEndpoint[String, Address] =
-    wallets.post
-      .in(path[String]("wallet_name"))
+  val deriveNextAddress: BaseEndpoint[String, DeriveNextAddress.Result] =
+    wallet.post
       .in("deriveNextAddress")
-      .out(jsonBody[Address])
+      .out(jsonBody[DeriveNextAddress.Result])
       .summary("Derive your next address")
       .description("Cannot be called from a miner wallet")
 
   val changeActiveAddress: BaseEndpoint[(String, ChangeActiveAddress), Unit] =
-    wallets.post
-      .in(path[String]("wallet_name"))
+    wallet.post
       .in("changeActiveAddress")
       .in(jsonBody[ChangeActiveAddress])
       .summary("Choose the active address")
 
   val getMinerAddresses: BaseEndpoint[String, AVector[MinerAddressesInfo]] =
-    minerWallets.get
-      .in(path[String]("wallet_name"))
+    minerWallet.get
       .in("miner-addresses")
       .out(jsonBody[AVector[MinerAddressesInfo]])
       .summary("List all miner addresses per group")
 
   val deriveNextMinerAddresses: BaseEndpoint[String, AVector[AddressInfo]] =
-    minerWallets.post
-      .in(path[String]("wallet_name"))
+    minerWallet.post
       .in("deriveNextMinerAddresses")
       .out(jsonBody[AVector[AddressInfo]])
       .summary("Derive your next miner addresses for each group")

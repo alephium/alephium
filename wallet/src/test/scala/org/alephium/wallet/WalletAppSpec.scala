@@ -92,6 +92,7 @@ class WalletAppSpec
   def changeActiveAddress(address: Address) =
     Post(s"/wallets/$wallet/changeActiveAddress", changeActiveAddressJson(address))
   def listWallets() = Get("/wallets")
+  def getWallet()   = Get(s"/wallets/$wallet")
 
   it should "work" in {
 
@@ -117,7 +118,13 @@ class WalletAppSpec
       val walletStatus = response.as[AVector[model.WalletStatus]].head
       walletStatus.walletName is wallet
       walletStatus.locked is false
-      wallet is walletStatus.walletName
+      response.code is StatusCode.Ok
+    }
+
+    getWallet() check { response =>
+      val walletStatus = response.as[model.WalletStatus]
+      walletStatus.walletName is wallet
+      walletStatus.locked is false
       response.code is StatusCode.Ok
     }
 
@@ -138,6 +145,13 @@ class WalletAppSpec
 
     transfer(transferAmount) check { response =>
       response.code is StatusCode.Unauthorized
+    }
+
+    getWallet() check { response =>
+      val walletStatus = response.as[model.WalletStatus]
+      walletStatus.walletName is wallet
+      walletStatus.locked is true
+      response.code is StatusCode.Ok
     }
 
     unlock()
@@ -169,7 +183,7 @@ class WalletAppSpec
     }
 
     deriveNextAddress() check { response =>
-      address = response.as[Address]
+      address = response.as[model.DeriveNextAddress.Result].address
       addresses = model.Addresses(address, addresses.addresses :+ address)
       response.code is StatusCode.Ok
     }
