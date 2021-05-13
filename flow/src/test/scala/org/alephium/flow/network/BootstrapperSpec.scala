@@ -61,9 +61,9 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   class MasterFixture(name: String) extends AlephiumFlowActorSpec(name) with InfoFixture {
     override val configValues = Map(
-      ("alephium.network.internal-address", s"localhost:9972"),
-      ("alephium.network.coordinator-address", s"localhost:9972"),
-      ("alephium.network.external-address", s"localhost:9972")
+      ("alephium.network.internal-address", s"127.0.0.1:9972"),
+      ("alephium.network.coordinator-address", s"127.0.0.1:9972"),
+      ("alephium.network.external-address", s"127.0.0.1:9972")
     )
 
     val connected =

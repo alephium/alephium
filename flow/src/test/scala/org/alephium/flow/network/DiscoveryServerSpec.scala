@@ -293,7 +293,7 @@ object DiscoveryServerSpec {
       _scanFrequency: Duration = Duration.unsafe(200),
       _expireDuration: Duration = Duration.ofHoursUnsafe(1)
   ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
-    val publicAddress: InetSocketAddress = new InetSocketAddress("localhost", port)
+    val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
       val peersPerGroup: Int          = _peersPerGroup

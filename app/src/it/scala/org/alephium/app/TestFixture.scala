@@ -104,13 +104,13 @@ trait TestFixtureLike
       val ws: ServerSocket    = ServerSocketChannel.open().socket()
       try {
         tcp.setReuseAddress(true)
-        tcp.bind(new InetSocketAddress("localhost", tcpPort))
+        tcp.bind(new InetSocketAddress("127.0.0.1", tcpPort))
         udp.setReuseAddress(true)
-        udp.bind(new InetSocketAddress("localhost", tcpPort))
+        udp.bind(new InetSocketAddress("127.0.0.1", tcpPort))
         rest.setReuseAddress(true)
-        rest.bind(new InetSocketAddress("localhost", restPort(tcpPort)))
+        rest.bind(new InetSocketAddress("127.0.0.1", restPort(tcpPort)))
         ws.setReuseAddress(true)
-        ws.bind(new InetSocketAddress("localhost", wsPort(tcpPort)))
+        ws.bind(new InetSocketAddress("127.0.0.1", wsPort(tcpPort)))
         usedPort.add(tcpPort)
         tcpPort
       } catch {
@@ -246,10 +246,10 @@ trait TestFixtureLike
   ) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
-        ("alephium.network.bind-address", s"localhost:$publicPort"),
-        ("alephium.network.internal-address", s"localhost:$publicPort"),
-        ("alephium.network.coordinator-address", s"localhost:$masterPort"),
-        ("alephium.network.external-address", s"localhost:$publicPort"),
+        ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
+        ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
+        ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
+        ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.ws-port", wsPort(publicPort)),
         ("alephium.network.rest-port", restPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),

@@ -63,7 +63,7 @@ class BroadcastTxTest extends AlephiumSpec {
     val clique2 =
       bootClique(
         nbOfNodes = 1,
-        bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1))
+        bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1))
       )
     val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 

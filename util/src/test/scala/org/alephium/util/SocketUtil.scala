@@ -37,9 +37,9 @@ trait SocketUtil {
       val udp: DatagramSocket = DatagramChannel.open().socket()
       try {
         tcp.setReuseAddress(true)
-        tcp.bind(new InetSocketAddress("localhost", port))
+        tcp.bind(new InetSocketAddress("127.0.0.1", port))
         udp.setReuseAddress(true)
-        udp.bind(new InetSocketAddress("localhost", port))
+        udp.bind(new InetSocketAddress("127.0.0.1", port))
         usedPort.add(port)
         port
       } catch {

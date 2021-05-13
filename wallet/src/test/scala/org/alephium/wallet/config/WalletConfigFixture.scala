@@ -26,9 +26,9 @@ import org.alephium.wallet.config.WalletConfig
 
 trait WalletConfigFixture extends SocketUtil {
 
-  val localhost: InetAddress = InetAddress.getByName("127.0.0.1")
-  val blockFlowPort          = generatePort()
-  val walletPort             = generatePort()
+  val host: InetAddress = InetAddress.getByName("127.0.0.1")
+  val blockFlowPort     = generatePort()
+  val walletPort        = generatePort()
 
   val groupNum = 4
 
@@ -50,6 +50,6 @@ trait WalletConfigFixture extends SocketUtil {
     tempSecretDir,
     networkType,
     lockingTimeout,
-    WalletConfig.BlockFlow(localhost.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge)
+    WalletConfig.BlockFlow(host.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge)
   )
 }

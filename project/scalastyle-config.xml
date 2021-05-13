@@ -103,6 +103,12 @@
         </parameters>
         <customMessage><![CDATA[tapir statusMapping are not type safe]]></customMessage>
     </check>
+    <check level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
+        <parameters>
+            <parameter name="regex"><![CDATA[localhost]]></parameter>
+        </parameters>
+        <customMessage><![CDATA[use 127.0.0.1 over localhost]]></customMessage>
+    </check>
     <check level="error" class="org.scalastyle.scalariform.ImportOrderChecker" enabled="true">
         <parameters>
             <parameter name="groups">java,scala,3rdParty,alephium</parameter>

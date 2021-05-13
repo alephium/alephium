@@ -114,7 +114,7 @@ class WebSocketServerSpec
         server.start().futureValue
 
         httpClient
-          .webSocket(port, "localhost", "/events")
+          .webSocket(port, "127.0.0.1", "/events")
           .asScala
           .map { ws =>
             ws.textMessageHandler { blockNotify =>

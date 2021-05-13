@@ -78,7 +78,7 @@ class WalletApp(config: WalletConfig)(implicit
       case Some(port) =>
         routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
         for {
-          binding <- server.listen(port, "localhost").asScala
+          binding <- server.listen(port, "127.0.0.1").asScala
         } yield {
           bindingPromise.success(binding)
           logger.info(s"Listening wallet http request on $binding")

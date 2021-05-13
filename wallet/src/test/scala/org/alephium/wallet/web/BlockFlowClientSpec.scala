@@ -26,9 +26,9 @@ import org.alephium.util.{AlephiumSpec, Duration, U256}
 
 class BlockFlowClientSpec() extends AlephiumSpec {
   it should "correclty create an sttp request" in new Fixture {
-    val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://localhost:1234"))
+    val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://127.0.0.1:1234"))
       .apply((publicKey, toAddress, None, value))
-    request.uri is uri"http://localhost:1234/transactions/build?fromKey=${publicKey.toHexString}&toAddress=${toAddress.toBase58}&value=${value.v}"
+    request.uri is uri"http://127.0.0.1:1234/transactions/build?fromKey=${publicKey.toHexString}&toAddress=${toAddress.toBase58}&value=${value.v}"
   }
 
   trait Fixture extends Endpoints with LockupScriptGenerators with SttpClientInterpreter {

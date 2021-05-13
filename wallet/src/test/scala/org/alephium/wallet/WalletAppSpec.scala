@@ -49,7 +49,7 @@ class WalletAppSpec
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
   val blockFlowMock =
-    new WalletAppSpec.BlockFlowServerMock(localhost, blockFlowPort, networkType)
+    new WalletAppSpec.BlockFlowServerMock(host, blockFlowPort, networkType)
 
   val walletApp: WalletApp =
     new WalletApp(config)

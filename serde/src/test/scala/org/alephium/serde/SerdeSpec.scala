@@ -203,8 +203,13 @@ class SerdeSpec extends AlephiumSpec {
     output1 isE address1
   }
 
+  // scalastyle:off regex
   it should "fail for address based on host name" in {
-    val address = serialize("localhost") ++ serialize("9000")
-    deserialize[InetSocketAddress](address).left.value is a[SerdeError.WrongFormat]
+    val address1 = serialize("localhost") ++ serialize("9000")
+    deserialize[InetSocketAddress](address1).left.value is a[SerdeError.WrongFormat]
+
+    val address2 = serialize("127.0.0.1") ++ serialize("9000")
+    deserialize[InetSocketAddress](address2).left.value is a[SerdeError.WrongFormat]
   }
+  // scalastyle:on regex
 }

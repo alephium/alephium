@@ -35,7 +35,7 @@ import org.alephium.util.{ActorRefT, Duration}
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
   it should "handshake with new connection" in new Fixture {
     val brokerInfo =
-      BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("localhost", 0))
+      BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("127.0.0.1", 0))
     val hello = Hello.unsafe(brokerInfo.interBrokerInfo)
     brokerHandler ! BrokerHandler.Received(hello)
     brokerHandler.underlyingActor.pingPongTickOpt is a[Some[_]]
@@ -90,7 +90,7 @@ class TestBrokerHandler(
 
   override def allHandlers: AllHandlers = ???
 
-  val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("localhost", 0))
+  val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("127.0.0.1", 0))
 
   override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo)
 

@@ -116,7 +116,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       val clique2 =
         bootClique(
           nbOfNodes = nbOfNodesClique2,
-          bootstrap = Some(new InetSocketAddress("localhost", masterPortClique1)),
+          bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
           connectionBuild = connectionBuild
         )
       val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
@@ -176,7 +176,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       bootClique(
         1,
         bootstrap = Some(
-          new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)
+          new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)
         ),
         connectionBuild = Injected.apply(modifier, _)
       ).head
@@ -209,7 +209,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val server1 = bootClique(
       1,
       bootstrap =
-        Some(new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)),
+        Some(new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)),
       connectionBuild = Injected.payload(injection, _)
     ).head
 
@@ -243,7 +243,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     val server1 = bootClique(
       1,
       bootstrap =
-        Some(new InetSocketAddress("localhost", server0.config.network.coordinatorAddress.getPort)),
+        Some(new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)),
       connectionBuild = Injected(injectionData, _)
     ).head
 

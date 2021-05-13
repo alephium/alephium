@@ -47,14 +47,14 @@ class AlephiumConfigSpec extends AlephiumSpec {
     case class Bootstrap(addresses: ArraySeq[InetSocketAddress])
 
     val expected =
-      ArraySeq(new InetSocketAddress("localhost", 1234), new InetSocketAddress("localhost", 4321))
+      ArraySeq(new InetSocketAddress("127.0.0.1", 1234), new InetSocketAddress("127.0.0.1", 4321))
 
     ConfigFactory
-      .parseString("""{ addresses = ["localhost:1234", "localhost:4321"] }""")
+      .parseString("""{ addresses = ["127.0.0.1:1234", "127.0.0.1:4321"] }""")
       .as[ArraySeq[InetSocketAddress]]("addresses")(inetSocketAddressesReader) is expected
 
     ConfigFactory
-      .parseString("""{ addresses = "localhost:1234,localhost:4321" }""")
+      .parseString("""{ addresses = "127.0.0.1:1234,127.0.0.1:4321" }""")
       .as[ArraySeq[InetSocketAddress]]("addresses")(inetSocketAddressesReader) is expected
 
     ConfigFactory

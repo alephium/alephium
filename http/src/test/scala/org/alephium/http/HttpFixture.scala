@@ -103,7 +103,7 @@ trait HttpFixture {
 
   def parseUri(endpoint: String): Uri = {
     val (path, params) = parsePath(endpoint)
-    val base           = Uri("localhost").withPath(path)
+    val base           = Uri("127.0.0.1").withPath(path)
     if (params.isEmpty) {
       base
     } else {

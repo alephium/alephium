@@ -102,6 +102,12 @@
         </parameters>
         <customMessage><![CDATA[println|noSpaces are disabled]]></customMessage>
     </check>
+    <check level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
+        <parameters>
+            <parameter name="regex"><![CDATA[localhost]]></parameter>
+        </parameters>
+        <customMessage><![CDATA[use 127.0.0.1 over localhost]]></customMessage>
+    </check>
     <check customId="no.should" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
         <parameters>
             <parameter name="regex"><![CDATA[shouldBe|shouldEqual]]></parameter>

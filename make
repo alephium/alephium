@@ -31,7 +31,7 @@ def mining_action_call_all(action):
     calls = []
     for node in range(deployedNodes, deployedNodes + nodes):
         port = (port_start + 3000) + node
-        calls.append(('localhost', port, action))
+        calls.append(('127.0.0.1', port, action))
 
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
     results = pool.map(mining_action_call, calls)
@@ -126,15 +126,15 @@ class AlephiumMake(object):
             rpcPort = port + 1000
             wsPort = port + 2000
             restPort = port + 3000
-            bindAddress = "localhost:" + str(port)
-            coordinatorAddress = "localhost:" + str(9973 + node // brokerNum * brokerNum)
+            bindAddress = "127.0.0.1:" + str(port)
+            coordinatorAddress = "127.0.0.1:" + str(9973 + node // brokerNum * brokerNum)
             brokerId = node % brokerNum
             print("Starting a new node")
             print("node-{}: {} (coordinator: {})".format(str(brokerId), bindAddress, coordinatorAddress))
 
             bootstrap = ""
             if node // brokerNum > 0:
-                bootstrap = "localhost:" + str(9973 + node % brokerNum)
+                bootstrap = "127.0.0.1:" + str(9973 + node % brokerNum)
 
             nodedir = "{}/alephium/node-{}".format(tempdir, node)
 
@@ -175,7 +175,7 @@ class AlephiumMake(object):
             userConfFile.close()
 
             run('ALEPHIUM_HOME={} '\
-              'nice -n 19 ./app/target/universal/stage/bin/alephium-app &> {}/console.log &'\
+              'nice -n 19 ./app/target/universal/scripts/bin/alephium-app &> {}/console.log &'\
               .format(nodedir, nodedir))
 
     def mining(self, params):
