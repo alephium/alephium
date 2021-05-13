@@ -140,6 +140,9 @@ trait WalletExamples {
   implicit val changeActiveAddressExamples: List[Example[ChangeActiveAddress]] =
     simpleExample(ChangeActiveAddress(address))
 
+  implicit val deriveNextAddressResultExamples: List[Example[DeriveNextAddress.Result]] =
+    simpleExample(DeriveNextAddress.Result(address))
+
   implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
     simpleExample(ApiError.BadRequest("Something bad in the request"))
 

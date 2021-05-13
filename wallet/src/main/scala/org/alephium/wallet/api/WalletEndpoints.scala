@@ -22,7 +22,6 @@ import sttp.tapir.generic.auto._
 import org.alephium.api.{ApiError, TapirCodecs, TapirSchemasLike}
 import org.alephium.api.Endpoints.{error, jsonBody}
 import org.alephium.api.UtilJson._
-import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.json
@@ -123,11 +122,11 @@ trait WalletEndpoints
       .out(jsonBody[Addresses])
       .summary("List all your wallet's addresses")
 
-  val deriveNextAddress: BaseEndpoint[String, Address] =
+  val deriveNextAddress: BaseEndpoint[String, DeriveNextAddress.Result] =
     wallets.post
       .in(path[String]("wallet_name"))
       .in("deriveNextAddress")
-      .out(jsonBody[Address])
+      .out(jsonBody[DeriveNextAddress.Result])
       .summary("Derive your next address")
       .description("Cannot be called from a miner wallet")
 

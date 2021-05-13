@@ -169,7 +169,7 @@ class WalletAppSpec
     }
 
     deriveNextAddress() check { response =>
-      address = response.as[Address]
+      address = response.as[model.DeriveNextAddress.Result].address
       addresses = model.Addresses(address, addresses.addresses :+ address)
       response.code is StatusCode.Ok
     }

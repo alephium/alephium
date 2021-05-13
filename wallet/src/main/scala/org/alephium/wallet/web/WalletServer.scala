@@ -151,6 +151,7 @@ class WalletServer(
       Future.successful(
         walletService
           .deriveNextAddress(wallet)
+          .map(model.DeriveNextAddress.Result(_))
           .left
           .map(toApiError)
       )

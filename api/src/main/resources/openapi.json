@@ -830,9 +830,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Result3"
                 },
-                "example": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                "example": {
+                  "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                }
               }
             }
           },
@@ -3741,6 +3743,17 @@
           },
           "group": {
             "type": "integer"
+          }
+        }
+      },
+      "Result3": {
+        "required": [
+          "address"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
           }
         }
       },
