@@ -20,12 +20,7 @@ import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{
-  defaultBlockVersion,
-  genesisBlockVersion,
-  BlockHeader,
-  ChainIndex
-}
+import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
 
 trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
