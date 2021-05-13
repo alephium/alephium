@@ -19,11 +19,12 @@ package org.alephium.app
 import scala.concurrent.ExecutionContext
 
 import akka.actor.ActorSystem
+import akka.pattern.ask
 import akka.testkit.TestProbe
+import akka.util.Timeout
 import io.vertx.core.Vertx
 import org.scalatest.{Assertion, EitherValues}
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{Minutes, Span}
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.flow.handler.FlowHandler.BlockNotify
@@ -38,10 +39,10 @@ class WebSocketServerSpec
     with NoIndexModelGenerators
     with EitherValues
     with ScalaFutures
-    with NumericHelpers {
+    with Eventually
+    with NumericHelpers
+    with IntegrationPatience {
   import ServerFixture._
-
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   behavior of "http"
 
@@ -70,12 +71,6 @@ class WebSocketServerSpec
   }
 
   behavior of "ws"
-
-  it should "receive one event" in new RouteWS {
-    checkWS {
-      sendEventAndCheck
-    }
-  }
 
   it should "receive multiple events" in new RouteWS {
     checkWS {
@@ -116,23 +111,42 @@ class WebSocketServerSpec
       }
     }
 
-    def checkWS[A](f: => A): A =
-      try {
-        server.start().futureValue
+    def checkWS[A](f: => A) = {
+      server.start().futureValue
 
-        httpClient
-          .webSocket(port, "127.0.0.1", "/events")
-          .asScala
-          .map { ws =>
-            ws.textMessageHandler { blockNotify =>
-              blockNotifyProbe.ref ! blockNotify
-            }
-          }
+      implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
+      eventually {
+        node.eventBus
+          .ask(EventBus.ListSubscribers)
+          .mapTo[EventBus.Subscribers]
           .futureValue
-
-        f
-      } finally {
-        server.stop().futureValue
+          .value
+          .contains(server.eventHandler) is true
       }
+
+      val ws = httpClient
+        .webSocket(port, "127.0.0.1", "/events")
+        .asScala
+        .map { ws =>
+          ws.textMessageHandler { blockNotify =>
+            blockNotifyProbe.ref ! blockNotify
+          }
+          ws
+        }
+        .futureValue
+
+      eventually {
+        server.eventHandler
+          .ask(WebSocketServer.EventHandler.ListSubscribers)
+          .mapTo[AVector[String]]
+          .futureValue
+          .nonEmpty is true
+      }
+
+      f
+
+      ws.close().asScala.futureValue
+      server.stop().futureValue
+    }
   }
 }

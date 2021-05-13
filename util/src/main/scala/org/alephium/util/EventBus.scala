@@ -27,11 +27,14 @@ object EventBus {
 
   trait Message
 
-  sealed trait Command    extends Message
-  case object Subscribe   extends Command
-  case object Unsubscribe extends Command
+  sealed trait Command        extends Message
+  case object Subscribe       extends Command
+  case object Unsubscribe     extends Command
+  case object ListSubscribers extends Command
 
   trait Event extends Message
+
+  final case class Subscribers(value: AVector[ActorRef]) extends Message
 }
 
 class EventBus() extends BaseActor {
@@ -48,5 +51,7 @@ class EventBus() extends BaseActor {
     case Unsubscribe =>
       val subscriber = sender()
       if (subscribers.contains(subscriber)) { subscribers -= subscriber }
+    case ListSubscribers =>
+      sender() ! Subscribers(AVector.unsafe(subscribers.toArray))
   }
 }

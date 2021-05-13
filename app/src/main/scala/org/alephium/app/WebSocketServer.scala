@@ -20,7 +20,7 @@ import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.concurrent._
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
@@ -37,7 +37,7 @@ import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{BaseActor, EventBus, Service}
+import org.alephium.util.{AVector, BaseActor, EventBus, Service}
 
 class WebSocketServer(node: Node, wsPort: Int)(implicit
     val system: ActorSystem,
@@ -57,7 +57,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   private val vertxEventBus = vertx.eventBus()
   private val server        = vertx.createHttpServer()
 
-  private val eventHandler = system.actorOf(EventHandler.props(vertxEventBus))
+  val eventHandler: ActorRef = system.actorOf(EventHandler.props(vertxEventBus))
 
   node.eventBus.tell(EventBus.Subscribe, eventHandler)
 
@@ -114,7 +114,7 @@ object WebSocketServer {
 
     final case class Subscribe(address: String)
     final case class Unsubscribe(address: String)
-
+    case object ListSubscribers
   }
   class EventHandler(vertxEventBus: VertxEventBus)(implicit
       val networkType: NetworkType,
@@ -130,10 +130,11 @@ object WebSocketServer {
       case event: EventBus.Event =>
         subscribers.foreach { subscriber => vertxEventBus.send(subscriber, handleEvent(event)) }
       case EventHandler.Subscribe(subscriber) =>
-        vertxEventBus.localConsumer(subscriber)
         if (!subscribers.contains(subscriber)) { subscribers += subscriber }
       case EventHandler.Unsubscribe(subscriber) =>
         if (subscribers.contains(subscriber)) { subscribers -= subscriber }
+      case EventHandler.ListSubscribers =>
+        sender() ! AVector.unsafe(subscribers.toArray)
     }
   }
 
