@@ -36,6 +36,11 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     (x >= y * (errorBase - 1) / errorBase && x <= y * (errorBase + 1) / errorBase) is true
   }
 
+  def equalBigInt(x: BigInteger, y: BigInteger, errorOrder: Long = 8): Assertion = {
+    val errorBase = math.pow(10.0, errorOrder.toDouble).toLong
+    (x >= y * (errorBase - 1) / errorBase && x <= y * (errorBase + 1) / errorBase) is true
+  }
+
   def getInflationRate(amount: U256): Double = {
     (BigDecimal(amount.toBigInt) / BigDecimal(ALF.MaxALFValue.toBigInt)).doubleValue
   }
@@ -107,5 +112,46 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
       TimeStamp.zero
     ) is stableMaxRewardPerChain
+  }
+
+  behavior of "PoLW"
+
+  it should "fail when hashrate is low" in new Fixture {
+    import emission._
+
+    assertThrows[AssertionError](burntAmountUnsafe(oneEhPerSecondDivided, U256.One))
+    assertThrows[AssertionError](burntAmountUnsafe(onePhPerSecondDivided, U256.One))
+    assertThrows[AssertionError](poLWTargetUnsafe(oneEhPerSecondDivided))
+    assertThrows[AssertionError](poLWTargetUnsafe(onePhPerSecondDivided))
+  }
+
+  it should "calculate correct poLW target" in new Fixture {
+    import emission._
+
+    def check(target: Target): Assertion = {
+      equalBigInt(
+        poLWTargetUnsafe(target).value,
+        target.value.multiply(BigInteger.valueOf(8)),
+        1
+      )
+    }
+
+    check(a128EhPerSecondDivided)
+    check(Target.unsafe(a128EhPerSecondDivided.value.multiply(2)))
+  }
+
+  it should "calculate correct burnt amount" in new Fixture {
+    import emission._
+
+    def check(target: Target): Assertion = {
+      equalU256(
+        emission.burntAmountUnsafe(target, U256.Billion),
+        U256.Billion * 3 / 4,
+        1
+      )
+    }
+
+    check(a128EhPerSecondDivided)
+    check(Target.unsafe(a128EhPerSecondDivided.value.multiply(2)))
   }
 }

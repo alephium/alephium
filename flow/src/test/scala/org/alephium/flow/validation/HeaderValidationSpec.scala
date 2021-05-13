@@ -248,6 +248,11 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     failValidation(modified, InvalidWorkAmount)
   }
 
+  it should "check PoLW work amount" in new HeaderFixture {
+    val modified = updateNonce(header.copy(version = defaultBlockVersionWithPoLW))
+    assertThrows[AssertionError](headerValidator.validate(modified, blockFlow))
+  }
+
   it should "check PoW work target" in new HeaderFixture {
     val target0   = Target.unsafe(header.target.value.multiply(BigInteger.valueOf(2)))
     val modified0 = header.copy(target = target0)

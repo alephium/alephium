@@ -123,7 +123,7 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     val hashRate = HashRate.from(target, blockTargetTime)
     val powHashRate =
       hashRate.value
-        .add(oneEhPerSecondDivided.value.multiply(BigInteger.valueOf(7)))
+        .add(oneEhPerSecondDividedHashRate.value.multiply(BigInteger.valueOf(7)))
         .divide(BigInteger.valueOf(8))
     val powTarget = Target.from(HashRate.unsafe(powHashRate), blockTargetTime)
     powTarget
