@@ -28,6 +28,7 @@ trait WalletDocumentation extends WalletEndpoints {
     createWallet,
     restoreWallet,
     listWallets,
+    getWallet,
     lockWallet,
     unlockWallet,
     deleteWallet,

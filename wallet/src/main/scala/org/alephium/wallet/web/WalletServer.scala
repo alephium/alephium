@@ -181,6 +181,15 @@ class WalletServer(
           .left
           .map(toApiError)
       )
+    },
+    toRoute(getWallet) { wallet =>
+      Future.successful(
+        walletService
+          .getWallet(wallet)
+          .map { case (name, locked) => model.WalletStatus(name, locked) }
+          .left
+          .map(toApiError)
+      )
     }
   )
 }

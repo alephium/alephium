@@ -86,6 +86,11 @@ trait WalletEndpoints
       .out(jsonBody[AVector[WalletStatus]])
       .summary("List available wallets")
 
+  val getWallet: BaseEndpoint[String, WalletStatus] =
+    wallet.get
+      .out(jsonBody[WalletStatus])
+      .summary("Get wallet's status")
+
   val lockWallet: BaseEndpoint[String, Unit] =
     wallet.post
       .in("lock")

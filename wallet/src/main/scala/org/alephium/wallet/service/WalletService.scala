@@ -74,6 +74,7 @@ trait WalletService extends Service {
   def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[Address]]
   def changeActiveAddress(wallet: String, address: Address): Either[WalletError, Unit]
   def listWallets(): Either[WalletError, AVector[(String, Boolean)]]
+  def getWallet(wallet: String): Either[WalletError, (String, Boolean)]
 }
 
 object WalletService {
@@ -364,6 +365,12 @@ object WalletService {
             (wallet, locked)
           }
         }
+      }
+    }
+
+    override def getWallet(wallet: String): Either[WalletError, (String, Boolean)] = {
+      withWallet(wallet) { secretStorage =>
+        Right((wallet, secretStorage.isLocked()))
       }
     }
 

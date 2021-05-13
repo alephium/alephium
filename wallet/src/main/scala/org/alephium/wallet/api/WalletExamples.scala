@@ -104,7 +104,10 @@ trait WalletExamples {
   implicit val walletRestoreResultExamples: List[Example[WalletRestore.Result]] =
     simpleExample(WalletRestore.Result(walletName))
 
-  implicit val walletStatusExamples: List[Example[AVector[WalletStatus]]] =
+  implicit val walletStatusExamples: List[Example[WalletStatus]] =
+    simpleExample(WalletStatus(walletName, locked = true))
+
+  implicit val walletsStatusExamples: List[Example[AVector[WalletStatus]]] =
     simpleExample(AVector(WalletStatus(walletName, locked = true)))
 
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
