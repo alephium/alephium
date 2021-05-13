@@ -105,6 +105,8 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     target < oneEhPerSecondDivided
   }
 
+  // the amount to burn is reward * 7/8 (1 - 1Eh/s / HR)
+  // to encourage burning, we reduce the ratio from 7/8 to 3/4
   def burntAmountUnsafe(target: Target, miningReward: U256): U256 = {
     assume(canEnablePoLW(target))
     val amount = miningReward.toBigInt
@@ -118,6 +120,8 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   val oneEhPerSecondDividedHashRate: HashRate =
     HashRate.from(oneEhPerSecondDivided, blockTargetTime)
 
+  // the true hash rate for energy-based mining is (HR * 1/8 + 1Eh/s * 7/8)
+  // we could reduce energy consumption by ~1/8 when hash rate is significantly high
   def poLWTargetUnsafe(target: Target): Target = {
     assume(canEnablePoLW(target))
     val hashRate = HashRate.from(target, blockTargetTime)
