@@ -23,8 +23,7 @@ import scala.util.Random
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Seconds, Span}
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
@@ -38,12 +37,11 @@ class DiscoveryServerSpec
     extends RefinedAlephiumActorSpec
     with ScalaFutures
     with Eventually
-    with SocketUtil {
+    with SocketUtil
+    with IntegrationPatience {
   import DiscoveryServerSpec._
 
   trait SimulationFixture { fixture =>
-    implicit val patienceConfig =
-      PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
 
     def groups: Int
 
@@ -242,8 +240,6 @@ class DiscoveryServerSpec
   }
 
   trait Fixture extends BrokerConfigFixture.Default with ActorFixture {
-    implicit val patienceConfig =
-      PatienceConfig(timeout = Span(20, Seconds), interval = Span(1, Seconds))
 
     override val groups = Gen.choose(2, 10).sample.get
 
