@@ -1,5 +1,5 @@
 FROM adoptopenjdk/openjdk11:jre
-# Uncomment the next line and comment the previous one if you want to usee GraalVM instaed of OpenJDK
+# Uncomment the next line and comment the previous one if you want to usee GraalVM instead of OpenJDK
 # FROM ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2
 
 # RELEASE is set via the docker-compose.yml file

@@ -159,6 +159,9 @@ lazy val app = mainProject("app")
       new Dockerfile {
         from("adoptopenjdk/openjdk11:jre")
 
+        // Uncomment the next line and comment the previous one if you want to usee GraalVM instead of OpenJDK
+        // from("ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2")
+
         add(artifact, artifactTargetPath)
 
         runRaw(s"mkdir -p $alephiumHome && usermod -d $alephiumHome nobody && chown nobody $alephiumHome")
