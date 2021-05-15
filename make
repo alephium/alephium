@@ -66,6 +66,7 @@ class AlephiumMake(object):
             package      Produce the project deliverable
             publish      Publish locally the projects libraries
             release      Release a new version of the project
+            docker       Build the docker image
 
             run          Run a local testnet
             kill         kill a local running testnet
@@ -106,6 +107,9 @@ class AlephiumMake(object):
 
     def release(self):
         run_exit('sbt release')
+
+    def docker(self):
+        run_exit('sbt clean app/docker')
 
     def benchmark(self):
         run_exit('sbt \"benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*\"')
