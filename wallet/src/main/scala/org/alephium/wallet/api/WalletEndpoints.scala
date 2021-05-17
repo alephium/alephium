@@ -19,8 +19,8 @@ package org.alephium.wallet.api
 import sttp.tapir._
 import sttp.tapir.generic.auto._
 
-import org.alephium.api.{ApiError, TapirCodecs, TapirSchemasLike}
-import org.alephium.api.Endpoints.{error, jsonBody}
+import org.alephium.api.{BaseEndpoint, TapirCodecs, TapirSchemasLike}
+import org.alephium.api.Endpoints.jsonBody
 import org.alephium.api.UtilJson._
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
@@ -28,41 +28,26 @@ import org.alephium.wallet.json
 
 trait WalletEndpoints
     extends json.ModelCodecs
+    with BaseEndpoint
     with TapirSchemasLike
     with TapirCodecs
     with WalletExamples {
 
-  private val wallets = endpoint
+  private val wallets = baseEndpoint
     .in("wallets")
-    .errorOut(
-      oneOf[ApiError[_]](
-        error(ApiError.BadRequest),
-        error(ApiError.NotFound),
-        error(ApiError.Unauthorized)
-      )
-    )
     .tag("Wallets")
 
   private val wallet =
     wallets
       .in(path[String]("wallet_name"))
 
-  private val minerWallet = endpoint
+  private val minerWallet = baseEndpoint
     .in("wallets")
     .in(path[String]("wallet_name"))
-    .errorOut(
-      oneOf[ApiError[_]](
-        error(ApiError.BadRequest),
-        error(ApiError.NotFound),
-        error(ApiError.Unauthorized)
-      )
-    )
     .tag("Miners")
     .description(
       "This endpoint can only be called if the wallet was created with the `miner = true` flag"
     )
-
-  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_], B, Any]
 
   val createWallet: BaseEndpoint[WalletCreation, WalletCreation.Result] =
     wallets.post

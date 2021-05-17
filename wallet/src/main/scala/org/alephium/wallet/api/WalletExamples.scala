@@ -18,7 +18,7 @@ package org.alephium.wallet.api
 
 import sttp.tapir.EndpointIO.Example
 
-import org.alephium.api.ApiError
+import org.alephium.api.ErrorExamples
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, NetworkType}
@@ -27,7 +27,7 @@ import org.alephium.util.{AVector, Hex, U256}
 import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-trait WalletExamples {
+trait WalletExamples extends ErrorExamples {
 
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
@@ -74,8 +74,6 @@ trait WalletExamples {
   private val toGroup            = 1
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
-
-  def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
     Example(
@@ -145,13 +143,4 @@ trait WalletExamples {
 
   implicit val deriveNextAddressResultExamples: List[Example[DeriveNextAddress.Result]] =
     simpleExample(DeriveNextAddress.Result(address))
-
-  implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
-    simpleExample(ApiError.BadRequest("Something bad in the request"))
-
-  implicit val notFoundExamples: List[Example[ApiError.NotFound]] =
-    simpleExample(ApiError.NotFound("wallet-name"))
-
-  implicit val unauthorizedExamples: List[Example[ApiError.Unauthorized]] =
-    simpleExample(ApiError.Unauthorized("You shall not pass"))
 }

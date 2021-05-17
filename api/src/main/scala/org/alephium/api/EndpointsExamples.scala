@@ -30,7 +30,7 @@ import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 // scalastyle:off magic.number
-trait EndpointsExamples {
+trait EndpointsExamples extends ErrorExamples {
 
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
@@ -106,8 +106,6 @@ trait EndpointsExamples {
   )
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
-
-  def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
 
   val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
@@ -226,20 +224,5 @@ trait EndpointsExamples {
 
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
-
-  implicit val badRequestExamples: List[Example[ApiError.BadRequest]] =
-    simpleExample(ApiError.BadRequest("Something bad in the request"))
-
-  implicit val notFoundExamples: List[Example[ApiError.NotFound]] =
-    simpleExample(ApiError.NotFound("wallet-name"))
-
-  implicit val internalServerErrorExamples: List[Example[ApiError.InternalServerError]] =
-    simpleExample(ApiError.InternalServerError("Ouch"))
-
-  implicit val unauthorizedExamples: List[Example[ApiError.Unauthorized]] =
-    simpleExample(ApiError.Unauthorized("You shall not pass"))
-
-  implicit val serviceUnavailableExamples: List[Example[ApiError.ServiceUnavailable]] =
-    simpleExample(ApiError.ServiceUnavailable("Self clique unsynced"))
 }
 // scalastyle:on magic.number

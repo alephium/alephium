@@ -27,7 +27,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 import akka.util.ByteString
+import sttp.model.StatusCode
 
+import org.alephium.api.ApiError
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
@@ -134,7 +136,9 @@ object WalletService {
     val message: String = s"Wallet ${file.getName()} not found"
   }
 
-  final case class BlockFlowClientError(message: String) extends WalletError
+  final case class BlockFlowClientError(apiError: ApiError[_ <: StatusCode]) extends WalletError {
+    val message: String = apiError.detail
+  }
 
   def apply(
       blockFlowClient: BlockFlowClient,
@@ -386,7 +390,7 @@ object WalletService {
     private def getBalance(address: Address): Future[Either[WalletError, (Address, U256)]] = {
       blockFlowClient
         .fetchBalance(address)
-        .map(_.map(amount => (address, amount)).left.map(message => BlockFlowClientError(message)))
+        .map(_.map(amount => (address, amount)).left.map(error => BlockFlowClientError(error)))
     }
 
     private def withWalletM[A, M[_]](

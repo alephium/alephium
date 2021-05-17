@@ -58,6 +58,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -68,6 +81,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -134,6 +160,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -144,6 +183,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -226,6 +278,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -236,6 +301,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -301,6 +379,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -311,6 +402,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -376,6 +480,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -386,6 +503,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -440,6 +570,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -450,6 +593,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -517,6 +673,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -527,6 +696,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -597,6 +779,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -607,6 +802,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -687,6 +895,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -697,6 +918,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -764,6 +998,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -774,6 +1021,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -849,6 +1109,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -859,6 +1132,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -924,6 +1210,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -934,6 +1233,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -1005,6 +1317,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -1015,6 +1340,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -1082,6 +1420,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFound",
             "content": {
@@ -1092,6 +1443,19 @@
                 "example": {
                   "resource": "wallet-name",
                   "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
                 }
               }
             }
@@ -3594,6 +3958,17 @@
           }
         }
       },
+      "InternalServerError": {
+        "required": [
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
       "NotFound": {
         "required": [
           "detail",
@@ -3606,6 +3981,17 @@
           },
           "resource": {
             "type": "integer"
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "required": [
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -3837,28 +4223,6 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
-          }
-        }
-      },
-      "InternalServerError": {
-        "required": [
-          "detail"
-        ],
-        "type": "object",
-        "properties": {
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "ServiceUnavailable": {
-        "required": [
-          "detail"
-        ],
-        "type": "object",
-        "properties": {
-          "detail": {
             "type": "string"
           }
         }

@@ -19,6 +19,7 @@ package org.alephium.wallet.web
 import scala.concurrent.{ExecutionContext, Future}
 
 import io.vertx.ext.web._
+import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
 import sttp.tapir.swagger.vertx.SwaggerVertx
 
@@ -196,7 +197,7 @@ class WalletServer(
 
 object WalletServer {
   import ApiError._
-  def toApiError(walletError: WalletError): ApiError[_] = {
+  def toApiError(walletError: WalletError): ApiError[_ <: StatusCode] = {
 
     def badRequest                 = BadRequest(walletError.message)
     def internalServerError        = InternalServerError(walletError.message)
@@ -206,7 +207,7 @@ object WalletServer {
     walletError match {
       case _: InvalidWalletName         => badRequest
       case _: CannotCreateEncryptedFile => badRequest
-      case _: BlockFlowClientError      => internalServerError
+      case BlockFlowClientError(error)  => error
       case _: UnknownAddress            => badRequest
       case InvalidWalletFile            => badRequest
       case UnexpectedError              => internalServerError
