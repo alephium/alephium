@@ -43,6 +43,11 @@ class TxPool private (
       weights.contains(txId)
     }
 
+  def isDoubleSpending(tx: TransactionTemplate): Boolean =
+    readOnly {
+      tx.unsigned.inputs.exists(input => indexes.isSpent(input.outputRef))
+    }
+
   def collectForBlock(maxNum: Int): AVector[TransactionTemplate] =
     readOnly {
       AVector.from(pool.values.take(maxNum))

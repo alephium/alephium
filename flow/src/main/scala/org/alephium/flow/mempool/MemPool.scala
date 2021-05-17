@@ -45,14 +45,18 @@ class MemPool private (
 
   def size: Int = pools.sumBy(_.size)
 
-  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean =
-    readOnly {
-      contains(index, transaction.id)
-    }
+  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = {
+    contains(index, transaction.id)
+  }
 
   def contains(index: ChainIndex, txId: Hash): Boolean =
     readOnly {
       getPool(index).contains(txId) || pendingPool.contains(txId)
+    }
+
+  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean =
+    readOnly {
+      getPool(index).isDoubleSpending(tx) || pendingPool.isDoubleSpending(tx)
     }
 
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
