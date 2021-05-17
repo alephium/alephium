@@ -19,10 +19,10 @@ package org.alephium.wallet.web
 import scala.concurrent.{ExecutionContext, Future}
 
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
-import sttp.model.Uri
+import sttp.model.{StatusCode, Uri}
 import sttp.tapir.client.sttp._
 
-import org.alephium.api.Endpoints
+import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.model._
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
@@ -31,17 +31,17 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{Duration, Hex, U256}
 
 trait BlockFlowClient {
-  def fetchBalance(address: Address): Future[Either[String, U256]]
+  def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]]
   def prepareTransaction(
       fromKey: String,
       toAddress: Address,
       value: U256
-  ): Future[Either[String, BuildTransactionResult]]
+  ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def postTransaction(
       tx: String,
       signature: Signature,
       fromGroup: Int
-  ): Future[Either[String, TxResult]]
+  ): Future[Either[ApiError[_ <: StatusCode], TxResult]]
 }
 
 object BlockFlowClient {
@@ -64,7 +64,9 @@ object BlockFlowClient {
 
     private val backend = AsyncHttpClientFutureBackend()
 
-    private def uriFromGroup(fromGroup: GroupIndex): Future[Either[String, Uri]] =
+    private def uriFromGroup(
+        fromGroup: GroupIndex
+    ): Future[Either[ApiError[_ <: StatusCode], Uri]] =
       fetchSelfClique().map { selfCliqueEither =>
         for {
           selfClique <- selfCliqueEither
@@ -78,27 +80,27 @@ object BlockFlowClient {
         fromGroup: GroupIndex,
         endpoint: BaseEndpoint[P, A],
         params: P
-    )(f: A => R): Future[Either[String, R]] =
+    )(f: A => R): Future[Either[ApiError[_ <: StatusCode], R]] =
       uriFromGroup(fromGroup).flatMap {
         _.fold(
-          error => Future.successful(Left(error)),
+          e => Future.successful(Left(e)),
           uri =>
             backend
               .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
-              .map(_.body.map(f).left.map(_.detail))
+              .map(_.body.map(f))
         )
       }
 
-    def fetchBalance(address: Address): Future[Either[String, U256]] =
+    def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]] =
       requestFromGroup(address.groupIndex, getBalance, address)(_.balance)
 
     def prepareTransaction(
         fromKey: String,
         toAddress: Address,
         value: U256
-    ): Future[Either[String, BuildTransactionResult]] = {
+    ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from) match {
-        case None => Future.successful(Left(s"Cannot decode key $fromKey"))
+        case None => Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromKey")))
         case Some(publicKey) =>
           val lockupScript = LockupScript.p2pkh(publicKey)
           requestFromGroup(
@@ -113,7 +115,7 @@ object BlockFlowClient {
         tx: String,
         signature: Signature,
         fromGroup: Int
-    ): Future[Either[String, TxResult]] = {
+    ): Future[Either[ApiError[_ <: StatusCode], TxResult]] = {
       requestFromGroup(
         GroupIndex.unsafe(fromGroup),
         sendTransaction,
@@ -121,12 +123,12 @@ object BlockFlowClient {
       )(identity)
     }
 
-    private def fetchSelfClique(): Future[Either[String, SelfClique]] = {
-      backend
+    private def fetchSelfClique(): Future[Either[ApiError[_ <: StatusCode], SelfClique]] = {
+      val x = backend
         .send(
           toRequestThrowDecodeFailures(getSelfClique, Some(defaultUri)).apply(())
         )
-        .map(_.body.left.map(_.detail))
+      x.map(_.body)
     }
   }
 }

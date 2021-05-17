@@ -184,9 +184,9 @@ class WalletAppSpec
 
     val tooMuchAmount = 10000
     transfer(tooMuchAmount) check { response =>
-      val error = response.as[ApiError.InternalServerError]
+      val error = response.as[ApiError.BadRequest]
       error.detail.contains(s"""Not enough balance""") is true
-      response.code is StatusCode.InternalServerError
+      response.code is StatusCode.BadRequest
     }
 
     deriveNextAddress() check { response =>

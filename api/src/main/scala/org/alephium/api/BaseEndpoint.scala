@@ -17,6 +17,7 @@
 package org.alephium.api
 
 import com.typesafe.scalalogging.StrictLogging
+import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.generic.auto._
 
@@ -26,12 +27,12 @@ import org.alephium.api.TapirSchemasLike
 trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike with StrictLogging {
   import Endpoints._
 
-  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_], B, Any]
+  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_ <: StatusCode], B, Any]
 
   val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
       .errorOut(
-        oneOf[ApiError[_]](
+        oneOf[ApiError[_ <: StatusCode]](
           error(ApiError.BadRequest),
           error(ApiError.InternalServerError),
           error(ApiError.NotFound),
