@@ -37,6 +37,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints
     extends ApiModelCodec
+    with BaseEndpoint
     with EndpointsExamples
     with TapirCodecs
     with TapirSchemasLike
@@ -44,8 +45,6 @@ trait Endpoints
   import Endpoints._
 
   implicit def groupConfig: GroupConfig
-
-  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_], B, Any]
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
@@ -68,18 +67,6 @@ trait Endpoints
       .and(query[GroupIndex]("toGroup"))
       .map({ case (from, to) => ChainIndex(from, to) })(chainIndex =>
         (chainIndex.from, chainIndex.to)
-      )
-
-  private val baseEndpoint: BaseEndpoint[Unit, Unit] =
-    endpoint
-      .errorOut(
-        oneOf[ApiError[_]](
-          error(ApiError.BadRequest),
-          error(ApiError.InternalServerError),
-          error(ApiError.NotFound),
-          error(ApiError.ServiceUnavailable),
-          error(ApiError.Unauthorized)
-        )
       )
 
   private val infosEndpoint: BaseEndpoint[Unit, Unit] =

@@ -182,6 +182,13 @@ class WalletAppSpec
       response.code is StatusCode.BadRequest
     }
 
+    val tooMuchAmount = 10000
+    transfer(tooMuchAmount) check { response =>
+      val error = response.as[ApiError.InternalServerError]
+      error.detail.contains(s"""Not enough balance""") is true
+      response.code is StatusCode.InternalServerError
+    }
+
     deriveNextAddress() check { response =>
       address = response.as[model.DeriveNextAddress.Result].address
       addresses = model.Addresses(address, addresses.addresses :+ address)
@@ -266,10 +273,11 @@ object WalletAppSpec extends {
     private val vertx  = Vertx.vertx()
     private val router = Router.router(vertx)
 
-    def complete[A: Writer](ctx: RoutingContext, a: A): Unit = {
+    def complete[A: Writer](ctx: RoutingContext, a: A, code: Int = 200): Unit = {
       discard(
         ctx.request
           .response()
+          .setStatusCode(code)
           .putHeader("content-type", "application/json")
           .end(write(a))
       )
@@ -278,18 +286,26 @@ object WalletAppSpec extends {
     router.route().path("/transactions/build").handler { ctx =>
       val _          = ctx.request.getParam("fromKey")
       val _          = ctx.request.getParam("toAddress")
-      val _          = ctx.request.getParam("value")
+      val amount     = read[Int](ctx.request.getParam("value"))
       val unsignedTx = transactionGen().sample.get.unsigned
 
-      complete(
-        ctx,
-        BuildTransactionResult(
-          Hex.toHexString(serialize(unsignedTx)),
-          unsignedTx.hash,
-          unsignedTx.fromGroup.value,
-          unsignedTx.toGroup.value
+      if (amount > 100) {
+        complete(
+          ctx,
+          ApiError.BadRequest("Not enough balance"),
+          400
         )
-      )
+      } else {
+        complete(
+          ctx,
+          BuildTransactionResult(
+            Hex.toHexString(serialize(unsignedTx)),
+            unsignedTx.hash,
+            unsignedTx.fromGroup.value,
+            unsignedTx.toGroup.value
+          )
+        )
+      }
     }
 
     router.route().path("/transactions/send").handler(BodyHandler.create()).handler { ctx =>
