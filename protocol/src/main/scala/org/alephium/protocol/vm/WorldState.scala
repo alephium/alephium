@@ -211,13 +211,17 @@ object WorldState {
 
     def getAssetOutputs(
         outputRefPrefix: ByteString,
-        maxOutputs: Int
+        maxOutputs: Int,
+        predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
       outputState
-        .getAll(outputRefPrefix, maxOutputs)
-        .map(
-          _.filter(p => p._1.isAssetType && p._2.isAsset).asUnsafe[(AssetOutputRef, AssetOutput)]
+        .getAll(
+          outputRefPrefix,
+          maxOutputs,
+          (outputRef, output) =>
+            predicate(outputRef, output) && outputRef.isAssetType && output.isAsset
         )
+        .map(_.asUnsafe[(AssetOutputRef, AssetOutput)])
     }
 
     def getContractOutputs(
@@ -225,11 +229,12 @@ object WorldState {
         maxOutputs: Int
     ): IOResult[AVector[(ContractOutputRef, ContractOutput)]] = {
       outputState
-        .getAll(outputRefPrefix, maxOutputs)
-        .map(
-          _.filter(p => p._1.isContractType && !p._2.isAsset)
-            .asUnsafe[(ContractOutputRef, ContractOutput)]
+        .getAll(
+          outputRefPrefix,
+          maxOutputs,
+          (outputRef, output) => outputRef.isContractType && output.isContract
         )
+        .map(_.asUnsafe[(ContractOutputRef, ContractOutput)])
     }
 
     def getContractState(key: Hash): IOResult[ContractState] = {

@@ -33,6 +33,8 @@ sealed trait TxOutput {
 
   def isAsset: Boolean
 
+  def isContract: Boolean = !isAsset
+
   def payGasUnsafe(fee: U256): TxOutput
 }
 
