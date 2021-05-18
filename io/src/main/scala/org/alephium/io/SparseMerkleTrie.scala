@@ -439,23 +439,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 
   def getAll(prefix: ByteString, maxNodes: Int): IOResult[AVector[(K, V)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes).flatMap { dataVec =>
-      dataVec.mapE { case (nibbles, leaf) =>
-        val deser = for {
-          key   <- deserialize[K](SparseMerkleTrie.nibbles2Bytes(nibbles))
-          value <- deserialize[V](leaf.data)
-        } yield (key, value)
-        deser.left.map(IOError.Serde)
-      }
-    }
-  }
-
-  def getAllRaw(prefix: ByteString, maxNodes: Int): IOResult[AVector[(ByteString, ByteString)]] = {
-    val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes: Int).map(_.map {
-      case (nibbles, leaf) =>
-        (SparseMerkleTrie.nibbles2Bytes(nibbles), leaf.data)
-    })
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes: Int)
   }
 
   protected def getAllRaw(
@@ -463,7 +447,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       hash: Hash,
       acc: ByteString,
       maxNodes: Int
-  ): IOResult[AVector[(ByteString, LeafNode)]] = {
+  ): IOResult[AVector[(K, V)]] = {
     if (prefix.isEmpty) {
       getAllRaw(hash, acc, maxNodes)
     } else {
@@ -477,7 +461,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       node: Node,
       acc: ByteString,
       maxNodes: Int
-  ): IOResult[AVector[(ByteString, LeafNode)]] = {
+  ): IOResult[AVector[(K, V)]] = {
     node match {
       case n: BranchNode =>
         if (n.path.length >= prefix.length) {
@@ -498,7 +482,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
         }
       case n: LeafNode =>
         if (n.path.take(prefix.length) == prefix) {
-          Right(AVector(acc ++ n.path -> n))
+          deserializeKV(acc ++ n.path, n)
         } else {
           Right(AVector.empty)
         }
@@ -509,10 +493,10 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       hash: Hash,
       acc: ByteString,
       maxNodes: Int
-  ): IOResult[AVector[(ByteString, LeafNode)]] = {
+  ): IOResult[AVector[(K, V)]] = {
     getNode(hash).flatMap {
       case n: BranchNode => getAllRaw(n, acc, maxNodes)
-      case n: LeafNode   => Right(AVector(acc ++ n.path -> n))
+      case n: LeafNode   => deserializeKV(acc ++ n.path, n)
     }
   }
 
@@ -520,16 +504,23 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       node: BranchNode,
       acc: ByteString,
       maxNodes: Int
-  ): IOResult[AVector[(ByteString, LeafNode)]] = {
-    node.children.foldWithIndexE(AVector.empty[(ByteString, LeafNode)]) {
-      case (leafNodes, childOpt, index) =>
-        val restNodes = maxNodes - leafNodes.length
-        childOpt match {
-          case Some(child) if restNodes > 0 =>
-            getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte), restNodes)
-              .map(leafNodes ++ _)
-          case _ => Right(leafNodes)
-        }
+  ): IOResult[AVector[(K, V)]] = {
+    node.children.foldWithIndexE(AVector.empty[(K, V)]) { case (leafNodes, childOpt, index) =>
+      val restNodes = maxNodes - leafNodes.length
+      childOpt match {
+        case Some(child) if restNodes > 0 =>
+          getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte), restNodes)
+            .map(leafNodes ++ _)
+        case _ => Right(leafNodes)
+      }
     }
+  }
+
+  def deserializeKV(nibbles: ByteString, node: LeafNode): IOResult[AVector[(K, V)]] = {
+    val deser = for {
+      key   <- deserialize[K](SparseMerkleTrie.nibbles2Bytes(nibbles))
+      value <- deserialize[V](node.data)
+    } yield AVector(key -> value)
+    deser.left.map(IOError.Serde)
   }
 }
