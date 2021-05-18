@@ -189,6 +189,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     (filter2.length + filter3.length > 100) is true
     (filter2.length + filter3.length <= 200) is true
 
+    val samples = Set(keys.take(500).sample(), keys.drop(500).sample())
+    trie.getAll(ByteString.empty, 1, (key, _) => samples.contains(key)).rightValue.length is 1
+    trie.getAll(ByteString.empty, 2, (key, _) => samples.contains(key)).rightValue.length is 2
+    trie.getAll(ByteString.empty, 3, (key, _) => samples.contains(key)).rightValue.length is 2
+
     keys.foreach { key =>
       trie.getOpt(key).map(_.nonEmpty) isE true
       trie.exist(key) isE true
