@@ -23,7 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlowState.TxStatus
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
+import org.alephium.flow.core.FlowUtils._
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool.{GrandPool, MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.setting.MemPoolSetting
@@ -310,10 +310,8 @@ trait FlowUtils
       getUsableUtxosOnce(lockupScript) match {
         case Right(utxos) =>
           lastTryOpt match {
-            case Some(firstTry) =>
-              if (utxos.toSet == firstTry.toSet) Right(utxos) else iter(Some(utxos))
-            case None =>
-              iter(Some(utxos))
+            case Some(lastTry) if isSame(utxos, lastTry) => Right(utxos)
+            case _                                       => iter(Some(utxos))
           }
         case Left(error) => Left(error)
       }
@@ -601,6 +599,13 @@ object FlowUtils {
       parentTs.plusMillisUnsafe(1)
     } else {
       resultTs
+    }
+  }
+
+  def isSame(utxos0: AVector[AssetOutputInfo], utxos1: AVector[AssetOutputInfo]): Boolean = {
+    (utxos0.length == utxos1.length) && {
+      val set = utxos0.toSet
+      utxos1.forall(set.contains)
     }
   }
 }

@@ -20,7 +20,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
-import org.alephium.util.{AlephiumSpec, AVector, Bytes}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, U256}
 
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
@@ -98,6 +98,25 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
     val newBlock = block.copy(transactions = AVector(newTx))
+
+    val ts0 = System.currentTimeMillis()
     blockFlow.add(newBlock).isRight is true
+    val ts1 = System.currentTimeMillis()
+
+    val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
+    balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
+    lockedBalance is 0
+    utxos is 10000
+
+    val ts2 = System.currentTimeMillis()
+    blockFlow.prepareUnsignedTx(
+      keyManager(output.lockupScript).publicKey,
+      output.lockupScript,
+      None,
+      ALF.oneAlf
+    )
+    val ts3 = System.currentTimeMillis()
+
+    print(s"Times: ${ts1 - ts0} - ${ts2 - ts1} - ${ts3 - ts2}\n")
   }
 }
