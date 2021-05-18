@@ -1476,6 +1476,96 @@
         }
       }
     },
+    "/infos/node": {
+      "get": {
+        "tags": [
+          "Infos"
+        ],
+        "summary": "Get info about that node",
+        "operationId": "getInfosNode",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeInfo"
+                },
+                "example": {
+                  "isMining": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/infos/self-clique": {
       "get": {
         "tags": [
@@ -4224,6 +4314,17 @@
         "properties": {
           "address": {
             "type": "string"
+          }
+        }
+      },
+      "NodeInfo": {
+        "required": [
+          "isMining"
+        ],
+        "type": "object",
+        "properties": {
+          "isMining": {
+            "type": "boolean"
           }
         }
       },

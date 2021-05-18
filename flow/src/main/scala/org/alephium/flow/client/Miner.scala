@@ -62,6 +62,7 @@ object Miner extends LazyLogging {
   }
 
   sealed trait Command
+  case object IsMining                                              extends Command
   case object Start                                                 extends Command
   case object Stop                                                  extends Command
   case object UpdateTemplate                                        extends Command
@@ -209,6 +210,7 @@ class Miner(
         setIdle(fromShift, to)
         startNewTasks()
       }
+    case Miner.IsMining => sender() ! miningStarted
   }
   // scalastyle:on method.length
 

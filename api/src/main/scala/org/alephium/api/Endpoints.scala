@@ -99,6 +99,12 @@ trait Endpoints
       .in("blockflow")
       .tag("Blockflow")
 
+  val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
+    infosEndpoint.get
+      .in("node")
+      .out(jsonBody[NodeInfo])
+      .summary("Get info about that node")
+
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
     infosEndpoint.get
       .in("self-clique")

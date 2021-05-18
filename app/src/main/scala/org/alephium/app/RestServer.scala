@@ -92,6 +92,14 @@ class RestServer(
       }
   }
 
+  private val getNodeInfoRoute = toRoute(getNodeInfo) { _ =>
+    for {
+      isMining <- miner.ask(Miner.IsMining).mapTo[Boolean]
+    } yield {
+      Right(NodeInfo(isMining = isMining))
+    }
+  }
+
   private val getSelfCliqueRoute = toRoute(getSelfClique) { _ =>
     for {
       synced     <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
@@ -285,6 +293,7 @@ class RestServer(
     new SwaggerVertx(openApiJson(openAPI), yamlName = "openapi.json").route
 
   private val blockFlowRoute: AVector[Router => Route] = AVector(
+    getNodeInfoRoute,
     getSelfCliqueRoute,
     getInterCliquePeerInfoRoute,
     getDiscoveredNeighborsRoute,

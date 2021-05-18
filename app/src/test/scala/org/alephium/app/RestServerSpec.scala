@@ -365,6 +365,44 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
+  it should "call GET /infos/node" in new RestServerFixture {
+    withServer {
+      minerProbe.setAutoPilot(new TestActor.AutoPilot {
+        var miningStarted: Boolean = false
+        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
+          msg match {
+            case Miner.IsMining =>
+              sender ! miningStarted
+              TestActor.KeepRunning
+            case Miner.Start =>
+              miningStarted = true
+              TestActor.KeepRunning
+            case Miner.Stop =>
+              miningStarted = false
+              TestActor.KeepRunning
+          }
+
+      })
+
+      Get(s"/infos/node") check { response =>
+        response.code is StatusCode.Ok
+        response.as[NodeInfo] is NodeInfo(isMining = false)
+      }
+
+      miner ! Miner.Start
+
+      Get(s"/infos/node") check { response =>
+        response.as[NodeInfo] is NodeInfo(isMining = true)
+      }
+
+      miner ! Miner.Stop
+
+      Get(s"/infos/node") check { response =>
+        response.as[NodeInfo] is NodeInfo(isMining = false)
+      }
+    }
+  }
+
   it should "call GET /docs" in new RestServerFixture {
     withServer {
       Get(s"/docs") check { response =>

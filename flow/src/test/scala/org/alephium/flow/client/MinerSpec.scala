@@ -50,7 +50,15 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
       Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
     )
 
+    def checkMining(isMining: Boolean) = {
+      miner ! Miner.IsMining
+      expectMsg(isMining)
+    }
+
+    checkMining(false)
+
     miner ! Miner.Start
+    checkMining(true)
     flowHandler.expectMsgType[FlowHandler.SetHandler]
     flowHandler.expectMsgType[FlowHandler.Register]
     flowHandler.expectMsgType[FlowHandler.AddBlock]
@@ -58,6 +66,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     flowHandler.expectMsgType[FlowHandler.AddBlock]
 
     miner ! Miner.Stop
+    checkMining(false)
     flowHandler.expectMsgType[FlowHandler.UnRegister.type]
 
     miner ! Miner.Start

@@ -112,6 +112,13 @@ trait EndpointsExamples extends ErrorExamples {
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
   )
 
+  implicit val nodeInfoExamples: List[Example[NodeInfo]] =
+    simpleExample(
+      NodeInfo(
+        isMining = true
+      )
+    )
+
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(
       SelfClique(

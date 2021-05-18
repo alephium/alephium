@@ -28,6 +28,7 @@ trait Documentation extends Endpoints {
   def port: Int
 
   private lazy val blockflowEndpoints = List(
+    getNodeInfo,
     getSelfClique,
     getInterCliquePeerInfo,
     getDiscoveredNeighbors,

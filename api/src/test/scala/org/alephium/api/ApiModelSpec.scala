@@ -101,6 +101,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(response, jsonRaw)
   }
 
+  it should "encode/decode NodeInfo" in {
+    val nodeInfo = NodeInfo(isMining = true)
+    val jsonRaw =
+      s"""{"isMining":true}"""
+    checkData(nodeInfo, jsonRaw)
+  }
+
   it should "encode/decode SelfClique" in {
     val cliqueId = CliqueId.generate
     val peerAddress =
