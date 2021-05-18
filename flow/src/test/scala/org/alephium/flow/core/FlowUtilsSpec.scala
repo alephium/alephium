@@ -17,7 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
 import org.alephium.util.{AlephiumSpec, AVector, Bytes}
@@ -85,5 +85,19 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
+  }
+
+  it should "deal with large amount of UTXOs" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = transfer(blockFlow, chainIndex)
+    val tx         = block.nonCoinbase.head
+    val output     = tx.unsigned.fixedOutputs.head
+
+    val outputs = AVector.tabulate(10000) { k =>
+      output.copy(amount = ALF.nanoAlf(k.toLong))
+    }
+    val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
+    val newBlock = block.copy(transactions = AVector(newTx))
+    blockFlow.add(newBlock).isRight is true
   }
 }

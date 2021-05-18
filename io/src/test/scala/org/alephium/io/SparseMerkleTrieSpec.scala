@@ -153,7 +153,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     keys.foreach { key => trie.getOptRaw(key).map(_.nonEmpty) isE true }
 
-    val allStored    = trie.getAllRaw(ByteString.empty).toOption.get
+    val allStored    = trie.getAllRaw(ByteString.empty, Int.MaxValue).toOption.get
     val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())
     val expectedKeys = (keys :+ genesisKey.bytes).toArray.sortBy(_.hashCode())
     allKeys is expectedKeys
@@ -169,14 +169,16 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   it should "work for random insertions" in withTrieFixture { fixture =>
     import fixture.trie
 
-    val keys = AVector.tabulate(100) { _ =>
+    val keys = AVector.tabulate(1000) { _ =>
       val (key, value) = fixture.generateKV()
       trie = trie.putRaw(key, value).toOption.get
       trie = trie.putRaw(key, value).toOption.get //idempotent tests
       key
     }
 
-    trie.getAllRaw(ByteString.empty).toOption.get.length is 101
+    (1 to 1001).foreach { k =>
+      trie.getAllRaw(ByteString.empty, k).rightValue.length is k
+    }
     keys.foreach { key =>
       trie.getOptRaw(key).map(_.nonEmpty) isE true
       trie.existRaw(key) isE true
@@ -187,7 +189,9 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       trie = trie.putRaw(key, value).toOption.get
     }
 
-    trie.getAllRaw(ByteString.empty).toOption.get.length is 101
+    (1 to 1001).foreach { k =>
+      trie.getAllRaw(ByteString.empty, k).rightValue.length is k
+    }
     keys.foreach { key =>
       trie.getOptRaw(key).map(_.nonEmpty) isE true
       trie.existRaw(key) isE true

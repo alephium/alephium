@@ -445,8 +445,8 @@ trait FlowFixture
     contractState.fields is fields
     contractState.contractOutputRef is outputRef
 
-    worldState.getAssetOutputs(ByteString.empty).toOption.get.length is numAssets
-    worldState.getContractOutputs(ByteString.empty).toOption.get.length is numContracts
+    worldState.getAssetOutputs(ByteString.empty, Int.MaxValue).rightValue.length is numAssets
+    worldState.getContractOutputs(ByteString.empty, Int.MaxValue).rightValue.length is numContracts
   }
 }
 

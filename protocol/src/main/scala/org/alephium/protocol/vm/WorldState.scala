@@ -209,27 +209,27 @@ object WorldState {
       outputState.exist(outputRef)
     }
 
-    def getAllOutputs(outputRefPrefix: ByteString): IOResult[AVector[(TxOutputRef, TxOutput)]] = {
-      outputState.getAll(outputRefPrefix)
-    }
-
     def getAssetOutputs(
-        outputRefPrefix: ByteString
+        outputRefPrefix: ByteString,
+        maxOutputs: Int
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
       outputState
-        .getAll(outputRefPrefix)
+        .getAll(outputRefPrefix, maxOutputs)
         .map(
           _.filter(p => p._1.isAssetType && p._2.isAsset).asUnsafe[(AssetOutputRef, AssetOutput)]
         )
     }
 
     def getContractOutputs(
-        outputRefPrefix: ByteString
+        outputRefPrefix: ByteString,
+        maxOutputs: Int
     ): IOResult[AVector[(ContractOutputRef, ContractOutput)]] = {
-      getAllOutputs(outputRefPrefix).map(
-        _.filter(p => p._1.isContractType && !p._2.isAsset)
-          .asUnsafe[(ContractOutputRef, ContractOutput)]
-      )
+      outputState
+        .getAll(outputRefPrefix, maxOutputs)
+        .map(
+          _.filter(p => p._1.isContractType && !p._2.isAsset)
+            .asUnsafe[(ContractOutputRef, ContractOutput)]
+        )
     }
 
     def getContractState(key: Hash): IOResult[ContractState] = {
@@ -237,7 +237,7 @@ object WorldState {
     }
 
     def getContractStates(): IOResult[AVector[(ContractId, ContractState)]] = {
-      contractState.getAll(ByteString.empty)
+      contractState.getAll(ByteString.empty, Int.MaxValue)
     }
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Persisted] = {

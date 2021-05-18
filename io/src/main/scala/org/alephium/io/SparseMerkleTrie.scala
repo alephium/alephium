@@ -437,9 +437,9 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     Right(TrieUpdateActions(Some(branchNode), AVector(hash), toAdd))
   }
 
-  def getAll(prefix: ByteString): IOResult[AVector[(K, V)]] = {
+  def getAll(prefix: ByteString, maxNodes: Int): IOResult[AVector[(K, V)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty).flatMap { dataVec =>
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes).flatMap { dataVec =>
       dataVec.mapE { case (nibbles, leaf) =>
         val deser = for {
           key   <- deserialize[K](SparseMerkleTrie.nibbles2Bytes(nibbles))
@@ -450,22 +450,24 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  def getAllRaw(prefix: ByteString): IOResult[AVector[(ByteString, ByteString)]] = {
+  def getAllRaw(prefix: ByteString, maxNodes: Int): IOResult[AVector[(ByteString, ByteString)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty).map(_.map { case (nibbles, leaf) =>
-      (SparseMerkleTrie.nibbles2Bytes(nibbles), leaf.data)
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes: Int).map(_.map {
+      case (nibbles, leaf) =>
+        (SparseMerkleTrie.nibbles2Bytes(nibbles), leaf.data)
     })
   }
 
   protected def getAllRaw(
       prefix: ByteString,
       hash: Hash,
-      acc: ByteString
+      acc: ByteString,
+      maxNodes: Int
   ): IOResult[AVector[(ByteString, LeafNode)]] = {
     if (prefix.isEmpty) {
-      getAllRaw(hash, acc)
+      getAllRaw(hash, acc, maxNodes)
     } else {
-      getNode(hash).flatMap(getAllRaw(prefix, _, acc))
+      getNode(hash).flatMap(getAllRaw(prefix, _, acc, maxNodes))
     }
   }
 
@@ -473,12 +475,13 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
   protected def getAllRaw(
       prefix: ByteString,
       node: Node,
-      acc: ByteString
+      acc: ByteString,
+      maxNodes: Int
   ): IOResult[AVector[(ByteString, LeafNode)]] = {
     node match {
       case n: BranchNode =>
         if (n.path.length >= prefix.length) {
-          if (n.path.startsWith(prefix)) getAllRaw(n, acc) else Right(AVector.empty)
+          if (n.path.startsWith(prefix)) getAllRaw(n, acc, maxNodes) else Right(AVector.empty)
         } else {
           if (prefix.startsWith(n.path)) {
             val prefixRest = prefix.drop(n.path.length)
@@ -486,7 +489,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
             assume(nibble >= 0 && nibble < 16)
             n.children(nibble.toInt) match {
               case Some(child) =>
-                getAllRaw(prefixRest.tail, child, acc ++ n.path ++ ByteString(nibble))
+                getAllRaw(prefixRest.tail, child, acc ++ n.path ++ ByteString(nibble), maxNodes)
               case None => Right(AVector.empty)
             }
           } else {
@@ -504,24 +507,29 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 
   protected def getAllRaw(
       hash: Hash,
-      acc: ByteString
+      acc: ByteString,
+      maxNodes: Int
   ): IOResult[AVector[(ByteString, LeafNode)]] = {
     getNode(hash).flatMap {
-      case n: BranchNode =>
-        getAllRaw(n, acc)
-      case n: LeafNode => Right(AVector(acc ++ n.path -> n))
+      case n: BranchNode => getAllRaw(n, acc, maxNodes)
+      case n: LeafNode   => Right(AVector(acc ++ n.path -> n))
     }
   }
 
   protected def getAllRaw(
       node: BranchNode,
-      acc: ByteString
+      acc: ByteString,
+      maxNodes: Int
   ): IOResult[AVector[(ByteString, LeafNode)]] = {
-    node.children.flatMapWithIndexE { (childOpt, index) =>
-      childOpt match {
-        case Some(child) => getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte))
-        case None        => Right(AVector.empty)
-      }
+    node.children.foldWithIndexE(AVector.empty[(ByteString, LeafNode)]) {
+      case (leafNodes, childOpt, index) =>
+        val restNodes = maxNodes - leafNodes.length
+        childOpt match {
+          case Some(child) if restNodes > 0 =>
+            getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte), restNodes)
+              .map(leafNodes ++ _)
+          case _ => Right(leafNodes)
+        }
     }
   }
 }

@@ -18,4 +18,5 @@ package org.alephium.flow
 
 package object core {
   val maxSyncBlocksPerChain: Int = 100
+  val maxUtxosReads: Int         = 10000
 }

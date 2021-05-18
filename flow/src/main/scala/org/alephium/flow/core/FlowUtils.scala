@@ -242,7 +242,7 @@ trait FlowUtils
     for {
       bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
       persistedUtxos <- bestWorldState
-        .getAssetOutputs(lockupScript.assetHintBytes)
+        .getAssetOutputs(lockupScript.assetHintBytes, maxUtxosReads)
         .map(
           _.filter(p => p._2.lockupScript == lockupScript).map(p =>
             AssetOutputInfo(p._1, p._2, PersistedOutput)
