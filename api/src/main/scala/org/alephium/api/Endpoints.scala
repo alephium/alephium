@@ -33,6 +33,7 @@ import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait Endpoints
@@ -193,14 +194,15 @@ trait Endpoints
       .out(jsonBody[AVector[Tx]])
       .summary("List unconfirmed transactions")
 
-  val buildTransaction
-      : BaseEndpoint[(PublicKey, Address, Option[TimeStamp], U256), BuildTransactionResult] =
+  type BuildTransactionQuery = (PublicKey, Address, Option[TimeStamp], U256, Option[GasPrice])
+  val buildTransaction: BaseEndpoint[BuildTransactionQuery, BuildTransactionResult] =
     transactionsEndpoint.get
       .in("build")
       .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
       .in(query[Option[TimeStamp]]("lockTime"))
       .in(query[U256]("value"))
+      .in(query[Option[GasPrice]]("gasPrice"))
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction")
 

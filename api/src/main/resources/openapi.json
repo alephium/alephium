@@ -2938,6 +2938,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "gasPrice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4322,6 +4330,21 @@
             "type": "string"
           },
           "amount": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "GasPrice": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
             "type": "integer",
             "format": "uint256"
           }

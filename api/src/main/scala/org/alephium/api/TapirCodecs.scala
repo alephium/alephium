@@ -26,12 +26,13 @@ import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {
 
   implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
-    Codec.long.validate(Validator.min(0L)).map(TimeStamp.unsafe(_))(_.millis)
+    Codec.long.validate(Validator.min(0L)).map(TimeStamp.unsafe)(_.millis)
 
   implicit val hashTapirCodec: Codec[String, Hash, TextPlain] =
     fromJson[Hash]
@@ -47,6 +48,9 @@ trait TapirCodecs extends ApiModelCodec {
 
   implicit val u256TapirCodec: Codec[String, U256, TextPlain] =
     fromJson[U256]
+
+  implicit val gasPriceCodec: Codec[String, GasPrice, TextPlain] =
+    u256TapirCodec.map[GasPrice](GasPrice.apply)(_.value)
 
   implicit val minerActionTapirCodec: Codec[String, MinerAction, TextPlain] =
     fromJson[MinerAction]
