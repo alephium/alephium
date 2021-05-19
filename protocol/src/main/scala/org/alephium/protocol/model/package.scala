@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import org.alephium.protocol.vm.GasBox
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{Duration, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
@@ -36,10 +36,10 @@ package object model {
   val defaultGasPerInput: GasBox  = GasBox.unsafe(10000)
   val defaultGasPerOutput: GasBox = GasBox.unsafe(10000)
 
-  val defaultGasPrice: U256        = ALF.nanoAlf(1)
-  val defaultGasFee: U256          = defaultGasPrice.mulUnsafe(minimalGas.toU256)
-  val defaultGasFeePerInput: U256  = defaultGasPrice.mulUnsafe(defaultGasPerInput.toU256)
-  val defaultGasFeePerOutput: U256 = defaultGasPrice.mulUnsafe(defaultGasPerOutput.toU256)
+  val defaultGasPrice: GasPrice    = GasPrice(ALF.nanoAlf(1))
+  val defaultGasFee: U256          = defaultGasPrice * minimalGas
+  val defaultGasFeePerInput: U256  = defaultGasPrice * defaultGasPerInput
+  val defaultGasFeePerOutput: U256 = defaultGasPrice * defaultGasPerOutput
   //scalastyle:on magic.number
 
   type TokenId    = Hash

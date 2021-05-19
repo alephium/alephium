@@ -152,7 +152,7 @@ trait FlowFixture
     }
     val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
 
-    val gasFee = defaultGasPrice * minimalGas.toU256
+    val gasFee = defaultGasFee
     val (outputs, remaining) = if (gasFeeInTheAmount) {
       val outputs = toLockupScripts.map(
         TxOutput.asset(amount - gasFee.divUnsafe(toLockupScripts.length), _, lockTimeOpt)

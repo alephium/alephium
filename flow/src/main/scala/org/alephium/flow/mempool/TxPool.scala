@@ -21,6 +21,7 @@ import scala.collection.mutable
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, RWLock, U256}
 
 /*
@@ -28,7 +29,7 @@ import org.alephium.util.{AVector, RWLock, U256}
  */
 class TxPool private (
     pool: mutable.SortedMap[WeightedId, TransactionTemplate],
-    weights: mutable.HashMap[Hash, U256],
+    weights: mutable.HashMap[Hash, GasPrice],
     val capacity: Int
 ) extends Pool
     with RWLock {
@@ -92,7 +93,7 @@ object TxPool {
   def empty(capacity: Int): TxPool =
     new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
 
-  final case class WeightedId(weight: U256, id: Hash) {
+  final case class WeightedId(weight: GasPrice, id: Hash) {
     override def equals(obj: Any): Boolean =
       obj match {
         case that: WeightedId => this.id == that.id
@@ -103,6 +104,8 @@ object TxPool {
   }
 
   implicit val ord: Ordering[WeightedId] = {
-    Ordering.by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight, weightedId.id)).reverse
+    Ordering
+      .by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight.value, weightedId.id))
+      .reverse
   }
 }

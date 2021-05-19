@@ -18,6 +18,7 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, LockFixture, U256}
 
 class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGeneratorsLike {
@@ -73,7 +74,7 @@ class TxPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGene
   it should "order txs" in new Fixture {
     def txGen(gasPrice: U256): TransactionTemplate = {
       val tx: Transaction = transactionGen().sample.get
-      tx.toTemplate.copy(unsigned = tx.unsigned.copy(gasPrice = gasPrice))
+      tx.toTemplate.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(gasPrice)))
     }
 
     val tx1 = txGen(U256.unsafe(1))

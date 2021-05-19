@@ -20,12 +20,16 @@ import org.scalacheck.Arbitrary.{arbAnyVal, arbitrary}
 
 import org.alephium.flow.mempool.TxPool.WeightedId
 import org.alephium.protocol.Generators
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AlephiumSpec, U256}
 
 class WeightedIdSpec extends AlephiumSpec with Generators {
   it should "equals by id" in {
     forAll(hashGen, arbitrary[U256], hashGen, arbitrary[U256], arbAnyVal) {
-      (id1, amount1, id2, amount2, any) =>
+      (id1, _amount1, id2, _amount2, any) =>
+        val amount1 = GasPrice(_amount1)
+        val amount2 = GasPrice(_amount2)
+
         WeightedId(amount1, id1) is WeightedId(amount2, id1)
         WeightedId(amount1, id1) isnot WeightedId(amount1, id2)
 

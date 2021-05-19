@@ -368,14 +368,11 @@ trait FlowUtils
         selected <- UtxoUtils.select(
           utxos,
           amount,
-          defaultGasFee,
-          defaultGasFeePerInput,
-          defaultGasFeePerOutput,
+          defaultGasPrice,
+          defaultGasPerInput,
+          defaultGasPerOutput,
           2
         ) // sometime only 1 output, but 2 is always safe
-        gas <- GasBox
-          .from(selected.gasFee, defaultGasPrice)
-          .toRight(s"Invalid gas: ${selected.gasFee} / $defaultGasPrice")
         unsignedTx <- UnsignedTransaction
           .transferAlf(
             selected.assets.map(asset => (asset.ref, asset.output)),
@@ -384,7 +381,7 @@ trait FlowUtils
             toLockupScript,
             lockTimeOpt,
             amount,
-            gas,
+            if (selected.gas.value > minimalGas.value) selected.gas else minimalGas,
             defaultGasPrice
           )
       } yield {
@@ -520,11 +517,21 @@ trait FlowUtils
 object FlowUtils {
   final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)
 
-  sealed trait OutputType
-  case object PersistedOutput        extends OutputType
-  case object UnpersistedBlockOutput extends OutputType
-  case object SharedPoolOutput       extends OutputType
-  case object PendingPoolOutput      extends OutputType
+  sealed trait OutputType {
+    def cachedLevel: Int
+  }
+  case object PersistedOutput extends OutputType {
+    val cachedLevel = 0
+  }
+  case object UnpersistedBlockOutput extends OutputType {
+    val cachedLevel = 1
+  }
+  case object SharedPoolOutput extends OutputType {
+    val cachedLevel = 2
+  }
+  case object PendingPoolOutput extends OutputType {
+    val cachedLevel = 3
+  }
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
     var output   = AVector.ofSize[T](txs.length)

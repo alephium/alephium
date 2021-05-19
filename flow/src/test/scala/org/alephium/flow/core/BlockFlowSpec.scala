@@ -442,7 +442,9 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
     blockFlow
       .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
-      .rightValue is Left("Not enough balance")
+      .rightValue
+      .leftValue
+      .startsWith("Not enough balance") is true
     Thread.sleep(2000)
     blockFlow
       .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
