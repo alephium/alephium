@@ -80,5 +80,5 @@ class PendingPool(
 }
 
 object PendingPool {
-  def empty: PendingPool = new PendingPool(mutable.HashMap.empty, TxIndexes.empty)
+  def empty: PendingPool = new PendingPool(mutable.HashMap.empty, TxIndexes.emptyPendingPool)
 }

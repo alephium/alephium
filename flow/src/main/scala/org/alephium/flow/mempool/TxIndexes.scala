@@ -18,7 +18,7 @@ package org.alephium.flow.mempool
 
 import scala.collection.mutable
 
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MempoolOutput}
+import org.alephium.flow.core.FlowUtils._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.AVector
@@ -26,7 +26,8 @@ import org.alephium.util.AVector
 final case class TxIndexes(
     inputIndex: mutable.HashSet[AssetOutputRef],
     outputIndex: mutable.HashMap[AssetOutputRef, TxOutput],
-    addressIndex: mutable.HashMap[LockupScript, mutable.ArrayBuffer[AssetOutputRef]]
+    addressIndex: mutable.HashMap[LockupScript, mutable.ArrayBuffer[AssetOutputRef]],
+    outputType: OutputType
 ) {
   def add(transaction: TransactionTemplate): Unit = {
     transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef))
@@ -68,7 +69,7 @@ final case class TxIndexes(
       .map { refs =>
         AVector.from(
           refs.view.map(ref =>
-            AssetOutputInfo(ref, outputIndex(ref).asInstanceOf[AssetOutput], MempoolOutput)
+            AssetOutputInfo(ref, outputIndex(ref).asInstanceOf[AssetOutput], outputType)
           )
         )
       }
@@ -86,6 +87,14 @@ final case class TxIndexes(
 }
 
 object TxIndexes {
-  def empty: TxIndexes =
-    TxIndexes(mutable.HashSet.empty, mutable.HashMap.empty, mutable.HashMap.empty)
+  def emptySharedPool: TxIndexes =
+    TxIndexes(mutable.HashSet.empty, mutable.HashMap.empty, mutable.HashMap.empty, SharedPoolOutput)
+
+  def emptyPendingPool: TxIndexes =
+    TxIndexes(
+      mutable.HashSet.empty,
+      mutable.HashMap.empty,
+      mutable.HashMap.empty,
+      PendingPoolOutput
+    )
 }

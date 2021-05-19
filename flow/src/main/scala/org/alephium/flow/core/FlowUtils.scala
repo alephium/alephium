@@ -523,8 +523,8 @@ object FlowUtils {
   sealed trait OutputType
   case object PersistedOutput        extends OutputType
   case object UnpersistedBlockOutput extends OutputType
-  case object MempoolOutput          extends OutputType
-  case object PendingOutput          extends OutputType
+  case object SharedPoolOutput       extends OutputType
+  case object PendingPoolOutput      extends OutputType
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
     var output   = AVector.ofSize[T](txs.length)

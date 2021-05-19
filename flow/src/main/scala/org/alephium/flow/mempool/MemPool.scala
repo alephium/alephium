@@ -54,11 +54,6 @@ class MemPool private (
       getPool(index).contains(txId) || pendingPool.contains(txId)
     }
 
-  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean =
-    readOnly {
-      getPool(index).isDoubleSpending(tx) || pendingPool.isDoubleSpending(tx)
-    }
-
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
     readOnly {
       getPool(index).collectForBlock(maxNum)
@@ -79,6 +74,12 @@ class MemPool private (
     (!txIndexes.inputIndex
       .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
   }
+
+  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean =
+    readOnly {
+      assume(index.from == group)
+      tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
+    }
 
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = writeOnly {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
@@ -174,7 +175,7 @@ object MemPool {
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
     val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
-    new MemPool(groupIndex, pools, TxIndexes.empty, PendingPool.empty)
+    new MemPool(groupIndex, pools, TxIndexes.emptySharedPool, PendingPool.empty)
   }
 
   sealed trait NewTxCategory

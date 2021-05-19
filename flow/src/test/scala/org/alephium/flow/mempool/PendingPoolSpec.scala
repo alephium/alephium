@@ -40,6 +40,6 @@ class PendingPoolSpec
     pool.remove(tx.toTemplate)
     pool.remove(tx.toTemplate) // for idempotent
     pool.txs.contains(tx.id) is false
-    pool.indexes is TxIndexes.empty
+    pool.indexes is TxIndexes.emptyPendingPool
   }
 }
