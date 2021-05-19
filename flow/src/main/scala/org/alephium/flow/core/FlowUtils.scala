@@ -359,7 +359,8 @@ trait FlowUtils
       fromKey: PublicKey,
       toLockupScript: LockupScript,
       lockTimeOpt: Option[TimeStamp],
-      amount: U256
+      amount: U256,
+      gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
@@ -368,7 +369,7 @@ trait FlowUtils
         selected <- UtxoUtils.select(
           utxos,
           amount,
-          defaultGasPrice,
+          gasPrice,
           defaultGasPerInput,
           defaultGasPerOutput,
           2
@@ -382,7 +383,7 @@ trait FlowUtils
             lockTimeOpt,
             amount,
             if (selected.gas.value > minimalGas.value) selected.gas else minimalGas,
-            defaultGasPrice
+            gasPrice
           )
       } yield {
         unsignedTx

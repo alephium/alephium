@@ -113,7 +113,8 @@ class FlowUtilsSpec extends AlephiumSpec {
       keyManager(output.lockupScript).publicKey,
       output.lockupScript,
       None,
-      ALF.oneAlf
+      ALF.oneAlf,
+      defaultGasPrice
     )
     val ts3 = System.currentTimeMillis()
 

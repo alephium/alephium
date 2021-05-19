@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.util.{TimeStamp, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -26,7 +26,8 @@ final case class BuildTransaction(
     fromKey: PublicKey,
     toAddress: Address,
     lockTime: Option[TimeStamp] = None,
-    value: U256
+    value: U256,
+    gasPrice: Option[GasPrice] = None
 ) {
   def fromAddress(networkType: NetworkType): Address =
     Address(networkType, LockupScript.p2pkh(fromKey))
