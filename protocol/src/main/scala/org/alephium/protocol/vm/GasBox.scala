@@ -20,7 +20,7 @@ import org.alephium.protocol.model.minimalGas
 import org.alephium.serde.Serde
 import org.alephium.util.U256
 
-final case class GasBox private (value: Int) extends AnyVal {
+final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox] {
   def use(amount: Int): ExeResult[GasBox] = {
     if (value >= amount) {
       Right(GasBox(value - amount))
@@ -30,6 +30,8 @@ final case class GasBox private (value: Int) extends AnyVal {
   }
 
   def toU256: U256 = U256.unsafe(value)
+
+  override def compare(that: GasBox): Int = this.value.compare(that.value)
 }
 
 object GasBox {

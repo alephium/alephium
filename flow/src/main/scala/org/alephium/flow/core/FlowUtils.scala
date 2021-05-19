@@ -376,6 +376,12 @@ trait FlowUtils
           defaultGasPerOutput,
           2
         ) // sometime only 1 output, but 2 is always safe
+        _ <-
+          if (selected.assets.length > ALF.MaxTxInputNum) {
+            Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
+          } else {
+            Right(())
+          }
         unsignedTx <- UnsignedTransaction
           .transferAlf(
             selected.assets.map(asset => (asset.ref, asset.output)),
@@ -384,7 +390,7 @@ trait FlowUtils
             toLockupScript,
             lockTimeOpt,
             amount,
-            if (selected.gas.value > minimalGas.value) selected.gas else minimalGas,
+            if (selected.gas > minimalGas) selected.gas else minimalGas,
             gasPrice
           )
       } yield {

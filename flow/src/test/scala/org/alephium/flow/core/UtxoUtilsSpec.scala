@@ -18,7 +18,8 @@ package org.alephium.flow.core
 
 import akka.util.ByteString
 
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput}
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
+import org.alephium.flow.core.UtxoUtils.Selected
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -54,6 +55,12 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     select(utxos, 27) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
     select(utxos, 55) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
     select(utxos, 56).leftValue is s"Not enough balance for fee, maybe transfer a smaller amount"
+  }
+
+  it should "prefer persisted utxos" in new Fixture {
+    val utxos0 = buildUtxos(20, 10)
+    val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
+    select(utxos1, 7) is Right(Selected(AVector(utxos1(0)), 3))
   }
 
   trait Fixture extends AlephiumConfigFixture {
