@@ -33,6 +33,7 @@ trait Documentation extends Endpoints {
     getInterCliquePeerInfo,
     getDiscoveredNeighbors,
     getMisbehaviors,
+    misbehaviorAction,
     getBlockflow,
     getBlock,
     getBalance,

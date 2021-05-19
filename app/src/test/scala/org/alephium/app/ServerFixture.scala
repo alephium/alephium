@@ -122,15 +122,17 @@ object ServerFixture {
       blockFlowProbe: ActorRef,
       dummyTx: Transaction,
       storages: Storages,
-      cliqueManagerOpt: Option[ActorRefT[CliqueManager.Command]] = None
+      cliqueManagerOpt: Option[ActorRefT[CliqueManager.Command]] = None,
+      misbehaviorManagerOpt: Option[ActorRefT[MisbehaviorManager.Command]] = None
   )(implicit val config: AlephiumConfig)
       extends Node {
     implicit val system: ActorSystem       = ActorSystem("NodeDummy")
     val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     val blockFlow: BlockFlow               = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
-    val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] = ActorRefT(TestProbe().ref)
-    val tcpController: ActorRefT[TcpController.Command]           = ActorRefT(TestProbe().ref)
+    val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
+      misbehaviorManagerOpt.getOrElse(ActorRefT(TestProbe().ref))
+    val tcpController: ActorRefT[TcpController.Command] = ActorRefT(TestProbe().ref)
 
     val eventBus =
       ActorRefT

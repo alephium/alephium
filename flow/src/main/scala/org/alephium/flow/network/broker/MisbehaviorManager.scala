@@ -39,7 +39,8 @@ object MisbehaviorManager {
     def penalty: Int
   }
 
-  case object GetPeers extends Command
+  case object GetPeers                                extends Command
+  final case class Unban(peers: AVector[InetAddress]) extends Command
 
   final case class PeerBanned(remote: InetAddress) extends EventStream.Event
 
@@ -144,6 +145,9 @@ class MisbehaviorManager(
     case misbehavior: Misbehavior =>
       log.debug(s"Misbehavior: $misbehavior")
       handleMisbehavior(misbehavior)
+
+    case Unban(peers) =>
+      peers.foreach(misbehaviorStorage.remove)
 
     case GetPeers =>
       sender() ! Peers(misbehaviorStorage.list())

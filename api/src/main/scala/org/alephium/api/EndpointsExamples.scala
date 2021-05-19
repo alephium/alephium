@@ -112,6 +112,11 @@ trait EndpointsExamples extends ErrorExamples {
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
   )
 
+  implicit val misbehaviorActionExamples: List[Example[MisbehaviorAction]] =
+    simpleExample(
+      MisbehaviorAction.Unban(AVector(inetAddress))
+    )
+
   implicit val nodeInfoExamples: List[Example[NodeInfo]] =
     simpleExample(
       NodeInfo(

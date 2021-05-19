@@ -135,6 +135,12 @@ trait Endpoints
       .out(jsonBody[AVector[PeerMisbehavior]])
       .summary("Get the misbehaviors of peers")
 
+  val misbehaviorAction: BaseEndpoint[MisbehaviorAction, Unit] =
+    infosEndpoint.post
+      .in("misbehaviors")
+      .in(jsonBody[MisbehaviorAction])
+      .summary("Unban given peers")
+
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get
       .in(timeIntervalQuery)

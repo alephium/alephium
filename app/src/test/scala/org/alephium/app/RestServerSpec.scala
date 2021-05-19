@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import java.net.InetAddress
+
 import scala.concurrent._
 import scala.io.Source
 import scala.util.Random
@@ -32,6 +34,7 @@ import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
@@ -403,6 +406,40 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
+  it should "call GET /infos/misbehaviors" in new RestServerFixture {
+    import MisbehaviorManager._
+    withServer {
+
+      val inetAddress = InetAddress.getByName("127.0.0.1")
+      val ts          = TimeStamp.now()
+
+      misbehaviorManagerProbe.setAutoPilot(new TestActor.AutoPilot {
+        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
+          msg match {
+            case GetPeers =>
+              sender ! Peers(AVector(Peer(inetAddress, Banned(ts))))
+              TestActor.NoAutoPilot
+          }
+      })
+
+      Get(s"/infos/misbehaviors") check { response =>
+        response.code is StatusCode.Ok
+        response.as[AVector[PeerMisbehavior]] is AVector(
+          PeerMisbehavior(inetAddress, PeerStatus.Banned(ts))
+        )
+      }
+    }
+  }
+
+  it should "call POST /infos/misbehaviors" in new RestServerFixture {
+    withServer {
+      val body = """{"type":"unban","peers":["123.123.123.123"]}"""
+      Post(s"/infos/misbehaviors", body) check { response =>
+        response.code is StatusCode.Ok
+      }
+    }
+  }
+
   it should "call GET /docs" in new RestServerFixture {
     withServer {
       Get(s"/docs") check { response =>
@@ -456,6 +493,10 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       )
 
     lazy val blockFlowProbe = TestProbe()
+
+    lazy val misbehaviorManagerProbe = TestProbe()
+    lazy val misbehaviorManager      = ActorRefT[MisbehaviorManager.Command](misbehaviorManagerProbe.ref)
+
     lazy val node = new NodeDummy(
       dummyIntraCliqueInfo,
       dummyNeighborPeers,
@@ -463,7 +504,8 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       blockFlowProbe.ref,
       dummyTx,
       storages,
-      cliqueManagerOpt = Some(cliqueManager)
+      cliqueManagerOpt = Some(cliqueManager),
+      misbehaviorManagerOpt = Some(misbehaviorManager)
     )
     lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
     val walletConfig: WalletConfig = WalletConfig(

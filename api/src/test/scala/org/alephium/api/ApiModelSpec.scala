@@ -49,6 +49,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   val networkType = NetworkType.Mainnet
 
+  val inetAddress = InetAddress.getByName("127.0.0.1")
+
   def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
   def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
@@ -111,7 +113,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode SelfClique" in {
     val cliqueId = CliqueId.generate
     val peerAddress =
-      PeerAddress(InetAddress.getByName("127.0.0.1"), 9001, 9002)
+      PeerAddress(inetAddress, 9001, 9002)
     val selfClique = SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peerAddress), true, 1, 2)
     val jsonRaw =
       s"""{"cliqueId":"${cliqueId.toHexString}","networkType":"mainnet","numZerosAtLeastInHash":18,"nodes":[{"address":"127.0.0.1","restPort":9001,"wsPort":9002}],"synced":true,"groupNumPerBroker":1,"groups":2}"""
@@ -253,6 +255,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
     checkData(MemPooled: TxStatus, s"""{"type":"mem-pooled"}""")
     checkData(NotFound: TxStatus, s"""{"type":"not-found"}""")
+  }
+
+  it should "encode/decode MisbehaviorAction" in {
+    checkData(
+      MisbehaviorAction.Unban(AVector(inetAddress)),
+      s"""{"type":"unban","peers":["127.0.0.1"]}"""
+    )
   }
 
   it should "encode/decode BlockCandidate" in {

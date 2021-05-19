@@ -97,6 +97,22 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     }
   }
 
+  it should "manually unban" in new Fixture {
+    misbehaviorManager ! InvalidMessage(peer)
+
+    bannedProbe.expectMsg(PeerBanned(peer.getAddress))
+
+    misbehaviorManager ! GetPeers
+    expectMsgPF() { case Peers(peers) =>
+      peers.nonEmpty is true
+    }
+
+    misbehaviorManager ! Unban(AVector(peer.getAddress))
+
+    misbehaviorManager ! GetPeers
+    expectMsg(Peers(AVector.empty))
+  }
+
   it should "forgive a penalty after some time" in new Fixture {
     override val penaltyForgivness = Duration.zero
 

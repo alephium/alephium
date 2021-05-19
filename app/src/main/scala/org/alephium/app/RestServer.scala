@@ -159,6 +159,11 @@ class RestServer(
     }
   }
 
+  private val misbehaviorActionRoute = toRoute(misbehaviorAction) {
+    case MisbehaviorAction.Unban(peers) =>
+      Future.successful(Right(node.misbehaviorManager ! MisbehaviorManager.Unban(peers)))
+  }
+
   private val getHashesAtHeightRoute = toRoute(getHashesAtHeight) { case (chainIndex, height) =>
     Future.successful(
       serverUtils.getHashesAtHeight(
@@ -298,6 +303,7 @@ class RestServer(
     getInterCliquePeerInfoRoute,
     getDiscoveredNeighborsRoute,
     getMisbehaviorsRoute,
+    misbehaviorActionRoute,
     getBlockflowRoute,
     getBlockRoute,
     getBalanceRoute,

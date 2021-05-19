@@ -183,6 +183,10 @@ trait ApiModelCodec {
     }
   )
 
+  implicit val misbehaviorActionBanRW: RW[MisbehaviorAction.Unban] = macroRW
+
+  implicit val misbehaviorActionRW: RW[MisbehaviorAction] = macroRW
+
   implicit val minerAddressesRW: RW[MinerAddresses] = macroRW
 
   implicit val peerInfoRW: ReadWriter[BrokerInfo] = {
