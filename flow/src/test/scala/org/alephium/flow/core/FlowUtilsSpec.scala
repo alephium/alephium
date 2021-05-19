@@ -93,7 +93,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx         = block.nonCoinbase.head
     val output     = tx.unsigned.fixedOutputs.head
 
-    val outputs = AVector.tabulate(10000) { k =>
+    val n = ALF.MaxTxInputNum
+
+    val outputs = AVector.tabulate(n) { k =>
       output.copy(amount = ALF.nanoAlf(k.toLong))
     }
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
@@ -106,7 +108,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
-    utxos is 10000
+    utxos is n
 
     val ts2 = System.currentTimeMillis()
     blockFlow.prepareUnsignedTx(

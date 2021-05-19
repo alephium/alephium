@@ -237,14 +237,15 @@ trait FlowUtils
   def getPersistedUtxos(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
-      lockupScript: LockupScript
+      lockupScript: LockupScript,
+      maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     for {
       bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
       persistedUtxos <- bestWorldState
         .getAssetOutputs(
           lockupScript.assetHintBytes,
-          maxUtxosReads,
+          maxUtxosToRead,
           (_, output) => output.lockupScript == lockupScript
         )
         .map(
@@ -264,10 +265,11 @@ trait FlowUtils
   def getRelevantUtxos(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
-      lockupScript: LockupScript
+      lockupScript: LockupScript,
+      maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     for {
-      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript)
+      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToRead)
       cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
     } yield {
       val utxosInBlock = mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
@@ -334,7 +336,7 @@ trait FlowUtils
       lockupScript: LockupScript
   ): IOResult[AVector[AssetOutputInfo]] = {
     val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript).map(
+    getRelevantUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToReadForTransfer).map(
       _.filter(_.output.lockTime <= currentTs)
     )
   }
@@ -346,7 +348,7 @@ trait FlowUtils
     val bestDeps = getBestDeps(groupIndex)
 
     val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript).map { utxos =>
+    getRelevantUtxos(groupIndex, bestDeps, lockupScript, Int.MaxValue).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
         if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
