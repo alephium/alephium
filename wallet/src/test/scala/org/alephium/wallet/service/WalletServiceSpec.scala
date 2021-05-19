@@ -113,7 +113,10 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.getBalances(walletName).futureValue.leftValue is notFound
     walletService.getAddresses(walletName).leftValue is notFound
     walletService.getMinerAddresses(walletName).leftValue is notFound
-    walletService.transfer(walletName, address, U256.Zero, None).futureValue.leftValue is notFound
+    walletService
+      .transfer(walletName, address, U256.Zero, None, None)
+      .futureValue
+      .leftValue is notFound
     walletService.deriveNextAddress(walletName).leftValue is notFound
     walletService.deriveNextMinerAddresses(walletName).leftValue is notFound
     walletService.changeActiveAddress(walletName, address).leftValue is notFound

@@ -72,6 +72,7 @@ trait WalletService extends Service {
       wallet: String,
       address: Address,
       amount: U256,
+      lockTime: Option[TimeStamp],
       gasPrice: Option[GasPrice]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def deriveNextAddress(wallet: String): Either[WalletError, Address]
@@ -310,19 +311,22 @@ object WalletService {
         wallet: String,
         address: Address,
         amount: U256,
+        lockTime: Option[TimeStamp],
         gasPrice: Option[GasPrice]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
-        blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount, gasPrice).flatMap {
-          case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
-          case Right(buildTxResult) =>
-            val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
-            blockFlowClient
-              .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
-              .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
-              .map(_.left.map(BlockFlowClientError))
-        }
+        blockFlowClient
+          .prepareTransaction(pubKey.toHexString, address, amount, lockTime, gasPrice)
+          .flatMap {
+            case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
+            case Right(buildTxResult) =>
+              val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
+              blockFlowClient
+                .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
+                .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
+                .map(_.left.map(BlockFlowClientError))
+          }
       }
     }
 

@@ -194,14 +194,14 @@ trait Endpoints
       .out(jsonBody[AVector[Tx]])
       .summary("List unconfirmed transactions")
 
-  type BuildTransactionQuery = (PublicKey, Address, Option[TimeStamp], U256, Option[GasPrice])
+  type BuildTransactionQuery = (PublicKey, Address, U256, Option[TimeStamp], Option[GasPrice])
   val buildTransaction: BaseEndpoint[BuildTransactionQuery, BuildTransactionResult] =
     transactionsEndpoint.get
       .in("build")
       .in(query[PublicKey]("fromKey"))
       .in(query[Address]("toAddress"))
-      .in(query[Option[TimeStamp]]("lockTime"))
       .in(query[U256]("value"))
+      .in(query[Option[TimeStamp]]("lockTime"))
       .in(query[Option[GasPrice]]("gasPrice"))
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction")

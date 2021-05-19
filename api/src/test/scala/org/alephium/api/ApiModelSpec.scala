@@ -208,16 +208,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val toAddress = Address.p2pkh(networkType, toKey)
 
     {
-      val transfer = BuildTransaction(fromKey, toAddress, None, 1)
+      val transfer = BuildTransaction(fromKey, toAddress, 1)
       val jsonRaw =
         s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1"}"""
       checkData(transfer, jsonRaw)
     }
 
     {
-      val transfer = BuildTransaction(fromKey, toAddress, Some(TimeStamp.unsafe(1234)), 1)
+      val transfer = BuildTransaction(fromKey, toAddress, 1, Some(TimeStamp.unsafe(1234)))
       val jsonRaw =
-        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","lockTime":1234,"value":"1"}"""
+        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1","lockTime":1234}"""
       checkData(transfer, jsonRaw)
     }
   }

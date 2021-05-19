@@ -25,8 +25,8 @@ import org.alephium.util.{TimeStamp, U256}
 final case class BuildTransaction(
     fromKey: PublicKey,
     toAddress: Address,
-    lockTime: Option[TimeStamp] = None,
     value: U256,
+    lockTime: Option[TimeStamp] = None,
     gasPrice: Option[GasPrice] = None
 ) {
   def fromAddress(networkType: NetworkType): Address =
