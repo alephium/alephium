@@ -2922,6 +2922,14 @@
             }
           },
           {
+            "name": "value",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "lockTime",
             "in": "query",
             "required": false,
@@ -2929,14 +2937,6 @@
               "type": "integer",
               "format": "int64",
               "minimum": "0"
-            }
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
             }
           },
           {
@@ -4332,6 +4332,9 @@
           "amount": {
             "type": "integer",
             "format": "uint256"
+          },
+          "lockTime": {
+            "type": "integer"
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
