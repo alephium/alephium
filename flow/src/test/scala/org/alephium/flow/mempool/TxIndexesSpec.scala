@@ -27,17 +27,17 @@ class TxIndexesSpec
     with NoIndexModelGeneratorsLike {
   it should "add txs" in {
     val tx      = transactionGen().sample.get
-    val indexes = TxIndexes.empty
+    val indexes = TxIndexes.emptySharedPool
     indexes.add(tx.toTemplate)
     checkTx(indexes, tx)
   }
 
   it should "be idempotent for adding" in {
     val tx       = transactionGen().sample.get
-    val indexes0 = TxIndexes.empty
+    val indexes0 = TxIndexes.emptySharedPool
     indexes0.add(tx.toTemplate)
 
-    val indexes1 = TxIndexes.empty
+    val indexes1 = TxIndexes.emptySharedPool
     indexes1.add(tx.toTemplate)
     indexes1.add(tx.toTemplate)
 
@@ -46,14 +46,14 @@ class TxIndexesSpec
 
   it should "remove tx" in {
     val tx      = transactionGen().sample.get
-    val indexes = TxIndexes.empty
+    val indexes = TxIndexes.emptySharedPool
     indexes.add(tx.toTemplate)
     indexes.remove(tx.toTemplate)
-    indexes is TxIndexes.empty
+    indexes is TxIndexes.emptySharedPool
 
     // check for idempotent
     indexes.remove(tx.toTemplate)
-    indexes is TxIndexes.empty
+    indexes is TxIndexes.emptySharedPool
   }
 }
 

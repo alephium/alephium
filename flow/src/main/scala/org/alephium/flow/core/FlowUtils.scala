@@ -23,7 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlowState.TxStatus
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
+import org.alephium.flow.core.FlowUtils._
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool.{GrandPool, MemPool, MemPoolChanges, Normal, Reorg}
 import org.alephium.flow.setting.MemPoolSetting
@@ -237,16 +237,19 @@ trait FlowUtils
   def getPersistedUtxos(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
-      lockupScript: LockupScript
+      lockupScript: LockupScript,
+      maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     for {
       bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
       persistedUtxos <- bestWorldState
-        .getAssetOutputs(lockupScript.assetHintBytes)
+        .getAssetOutputs(
+          lockupScript.assetHintBytes,
+          maxUtxosToRead,
+          (_, output) => output.lockupScript == lockupScript
+        )
         .map(
-          _.filter(p => p._2.lockupScript == lockupScript).map(p =>
-            AssetOutputInfo(p._1, p._2, PersistedOutput)
-          )
+          _.map(p => AssetOutputInfo(p._1, p._2, PersistedOutput))
         )
     } yield persistedUtxos
   }
@@ -262,10 +265,11 @@ trait FlowUtils
   def getRelevantUtxos(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
-      lockupScript: LockupScript
+      lockupScript: LockupScript,
+      maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     for {
-      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript)
+      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToRead)
       cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
     } yield {
       val utxosInBlock = mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
@@ -308,10 +312,8 @@ trait FlowUtils
       getUsableUtxosOnce(lockupScript) match {
         case Right(utxos) =>
           lastTryOpt match {
-            case Some(firstTry) =>
-              if (utxos.toSet == firstTry.toSet) Right(utxos) else iter(Some(utxos))
-            case None =>
-              iter(Some(utxos))
+            case Some(lastTry) if isSame(utxos, lastTry) => Right(utxos)
+            case _                                       => iter(Some(utxos))
           }
         case Left(error) => Left(error)
       }
@@ -334,7 +336,7 @@ trait FlowUtils
       lockupScript: LockupScript
   ): IOResult[AVector[AssetOutputInfo]] = {
     val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript).map(
+    getRelevantUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToReadForTransfer).map(
       _.filter(_.output.lockTime <= currentTs)
     )
   }
@@ -346,7 +348,7 @@ trait FlowUtils
     val bestDeps = getBestDeps(groupIndex)
 
     val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript).map { utxos =>
+    getRelevantUtxos(groupIndex, bestDeps, lockupScript, Int.MaxValue).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
         if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
@@ -359,7 +361,8 @@ trait FlowUtils
       fromKey: PublicKey,
       toLockupScript: LockupScript,
       lockTimeOpt: Option[TimeStamp],
-      amount: U256
+      amount: U256,
+      gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
@@ -368,14 +371,17 @@ trait FlowUtils
         selected <- UtxoUtils.select(
           utxos,
           amount,
-          defaultGasFee,
-          defaultGasFeePerInput,
-          defaultGasFeePerOutput,
+          gasPrice,
+          defaultGasPerInput,
+          defaultGasPerOutput,
           2
         ) // sometime only 1 output, but 2 is always safe
-        gas <- GasBox
-          .from(selected.gasFee, defaultGasPrice)
-          .toRight(s"Invalid gas: ${selected.gasFee} / $defaultGasPrice")
+        _ <-
+          if (selected.assets.length > ALF.MaxTxInputNum) {
+            Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
+          } else {
+            Right(())
+          }
         unsignedTx <- UnsignedTransaction
           .transferAlf(
             selected.assets.map(asset => (asset.ref, asset.output)),
@@ -384,8 +390,8 @@ trait FlowUtils
             toLockupScript,
             lockTimeOpt,
             amount,
-            gas,
-            defaultGasPrice
+            if (selected.gas > minimalGas) selected.gas else minimalGas,
+            gasPrice
           )
       } yield {
         unsignedTx
@@ -520,11 +526,21 @@ trait FlowUtils
 object FlowUtils {
   final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)
 
-  sealed trait OutputType
-  case object PersistedOutput        extends OutputType
-  case object UnpersistedBlockOutput extends OutputType
-  case object MempoolOutput          extends OutputType
-  case object PendingOutput          extends OutputType
+  sealed trait OutputType {
+    def cachedLevel: Int
+  }
+  case object PersistedOutput extends OutputType {
+    val cachedLevel = 0
+  }
+  case object UnpersistedBlockOutput extends OutputType {
+    val cachedLevel = 1
+  }
+  case object SharedPoolOutput extends OutputType {
+    val cachedLevel = 2
+  }
+  case object PendingPoolOutput extends OutputType {
+    val cachedLevel = 3
+  }
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
     var output   = AVector.ofSize[T](txs.length)
@@ -599,6 +615,13 @@ object FlowUtils {
       parentTs.plusMillisUnsafe(1)
     } else {
       resultTs
+    }
+  }
+
+  def isSame(utxos0: AVector[AssetOutputInfo], utxos1: AVector[AssetOutputInfo]): Boolean = {
+    (utxos0.length == utxos1.length) && {
+      val set = utxos0.toSet
+      utxos1.forall(set.contains)
     }
   }
 }

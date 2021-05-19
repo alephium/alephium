@@ -22,7 +22,7 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
-import org.alephium.protocol.vm.{LockupScript, StatefulScript}
+import org.alephium.protocol.vm.{GasPrice, LockupScript, StatefulScript}
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
@@ -82,7 +82,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
             UnsignedTransaction(
               Some(StatefulScript.unsafe(AVector.empty)),
               minimalGas,
-              U256.unsafe(Random.nextLong(Long.MaxValue)),
+              GasPrice(U256.unsafe(Random.nextLong(Long.MaxValue))),
               AVector.empty,
               AVector.empty
             ),
@@ -114,14 +114,20 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         UnsignedTransaction(
           Some(StatefulScript.unsafe(AVector.empty)),
           minimalGas,
-          U256.unsafe(gasPrice0),
+          GasPrice(U256.unsafe(gasPrice0)),
           AVector.empty,
           AVector.empty
         ),
         AVector.empty[Signature]
       )
       val tx1 = Transaction.from(
-        UnsignedTransaction(None, minimalGas, U256.unsafe(gasPrice1), AVector.empty, AVector.empty),
+        UnsignedTransaction(
+          None,
+          minimalGas,
+          GasPrice(U256.unsafe(gasPrice1)),
+          AVector.empty,
+          AVector.empty
+        ),
         AVector.empty[Signature]
       )
       val coinbase = Transaction.coinbase(

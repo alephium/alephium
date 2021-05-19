@@ -49,7 +49,7 @@ class MemPoolSpec
         txTemplates.foreach(pool.contains(index, _) is true)
         pool.removeFromTxPool(index, txTemplates) is block.transactions.length
         pool.size is 0
-        pool.txIndexes is TxIndexes.empty
+        pool.txIndexes is TxIndexes.emptySharedPool
       } else {
         assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }

@@ -42,7 +42,7 @@ sealed trait TransactionAbstract {
   // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
-  def gasFeeUnsafe: U256 = unsigned.gasPrice.mulUnsafe(unsigned.startGas.toU256)
+  def gasFeeUnsafe: U256 = unsigned.gasPrice * unsigned.startGas
 
   def outputsLength: Int
 

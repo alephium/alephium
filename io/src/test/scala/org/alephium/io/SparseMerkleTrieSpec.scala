@@ -110,10 +110,10 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     val db   = newDB[Hash, SparseMerkleTrie.Node]
     var trie = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
 
-    def generateKV(keyPrefix: ByteString = ByteString.empty): (ByteString, ByteString) = {
-      val key  = Hash.random.bytes
-      val data = ByteString.fromString(Gen.alphaStr.sample.get)
-      (keyPrefix ++ key.drop(keyPrefix.length), data)
+    def generateKV(keyPrefix: ByteString = ByteString.empty): (Hash, Hash) = {
+      val key  = Hash.random
+      val data = Hash.random
+      (Hash.unsafe(keyPrefix ++ key.bytes.drop(keyPrefix.length)), data)
     }
   }
 
@@ -137,7 +137,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       } else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
-        trie = trie.putRaw(key, value).toOption.get
+        trie = trie.put(key, value).toOption.get
         Some(key)
       }
     }
@@ -151,16 +151,16 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
         true is false
     }
 
-    keys.foreach { key => trie.getOptRaw(key).map(_.nonEmpty) isE true }
+    keys.foreach { key => trie.getOpt(key).map(_.nonEmpty) isE true }
 
-    val allStored    = trie.getAllRaw(ByteString.empty).toOption.get
-    val allKeys      = allStored.map(_._1).toArray.sortBy(_.hashCode())
-    val expectedKeys = (keys :+ genesisKey.bytes).toArray.sortBy(_.hashCode())
+    val allStored    = trie.getAll(ByteString.empty, Int.MaxValue).toOption.get
+    val allKeys      = allStored.map(_._1).toSet
+    val expectedKeys = (keys :+ genesisKey).toSet
     allKeys is expectedKeys
 
     keys.foreach { key =>
-      trie = trie.removeRaw(key).toOption.get
-      trie.getOptRaw(key).map(_.isEmpty) isE true
+      trie = trie.remove(key).toOption.get
+      trie.getOpt(key).map(_.isEmpty) isE true
     }
 
     trie.rootHash is genesisNode.hash
@@ -169,34 +169,53 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   it should "work for random insertions" in withTrieFixture { fixture =>
     import fixture.trie
 
-    val keys = AVector.tabulate(100) { _ =>
+    val keys = AVector.tabulate(1000) { _ =>
       val (key, value) = fixture.generateKV()
-      trie = trie.putRaw(key, value).toOption.get
-      trie = trie.putRaw(key, value).toOption.get //idempotent tests
+      trie = trie.put(key, value).toOption.get
+      trie = trie.put(key, value).toOption.get //idempotent tests
       key
     }
 
-    trie.getAllRaw(ByteString.empty).toOption.get.length is 101
+    (1 to 1001).foreach { k =>
+      trie.getAll(ByteString.empty, k).rightValue.length is k
+    }
+
+    val filter0 = trie.getAll(ByteString.empty, 1001, (key, _) => key.hashCode() > 0).rightValue
+    val filter1 = trie.getAll(ByteString.empty, 1001, (key, _) => key.hashCode() <= 0).rightValue
+    filter0.length + filter1.length is 1001
+
+    val filter2 = trie.getAll(ByteString.empty, 100, (key, _) => key.hashCode() > 0).rightValue
+    val filter3 = trie.getAll(ByteString.empty, 100, (key, _) => key.hashCode() <= 0).rightValue
+    (filter2.length + filter3.length > 100) is true
+    (filter2.length + filter3.length <= 200) is true
+
+    val samples = Set(keys.take(500).sample(), keys.drop(500).sample())
+    trie.getAll(ByteString.empty, 1, (key, _) => samples.contains(key)).rightValue.length is 1
+    trie.getAll(ByteString.empty, 2, (key, _) => samples.contains(key)).rightValue.length is 2
+    trie.getAll(ByteString.empty, 3, (key, _) => samples.contains(key)).rightValue.length is 2
+
     keys.foreach { key =>
-      trie.getOptRaw(key).map(_.nonEmpty) isE true
-      trie.existRaw(key) isE true
+      trie.getOpt(key).map(_.nonEmpty) isE true
+      trie.exist(key) isE true
     }
 
     keys.foreach { key =>
       val (_, value) = fixture.generateKV()
-      trie = trie.putRaw(key, value).toOption.get
+      trie = trie.put(key, value).toOption.get
     }
 
-    trie.getAllRaw(ByteString.empty).toOption.get.length is 101
+    (1 to 1001).foreach { k =>
+      trie.getAll(ByteString.empty, k).rightValue.length is k
+    }
     keys.foreach { key =>
-      trie.getOptRaw(key).map(_.nonEmpty) isE true
-      trie.existRaw(key) isE true
+      trie.getOpt(key).map(_.nonEmpty) isE true
+      trie.exist(key) isE true
     }
 
     keys.map { key =>
-      trie = trie.removeRaw(key).toOption.get
-      trie.getOptRaw(key).map(_.isEmpty) isE true
-      trie.existRaw(key) isE false
+      trie = trie.remove(key).toOption.get
+      trie.getOpt(key).map(_.isEmpty) isE true
+      trie.exist(key) isE false
     }
 
     trie.rootHash is genesisNode.hash

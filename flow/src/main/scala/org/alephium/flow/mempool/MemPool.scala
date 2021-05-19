@@ -45,10 +45,9 @@ class MemPool private (
 
   def size: Int = pools.sumBy(_.size)
 
-  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean =
-    readOnly {
-      contains(index, transaction.id)
-    }
+  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = {
+    contains(index, transaction.id)
+  }
 
   def contains(index: ChainIndex, txId: Hash): Boolean =
     readOnly {
@@ -75,6 +74,12 @@ class MemPool private (
     (!txIndexes.inputIndex
       .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
   }
+
+  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean =
+    readOnly {
+      assume(index.from == group)
+      tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
+    }
 
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = writeOnly {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
@@ -170,7 +175,7 @@ object MemPool {
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
     val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
-    new MemPool(groupIndex, pools, TxIndexes.empty, PendingPool.empty)
+    new MemPool(groupIndex, pools, TxIndexes.emptySharedPool, PendingPool.empty)
   }
 
   sealed trait NewTxCategory

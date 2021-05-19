@@ -86,7 +86,8 @@ class ServerUtils(networkType: NetworkType) {
         query.fromKey,
         query.toAddress.lockupScript,
         query.lockTime,
-        query.value
+        query.value,
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -208,9 +209,10 @@ class ServerUtils(networkType: NetworkType) {
       fromKey: PublicKey,
       toLockupScript: LockupScript,
       lockTimeOpt: Option[TimeStamp],
-      value: U256
+      value: U256,
+      gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    blockFlow.prepareUnsignedTx(fromKey, toLockupScript, lockTimeOpt, value) match {
+    blockFlow.prepareUnsignedTx(fromKey, toLockupScript, lockTimeOpt, value, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

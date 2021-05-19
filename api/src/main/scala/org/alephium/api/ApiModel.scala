@@ -28,6 +28,7 @@ import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.serde.RandomBytes
 import org.alephium.util._
 
@@ -57,6 +58,9 @@ trait ApiModelCodec {
   implicit val u256Reader: Reader[U256] = javaBigIntegerReader.map { u256 =>
     U256.from(u256).getOrElse(throw new Abort(s"Invalid U256: $u256"))
   }
+
+  implicit val gasPriceWrite: Writer[GasPrice]  = u256Writer.comap(_.value)
+  implicit val gasPriceReader: Reader[GasPrice] = u256Reader.map(GasPrice.apply)
 
   implicit val publicKeyWriter: Writer[PublicKey] = bytesWriter
   implicit val publicKeyReader: Reader[PublicKey] = bytesReader(PublicKey.from)

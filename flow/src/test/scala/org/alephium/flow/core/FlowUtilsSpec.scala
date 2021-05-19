@@ -17,10 +17,10 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
-import org.alephium.util.{AlephiumSpec, AVector, Bytes}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, U256}
 
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
@@ -85,5 +85,41 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
+  }
+
+  it should "deal with large amount of UTXOs" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = transfer(blockFlow, chainIndex)
+    val tx         = block.nonCoinbase.head
+    val output     = tx.unsigned.fixedOutputs.head
+
+    val n = ALF.MaxTxInputNum
+
+    val outputs = AVector.tabulate(n) { k =>
+      output.copy(amount = ALF.nanoAlf(k.toLong))
+    }
+    val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
+    val newBlock = block.copy(transactions = AVector(newTx))
+
+    val ts0 = System.currentTimeMillis()
+    blockFlow.add(newBlock).isRight is true
+    val ts1 = System.currentTimeMillis()
+
+    val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
+    balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
+    lockedBalance is 0
+    utxos is n
+
+    val ts2 = System.currentTimeMillis()
+    blockFlow.prepareUnsignedTx(
+      keyManager(output.lockupScript).publicKey,
+      output.lockupScript,
+      None,
+      ALF.oneAlf,
+      defaultGasPrice
+    )
+    val ts3 = System.currentTimeMillis()
+
+    print(s"Times: ${ts1 - ts0} - ${ts2 - ts1} - ${ts3 - ts2}\n")
   }
 }

@@ -20,15 +20,15 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.IOError
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{ChainIndex, FlowData}
+import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 
 object ChainHandler {
   trait Event
 }
 
-abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](
+abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
     validator: Validation[T, S]
@@ -39,18 +39,21 @@ abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](
     assume(!blockFlow.containsUnsafe(data.hash))
     log.debug(s"Try to add ${data.shortHex}")
     validator.validate(data, blockFlow) match {
-      case Left(Left(e))                 => handleIOError(data.hash, broker, e)
+      case Left(Left(e))                 => handleIOError(data, broker, e)
       case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, x)
       case Right(_)                      => handleValidData(data, broker, origin)
     }
   }
 
   def handleIOError(
-      hash: BlockHash,
+      data: T,
       broker: ActorRefT[ChainHandler.Event],
       error: IOError
   ): Unit = {
-    log.error(s"IO failed in block/header ${hash.shortHex} validation: ${error.toString}")
+    val blockHex = Hex.toHexString(serialize(data))
+    log.error(
+      s"IO failed in block/header ${data.hash.shortHex}: $blockHex validation: $error"
+    )
     broker ! dataAddingFailed()
   }
 
@@ -59,7 +62,8 @@ abstract class ChainHandler[T <: FlowData, S <: InvalidStatus, Command](
       broker: ActorRefT[ChainHandler.Event],
       status: InvalidStatus
   ): Unit = {
-    log.warning(s"Invalid block/blockheader ${data.shortHex}: $status")
+    val blockHex = Hex.toHexString(serialize(data))
+    log.warning(s"Invalid block/header ${data.shortHex}: $status : $blockHex")
     sender() ! DependencyHandler.Invalid(data.hash)
     broker ! dataInvalid(data)
   }

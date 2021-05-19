@@ -35,6 +35,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{discard, AVector, Duration, Service, TimeStamp, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
@@ -70,7 +71,9 @@ trait WalletService extends Service {
   def transfer(
       wallet: String,
       address: Address,
-      amount: U256
+      amount: U256,
+      lockTime: Option[TimeStamp],
+      gasPrice: Option[GasPrice]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def deriveNextAddress(wallet: String): Either[WalletError, Address]
   def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[Address]]
@@ -307,19 +310,23 @@ object WalletService {
     override def transfer(
         wallet: String,
         address: Address,
-        amount: U256
+        amount: U256,
+        lockTime: Option[TimeStamp],
+        gasPrice: Option[GasPrice]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
-        blockFlowClient.prepareTransaction(pubKey.toHexString, address, amount).flatMap {
-          case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
-          case Right(buildTxResult) =>
-            val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
-            blockFlowClient
-              .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
-              .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
-              .map(_.left.map(BlockFlowClientError))
-        }
+        blockFlowClient
+          .prepareTransaction(pubKey.toHexString, address, amount, lockTime, gasPrice)
+          .flatMap {
+            case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
+            case Right(buildTxResult) =>
+              val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
+              blockFlowClient
+                .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
+                .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
+                .map(_.left.map(BlockFlowClientError))
+          }
       }
     }
 

@@ -245,8 +245,8 @@ object TxValidation {
       }
     }
 
-    private def checkGasPrice(gas: U256): Boolean = {
-      gas > U256.Zero && gas < ALF.MaxALFValue
+    private def checkGasPrice(gasPrice: GasPrice): Boolean = {
+      gasPrice.value > U256.Zero && gasPrice.value < ALF.MaxALFValue
     }
 
     protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {

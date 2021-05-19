@@ -33,6 +33,10 @@ class PendingPool(
     txs.contains(txId)
   }
 
+  def isDoubleSpending(tx: TransactionTemplate): Boolean = readOnly {
+    tx.unsigned.inputs.exists(input => indexes.isSpent(input.outputRef))
+  }
+
   def add(tx: TransactionTemplate): Unit = writeOnly {
     if (!txs.contains(tx.id)) {
       txs.addOne(tx.id -> tx)
@@ -76,5 +80,5 @@ class PendingPool(
 }
 
 object PendingPool {
-  def empty: PendingPool = new PendingPool(mutable.HashMap.empty, TxIndexes.empty)
+  def empty: PendingPool = new PendingPool(mutable.HashMap.empty, TxIndexes.emptyPendingPool)
 }

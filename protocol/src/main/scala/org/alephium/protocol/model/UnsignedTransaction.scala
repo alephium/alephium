@@ -16,9 +16,9 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{Hash, HashSerde}
+import org.alephium.protocol.{ALF, Hash, HashSerde}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -33,7 +33,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 final case class UnsignedTransaction(
     scriptOpt: Option[StatefulScript],
     startGas: GasBox,
-    gasPrice: U256,
+    gasPrice: GasPrice,
     inputs: AVector[TxInput],
     fixedOutputs: AVector[AssetOutput]
 ) extends HashSerde[UnsignedTransaction] {
@@ -68,7 +68,7 @@ object UnsignedTransaction {
   // format: off
   implicit val serde: Serde[UnsignedTransaction] =
     Serde
-      .forProduct5[Option[StatefulScript], GasBox, U256, AVector[TxInput], AVector[AssetOutput], UnsignedTransaction](
+      .forProduct5[Option[StatefulScript], GasBox, GasPrice, AVector[TxInput], AVector[AssetOutput], UnsignedTransaction](
         UnsignedTransaction.apply,
         t => (t.scriptOpt, t.startGas, t.gasPrice, t.inputs, t.fixedOutputs)
       )
@@ -102,11 +102,12 @@ object UnsignedTransaction {
       lockTimeOpt: Option[TimeStamp],
       amount: U256,
       gas: GasBox,
-      gasPrice: U256
+      gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {
+    assume(gasPrice.value <= ALF.MaxALFValue)
     val inputSum = inputs.fold(U256.Zero)(_ addUnsafe _._2.amount)
+    val gasFee   = gasPrice * gas
     (for {
-      gasFee     <- gasPrice.mul(gas.toU256)
       remainder0 <- inputSum.sub(amount)
       remainder  <- remainder0.sub(gasFee)
     } yield {

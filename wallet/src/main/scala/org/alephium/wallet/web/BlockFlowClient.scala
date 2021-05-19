@@ -27,15 +27,17 @@ import org.alephium.api.model._
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{Duration, Hex, U256}
+import org.alephium.protocol.vm.{GasPrice, LockupScript}
+import org.alephium.util.{Duration, Hex, TimeStamp, U256}
 
 trait BlockFlowClient {
   def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]]
   def prepareTransaction(
       fromKey: String,
       toAddress: Address,
-      value: U256
+      value: U256,
+      lockTime: Option[TimeStamp],
+      gasPrice: Option[GasPrice]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def postTransaction(
       tx: String,
@@ -76,28 +78,30 @@ object BlockFlowClient {
         }
       }
 
-    private def requestFromGroup[P, A, R](
+    private def requestFromGroup[P, A](
         fromGroup: GroupIndex,
         endpoint: BaseEndpoint[P, A],
         params: P
-    )(f: A => R): Future[Either[ApiError[_ <: StatusCode], R]] =
+    ): Future[Either[ApiError[_ <: StatusCode], A]] =
       uriFromGroup(fromGroup).flatMap {
         _.fold(
           e => Future.successful(Left(e)),
           uri =>
             backend
               .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
-              .map(_.body.map(f))
+              .map(_.body)
         )
       }
 
     def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]] =
-      requestFromGroup(address.groupIndex, getBalance, address)(_.balance)
+      requestFromGroup(address.groupIndex, getBalance, address).map(_.map(_.balance))
 
     def prepareTransaction(
         fromKey: String,
         toAddress: Address,
-        value: U256
+        value: U256,
+        lockTime: Option[TimeStamp],
+        gasPrice: Option[GasPrice]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
       Hex.from(fromKey).flatMap(PublicKey.from) match {
         case None => Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromKey")))
@@ -106,8 +110,8 @@ object BlockFlowClient {
           requestFromGroup(
             lockupScript.groupIndex,
             buildTransaction,
-            (publicKey, toAddress, None, value)
-          )(identity)
+            (publicKey, toAddress, value, lockTime, gasPrice)
+          )
       }
     }
 
@@ -120,7 +124,7 @@ object BlockFlowClient {
         GroupIndex.unsafe(fromGroup),
         sendTransaction,
         SendTransaction(tx, signature)
-      )(identity)
+      )
     }
 
     private def fetchSelfClique(): Future[Either[ApiError[_ <: StatusCode], SelfClique]] = {

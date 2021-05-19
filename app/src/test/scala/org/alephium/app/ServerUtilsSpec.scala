@@ -42,7 +42,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.oneAlf)
+          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), ALF.oneAlf)
         )
         .rightValue
 
@@ -100,7 +100,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), None, ALF.oneAlf)
+          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), ALF.oneAlf)
         )
         .rightValue
 

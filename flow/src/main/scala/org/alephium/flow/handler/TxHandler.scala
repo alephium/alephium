@@ -28,7 +28,8 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
-import org.alephium.util.{AVector, BaseActor, EventStream}
+import org.alephium.serde.serialize
+import org.alephium.util.{AVector, BaseActor, EventStream, Hex}
 
 object TxHandler {
   def props(
@@ -73,7 +74,14 @@ class TxHandler(blockFlow: BlockFlow)(implicit
   ): Unit = {
     val chainIndex = tx.chainIndex
     val mempool    = blockFlow.getMemPool(chainIndex)
-    if (!mempool.contains(chainIndex, tx)) {
+    if (mempool.contains(chainIndex, tx)) {
+      log.debug(s"tx ${tx.id.shortHex} is already included")
+      addFailed(tx)
+    } else if (mempool.isDoubleSpending(chainIndex, tx)) {
+      val txHex = Hex.toHexString(serialize(tx))
+      log.warning(s"tx ${tx.id.shortHex}: $txHex is double spending")
+      addFailed(tx)
+    } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
           log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s")
@@ -81,12 +89,10 @@ class TxHandler(blockFlow: BlockFlow)(implicit
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin, acknowledge = true)
         case Left(Left(e)) =>
-          log.warning(s"IO failed in validating tx ${tx.id.shortHex} due to $e")
+          val txHex = Hex.toHexString(serialize(tx))
+          log.warning(s"IO failed in validating tx ${tx.id.shortHex}: $txHex, due to $e")
           addFailed(tx)
       }
-    } else {
-      log.debug(s"tx ${tx.id.shortHex} is already included")
-      addFailed(tx)
     }
   }
 

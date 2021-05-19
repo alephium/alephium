@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.testkit.TestProbe
+import akka.testkit.{EventFilter, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
@@ -56,8 +56,23 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
 
-    txHandler ! addTx(tx)
-    expectMsg(TxHandler.AddFailed(tx.id))
+    EventFilter.warning(pattern = ".*already existed.*").intercept {
+      txHandler ! addTx(tx)
+      expectMsg(TxHandler.AddFailed(tx.id))
+    }
+  }
+
+  it should "fail in double-spending" in new Fixture {
+    val tx0 = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
+    val tx1 = transferTxs(blockFlow, chainIndex, ALF.alf(2), 1, None, true, None).head
+
+    txHandler ! addTx(tx0)
+    expectMsg(TxHandler.AddSucceeded(tx0.id))
+
+    EventFilter.warning(pattern = ".*double spending.*").intercept {
+      txHandler ! addTx(tx1)
+      expectMsg(TxHandler.AddFailed(tx1.id))
+    }
   }
 
   trait Fixture extends FlowFixture with TxGenerators {

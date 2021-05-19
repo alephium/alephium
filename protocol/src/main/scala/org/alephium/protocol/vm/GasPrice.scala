@@ -14,21 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.vm
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.{GasPrice, LockupScript}
-import org.alephium.util.{TimeStamp, U256}
+import org.alephium.serde.Serde
+import org.alephium.util.U256
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromKey: PublicKey,
-    toAddress: Address,
-    value: U256,
-    lockTime: Option[TimeStamp] = None,
-    gasPrice: Option[GasPrice] = None
-) {
-  def fromAddress(networkType: NetworkType): Address =
-    Address(networkType, LockupScript.p2pkh(fromKey))
+final case class GasPrice(value: U256) {
+  // this is safe as value <= ALF.MaxALFValue
+  def *(gas: GasBox): U256 = {
+    value.mulUnsafe(gas.toU256)
+  }
+}
+
+object GasPrice {
+  implicit val serde: Serde[GasPrice] = Serde.forProduct1(GasPrice.apply, _.value)
 }

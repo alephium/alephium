@@ -18,147 +18,116 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
 
 /*
- * We first travel all utxos and organize them in the state
- *   - if the amount match the target we take it and stop the iteration
- *   - if it smaller we keep the value in our `smallers` list
- *   - if it's bigger, we keep it if it's the smallest bigger
- *
- *  With the `State` we have everything to select the rights utxos
- *  - If we have a matched value, we use only that one
- *  - If the smallers sum match the target we use all of them (for cleaning
- *    and also because it might be a "wallet dump"
- *  - If the smallers sum is less than the target we use the smallest greater (if exist)
- *  - If the smallers sum is bigger than the target, we use them, but clean to keep the
- *    minimum set of utxos (might be changed to use the random combination of bitcoin
- *    to avoid the sort)
- *  - Otherwise we return None as we can't reach the target
+ * We sort the utxos based on the amount and type
+ *   - the utxos with smaller amounts are selected first
+ *   - the utxos with higher persisted level are selected first (confirmed utxos are of high priority)
  */
 object UtxoUtils {
+  implicit val assetOrder: Ordering[Asset] = (x: Asset, y: Asset) => {
+    val compare1 = x.outputType.cachedLevel.compareTo(y.outputType.cachedLevel)
+    if (compare1 != 0) {
+      compare1
+    } else {
+      x.output.amount.compareTo(y.output.amount)
+    }
+  }
 
   type Asset = FlowUtils.AssetOutputInfo
-  final case class Selected(assets: AVector[Asset], gasFee: U256)
-
-  final private case class State(
-      smallers: AVector[Asset],
-      smallestGreater: Option[Asset],
-      matching: Option[Asset]
-  )
-
-  private def sumAssets(assets: AVector[Asset]): U256 = {
-    assets.fold(U256.Zero) { (total, asset) => total.addUnsafe(asset.output.amount) }
-  }
+  final case class Selected(assets: AVector[Asset], gas: GasBox)
 
   // to select a list of utxos of value (amount + gas fees for inputs and outputs)
   def select(
       utxos: AVector[Asset],
       amount: U256,
-      totalGasFee: U256,
-      gasFeePerInput: U256,
-      gasFeePerOutput: U256,
+      gasPrice: GasPrice,
+      gasPerInput: GasBox,
+      gasPerOutput: GasBox,
       numOutputs: Int
   ): Either[String, Selected] = {
-    require(numOutputs >= 0)
+    val sortedUtxos = utxos.sorted
+
     for {
-      outputGasFee <- gasFeePerOutput
-        .mul(U256.unsafe(numOutputs))
-        .toRight(s"Output gas fee overflow ($gasFeePerOutput * $numOutputs)")
-      selected <- select(utxos, amount, totalGasFee, gasFeePerInput, outputGasFee)
-    } yield selected
+      sum_startIndex <- findUtxosWithoutGas(sortedUtxos, amount)
+      sum_index <- findUtxosWithGas(
+        sortedUtxos,
+        sum_startIndex._1,
+        sum_startIndex._2,
+        amount,
+        gasPrice,
+        gasPerInput,
+        gasPerOutput,
+        numOutputs
+      )
+    } yield {
+      val selectedUtxos = sortedUtxos.take(sum_index._2 + 1)
+      val gas           = estimateGas(gasPerInput, gasPerOutput, selectedUtxos.length, numOutputs)
+      Selected(selectedUtxos, gas)
+    }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def select(
-      utxos: AVector[Asset],
+  def findUtxosWithoutGas(
+      sortedUtxos: AVector[Asset],
+      amount: U256
+  ): Either[String, (U256, Int)] = {
+    @tailrec
+    def iter(sum: U256, index: Int): (U256, Int) = {
+      if (index >= sortedUtxos.length) {
+        (sum, -1)
+      } else {
+        val newSum = sum.addUnsafe(sortedUtxos(index).output.amount)
+        if (newSum >= amount) (newSum, index) else iter(newSum, index + 1)
+      }
+    }
+
+    iter(U256.Zero, 0) match {
+      case (sum, -1) => Left(s"Not enough balance: got $sum, expected $amount")
+      case result    => Right(result)
+    }
+  }
+
+  def findUtxosWithGas(
+      sortedUtxos: AVector[Asset],
+      sum: U256,
+      currentIndex: Int,
       amount: U256,
-      totalGasFee: U256,
-      gasFeePerInput: U256,
-      outputGasFee: U256
-  ): Either[String, Selected] = {
-    for {
-      totalAmount     <- (amount add totalGasFee).toRight(s"Amount overflow ($amount + $totalGasFee")
-      candidateAssets <- select(utxos, totalAmount)
-      usedGasFee <- (for {
-        inputFees <- gasFeePerInput mul U256.unsafe(candidateAssets.length)
-        allGasFee <- inputFees add outputGasFee
-      } yield allGasFee)
-        .toRight(
-          s"Gas fee overflow ($gasFeePerInput * ${candidateAssets.length} + $outputGasFee)"
-        )
-      assets <-
-        if (totalGasFee >= usedGasFee) {
-          Right(Selected(candidateAssets, totalGasFee))
+      gasPrice: GasPrice,
+      gasPerInput: GasBox,
+      gasPerOutput: GasBox,
+      numOutputs: Int
+  ): Either[String, (U256, Int)] = {
+    @tailrec
+    def iter(sum: U256, index: Int): (U256, Int) = {
+      val gas         = estimateGas(gasPerInput, gasPerOutput, index + 1, numOutputs)
+      val gasFee      = gasPrice * gas
+      val totalAmount = amount.addUnsafe(gasFee)
+      if (sum >= totalAmount) {
+        (sum, index)
+      } else {
+        val nextIndex = index + 1
+        if (nextIndex == sortedUtxos.length) {
+          (sum, -1)
         } else {
-          select(utxos, amount, usedGasFee, gasFeePerInput, outputGasFee)
+          iter(sum.addUnsafe(sortedUtxos(nextIndex).output.amount), nextIndex)
         }
-    } yield assets
-  }
-
-  def select(utxos: AVector[Asset], target: U256): Either[String, AVector[Asset]] = {
-    val state = buildState(utxos, target)
-
-    val smallersSum = sumAssets(state.smallers)
-
-    state match {
-      case State(_, _, Some(matching)) =>
-        Right(AVector(matching))
-      case State(smallers, _, _) if smallersSum == target =>
-        Right(smallers)
-      case State(_, Some(smallestGreater), _) if smallersSum < target =>
-        Right(AVector(smallestGreater))
-      case State(smallers, _, _) if smallersSum > target =>
-        Right(reduceSmallerValue(smallers, smallersSum, target))
-      case State(_, Some(smallestGreater), _) => Right(AVector(smallestGreater))
-      case _                                  => Left("Not enough balance")
-    }
-  }
-
-  private def buildState(initialAssets: AVector[Asset], target: U256): State = {
-    @tailrec
-    def iter(state: State, assets: AVector[Asset]): State = {
-      assets.headOption match {
-        case None => state
-        case Some(asset) =>
-          val amount = asset.output.amount
-          if (amount == target) {
-            state.copy(matching = Some(asset))
-          } else if (amount < target) {
-            iter(state.copy(smallers = state.smallers :+ asset), assets.tail)
-          } else {
-            state.smallestGreater match {
-              case Some(currentSmallerGreater) if amount >= currentSmallerGreater.output.amount =>
-                iter(state, assets.tail)
-              case _ =>
-                iter(state.copy(smallestGreater = Some(asset)), assets.tail)
-            }
-          }
       }
     }
 
-    iter(State(AVector.empty, None, None), initialAssets)
+    iter(sum, currentIndex) match {
+      case (_, -1) => Left(s"Not enough balance for fee, maybe transfer a smaller amount")
+      case result  => Right(result)
+    }
   }
 
-  private def reduceSmallerValue(
-      assets: AVector[Asset],
-      currentValue: U256,
-      target: U256
-  ): AVector[Asset] = {
-    @tailrec
-    def iter(sorted: AVector[Asset], value: U256): AVector[Asset] = {
-      sorted.headOption.flatMap(asset => value.sub(asset.output.amount)) match {
-        case Some(newValue) =>
-          if (newValue >= target) {
-            iter(sorted.tail, newValue)
-          } else {
-            sorted
-          }
-        case None => sorted
-      }
-    }
-
-    assume(currentValue > target)
-    iter(assets.sortBy(_.output.amount), currentValue)
+  def estimateGas(
+      gasPerInput: GasBox,
+      gasPerOutput: GasBox,
+      numInputs: Int,
+      numOutputs: Int
+  ): GasBox = {
+    GasBox.unsafe(gasPerInput.value * numInputs + gasPerOutput.value * numOutputs)
   }
 }

@@ -38,7 +38,7 @@ import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -203,7 +203,8 @@ object ServerFixture {
         fromKey: PublicKey,
         toLockupScript: LockupScript,
         lockTimeOpt: Option[TimeStamp],
-        amount: U256
+        amount: U256,
+        gasPrice: GasPrice
     ): IOResult[Either[String, UnsignedTransaction]] =
       lockTimeOpt match {
         case None => Right(Right(dummyTx.unsigned))

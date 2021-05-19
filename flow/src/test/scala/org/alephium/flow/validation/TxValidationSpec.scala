@@ -28,7 +28,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
-import org.alephium.protocol.vm.{GasBox, LockupScript, VMFactory}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, VMFactory}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -147,9 +147,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
     passCheck(checkGasBound(txNew3))
 
-    val txNew4 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = 0))
+    val txNew4 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(0)))
     failCheck(checkGasBound(txNew4), InvalidGasPrice)
-    val txNew5 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = ALF.MaxALFValue))
+    val txNew5 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(ALF.MaxALFValue)))
     failCheck(checkGasBound(txNew5), InvalidGasPrice)
   }
 

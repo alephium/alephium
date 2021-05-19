@@ -421,7 +421,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val unsigned =
         blockFlow
-          .prepareUnsignedTx(publicKey, toLockupScript, lockTimeOpt, ALF.alf(1))
+          .prepareUnsignedTx(publicKey, toLockupScript, lockTimeOpt, ALF.alf(1), defaultGasPrice)
           .rightValue
           .rightValue
       unsigned.fixedOutputs.length is 2
@@ -441,11 +441,25 @@ class BlockFlowSpec extends AlephiumSpec {
     val toPrivateKey   = keyManager(toLockupScript)
     addAndCheck(blockFlow, block)
     blockFlow
-      .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
-      .rightValue is Left("Not enough balance")
+      .prepareUnsignedTx(
+        toPrivateKey.publicKey,
+        toLockupScript,
+        None,
+        ALF.nanoAlf(1),
+        defaultGasPrice
+      )
+      .rightValue
+      .leftValue
+      .startsWith("Not enough balance") is true
     Thread.sleep(2000)
     blockFlow
-      .prepareUnsignedTx(toPrivateKey.publicKey, toLockupScript, None, ALF.nanoAlf(1))
+      .prepareUnsignedTx(
+        toPrivateKey.publicKey,
+        toLockupScript,
+        None,
+        ALF.nanoAlf(1),
+        defaultGasPrice
+      )
       .rightValue
       .isRight is true
   }
@@ -466,7 +480,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val (_, toPubKey)  = toGroup.generateKey
       val toLockupScript = LockupScript.p2pkh(toPubKey)
       val unsignedTx = blockFlow
-        .prepareUnsignedTx(fromPubKey, toLockupScript, None, ALF.oneAlf)
+        .prepareUnsignedTx(fromPubKey, toLockupScript, None, ALF.oneAlf, defaultGasPrice)
         .rightValue
         .rightValue
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)

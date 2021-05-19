@@ -152,7 +152,7 @@ trait FlowFixture
     }
     val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
 
-    val gasFee = defaultGasPrice * minimalGas.toU256
+    val gasFee = defaultGasFee
     val (outputs, remaining) = if (gasFeeInTheAmount) {
       val outputs = toLockupScripts.map(
         TxOutput.asset(amount - gasFee.divUnsafe(toLockupScripts.length), _, lockTimeOpt)
@@ -445,8 +445,11 @@ trait FlowFixture
     contractState.fields is fields
     contractState.contractOutputRef is outputRef
 
-    worldState.getAssetOutputs(ByteString.empty).toOption.get.length is numAssets
-    worldState.getContractOutputs(ByteString.empty).toOption.get.length is numContracts
+    worldState
+      .getAssetOutputs(ByteString.empty, Int.MaxValue, (_, _) => true)
+      .rightValue
+      .length is numAssets
+    worldState.getContractOutputs(ByteString.empty, Int.MaxValue).rightValue.length is numContracts
   }
 }
 
