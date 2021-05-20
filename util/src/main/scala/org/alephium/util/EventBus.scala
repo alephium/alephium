@@ -20,6 +20,8 @@ import scala.collection.mutable
 
 import akka.actor.{ActorRef, Props}
 
+import org.alephium.util.EventStream.Subscriber
+
 object EventBus {
   def props(): Props = {
     Props(new EventBus())
@@ -37,7 +39,7 @@ object EventBus {
   final case class Subscribers(value: AVector[ActorRef]) extends Message
 }
 
-class EventBus() extends BaseActor {
+class EventBus() extends BaseActor with Subscriber {
   import EventBus._
 
   private val subscribers: mutable.HashSet[ActorRef] = mutable.HashSet.empty

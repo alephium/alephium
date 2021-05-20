@@ -41,6 +41,12 @@ trait MinerState {
 
   def setRunning(fromShift: Int, to: Int): Unit = running(fromShift)(to) = true
 
+  def setIdle(chainIndex: ChainIndex): Unit = {
+    val fromShift = chainIndex.from.value - brokerConfig.groupFrom
+    val to        = chainIndex.to.value
+    setIdle(fromShift, to)
+  }
+
   def setIdle(fromShift: Int, to: Int): Unit = running(fromShift)(to) = false
 
   def countsToString: String = {

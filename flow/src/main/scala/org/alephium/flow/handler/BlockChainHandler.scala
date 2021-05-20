@@ -19,27 +19,30 @@ package org.alephium.flow.handler
 import akka.actor.Props
 
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
+import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
+import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
-import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector, EventStream}
+import org.alephium.protocol.model.{Block, ChainIndex, TransactionTemplate}
+import org.alephium.util.{ActorRefT, AVector, EventBus, EventStream}
 
 object BlockChainHandler {
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      flowHandler: ActorRefT[FlowHandler.Command]
+      txHandler: ActorRefT[TxHandler.Command],
+      eventBus: ActorRefT[EventBus.Message]
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting
   ): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, flowHandler))
+    Props(new BlockChainHandler(blockFlow, chainIndex, txHandler, eventBus))
 
   sealed trait Command
   final case class Validate(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
@@ -54,13 +57,15 @@ object BlockChainHandler {
 class BlockChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex,
-    flowHandler: ActorRefT[FlowHandler.Command]
+    txHandler: ActorRefT[TxHandler.Command],
+    eventBus: ActorRefT[EventBus.Message]
 )(implicit
     brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig,
+    val consensusConfig: ConsensusConfig,
     networkSetting: NetworkSetting
 ) extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
       blockFlow,
+      txHandler,
       chainIndex,
       BlockValidation.build
     )
@@ -85,15 +90,22 @@ class BlockChainHandler(
     }
   }
 
-  override def addToFlowHandler(
-      block: Block,
-      broker: ActorRefT[ChainHandler.Event],
-      origin: DataOrigin
-  ): Unit = {
-    flowHandler ! FlowHandler.AddBlock(block, broker, origin)
-  }
-
   override def dataAddingFailed(): Event = BlockAddingFailed
 
   override def dataInvalid(data: Block): Event = InvalidBlock(data.hash)
+
+  override def addDataToBlockFlow(block: Block): IOResult[AVector[TransactionTemplate]] = {
+    blockFlow.addNew(block)
+  }
+
+  override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {
+    broker ! BlockChainHandler.BlockAdded(block.hash)
+    escapeIOError(blockFlow.getHeight(block)) { height =>
+      eventBus ! BlockNotify(block.header, height)
+    }
+  }
+
+  override def show(block: Block): String = {
+    showHeader(block.header) + s" #tx: ${block.transactions.length}"
+  }
 }

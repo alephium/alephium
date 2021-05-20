@@ -36,5 +36,11 @@ object EventStream {
     ): Unit = {
       require(context.system.eventStream.subscribe(actor, channel))
     }
+
+    def unsubscribeEvent(actor: ActorRef, channel: Class[_ <: Event])(implicit
+        context: ActorContext
+    ): Unit = {
+      require(context.system.eventStream.unsubscribe(actor, channel))
+    }
   }
 }

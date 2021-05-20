@@ -83,14 +83,6 @@ akka {
   io.tcp.register-timeout = 1m
 
   actor {
-    default-dispatcher {
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-factor = 0.5
-      }
-      throughput = 1
-    }
-
     mining-dispatcher {
       type = Dispatcher
       executor = "fork-join-executor"
