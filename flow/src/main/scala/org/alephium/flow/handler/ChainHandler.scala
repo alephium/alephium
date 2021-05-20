@@ -19,21 +19,31 @@ package org.alephium.flow.handler
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
-import org.alephium.io.IOError
-import org.alephium.protocol.model.{ChainIndex, FlowData}
+import org.alephium.io.{IOError, IOResult}
+import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData, TransactionTemplate}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
+import org.alephium.util.EventStream.Publisher
 
 object ChainHandler {
   trait Event
+
+  final case class FlowDataAdded(data: FlowData, origin: DataOrigin)
+      extends Event
+      with EventStream.Event
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     blockFlow: BlockFlow,
+    txHandler: ActorRefT[TxHandler.Command],
     val chainIndex: ChainIndex,
     validator: Validation[T, S]
-) extends IOBaseActor {
+) extends IOBaseActor
+    with Publisher {
   import ChainHandler.Event
+
+  def consensusConfig: ConsensusConfig
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     assume(!blockFlow.containsUnsafe(data.hash))
@@ -73,14 +83,60 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     if (blockFlow.isRecent(data)) {
       broadcast(data, origin)
     }
-    addToFlowHandler(data, broker, origin)
+    blockFlow.contains(data.hash) match {
+      case Right(true) =>
+        log.debug(s"Block/Header ${data.shortHex} exists already")
+      case Right(false) =>
+        addDataToBlockFlow(data) match {
+          case Left(error) => handleIOError(error)
+          case Right(newReadyTxs) =>
+            publishEvent(ChainHandler.FlowDataAdded(data, origin))
+            broadcastReadyTxs(newReadyTxs)
+            notifyBroker(broker, data)
+            log.info(show(data))
+        }
+      case Left(error) => handleIOError(error)
+    }
+  }
+
+  def addDataToBlockFlow(data: T): IOResult[AVector[TransactionTemplate]]
+
+  def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
+    if (txs.nonEmpty) {
+      // TODO: maybe broadcast it based on peer sync status
+      // delay this broadcast so that peers have download this block
+      scheduleOnce(
+        txHandler.ref,
+        TxHandler.Broadcast(txs),
+        Duration.ofSecondsUnsafe(2)
+      )
+    }
   }
 
   def broadcast(data: T, origin: DataOrigin): Unit
 
-  def addToFlowHandler(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit
+  def notifyBroker(broker: ActorRefT[ChainHandler.Event], data: T): Unit
 
   def dataAddingFailed(): Event
 
   def dataInvalid(data: T): Event
+
+  def show(data: T): String
+
+  def showHeader(header: BlockHeader): String = {
+    val total = blockFlow.numHashes
+    val index = header.chainIndex
+    val chain = blockFlow.getHeaderChain(header)
+    val targetRatio =
+      (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
+    val blockTime = {
+      chain.getBlockHeader(header.parentHash) match {
+        case Left(_) => "?ms"
+        case Right(parentHeader) =>
+          val span = header.timestamp.millis - parentHeader.timestamp.millis
+          s"${span}ms"
+      }
+    }
+    s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
+  }
 }

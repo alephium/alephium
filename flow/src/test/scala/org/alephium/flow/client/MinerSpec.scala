@@ -16,19 +16,20 @@
 
 package org.alephium.flow.client
 
-import akka.testkit.TestProbe
 import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
+import org.alephium.flow.handler.{BlockChainHandler, TestUtils}
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
+
   implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
+
   it should "use proper timestamp" in {
     val currentTs = TimeStamp.now()
     val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
@@ -40,11 +41,12 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     Miner.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
   }
 
-  it should "initialize FairMiner" in {
-    val flowHandler          = TestProbe("flowHandler")
-    val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
-    val allHandlers: AllHandlers =
-      AllHandlers.buildWithFlowHandler(system, blockFlow, ActorRefT(flowHandler.ref), "")
+  it should "initialize FairMiner" in new FlowFixture {
+    override val configValues =
+      Map(("alephium.broker.groups", 1), ("alephium.broker.broker-num", 1))
+
+    val (allHandlers, allHandlersProbes) = TestUtils.createBlockHandlersProbe
+    val blockHandlerProbe                = allHandlersProbes.blockHandlers(ChainIndex.unsafe(0, 0))
 
     val miner = system.actorOf(
       Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
@@ -55,25 +57,27 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
       expectMsg(isMining)
     }
 
+    def awaitForBlocks(n: Int) = {
+      (0 until n).foreach { _ =>
+        val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
+        miner ! BlockChainHandler.BlockAdded(block.hash)
+      }
+    }
+
     checkMining(false)
 
     miner ! Miner.Start
     checkMining(true)
-    flowHandler.expectMsgType[FlowHandler.SetHandler]
-    flowHandler.expectMsgType[FlowHandler.Register]
-    flowHandler.expectMsgType[FlowHandler.AddBlock]
-    flowHandler.expectMsgType[FlowHandler.AddBlock]
-    flowHandler.expectMsgType[FlowHandler.AddBlock]
+    awaitForBlocks(3)
+    val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
 
     miner ! Miner.Stop
     checkMining(false)
-    flowHandler.expectMsgType[FlowHandler.UnRegister.type]
+    miner ! BlockChainHandler.BlockAdded(block.hash)
+    blockHandlerProbe.expectNoMessage()
 
     miner ! Miner.Start
-    flowHandler.expectMsgType[FlowHandler.Register]
-    flowHandler.expectMsgType[FlowHandler.AddBlock]
-    flowHandler.expectMsgType[FlowHandler.AddBlock]
-    flowHandler.expectMsgType[FlowHandler.AddBlock]
+    awaitForBlocks(3)
   }
 
   it should "ignore handled mining result when it's stopped" in {

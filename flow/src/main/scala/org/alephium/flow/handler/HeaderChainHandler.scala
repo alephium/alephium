@@ -21,18 +21,19 @@ import akka.actor.Props
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
+import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.{BlockHeader, ChainIndex}
-import org.alephium.util.ActorRefT
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, TransactionTemplate}
+import org.alephium.util.{ActorRefT, AVector}
 
 object HeaderChainHandler {
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      flowHandler: ActorRefT[FlowHandler.Command]
+      txHandler: ActorRefT[TxHandler.Command]
   )(implicit brokerConfig: BrokerConfig, consensusConfig: ConsensusConfig): Props =
-    Props(new HeaderChainHandler(blockFlow, chainIndex, flowHandler))
+    Props(new HeaderChainHandler(blockFlow, chainIndex, txHandler))
 
   sealed trait Command
   final case class Validate(
@@ -50,10 +51,11 @@ object HeaderChainHandler {
 class HeaderChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex,
-    flowHandler: ActorRefT[FlowHandler.Command]
-)(implicit brokerConfig: BrokerConfig, consensusConfig: ConsensusConfig)
+    txHandler: ActorRefT[TxHandler.Command]
+)(implicit brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
     extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderChainHandler.Command](
       blockFlow,
+      txHandler,
       chainIndex,
       HeaderValidation.build
     ) {
@@ -65,15 +67,17 @@ class HeaderChainHandler(
 
   override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
-  override def addToFlowHandler(
-      header: BlockHeader,
-      broker: ActorRefT[ChainHandler.Event],
-      origin: DataOrigin
-  ): Unit = {
-    flowHandler ! FlowHandler.AddHeader(header, broker, origin)
-  }
-
   override def dataAddingFailed(): Event = HeaderAddingFailed
 
   override def dataInvalid(data: BlockHeader): Event = InvalidHeader(data.hash)
+
+  override def addDataToBlockFlow(header: BlockHeader): IOResult[AVector[TransactionTemplate]] = {
+    blockFlow.addNew(header)
+  }
+
+  override def notifyBroker(broker: ActorRefT[ChainHandler.Event], data: BlockHeader): Unit = {
+    broker ! HeaderChainHandler.HeaderAdded(data.hash)
+  }
+
+  override def show(header: BlockHeader): String = showHeader(header)
 }

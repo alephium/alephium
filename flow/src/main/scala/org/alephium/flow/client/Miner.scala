@@ -24,9 +24,9 @@ import akka.actor.Props
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, FlowHandler}
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ChainHandler}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.{BlockTemplate, DataOrigin}
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
@@ -34,6 +34,7 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
+import org.alephium.util.EventStream.Subscriber
 
 object Miner extends LazyLogging {
   def props(node: Node)(implicit config: AlephiumConfig): Props =
@@ -142,7 +143,8 @@ class Miner(
     val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting
 ) extends BaseActor
-    with MinerState {
+    with MinerState
+    with Subscriber {
   val handlers = allHandlers
 
   def receive: Receive = handleAddresses orElse handleMining()
@@ -154,18 +156,17 @@ class Miner(
     case Miner.Start =>
       if (!miningStarted) {
         log.info("Start mining")
-        handlers.flowHandler ! FlowHandler.Register(ActorRefT[Miner.Command](self))
+        subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
         updateTasks()
         startNewTasks()
         miningStarted = true
       } else {
         log.info("Mining already started")
       }
-
     case Miner.Stop =>
       if (miningStarted) {
         log.info("Stop mining")
-        handlers.flowHandler ! FlowHandler.UnRegister
+        unsubscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
         postMinerStop()
         miningStarted = false
       } else {
@@ -178,41 +179,50 @@ class Miner(
       allHandlers.getBlockHandler(index) ! handlerMessage
       self ! Miner.MiningResult(Some(block), index, miningCount)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
-      assume(brokerConfig.contains(chainIndex.from))
-      val fromShift = chainIndex.from.value - brokerConfig.groupFrom
-      val to        = chainIndex.to.value
-      increaseCounts(fromShift, to, miningCount)
-      blockOpt match {
-        case Some(block) =>
-          val miningCount = getMiningCount(fromShift, to)
-          val txCount     = block.transactions.length
-          log.debug(s"MiningCounts: $countsToString")
-          val minerAddress =
-            Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
-          log.info(
-            s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
-              s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress"
-          )
-        case None =>
-          if (miningStarted) {
-            setIdle(fromShift, to)
-            startNewTasks()
-          }
+      handleMiningResult(blockOpt, chainIndex, miningCount)
+    case ChainHandler.FlowDataAdded(_, origin) =>
+      origin match {
+        case DataOrigin.Local => () // we have updated the tasks when receiving BlockAdded
+        case _: DataOrigin.FromClique =>
+          updateTasks()
       }
-    case Miner.UpdateTemplate =>
-      updateTasks()
     case BlockChainHandler.BlockAdded(hash) =>
-      val chainIndex = ChainIndex.from(hash)
-      val fromShift  = chainIndex.from.value - brokerConfig.groupFrom
-      val to         = chainIndex.to.value
       updateTasks()
       if (miningStarted) {
-        setIdle(fromShift, to)
+        setIdle(ChainIndex.from(hash))
         startNewTasks()
       }
     case Miner.IsMining => sender() ! miningStarted
   }
   // scalastyle:on method.length
+
+  def handleMiningResult(
+      blockOpt: Option[Block],
+      chainIndex: ChainIndex,
+      miningCount: U256
+  ): Unit = {
+    assume(brokerConfig.contains(chainIndex.from))
+    val fromShift = chainIndex.from.value - brokerConfig.groupFrom
+    val to        = chainIndex.to.value
+    increaseCounts(fromShift, to, miningCount)
+    blockOpt match {
+      case Some(block) =>
+        val miningCount = getMiningCount(fromShift, to)
+        val txCount     = block.transactions.length
+        log.debug(s"MiningCounts: $countsToString")
+        val minerAddress =
+          Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
+        log.info(
+          s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
+            s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress"
+        )
+      case None =>
+        if (miningStarted) {
+          setIdle(fromShift, to)
+          startNewTasks()
+        }
+    }
+  }
 
   def handleAddresses: Receive = {
     case Miner.UpdateAddresses(newAddresses) => {

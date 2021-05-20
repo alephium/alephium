@@ -27,6 +27,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.EventStream.Subscriber
 
 object DependencyHandler {
   def props(
@@ -38,7 +39,6 @@ object DependencyHandler {
 
   sealed trait Command
   final case class AddFlowData[T <: FlowData](datas: AVector[T], origin: DataOrigin) extends Command
-  final case class FlowDataAdded(data: FlowData)                                     extends Command
   final case class Invalid(data: BlockHash)                                          extends Command
   final case object GetPendings                                                      extends Command
 
@@ -50,15 +50,18 @@ class DependencyHandler(
     val blockFlow: BlockFlow,
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
-) extends DependencyHandlerState {
+) extends DependencyHandlerState
+    with Subscriber {
   import DependencyHandler._
+
+  subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
   override def receive: Receive = {
     case AddFlowData(datas, origin) =>
       val broker = ActorRefT[ChainHandler.Event](sender())
       datas.foreach(addPendingData(_, broker, origin))
       processReadies()
-    case FlowDataAdded(data) =>
+    case ChainHandler.FlowDataAdded(data, _) =>
       uponDataProcessed(data)
       processReadies()
     case Invalid(hash) =>

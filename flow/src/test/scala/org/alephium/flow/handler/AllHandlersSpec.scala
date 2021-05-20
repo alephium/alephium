@@ -33,6 +33,9 @@ class AllHandlersSpec extends AlephiumFlowActorSpec("AllHandlersSpec") {
     val allHandlers =
       AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex)
 
+    val dataAddedProbe = TestProbe()
+    system.eventStream.subscribe(dataAddedProbe.ref, classOf[ChainHandler.FlowDataAdded])
+
     val chainIndex = ChainIndex.unsafe(0, 0)
     val blockFlow0 = isolatedBlockFlow()
     val block0     = mineFromMemPool(blockFlow0, chainIndex)
@@ -44,7 +47,9 @@ class AllHandlersSpec extends AlephiumFlowActorSpec("AllHandlersSpec") {
     )
 
     expectMsg(BlockChainHandler.BlockAdded(block0.hash))
+    dataAddedProbe.expectMsg(ChainHandler.FlowDataAdded(block0, DataOrigin.Local))
     expectMsg(BlockChainHandler.BlockAdded(block1.hash))
+    dataAddedProbe.expectMsg(ChainHandler.FlowDataAdded(block1, DataOrigin.Local))
     blockFlow.contains(block0) isE true
     blockFlow.contains(block1) isE true
 
