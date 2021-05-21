@@ -23,21 +23,24 @@ import scala.annotation.tailrec
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.IOResult
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, LruCache, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
 
+  lazy val headerCache =
+    LruCache[BlockHash, BlockHeader, IOError](consensusConfig.blockCacheCapacityPerChain)
+
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = {
-    headerStorage.get(hash)
+    headerCache.get(hash)(headerStorage.get(hash))
   }
 
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader = {
-    headerStorage.getUnsafe(hash)
+    headerCache.getUnsafe(hash)(headerStorage.getUnsafe(hash))
   }
 
   def getParentHash(hash: BlockHash): IOResult[BlockHash] = {
