@@ -51,6 +51,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   ): IOResult[Unit] = {
     for {
       _ <- blockStateStorage.put(hash, BlockState(height, weight))
+      // updateHeightIndex should go after block state update to ensure that
+      // all the hashes at height are contained in the chain
       _ <- updateHeightIndex(hash, height, isCanonical)
       _ <- updateState(hash, timestamp, parentHash)
     } yield ()
@@ -107,7 +109,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def isCanonicalUnsafe(hash: BlockHash): Boolean = {
     blockStateStorage.getOptUnsafe(hash).exists { state =>
       val hashes = getHashesUnsafe(state.height)
-      hashes.head == hash // .head is safe here
+      hashes.headOption.contains(hash)
     }
   }
 
