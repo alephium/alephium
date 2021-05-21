@@ -203,7 +203,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
-  // TODO: use Merkle hash for transactions
   private[validation] def checkMerkleRoot(block: Block): BlockValidationResult[Unit] = {
     if (block.header.txsHash == Block.calTxsHash(block.transactions)) {
       validBlock(())

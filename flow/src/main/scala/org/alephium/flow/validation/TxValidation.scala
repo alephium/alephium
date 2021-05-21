@@ -444,7 +444,6 @@ object TxValidation {
         case _: NoSuchElementException => Left(Right(BalanceOverFlow))
       }
 
-    // TODO: signatures might not be 1-to-1 mapped to inputs
     protected[validation] def checkWitnesses(
         tx: Transaction,
         preOutputs: AVector[TxOutput]
