@@ -153,7 +153,7 @@ lazy val app = mainProject("app")
     publish / skip := true,
     docker / dockerfile := {
       val artifact: File     = assembly.value
-      val artifactTargetPath = s"/${artifact.name}"
+      val artifactTargetPath = "/alephium.jar"
 
       val alephiumHome = "/alephium-home"
 
@@ -177,8 +177,8 @@ lazy val app = mainProject("app")
         expose(11973) // ws
         expose(9973)  // p2p
 
-        volume("/alephium-home/.alephium")
-        volume("/alephium-home/.alephium-wallets")
+        volume(s"$alephiumHome/.alephium")
+        volume(s"$alephiumHome/.alephium-wallets")
 
         user("nobody")
 
