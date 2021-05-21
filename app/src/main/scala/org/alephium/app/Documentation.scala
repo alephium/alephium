@@ -55,8 +55,9 @@ trait Documentation extends Endpoints {
   )
 
   private lazy val servers = List(
-    Server("http://{host}:{port}")
+    Server("{protocol}://{host}:{port}")
       .variables(
+        "protocol" -> ServerVariable(Some(List("http", "https")), "http", None),
         "host" -> ServerVariable(None, "127.0.0.1", None),
         "port" -> ServerVariable(None, port.toString, None)
       )
