@@ -90,9 +90,10 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
   }
 
   def exists(key: K)(genValue: => Either[E, Boolean]): Either[E, Boolean] = {
-    existsInCache(key) match {
-      case true  => Right(true)
-      case false => genValue
+    if (existsInCache(key)) {
+      Right(true)
+    } else {
+      genValue
     }
   }
 
