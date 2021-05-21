@@ -6,8 +6,12 @@
   },
   "servers": [
     {
-      "url": "http://{host}:{port}",
+      "url": "{protocol}://{host}:{port}",
       "variables": {
+        "protocol": {
+          "enum": ["http", "https"],
+          "default": "http"
+        },
         "host": {
           "default": "127.0.0.1"
         },
