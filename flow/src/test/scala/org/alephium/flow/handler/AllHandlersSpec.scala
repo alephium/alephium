@@ -20,7 +20,7 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Generators}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
@@ -57,19 +57,37 @@ class AllHandlersSpec extends AlephiumFlowActorSpec("AllHandlersSpec") {
     expectMsg(DependencyHandler.Pendings(AVector.empty))
   }
 
-  it should "work for invalid block" in {
+  it should "work for invalid block from peers" in new Generators {
     val allHandlers =
       AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex)
 
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
     allHandlers.dependencyHandler !
-      DependencyHandler.AddFlowData(AVector(invalidBlock), DataOrigin.Local)
+      DependencyHandler.AddFlowData(
+        AVector(invalidBlock),
+        DataOrigin.InterClique(brokerInfoGen.sample.get)
+      )
 
     expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash))
     blockFlow.contains(invalidBlock) isE false
 
     allHandlers.dependencyHandler ! DependencyHandler.GetPendings
     expectMsg(DependencyHandler.Pendings(AVector.empty))
+  }
+
+  it should "work for invalid block from local" in new Generators {
+    val allHandlers =
+      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex)
+
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
+    allHandlers.getBlockHandler(chainIndex) ! BlockChainHandler.Validate(
+      invalidBlock,
+      testActor,
+      DataOrigin.Local
+    )
+    expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash))
+    blockFlow.contains(invalidBlock) isE false
   }
 }

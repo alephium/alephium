@@ -99,7 +99,7 @@ class BlockChainHandler(
   }
 
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {
-    broker ! BlockChainHandler.BlockAdded(block.hash)
+    broker ! BlockAdded(block.hash)
     escapeIOError(blockFlow.getHeight(block)) { height =>
       eventBus ! BlockNotify(block.header, height)
     }
