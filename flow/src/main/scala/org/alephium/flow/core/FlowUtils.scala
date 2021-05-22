@@ -181,21 +181,29 @@ trait FlowUtils
     for {
       target       <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
-      candidates   <- collectTransactions(chainIndex, bestDeps)
-      fullTxs      <- executeTxTemplates(chainIndex, bestDeps, candidates)
-      loosenDeps <- looseUncleDependencies(
-        bestDeps,
-        chainIndex,
-        FlowUtils.nextTimeStamp(parentHeader.timestamp)
-      )
-      depStateHash <- getDepStateHash(BlockDeps.unsafe(loosenDeps), chainIndex.from)
+      templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
+      loosenDeps <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
+      template   <- prepareBlockFlowUnsafe(chainIndex, loosenDeps, target, templateTs)
+    } yield template
+  }
+
+  def prepareBlockFlowUnsafe(
+      chainIndex: ChainIndex,
+      loosenDeps: BlockDeps,
+      target: Target,
+      templateTs: TimeStamp
+  ): IOResult[BlockFlowTemplate] = {
+    for {
+      candidates   <- collectTransactions(chainIndex, loosenDeps)
+      fullTxs      <- executeTxTemplates(chainIndex, loosenDeps, candidates)
+      depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
       BlockFlowTemplate(
         chainIndex,
-        loosenDeps,
+        loosenDeps.deps,
         depStateHash,
         target,
-        parentHeader.timestamp,
+        templateTs,
         fullTxs
       )
     }
@@ -205,15 +213,17 @@ trait FlowUtils
       bestDeps: BlockDeps,
       chainIndex: ChainIndex,
       currentTs: TimeStamp
-  ): IOResult[AVector[BlockHash]] = {
+  ): IOResult[BlockDeps] = {
     val thresholdTs = currentTs.minusUnsafe(consensusConfig.uncleDependencyGapTime)
-    bestDeps.deps.mapWithIndexE {
-      case (hash, k) if k != (groups - 1 + chainIndex.to.value) =>
-        val hashIndex = ChainIndex.from(hash)
-        val chain     = getHeaderChain(hashIndex)
-        looseDependency(hash, chain, thresholdTs)
-      case (hash, _) => Right(hash)
-    }
+    bestDeps.deps
+      .mapWithIndexE {
+        case (hash, k) if k != (groups - 1 + chainIndex.to.value) =>
+          val hashIndex = ChainIndex.from(hash)
+          val chain     = getHeaderChain(hashIndex)
+          looseDependency(hash, chain, thresholdTs)
+        case (hash, _) => Right(hash)
+      }
+      .map(BlockDeps.unsafe)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

@@ -319,9 +319,9 @@ trait FlowFixture
   ): Block = {
     val loosenDeps = blockFlow.looseUncleDependencies(deps, chainIndex, TimeStamp.now()).rightValue
     val depStateHash =
-      blockFlow.getDepStateHash(BlockDeps.unsafe(loosenDeps), chainIndex.from).rightValue
+      blockFlow.getDepStateHash(loosenDeps, chainIndex.from).rightValue
     val txsHash = Block.calTxsHash(txs)
-    Block(mineHeader(chainIndex, loosenDeps, depStateHash, txsHash, blockTs, target), txs)
+    Block(mineHeader(chainIndex, loosenDeps.deps, depStateHash, txsHash, blockTs, target), txs)
   }
 
   def mineHeader(

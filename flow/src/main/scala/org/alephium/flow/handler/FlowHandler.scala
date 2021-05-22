@@ -43,7 +43,7 @@ object FlowHandler {
       deps: AVector[BlockHash],
       depStateHash: Hash,
       target: Target,
-      parentTs: TimeStamp,
+      templateTs: TimeStamp,
       transactions: AVector[Transaction]
   )                                                                     extends Event
   final case class BlocksLocated(blocks: AVector[Block])                extends Event

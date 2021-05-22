@@ -103,13 +103,13 @@ object Miner extends LazyLogging {
   }
 
   def nextTimeStamp(template: BlockFlowTemplate): TimeStamp = {
-    nextTimeStamp(template.parentTs)
+    nextTimeStamp(template.templateTs)
   }
 
-  def nextTimeStamp(parentTs: TimeStamp): TimeStamp = {
+  def nextTimeStamp(templateTs: TimeStamp): TimeStamp = {
     val resultTs = TimeStamp.now()
-    if (resultTs <= parentTs) {
-      parentTs.plusMillisUnsafe(1)
+    if (resultTs <= templateTs) {
+      templateTs.plusMillisUnsafe(1)
     } else {
       resultTs
     }
