@@ -187,14 +187,21 @@ class Miner(
           updateTasks()
       }
     case BlockChainHandler.BlockAdded(hash) =>
-      updateTasks()
-      if (miningStarted) {
-        setIdle(ChainIndex.from(hash))
-        startNewTasks()
-      }
+      continueWorkFor(ChainIndex.from(hash))
+    case BlockChainHandler.InvalidBlock(hash) =>
+      log.error(s"Mined an invalid block ${hash.shortHex}")
+      continueWorkFor(ChainIndex.from(hash))
     case Miner.IsMining => sender() ! miningStarted
   }
   // scalastyle:on method.length
+
+  def continueWorkFor(chainIndex: ChainIndex): Unit = {
+    updateTasks()
+    if (miningStarted) {
+      setIdle(chainIndex)
+      startNewTasks()
+    }
+  }
 
   def handleMiningResult(
       blockOpt: Option[Block],

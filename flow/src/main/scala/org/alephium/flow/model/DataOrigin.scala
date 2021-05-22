@@ -19,6 +19,8 @@ package org.alephium.flow.model
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 
 sealed trait DataOrigin {
+  def isLocal: Boolean
+
   def isFrom(another: CliqueId): Boolean
 
   def isFrom(brokerInfo: BrokerInfo): Boolean
@@ -26,12 +28,16 @@ sealed trait DataOrigin {
 
 object DataOrigin {
   case object Local extends DataOrigin {
+    override def isLocal: Boolean = true
+
     override def isFrom(another: CliqueId): Boolean = false
 
     override def isFrom(brokerInfo: BrokerInfo): Boolean = false
   }
 
   sealed trait FromClique extends DataOrigin {
+    override def isLocal: Boolean = false
+
     def brokerInfo: BrokerInfo
 
     def cliqueId: CliqueId = brokerInfo.cliqueId

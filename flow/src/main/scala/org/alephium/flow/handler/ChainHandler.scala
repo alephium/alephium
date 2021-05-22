@@ -50,7 +50,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     log.debug(s"Try to add ${data.shortHex}")
     validator.validate(data, blockFlow) match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
-      case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, x)
+      case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
       case Right(_)                      => handleValidData(data, broker, origin)
     }
   }
@@ -70,11 +70,14 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   def handleInvalidData(
       data: T,
       broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin,
       status: InvalidStatus
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.warning(s"Invalid block/header ${data.shortHex}: $status : $blockHex")
-    sender() ! DependencyHandler.Invalid(data.hash)
+    if (!origin.isLocal) {
+      sender() ! DependencyHandler.Invalid(data.hash)
+    }
     broker ! dataInvalid(data)
   }
 
