@@ -19,8 +19,8 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike, Transaction}
-import org.alephium.util.{AVector, LockFixture}
+import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike}
+import org.alephium.util.LockFixture
 
 class MemPoolSpec
     extends AlephiumFlowSpec
@@ -54,37 +54,5 @@ class MemPoolSpec
         assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }
     }
-  }
-
-  trait Fixture extends WithLock {
-    val group       = GroupIndex.unsafe(0)
-    val pool        = MemPool.empty(group)
-    val block       = blockGenOf(group).retryUntil(_.transactions.nonEmpty).sample.get
-    val txTemplates = block.transactions.map(_.toTemplate)
-    val txNum       = block.transactions.length
-    val rwl         = pool._getLock
-
-    val chainIndex   = block.chainIndex
-    val sizeAfterAdd = if (txNum >= 3) 3 else txNum
-  }
-
-  it should "use read lock for contains" in new Fixture {
-    checkReadLock(rwl)(true, pool.contains(chainIndex, txTemplates.head), false)
-  }
-
-  it should "use read lock for add" in new Fixture {
-    checkLockUsed(rwl)(0, pool.addToTxPool(chainIndex, txTemplates), txNum)
-    pool.clear()
-    checkNoWriteLock(rwl)(0, pool.addToTxPool(chainIndex, txTemplates), txNum)
-  }
-
-  it should "use read lock for remove" in new Fixture {
-    checkReadLock(rwl)(1, pool.removeFromTxPool(chainIndex, txTemplates), 0)
-  }
-
-  it should "use write lock for reorg" in new Fixture {
-    val foo = AVector.fill(brokerConfig.groups)(AVector.empty[Transaction])
-    val bar = AVector.fill(brokerConfig.groups)(AVector.empty[Transaction])
-    checkWriteLock(rwl)((1, 1), pool.reorg(foo, bar), (0, 0))
   }
 }
