@@ -16,6 +16,7 @@
 
 package org.alephium.flow.client
 
+import akka.testkit.TestActorRef
 import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 
@@ -41,14 +42,14 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     Miner.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
   }
 
-  it should "initialize FairMiner" in new FlowFixture {
+  trait WorkflowFixture extends FlowFixture {
     override val configValues =
       Map(("alephium.broker.groups", 1), ("alephium.broker.broker-num", 1))
 
     val (allHandlers, allHandlersProbes) = TestUtils.createBlockHandlersProbe
     val blockHandlerProbe                = allHandlersProbes.blockHandlers(ChainIndex.unsafe(0, 0))
 
-    val miner = system.actorOf(
+    val miner = TestActorRef[Miner](
       Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
     )
 
@@ -63,7 +64,9 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
         miner ! BlockChainHandler.BlockAdded(block.hash)
       }
     }
+  }
 
+  it should "initialize FairMiner" in new WorkflowFixture {
     checkMining(false)
 
     miner ! Miner.Start
@@ -77,6 +80,16 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     blockHandlerProbe.expectNoMessage()
 
     miner ! Miner.Start
+    awaitForBlocks(3)
+  }
+
+  it should "continue mining after an invalid block" in new WorkflowFixture {
+    miner.underlyingActor.setRunning(0, 0)
+    miner ! Miner.Start
+    blockHandlerProbe.expectNoMessage()
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    miner ! BlockChainHandler.InvalidBlock(block.hash)
     awaitForBlocks(3)
   }
 
