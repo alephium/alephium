@@ -21,15 +21,15 @@ import scala.collection.mutable
 import org.alephium.flow.core.FlowUtils._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, RWLock}
 
 final case class TxIndexes(
     inputIndex: mutable.HashSet[AssetOutputRef],
     outputIndex: mutable.HashMap[AssetOutputRef, TxOutput],
     addressIndex: mutable.HashMap[LockupScript, mutable.ArrayBuffer[AssetOutputRef]],
     outputType: OutputType
-) {
-  def add(transaction: TransactionTemplate): Unit = {
+) extends RWLock {
+  def add(transaction: TransactionTemplate): Unit = writeOnly {
     transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
       val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))
@@ -44,7 +44,7 @@ final case class TxIndexes(
     }
   }
 
-  def remove(transaction: TransactionTemplate): Unit = {
+  def remove(transaction: TransactionTemplate): Unit = writeOnly {
     transaction.unsigned.inputs.foreach(input => inputIndex.remove(input.outputRef))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
       val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))
@@ -60,10 +60,12 @@ final case class TxIndexes(
 
   def isSpent(asset: AssetOutputInfo): Boolean = isSpent(asset.ref)
 
-  def isSpent(asset: AssetOutputRef): Boolean = inputIndex.contains(asset)
+  def isSpent(asset: AssetOutputRef): Boolean = readOnly {
+    inputIndex.contains(asset)
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
+  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = readOnly {
     addressIndex
       .get(lockupScript)
       .map { refs =>
@@ -77,7 +79,7 @@ final case class TxIndexes(
   }
 
   // Left means the output is spent
-  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
+  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = readOnly {
     if (inputIndex.contains(outputRef)) {
       Left(())
     } else {

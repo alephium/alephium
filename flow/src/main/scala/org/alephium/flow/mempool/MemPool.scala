@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
-import org.alephium.util.{AVector, RWLock}
+import org.alephium.util.AVector
 
 /*
  * MemPool is the class to store all the pending transactions
@@ -37,7 +37,7 @@ class MemPool private (
     val pendingPool: PendingPool
 )(implicit
     groupConfig: GroupConfig
-) extends RWLock {
+) {
   def getPool(index: ChainIndex): TxPool = {
     assume(group == index.from)
     pools(index.to.value)
@@ -50,19 +50,13 @@ class MemPool private (
   }
 
   def contains(index: ChainIndex, txId: Hash): Boolean =
-    readOnly {
-      getPool(index).contains(txId) || pendingPool.contains(txId)
-    }
+    getPool(index).contains(txId) || pendingPool.contains(txId)
 
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
-    readOnly {
-      getPool(index).collectForBlock(maxNum)
-    }
+    getPool(index).collectForBlock(maxNum)
 
   def getAll(index: ChainIndex): AVector[TransactionTemplate] =
-    readOnly {
-      getPool(index).getAll() ++ pendingPool.getAll()
-    }
+    getPool(index).getAll() ++ pendingPool.getAll()
 
   def isSpent(outputRef: AssetOutputRef): Boolean = {
     pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
@@ -75,13 +69,12 @@ class MemPool private (
       .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
   }
 
-  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean =
-    readOnly {
-      assume(index.from == group)
-      tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
-    }
+  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean = {
+    assume(index.from == group)
+    tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
+  }
 
-  def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = writeOnly {
+  def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
       pendingPool.add(tx)
       MemPool.AddedToLocalPool
@@ -91,43 +84,38 @@ class MemPool private (
     }
   }
 
-  def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
-    readOnly {
-      val count = getPool(index).add(transactions)
-      transactions.foreach(txIndexes.add)
-      count
-    }
+  def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
+    val count = getPool(index).add(transactions)
+    transactions.foreach(txIndexes.add)
+    count
+  }
 
-  def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int =
-    readOnly {
-      val count = getPool(index).remove(transactions)
-      transactions.foreach(txIndexes.remove)
-      count
-    }
+  def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
+    val count = getPool(index).remove(transactions)
+    transactions.foreach(txIndexes.remove)
+    count
+  }
 
   // Note: we lock the mem pool so that we could update all the transaction pools
   def reorg(
       toRemove: AVector[AVector[Transaction]],
       toAdd: AVector[AVector[Transaction]]
-  ): (Int, Int) =
-    writeOnly {
-      assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
+  ): (Int, Int) = {
+    assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
-      // First, add transactions from short chains, then remove transactions from canonical chains
-      val added =
-        toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
-          sum + pools(toGroup).add(txs.map(_.toTemplate))
-        )
-      val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
-        sum + pools(toGroup).remove(txs.map(_.toTemplate))
-      )
-      (removed, added)
-    }
+    // First, add transactions from short chains, then remove transactions from canonical chains
+    val added =
+      toAdd.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).add(txs.map(_.toTemplate)))
+    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
+      sum + pools(toGroup).remove(txs.map(_.toTemplate))
+    )
+    (removed, added)
+  }
 
   def getRelevantUtxos(
       lockupScript: LockupScript,
       utxosInBlock: AVector[AssetOutputInfo]
-  ): AVector[AssetOutputInfo] = readOnly {
+  ): AVector[AssetOutputInfo] = {
     val newUtxos =
       txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.getRelevantUtxos(lockupScript)
 
@@ -164,10 +152,9 @@ class MemPool private (
     }
   }
 
-  def clear(): Unit =
-    writeOnly {
-      pools.foreach(_.clear())
-    }
+  def clear(): Unit = {
+    pools.foreach(_.clear())
+  }
 }
 
 object MemPool {

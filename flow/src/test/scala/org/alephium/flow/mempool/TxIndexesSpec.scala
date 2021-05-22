@@ -55,6 +55,19 @@ class TxIndexesSpec
     indexes.remove(tx.toTemplate)
     indexes is TxIndexes.emptySharedPool
   }
+
+  trait LockFixture extends WithLock {
+    val indexes  = TxIndexes.emptySharedPool
+    lazy val rwl = indexes._getLock
+
+    val tx = transactionGen().sample.get.toTemplate
+  }
+
+  it should "use locks" in new LockFixture {
+    checkReadLock(rwl)(true, indexes.isSpent(tx.unsigned.inputs.head.outputRef), false)
+    checkWriteLock(rwl)(0, { indexes.add(tx); indexes.inputIndex.size }, tx.unsigned.inputs.length)
+    checkWriteLock(rwl)(100, { indexes.remove(tx); indexes.inputIndex.size }, 0)
+  }
 }
 
 object TxIndexesSpec {
