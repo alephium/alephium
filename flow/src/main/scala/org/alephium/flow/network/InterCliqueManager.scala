@@ -32,6 +32,8 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
+import io.prometheus.client.Gauge
+
 object InterCliqueManager {
   // scalastyle:off parameter.number
   def props(
@@ -216,6 +218,10 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   // The key is (CliqueId, BrokerId)
   val brokers = collection.mutable.HashMap.empty[PeerId, BrokerState]
 
+  private val peersTotal = Gauge
+    .build("alephium_peers_total", "Number of connected peers")
+    .register()
+
   def addBroker(
       brokerInfo: BrokerInfo,
       connectionType: ConnectionType,
@@ -225,6 +231,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     if (!brokers.contains(peerId)) {
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
       brokers += peerId -> BrokerState(brokerInfo, connectionType, broker, isSynced = false)
+      peersTotal.set(brokers.size.toDouble)
     } else {
       log.debug(s"Ignore another connection from $peerId")
     }
@@ -282,6 +289,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def removeBroker(peer: InetSocketAddress): Unit = {
     brokers.filterInPlace { case (_, state) => state.info.address != peer }
+    peersTotal.set(brokers.size.toDouble)
   }
 
   def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {
