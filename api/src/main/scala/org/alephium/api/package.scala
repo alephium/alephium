@@ -37,4 +37,7 @@ package object api {
       }
     } { t => write(t) }
 
+  def alfPlainTextBody: EndpointIO.Body[String, String] = {
+    anyFromUtf8StringBody(Codec.string)
+  }
 }

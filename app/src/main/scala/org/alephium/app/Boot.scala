@@ -26,6 +26,8 @@ import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
 
+import io.prometheus.client.hotspot.DefaultExports
+
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Files => AFiles}
@@ -57,6 +59,9 @@ class BootUp extends StrictLogging {
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
+
+  // Register the default Hotspot (JVM) collectors for Prometheus
+  DefaultExports.initialize()
 
   val server: Server = Server(rootPath, flowSystem)
 

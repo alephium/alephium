@@ -17,10 +17,11 @@
 import sbt._
 
 object Version {
-  lazy val akka    = "2.6.13"
-  lazy val metrics = "4.0.6"
-  lazy val tapir   = "0.17.19"
-  lazy val sttp    = "3.2.3"
+  lazy val akka       = "2.6.13"
+  lazy val metrics    = "4.0.6"
+  lazy val tapir      = "0.17.19"
+  lazy val sttp       = "3.2.3"
+  lazy val prometheus = "0.10.0"
 }
 
 object Dependencies {
@@ -57,4 +58,10 @@ object Dependencies {
   lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
   lazy val `sttp-backend` =
     "com.softwaremill.sttp.client3" %% "async-http-client-backend-future" % Version.sttp
+
+  lazy val `prometheus-simple-client` = "io.prometheus" % "simpleclient" % Version.prometheus
+  lazy val `prometheus-simple-client-common` =
+    "io.prometheus" % "simpleclient_common" % Version.prometheus
+  lazy val `prometheus-simple-client-hotspot` =
+    "io.prometheus" % "simpleclient_hotspot" % Version.prometheus
 }
