@@ -240,7 +240,10 @@ lazy val flow = project("flow")
       `akka-slf4j`,
       logback,
       `scala-logging`,
-      weupnp
+      weupnp,
+      `prometheus-simple-client`,
+      `prometheus-simple-client-common`,
+      `prometheus-simple-client-hotspot`
     ),
     publish / skip := true
   )

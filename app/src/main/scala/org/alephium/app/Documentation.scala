@@ -58,8 +58,8 @@ trait Documentation extends Endpoints {
     Server("{protocol}://{host}:{port}")
       .variables(
         "protocol" -> ServerVariable(Some(List("http", "https")), "https", None),
-        "host" -> ServerVariable(None, "alephium.nioctib.tech", None),
-        "port" -> ServerVariable(None, "443", None)
+        "host"     -> ServerVariable(None, "alephium.nioctib.tech", None),
+        "port"     -> ServerVariable(None, "443", None)
       )
   )
 
