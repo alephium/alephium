@@ -128,7 +128,7 @@ lazy val app = mainProject("app")
     flow % "it,test->test",
     wallet
   )
-  .enablePlugins(sbtdocker.DockerPlugin)
+  .enablePlugins(sbtdocker.DockerPlugin, BuildInfoPlugin)
   .settings(
     mainClass in assembly := Some("org.alephium.app.Boot"),
     assemblyJarName in assembly := s"alephium-${version.value}.jar",
@@ -194,7 +194,17 @@ lazy val app = mainProject("app")
           ImageName(baseImageName + ":" + commitId)
         }
       ).flatten
-    }
+    },
+    buildInfoKeys := Seq[BuildInfoKey](
+      name,
+      scalaVersion,
+      sbtVersion,
+      BuildInfoKey("commitId" -> git.gitHeadCommit.value.getOrElse("missing-git-commit")),
+      BuildInfoKey("branch" -> git.gitCurrentBranch.value),
+      BuildInfoKey("releaseVersion" -> version.value)
+    ),
+    buildInfoPackage := "org.alephium.app",
+    buildInfoUsePackageAsPath := true
   )
 
 lazy val json = project("json")
