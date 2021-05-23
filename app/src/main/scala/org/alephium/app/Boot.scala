@@ -115,7 +115,7 @@ class BootUp extends StrictLogging {
       .labelNames("release_version", "commit_id")
       .register()
       .labels(BuildInfo.releaseVersion, BuildInfo.commitId)
-      .set(0)
+      .set(1)
 
     logger.info(s"Build info: ${BuildInfo}")
   }
