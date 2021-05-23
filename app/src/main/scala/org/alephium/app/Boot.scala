@@ -31,6 +31,7 @@ import io.prometheus.client.hotspot.DefaultExports
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Files => AFiles}
+import io.prometheus.client.Gauge
 
 object Boot extends App with StrictLogging {
   try {
@@ -62,6 +63,8 @@ class BootUp extends StrictLogging {
 
   // Register the default Hotspot (JVM) collectors for Prometheus
   DefaultExports.initialize()
+
+  collectBuildInfo()
 
   val server: Server = Server(rootPath, flowSystem)
 
@@ -104,6 +107,17 @@ class BootUp extends StrictLogging {
 
     val digests = config.genesisBlocks.map(showBlocks).mkString("-")
     logger.info(s"Genesis digests: $digests")
+  }
+
+  def collectBuildInfo(): Unit = {
+    Gauge
+      .build("alephium_build_info", "Alephium full node build info")
+      .labelNames("release_version", "commit_id")
+      .register()
+      .labels(BuildInfo.releaseVersion, BuildInfo.commitId)
+      .set(0)
+
+    logger.info(s"Build info: ${BuildInfo}")
   }
 
   def showBlocks(blocks: AVector[Block]): String = blocks.map(_.shortHex).mkString("-")
