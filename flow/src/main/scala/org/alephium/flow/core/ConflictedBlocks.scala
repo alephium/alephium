@@ -30,7 +30,10 @@ trait ConflictedBlocks {
   implicit def brokerConfig: BrokerConfig
   def consensusConfig: ConsensusSetting
 
-  def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash]
+  def getHashesForDoubleSpendingCheckUnsafe(
+      groupIndex: GroupIndex,
+      deps: BlockDeps
+  ): AVector[BlockHash]
 
   lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(
     ConflictedBlocks.emptyCache(
@@ -60,7 +63,7 @@ trait ConflictedBlocks {
       txs: AVector[TransactionTemplate],
       getBlock: BlockHash => Block
   ): AVector[TransactionTemplate] = {
-    val diffs = getHashesForUpdatesUnsafe(target, deps)
+    val diffs = getHashesForDoubleSpendingCheckUnsafe(target, deps)
     getCache(target).filterConflicts(diffs, txs, getBlock)
   }
 

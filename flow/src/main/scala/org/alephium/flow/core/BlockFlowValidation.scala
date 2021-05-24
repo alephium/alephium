@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, GroupIndex}
+import org.alephium.util.AVector
 
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>
   def getBlockUnsafe(hash: BlockHash): Block
@@ -50,13 +51,21 @@ trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: Blo
     checkFlowDepsUnsafe(header.blockDeps, targetGroup)
   }
 
-  def checkFlowTxsUnsafe(block: Block): Boolean = {
-    val chainIndex     = block.chainIndex
-    val newOutTips     = block.header.outDeps
-    val allIntraDeps   = newOutTips.map(tip => getOutTip(getBlockHeaderUnsafe(tip), chainIndex.from))
+  def getHashesForDoubleSpendingCheckUnsafe(
+      groupIndex: GroupIndex,
+      deps: BlockDeps
+  ): AVector[BlockHash] = {
+    val newOutTips     = deps.outDeps
+    val allIntraDeps   = newOutTips.map(tip => getOutTip(getBlockHeaderUnsafe(tip), groupIndex))
     val commonIntraDep = allIntraDeps.minBy(getHeightUnsafe)
     val oldOutTips     = getOutTips(getBlockHeaderUnsafe(commonIntraDep), inclusive = true)
-    val diff           = getTipsDiffUnsafe(newOutTips, oldOutTips)
+    getTipsDiffUnsafe(newOutTips, oldOutTips)
+  }
+
+  // We need to find the common intra group dep and check all the new blocks after that
+  def checkFlowTxsUnsafe(block: Block): Boolean = {
+    val chainIndex = block.chainIndex
+    val diff       = getHashesForDoubleSpendingCheckUnsafe(chainIndex.from, block.blockDeps)
     !isConflicted(
       block.hash +: diff,
       hash => if (hash == block.hash) block else getBlockUnsafe(hash)

@@ -104,6 +104,7 @@ object UnsignedTransaction {
       gas: GasBox,
       gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {
+    assume(gas >= minimalGas)
     assume(gasPrice.value <= ALF.MaxALFValue)
     val inputSum = inputs.fold(U256.Zero)(_ addUnsafe _._2.amount)
     val gasFee   = gasPrice * gas

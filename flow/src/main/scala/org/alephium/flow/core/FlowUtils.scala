@@ -132,15 +132,19 @@ trait FlowUtils
 
   def collectTransactions(
       chainIndex: ChainIndex,
-      deps: BlockDeps
-  ): IOResult[AVector[TransactionTemplate]] =
+      loosenDeps: BlockDeps,
+      bestDeps: BlockDeps
+  ): IOResult[AVector[TransactionTemplate]] = {
     IOUtils.tryExecute {
       val candidates0 = collectPooledTxs(chainIndex)
       val candidates1 = FlowUtils.filterDoubleSpending(candidates0)
-      val candidates2 = filterValidInputsUnsafe(chainIndex, deps, candidates1)
-      val candidates3 = filterConflicts(chainIndex.from, deps, candidates2, getBlockUnsafe)
+      // some tx inputs might from bestDeps, but not loosenDeps
+      val candidates2 = filterValidInputsUnsafe(chainIndex, loosenDeps, candidates1)
+      // we don't want any tx that conflicts with bestDeps
+      val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
       candidates3
     }
+  }
 
   // all the inputs and double spending should have been checked
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -183,18 +187,19 @@ trait FlowUtils
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       loosenDeps <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
-      template   <- prepareBlockFlowUnsafe(chainIndex, loosenDeps, target, templateTs)
+      candidates <- collectTransactions(chainIndex, loosenDeps, bestDeps)
+      template   <- prepareBlockFlowUnsafe(chainIndex, loosenDeps, candidates, target, templateTs)
     } yield template
   }
 
   def prepareBlockFlowUnsafe(
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
+      candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp
   ): IOResult[BlockFlowTemplate] = {
     for {
-      candidates   <- collectTransactions(chainIndex, loosenDeps)
       fullTxs      <- executeTxTemplates(chainIndex, loosenDeps, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
