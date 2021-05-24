@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.util.Random
+
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
@@ -85,6 +87,31 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
+  }
+
+  it should "detect tx conflicts using bestDeps" in new FlowFixture {
+    override val configValues =
+      Map(
+        ("alephium.consensus.uncle-dependency-gap-time", "10 seconds"),
+        ("alephium.broker.broker-num", 1)
+      )
+
+    val fromGroup      = Random.nextInt(groups0)
+    val chainIndex0    = ChainIndex.unsafe(fromGroup, Random.nextInt(groups0))
+    val anotherToGroup = (chainIndex0.to.value + 1 + Random.nextInt(groups0 - 1)) % groups0
+    val chainIndex1    = ChainIndex.unsafe(fromGroup, anotherToGroup)
+    val block0         = transfer(blockFlow, chainIndex0)
+    val block1         = transfer(blockFlow, chainIndex1)
+
+    addAndCheck(blockFlow, block0)
+    val groupIndex = GroupIndex.unsafe(fromGroup)
+    val tx1        = block1.nonCoinbase.head.toTemplate
+    blockFlow.isTxConflicted(groupIndex, tx1) is true
+    blockFlow.getMemPool(groupIndex).addNewTx(chainIndex1, tx1)
+
+    val template = blockFlow.prepareBlockFlow(chainIndex1).rightValue
+    template.deps.contains(block0.hash) is false
+    blockFlow.prepareBlockFlowUnsafe(chainIndex1).transactions.isEmpty is true
   }
 
   it should "deal with large amount of UTXOs" in new FlowFixture {
