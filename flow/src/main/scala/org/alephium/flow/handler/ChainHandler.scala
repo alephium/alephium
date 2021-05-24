@@ -46,7 +46,6 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   def consensusConfig: ConsensusConfig
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    assume(!blockFlow.containsUnsafe(data.hash))
     log.debug(s"Try to add ${data.shortHex}")
     validator.validate(data, blockFlow) match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
