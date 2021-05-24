@@ -67,6 +67,10 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       }
   }
 
+  private def hex(tx: TransactionTemplate): String = {
+    Hex.toHexString(serialize(tx))
+  }
+
   def handleTx(
       tx: TransactionTemplate,
       origin: DataOrigin,
@@ -78,19 +82,17 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       log.debug(s"tx ${tx.id.shortHex} is already included")
       addFailed(tx)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      val txHex = Hex.toHexString(serialize(tx))
-      log.warning(s"tx ${tx.id.shortHex}: $txHex is double spending")
+      log.warning(s"tx ${tx.id.shortHex}: ${hex(tx)} is double spending")
       addFailed(tx)
     } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s")
+          log.warning(s"failed in validating tx ${tx.id.shortHex}: ${hex(tx)} due to $s")
           addFailed(tx)
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin, acknowledge = true)
         case Left(Left(e)) =>
-          val txHex = Hex.toHexString(serialize(tx))
-          log.warning(s"IO failed in validating tx ${tx.id.shortHex}: $txHex, due to $e")
+          log.warning(s"IO failed in validating tx ${tx.id.shortHex}: ${hex(tx)}, due to $e")
           addFailed(tx)
       }
     }
