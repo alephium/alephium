@@ -435,7 +435,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "spend locked outputs" in new FlowFixture {
-    val lockTime       = TimeStamp.now().plusSecondsUnsafe(2)
+    val lockTime       = TimeStamp.now().plusSecondsUnsafe(3)
     val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
     val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     val toPrivateKey   = keyManager(toLockupScript)
@@ -452,7 +452,7 @@ class BlockFlowSpec extends AlephiumSpec {
       .rightValue
       .leftValue
       .startsWith("Not enough balance") is true
-    Thread.sleep(2000)
+    Thread.sleep(3000)
     blockFlow
       .transfer(
         toPrivateKey.publicKey,
