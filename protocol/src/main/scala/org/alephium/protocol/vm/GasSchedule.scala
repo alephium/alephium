@@ -29,93 +29,93 @@ trait GasSchedule {
 trait GasSimple extends GasSchedule {
   protected def typeHint(): Unit = ()
 
-  def gas: Int
+  def gas(): GasBox
 }
 
 trait GasFormula extends GasSchedule {
   protected def typeHint(): Unit = ()
 
-  def gas(size: Int): Int
+  def gas(size: Int): GasBox
 }
 
 trait GasZero extends GasSimple {
-  def gas: Int = GasZero.gas
+  def gas(): GasBox = GasZero.gas
 }
 object GasZero {
-  val gas: Int = 0
+  val gas: GasBox = GasBox.unsafe(0)
 }
 
 trait GasVeryLow extends GasSimple {
-  def gas: Int = GasVeryLow.gas
+  def gas(): GasBox = GasVeryLow.gas
 }
 object GasVeryLow {
-  val gas: Int = 3
+  val gas: GasBox = GasBox.unsafe(3)
 }
 
 trait GasLow extends GasSimple {
-  def gas: Int = GasLow.gas
+  def gas(): GasBox = GasLow.gas
 }
 object GasLow {
-  val gas: Int = 5
+  val gas: GasBox = GasBox.unsafe(5)
 }
 
 trait GasMid extends GasSimple {
-  def gas: Int = GasMid.gas
+  def gas(): GasBox = GasMid.gas
 }
 object GasMid {
-  val gas: Int = 8
+  val gas: GasBox = GasBox.unsafe(8)
 }
 
 trait GasHigh extends GasSimple {
-  def gas: Int = GasHigh.gas
+  def gas(): GasBox = GasHigh.gas
 }
 object GasHigh {
-  val gas: Int = 10
+  val gas: GasBox = GasBox.unsafe(10)
 }
 
 trait GasHash extends GasFormula {
-  def gas(inputLength: Int): Int = GasHash.gas(inputLength)
+  def gas(inputLength: Int): GasBox = GasHash.gas(inputLength)
 }
 object GasHash {
   val baseGas: Int         = 30
   val extraGasPerWord: Int = 6
 
-  def gas(inputLength: Int): Int =
-    GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8)
+  def gas(inputLength: Int): GasBox =
+    GasBox.unsafe(GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8))
 }
 
 trait GasSignature extends GasSimple {
-  def gas: Int = GasSignature.gas
+  def gas(): GasBox = GasSignature.gas
 }
 object GasSignature {
-  val gas: Int = 10000 // TODO: bench this
+  val gas: GasBox = GasBox.unsafe(10000) // TODO: bench this
 }
 
 trait GasCreate extends GasSimple {
-  def gas: Int = GasCreate.gas
+  def gas(): GasBox = GasCreate.gas
 }
 object GasCreate {
-  val gas: Int = 32000
+  val gas: GasBox = GasBox.unsafe(32000)
 }
 
 trait GasBalance extends GasSimple {
-  def gas: Int = GasBalance.gas
+  def gas(): GasBox = GasBalance.gas
 }
 object GasBalance {
-  val gas: Int = 50
+  val gas: GasBox = GasBox.unsafe(50)
 }
 
 trait GasCall extends GasFormula {
-  def gas(size: Int): Int = ??? // should call the companion object instead
+  def gas(size: Int): GasBox = ??? // should call the companion object instead
 }
 
 object GasSchedule {
-  val callGas: Int           = 200
-  val contractLoadGas: Int   = 800
-  val contractUpdateGas: Int = 5000
+  val callGas: GasBox           = GasBox.unsafe(200)
+  val contractLoadGas: GasBox   = GasBox.unsafe(800)
+  val contractUpdateGas: GasBox = GasBox.unsafe(5000)
 
-  val trieRemovalGas: Int = 4000
-  val trieUpdateGas: Int  = 5000
+  val trieRemovalGas: GasBox = GasBox.unsafe(4000)
+  val trieUpdateGas: GasBox  = GasBox.unsafe(5000)
 
   /*
    * The gas cost of a transaction consists of 4 parts
@@ -129,18 +129,20 @@ object GasSchedule {
    *    3.2. data gas based on the length of the serialized output
    * 4. execution gas for the optional tx script
    */
-  val txBaseGas: Int = 4000
-  val txDataGas: Int = 68
+  val txBaseGas: GasBox = GasBox.unsafe(4000)
+  val txDataGas: GasBox = GasBox.unsafe(68)
 
-  def inputGas(theOutputOfInput: TxOutput, unlockGas: Int): Int = {
-    trieRemovalGas + txDataGas * serialize(theOutputOfInput).length + unlockGas
+  def inputGas(theOutputOfInput: TxOutput, unlockGas: GasBox): GasBox = {
+    GasBox.unsafe(
+      trieRemovalGas.value + txDataGas.value * serialize(theOutputOfInput).length + unlockGas.value
+    )
   }
 
-  def outputGas(txOutput: TxOutput): Int = {
-    trieUpdateGas + txDataGas * serialize(txOutput).length
+  def outputGas(txOutput: TxOutput): GasBox = {
+    GasBox.unsafe(trieUpdateGas.value + txDataGas.value * serialize(txOutput).length)
   }
 
-  val p2pkUnlockGas: Int = {
-    GasHash.gas(PublicKey.length) + GasSignature.gas
+  val p2pkUnlockGas: GasBox = {
+    GasBox.unsafe(GasHash.gas(PublicKey.length).value + GasSignature.gas.value)
   }
 }
