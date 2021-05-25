@@ -23,7 +23,7 @@ import org.alephium.flow.core.FlowUtils._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasPrice, LockupScript, UnlockScript, WorldState}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript, WorldState}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TxUtils { Self: FlowUtils =>
@@ -150,25 +150,28 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def prepareUnsignedTx(
+  def transfer(
       fromKey: PublicKey,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      amount: U256,
+      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
+      gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromKey)
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {
+        totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
+          acc.add(amount).toRight(s"Amount overflow")
+        }
         selected <- UtxoUtils.select(
           utxos,
-          amount,
+          totalAmount,
+          gasOpt,
           gasPrice,
           defaultGasPerInput,
           defaultGasPerOutput,
-          2
-        ) // sometime only 1 output, but 2 is always safe
+          outputInfos.length + 1
+        )
         _ <-
           if (selected.assets.length > ALF.MaxTxInputNum) {
             Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
@@ -180,16 +183,23 @@ trait TxUtils { Self: FlowUtils =>
             selected.assets.map(asset => (asset.ref, asset.output)),
             fromLockupScript,
             fromUnlockScript,
-            toLockupScript,
-            lockTimeOpt,
-            amount,
+            outputInfos,
             if (selected.gas > minimalGas) selected.gas else minimalGas,
             gasPrice
           )
-      } yield {
-        unsignedTx
-      }
+      } yield unsignedTx
     }
+  }
+
+  def transfer(
+      fromKey: PublicKey,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp],
+      amount: U256,
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    transfer(fromKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
   }
 
   def getTxStatus(txId: Hash, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =

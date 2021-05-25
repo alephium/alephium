@@ -63,6 +63,12 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     select(utxos1, 7) is Right(Selected(AVector(utxos1(0)), 3))
   }
 
+  it should "return the correct utxos when gas is preset" in new Fixture {
+    val utxos = buildUtxos(20, 10, 30)
+    select(utxos, 9, Some(GasBox.unsafe(1))) is Right(Selected(AVector(utxos(1)), 1))
+    select(utxos, 10, Some(GasBox.unsafe(1))) is Right(Selected(AVector(utxos(1), utxos(0)), 1))
+  }
+
   trait Fixture extends AlephiumConfigFixture {
 
     def buildOutput(lockupScript: LockupScript, amount: U256): AssetOutputInfo = {
@@ -91,9 +97,10 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
     def select(
         utxos: AVector[AssetOutputInfo],
-        amount: U256
+        amount: U256,
+        gasOpt: Option[GasBox] = None
     ): Either[String, UtxoUtils.Selected] = {
-      UtxoUtils.select(utxos, amount, GasPrice(1), GasBox.unsafe(1), GasBox.unsafe(1), 2)
+      UtxoUtils.select(utxos, amount, gasOpt, GasPrice(1), GasBox.unsafe(1), GasBox.unsafe(1), 2)
     }
   }
 }

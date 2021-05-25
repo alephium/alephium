@@ -212,7 +212,7 @@ class ServerUtils(networkType: NetworkType) {
       value: U256,
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    blockFlow.prepareUnsignedTx(fromKey, toLockupScript, lockTimeOpt, value, gasPrice) match {
+    blockFlow.transfer(fromKey, toLockupScript, lockTimeOpt, value, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

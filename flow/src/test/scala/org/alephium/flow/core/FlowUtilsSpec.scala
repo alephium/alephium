@@ -138,7 +138,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     utxos is n
 
     val ts2 = System.currentTimeMillis()
-    blockFlow.prepareUnsignedTx(
+    blockFlow.transfer(
       keyManager(output.lockupScript).publicKey,
       output.lockupScript,
       None,

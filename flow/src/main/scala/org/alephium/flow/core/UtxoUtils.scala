@@ -43,6 +43,7 @@ object UtxoUtils {
   def select(
       utxos: AVector[Asset],
       amount: U256,
+      gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       gasPerInput: GasBox,
       gasPerOutput: GasBox,
@@ -50,6 +51,23 @@ object UtxoUtils {
   ): Either[String, Selected] = {
     val sortedUtxos = utxos.sorted
 
+    gasOpt match {
+      case Some(gas) =>
+        findUtxosWithoutGas(sortedUtxos, amount.addUnsafe(gasPrice * gas)).map { case (_, index) =>
+          Selected(sortedUtxos.take(index + 1), gas)
+        }
+      case None => select(sortedUtxos, amount, gasPrice, gasPerInput, gasPerOutput, numOutputs)
+    }
+  }
+
+  def select(
+      sortedUtxos: AVector[Asset],
+      amount: U256,
+      gasPrice: GasPrice,
+      gasPerInput: GasBox,
+      gasPerOutput: GasBox,
+      numOutputs: Int
+  ): Either[String, Selected] = {
     for {
       sum_startIndex <- findUtxosWithoutGas(sortedUtxos, amount)
       sum_index <- findUtxosWithGas(
