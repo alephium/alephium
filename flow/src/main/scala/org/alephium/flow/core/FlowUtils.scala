@@ -16,29 +16,26 @@
 
 package org.alephium.flow.core
 
-import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.BlockFlowState.TxStatus
-import org.alephium.flow.core.FlowUtils._
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.mempool.{GrandPool, MemPool, MemPoolChanges, Normal, Reorg}
+import org.alephium.flow.mempool._
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-// scalastyle:off number.of.methods
 trait FlowUtils
     extends MultiChain
     with BlockFlowState
     with SyncUtils
+    with TxUtils
     with ConflictedBlocks
     with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
@@ -248,295 +245,7 @@ trait FlowUtils
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
     Utils.unsafe(prepareBlockFlow(chainIndex))
   }
-
-  def getPersistedUtxos(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript,
-      maxUtxosToRead: Int
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    for {
-      bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
-      persistedUtxos <- bestWorldState
-        .getAssetOutputs(
-          lockupScript.assetHintBytes,
-          maxUtxosToRead,
-          (_, output) => output.lockupScript == lockupScript
-        )
-        .map(
-          _.map(p => AssetOutputInfo(p._1, p._2, PersistedOutput))
-        )
-    } yield persistedUtxos
-  }
-
-  def mergeUtxos(
-      persistedUtxos: AVector[AssetOutputInfo],
-      usedInCache: AVector[AssetOutputRef],
-      newInCache: AVector[AssetOutputInfo]
-  ): AVector[AssetOutputInfo] = {
-    persistedUtxos.filter(p => !usedInCache.contains(p.ref)) ++ newInCache
-  }
-
-  def getRelevantUtxos(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript,
-      maxUtxosToRead: Int
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    for {
-      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToRead)
-      cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
-    } yield {
-      val utxosInBlock = mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
-      grandPool.getRelevantUtxos(groupIndex, lockupScript, utxosInBlock)
-    }
-  }
-
-  def getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
-    val chainIndex = tx.chainIndex
-    val mainGroup  = chainIndex.from
-    val bestDeps   = getBestDeps(mainGroup)
-    for {
-      worldState <- getPersistedWorldState(bestDeps, mainGroup)
-      result <- tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
-        case (Some(outputs), input) =>
-          getPreOutput(mainGroup, worldState, input).map(_.map(outputs :+ _))
-        case (None, _) => Right(None)
-      }
-    } yield result
-  }
-
-  def getPreOutput(
-      mainGroup: GroupIndex,
-      worldState: WorldState.Persisted,
-      outputRef: TxOutputRef
-  ): IOResult[Option[TxOutput]] = {
-    getMemPool(mainGroup).getUtxo(outputRef) match {
-      case Some(output) => Right(Some(output))
-      case None         => worldState.getOutputOpt(outputRef)
-    }
-  }
-
-  // We call getUsableUtxosOnce multiple times until the resulted tx does not change
-  // In this way, we can guarantee that no concurrent utxos operations are making trouble
-  def getUsableUtxos(
-      lockupScript: LockupScript
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    @tailrec
-    def iter(lastTryOpt: Option[AVector[AssetOutputInfo]]): IOResult[AVector[AssetOutputInfo]] = {
-      getUsableUtxosOnce(lockupScript) match {
-        case Right(utxos) =>
-          lastTryOpt match {
-            case Some(lastTry) if isSame(utxos, lastTry) => Right(utxos)
-            case _                                       => iter(Some(utxos))
-          }
-        case Left(error) => Left(error)
-      }
-    }
-    iter(None)
-  }
-
-  def getUsableUtxosOnce(
-      lockupScript: LockupScript
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    val groupIndex = lockupScript.groupIndex
-    assume(brokerConfig.contains(groupIndex))
-    val bestDeps = getBestDeps(groupIndex)
-    getUsableUtxosOnce(groupIndex, bestDeps, lockupScript)
-  }
-
-  def getUsableUtxosOnce(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToReadForTransfer).map(
-      _.filter(_.output.lockTime <= currentTs)
-    )
-  }
-
-  // return the total balance, the locked balance, and the number of all utxos
-  def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] = {
-    val groupIndex = lockupScript.groupIndex
-    assume(brokerConfig.contains(groupIndex))
-    val bestDeps = getBestDeps(groupIndex)
-
-    val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript, Int.MaxValue).map { utxos =>
-      val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
-      val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
-        if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
-      }
-      (balance, lockedBalance, utxos.length)
-    }
-  }
-
-  def prepareUnsignedTx(
-      fromKey: PublicKey,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      amount: U256,
-      gasPrice: GasPrice
-  ): IOResult[Either[String, UnsignedTransaction]] = {
-    val fromLockupScript = LockupScript.p2pkh(fromKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
-    getUsableUtxos(fromLockupScript).map { utxos =>
-      for {
-        selected <- UtxoUtils.select(
-          utxos,
-          amount,
-          gasPrice,
-          defaultGasPerInput,
-          defaultGasPerOutput,
-          2
-        ) // sometime only 1 output, but 2 is always safe
-        _ <-
-          if (selected.assets.length > ALF.MaxTxInputNum) {
-            Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
-          } else {
-            Right(())
-          }
-        unsignedTx <- UnsignedTransaction
-          .transferAlf(
-            selected.assets.map(asset => (asset.ref, asset.output)),
-            fromLockupScript,
-            fromUnlockScript,
-            toLockupScript,
-            lockTimeOpt,
-            amount,
-            if (selected.gas > minimalGas) selected.gas else minimalGas,
-            gasPrice
-          )
-      } yield {
-        unsignedTx
-      }
-    }
-  }
-
-  def getTxStatus(txId: Hash, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
-    IOUtils.tryExecute {
-      assume(brokerConfig.contains(chainIndex.from))
-      val chain = getBlockChain(chainIndex)
-      chain.getTxStatusUnsafe(txId).flatMap { chainStatus =>
-        val confirmations = chainStatus.confirmations
-        if (chainIndex.isIntraGroup) {
-          Some(TxStatus(chainStatus.index, confirmations, confirmations, confirmations))
-        } else {
-          val confirmHash = chainStatus.index.hash
-          val fromGroupConfirmations =
-            getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          val toGroupConfirmations =
-            getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          Some(
-            TxStatus(chainStatus.index, confirmations, fromGroupConfirmations, toGroupConfirmations)
-          )
-        }
-      }
-    }
-
-  def getFromGroupConfirmationsUnsafe(hash: BlockHash, chainIndex: ChainIndex): Int = {
-    assume(ChainIndex.from(hash) == chainIndex)
-    val header        = getBlockHeaderUnsafe(hash)
-    val fromChain     = getHeaderChain(chainIndex.from, chainIndex.from)
-    val fromTip       = getOutTip(header, chainIndex.from)
-    val fromTipHeight = fromChain.getHeightUnsafe(fromTip)
-
-    @tailrec
-    def iter(height: Int): Option[Int] = {
-      val hashes = fromChain.getHashesUnsafe(height)
-      if (hashes.isEmpty) {
-        None
-      } else {
-        val header   = fromChain.getBlockHeaderUnsafe(hashes.head)
-        val chainDep = header.uncleHash(chainIndex.to)
-        if (fromChain.isBeforeUnsafe(hash, chainDep)) Some(height) else iter(height + 1)
-      }
-    }
-
-    iter(fromTipHeight + 1) match {
-      case None => 0
-      case Some(firstConfirmationHeight) =>
-        fromChain.maxHeightUnsafe - firstConfirmationHeight + 1
-    }
-  }
-
-  def getToGroupConfirmationsUnsafe(hash: BlockHash, chainIndex: ChainIndex): Int = {
-    assume(ChainIndex.from(hash) == chainIndex)
-    val header        = getBlockHeaderUnsafe(hash)
-    val toChain       = getHeaderChain(chainIndex.to, chainIndex.to)
-    val toGroupTip    = getGroupTip(header, chainIndex.to)
-    val toGroupHeader = getBlockHeaderUnsafe(toGroupTip)
-    val toTip         = getOutTip(toGroupHeader, chainIndex.to)
-    val toTipHeight   = toChain.getHeightUnsafe(toTip)
-
-    assume(ChainIndex.from(toTip) == ChainIndex(chainIndex.to, chainIndex.to))
-
-    @tailrec
-    def iter(height: Int): Option[Int] = {
-      val hashes = toChain.getHashesUnsafe(height)
-      if (hashes.isEmpty) {
-        None
-      } else {
-        val header   = toChain.getBlockHeaderUnsafe(hashes.head)
-        val chainDep = getGroupTip(header, chainIndex.from)
-        if (isExtendingUnsafe(chainDep, hash)) Some(height) else iter(height + 1)
-      }
-    }
-
-    if (header.isGenesis) {
-      toChain.maxHeightUnsafe - ALF.GenesisHeight + 1
-    } else {
-      iter(toTipHeight + 1) match {
-        case None => 0
-        case Some(firstConfirmationHeight) =>
-          toChain.maxHeightUnsafe - firstConfirmationHeight + 1
-      }
-    }
-  }
-
-  private def ableToUse(
-      output: TxOutput,
-      lockupScript: LockupScript
-  ): Boolean =
-    output match {
-      case o: AssetOutput    => o.lockupScript == lockupScript
-      case _: ContractOutput => false
-    }
-
-  def getUtxosInCache(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript,
-      persistedUtxos: AVector[AssetOutputInfo]
-  ): IOResult[(AVector[AssetOutputRef], AVector[AssetOutputInfo])] = {
-    getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
-      val usedUtxos = blockCaches.flatMap[AssetOutputRef] { blockCache =>
-        AVector.from(
-          blockCache.inputs.view
-            .filter(input => persistedUtxos.exists(_.ref == input))
-            .map(_.asInstanceOf[AssetOutputRef])
-        )
-      }
-      val newUtxos = blockCaches.flatMap { blockCache =>
-        AVector
-          .from(
-            blockCache.relatedOutputs.view
-              .filter(p => ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset)
-              .map(p =>
-                AssetOutputInfo(
-                  p._1.asInstanceOf[AssetOutputRef],
-                  p._2.asInstanceOf[AssetOutput],
-                  UnpersistedBlockOutput
-                )
-              )
-          )
-      }
-      (usedUtxos, newUtxos)
-    }
-  }
 }
-// scalastyle:on number.of.methods
 
 object FlowUtils {
   final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)
