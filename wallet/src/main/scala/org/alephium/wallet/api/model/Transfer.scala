@@ -18,7 +18,7 @@ package org.alephium.wallet.api.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{TimeStamp, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -26,6 +26,7 @@ final case class Transfer(
     address: Address,
     amount: U256,
     lockTime: Option[TimeStamp] = None,
+    gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 )
 

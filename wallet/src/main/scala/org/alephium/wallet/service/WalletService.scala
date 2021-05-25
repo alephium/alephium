@@ -35,7 +35,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, Service, TimeStamp, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
@@ -73,6 +73,7 @@ trait WalletService extends Service {
       address: Address,
       amount: U256,
       lockTime: Option[TimeStamp],
+      gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def deriveNextAddress(wallet: String): Either[WalletError, Address]
@@ -312,12 +313,13 @@ object WalletService {
         address: Address,
         amount: U256,
         lockTime: Option[TimeStamp],
+        gas: Option[GasBox],
         gasPrice: Option[GasPrice]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareTransaction(pubKey.toHexString, address, amount, lockTime, gasPrice)
+          .prepareTransaction(pubKey.toHexString, address, amount, lockTime, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>

@@ -38,7 +38,7 @@ import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -199,11 +199,12 @@ object ServerFixture {
     override def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] =
       Right((U256.Zero, U256.Zero, 0))
 
-    override def prepareUnsignedTx(
+    override def transfer(
         fromKey: PublicKey,
         toLockupScript: LockupScript,
         lockTimeOpt: Option[TimeStamp],
         amount: U256,
+        gasOpt: Option[GasBox],
         gasPrice: GasPrice
     ): IOResult[Either[String, UnsignedTransaction]] =
       lockTimeOpt match {
