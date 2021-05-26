@@ -66,7 +66,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       parentState <- getState(parentHash)
       height = parentState.height + 1
       _           <- addHeader(header)
-      isCanonical <- reorgFor(header, height)
+      isCanonical <- reorgFor(header, height, weight)
       _           <- addHash(header.hash, parentHash, height, weight, header.timestamp, isCanonical)
     } yield ()
   }
@@ -79,10 +79,24 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  def reorgFor(header: BlockHeader, height: Int): IOResult[Boolean] = {
-    maxHeight.map(_ < height).flatMap {
-      case true  => reorgFrom(header.parentHash, height - 1).map(_ => true)
-      case false => Right(false)
+  def reorgFor(header: BlockHeader, height: Int, weight: BigInteger): IOResult[Boolean] = {
+    maxHeight.flatMap { mHeight =>
+      if (mHeight < height) {
+        reorgFrom(header.parentHash, height - 1).map(_ => true)
+      } else if (mHeight == height) {
+        for {
+          hashes  <- heightIndexStorage.get(mHeight)
+          mWeight <- getWeight(hashes.head)
+          result <-
+            if (BlockHashPool.compare(header.hash, weight, hashes.head, mWeight) > 0) {
+              reorgFrom(header.parentHash, height - 1).map(_ => true)
+            } else {
+              Right(false)
+            }
+        } yield result
+      } else {
+        Right(false)
+      }
     }
   }
 
