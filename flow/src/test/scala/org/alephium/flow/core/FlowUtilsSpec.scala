@@ -129,7 +129,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val newBlock = block.copy(transactions = AVector(newTx))
 
     val ts0 = System.currentTimeMillis()
-    blockFlow.add(newBlock).isRight is true
+    blockFlow.addAndUpdateView(newBlock).isRight is true
     val ts1 = System.currentTimeMillis()
 
     val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue

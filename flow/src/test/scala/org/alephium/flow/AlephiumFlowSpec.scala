@@ -348,21 +348,21 @@ trait FlowFixture
     val blockValidation =
       BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
     blockValidation.validate(block, blockFlow).isRight is true
-    blockFlow.add(block).isRight is true
+    blockFlow.addAndUpdateView(block).isRight is true
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
     val blockValidation =
       BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
     blockValidation.validate(block, blockFlow).isRight is true
-    blockFlow.add(block).isRight is true
+    blockFlow.addAndUpdateView(block).isRight is true
     blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * weightRatio
   }
 
   def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
     val headerValidation = HeaderValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
     headerValidation.validate(header, blockFlow).isRight is true
-    blockFlow.add(header).isRight is true
+    blockFlow.addAndUpdateView(header).isRight is true
     blockFlow.getWeight(header) isE consensusConfig.maxMiningTarget * weightFactor
   }
 

@@ -21,7 +21,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData, TransactionTemplate}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
@@ -36,7 +36,6 @@ object ChainHandler {
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     blockFlow: BlockFlow,
-    txHandler: ActorRefT[TxHandler.Command],
     val chainIndex: ChainIndex,
     validator: Validation[T, S]
 ) extends IOBaseActor
@@ -91,9 +90,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
       case Right(false) =>
         addDataToBlockFlow(data) match {
           case Left(error) => handleIOError(error)
-          case Right(newReadyTxs) =>
+          case Right(_) =>
             publishEvent(ChainHandler.FlowDataAdded(data, origin))
-            broadcastReadyTxs(newReadyTxs)
             notifyBroker(broker, data)
             log.info(show(data))
         }
@@ -101,19 +99,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     }
   }
 
-  def addDataToBlockFlow(data: T): IOResult[AVector[TransactionTemplate]]
-
-  def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
-    if (txs.nonEmpty) {
-      // TODO: maybe broadcast it based on peer sync status
-      // delay this broadcast so that peers have download this block
-      scheduleOnce(
-        txHandler.ref,
-        TxHandler.Broadcast(txs),
-        Duration.ofSecondsUnsafe(2)
-      )
-    }
-  }
+  def addDataToBlockFlow(data: T): IOResult[Unit]
 
   def broadcast(data: T, origin: DataOrigin): Unit
 

@@ -42,9 +42,9 @@ trait BlockFlow
 
   def add(header: BlockHeader, weight: BigInteger): IOResult[Unit] = ???
 
-  def addNew(block: Block): IOResult[AVector[TransactionTemplate]]
+  def addAndUpdateView(block: Block): IOResult[Unit]
 
-  def addNew(header: BlockHeader): IOResult[AVector[TransactionTemplate]]
+  def addAndUpdateView(header: BlockHeader): IOResult[Unit]
 
   override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
     getSyncLocatorsUnsafe(brokerConfig)
@@ -167,10 +167,6 @@ object BlockFlow extends StrictLogging {
   ) extends BlockFlow {
 
     def add(block: Block): IOResult[Unit] = {
-      addNew(block).map(_ => ())
-    }
-
-    def addNew(block: Block): IOResult[AVector[TransactionTemplate]] = {
       val index = block.chainIndex
       assume(index.relateTo(brokerConfig))
 
@@ -179,25 +175,33 @@ object BlockFlow extends StrictLogging {
         cacheForConflicts(block)
       }
       for {
-        weight       <- calWeight(block)
-        _            <- getBlockChain(index).add(block, weight)
-        newPooledTxs <- updateBestDeps()
-      } yield newPooledTxs
+        weight <- calWeight(block)
+        _      <- getBlockChain(index).add(block, weight)
+      } yield ()
+    }
+
+    def addAndUpdateView(block: Block): IOResult[Unit] = {
+      for {
+        _ <- add(block)
+        _ <- updateBestDeps()
+      } yield ()
     }
 
     def add(header: BlockHeader): IOResult[Unit] = {
-      addNew(header).map(_ => ())
-    }
-
-    def addNew(header: BlockHeader): IOResult[AVector[TransactionTemplate]] = {
       val index = header.chainIndex
       assume(!index.relateTo(brokerConfig))
 
       for {
-        weight       <- calWeight(header)
-        _            <- getHeaderChain(index).add(header, weight)
-        newPooledTxs <- updateBestDeps()
-      } yield newPooledTxs
+        weight <- calWeight(header)
+        _      <- getHeaderChain(index).add(header, weight)
+      } yield ()
+    }
+
+    def addAndUpdateView(header: BlockHeader): IOResult[Unit] = {
+      for {
+        _ <- add(header)
+        _ <- updateBestDeps()
+      } yield ()
     }
 
     private def calWeight(block: Block): IOResult[BigInteger] = {
