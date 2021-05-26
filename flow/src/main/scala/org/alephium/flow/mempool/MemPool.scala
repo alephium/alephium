@@ -25,6 +25,8 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.AVector
 
+import io.prometheus.client.Gauge
+
 /*
  * MemPool is the class to store all the pending transactions
  *
@@ -76,6 +78,7 @@ class MemPool private (
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
       pendingPool.add(tx)
+      measurePendingPoolTransactionsTotal()
       MemPool.AddedToLocalPool
     } else {
       addToTxPool(index, AVector(tx))
@@ -86,12 +89,14 @@ class MemPool private (
   def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
     val count = getSharedPool(index).add(transactions)
     txIndexes.add(transactions)
+    measureSharedPoolTransactionsTotal(index.to.value)
     count
   }
 
   def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
     val count = getSharedPool(index).remove(transactions)
     txIndexes.remove(transactions)
+    measureSharedPoolTransactionsTotal(index.to.value)
     count
   }
 
@@ -108,6 +113,11 @@ class MemPool private (
     val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
       sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
     )
+
+    for (group <- 0 to groupConfig.groups) {
+      measureSharedPoolTransactionsTotal(group)
+    }
+
     (removed, added)
   }
 
@@ -131,6 +141,7 @@ class MemPool private (
         addToTxPool(chainIndex, txss)
       }
       pendingPool.remove(txs)
+      measurePendingPoolTransactionsTotal()
       txs
     }
   }
@@ -154,6 +165,18 @@ class MemPool private (
   def clear(): Unit = {
     sharedPools.foreach(_.clear())
   }
+
+  private def measurePendingPoolTransactionsTotal() = {
+    MemPool.pendingPoolTransactionsTotal
+      .labels(group.value.toString)
+      .set(pendingPool.txs.size.toDouble)
+  }
+
+  private def measureSharedPoolTransactionsTotal(toGroup: Int) = {
+    MemPool.sharedPoolTransactionsTotal
+      .labels(group.value.toString, toGroup.toString)
+      .set(pools(toGroup).size.toDouble)
+  }
 }
 
 object MemPool {
@@ -168,4 +191,21 @@ object MemPool {
   sealed trait NewTxCategory
   case object AddedToLocalPool  extends NewTxCategory
   case object AddedToSharedPool extends NewTxCategory
+
+  val sharedPoolTransactionsTotal: Gauge = Gauge
+    .build(
+      "alephium_mempool_shared_pool_transactions_total",
+      "Number of transactions in shared pool"
+    )
+    .labelNames("group_index", "chain_index")
+    .register()
+
+  val pendingPoolTransactionsTotal: Gauge = Gauge
+    .build(
+      "alephium_mempool_pending_pool_transactions_total",
+      "Number of transactions in pending pool"
+    )
+    .labelNames("group_index")
+    .register()
+
 }
