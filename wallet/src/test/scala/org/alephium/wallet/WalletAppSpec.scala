@@ -21,7 +21,7 @@ import java.net.InetAddress
 import io.vertx.core.Vertx
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.BodyHandler
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import sttp.model.StatusCode
 
 import org.alephium.api.{ApiError, ApiModelCodec}
@@ -44,7 +44,8 @@ class WalletAppSpec
     extends AlephiumFutureSpec
     with ModelCodecs
     with WalletConfigFixture
-    with HttpRouteFixture {
+    with HttpRouteFixture
+    with IntegrationPatience {
 
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
