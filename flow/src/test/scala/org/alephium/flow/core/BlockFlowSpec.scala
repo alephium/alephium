@@ -436,7 +436,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "spend locked outputs" in new FlowFixture with Eventually with IntegrationPatience {
-    val lockTime       = TimeStamp.now().plusSecondsUnsafe(3)
+    val lockTime       = TimeStamp.now().plusSecondsUnsafe(5)
     val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
     val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     val toPrivateKey   = keyManager(toLockupScript)
