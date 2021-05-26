@@ -60,7 +60,7 @@ class DependencyHandler(
       val broker = ActorRefT[ChainHandler.Event](sender())
       datas.foreach(addPendingData(_, broker, origin))
       processReadies()
-    case ChainHandler.FlowDataAdded(data, _) =>
+    case ChainHandler.FlowDataAdded(data, _, _) =>
       uponDataProcessed(data)
       processReadies()
     case Invalid(hash) =>

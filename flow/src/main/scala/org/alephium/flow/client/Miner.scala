@@ -180,7 +180,7 @@ class Miner(
       self ! Miner.MiningResult(Some(block), index, miningCount)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       handleMiningResult(blockOpt, chainIndex, miningCount)
-    case ChainHandler.FlowDataAdded(_, origin) =>
+    case ChainHandler.FlowDataAdded(_, origin, _) =>
       origin match {
         case DataOrigin.Local => () // we have updated the tasks when receiving BlockAdded
         case _: DataOrigin.FromClique =>

@@ -29,7 +29,7 @@ import org.alephium.util.EventStream.Publisher
 object ChainHandler {
   trait Event
 
-  final case class FlowDataAdded(data: FlowData, origin: DataOrigin)
+  final case class FlowDataAdded(data: FlowData, origin: DataOrigin, addedAt: TimeStamp)
       extends Event
       with EventStream.Event
 }
@@ -91,7 +91,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
         addDataToBlockFlow(data) match {
           case Left(error) => handleIOError(error)
           case Right(_) =>
-            publishEvent(ChainHandler.FlowDataAdded(data, origin))
+            publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
             notifyBroker(broker, data)
             log.info(show(data))
         }

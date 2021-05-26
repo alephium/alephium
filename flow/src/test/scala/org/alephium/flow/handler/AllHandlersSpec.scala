@@ -47,9 +47,15 @@ class AllHandlersSpec extends AlephiumFlowActorSpec("AllHandlersSpec") {
     )
 
     expectMsg(BlockChainHandler.BlockAdded(block0.hash))
-    dataAddedProbe.expectMsg(ChainHandler.FlowDataAdded(block0, DataOrigin.Local))
+    dataAddedProbe.expectMsgPF() { case ChainHandler.FlowDataAdded(block, origin, _) =>
+      block is block0
+      origin is DataOrigin.Local
+    }
     expectMsg(BlockChainHandler.BlockAdded(block1.hash))
-    dataAddedProbe.expectMsg(ChainHandler.FlowDataAdded(block1, DataOrigin.Local))
+    dataAddedProbe.expectMsgPF() { case ChainHandler.FlowDataAdded(block, origin, _) =>
+      block is block1
+      origin is DataOrigin.Local
+    }
     blockFlow.contains(block0) isE true
     blockFlow.contains(block1) isE true
 

@@ -21,7 +21,7 @@ import akka.actor.Props
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
-import org.alephium.util.{ActorRefT, AVector, Duration}
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 import org.alephium.util.EventStream.Subscriber
 
 object ViewHandler {
@@ -42,13 +42,16 @@ class ViewHandler(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])
     brokerConfig: BrokerConfig
 ) extends IOBaseActor
     with Subscriber {
+  var lastUpdated: TimeStamp = TimeStamp.zero
+
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
-  override def receive: Receive = { case ChainHandler.FlowDataAdded(data, _) =>
+  override def receive: Receive = { case ChainHandler.FlowDataAdded(data, _, addedAt) =>
     // We only update best deps for the following 2 cases:
     //  1. the block belongs to the groups of the node
     //  2. the header belongs to intra-group chain
-    if (ViewHandler.needUpdate(data.chainIndex)) {
+    if (addedAt >= lastUpdated && ViewHandler.needUpdate(data.chainIndex)) {
+      lastUpdated = TimeStamp.now()
       escapeIOError(blockFlow.updateBestDeps()) { newReadyTxs =>
         broadcastReadyTxs(newReadyTxs)
       }
