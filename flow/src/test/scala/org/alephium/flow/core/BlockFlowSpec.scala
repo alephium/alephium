@@ -20,6 +20,7 @@ import scala.util.Random
 
 import org.scalacheck.Gen
 import org.scalatest.Assertion
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockChain.TxIndex
@@ -434,7 +435,7 @@ class BlockFlowSpec extends AlephiumSpec {
     test(Some(TimeStamp.now()))
   }
 
-  it should "spend locked outputs" in new FlowFixture {
+  it should "spend locked outputs" in new FlowFixture with Eventually with IntegrationPatience {
     val lockTime       = TimeStamp.now().plusSecondsUnsafe(3)
     val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
     val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
@@ -452,18 +453,19 @@ class BlockFlowSpec extends AlephiumSpec {
       .rightValue
       .leftValue
       .startsWith("Not enough balance") is true
-    Thread.sleep(3000)
-    blockFlow
-      .transfer(
-        toPrivateKey.publicKey,
-        toLockupScript,
-        None,
-        ALF.nanoAlf(1),
-        None,
-        defaultGasPrice
-      )
-      .rightValue
-      .isRight is true
+    eventually {
+      blockFlow
+        .transfer(
+          toPrivateKey.publicKey,
+          toLockupScript,
+          None,
+          ALF.nanoAlf(1),
+          None,
+          defaultGasPrice
+        )
+        .rightValue
+        .isRight is true
+    }
   }
 
   it should "handle sequential txs" in new FlowFixture {
