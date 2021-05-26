@@ -184,12 +184,12 @@ class RestServer(
   }
 
   private val buildTransactionRoute = toRoute(buildTransaction) {
-    case (fromKey, toAddress, value, lockTime, gasPrice) =>
+    case (fromKey, toAddress, value, lockTime, gas, gasPrice) =>
       withSyncedClique {
         Future.successful(
           serverUtils.buildTransaction(
             blockFlow,
-            BuildTransaction(fromKey, toAddress, value, lockTime, gasPrice)
+            BuildTransaction(fromKey, toAddress, value, lockTime, gas, gasPrice)
           )
         )
       }

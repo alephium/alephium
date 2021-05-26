@@ -26,7 +26,7 @@ import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {
@@ -48,6 +48,14 @@ trait TapirCodecs extends ApiModelCodec {
 
   implicit val u256TapirCodec: Codec[String, U256, TextPlain] =
     fromJson[U256]
+
+  implicit val gasBoxCodec: Codec[String, GasBox, TextPlain] =
+    Codec.int.mapDecode(value =>
+      GasBox.from(value) match {
+        case Some(gas) => DecodeResult.Value(gas)
+        case None      => DecodeResult.Error(s"$value", new IllegalArgumentException(s"Invalid gas"))
+      }
+    )(_.value)
 
   implicit val gasPriceCodec: Codec[String, GasPrice, TextPlain] =
     u256TapirCodec.map[GasPrice](GasPrice.apply)(_.value)

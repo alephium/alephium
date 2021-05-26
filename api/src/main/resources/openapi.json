@@ -2940,6 +2940,14 @@
             }
           },
           {
+            "name": "gas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
             "name": "gasPrice",
             "in": "query",
             "required": false,
@@ -4334,6 +4342,9 @@
             "format": "uint256"
           },
           "lockTime": {
+            "type": "integer"
+          },
+          "gas": {
             "type": "integer"
           },
           "gasPrice": {

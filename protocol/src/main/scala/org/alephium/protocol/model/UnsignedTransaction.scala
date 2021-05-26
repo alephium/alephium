@@ -98,28 +98,25 @@ object UnsignedTransaction {
       inputs: AVector[(AssetOutputRef, AssetOutput)],
       fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      amount: U256,
+      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
       gas: GasBox,
       gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {
+    assume(gas >= minimalGas)
     assume(gasPrice.value <= ALF.MaxALFValue)
-    val inputSum = inputs.fold(U256.Zero)(_ addUnsafe _._2.amount)
-    val gasFee   = gasPrice * gas
-    (for {
-      remainder0 <- inputSum.sub(amount)
-      remainder  <- remainder0.sub(gasFee)
+    val gasFee = gasPrice * gas
+    for {
+      inputSum     <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight s"Input amount overflow")
+      outputAmount <- outputInfos.foldE(U256.Zero)(_ add _._2 toRight s"Output amount overflow")
+      remainder0   <- inputSum.sub(outputAmount).toRight(s"Not enough balance")
+      remainder    <- remainder0.sub(gasFee).toRight(s"Not enough balance for gas fee")
     } yield {
-      val toOutput   = TxOutput.asset(amount, toLockupScript, lockTimeOpt)
-      val fromOutput = TxOutput.asset(remainder, fromLockupScript)
-
-      val outputs =
-        if (remainder > U256.Zero) {
-          AVector[AssetOutput](toOutput, fromOutput)
-        } else {
-          AVector[AssetOutput](toOutput)
-        }
+      var outputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
+        TxOutput.asset(amount, toLockupScript, lockTimeOpt)
+      }
+      if (remainder > U256.Zero) {
+        outputs = outputs :+ TxOutput.asset(remainder, fromLockupScript)
+      }
       UnsignedTransaction(
         None,
         gas,
@@ -129,6 +126,26 @@ object UnsignedTransaction {
         },
         outputs
       )
-    }).toRight(s"Not enough balance")
+    }
+  }
+
+  def transferAlf(
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      fromLockupScript: LockupScript,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp],
+      amount: U256,
+      gas: GasBox,
+      gasPrice: GasPrice
+  ): Either[String, UnsignedTransaction] = {
+    transferAlf(
+      inputs,
+      fromLockupScript,
+      fromUnlockScript,
+      AVector((toLockupScript, amount, lockTimeOpt)),
+      gas,
+      gasPrice
+    )
   }
 }

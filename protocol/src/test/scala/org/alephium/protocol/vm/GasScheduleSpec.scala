@@ -16,20 +16,11 @@
 
 package org.alephium.protocol.vm
 
-trait CostStrategy {
-  var gasRemaining: GasBox
+import org.alephium.protocol.model.defaultGasPerInput
+import org.alephium.util.AlephiumSpec
 
-  def chargeGas(instr: GasSimple): ExeResult[Unit] = chargeGas(instr.gas())
-
-  def chargeGasWithSize(instr: GasFormula, size: Int): ExeResult[Unit] = {
-    chargeGas(instr.gas(size))
-  }
-
-  def chargeContractLoad(): ExeResult[Unit] = chargeGas(GasSchedule.contractLoadGas)
-
-  def chargeContractUpdate(): ExeResult[Unit] = chargeGas(GasSchedule.contractUpdateGas)
-
-  def chargeGas(gas: GasBox): ExeResult[Unit] = {
-    gasRemaining.use(gas).map(gasRemaining = _)
+class GasScheduleSpec extends AlephiumSpec {
+  it should "validate default gases" in {
+    (defaultGasPerInput >= GasSchedule.p2pkUnlockGas) is true
   }
 }

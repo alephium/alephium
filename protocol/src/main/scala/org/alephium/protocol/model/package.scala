@@ -33,8 +33,8 @@ package object model {
   //scalastyle:off magic.number
   // TODO: improve gas mechanism
   val minimalGas: GasBox          = GasBox.unsafe(100000)
-  val defaultGasPerInput: GasBox  = GasBox.unsafe(10000)
-  val defaultGasPerOutput: GasBox = GasBox.unsafe(10000)
+  val defaultGasPerInput: GasBox  = GasBox.unsafe(10100)
+  val defaultGasPerOutput: GasBox = GasBox.unsafe(10100)
 
   val defaultGasPrice: GasPrice    = GasPrice(ALF.nanoAlf(1))
   val defaultGasFee: U256          = defaultGasPrice * minimalGas

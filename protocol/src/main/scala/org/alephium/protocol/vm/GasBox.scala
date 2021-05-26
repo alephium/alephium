@@ -21,9 +21,9 @@ import org.alephium.serde.Serde
 import org.alephium.util.U256
 
 final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox] {
-  def use(amount: Int): ExeResult[GasBox] = {
-    if (value >= amount) {
-      Right(GasBox(value - amount))
+  def use(amount: GasBox): ExeResult[GasBox] = {
+    if (this >= amount) {
+      Right(GasBox(value - amount.value))
     } else {
       Left(OutOfGas)
     }

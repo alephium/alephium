@@ -18,7 +18,6 @@ package org.alephium.flow.handler
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.util.Random
 
 import akka.actor.Props
 
@@ -98,27 +97,22 @@ trait DependencyHandlerState extends IOBaseActor {
       origin: DataOrigin
   ): Unit = {
     escapeIOError(blockFlow.contains(data.hash)) { existing =>
-      if (!existing) {
-        if (pending.contains(data.hash)) {
-          // we replace the old cache with 0.5 probability
-          if (Random.nextInt() % 2 == 0) pending(data.hash) = (data, broker, origin)
-        } else {
-          pending(data.hash) = (data, broker, origin)
+      if (!existing && !pending.contains(data.hash)) {
+        pending(data.hash) = (data, broker, origin)
 
-          escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
-            if (missingDeps.nonEmpty) {
-              missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
-            }
-
-            missingDeps.foreach { dep =>
-              missingIndex.get(dep) match {
-                case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
-                case None           => missingIndex(dep) = ArrayBuffer(data.hash)
-              }
-            }
-
-            if (missingDeps.isEmpty) readies.addOne(data.hash)
+        escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
+          if (missingDeps.nonEmpty) {
+            missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
           }
+
+          missingDeps.foreach { dep =>
+            missingIndex.get(dep) match {
+              case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
+              case None           => missingIndex(dep) = ArrayBuffer(data.hash)
+            }
+          }
+
+          if (missingDeps.isEmpty) readies.addOne(data.hash)
         }
       }
     }

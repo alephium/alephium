@@ -25,6 +25,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType, Target}
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -215,9 +216,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
 
     {
-      val transfer = BuildTransaction(fromKey, toAddress, 1, Some(TimeStamp.unsafe(1234)))
+      val transfer = BuildTransaction(
+        fromKey,
+        toAddress,
+        1,
+        Some(TimeStamp.unsafe(1234)),
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(1))
+      )
       val jsonRaw =
-        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1","lockTime":1234}"""
+        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1","lockTime":1234,"gas":1,"gasPrice":"1"}"""
       checkData(transfer, jsonRaw)
     }
   }

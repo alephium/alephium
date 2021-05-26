@@ -20,6 +20,7 @@ import scala.util.Random
 
 import org.scalacheck.Gen
 import org.scalatest.Assertion
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockChain.TxIndex
@@ -421,7 +422,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val unsigned =
         blockFlow
-          .prepareUnsignedTx(publicKey, toLockupScript, lockTimeOpt, ALF.alf(1), defaultGasPrice)
+          .transfer(publicKey, toLockupScript, lockTimeOpt, ALF.alf(1), None, defaultGasPrice)
           .rightValue
           .rightValue
       unsigned.fixedOutputs.length is 2
@@ -434,34 +435,37 @@ class BlockFlowSpec extends AlephiumSpec {
     test(Some(TimeStamp.now()))
   }
 
-  it should "spend locked outputs" in new FlowFixture {
-    val lockTime       = TimeStamp.now().plusSecondsUnsafe(2)
+  it should "spend locked outputs" in new FlowFixture with Eventually with IntegrationPatience {
+    val lockTime       = TimeStamp.now().plusSecondsUnsafe(3)
     val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
     val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     val toPrivateKey   = keyManager(toLockupScript)
     addAndCheck(blockFlow, block)
     blockFlow
-      .prepareUnsignedTx(
+      .transfer(
         toPrivateKey.publicKey,
         toLockupScript,
         None,
         ALF.nanoAlf(1),
+        None,
         defaultGasPrice
       )
       .rightValue
       .leftValue
       .startsWith("Not enough balance") is true
-    Thread.sleep(2000)
-    blockFlow
-      .prepareUnsignedTx(
-        toPrivateKey.publicKey,
-        toLockupScript,
-        None,
-        ALF.nanoAlf(1),
-        defaultGasPrice
-      )
-      .rightValue
-      .isRight is true
+    eventually {
+      blockFlow
+        .transfer(
+          toPrivateKey.publicKey,
+          toLockupScript,
+          None,
+          ALF.nanoAlf(1),
+          None,
+          defaultGasPrice
+        )
+        .rightValue
+        .isRight is true
+    }
   }
 
   it should "handle sequential txs" in new FlowFixture {
@@ -480,7 +484,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val (_, toPubKey)  = toGroup.generateKey
       val toLockupScript = LockupScript.p2pkh(toPubKey)
       val unsignedTx = blockFlow
-        .prepareUnsignedTx(fromPubKey, toLockupScript, None, ALF.oneAlf, defaultGasPrice)
+        .transfer(fromPubKey, toLockupScript, None, ALF.oneAlf, None, defaultGasPrice)
         .rightValue
         .rightValue
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
