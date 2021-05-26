@@ -26,7 +26,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ChainHandler}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.model.{BlockTemplate, DataOrigin}
+import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
@@ -180,11 +180,9 @@ class Miner(
       self ! Miner.MiningResult(Some(block), index, miningCount)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       handleMiningResult(blockOpt, chainIndex, miningCount)
-    case ChainHandler.FlowDataAdded(_, origin, _) =>
-      origin match {
-        case DataOrigin.Local => () // we have updated the tasks when receiving BlockAdded
-        case _: DataOrigin.FromClique =>
-          updateTasks()
+    case ChainHandler.FlowDataAdded(data, origin, _) =>
+      if (!origin.isLocal && data.chainIndex.isIntraGroup) {
+        updateTasks()
       }
     case BlockChainHandler.BlockAdded(hash) =>
       continueWorkFor(ChainIndex.from(hash))
