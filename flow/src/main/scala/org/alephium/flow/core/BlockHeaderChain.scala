@@ -27,7 +27,7 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
-import org.alephium.util.{AVector, LruCache, TimeStamp}
+import org.alephium.util.{AVector, EitherF, LruCache, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
@@ -66,8 +66,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       parentState <- getState(parentHash)
       height = parentState.height + 1
       _           <- addHeader(header)
-      isCanonical <- reorgFor(header, height, weight)
+      isCanonical <- checkCanonicality(header.hash, weight)
       _           <- addHash(header.hash, parentHash, height, weight, header.timestamp, isCanonical)
+      _           <- if (isCanonical) reorgFrom(header.parentHash, height - 1) else Right(())
     } yield ()
   }
 
@@ -79,24 +80,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  def reorgFor(header: BlockHeader, height: Int, weight: BigInteger): IOResult[Boolean] = {
-    maxHeight.flatMap { mHeight =>
-      if (mHeight < height) {
-        reorgFrom(header.parentHash, height - 1).map(_ => true)
-      } else if (mHeight == height) {
-        for {
-          hashes  <- heightIndexStorage.get(mHeight)
-          mWeight <- getWeight(hashes.head)
-          result <-
-            if (BlockHashPool.compare(header.hash, weight, hashes.head, mWeight) > 0) {
-              reorgFrom(header.parentHash, height - 1).map(_ => true)
-            } else {
-              Right(false)
-            }
-        } yield result
-      } else {
-        Right(false)
-      }
+  private def checkCanonicality(hash: BlockHash, weight: BigInteger): IOResult[Boolean] = {
+    EitherF.forallTry(tips.keys) { tip =>
+      getWeight(tip).map(BlockHashPool.compare(hash, weight, tip, _) > 0)
     }
   }
 

@@ -38,5 +38,18 @@ object EitherF {
     }
     Right(result)
   }
+
+  def forallTry[E, L](
+      elems: Iterable[E]
+  )(predicate: E => Either[L, Boolean]): Either[L, Boolean] = {
+    elems.foreach { e =>
+      predicate(e) match {
+        case Right(true)  => ()
+        case Right(false) => return Right(false)
+        case Left(l)      => return Left(l)
+      }
+    }
+    Right(true)
+  }
   // scalastyle:on return
 }

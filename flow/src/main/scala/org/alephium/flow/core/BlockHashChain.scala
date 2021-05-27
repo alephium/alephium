@@ -96,10 +96,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       getWeight(hash).map(weight.max)
     }
 
-  def maxHeight: IOResult[Int] =
-    EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
-      getHeight(hash).map(math.max(height, _))
+  // the max height is the height of the tip of max weight
+  def maxHeight: IOResult[Int] = {
+    val maxWeighted = EitherF.foldTry(tips.keys, (ALF.GenesisHeight, ALF.GenesisWeight)) {
+      case ((height, weight), tip) =>
+        getState(tip).map { case BlockState(tipHeight, tipWeight) =>
+          if (tipWeight.compareTo(weight) > 0) (tipHeight, tipWeight) else (height, weight)
+        }
     }
+    maxWeighted.map(_._1)
+  }
 
   def maxHeightUnsafe: Int =
     tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>

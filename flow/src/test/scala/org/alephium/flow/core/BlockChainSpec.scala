@@ -24,14 +24,14 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash, Hash}
-import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
+import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp}
 
-class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
-  trait Fixture extends AlephiumConfigFixture {
-    lazy val genesis  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
-    lazy val blockGen = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash), Hash.zero)
-    lazy val chainGen = chainGenOf(4, genesis)
+class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
+  trait Fixture extends AlephiumConfigFixture with NoIndexModelGeneratorsLike {
+    lazy val genesis   = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
+    lazy val blockGen0 = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash), Hash.zero)
+    lazy val chainGen  = chainGenOf(4, genesis)
 
     def buildBlockChain(genesisBlock: Block = genesis): BlockChain = {
       val storages = StoragesFixture.buildStorages(rootPath)
@@ -41,16 +41,22 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     def createBlockChain(blocks: AVector[Block]): BlockChain = {
       assume(blocks.nonEmpty)
       val chain = buildBlockChain(blocks.head)
-      blocks.toIterable.zipWithIndex.tail foreach { case (block, index) =>
-        chain.add(block, index * 2)
+      blocks.tail foreach { block =>
+        val parentWeight = chain.getWeightUnsafe(block.parentHash)
+        chain.add(block, parentWeight + block.weight).isRight is true
       }
       chain
     }
 
-    def addBlocks(chain: BlockChain, blocks: AVector[Block], preBlocks: Int = 0): Unit = {
-      blocks.foreachWithIndex((block, index) =>
-        chain.add(block, preBlocks + index + 1).isRight is true
-      )
+    def addBlock(chain: BlockChain, block: Block): Unit = {
+      addBlocks(chain, AVector(block))
+    }
+
+    def addBlocks(chain: BlockChain, blocks: AVector[Block]): Unit = {
+      blocks.foreach { block =>
+        val parentWeight = chain.getWeightUnsafe(block.parentHash)
+        chain.add(block, parentWeight + block.weight).isRight is true
+      }
     }
   }
 
@@ -66,11 +72,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
   }
 
   it should "add block correctly" in new Fixture {
-    val block = blockGen.sample.get
+    val block = blockGen0.sample.get
     val chain = buildBlockChain()
     chain.numHashes is 1
     val blocksSize1 = chain.numHashes
-    chain.add(block, 1).isRight is true
+    addBlock(chain, block)
     val blocksSize2 = chain.numHashes
     blocksSize1 + 1 is blocksSize2
 
@@ -84,7 +90,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
 
   it should "persiste txs" in new Fixture {
     val chain = buildBlockChain()
-    forAll(blockGen) { block0 =>
+    forAll(blockGen0) { block0 =>
       chain.add(block0, 1).isRight is true
       block0.transactions.foreachWithIndex { case (tx, index) =>
         val txIndex = TxIndex(block0.hash, index)
@@ -264,7 +270,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     chain.maxHeight isE longChain.length - 1
     chain.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
 
-    chain.add(longChain.last, longChain.length)
+    addBlock(chain, longChain.last)
     chain.getHeight(longChain.head) isE 1
     chain.getHeight(longChain.last) isE longChain.length
     chain.getBlockSlice(longChain.head) isE AVector(genesis, longChain.head)
@@ -290,12 +296,12 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     longChain.init.foreach { block => chain.isCanonicalUnsafe(block.hash) is true }
     chain.isCanonicalUnsafe(longChain.last.hash) is false
 
-    chain.add(longChain.last, longChain.length)
+    addBlock(chain, longChain.last)
     shortChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is false }
     longChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is true }
   }
 
-  it should "check reorg" in new Fixture {
+  it should "check reorg when weights of blocks are equal" in new Fixture {
     val longChain  = chainGenOf(3, genesis).sample.get
     val shortChain = chainGenOf(2, genesis).sample.get
 
@@ -313,9 +319,46 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
       chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
     }
 
-    addBlocks(chain, longChain.drop(2), 2)
+    addBlocks(chain, longChain.drop(2))
     chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
     chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+  }
+
+  it should "check reorg when weights of blocks are different" in new Fixture {
+    override val configValues = Map(
+      ("alephium.consensus.num-zeros-at-least-in-hash", 10)
+    )
+
+    val longChain   = chainGenOf(3, genesis).sample.get
+    val shortChain0 = chainGenOf(2, genesis).sample.get
+    val block0      = shortChain0(0)
+    val block1      = shortChain0(1)
+    val block00 = block0.copy(header =
+      block0.header.copy(target = Target.unsafe(block0.header.target.value.divide(2)))
+    )
+    val block11 = block1.copy(header =
+      block1.header.copy(
+        blockDeps = BlockDeps.unsafe(AVector.fill(config.broker.depsNum)(block00.hash)),
+        target = Target.unsafe(block1.header.target.value.divide(2))
+      )
+    )
+    val shortChain = AVector(block00, block11)
+
+    val chain = buildBlockChain()
+    addBlocks(chain, longChain)
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash)
+    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+
+    addBlocks(chain, shortChain.take(1))
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash)
+    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+
+    addBlocks(chain, shortChain.drop(1))
+    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
+    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
     chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
   }
 
@@ -355,11 +398,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     val chain  = createBlockChain(blocks.init)
     blocks.init.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 3
-    chain.maxWeight isE 6
-    chain.add(blocks.last, 8)
+    chain.maxWeight isE consensusConfig.maxMiningTarget.value.multiply(3)
+    addBlock(chain, blocks.last)
     chain.contains(blocks.last) isE true
     chain.maxHeight isE 4
-    chain.maxWeight isE 8
+    chain.maxWeight isE consensusConfig.maxMiningTarget.value.multiply(4)
   }
 
   it should "compute correct weights for two chains with same root" in new Fixture {
@@ -371,7 +414,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     blocks1.foreach(block => chain.contains(block) isE true)
     blocks2.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 4
-    chain.maxWeight isE 8
+    chain.maxWeight isE consensusConfig.maxMiningTarget.value.multiply(4)
     chain.getHashesAfter(blocks1.head.hash) isE {
       val branch1 = blocks1.tail
       AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)
@@ -438,7 +481,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     chain.getHashesAfter(chain1.head.hash) isE chain1.tail.map(_.hash)
     chain.getHashesAfter(genesis.hash).toOption.get.toSet is allHashes
 
-    chain.getHashesAfter(blockGen.sample.get.hash) isE AVector.empty[BlockHash]
+    chain.getHashesAfter(blockGen0.sample.get.hash) isE AVector.empty[BlockHash]
   }
 
   it should "test isBefore" in new ForkedFixture {
