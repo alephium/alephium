@@ -16,8 +16,6 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
@@ -25,7 +23,7 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
@@ -41,7 +39,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     blockStorage.getUnsafe(hash)
   }
 
-  def add(block: Block, weight: BigInteger): IOResult[Unit] = {
+  def add(block: Block, weight: Weight): IOResult[Unit] = {
     assume {
       val assertion = for {
         isNewIncluded    <- contains(block.hash)

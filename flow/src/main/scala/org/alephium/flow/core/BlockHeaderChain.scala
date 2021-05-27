@@ -16,8 +16,6 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import scala.annotation.tailrec
 
 import org.alephium.flow.Utils
@@ -26,7 +24,7 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BlockHeader, Target}
+import org.alephium.protocol.model.{BlockHeader, Target, Weight}
 import org.alephium.util.{AVector, EitherF, LruCache, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
@@ -51,7 +49,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     getBlockHeader(hash).map(_.timestamp)
   }
 
-  def add(header: BlockHeader, weight: BigInteger): IOResult[Unit] = {
+  def add(header: BlockHeader, weight: Weight): IOResult[Unit] = {
     assume(!header.isGenesis)
     val parentHash = header.parentHash
     assume {
@@ -80,7 +78,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  private def checkCanonicality(hash: BlockHash, weight: BigInteger): IOResult[Boolean] = {
+  private def checkCanonicality(hash: BlockHash, weight: Weight): IOResult[Boolean] = {
     EitherF.forallTry(tips.keys) { tip =>
       getWeight(tip).map(BlockHashPool.compare(hash, weight, tip, _) > 0)
     }

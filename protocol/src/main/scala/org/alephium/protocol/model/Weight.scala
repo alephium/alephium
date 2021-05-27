@@ -14,14 +14,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.model
+package org.alephium.protocol.model
 
-import org.alephium.protocol.model.Weight
+import java.math.BigInteger
+
 import org.alephium.serde.Serde
 
-final case class BlockState(height: Int, weight: Weight)
+final case class Weight(value: BigInteger) extends AnyVal with Ordered[Weight] {
+  def +(that: Weight): Weight = Weight(this.value.add(that.value))
 
-object BlockState {
-  implicit val serde: Serde[BlockState] =
-    Serde.forProduct2(BlockState(_, _), t => (t.height, t.weight))
+  def *(n: Int): Weight = Weight(value.multiply(BigInteger.valueOf(n.toLong)))
+
+  override def compare(that: Weight): Int = this.value.compareTo(that.value)
+}
+
+object Weight {
+  implicit val serde: Serde[Weight] = Serde.forProduct1(Weight(_), _.value)
+
+  val zero: Weight = Weight(BigInteger.ZERO)
+
+  def from(target: Target): Weight = Weight(Target.maxBigInt.divide(target.value))
 }

@@ -16,11 +16,9 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.util.AVector
 
 trait BlockPool extends BlockHashPool {
@@ -31,7 +29,7 @@ trait BlockPool extends BlockHashPool {
   def getBlock(hash: BlockHash): IOResult[Block]
 
   // Assuming the block is verified
-  def add(block: Block, weight: BigInteger): IOResult[Unit]
+  def add(block: Block, weight: Weight): IOResult[Unit]
 
   def getBlocksAfter(locator: BlockHash): IOResult[AVector[Block]] = {
     for {
@@ -42,7 +40,7 @@ trait BlockPool extends BlockHashPool {
 
   def getHeight(block: Block): IOResult[Int] = getHeight(block.hash)
 
-  def getWeight(block: Block): IOResult[BigInteger] = getWeight(block.hash)
+  def getWeight(block: Block): IOResult[Weight] = getWeight(block.hash)
 
   // TODO: use ChainSlice instead of AVector[Block]
   def getBlockSlice(hash: BlockHash): IOResult[AVector[Block]] = {

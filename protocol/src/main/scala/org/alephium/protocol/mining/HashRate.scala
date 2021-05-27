@@ -22,7 +22,9 @@ import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
 // unit: hash per second
-final case class HashRate private (value: BigInteger)
+final case class HashRate private (value: BigInteger) extends AnyVal with Ordered[HashRate] {
+  override def compare(that: HashRate): Int = this.value.compareTo(that.value)
+}
 
 object HashRate {
   def unsafe(value: BigInteger): HashRate = new HashRate(value)

@@ -36,7 +36,7 @@ import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
     config.genesisBlocks.flatMap(identity).foreach { block =>
-      blockFlow.getWeight(block.hash) isE 0
+      blockFlow.getWeight(block.hash) isE Weight.zero
     }
 
     checkBalance(blockFlow, brokerConfig.groupFrom, genesisBalance)
@@ -117,7 +117,7 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks1.foreach { block =>
         addAndCheck(blockFlow, block, 1)
-        blockFlow.getWeight(block) isE consensusConfig.maxMiningTarget * 1
+        blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * 1
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))

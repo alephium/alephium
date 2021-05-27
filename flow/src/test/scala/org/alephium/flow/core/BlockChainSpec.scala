@@ -91,7 +91,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   it should "persiste txs" in new Fixture {
     val chain = buildBlockChain()
     forAll(blockGen0) { block0 =>
-      chain.add(block0, 1).isRight is true
+      chain.add(block0, Weight(1)).isRight is true
       block0.transactions.foreachWithIndex { case (tx, index) =>
         val txIndex = TxIndex(block0.hash, index)
         if (brokerConfig.contains(block0.chainIndex.from)) {
@@ -101,7 +101,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         }
       }
       val block1 = block0.copy(header = block0.header.copy(nonce = 123456))
-      chain.add(block1, 1).isRight is true
+      chain.add(block1, Weight(1)).isRight is true
       block1.transactions.foreachWithIndex { case (tx, index) =>
         val txIndex0 = TxIndex(block0.hash, index)
         val txIndex1 = TxIndex(block1.hash, index)
@@ -398,11 +398,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val chain  = createBlockChain(blocks.init)
     blocks.init.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 3
-    chain.maxWeight isE consensusConfig.maxMiningTarget.value.multiply(3)
+    chain.maxWeight isE consensusConfig.minBlockWeight * 3
     addBlock(chain, blocks.last)
     chain.contains(blocks.last) isE true
     chain.maxHeight isE 4
-    chain.maxWeight isE consensusConfig.maxMiningTarget.value.multiply(4)
+    chain.maxWeight isE consensusConfig.minBlockWeight * 4
   }
 
   it should "compute correct weights for two chains with same root" in new Fixture {
@@ -414,7 +414,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     blocks1.foreach(block => chain.contains(block) isE true)
     blocks2.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 4
-    chain.maxWeight isE consensusConfig.maxMiningTarget.value.multiply(4)
+    chain.maxWeight isE consensusConfig.minBlockWeight * 4
     chain.getHashesAfter(blocks1.head.hash) isE {
       val branch1 = blocks1.tail
       AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)
@@ -429,9 +429,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val hash2 = BlockHash.generate
     val chain = buildBlockChain()
 
-    chain.addHash(hash0, BlockHash.zero, 1, 1, TimeStamp.unsafe(1), false)
-    chain.addHash(hash1, BlockHash.zero, 1, 1, TimeStamp.unsafe(1), false)
-    chain.addHash(hash2, BlockHash.zero, 1, 2, TimeStamp.unsafe(1), false)
+    chain.addHash(hash0, BlockHash.zero, 1, Weight(1), TimeStamp.unsafe(1), false)
+    chain.addHash(hash1, BlockHash.zero, 1, Weight(1), TimeStamp.unsafe(1), false)
+    chain.addHash(hash2, BlockHash.zero, 1, Weight(2), TimeStamp.unsafe(1), false)
 
     chain.blockHashOrdering.lt(hash0, hash1) is
       Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes)

@@ -16,11 +16,10 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.Weight
 import org.alephium.util.{AVector, Bytes}
 
 trait BlockHashPool {
@@ -34,9 +33,9 @@ trait BlockHashPool {
 
   def getStateUnsafe(hash: BlockHash): BlockState
 
-  def getWeight(hash: BlockHash): IOResult[BigInteger]
+  def getWeight(hash: BlockHash): IOResult[Weight]
 
-  def getWeightUnsafe(hash: BlockHash): BigInteger
+  def getWeightUnsafe(hash: BlockHash): Weight
 
   def getHeight(hash: BlockHash): IOResult[Int]
 
@@ -72,7 +71,7 @@ trait BlockHashPool {
 }
 
 object BlockHashPool {
-  def compare(hash0: BlockHash, weight0: BigInteger, hash1: BlockHash, weight1: BigInteger): Int = {
+  def compare(hash0: BlockHash, weight0: Weight, hash1: BlockHash, weight1: Weight): Int = {
     val compare1 = weight0.compareTo(weight1)
     if (compare1 != 0) {
       compare1

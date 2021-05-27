@@ -16,11 +16,9 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHeader, Weight}
 import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockHeaderPool extends BlockHashPool {
@@ -31,7 +29,7 @@ trait BlockHeaderPool extends BlockHashPool {
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader]
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader
 
-  def add(header: BlockHeader, weight: BigInteger): IOResult[Unit]
+  def add(header: BlockHeader, weight: Weight): IOResult[Unit]
 
   def getHeadersAfter(locator: BlockHash): IOResult[AVector[BlockHeader]] = {
     for {
@@ -42,7 +40,7 @@ trait BlockHeaderPool extends BlockHashPool {
 
   def getHeight(bh: BlockHeader): IOResult[Int] = getHeight(bh.hash)
 
-  def getWeight(bh: BlockHeader): IOResult[BigInteger] = getWeight(bh.hash)
+  def getWeight(bh: BlockHeader): IOResult[Weight] = getWeight(bh.hash)
 
   def isTip(bh: BlockHeader): Boolean = isTip(bh.hash)
 

@@ -16,15 +16,13 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.protocol.vm.WorldState
 
 trait BlockChainWithState extends BlockChain {
@@ -48,7 +46,7 @@ trait BlockChainWithState extends BlockChain {
 
   def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit]
 
-  override def add(block: Block, weight: BigInteger): IOResult[Unit] = {
+  override def add(block: Block, weight: Weight): IOResult[Unit] = {
     for {
       cachedWorldState <- getCachedWorldState(block.parentHash)
       _                <- persistBlock(block)

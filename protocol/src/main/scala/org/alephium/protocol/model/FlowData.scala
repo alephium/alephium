@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.model
 
-import java.math.BigInteger
-
 import org.alephium.protocol.BlockHash
 import org.alephium.util.TimeStamp
 
@@ -26,7 +24,7 @@ trait FlowData {
 
   def target: Target
 
-  def weight: BigInteger = target.value
+  def weight: Weight = Weight.from(target)
 
   def hash: BlockHash
 
