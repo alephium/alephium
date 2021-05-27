@@ -24,7 +24,7 @@ import akka.actor.Props
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ChainHandler}
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.model.DataOrigin.Local
@@ -156,7 +156,7 @@ class Miner(
     case Miner.Start =>
       if (!miningStarted) {
         log.info("Start mining")
-        subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
+        subscribeEvent(self, classOf[ViewHandler.ViewUpdated])
         updateTasks()
         startNewTasks()
         miningStarted = true
@@ -166,7 +166,7 @@ class Miner(
     case Miner.Stop =>
       if (miningStarted) {
         log.info("Stop mining")
-        unsubscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
+        unsubscribeEvent(self, classOf[ViewHandler.ViewUpdated])
         postMinerStop()
         miningStarted = false
       } else {
@@ -180,12 +180,13 @@ class Miner(
       self ! Miner.MiningResult(Some(block), index, miningCount)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       handleMiningResult(blockOpt, chainIndex, miningCount)
-    case ChainHandler.FlowDataAdded(data, origin, _) =>
-      if (!origin.isLocal && data.chainIndex.isIntraGroup) {
+    case ViewHandler.ViewUpdated(chainIndex, origin) =>
+      if (origin.isLocal) {
+        continueWorkFor(chainIndex)
+      } else {
         updateTasks()
       }
-    case BlockChainHandler.BlockAdded(hash) =>
-      continueWorkFor(ChainIndex.from(hash))
+    case BlockChainHandler.BlockAdded(_) => ()
     case BlockChainHandler.InvalidBlock(hash) =>
       log.error(s"Mined an invalid block ${hash.shortHex}")
       continueWorkFor(ChainIndex.from(hash))

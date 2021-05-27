@@ -19,10 +19,11 @@ package org.alephium.flow.handler
 import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
-import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
-import org.alephium.util.EventStream.Subscriber
+import org.alephium.util.{ActorRefT, AVector, Duration, EventStream, TimeStamp}
+import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object ViewHandler {
   def props(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])(implicit
@@ -33,6 +34,11 @@ object ViewHandler {
 
   sealed trait Command
 
+  sealed trait Event
+  final case class ViewUpdated(chainIndex: ChainIndex, origin: DataOrigin)
+      extends Event
+      with EventStream.Event
+
   def needUpdate(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from) || chainIndex.isIntraGroup
   }
@@ -41,21 +47,24 @@ object ViewHandler {
 class ViewHandler(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])(implicit
     brokerConfig: BrokerConfig
 ) extends IOBaseActor
-    with Subscriber {
+    with Subscriber
+    with Publisher {
   var lastUpdated: TimeStamp = TimeStamp.zero
 
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
-  override def receive: Receive = { case ChainHandler.FlowDataAdded(data, _, addedAt) =>
+  override def receive: Receive = { case ChainHandler.FlowDataAdded(data, origin, addedAt) =>
     // We only update best deps for the following 2 cases:
     //  1. the block belongs to the groups of the node
     //  2. the header belongs to intra-group chain
-    if (addedAt >= lastUpdated && ViewHandler.needUpdate(data.chainIndex)) {
+    val chainIndex = data.chainIndex
+    if (addedAt >= lastUpdated && ViewHandler.needUpdate(chainIndex)) {
       lastUpdated = TimeStamp.now()
       escapeIOError(blockFlow.updateBestDeps()) { newReadyTxs =>
         broadcastReadyTxs(newReadyTxs)
       }
     }
+    publishEvent(ViewHandler.ViewUpdated(chainIndex, origin))
   }
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
