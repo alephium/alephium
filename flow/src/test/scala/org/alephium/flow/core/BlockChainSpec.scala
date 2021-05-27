@@ -305,8 +305,13 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
 
     addBlocks(chain, longChain.take(2))
-    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+    if (chain.blockHashOrdering.compare(longChain(1).hash, shortChain(1).hash) > 0) {
+      chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+      chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    } else {
+      chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
+      chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+    }
 
     addBlocks(chain, longChain.drop(2), 2)
     chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
