@@ -44,9 +44,8 @@ object EitherF {
   )(predicate: E => Either[L, Boolean]): Either[L, Boolean] = {
     elems.foreach { e =>
       predicate(e) match {
-        case Right(true)  => ()
-        case Right(false) => return Right(false)
-        case Left(l)      => return Left(l)
+        case Right(true) => ()
+        case result      => return result
       }
     }
     Right(true)
