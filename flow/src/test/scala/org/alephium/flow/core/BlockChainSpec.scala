@@ -25,7 +25,7 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGenerators}
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelGenerators {
   trait Fixture extends AlephiumConfigFixture {
@@ -378,6 +378,25 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter with NoIndexModelG
     }
     chain.getHashesAfter(blocks2.head.hash).map(_.length) isE 0
     chain.getHashesAfter(blocks1.tail.head.hash) isE blocks1.tail.tail.map(_.hash)
+  }
+
+  it should "order hash" in new Fixture {
+    val hash0 = BlockHash.generate
+    val hash1 = BlockHash.generate
+    val hash2 = BlockHash.generate
+    val chain = buildBlockChain()
+
+    chain.addHash(hash0, BlockHash.zero, 1, 1, TimeStamp.unsafe(1), false)
+    chain.addHash(hash1, BlockHash.zero, 1, 1, TimeStamp.unsafe(1), false)
+    chain.addHash(hash2, BlockHash.zero, 1, 2, TimeStamp.unsafe(1), false)
+
+    chain.blockHashOrdering.lt(hash0, hash1) is
+      Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes)
+    chain.blockHashOrdering.compare(hash0, hash2) is -1
+    chain.blockHashOrdering.compare(hash1, hash2) is -1
+    chain.blockHashOrdering.compare(hash0, hash0) is 0
+    chain.blockHashOrdering.compare(hash1, hash1) is 0
+    chain.blockHashOrdering.compare(hash2, hash2) is 0
   }
 
   behavior of "Block tree algorithm"

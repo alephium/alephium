@@ -41,7 +41,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def heightIndexStorage: HeightIndexStorage
 
-  protected def addHash(
+  private[core] def addHash(
       hash: BlockHash,
       parentHash: BlockHash,
       height: Int,
