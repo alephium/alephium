@@ -198,7 +198,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
+  // TODO: should try to reconnect and ban the node eventually
+  ignore should "ban node if send invalid pong" in new TestFixture("2-nodes") {
     val injection: PartialFunction[Payload, Payload] = { case Pong(x) =>
       Pong(x + 1)
     }
