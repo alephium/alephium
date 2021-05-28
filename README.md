@@ -33,7 +33,7 @@ You can already try our testnet following this guide [wiki/Testnet-Guide](https:
 
 ### Requierments
 
-You must have the following dependencies installed on your system in order to run our JAR delivrable:
+You must have the following dependencies installed on your system in order to run our JAR deliverable:
 
 - java (>= 8, 11 is recommended)
 
