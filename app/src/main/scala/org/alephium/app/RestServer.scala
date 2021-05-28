@@ -27,7 +27,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.prometheus.client.CollectorRegistry
 import io.prometheus.client.exporter.common.TextFormat
 import io.vertx.core.Vertx
-import io.vertx.core.http.HttpServer
+import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.model.StatusCode
@@ -361,7 +361,24 @@ class RestServer(
     ) // Fix swagger ui being not found on the first call
   private val server = vertx.createHttpServer().requestHandler(router)
 
-  routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
+  // scalastyle:off magic.number
+  router
+    .route()
+    .handler(
+      CorsHandler
+        .create(".*.")
+        .allowedMethod(HttpMethod.GET)
+        .allowedMethod(HttpMethod.POST)
+        .allowedMethod(HttpMethod.PUT)
+        .allowedMethod(HttpMethod.HEAD)
+        .allowedMethod(HttpMethod.OPTIONS)
+        .allowedHeader("*")
+        .allowCredentials(true)
+        .maxAgeSeconds(1800)
+    )
+  // scalastyle:on magic.number
+
+  routes.foreach(route => route(router))
 
   private val httpBindingPromise: Promise[HttpServer] = Promise()
 
