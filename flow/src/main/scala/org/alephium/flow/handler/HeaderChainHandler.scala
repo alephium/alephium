@@ -24,16 +24,15 @@ import org.alephium.flow.validation._
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.{BlockHeader, ChainIndex, TransactionTemplate}
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex}
+import org.alephium.util.ActorRefT
 
 object HeaderChainHandler {
   def props(
       blockFlow: BlockFlow,
-      chainIndex: ChainIndex,
-      txHandler: ActorRefT[TxHandler.Command]
+      chainIndex: ChainIndex
   )(implicit brokerConfig: BrokerConfig, consensusConfig: ConsensusConfig): Props =
-    Props(new HeaderChainHandler(blockFlow, chainIndex, txHandler))
+    Props(new HeaderChainHandler(blockFlow, chainIndex))
 
   sealed trait Command
   final case class Validate(
@@ -50,12 +49,10 @@ object HeaderChainHandler {
 
 class HeaderChainHandler(
     blockFlow: BlockFlow,
-    chainIndex: ChainIndex,
-    txHandler: ActorRefT[TxHandler.Command]
+    chainIndex: ChainIndex
 )(implicit brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
     extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderChainHandler.Command](
       blockFlow,
-      txHandler,
       chainIndex,
       HeaderValidation.build
     ) {
@@ -71,8 +68,8 @@ class HeaderChainHandler(
 
   override def dataInvalid(data: BlockHeader): Event = InvalidHeader(data.hash)
 
-  override def addDataToBlockFlow(header: BlockHeader): IOResult[AVector[TransactionTemplate]] = {
-    blockFlow.addNew(header)
+  override def addDataToBlockFlow(header: BlockHeader): IOResult[Unit] = {
+    blockFlow.add(header)
   }
 
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], data: BlockHeader): Unit = {

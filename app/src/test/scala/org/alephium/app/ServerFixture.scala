@@ -170,6 +170,7 @@ object ServerFixture {
       flowHandler = ActorRefT(TestProbe().ref),
       txHandler = txHandler,
       dependencyHandler = ActorRefT(TestProbe().ref),
+      viewHandler = ActorRefT(TestProbe().ref),
       blockHandlers = Map.empty,
       headerHandlers = Map.empty
     )(config.broker)

@@ -58,4 +58,23 @@ class EitherFSpec extends AlephiumSpec {
       }
     }
   }
+
+  it should "forall for positive case" in {
+    forAll { ns: Seq[Int] =>
+      val result = EitherF.forallTry[Int, Unit](ns)(n => Right(n > 0))
+      result isE ns.forall(_ > 0)
+    }
+  }
+
+  it should "forall for negative case" in {
+    forAll { ns: Seq[Int] =>
+      whenever(ns.nonEmpty) {
+        val r = ns(Random.nextInt(ns.length))
+        val result = EitherF.forallTry[Int, Unit](ns) { n =>
+          if (n.equals(r)) Left(()) else Right(true)
+        }
+        result.isLeft is true
+      }
+    }
+  }
 }

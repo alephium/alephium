@@ -16,11 +16,10 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.Weight
 import org.alephium.util.{AVector, Bytes}
 
 trait BlockHashPool {
@@ -34,9 +33,9 @@ trait BlockHashPool {
 
   def getStateUnsafe(hash: BlockHash): BlockState
 
-  def getWeight(hash: BlockHash): IOResult[BigInteger]
+  def getWeight(hash: BlockHash): IOResult[Weight]
 
-  def getWeightUnsafe(hash: BlockHash): BigInteger
+  def getWeightUnsafe(hash: BlockHash): Weight
 
   def getHeight(hash: BlockHash): IOResult[Int]
 
@@ -54,13 +53,10 @@ trait BlockHashPool {
   // Hashes ordered by height
   def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
 
-  final val blockHashOrdering: Ordering[BlockHash] = Ordering.fromLessThan[BlockHash] {
-    case (hash0, hash1) =>
-      val weight0 = getWeightUnsafe(hash0)
-      val weight1 = getWeightUnsafe(hash1)
-
-      val comp = weight0.compareTo(weight1)
-      comp < 0 || (comp == 0 && Bytes.byteStringOrdering.lt(hash0.bytes, hash1.bytes))
+  final val blockHashOrdering: Ordering[BlockHash] = { (hash0: BlockHash, hash1: BlockHash) =>
+    val weight0 = getWeightUnsafe(hash0)
+    val weight1 = getWeightUnsafe(hash1)
+    BlockHashPool.compare(hash0, weight0, hash1, weight1)
   }
 
   def getBestTipUnsafe: BlockHash
@@ -71,5 +67,16 @@ trait BlockHashPool {
     val hashNum = numHashes - 1 // exclude genesis block
     val height  = getHeight(hash).getOrElse(-1)
     s"height: $height/$hashNum"
+  }
+}
+
+object BlockHashPool {
+  def compare(hash0: BlockHash, weight0: Weight, hash1: BlockHash, weight1: Weight): Int = {
+    val compare1 = weight0.compareTo(weight1)
+    if (compare1 != 0) {
+      compare1
+    } else {
+      Bytes.byteStringOrdering.compare(hash0.bytes, hash1.bytes)
+    }
   }
 }

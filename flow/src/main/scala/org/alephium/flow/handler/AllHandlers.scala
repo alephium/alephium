@@ -19,7 +19,6 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
@@ -29,6 +28,7 @@ final case class AllHandlers(
     flowHandler: ActorRefT[FlowHandler.Command],
     txHandler: ActorRefT[TxHandler.Command],
     dependencyHandler: ActorRefT[DependencyHandler.Command],
+    viewHandler: ActorRefT[ViewHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
 )(implicit brokerConfig: BrokerConfig) {
@@ -86,8 +86,8 @@ object AllHandlers {
   ): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
-    val blockHandlers  = buildBlockHandlers(system, blockFlow, txHandler, eventBus, namePostfix)
-    val headerHandlers = buildHeaderHandlers(system, blockFlow, txHandler, namePostfix)
+    val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
+    val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)
 
     val dependencyHandlerProps = DependencyHandler.props(blockFlow, blockHandlers, headerHandlers)
     val dependencyHandler = ActorRefT
@@ -97,13 +97,22 @@ object AllHandlers {
         s"DependencyHandler$namePostfix"
       )
 
-    AllHandlers(flowHandler, txHandler, dependencyHandler, blockHandlers, headerHandlers)
+    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler)
+    val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
+
+    AllHandlers(
+      flowHandler,
+      txHandler,
+      dependencyHandler,
+      viewHandler,
+      blockHandlers,
+      headerHandlers
+    )
   }
 
   private def buildBlockHandlers(
       system: ActorSystem,
       blockFlow: BlockFlow,
-      txHandler: ActorRefT[handler.TxHandler.Command],
       eventBus: ActorRefT[EventBus.Message],
       namePostfix: String
   )(implicit
@@ -119,7 +128,7 @@ object AllHandlers {
     } yield {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
-        BlockChainHandler.props(blockFlow, chainIndex, txHandler, eventBus),
+        BlockChainHandler.props(blockFlow, chainIndex, eventBus),
         s"BlockChainHandler-$from-$to$namePostfix"
       )
       chainIndex -> handler
@@ -130,7 +139,6 @@ object AllHandlers {
   private def buildHeaderHandlers(
       system: ActorSystem,
       blockFlow: BlockFlow,
-      txHandler: ActorRefT[TxHandler.Command],
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
@@ -144,7 +152,7 @@ object AllHandlers {
     } yield {
       val headerHander = ActorRefT.build[HeaderChainHandler.Command](
         system,
-        HeaderChainHandler.props(blockFlow, chainIndex, txHandler),
+        HeaderChainHandler.props(blockFlow, chainIndex),
         s"HeaderChainHandler-$from-$to$namePostfix"
       )
       chainIndex -> headerHander

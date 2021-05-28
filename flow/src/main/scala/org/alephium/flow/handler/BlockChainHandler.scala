@@ -28,21 +28,20 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
-import org.alephium.protocol.model.{Block, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, EventBus, EventStream}
 
 object BlockChainHandler {
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      txHandler: ActorRefT[TxHandler.Command],
       eventBus: ActorRefT[EventBus.Message]
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting
   ): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, txHandler, eventBus))
+    Props(new BlockChainHandler(blockFlow, chainIndex, eventBus))
 
   sealed trait Command
   final case class Validate(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
@@ -57,7 +56,6 @@ object BlockChainHandler {
 class BlockChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex,
-    txHandler: ActorRefT[TxHandler.Command],
     eventBus: ActorRefT[EventBus.Message]
 )(implicit
     brokerConfig: BrokerConfig,
@@ -65,7 +63,6 @@ class BlockChainHandler(
     networkSetting: NetworkSetting
 ) extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
       blockFlow,
-      txHandler,
       chainIndex,
       BlockValidation.build
     )
@@ -94,8 +91,8 @@ class BlockChainHandler(
 
   override def dataInvalid(data: Block): Event = InvalidBlock(data.hash)
 
-  override def addDataToBlockFlow(block: Block): IOResult[AVector[TransactionTemplate]] = {
-    blockFlow.addNew(block)
+  override def addDataToBlockFlow(block: Block): IOResult[Unit] = {
+    blockFlow.add(block)
   }
 
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {

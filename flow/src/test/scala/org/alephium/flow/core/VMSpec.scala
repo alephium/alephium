@@ -185,7 +185,7 @@ class VMSpec extends AlephiumSpec {
     def addAndValidate(blockFlow: BlockFlow, block: Block): Assertion = {
       val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
       blockValidation.validate(block, blockFlow).isRight is true
-      blockFlow.add(block).isRight is true
+      blockFlow.addAndUpdateView(block).isRight is true
     }
 
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
@@ -314,7 +314,7 @@ class VMSpec extends AlephiumSpec {
     val script   = Compiler.compileTxScript(main).toOption.get
     val newState = AVector[Val](Val.U256(U256.unsafe(110)))
     val block    = simpleScript(blockFlow, chainIndex, script)
-    blockFlow.add(block).isRight is true
+    addAndValidate(blockFlow, block)
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().toOption.get.length is 3
@@ -360,7 +360,7 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(main).toOption.get
 
     val block0 = payableCall(blockFlow, chainIndex, script)
-    blockFlow.add(block0).isRight is true
+    addAndValidate(blockFlow, block0)
 
     val worldState0 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState0.getContractStates().toOption.get.length is 2
@@ -372,7 +372,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     val block1 = payableCall(blockFlow, chainIndex, script)
-    blockFlow.add(block1).isRight is true
+    addAndValidate(blockFlow, block1)
 
     val worldState1 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState1.getContractStates().toOption.get.length is 2

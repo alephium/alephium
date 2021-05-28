@@ -14,14 +14,32 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.model
+package org.alephium.flow.handler
 
-import org.alephium.protocol.model.Weight
-import org.alephium.serde.Serde
+import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.ChainIndex
 
-final case class BlockState(height: Int, weight: Weight)
+class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
+  it should "update when necessary" in {
+    implicit val brokerConfig = new BrokerConfig {
+      override def brokerId: Int  = 1
+      override def brokerNum: Int = 2
+      override def groups: Int    = 4
+    }
 
-object BlockState {
-  implicit val serde: Serde[BlockState] =
-    Serde.forProduct2(BlockState(_, _), t => (t.height, t.weight))
+    for {
+      from <- 0 to 1
+      to   <- 0 until 4
+    } {
+      ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is (from equals to)
+    }
+
+    for {
+      from <- 2 to 3
+      to   <- 0 until 4
+    } {
+      ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is true
+    }
+  }
 }

@@ -193,6 +193,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
   def handlePing(nonce: Int, timestamp: Long): Unit = {
     if (nonce == 0) {
       publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
+      context stop self
     } else {
       val delay = System.currentTimeMillis() - timestamp
       log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")
@@ -209,6 +210,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
         s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce"
       )
       publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
+      context stop self
     }
   }
 

@@ -35,7 +35,6 @@ object FlowHandler {
   case object GetSyncLocators                                                extends Command
   final case class GetSyncInventories(locators: AVector[AVector[BlockHash]]) extends Command
   final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)           extends Command
-  final case class PrepareBlockFlow(chainIndex: ChainIndex)                  extends Command
 
   sealed trait Event
   final case class BlockFlowTemplate(
@@ -89,7 +88,6 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
         case Right(blocks) =>
           sender() ! BlocksLocated(blocks)
       }
-    case PrepareBlockFlow(chainIndex) => prepareBlockFlow(chainIndex)
   }
 
   def handleSync: Receive = {
@@ -105,16 +103,5 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
       escapeIOError(blockFlow.getIntraSyncInventories(brokerInfo)) { inventories =>
         sender() ! SyncInventories(inventories)
       }
-  }
-
-  def prepareBlockFlow(chainIndex: ChainIndex): Unit = {
-    assume(brokerConfig.contains(chainIndex.from))
-    val template = blockFlow.prepareBlockFlow(chainIndex)
-    template match {
-      case Left(error) =>
-        log.warning(s"Failure while computing best dependencies: ${error.toString}")
-      case Right(message) =>
-        sender() ! message
-    }
   }
 }

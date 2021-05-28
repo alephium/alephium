@@ -24,6 +24,8 @@ trait FlowData {
 
   def target: Target
 
+  def weight: Weight = Weight.from(target)
+
   def hash: BlockHash
 
   def chainIndex: ChainIndex

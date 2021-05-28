@@ -16,8 +16,6 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import scala.annotation.tailrec
 
 import com.typesafe.scalalogging.StrictLogging
@@ -38,13 +36,13 @@ trait BlockFlow
     with FlowUtils
     with ConflictedBlocks
     with BlockFlowValidation {
-  def add(block: Block, weight: BigInteger): IOResult[Unit] = ???
+  def add(block: Block, weight: Weight): IOResult[Unit] = ???
 
-  def add(header: BlockHeader, weight: BigInteger): IOResult[Unit] = ???
+  def add(header: BlockHeader, weight: Weight): IOResult[Unit] = ???
 
-  def addNew(block: Block): IOResult[AVector[TransactionTemplate]]
+  def addAndUpdateView(block: Block): IOResult[Unit]
 
-  def addNew(header: BlockHeader): IOResult[AVector[TransactionTemplate]]
+  def addAndUpdateView(header: BlockHeader): IOResult[Unit]
 
   override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
     getSyncLocatorsUnsafe(brokerConfig)
@@ -167,10 +165,6 @@ object BlockFlow extends StrictLogging {
   ) extends BlockFlow {
 
     def add(block: Block): IOResult[Unit] = {
-      addNew(block).map(_ => ())
-    }
-
-    def addNew(block: Block): IOResult[AVector[TransactionTemplate]] = {
       val index = block.chainIndex
       assume(index.relateTo(brokerConfig))
 
@@ -179,56 +173,64 @@ object BlockFlow extends StrictLogging {
         cacheForConflicts(block)
       }
       for {
-        weight       <- calWeight(block)
-        _            <- getBlockChain(index).add(block, weight)
-        newPooledTxs <- updateBestDeps()
-      } yield newPooledTxs
+        weight <- calWeight(block)
+        _      <- getBlockChain(index).add(block, weight)
+      } yield ()
+    }
+
+    def addAndUpdateView(block: Block): IOResult[Unit] = {
+      for {
+        _ <- add(block)
+        _ <- updateBestDeps()
+      } yield ()
     }
 
     def add(header: BlockHeader): IOResult[Unit] = {
-      addNew(header).map(_ => ())
-    }
-
-    def addNew(header: BlockHeader): IOResult[AVector[TransactionTemplate]] = {
       val index = header.chainIndex
       assume(!index.relateTo(brokerConfig))
 
       for {
-        weight       <- calWeight(header)
-        _            <- getHeaderChain(index).add(header, weight)
-        newPooledTxs <- updateBestDeps()
-      } yield newPooledTxs
+        weight <- calWeight(header)
+        _      <- getHeaderChain(index).add(header, weight)
+      } yield ()
     }
 
-    private def calWeight(block: Block): IOResult[BigInteger] = {
+    def addAndUpdateView(header: BlockHeader): IOResult[Unit] = {
+      for {
+        _ <- add(header)
+        _ <- updateBestDeps()
+      } yield ()
+    }
+
+    private def calWeight(block: Block): IOResult[Weight] = {
       calWeight(block.header)
     }
 
-    private def calWeight(header: BlockHeader): IOResult[BigInteger] = {
+    private def calWeight(header: BlockHeader): IOResult[Weight] = {
       IOUtils.tryExecute(calWeightUnsafe(header))
     }
 
-    private def calWeightUnsafe(header: BlockHeader): BigInteger = {
+    private def calWeightUnsafe(header: BlockHeader): Weight = {
       if (header.isGenesis) {
-        ALF.GenesisWeight multiply BigInt(brokerConfig.chainNum).bigInteger
+        ALF.GenesisWeight * brokerConfig.chainNum
       } else {
         val targetGroup  = header.chainIndex.from
         val depsFlowTips = FlowTips.from(header.blockDeps, targetGroup)
-        calWeightUnsafe(depsFlowTips, targetGroup) add header.target.value
+        calWeightUnsafe(depsFlowTips, targetGroup) + header.weight
       }
     }
 
-    private def calWeightUnsafe(currentFlowTips: FlowTips, targetGroup: GroupIndex): BigInteger = {
+    private def calWeightUnsafe(currentFlowTips: FlowTips, targetGroup: GroupIndex): Weight = {
       val intraDep      = currentFlowTips.outTips(targetGroup.value)
       val intraFlowTips = getFlowTipsUnsafe(intraDep, targetGroup)
       val diffs         = getFlowTipsDiffUnsafe(currentFlowTips, intraFlowTips)
 
       val intraWeight = getWeightUnsafe(intraDep)
-      val diffsWeight = diffs.fold(BigInteger.ZERO) { case (acc, diff) =>
-        acc add getBlockHeaderUnsafe(diff).target.value
+      val diffsWeight = diffs.fold(Weight.zero) { case (acc, diff) =>
+        acc + getBlockHeaderUnsafe(diff).weight
       }
 
-      intraWeight add diffsWeight
+      intraWeight + diffsWeight
     }
 
     def getBestTipUnsafe: BlockHash = {
@@ -241,19 +243,19 @@ object BlockFlow extends StrictLogging {
 
     def tryExtendUnsafe(
         tipsCur: FlowTips,
-        weightCur: BigInteger,
+        weightCur: Weight,
         group: GroupIndex,
         groupTip: BlockHash,
         toTry: AVector[BlockHash]
-    ): (FlowTips, BigInteger) = {
+    ): (FlowTips, Weight) = {
       toTry
         .filter(isExtendingUnsafe(_, groupTip))
         .sorted(blockHashOrdering.reverse) // useful for draw situation
-        .fold[(FlowTips, BigInteger)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
+        .fold[(FlowTips, Weight)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
           tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
             case Some(merged) =>
               val weight = calWeightUnsafe(merged, group)
-              if (weight.compareTo(maxWeight) > 0) (merged, weight) else (maxTips, maxWeight)
+              if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
             case None => (maxTips, maxWeight)
           }
         }

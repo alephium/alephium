@@ -16,8 +16,7 @@
 
 package org.alephium.protocol
 
-import java.math.BigInteger
-
+import org.alephium.protocol.model.Weight
 import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALF {
@@ -29,7 +28,7 @@ object ALF {
   val MaxALFValue: U256 = U256.Billion mulUnsafe CoinInOneALF
 
   val GenesisHeight: Int          = 0
-  val GenesisWeight: BigInteger   = BigInteger.ZERO
+  val GenesisWeight: Weight       = Weight.zero
   val GenesisTimestamp: TimeStamp = TimeStamp.zero
 
   val MaxTxInputNum: Int     = 1024

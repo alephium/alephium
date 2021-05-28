@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.model
+package org.alephium.util
 
-import org.alephium.protocol.model.Weight
-import org.alephium.serde.Serde
+class MathSpec extends AlephiumSpec {
+  it should "compare" in {
+    case class OrderedClass(n: Int) extends Ordered[OrderedClass] {
+      def compare(that: OrderedClass) = this.n - that.n
+    }
 
-final case class BlockState(height: Int, weight: Weight)
-
-object BlockState {
-  implicit val serde: Serde[BlockState] =
-    Serde.forProduct2(BlockState(_, _), t => (t.height, t.weight))
+    Math.max(OrderedClass(1), OrderedClass(2)) is OrderedClass(2)
+    Math.min(OrderedClass(1), OrderedClass(2)) is OrderedClass(1)
+  }
 }

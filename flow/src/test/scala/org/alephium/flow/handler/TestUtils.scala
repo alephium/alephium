@@ -63,10 +63,13 @@ object TestUtils {
     }).toMap
     val dependencyProbe   = TestProbe()
     val dependencyHandler = ActorRefT[DependencyHandler.Command](dependencyProbe.ref)
+    val viewProbe         = TestProbe()
+    val viewHandler       = ActorRefT[ViewHandler.Command](viewProbe.ref)
     val allHandlers = AllHandlers(
       flowHandler,
       txHandler,
       dependencyHandler,
+      viewHandler,
       blockHandlers.view.mapValues(_._1).toMap,
       headerHandlers.view.mapValues(_._1).toMap
     )

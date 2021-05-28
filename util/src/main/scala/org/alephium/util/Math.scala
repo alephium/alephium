@@ -14,14 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.model
+package org.alephium.util
 
-import org.alephium.protocol.model.Weight
-import org.alephium.serde.Serde
+object Math {
+  def max[T <: Ordered[T]](x: T, y: T): T = if (x >= y) x else y
 
-final case class BlockState(height: Int, weight: Weight)
-
-object BlockState {
-  implicit val serde: Serde[BlockState] =
-    Serde.forProduct2(BlockState(_, _), t => (t.height, t.weight))
+  def min[T <: Ordered[T]](x: T, y: T): T = if (x <= y) x else y
 }

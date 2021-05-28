@@ -16,8 +16,6 @@
 
 package org.alephium.flow.core
 
-import java.math.BigInteger
-
 import scala.annotation.tailrec
 
 import org.alephium.flow.Utils
@@ -27,7 +25,8 @@ import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.util.{AVector, EitherF, TimeStamp}
+import org.alephium.protocol.model.Weight
+import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
@@ -41,11 +40,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def heightIndexStorage: HeightIndexStorage
 
-  protected def addHash(
+  private[core] def addHash(
       hash: BlockHash,
       parentHash: BlockHash,
       height: Int,
-      weight: BigInteger,
+      weight: Weight,
       timestamp: TimeStamp,
       isCanonical: Boolean
   ): IOResult[Unit] = {
@@ -91,15 +90,21 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def getParentHash(hash: BlockHash): IOResult[BlockHash]
 
-  def maxWeight: IOResult[BigInteger] =
-    EitherF.foldTry(tips.keys, BigInteger.ZERO) { (weight, hash) =>
-      getWeight(hash).map(weight.max)
+  def maxWeight: IOResult[Weight] =
+    EitherF.foldTry(tips.keys, Weight.zero) { (weight, hash) =>
+      getWeight(hash).map(Math.max(weight, _))
     }
 
-  def maxHeight: IOResult[Int] =
-    EitherF.foldTry(tips.keys, ALF.GenesisHeight) { (height, hash) =>
-      getHeight(hash).map(math.max(height, _))
+  // the max height is the height of the tip of max weight
+  def maxHeight: IOResult[Int] = {
+    val maxWeighted = EitherF.foldTry(tips.keys, (ALF.GenesisHeight, ALF.GenesisWeight)) {
+      case ((height, weight), tip) =>
+        getState(tip).map { case BlockState(tipHeight, tipWeight) =>
+          if (tipWeight.compareTo(weight) > 0) (tipHeight, tipWeight) else (height, weight)
+        }
     }
+    maxWeighted.map(_._1)
+  }
 
   def maxHeightUnsafe: Int =
     tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>
@@ -119,9 +124,9 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def getStateUnsafe(hash: BlockHash): BlockState     = blockStateStorage.getUnsafe(hash)
   def getHeight(hash: BlockHash): IOResult[Int]       = blockStateStorage.get(hash).map(_.height)
   def getHeightUnsafe(hash: BlockHash): Int           = blockStateStorage.getUnsafe(hash).height
-  def getWeight(hash: BlockHash): IOResult[BigInteger] =
+  def getWeight(hash: BlockHash): IOResult[Weight] =
     blockStateStorage.get(hash).map(_.weight)
-  def getWeightUnsafe(hash: BlockHash): BigInteger =
+  def getWeightUnsafe(hash: BlockHash): Weight =
     blockStateStorage.getUnsafe(hash).weight
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)

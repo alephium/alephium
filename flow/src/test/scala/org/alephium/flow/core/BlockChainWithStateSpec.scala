@@ -20,7 +20,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.Storages
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike}
+import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -51,7 +51,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       chain.numHashes is 1
       val blocksSize1  = chain.numHashes
       val initialCount = updateCount
-      val res          = chain.add(block, 0)
+      val res          = chain.add(block, Weight.zero)
       res.isRight is true
       val blocksSize2 = chain.numHashes
       blocksSize1 + 1 is blocksSize2
@@ -64,7 +64,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       val chain        = buildGenesis()
       val blocksSize1  = chain.numHashes
       val initialCount = updateCount
-      blocks.foreach(block => chain.add(block, 0))
+      blocks.foreach(block => chain.add(block, Weight.zero))
       val blocksSize2 = chain.numHashes
       blocksSize1 + blocks.length is blocksSize2
       updateCount is initialCount + blocks.length
