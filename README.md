@@ -70,7 +70,7 @@ The resulting package file will appear in the `app/target/scala-2.13/universal` 
 
 ## Configuration
 
-You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, where by default $ALEPHIUM_HOME points to `~/.alephium`.
+You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, where by default `$ALEPHIUM_HOME` points to `~/.alephium`.
 
 ## Testing
 
