@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import scala.util.Random
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
@@ -120,34 +121,43 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx         = block.nonCoinbase.head
     val output     = tx.unsigned.fixedOutputs.head
 
-    val n = ALF.MaxTxInputNum
+    val n = ALF.MaxTxInputNum + 1
 
-    val outputs = AVector.tabulate(n) { k =>
-      output.copy(amount = ALF.nanoAlf(k.toLong))
-    }
+    val outputs  = AVector.fill(n)(output.copy(amount = ALF.oneAlf))
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
     val newBlock = block.copy(transactions = AVector(newTx))
-
-    val ts0 = System.currentTimeMillis()
     blockFlow.addAndUpdateView(newBlock).isRight is true
-    val ts1 = System.currentTimeMillis()
 
     val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
     utxos is n
 
-    val ts2 = System.currentTimeMillis()
-    blockFlow.transfer(
-      keyManager(output.lockupScript).publicKey,
-      output.lockupScript,
-      None,
-      ALF.oneAlf,
-      None,
-      defaultGasPrice
-    )
-    val ts3 = System.currentTimeMillis()
+    val txValidation = TxValidation.build
+    val unsignedTx0 = blockFlow
+      .transfer(
+        keyManager(output.lockupScript).publicKey,
+        output.lockupScript,
+        None,
+        ALF.alf((n - 2).toLong),
+        None,
+        defaultGasPrice
+      )
+      .rightValue
+      .rightValue
+    val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
+    txValidation.validateMempoolTx(chainIndex, tx0, blockFlow) isE ()
 
-    print(s"Times: ${ts1 - ts0} - ${ts2 - ts1} - ${ts3 - ts2}\n")
+    blockFlow
+      .transfer(
+        keyManager(output.lockupScript).publicKey,
+        output.lockupScript,
+        None,
+        ALF.alf((n - 1).toLong),
+        None,
+        defaultGasPrice
+      )
+      .rightValue
+      .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
   }
 }
