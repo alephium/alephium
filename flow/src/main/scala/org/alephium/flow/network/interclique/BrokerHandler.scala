@@ -20,7 +20,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
+import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{SyncRequest, SyncResponse}
@@ -52,6 +52,7 @@ trait BrokerHandler extends BaseBrokerHandler {
           allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
         } else {
           log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
+          handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
         }
       case FlowHandler.SyncInventories(inventories) =>
         log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
@@ -65,6 +66,7 @@ trait BrokerHandler extends BaseBrokerHandler {
             blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
           } else {
             log.warning(s"Invalid sync response from $remoteAddress: ${Utils.showFlow(hashes)}")
+            handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
           }
         }
     }
