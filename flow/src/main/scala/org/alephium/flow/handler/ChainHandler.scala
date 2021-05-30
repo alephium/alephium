@@ -25,6 +25,8 @@ import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
+import io.prometheus.client.Gauge
+import io.prometheus.client.Counter
 
 object ChainHandler {
   trait Event
@@ -32,6 +34,30 @@ object ChainHandler {
   final case class FlowDataAdded(data: FlowData, origin: DataOrigin, addedAt: TimeStamp)
       extends Event
       with EventStream.Event
+
+  val chainValidationFailed: Counter = Counter
+    .build(
+      "alephium_chain_validation_failed",
+      "Error count of chain validation errors"
+    )
+    .labelNames("validation_type", "invalid_status")
+    .register()
+
+  val chainValidationTotal: Counter = Counter
+    .build(
+      "alephium_chain_validation_total",
+      "Total number of chain validations"
+    )
+    .labelNames("validation_type")
+    .register()
+
+  val chainValidationOngoing: Gauge = Gauge
+    .build(
+      "alephium_chain_validation_current",
+      "Current count of chain validations"
+    )
+    .labelNames("validation_type")
+    .register()
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
@@ -46,11 +72,17 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
+
+    ChainHandler.chainValidationOngoing.labels(data.`type`).inc()
+    ChainHandler.chainValidationTotal.labels(data.`type`).inc()
+
     validator.validate(data, blockFlow) match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
       case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
       case Right(_)                      => handleValidData(data, broker, origin)
     }
+
+    ChainHandler.chainValidationOngoing.labels(data.`type`).dec()
   }
 
   def handleIOError(
@@ -62,6 +94,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     log.error(
       s"IO failed in block/header ${data.hash.shortHex}: $blockHex validation: $error"
     )
+    ChainHandler.chainValidationFailed.labels(data.`type`, "IOError").inc()
+
     broker ! dataAddingFailed()
   }
 
@@ -73,6 +107,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.warning(s"Invalid block/header ${data.shortHex}: $status : $blockHex")
+    ChainHandler.chainValidationFailed.labels(data.`type`, status.name).inc()
+
     if (!origin.isLocal) {
       sender() ! DependencyHandler.Invalid(data.hash)
     }

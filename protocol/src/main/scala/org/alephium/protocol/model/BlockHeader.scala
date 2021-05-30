@@ -91,6 +91,8 @@ final case class BlockHeader(
     assume(!isGenesis)
     blockDeps.outDeps.replace(chainIndex.to.value, hash)
   }
+
+  def `type`: String = "BlockHeader"
 }
 
 object BlockHeader {

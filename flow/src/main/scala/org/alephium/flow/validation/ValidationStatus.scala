@@ -23,7 +23,9 @@ import org.alephium.util.AVector
 
 // scalastyle:off number.of.types
 
-sealed trait InvalidStatus
+sealed trait InvalidStatus extends Product {
+  val name = productPrefix
+}
 
 sealed trait InvalidBlockStatus extends InvalidStatus
 
