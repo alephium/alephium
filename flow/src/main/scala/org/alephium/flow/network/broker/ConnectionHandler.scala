@@ -68,6 +68,7 @@ object ConnectionHandler {
     }
 
     override def handleNewMessage(payload: Payload): Unit = {
+      payloadTotal.labels(payload.productPrefix).inc()
       brokerHandler ! BrokerHandler.Received(payload)
     }
   }
@@ -86,6 +87,14 @@ object ConnectionHandler {
       "Total upload bytes"
     )
     .labelNames("remote_address")
+    .register()
+
+  val payloadTotal: Counter = Counter
+    .build(
+      "alephium_payload_total",
+      "Total number of payloads"
+    )
+    .labelNames("payload_type")
     .register()
 }
 
