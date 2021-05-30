@@ -30,7 +30,6 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.AlephiumConfig
-import org.alephium.protocol.ALF
 import org.alephium.util.{ActorRefT, EventBus, Service}
 
 trait Node extends Service {
@@ -75,7 +74,11 @@ object Node {
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
       ActorRefT.build(
         system,
-        MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness, ALF.PenaltyFrequency)
+        MisbehaviorManager.props(
+          networkSetting.banDuration,
+          networkSetting.penaltyForgiveness,
+          networkSetting.penaltyFrequency
+        )
       )
 
     val discoveryProps: Props =

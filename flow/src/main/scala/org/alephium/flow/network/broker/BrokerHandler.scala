@@ -181,17 +181,17 @@ trait BrokerHandler extends FlowDataHandler {
 
   def sendPing(): Unit = {
     if (pingNonce != 0) {
-      log.info(s"No Pong message received in time from $remoteAddress, stopping the brokerHandler")
+      log.info(s"No Pong message received in time from $remoteAddress")
       handleMisbehavior(MisbehaviorManager.RequestTimeout(remoteAddress))
-    } else {
-      pingNonce = UnsecureRandom.nextNonZeroInt()
-      send(Ping(pingNonce, System.currentTimeMillis()))
     }
+
+    pingNonce = UnsecureRandom.nextNonZeroInt()
+    send(Ping(pingNonce, System.currentTimeMillis()))
   }
 
   def handlePing(nonce: Int, timestamp: Long): Unit = {
     if (nonce == 0) {
-      handleMisbehavior(MisbehaviorManager.InvalidPingPong(remoteAddress))
+      handleMisbehavior(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp
       log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")

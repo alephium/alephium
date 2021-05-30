@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
+import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
@@ -40,6 +41,17 @@ class DiscoveryServerSpec
     with SocketUtil
     with IntegrationPatience {
   import DiscoveryServerSpec._
+
+  def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {
+    ActorRefT.build(
+      system,
+      MisbehaviorManager.props(
+        Duration.ofDaysUnsafe(1),
+        Duration.ofHoursUnsafe(1),
+        Duration.ofMinutesUnsafe(1)
+      )
+    )
+  }
 
   trait SimulationFixture { fixture =>
 
@@ -92,11 +104,7 @@ class DiscoveryServerSpec
 
     val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
       infos.map { case (brokerInfo, config) =>
-        val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
-          ActorRefT.build(
-            system,
-            MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness, ALF.PenaltyFrequency)
-          )
+        val misbehaviorManager = buildMisbehaviorManager(system)
         val server = {
           if (index equals 0) {
             TestActorRef[DiscoveryServer](
@@ -254,16 +262,8 @@ class DiscoveryServerSpec
     val (address1, config1) = createConfig(groups, port1, 2)
     val cliqueInfo1         = generateCliqueInfo(address1, config1)
     val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
-    val misbehaviorManager0: ActorRefT[MisbehaviorManager.Command] =
-      ActorRefT.build(
-        system,
-        MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness, ALF.PenaltyFrequency)
-      )
-    val misbehaviorManager1: ActorRefT[MisbehaviorManager.Command] =
-      ActorRefT.build(
-        system,
-        MisbehaviorManager.props(ALF.BanDuration, ALF.PenaltyForgivness, ALF.PenaltyFrequency)
-      )
+    val misbehaviorManager0 = buildMisbehaviorManager(system)
+    val misbehaviorManager1 = buildMisbehaviorManager(system)
 
     val server0 =
       system.actorOf(
