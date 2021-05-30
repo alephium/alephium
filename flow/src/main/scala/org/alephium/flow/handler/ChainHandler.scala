@@ -25,8 +25,7 @@ import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
-import io.prometheus.client.Gauge
-import io.prometheus.client.Counter
+import io.prometheus.client.{Gauge, Counter, Histogram}
 
 object ChainHandler {
   trait Event
@@ -58,6 +57,16 @@ object ChainHandler {
     )
     .labelNames("validation_type")
     .register()
+
+  val chainValidationDurationMilliSeconds: Histogram = Histogram
+    .build(
+      "alephium_chain_validation_duration_milliseconds",
+      "Duration of the validation"
+    )
+    .labelNames("validation_type")
+    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
+      600000, 1800000, 3600000)
+    .register()
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
@@ -76,13 +85,20 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     ChainHandler.chainValidationOngoing.labels(data.`type`).inc()
     ChainHandler.chainValidationTotal.labels(data.`type`).inc()
 
-    validator.validate(data, blockFlow) match {
+    val startTime           = System.nanoTime()
+    val validationResult    = validator.validate(data, blockFlow)
+    val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
+
+    ChainHandler.chainValidationDurationMilliSeconds
+      .labels(data.`type`)
+      .observe(elapsedMilliSeconds)
+    ChainHandler.chainValidationOngoing.labels(data.`type`).dec()
+
+    validationResult match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
       case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
       case Right(_)                      => handleValidData(data, broker, origin)
     }
-
-    ChainHandler.chainValidationOngoing.labels(data.`type`).dec()
   }
 
   def handleIOError(
