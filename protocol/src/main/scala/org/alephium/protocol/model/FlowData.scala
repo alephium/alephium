@@ -39,4 +39,6 @@ trait FlowData {
   def uncleHash(toIndex: GroupIndex): BlockHash
 
   def shortHex: String = hash.shortHex
+
+  def `type`: String
 }
