@@ -170,9 +170,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroAlfAmount(tx)
-        failCheck(checkOutputAmount(txNew), AmountIsZero)
-        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-        failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
+        failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
+        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsDustOrZero)
+        failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
   }
@@ -181,9 +181,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroTokenAmount(tx)
-        failCheck(checkOutputAmount(txNew), AmountIsZero)
-        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-        failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
+        failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
+        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsDustOrZero)
+        failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
   }

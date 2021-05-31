@@ -170,6 +170,7 @@ trait TxUtils { Self: FlowUtils =>
           gasPrice,
           defaultGasPerInput,
           defaultGasPerOutput,
+          dustUtxoAmount,
           outputInfos.length + 1
         )
         _ <-

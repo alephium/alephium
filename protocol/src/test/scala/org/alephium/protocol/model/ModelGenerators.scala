@@ -99,7 +99,7 @@ trait TxInputGenerators extends Generators {
 }
 
 trait TokenGenerators extends Generators with NumericHelpers {
-  val minAmountInNanoAlf = 1000L
+  val minAmountInNanoAlf = dustUtxoAmount.divUnsafe(ALF.oneNanoAlf).toBigInt.longValue()
   val minAmount          = ALF.nanoAlf(minAmountInNanoAlf)
   def amountGen(inputNum: Int): Gen[U256] = {
     Gen.choose(minAmountInNanoAlf * inputNum, Number.quadrillion).map(ALF.nanoAlf)

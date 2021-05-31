@@ -404,7 +404,7 @@ class ServerUtils(networkType: NetworkType) {
           for {
             code   <- Compiler.compileContract(query.code)
             state  <- parseState(query.state)
-            script <- buildContract(code, query.address, state, U256.One)
+            script <- buildContract(code, query.address, state, dustUtxoAmount)
           } yield script
         case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))
       }).map(script => CompileResult(Hex.toHexString(serialize(script))))
