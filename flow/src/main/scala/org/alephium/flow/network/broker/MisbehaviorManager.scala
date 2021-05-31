@@ -48,13 +48,22 @@ object MisbehaviorManager {
   final case class Peers(peers: AVector[Peer])
 
   sealed trait Critical extends Misbehavior {
+    def penalty: Int = Critical.penalty
+  }
+  object Critical {
     val penalty: Int = 100
   }
   sealed trait Error extends Misbehavior
   sealed trait Warning extends Misbehavior {
+    def penalty: Int = Warning.penalty
+  }
+  object Warning {
     val penalty: Int = 20
   }
   sealed trait Uncertain extends Misbehavior {
+    def penalty: Int = Uncertain.penalty
+  }
+  object Uncertain {
     val penalty: Int = 10
   }
 
@@ -82,7 +91,7 @@ class MisbehaviorManager(
     with EventStream {
   import MisbehaviorManager._
 
-  private val misbehaviorThreshold: Int = 100
+  private val misbehaviorThreshold: Int = Critical.penalty
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage(
     penaltyForgivness
   )
@@ -101,14 +110,14 @@ class MisbehaviorManager(
             log.warning(s"${peer} already banned until $until, re-banning")
             banAndPublish(peer)
           case Penalty(current, lastTs) =>
-            if (TimeStamp.now().deltaUnsafe(lastTs) < penaltyFrequency) {
+            val newScore = current + misbehavior.penalty
+            val tsDelta  = TimeStamp.now().deltaUnsafe(lastTs)
+            if (tsDelta < penaltyFrequency && newScore < misbehaviorThreshold) {
               log.debug("Already penalized the peer recently, ignoring that misbehavior")
             } else {
-              val newScore = current + misbehavior.penalty
               handlePenalty(peer, newScore)
             }
         }
-
     }
   }
 

@@ -88,7 +88,6 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     override val banDuration = Duration.zero
 
     misbehaviorManager ! InvalidMessage(peer)
-
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 
     eventually {
@@ -124,30 +123,31 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
     }
   }
 
-  it should "not penalize to fast" in new Fixture {
+  it should "not penalize too fast" in new Fixture {
     override val penaltyFrequency = Duration.ofHoursUnsafe(1)
 
     misbehaviorManager ! Spamming(peer)
-
-    eventually {
-      misbehaviorManager ! GetPeers
-      expectMsgPF() { case Peers(peers) =>
-        val Peer(address, Penalty(value, _)) = peers.head
-        address is peer.getAddress
-        value is 20
-      }
+    misbehaviorManager ! GetPeers
+    expectMsgPF() { case Peers(peers) =>
+      val Peer(address, Penalty(value, _)) = peers.head
+      address is peer.getAddress
+      value is 20
     }
 
     misbehaviorManager ! Spamming(peer)
-
-    eventually {
-      misbehaviorManager ! GetPeers
-      expectMsgPF() { case Peers(peers) =>
-        val Peer(address, Penalty(value, _)) = peers.head
-        address is peer.getAddress
-        value is 20
-      }
+    misbehaviorManager ! GetPeers
+    expectMsgPF() { case Peers(peers) =>
+      val Peer(address, Penalty(value, _)) = peers.head
+      address is peer.getAddress
+      value is 20
     }
+
+    misbehaviorManager ! InvalidPoW(peer)
+    misbehaviorManager ! GetPeers
+    expectMsgPF() { case Peers(peers) =>
+      peers.head.status is a[Banned]
+    }
+    bannedProbe.expectMsg(PeerBanned(peer.getAddress))
   }
 
   trait Fixture extends Generators {
