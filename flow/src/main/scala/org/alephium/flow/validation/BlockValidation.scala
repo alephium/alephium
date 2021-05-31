@@ -74,6 +74,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     for {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
+      _ <- checkTxNumber(block)
+      _ <- checkTotalGas(block)
       _ <- checkMerkleRoot(block)
       _ <- checkFlow(block, flow)
       _ <- checkNonCoinbases(block, flow)
@@ -91,6 +93,19 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   private[validation] def checkNonEmptyTransactions(block: Block): BlockValidationResult[Unit] = {
     if (block.transactions.nonEmpty) validBlock(()) else invalidBlock(EmptyTransactionList)
+  }
+
+  private[validation] def checkTxNumber(block: Block): BlockValidationResult[Unit] = {
+    if (block.transactions.length <= maximalTxsInOneBlock) {
+      validBlock(())
+    } else {
+      invalidBlock(TooManyTransactions)
+    }
+  }
+
+  private[validation] def checkTotalGas(block: Block): BlockValidationResult[Unit] = {
+    val totalGas = block.transactions.fold(0)(_ + _.unsigned.startGas.value)
+    if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooManyGasUsed)
   }
 
   private[validation] def checkCoinbase(

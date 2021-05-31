@@ -52,6 +52,8 @@ final case class MissingDeps(hashes: AVector[BlockHash]) extends InvalidHeaderSt
 final case object InvalidDepStateHash                    extends InvalidHeaderStatus
 final case class HeaderIOError(e: IOError)               extends InvalidHeaderStatus
 final case object EmptyTransactionList                   extends InvalidBlockStatus
+final case object TooManyTransactions                    extends InvalidBlockStatus
+final case object TooManyGasUsed                         extends InvalidBlockStatus
 final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus
 final case object InvalidCoinbaseData                    extends InvalidBlockStatus
 final case object InvalidCoinbaseReward                  extends InvalidBlockStatus
