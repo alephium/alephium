@@ -113,7 +113,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
   }
 
   it should "forgive a penalty after some time" in new Fixture {
-    override val penaltyForgivness = Duration.zero
+    override val penaltyForgiveness = Duration.zero
 
     misbehaviorManager ! Spamming(peer)
 
@@ -151,12 +151,12 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSp
   }
 
   trait Fixture extends Generators {
-    val banDuration       = Duration.ofHoursUnsafe(1)
-    val penaltyForgivness = Duration.ofHoursUnsafe(1)
-    val penaltyFrequency  = Duration.zero
+    val banDuration        = Duration.ofHoursUnsafe(1)
+    val penaltyForgiveness = Duration.ofHoursUnsafe(1)
+    val penaltyFrequency   = Duration.zero
 
     lazy val misbehaviorManager =
-      system.actorOf(MisbehaviorManager.props(banDuration, penaltyForgivness, penaltyFrequency))
+      system.actorOf(MisbehaviorManager.props(banDuration, penaltyForgiveness, penaltyFrequency))
 
     val peer       = socketAddressGen.sample.get
     val local      = socketAddressGen.sample.get

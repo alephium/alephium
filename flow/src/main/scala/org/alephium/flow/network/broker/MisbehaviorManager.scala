@@ -26,8 +26,12 @@ import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 object MisbehaviorManager {
-  def props(banDuration: Duration, penaltyForgivness: Duration, penaltyFrequency: Duration): Props =
-    Props(new MisbehaviorManager(banDuration, penaltyForgivness, penaltyFrequency))
+  def props(
+      banDuration: Duration,
+      penaltyForgiveness: Duration,
+      penaltyFrequency: Duration
+  ): Props =
+    Props(new MisbehaviorManager(banDuration, penaltyForgiveness, penaltyFrequency))
 
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -85,7 +89,7 @@ object MisbehaviorManager {
 
 class MisbehaviorManager(
     banDuration: Duration,
-    penaltyForgivness: Duration,
+    penaltyForgiveness: Duration,
     penaltyFrequency: Duration
 ) extends BaseActor
     with EventStream {
@@ -93,7 +97,7 @@ class MisbehaviorManager(
 
   private val misbehaviorThreshold: Int = Critical.penalty
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage(
-    penaltyForgivness
+    penaltyForgiveness
   )
 
   override def preStart(): Unit = {
