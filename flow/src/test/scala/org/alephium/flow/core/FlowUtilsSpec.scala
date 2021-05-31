@@ -22,7 +22,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.StatefulScript
+import org.alephium.protocol.vm.{GasBox, StatefulScript}
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, U256}
 
 class FlowUtilsSpec extends AlephiumSpec {
@@ -159,5 +159,20 @@ class FlowUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
+  }
+
+  it should "truncate txs w.r.t. tx number and gas" in new FlowFixture {
+    val tx  = transfer(blockFlow, ChainIndex.unsafe(0, 0)).nonCoinbase.head.toTemplate
+    val gas = tx.unsigned.startGas.value
+
+    val txs = AVector(tx, tx)
+    FlowUtils.truncateTxs(txs, 0, GasBox.unsafe(gas * 2)) is txs.take(0)
+    FlowUtils.truncateTxs(txs, 1, GasBox.unsafe(gas * 2)) is txs.take(1)
+    FlowUtils.truncateTxs(txs, 2, GasBox.unsafe(gas * 2)) is txs.take(2)
+    FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2)) is txs.take(2)
+    FlowUtils.truncateTxs(txs, 0, GasBox.unsafe(gas * 2 - 1)) is txs.take(0)
+    FlowUtils.truncateTxs(txs, 1, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
+    FlowUtils.truncateTxs(txs, 2, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
+    FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
   }
 }
