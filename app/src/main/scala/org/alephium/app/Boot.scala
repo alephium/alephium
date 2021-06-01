@@ -26,11 +26,11 @@ import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
 
-import io.prometheus.client.hotspot.DefaultExports
-
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Files => AFiles}
+
+import io.prometheus.client.hotspot.DefaultExports
 import io.prometheus.client.Gauge
 
 object Boot extends App with StrictLogging {

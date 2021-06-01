@@ -18,7 +18,7 @@ package org.alephium.app
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
-import scala.util._
+import scala.util.Try
 
 import java.io.{StringWriter, Writer}
 import akka.util.Timeout
