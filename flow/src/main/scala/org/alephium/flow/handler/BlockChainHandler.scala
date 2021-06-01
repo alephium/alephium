@@ -30,6 +30,8 @@ import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, EventBus, EventStream}
+import io.prometheus.client.Counter
+import io.prometheus.client.Gauge
 
 object BlockChainHandler {
   def props(
@@ -51,6 +53,30 @@ object BlockChainHandler {
   final case class BlockAdded(hash: BlockHash)   extends Event
   case object BlockAddingFailed                  extends Event
   final case class InvalidBlock(hash: BlockHash) extends Event
+
+  val blocksTotal: Gauge = Gauge
+    .build(
+      "alephium_blocks_total",
+      "Total number of blocks"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val blocksReceivedTotal: Counter = Counter
+    .build(
+      "alephium_blocks_received_total",
+      "Total number of blocks received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val transactionsReceivedTotal: Counter = Counter
+    .build(
+      "alephium_transactions_received_total",
+      "Total number of transactions received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 class BlockChainHandler(
@@ -104,5 +130,18 @@ class BlockChainHandler(
 
   override def show(block: Block): String = {
     showHeader(block.header) + s" #tx: ${block.transactions.length}"
+  }
+
+  override def measure(block: Block): Unit = {
+    val chain             = measureHeader(block.header)
+    val numOfTransactions = block.transactions.length
+    val (from, to) = {
+      val index = block.header.chainIndex
+      (index.from.value.toString, index.to.value.toString)
+    }
+
+    blocksTotal.labels(from, to).set(chain.numHashes.toDouble)
+    blocksReceivedTotal.labels(from, to).inc()
+    transactionsReceivedTotal.labels(from, to).inc(numOfTransactions.toDouble)
   }
 }

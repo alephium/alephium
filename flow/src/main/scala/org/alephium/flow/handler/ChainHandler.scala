@@ -26,6 +26,7 @@ import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
 import io.prometheus.client.{Gauge, Counter, Histogram}
+import org.alephium.flow.core.BlockHeaderChain
 
 object ChainHandler {
   trait Event
@@ -64,6 +65,40 @@ object ChainHandler {
       "Duration of the validation"
     )
     .labelNames("validation_type")
+    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
+      600000, 1800000, 3600000)
+    .register()
+
+  val headersTotal: Gauge = Gauge
+    .build(
+      "alephium_headers_total",
+      "Total number of headers"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val headersCurrentHeight: Gauge = Gauge
+    .build(
+      "alephium_headers_current_height",
+      "Current height of the header"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val headersReceivedTotal: Counter = Counter
+    .build(
+      "alephium_headers_received_total",
+      "Total number of headers received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val blockDurationMilliSeconds: Histogram = Histogram
+    .build(
+      "alephium_block_duration_milliseconds",
+      "Block duration"
+    )
+    .labelNames("chain_from", "chain_to")
     .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
       600000, 1800000, 3600000)
     .register()
@@ -146,6 +181,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
             publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
             notifyBroker(broker, data)
             log.info(show(data))
+            measure(data)
         }
       case Left(error) => handleIOError(error)
     }
@@ -163,20 +199,43 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
 
   def show(data: T): String
 
+  def measure(data: T): Unit
+
   def showHeader(header: BlockHeader): String = {
     val total = blockFlow.numHashes
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
-    val blockTime = {
-      chain.getBlockHeader(header.parentHash) match {
-        case Left(_) => "?ms"
-        case Right(parentHeader) =>
-          val span = header.timestamp.millis - parentHeader.timestamp.millis
-          s"${span}ms"
-      }
-    }
+    val blockTime = getBlockTime(header, chain).map(time => s"${time}ms").getOrElse("?ms")
+
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
+  }
+
+  def measureHeader(header: BlockHeader): BlockHeaderChain = {
+    val chain = blockFlow.getHeaderChain(header)
+    val (from, to) = {
+      val index = header.chainIndex
+      (index.from.value.toString, index.to.value.toString)
+    }
+
+    ChainHandler.headersTotal.labels(from, to).set(chain.numHashes.toDouble)
+    ChainHandler.headersCurrentHeight
+      .labels(from, to)
+      .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
+    ChainHandler.headersReceivedTotal.labels(from, to).inc()
+
+    getBlockTime(header, chain).foreach { blockTime =>
+      ChainHandler.blockDurationMilliSeconds.labels(from, to).observe(blockTime.toDouble)
+    }
+
+    chain
+  }
+
+  private def getBlockTime(header: BlockHeader, chain: BlockHeaderChain): Option[Long] = {
+    chain
+      .getBlockHeader(header.parentHash)
+      .toOption
+      .map(header.timestamp.millis - _.timestamp.millis)
   }
 }

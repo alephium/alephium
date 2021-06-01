@@ -77,4 +77,8 @@ class HeaderChainHandler(
   }
 
   override def show(header: BlockHeader): String = showHeader(header)
+
+  override def measure(data: BlockHeader): Unit = {
+    val _ = measureHeader(data)
+  }
 }
