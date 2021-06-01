@@ -43,7 +43,7 @@ class MemPool private (
     sharedPools(index.to.value)
   }
 
-  def size: Int = sharedPools.sumBy(_.size)
+  def size: Int = sharedPools.sumBy(_.size) + pendingPool.size
 
   def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = {
     contains(index, transaction.id)
@@ -56,17 +56,16 @@ class MemPool private (
     getSharedPool(index).collectForBlock(maxNum)
 
   def getAll(index: ChainIndex): AVector[TransactionTemplate] =
-    getSharedPool(index).getAll() ++ pendingPool.getAll()
+    getSharedPool(index).getAll() ++ pendingPool.getAll(index)
 
   def isSpent(outputRef: AssetOutputRef): Boolean = {
     pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
   }
 
   def isUnspentInPool(outputRef: AssetOutputRef): Boolean = {
-    (txIndexes.outputIndex
-      .contains(outputRef) || pendingPool.indexes.outputIndex.contains(outputRef)) &&
-    (!txIndexes.inputIndex
-      .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
+    (txIndexes.outputIndex.contains(outputRef) ||
+      pendingPool.indexes.outputIndex.contains(outputRef)) &&
+    (!isSpent(outputRef))
   }
 
   def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean = {
@@ -86,17 +85,16 @@ class MemPool private (
 
   def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
     val count = getSharedPool(index).add(transactions)
-    transactions.foreach(txIndexes.add)
+    txIndexes.add(transactions)
     count
   }
 
   def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
     val count = getSharedPool(index).remove(transactions)
-    transactions.foreach(txIndexes.remove)
+    txIndexes.remove(transactions)
     count
   }
 
-  // Note: we lock the mem pool so that we could update all the transaction pools
   def reorg(
       toRemove: AVector[AVector[Transaction]],
       toAdd: AVector[AVector[Transaction]]
@@ -104,10 +102,9 @@ class MemPool private (
     assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
     // First, add transactions from short chains, then remove transactions from canonical chains
-    val added =
-      toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
-        sum + sharedPools(toGroup).add(txs.map(_.toTemplate))
-      )
+    val added = toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
+      sum + sharedPools(toGroup).add(txs.map(_.toTemplate))
+    )
     val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
       sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
     )

@@ -47,6 +47,12 @@ sealed trait TransactionAbstract {
   def outputsLength: Int
 
   def getOutput(index: Int): TxOutput
+
+  def assetOutputRefs: AVector[AssetOutputRef] = {
+    unsigned.fixedOutputs.mapWithIndex { case (output, index) =>
+      AssetOutputRef.from(output, TxOutputRef.key(id, index))
+    }
+  }
 }
 
 final case class Transaction(

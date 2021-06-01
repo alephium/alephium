@@ -30,6 +30,14 @@ final case class TxIndexes(
     outputType: OutputType
 ) extends RWLock {
   def add(transaction: TransactionTemplate): Unit = writeOnly {
+    _add(transaction)
+  }
+
+  def add(transactions: AVector[TransactionTemplate]): Unit = writeOnly {
+    transactions.foreach(_add)
+  }
+
+  private def _add(transaction: TransactionTemplate): Unit = {
     transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
       val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))
@@ -45,6 +53,14 @@ final case class TxIndexes(
   }
 
   def remove(transaction: TransactionTemplate): Unit = writeOnly {
+    _remove(transaction)
+  }
+
+  def remove(transactions: AVector[TransactionTemplate]): Unit = writeOnly {
+    transactions.foreach(_remove)
+  }
+
+  private def _remove(transaction: TransactionTemplate): Unit = {
     transaction.unsigned.inputs.foreach(input => inputIndex.remove(input.outputRef))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
       val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))

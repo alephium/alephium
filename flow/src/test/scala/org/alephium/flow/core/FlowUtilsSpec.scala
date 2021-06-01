@@ -175,4 +175,19 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.truncateTxs(txs, 2, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
     FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
   }
+
+  it should "prepare block template when txs are inter-dependent" in new FlowFixture {
+    val blockFlow1 = isolatedBlockFlow()
+    val index      = ChainIndex.unsafe(0, 0)
+    val block0     = transfer(blockFlow1, index)
+    val tx0        = block0.nonCoinbase.head
+    addAndCheck(blockFlow1, block0)
+    val block1 = transfer(blockFlow1, index)
+    val tx1    = block1.nonCoinbase.head
+    addAndCheck(blockFlow1, block1)
+
+    val pool = blockFlow.getMemPool(index)
+    pool.getSharedPool(index).add(AVector(tx0.toTemplate, tx1.toTemplate))
+    blockFlow.prepareBlockFlowUnsafe(index).transactions is AVector(tx0)
+  }
 }
