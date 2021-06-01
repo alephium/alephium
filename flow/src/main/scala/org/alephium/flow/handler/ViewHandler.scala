@@ -69,7 +69,6 @@ class ViewHandler(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
     if (txs.nonEmpty) {
-      // TODO: maybe broadcast it based on peer sync status
       // delay this broadcast so that peers have download this block
       scheduleOnce(
         txHandler.ref,

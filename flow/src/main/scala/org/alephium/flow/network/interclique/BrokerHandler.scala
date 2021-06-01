@@ -56,10 +56,13 @@ trait BrokerHandler extends BaseBrokerHandler {
         }
       case FlowHandler.SyncInventories(inventories) =>
         log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
+        if (inventories.forall(_.isEmpty)) {
+          setRemoteSynced()
+        }
         send(SyncResponse(inventories))
       case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
         if (hashes.forall(_.isEmpty)) {
-          cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
+          setSelfSynced()
         } else {
           if (validate(hashes)) {
             log.debug(s"Received sync response ${Utils.showFlow(hashes)} from $remoteAddress")
@@ -71,6 +74,28 @@ trait BrokerHandler extends BaseBrokerHandler {
         }
     }
     receive
+  }
+
+  var selfSynced: Boolean   = false
+  var remoteSynced: Boolean = false
+  def setSelfSynced(): Unit = {
+    if (!selfSynced) {
+      log.info(s"Self synced with $remoteAddress")
+      selfSynced = true
+      checkAllSynced()
+    }
+  }
+  def setRemoteSynced(): Unit = {
+    if (!remoteSynced) {
+      log.info(s"Remote $remoteAddress synced with our node")
+      remoteSynced = true
+      checkAllSynced()
+    }
+  }
+  def checkAllSynced(): Unit = {
+    if (selfSynced && remoteSynced) {
+      cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
+    }
   }
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
