@@ -18,7 +18,7 @@ package org.alephium.flow.mempool
 
 import org.scalacheck.Arbitrary.{arbAnyVal, arbitrary}
 
-import org.alephium.flow.mempool.TxPool.WeightedId
+import org.alephium.flow.mempool.SharedPool.WeightedId
 import org.alephium.protocol.Generators
 import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AlephiumSpec, U256}
