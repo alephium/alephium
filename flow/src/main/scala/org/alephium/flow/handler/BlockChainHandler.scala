@@ -30,8 +30,8 @@ import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, EventBus, EventStream}
-import io.prometheus.client.Counter
-import io.prometheus.client.Gauge
+
+import io.prometheus.client.{Counter, Gauge}
 
 object BlockChainHandler {
   def props(
