@@ -7,7 +7,7 @@ volumes:
 
 services:
   alephium:
-    image: liuhongchao/alephium:72cdc49390a69a5e665ceacfbfe4834e69cb564e
+    image: alephium/alephium:latest
     build:
       context: .
       args:
