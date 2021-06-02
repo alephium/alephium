@@ -78,6 +78,14 @@ object ChainHandler {
     .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
       600000, 1800000, 3600000)
     .register()
+
+  val blockCurrentHeight: Gauge = Gauge
+    .build(
+      "alephium_block_current_height",
+      "Current height of the block"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
@@ -86,24 +94,24 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     validator: Validation[T, S]
 ) extends IOBaseActor
     with Publisher {
-  import ChainHandler.Event
+  import ChainHandler._
 
   def consensusConfig: ConsensusConfig
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
 
-    ChainHandler.chainValidationOngoing.labels(data.`type`).inc()
-    ChainHandler.chainValidationTotal.labels(data.`type`).inc()
+    chainValidationOngoing.labels(data.`type`).inc()
+    chainValidationTotal.labels(data.`type`).inc()
 
     val startTime           = System.nanoTime()
     val validationResult    = validator.validate(data, blockFlow)
     val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
 
-    ChainHandler.chainValidationDurationMilliSeconds
+    chainValidationDurationMilliSeconds
       .labels(data.`type`)
       .observe(elapsedMilliSeconds)
-    ChainHandler.chainValidationOngoing.labels(data.`type`).dec()
+    chainValidationOngoing.labels(data.`type`).dec()
 
     validationResult match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
@@ -134,7 +142,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.warning(s"Invalid block/header ${data.shortHex}: $status : $blockHex")
-    ChainHandler.chainValidationFailed.labels(data.`type`, status.name).inc()
+    chainValidationFailed.labels(data.`type`, status.name).inc()
 
     if (!origin.isLocal) {
       sender() ! DependencyHandler.Invalid(data.hash)
@@ -188,12 +196,16 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
 
-  protected def measureBlockTime(header: BlockHeader): BlockHeaderChain = {
+  protected def measureCommon(header: BlockHeader): BlockHeaderChain = {
     val chain      = blockFlow.getHeaderChain(header)
     val (from, to) = getChainIndexLabels(header)
 
+    blockCurrentHeight
+      .labels(from, to)
+      .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
+
     getBlockTime(header, chain).foreach { blockTime =>
-      ChainHandler.blockDurationMilliSeconds.labels(from, to).observe(blockTime.toDouble)
+      blockDurationMilliSeconds.labels(from, to).observe(blockTime.toDouble)
     }
 
     chain
