@@ -69,30 +69,6 @@ object ChainHandler {
       600000, 1800000, 3600000)
     .register()
 
-  val headersTotal: Gauge = Gauge
-    .build(
-      "alephium_headers_total",
-      "Total number of headers"
-    )
-    .labelNames("chain_from", "chain_to")
-    .register()
-
-  val headersCurrentHeight: Gauge = Gauge
-    .build(
-      "alephium_headers_current_height",
-      "Current height of the header"
-    )
-    .labelNames("chain_from", "chain_to")
-    .register()
-
-  val headersReceivedTotal: Counter = Counter
-    .build(
-      "alephium_headers_received_total",
-      "Total number of headers received"
-    )
-    .labelNames("chain_from", "chain_to")
-    .register()
-
   val blockDurationMilliSeconds: Histogram = Histogram
     .build(
       "alephium_block_duration_milliseconds",
@@ -212,24 +188,20 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
 
-  def measureHeader(header: BlockHeader): BlockHeaderChain = {
-    val chain = blockFlow.getHeaderChain(header)
-    val (from, to) = {
-      val index = header.chainIndex
-      (index.from.value.toString, index.to.value.toString)
-    }
-
-    ChainHandler.headersTotal.labels(from, to).set(chain.numHashes.toDouble)
-    ChainHandler.headersCurrentHeight
-      .labels(from, to)
-      .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
-    ChainHandler.headersReceivedTotal.labels(from, to).inc()
+  protected def measureBlockTime(header: BlockHeader): BlockHeaderChain = {
+    val chain      = blockFlow.getHeaderChain(header)
+    val (from, to) = getChainIndexLabels(header)
 
     getBlockTime(header, chain).foreach { blockTime =>
       ChainHandler.blockDurationMilliSeconds.labels(from, to).observe(blockTime.toDouble)
     }
 
     chain
+  }
+
+  protected def getChainIndexLabels(header: BlockHeader): (String, String) = {
+    val index = header.chainIndex
+    (index.from.value.toString, index.to.value.toString)
   }
 
   private def getBlockTime(header: BlockHeader, chain: BlockHeaderChain): Option[Long] = {

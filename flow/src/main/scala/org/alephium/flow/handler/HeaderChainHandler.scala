@@ -26,6 +26,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
+import io.prometheus.client.{Counter, Gauge}
 
 object HeaderChainHandler {
   def props(
@@ -45,6 +46,30 @@ object HeaderChainHandler {
   final case class HeaderAdded(hash: BlockHash)   extends Event
   case object HeaderAddingFailed                  extends Event
   final case class InvalidHeader(hash: BlockHash) extends Event
+
+  val headersTotal: Gauge = Gauge
+    .build(
+      "alephium_headers_total",
+      "Total number of headers"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val headersCurrentHeight: Gauge = Gauge
+    .build(
+      "alephium_headers_current_height",
+      "Current height of the header"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val headersReceivedTotal: Counter = Counter
+    .build(
+      "alephium_headers_received_total",
+      "Total number of headers received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 class HeaderChainHandler(
@@ -78,7 +103,14 @@ class HeaderChainHandler(
 
   override def show(header: BlockHeader): String = showHeader(header)
 
-  override def measure(data: BlockHeader): Unit = {
-    val _ = measureHeader(data)
+  override def measure(header: BlockHeader): Unit = {
+    val chain      = measureBlockTime(header)
+    val (from, to) = getChainIndexLabels(header)
+
+    headersTotal.labels(from, to).set(chain.numHashes.toDouble)
+    headersCurrentHeight
+      .labels(from, to)
+      .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
+    headersReceivedTotal.labels(from, to).inc()
   }
 }

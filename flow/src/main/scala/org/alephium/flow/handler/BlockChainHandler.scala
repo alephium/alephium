@@ -133,12 +133,9 @@ class BlockChainHandler(
   }
 
   override def measure(block: Block): Unit = {
-    val chain             = measureHeader(block.header)
+    val chain             = measureBlockTime(block.header)
     val numOfTransactions = block.transactions.length
-    val (from, to) = {
-      val index = block.header.chainIndex
-      (index.from.value.toString, index.to.value.toString)
-    }
+    val (from, to)        = getChainIndexLabels(block.header)
 
     blocksTotal.labels(from, to).set(chain.numHashes.toDouble)
     blocksReceivedTotal.labels(from, to).inc()
