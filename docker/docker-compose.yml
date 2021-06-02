@@ -1,9 +1,13 @@
 version: "3.3"
 
-services:
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  alephium-data: {}
 
+services:
   alephium:
-    image: alephium/alephium:latest
+    image: liuhongchao/alephium:72cdc49390a69a5e665ceacfbfe4834e69cb564e
     build:
       context: .
       args:
@@ -26,6 +30,32 @@ services:
     volumes:
       # The provided file user-testnet.conf is a minimal default config to connect your container to the testnet.
       - ./user-testnet.conf:/alephium-home/.alephium/user.conf
-#      - ./alephium-data:/alephium-home/.alephium
+      - alephium-data:/alephium-home/.alephium
 #      - ./alephium-wallets:/alephium-home/.alephium-wallets
-# 
+
+  grafana:
+    image: grafana/grafana:7.2.1
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.21.0
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
