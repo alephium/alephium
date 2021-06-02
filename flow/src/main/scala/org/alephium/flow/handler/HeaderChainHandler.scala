@@ -55,14 +55,6 @@ object HeaderChainHandler {
     .labelNames("chain_from", "chain_to")
     .register()
 
-  val headersCurrentHeight: Gauge = Gauge
-    .build(
-      "alephium_headers_current_height",
-      "Current height of the header"
-    )
-    .labelNames("chain_from", "chain_to")
-    .register()
-
   val headersReceivedTotal: Counter = Counter
     .build(
       "alephium_headers_received_total",
@@ -104,13 +96,10 @@ class HeaderChainHandler(
   override def show(header: BlockHeader): String = showHeader(header)
 
   override def measure(header: BlockHeader): Unit = {
-    val chain      = measureBlockTime(header)
+    val chain      = measureCommon(header)
     val (from, to) = getChainIndexLabels(header)
 
     headersTotal.labels(from, to).set(chain.numHashes.toDouble)
-    headersCurrentHeight
-      .labels(from, to)
-      .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
     headersReceivedTotal.labels(from, to).inc()
   }
 }
