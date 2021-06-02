@@ -114,7 +114,7 @@ class MemPool private (
       sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
     )
 
-    for (group <- 0 to groupConfig.groups) {
+    for (group <- 0 until groupConfig.groups) {
       measureSharedPoolTransactionsTotal(group)
     }
 
