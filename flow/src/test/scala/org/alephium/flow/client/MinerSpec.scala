@@ -47,7 +47,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     override val configValues =
       Map(("alephium.broker.groups", 1), ("alephium.broker.broker-num", 1))
 
-    val (allHandlers, allHandlersProbes) = TestUtils.createBlockHandlersProbe
+    val (allHandlers, allHandlersProbes) = TestUtils.createAllHandlersProbe
     val blockHandlerProbe                = allHandlersProbes.blockHandlers(ChainIndex.unsafe(0, 0))
 
     val miner = TestActorRef[Miner](
@@ -96,7 +96,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
   it should "ignore handled mining result when it's stopped" in {
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
-    val (allHandlers, _) = TestUtils.createBlockHandlersProbe
+    val (allHandlers, _) = TestUtils.createAllHandlersProbe
     val miner = system.actorOf(
       Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
     )
@@ -107,7 +107,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
   it should "handle its addresses" in new LockupScriptGenerators {
     val groupConfig      = config.broker
     val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
-    val (allHandlers, _) = TestUtils.createBlockHandlersProbe
+    val (allHandlers, _) = TestUtils.createAllHandlersProbe
     val miner = system.actorOf(
       Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
     )

@@ -21,7 +21,8 @@ import scala.collection.mutable
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{AssetOutputRef, TransactionTemplate, TxOutput}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{AssetOutputRef, ChainIndex, TransactionTemplate, TxOutput}
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.{AVector, EitherF, RWLock}
 
@@ -29,6 +30,10 @@ class PendingPool(
     val txs: mutable.HashMap[Hash, TransactionTemplate],
     val indexes: TxIndexes
 ) extends RWLock {
+  def size: Int = readOnly {
+    txs.size
+  }
+
   def contains(txId: Hash): Boolean = readOnly {
     txs.contains(txId)
   }
@@ -55,8 +60,10 @@ class PendingPool(
     }
   }
 
-  def getAll(): AVector[TransactionTemplate] = readOnly {
-    AVector.from(txs.values)
+  def getAll(
+      chainIndex: ChainIndex
+  )(implicit groupConfig: GroupConfig): AVector[TransactionTemplate] = readOnly {
+    AVector.from(txs.values.view.filter(_.chainIndex == chainIndex))
   }
 
   def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = readOnly {

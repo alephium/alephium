@@ -26,8 +26,12 @@ import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 object MisbehaviorManager {
-  def props(banDuration: Duration, penaltyForgivness: Duration, penaltyFrequency: Duration): Props =
-    Props(new MisbehaviorManager(banDuration, penaltyForgivness, penaltyFrequency))
+  def props(
+      banDuration: Duration,
+      penaltyForgiveness: Duration,
+      penaltyFrequency: Duration
+  ): Props =
+    Props(new MisbehaviorManager(banDuration, penaltyForgiveness, penaltyFrequency))
 
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -48,19 +52,29 @@ object MisbehaviorManager {
   final case class Peers(peers: AVector[Peer])
 
   sealed trait Critical extends Misbehavior {
+    def penalty: Int = Critical.penalty
+  }
+  object Critical {
     val penalty: Int = 100
   }
   sealed trait Error extends Misbehavior
   sealed trait Warning extends Misbehavior {
+    def penalty: Int = Warning.penalty
+  }
+  object Warning {
     val penalty: Int = 20
   }
   sealed trait Uncertain extends Misbehavior {
+    def penalty: Int = Uncertain.penalty
+  }
+  object Uncertain {
     val penalty: Int = 10
   }
 
-  final case class InvalidMessage(remoteAddress: InetSocketAddress) extends Critical
-  final case class InvalidPoW(remoteAddress: InetSocketAddress)     extends Critical
-  final case class InvalidGroup(remoteAddress: InetSocketAddress)   extends Critical
+  final case class InvalidMessage(remoteAddress: InetSocketAddress)          extends Critical
+  final case class InvalidPoW(remoteAddress: InetSocketAddress)              extends Critical
+  final case class InvalidGroup(remoteAddress: InetSocketAddress)            extends Critical
+  final case class InvalidPingPongCritical(remoteAddress: InetSocketAddress) extends Critical
 
   final case class Spamming(remoteAddress: InetSocketAddress)              extends Warning
   final case class InvalidFlowChainIndex(remoteAddress: InetSocketAddress) extends Warning
@@ -75,15 +89,15 @@ object MisbehaviorManager {
 
 class MisbehaviorManager(
     banDuration: Duration,
-    penaltyForgivness: Duration,
+    penaltyForgiveness: Duration,
     penaltyFrequency: Duration
 ) extends BaseActor
     with EventStream {
   import MisbehaviorManager._
 
-  private val misbehaviorThreshold: Int = 100
+  private val misbehaviorThreshold: Int = Critical.penalty
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage(
-    penaltyForgivness
+    penaltyForgiveness
   )
 
   override def preStart(): Unit = {
@@ -100,14 +114,14 @@ class MisbehaviorManager(
             log.warning(s"${peer} already banned until $until, re-banning")
             banAndPublish(peer)
           case Penalty(current, lastTs) =>
-            if (TimeStamp.now().deltaUnsafe(lastTs) < penaltyFrequency) {
+            val newScore = current + misbehavior.penalty
+            val tsDelta  = TimeStamp.now().deltaUnsafe(lastTs)
+            if (tsDelta < penaltyFrequency && newScore < misbehaviorThreshold) {
               log.debug("Already penalized the peer recently, ignoring that misbehavior")
             } else {
-              val newScore = current + misbehavior.penalty
               handlePenalty(peer, newScore)
             }
         }
-
     }
   }
 

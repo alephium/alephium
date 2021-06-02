@@ -125,10 +125,37 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
       val txNew       = tx.copy(unsigned = unsignedNew)
-      failCheck(checkOutputNum(txNew), NoOutputs)
+      failCheck(checkOutputNum(txNew, tx.chainIndex.isIntraGroup), NoOutputs)
       failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
       failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
     }
+  }
+
+  it should "check too many outputs" in new StatelessFixture {
+    val tx     = transactionGen().sample.get
+    val output = tx.unsigned.fixedOutputs.head
+    tx.generatedOutputs.isEmpty is true
+
+    val modified0 =
+      tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = AVector.fill(ALF.MaxTxOutputNum)(output)))
+    passCheck(checkOutputNum(modified0, isIntraGroup = true))
+    passCheck(checkOutputNum(modified0, isIntraGroup = false))
+
+    val modified1 =
+      tx.copy(unsigned =
+        tx.unsigned.copy(fixedOutputs = AVector.fill(ALF.MaxTxOutputNum + 1)(output))
+      )
+    failCheck(checkOutputNum(modified1, isIntraGroup = true), TooManyOutputs)
+    failCheck(checkOutputNum(modified1, isIntraGroup = false), TooManyOutputs)
+
+    val modified2 =
+      tx.copy(generatedOutputs = AVector.fill(ALF.MaxTxOutputNum - tx.outputsLength)(output))
+    passCheck(checkOutputNum(modified2, isIntraGroup = true))
+    failCheck(checkOutputNum(modified2, isIntraGroup = false), GeneratedOutputForInterGroupTx)
+
+    val modified3 =
+      tx.copy(generatedOutputs = AVector.fill(ALF.MaxTxOutputNum + 1 - tx.outputsLength)(output))
+    failCheck(checkOutputNum(modified3, isIntraGroup = true), TooManyOutputs)
   }
 
   it should "check gas bounds" in new StatelessFixture {
@@ -170,9 +197,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroAlfAmount(tx)
-        failCheck(checkOutputAmount(txNew), AmountIsZero)
-        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-        failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
+        failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
+        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsDustOrZero)
+        failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
   }
@@ -181,9 +208,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroTokenAmount(tx)
-        failCheck(checkOutputAmount(txNew), AmountIsZero)
-        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsZero)
-        failCheck(checkBlockTx(txNew, preOutputs), AmountIsZero)
+        failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
+        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsDustOrZero)
+        failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
   }

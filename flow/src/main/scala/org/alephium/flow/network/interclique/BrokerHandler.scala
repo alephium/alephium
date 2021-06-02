@@ -20,7 +20,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
+import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{SyncRequest, SyncResponse}
@@ -52,23 +52,50 @@ trait BrokerHandler extends BaseBrokerHandler {
           allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
         } else {
           log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
+          handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
         }
       case FlowHandler.SyncInventories(inventories) =>
         log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
+        if (inventories.forall(_.isEmpty)) {
+          setRemoteSynced()
+        }
         send(SyncResponse(inventories))
       case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
         if (hashes.forall(_.isEmpty)) {
-          cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
+          setSelfSynced()
         } else {
           if (validate(hashes)) {
             log.debug(s"Received sync response ${Utils.showFlow(hashes)} from $remoteAddress")
             blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
           } else {
             log.warning(s"Invalid sync response from $remoteAddress: ${Utils.showFlow(hashes)}")
+            handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
           }
         }
     }
     receive
+  }
+
+  var selfSynced: Boolean   = false
+  var remoteSynced: Boolean = false
+  def setSelfSynced(): Unit = {
+    if (!selfSynced) {
+      log.info(s"Self synced with $remoteAddress")
+      selfSynced = true
+      checkAllSynced()
+    }
+  }
+  def setRemoteSynced(): Unit = {
+    if (!remoteSynced) {
+      log.info(s"Remote $remoteAddress synced with our node")
+      remoteSynced = true
+      checkAllSynced()
+    }
+  }
+  def checkAllSynced(): Unit = {
+    if (selfSynced && remoteSynced) {
+      cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
+    }
   }
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)

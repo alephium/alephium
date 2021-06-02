@@ -14,16 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow
+package org.alephium.flow.network.broker
 
-import org.alephium.util.Duration
+import org.alephium.util.BaseActor
+import org.alephium.util.EventStream.Publisher
 
-// scalastyle:off magic.number
-package object network {
-  val fastScanPeriod: Duration = Duration.ofMinutesUnsafe(1)
+trait BaseHandler extends BaseActor with Publisher {
 
-  val syncFrequency: Duration        = Duration.ofSecondsUnsafe(2)
-  val syncCleanupFrequency: Duration = Duration.ofSecondsUnsafe(10)
-  val syncExpiryPeriod: Duration     = Duration.ofSecondsUnsafe(10)
+  def handleMisbehavior(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
+    publishEvent(misbehavior)
+    misbehavior match {
+      case _: MisbehaviorManager.Critical => context.stop(self)
+      case _                              => ()
+    }
+  }
 }
-// scalastyle:on magic.number

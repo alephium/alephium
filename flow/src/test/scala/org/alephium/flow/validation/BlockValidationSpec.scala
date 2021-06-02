@@ -23,7 +23,7 @@ import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{GasBox, LockupScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -135,6 +135,38 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
     val blockNew = block.copy(transactions = txsNew)
     failCheck(checkCoinbase(blockNew, blockFlow), InvalidCoinbaseReward)
+  }
+
+  it should "check non-empty txs" in new Fixture {
+    val block    = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    val modified = block.copy(transactions = AVector.empty)
+    failCheck(checkBlock(modified, blockFlow), EmptyTransactionList)
+  }
+
+  it should "check the number of txs" in new Fixture {
+    val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    val modified0 =
+      block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(block.nonCoinbase.head))
+    passValidation(checkTxNumber(modified0))
+
+    val modified1 =
+      block.copy(transactions = AVector.fill(maximalTxsInOneBlock + 1)(block.nonCoinbase.head))
+    failCheck(checkTxNumber(modified1), TooManyTransactions)
+    failCheck(checkBlock(modified1, blockFlow), TooManyTransactions)
+  }
+
+  it should "check the amount of gas" in new Fixture {
+    val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    val tx    = block.nonCoinbase.head
+    tx.unsigned.startGas is minimalGas
+
+    val modified0 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(tx))
+    passValidation(checkTotalGas(modified0))
+
+    val tx1       = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafe(minimalGas.value + 1)))
+    val modified1 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock - 1)(tx) :+ tx1)
+    failValidation(checkTotalGas(modified1), TooManyGasUsed)
+    failValidation(checkBlock(modified1, blockFlow), TooManyGasUsed)
   }
 
   trait DoubleSpendingFixture extends FlowFixture {

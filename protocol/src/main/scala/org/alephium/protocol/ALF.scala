@@ -17,7 +17,7 @@
 package org.alephium.protocol
 
 import org.alephium.protocol.model.Weight
-import org.alephium.util.{Duration, Number, TimeStamp, U256}
+import org.alephium.util.{Number, TimeStamp, U256}
 
 object ALF {
   //scalastyle:off magic.number
@@ -34,11 +34,6 @@ object ALF {
   val MaxTxInputNum: Int     = 1024
   val MaxTxOutputNum: Int    = 1024
   val MaxOutputDataSize: Int = 256
-
-  //TODO Add those in conf file
-  val BanDuration: Duration       = Duration.ofDaysUnsafe(1)
-  val PenaltyForgivness: Duration = Duration.ofHoursUnsafe(1)
-  val PenaltyFrequency: Duration  = Duration.ofMinutesUnsafe(1)
 
   //scalastyle:on magic.number
 

@@ -16,7 +16,6 @@
 
 package org.alephium.flow.validation
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 
 import org.alephium.flow.core.{BlockFlow, FlowUtils}
@@ -144,7 +143,7 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkInputNum(tx)
-      _ <- checkOutputNum(tx)
+      _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
       _ <- checkOutputAmount(tx)
       _ <- checkChainIndex(tx, chainIndex)
@@ -187,7 +186,7 @@ trait TxValidation {
   // format off for the sake of reading and checking rules
   // format: off
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
   protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
@@ -224,8 +223,29 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkOutputNum(tx: Transaction): TxValidationResult[Unit] = {
-      val outputNum = tx.outputsLength
+    protected[validation] def checkOutputNum(
+        tx: Transaction,
+        isIntraGroup: Boolean
+    ): TxValidationResult[Unit] = {
+      if (isIntraGroup) checkIntraGroupOutputNum(tx) else checkInterGroupOutputNum(tx)
+    }
+    protected[validation] def checkIntraGroupOutputNum(
+        tx: Transaction
+    ): TxValidationResult[Unit] = {
+      checkOutputNumCommon(tx.outputsLength)
+    }
+    protected[validation] def checkInterGroupOutputNum(
+        tx: Transaction
+    ): TxValidationResult[Unit] = {
+      if (tx.generatedOutputs.nonEmpty) {
+        invalidTx(GeneratedOutputForInterGroupTx)
+      } else {
+        checkOutputNumCommon(tx.unsigned.fixedOutputs.length)
+      }
+    }
+    protected[validation] def checkOutputNumCommon(
+        outputNum: Int
+    ): TxValidationResult[Unit] = {
       if (outputNum == 0) {
         invalidTx(NoOutputs)
       } else if (outputNum > ALF.MaxTxOutputNum) {
@@ -251,26 +271,23 @@ object TxValidation {
 
     protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {
       for {
-        _      <- checkPositiveOutputAmount(tx)
+        _      <- checkEachOutputAmount(tx)
         amount <- checkAlfOutputAmount(tx)
       } yield amount
     }
 
-    protected[validation] def checkPositiveOutputAmount(
+    protected[validation] def checkEachOutputAmount(
         tx: Transaction
     ): TxValidationResult[Unit] = {
-      @tailrec
-      def iter(outputIndex: Int): TxValidationResult[Unit] = {
-        if (outputIndex >= tx.outputsLength) {
-          validTx(())
-        } else {
-          val output = tx.getOutput(outputIndex)
-          val ok     = output.amount.nonZero && output.tokens.forall(_._2.nonZero)
-          if (ok) iter(outputIndex + 1) else invalidTx(AmountIsZero)
-        }
-      }
+      val ok = tx.unsigned.fixedOutputs.forall(checkOutputAmount) &&
+        tx.generatedOutputs.forall(checkOutputAmount)
+      if (ok) validTx(()) else invalidTx(AmountIsDustOrZero)
+    }
 
-      iter(0)
+    @inline private def checkOutputAmount(
+        output: TxOutput
+    ): Boolean = {
+      output.amount >= dustUtxoAmount && output.tokens.forall(_._2.nonZero)
     }
 
     protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256] = {

@@ -40,6 +40,11 @@ package object model {
   val defaultGasFee: U256          = defaultGasPrice * minimalGas
   val defaultGasFeePerInput: U256  = defaultGasPrice * defaultGasPerInput
   val defaultGasFeePerOutput: U256 = defaultGasPrice * defaultGasPerOutput
+
+  val maximalTxsInOneBlock: Int = 2000
+  val maximalGas: GasBox        = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
+
+  val dustUtxoAmount: U256 = ALF.nanoAlf(1000)
   //scalastyle:on magic.number
 
   type TokenId    = Hash

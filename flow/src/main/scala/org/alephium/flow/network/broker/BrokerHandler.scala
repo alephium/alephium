@@ -48,7 +48,7 @@ object BrokerHandler {
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
 
-trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHandler {
+trait BrokerHandler extends FlowDataHandler {
   import BrokerHandler._
 
   def connectionType: ConnectionType
@@ -152,14 +152,14 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       log.debug(s"Failed in adding new block")
     case BlockChainHandler.InvalidBlock(hash) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
-      publishEvent(MisbehaviorManager.InvalidMessage(remoteAddress))
+      handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
     case HeaderChainHandler.HeaderAdded(_) =>
       ()
     case HeaderChainHandler.HeaderAddingFailed =>
       log.debug(s"Failed in adding new header")
     case HeaderChainHandler.InvalidHeader(hash) =>
       log.debug(s"Invalid header received ${hash.shortHex}")
-      publishEvent(MisbehaviorManager.InvalidMessage(remoteAddress))
+      handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
     case TxHandler.AddFailed(hash) =>
@@ -181,19 +181,17 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
 
   def sendPing(): Unit = {
     if (pingNonce != 0) {
-      log.info(s"No Pong message received in time from $remoteAddress, stopping the brokerHandler")
-      publishEvent(MisbehaviorManager.RequestTimeout(remoteAddress))
-      context stop self // stop it manually
-    } else {
-      pingNonce = UnsecureRandom.nextNonZeroInt()
-      send(Ping(pingNonce, System.currentTimeMillis()))
+      log.info(s"No Pong message received in time from $remoteAddress")
+      handleMisbehavior(MisbehaviorManager.RequestTimeout(remoteAddress))
     }
+
+    pingNonce = UnsecureRandom.nextNonZeroInt()
+    send(Ping(pingNonce, System.currentTimeMillis()))
   }
 
   def handlePing(nonce: Int, timestamp: Long): Unit = {
     if (nonce == 0) {
-      publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
-      context stop self
+      handleMisbehavior(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp
       log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")
@@ -209,8 +207,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
       log.debug(
         s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce"
       )
-      publishEvent(MisbehaviorManager.InvalidPingPong(remoteAddress))
-      context stop self
+      handleMisbehavior(MisbehaviorManager.InvalidPingPong(remoteAddress))
     }
   }
 
@@ -235,7 +232,7 @@ trait BrokerHandler extends BaseActor with EventStream.Publisher with FlowDataHa
   }
 }
 
-trait FlowDataHandler extends BaseActor with EventStream.Publisher {
+trait FlowDataHandler extends BaseHandler {
   implicit def brokerConfig: BrokerConfig
   def allHandlers: AllHandlers
   def remoteAddress: InetSocketAddress
@@ -249,14 +246,14 @@ trait FlowDataHandler extends BaseActor with EventStream.Publisher {
   ): Unit = {
     if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
       log.warning(s"The data received does not contain minimal work")
-      publishEvent(MisbehaviorManager.InvalidPoW(remoteAddress))
+      handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
     } else {
       val ok = datas.forall { data => data.chainIndex.relateTo(brokerConfig) == isBlock }
       if (ok) {
         val message = DependencyHandler.AddFlowData(datas, dataOrigin)
         allHandlers.dependencyHandler ! message
       } else {
-        publishEvent(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+        handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
       }
     }
   }

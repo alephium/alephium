@@ -35,15 +35,20 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
   }
 
   it should "return the utxos with the amount from small to large" in new Fixture {
-    val utxos = buildUtxos(2, 1, 3)
+    val utxos = buildUtxos(20, 10, 30)
 
-    selectWithoutGas(utxos, 1) is Right(AVector(utxos(1)))
-    selectWithoutGas(utxos, 2) is Right(AVector(utxos(1), utxos(0)))
-    selectWithoutGas(utxos, 3) is Right(AVector(utxos(1), utxos(0)))
-    selectWithoutGas(utxos, 4) is Right(AVector(utxos(1), utxos(0), utxos(2)))
-    selectWithoutGas(utxos, 5) is Right(AVector(utxos(1), utxos(0), utxos(2)))
-    selectWithoutGas(utxos, 6) is Right(AVector(utxos(1), utxos(0), utxos(2)))
-    selectWithoutGas(utxos, 7).leftValue.startsWith(s"Not enough balance") is true
+    selectWithoutGas(utxos, 10) is Right(AVector(utxos(1)))
+    selectWithoutGas(utxos, 20) is Right(AVector(utxos(1), utxos(0)))
+    selectWithoutGas(utxos, 30) is Right(AVector(utxos(1), utxos(0)))
+    selectWithoutGas(utxos, 40) is Right(AVector(utxos(1), utxos(0), utxos(2)))
+    selectWithoutGas(utxos, 50) is Right(AVector(utxos(1), utxos(0), utxos(2)))
+    selectWithoutGas(utxos, 60) is Right(AVector(utxos(1), utxos(0), utxos(2)))
+    selectWithoutGas(utxos, 70).leftValue.startsWith(s"Not enough balance") is true
+
+    selectWithoutGas(utxos, 29, 1) is Right(AVector(utxos(1), utxos(0)))
+    selectWithoutGas(utxos, 29, 2) is Right(AVector(utxos(1), utxos(0), utxos(2)))
+    selectWithoutGas(utxos, 30, 1) is Right(AVector(utxos(1), utxos(0)))
+    selectWithoutGas(utxos, 59, 2).leftValue.startsWith(s"Not enough balance") is true
   }
 
   it should "return the correct utxos when gas is considered" in new Fixture {
@@ -55,6 +60,9 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     select(utxos, 27) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
     select(utxos, 55) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
     select(utxos, 56).leftValue is s"Not enough balance for fee, maybe transfer a smaller amount"
+
+    select(utxos, 25, dustAmount = 2) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
+    select(utxos, 26, dustAmount = 2) is Right(Selected(AVector(utxos(1), utxos(0)), 4))
   }
 
   it should "prefer persisted utxos" in new Fixture {
@@ -86,11 +94,12 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
     def selectWithoutGas(
         utxos: AVector[AssetOutputInfo],
-        amount: U256
+        amount: U256,
+        dustAmount: U256 = U256.Zero
     ): Either[String, AVector[AssetOutputInfo]] = {
       import UtxoUtils._
       val utxosSorted = utxos.sorted
-      findUtxosWithoutGas(utxosSorted, amount).map { case (_, index) =>
+      findUtxosWithoutGas(utxosSorted, amount, dustAmount).map { case (_, index) =>
         utxosSorted.take(index + 1)
       }
     }
@@ -98,9 +107,19 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     def select(
         utxos: AVector[AssetOutputInfo],
         amount: U256,
-        gasOpt: Option[GasBox] = None
+        gasOpt: Option[GasBox] = None,
+        dustAmount: U256 = U256.Zero
     ): Either[String, UtxoUtils.Selected] = {
-      UtxoUtils.select(utxos, amount, gasOpt, GasPrice(1), GasBox.unsafe(1), GasBox.unsafe(1), 2)
+      UtxoUtils.select(
+        utxos,
+        amount,
+        gasOpt,
+        GasPrice(1),
+        GasBox.unsafe(1),
+        GasBox.unsafe(1),
+        dustAmount,
+        2
+      )
     }
   }
 }

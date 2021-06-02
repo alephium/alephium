@@ -18,7 +18,7 @@ package org.alephium.flow.mempool
 
 import scala.collection.mutable
 
-import org.alephium.flow.mempool.TxPool.WeightedId
+import org.alephium.flow.mempool.SharedPool.WeightedId
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
@@ -27,7 +27,7 @@ import org.alephium.util.{AVector, RWLock, U256}
 /*
  * Transaction pool implementation
  */
-class TxPool private (
+class SharedPool private (
     pool: mutable.SortedMap[WeightedId, TransactionTemplate],
     weights: mutable.HashMap[Hash, GasPrice],
     val capacity: Int
@@ -89,9 +89,9 @@ class TxPool private (
     }
 }
 
-object TxPool {
-  def empty(capacity: Int): TxPool =
-    new TxPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
+object SharedPool {
+  def empty(capacity: Int): SharedPool =
+    new SharedPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
 
   final case class WeightedId(weight: GasPrice, id: Hash) {
     override def equals(obj: Any): Boolean =

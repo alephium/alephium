@@ -35,7 +35,7 @@ object TestUtils {
       headerHandlers: Map[ChainIndex, TestProbe]
   )
 
-  def createBlockHandlersProbe(implicit
+  def createAllHandlersProbe(implicit
       brokerConfig: BrokerConfig,
       system: ActorSystem
   ): (AllHandlers, AllHandlerProbs) = {

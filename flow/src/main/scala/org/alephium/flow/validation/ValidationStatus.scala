@@ -52,6 +52,8 @@ final case class MissingDeps(hashes: AVector[BlockHash]) extends InvalidHeaderSt
 final case object InvalidDepStateHash                    extends InvalidHeaderStatus
 final case class HeaderIOError(e: IOError)               extends InvalidHeaderStatus
 final case object EmptyTransactionList                   extends InvalidBlockStatus
+final case object TooManyTransactions                    extends InvalidBlockStatus
+final case object TooManyGasUsed                         extends InvalidBlockStatus
 final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus
 final case object InvalidCoinbaseData                    extends InvalidBlockStatus
 final case object InvalidCoinbaseReward                  extends InvalidBlockStatus
@@ -102,9 +104,10 @@ final case object NoInputs                              extends InvalidTxStatus
 final case object TooManyInputs                         extends InvalidTxStatus
 final case object NoOutputs                             extends InvalidTxStatus
 final case object TooManyOutputs                        extends InvalidTxStatus
+final case object GeneratedOutputForInterGroupTx        extends InvalidTxStatus
 final case object InvalidStartGas                       extends InvalidTxStatus
 final case object InvalidGasPrice                       extends InvalidTxStatus
-final case object AmountIsZero                          extends InvalidTxStatus
+final case object AmountIsDustOrZero                    extends InvalidTxStatus
 final case object DuplicatedInputs                      extends InvalidTxStatus
 final case object InvalidInputGroupIndex                extends InvalidTxStatus
 final case object InvalidOutputGroupIndex               extends InvalidTxStatus

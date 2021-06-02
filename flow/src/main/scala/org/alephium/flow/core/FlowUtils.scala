@@ -16,6 +16,7 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
 import com.typesafe.scalalogging.StrictLogging
@@ -139,7 +140,7 @@ trait FlowUtils
       val candidates2 = filterValidInputsUnsafe(chainIndex, loosenDeps, candidates1)
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
-      candidates3
+      FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, maximalGas)
     }
   }
 
@@ -347,6 +348,25 @@ object FlowUtils {
       val set = utxos0.toSet
       utxos1.forall(set.contains)
     }
+  }
+
+  def truncateTxs(
+      txs: AVector[TransactionTemplate],
+      maximalTxs: Int,
+      maximalGas: GasBox
+  ): AVector[TransactionTemplate] = {
+    @tailrec
+    def iter(gasSum: Int, index: Int): Int = {
+      if (index < txs.length) {
+        val newSum = gasSum + txs(index).unsigned.startGas.value
+        if (newSum > 0 && newSum <= maximalGas.value) iter(newSum, index + 1) else index
+      } else {
+        index
+      }
+    }
+
+    val maximalGasIndex = iter(0, 0)
+    txs.take(math.min(maximalTxs, maximalGasIndex))
   }
 }
 
