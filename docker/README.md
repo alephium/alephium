@@ -39,12 +39,12 @@ A local instance of grafana will be started at `http://192.168.1.90:3000` with t
 `JVM Overview`:
 
 ```
-http://192.168.1.90:3000/d/ME6diT3Mk/jvm-overview?orgId=1&refresh=30s
+http://127.0.0.1:3000/d/ME6diT3Mk/jvm-overview?orgId=1&refresh=30s
 ```
 
 and `Alephium Overview`:
 ```
-http://192.168.1.90:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
+http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 ```
 
 # Configuration
