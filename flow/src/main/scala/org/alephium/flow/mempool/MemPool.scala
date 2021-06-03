@@ -175,7 +175,7 @@ class MemPool private (
   private def measureSharedPoolTransactionsTotal(toGroup: Int) = {
     MemPool.sharedPoolTransactionsTotal
       .labels(group.value.toString, toGroup.toString)
-      .set(pools(toGroup).size.toDouble)
+      .set(sharedPools(toGroup).size.toDouble)
   }
 }
 
