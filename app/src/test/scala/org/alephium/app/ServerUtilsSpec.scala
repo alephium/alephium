@@ -25,11 +25,14 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
+  implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+
   trait Fixture extends FlowFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
   }
 
   it should "check tx status for intra group txs" in new Fixture {
+
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     val networkType          = networkSetting.networkType

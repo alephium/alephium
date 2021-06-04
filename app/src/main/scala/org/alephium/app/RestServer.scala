@@ -30,8 +30,11 @@ import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
-import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute, _}
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
+import sttp.model.{StatusCode, Uri}
+import sttp.tapir.client.sttp.SttpClientInterpreter
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
@@ -48,7 +51,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.http.{ServerOptions, SwaggerVertx}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -63,12 +66,14 @@ class RestServer(
     blocksExporter: BlocksExporter,
     walletServer: Option[WalletServer]
 )(implicit
+    val brokerConfig: BrokerConfig,
     val apiConfig: ApiConfig,
     val executionContext: ExecutionContext
 ) extends Endpoints
     with Documentation
     with Service
     with ServerOptions
+    with SttpClientInterpreter
     with StrictLogging {
 
   private val blockFlow: BlockFlow                        = node.blockFlow
@@ -76,11 +81,13 @@ class RestServer(
   private val viewHandler: ActorRefT[ViewHandler.Command] = node.allHandlers.viewHandler
   lazy val blockflowFetchMaxAge                           = apiConfig.blockflowFetchMaxAge
 
-  implicit val groupConfig: GroupConfig = node.config.broker
+  implicit val groupConfig: GroupConfig = brokerConfig
   implicit val networkType: NetworkType = node.config.network.networkType
   implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
 
   private val serverUtils: ServerUtils = new ServerUtils(networkType)
+
+  private val backend = AsyncHttpClientFutureBackend()
 
   //TODO Do we want to cache the result once it's synced?
   private def withSyncedClique[A](f: => FutureTry[A]): FutureTry[A] = {
@@ -116,28 +123,7 @@ class RestServer(
   }
 
   private val getSelfCliqueRoute = toRoute(getSelfClique) { _ =>
-    for {
-      selfReady <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
-      synced <-
-        if (selfReady) {
-          viewHandler.ref
-            .ask(InterCliqueManager.IsSynced)
-            .mapTo[InterCliqueManager.SyncedResult]
-            .map(_.isSynced)
-        } else {
-          Future.successful(false)
-        }
-      cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
-    } yield {
-      Right(
-        RestServer.selfCliqueFrom(
-          cliqueInfo,
-          node.config.consensus,
-          selfReady = selfReady,
-          synced = synced
-        )
-      )
-    }
+    fetchSelfClique()
   }
 
   private val getInterCliquePeerInfoRoute = toRoute(getInterCliquePeerInfo) { _ =>
@@ -179,7 +165,7 @@ class RestServer(
   }
 
   private val getGroupRoute = toRoute(getGroup) { address =>
-    Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
+    Future.successful(serverUtils.getGroup(GetGroup(address)))
   }
 
   private val getMisbehaviorsRoute = toRoute(getMisbehaviors) { _ =>
@@ -224,7 +210,7 @@ class RestServer(
       Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
   }
 
-  private val buildTransactionRoute = toRoute(buildTransaction) { case buildTransaction =>
+  private val buildTransactionRoute = toRouteRedirect(buildTransaction) { case buildTransaction =>
     withSyncedClique {
       Future.successful(
         serverUtils.buildTransaction(
@@ -233,9 +219,9 @@ class RestServer(
         )
       )
     }
-  }
+  } { bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig) }
 
-  private val buildSweepAllTransactionRoute = toRoute(buildSweepAllTransaction) {
+  private val buildSweepAllTransactionRoute = toRouteRedirect(buildSweepAllTransaction) {
     case buildSweepAllTransaction =>
       withSyncedClique {
         Future.successful(
@@ -245,7 +231,7 @@ class RestServer(
           )
         )
       }
-  }
+  } { bst => LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig) }
 
   private val submitTransactionRoute = toRoute(submitTransaction) { transaction =>
     withSyncedClique {
@@ -427,6 +413,76 @@ class RestServer(
       logger.info(s"http unbound")
       ()
     }
+
+  private def fetchSelfClique(): FutureTry[SelfClique] = {
+    for {
+      selfReady <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
+      synced <-
+        if (selfReady) {
+          viewHandler.ref
+            .ask(InterCliqueManager.IsSynced)
+            .mapTo[InterCliqueManager.SyncedResult]
+            .map(_.isSynced)
+        } else {
+          Future.successful(false)
+        }
+      cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
+    } yield {
+      Right(
+        RestServer.selfCliqueFrom(
+          cliqueInfo,
+          node.config.consensus,
+          selfReady = selfReady,
+          synced = synced
+        )
+      )
+    }
+  }
+
+  private def toRouteRedirect[P, A](
+      endpoint: BaseEndpoint[P, A]
+  )(f: P => Future[Either[ApiError[_ <: StatusCode], A]])(p: P => GroupIndex) = {
+    toRoute(endpoint) { params =>
+      requestFromGroupIndex(
+        p(params),
+        f(params),
+        endpoint,
+        params
+      )
+    }
+  }
+
+  private def requestFromGroupIndex[P, A](
+      groupIndex: GroupIndex,
+      f: => Future[Either[ApiError[_ <: StatusCode], A]],
+      endpoint: BaseEndpoint[P, A],
+      params: P
+  ): Future[Either[ApiError[_ <: StatusCode], A]] =
+    serverUtils.checkGroup(groupIndex) match {
+      case Right(_) => f
+      case Left(_) =>
+        uriFromGroup(groupIndex).flatMap {
+          _.fold(
+            e => Future.successful(Left(e)),
+            uri =>
+              backend
+                .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
+                .map(_.body)
+          )
+        }
+    }
+
+  private def uriFromGroup(
+      fromGroup: GroupIndex
+  ): Future[Either[ApiError[_ <: StatusCode], Uri]] =
+    fetchSelfClique().map { selfCliqueEither =>
+      for {
+        selfClique <- selfCliqueEither
+      } yield {
+        val peer = selfClique.peer(fromGroup)
+        Uri(peer.address.getHostAddress, peer.restPort)
+      }
+    }
 }
 
 object RestServer {
@@ -436,6 +492,7 @@ object RestServer {
       blocksExporter: BlocksExporter,
       walletServer: Option[WalletServer]
   )(implicit
+      brokerConfig: BrokerConfig,
       apiConfig: ApiConfig,
       executionContext: ExecutionContext
   ): RestServer = {
@@ -448,7 +505,7 @@ object RestServer {
       consensus: ConsensusSetting,
       selfReady: Boolean,
       synced: Boolean
-  )(implicit groupConfig: GroupConfig, networkType: NetworkType): SelfClique = {
+  )(implicit brokerConfig: BrokerConfig, networkType: NetworkType): SelfClique = {
 
     SelfClique(
       cliqueInfo.id,
@@ -460,7 +517,7 @@ object RestServer {
       selfReady = selfReady,
       synced = synced,
       cliqueInfo.groupNumPerBroker,
-      groupConfig.groups
+      brokerConfig.groups
     )
   }
 

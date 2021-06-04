@@ -28,7 +28,7 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -36,7 +36,10 @@ import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-class ServerUtils(networkType: NetworkType) {
+class ServerUtils(networkType: NetworkType)(implicit
+    brokerConfig: BrokerConfig,
+    executionContext: ExecutionContext
+) {
   import ServerUtils._
 
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
@@ -54,7 +57,7 @@ class ServerUtils(networkType: NetworkType) {
 
   def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] =
     for {
-      _ <- checkGroup(blockFlow, balanceRequest.address.lockupScript)
+      _ <- checkGroup(balanceRequest.address.lockupScript)
       balance <- blockFlow
         .getBalance(balanceRequest.address.lockupScript)
         .map(Balance(_))
@@ -62,8 +65,8 @@ class ServerUtils(networkType: NetworkType) {
         .flatMap(failed)
     } yield balance
 
-  def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = {
-    Right(Group(query.address.groupIndex(blockFlow.brokerConfig).value))
+  def getGroup(query: GetGroup): Try[Group] = {
+    Right(Group(query.address.groupIndex(brokerConfig).value))
   }
 
   def listUnconfirmedTransactions(
@@ -78,11 +81,12 @@ class ServerUtils(networkType: NetworkType) {
     )
   }
 
-  def buildTransaction(blockFlow: BlockFlow, query: BuildTransaction)(implicit
-      groupConfig: GroupConfig
+  def buildTransaction(
+      blockFlow: BlockFlow,
+      query: BuildTransaction
   ): Try[BuildTransactionResult] = {
     val resultEither = for {
-      _ <- checkGroup(blockFlow, query.fromPublicKey)
+      _ <- checkGroup(query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         query.fromPublicKey,
@@ -99,11 +103,12 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def buildSweepAllTransaction(blockFlow: BlockFlow, query: BuildSweepAllTransaction)(implicit
-      groupConfig: GroupConfig
+  def buildSweepAllTransaction(
+      blockFlow: BlockFlow,
+      query: BuildSweepAllTransaction
   ): Try[BuildTransactionResult] = {
     val resultEither = for {
-      _ <- checkGroup(blockFlow, query.fromPublicKey)
+      _ <- checkGroup(query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         query.fromPublicKey,
@@ -122,9 +127,7 @@ class ServerUtils(networkType: NetworkType) {
   }
 
   def submitTransaction(txHandler: ActorRefT[TxHandler.Command], query: SubmitTransaction)(implicit
-      config: GroupConfig,
-      askTimeout: Timeout,
-      executionContext: ExecutionContext
+      askTimeout: Timeout
   ): FutureTry[TxResult] = {
     createTxTemplate(query) match {
       case Right(tx)   => publishTx(txHandler, tx)
@@ -151,11 +154,14 @@ class ServerUtils(networkType: NetworkType) {
       status.toGroupConfirmations
     )
 
-  def getTransactionStatus(blockFlow: BlockFlow, txId: Hash, fromGroup: Int, toGroup: Int)(implicit
-      groupConfig: GroupConfig
+  def getTransactionStatus(
+      blockFlow: BlockFlow,
+      txId: Hash,
+      fromGroup: Int,
+      toGroup: Int
   ): Try[TxStatus] = {
     for {
-      chainIndex <- checkTxChainIndex(blockFlow, fromGroup, toGroup)
+      chainIndex <- checkTxChainIndex(fromGroup, toGroup)
       status     <- getTransactionStatus(blockFlow, txId, chainIndex)
     } yield status
   }
@@ -188,9 +194,9 @@ class ServerUtils(networkType: NetworkType) {
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock)(implicit cfg: GroupConfig): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
     for {
-      _ <- checkChainIndex(blockFlow, query.hash)
+      _ <- checkHashChainIndex(query.hash)
       block <- blockFlow
         .getBlock(query.hash)
         .left
@@ -222,9 +228,7 @@ class ServerUtils(networkType: NetworkType) {
     } yield ChainInfo(maxHeight)
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
-      config: GroupConfig,
-      askTimeout: Timeout,
-      executionContext: ExecutionContext
+      askTimeout: Timeout
   ): FutureTry[TxResult] = {
     val message = TxHandler.AddToGrandPool(AVector(tx), DataOrigin.Local)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
@@ -268,62 +272,52 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def checkGroup(group: Int)(implicit groupConfig: GroupConfig): Try[Unit] = {
-    if (group >= 0 && group < groupConfig.groups) {
+  def checkGroup(lockupScript: LockupScript): Try[Unit] = {
+    checkGroup(
+      lockupScript.groupIndex(brokerConfig),
+      Some(s"Address ${Address(networkType, lockupScript)}")
+    )
+  }
+
+  def checkGroup(publicKey: PublicKey): Try[Unit] = {
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    checkGroup(
+      lockupScript.groupIndex(brokerConfig),
+      Some(s"Address ${Address(networkType, lockupScript)}")
+    )
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def checkGroup(groupIndex: GroupIndex, data: Option[String] = None): Try[Unit] = {
+    if (brokerConfig.contains(groupIndex)) {
       Right(())
     } else {
-      Left(badRequest(s"Invalid group: $group"))
+      Left(badRequest(s"${data.getOrElse("This node")} belongs to other groups"))
     }
   }
 
-  def checkGroup(blockFlow: BlockFlow, publicKey: PublicKey): Try[Unit] = {
-    checkGroup(blockFlow, LockupScript.p2pkh(publicKey))
-  }
-
-  def checkGroup(blockFlow: BlockFlow, lockupScript: LockupScript): Try[Unit] = {
-    val groupIndex = lockupScript.groupIndex(blockFlow.brokerConfig)
-    if (blockFlow.brokerConfig.contains(groupIndex)) {
-      Right(())
-    } else {
-      Left(badRequest(s"Address ${Address(networkType, lockupScript)} belongs to other groups"))
-    }
-  }
-
-  def checkChainIndex(blockFlow: BlockFlow, hash: BlockHash)(implicit
-      groupConfig: GroupConfig
-  ): Try[Unit] = {
-    val chainIndex = ChainIndex.from(hash)
+  def checkChainIndex(chainIndex: ChainIndex, data: String): Try[ChainIndex] = {
     if (
-      blockFlow.brokerConfig.contains(chainIndex.from) ||
-      blockFlow.brokerConfig.contains(chainIndex.to)
+      brokerConfig.contains(chainIndex.from) ||
+      brokerConfig.contains(chainIndex.to)
     ) {
-      Right(())
+      Right(chainIndex)
     } else {
-      Left(badRequest(s"${hash.toHexString} belongs to other groups"))
+      Left(badRequest(s"$data belongs to other groups"))
     }
   }
 
-  def checkTxChainIndex(blockFlow: BlockFlow, fromGroup: Int, toGroup: Int)(implicit
-      groupConfig: GroupConfig
-  ): Try[ChainIndex] = {
-    val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-    for {
-      _ <- checkGroup(fromGroup)
-      _ <- checkGroup(toGroup)
-      _ <- {
-        if (
-          blockFlow.brokerConfig.contains(chainIndex.from) ||
-          blockFlow.brokerConfig.contains(chainIndex.to)
-        ) {
-          Right(())
-        } else {
-          Left(badRequest(s"$chainIndex belongs to other groups"))
-        }
-      }
-    } yield chainIndex
+  def checkHashChainIndex(hash: BlockHash): Try[ChainIndex] = {
+    val chainIndex = ChainIndex.from(hash)
+    checkChainIndex(chainIndex, hash.toHexString)
   }
 
-  def execute(f: => Unit)(implicit ec: ExecutionContext): FutureTry[Boolean] =
+  def checkTxChainIndex(fromGroup: Int, toGroup: Int): Try[ChainIndex] = {
+    val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+    checkChainIndex(chainIndex, chainIndex.toString)
+  }
+
+  def execute(f: => Unit): FutureTry[Boolean] =
     Future {
       f
       Right(true)
@@ -374,9 +368,7 @@ class ServerUtils(networkType: NetworkType) {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def buildContract(blockFlow: BlockFlow, query: BuildContract)(implicit
-      groupConfig: GroupConfig
-  ): FutureTry[BuildContractResult] = {
+  def buildContract(blockFlow: BlockFlow, query: BuildContract): FutureTry[BuildContractResult] = {
     Future.successful((for {
       codeBytestring <- Hex
         .from(query.code)
@@ -395,9 +387,7 @@ class ServerUtils(networkType: NetworkType) {
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def submitContract(txHandler: ActorRefT[TxHandler.Command], query: SubmitContract)(implicit
-      groupConfig: GroupConfig,
-      askTimeout: Timeout,
-      executionContext: ExecutionContext
+      askTimeout: Timeout
   ): FutureTry[TxResult] = {
     (for {
       txByteString <- Hex.from(query.tx).toRight(badRequest(s"Invalid hex"))

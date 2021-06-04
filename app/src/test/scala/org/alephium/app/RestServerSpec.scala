@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import java.net.InetAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.concurrent._
 import scala.io.Source
@@ -34,6 +34,7 @@ import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.bootstrap._
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
@@ -158,8 +159,8 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call POST /transactions/build" in new RestServerFixture {
-    withServer {
+  it should "call POST /transactions/build" in new MultiRestServerFixture {
+    withServers {
       Post(
         s"/transactions/build",
         body = s"""
@@ -176,7 +177,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       ) check { response =>
         response.code is StatusCode.Ok
         response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-          dummyTransferTx(dummyTx, AVector((dummyToLockupScript, U256.One, None)))
+          ServerFixture.dummyTransferTx(dummyTx, AVector((dummyToLockupScript, U256.One, None)))
         )
       }
       Post(
@@ -196,7 +197,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       ) check { response =>
         response.code is StatusCode.Ok
         response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-          dummyTransferTx(
+          ServerFixture.dummyTransferTx(
             dummyTx,
             AVector((dummyToLockupScript, U256.One, Some(TimeStamp.unsafe(1234))))
           )
@@ -262,7 +263,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       ) check { response =>
         response.code is StatusCode.Ok
         response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-          dummySweepAllTx(dummyTx, dummyToLockupScript, None)
+          ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, None)
         )
       }
       Post(
@@ -277,7 +278,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       ) check { response =>
         response.code is StatusCode.Ok
         response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-          dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
+          ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
         )
       }
 
@@ -539,7 +540,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  trait RestServerFixture extends ServerFixture with HttpRouteFixture {
+  trait Fixture extends ServerFixture with HttpRouteFixture {
     lazy val minerProbe                      = TestProbe()
     lazy val miner                           = ActorRefT[Miner.Command](minerProbe.ref)
     lazy val (allHandlers, allHandlersProbe) = TestUtils.createAllHandlersProbe
@@ -589,10 +590,18 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0))
     )
 
-    lazy val port      = node.config.network.restPort
     lazy val walletApp = new WalletApp(walletConfig)
+  }
+
+  trait RestServerFixture extends Fixture {
+    lazy val port = config.network.restPort
     lazy val server: RestServer =
       RestServer(node, miner, blocksExporter, Some(walletApp.walletServer))
+
+    implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig)
+    implicit lazy val networkType: NetworkType = config.network.networkType
+
+    lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
     def withServer(f: => Any) = {
       try {
@@ -600,6 +609,88 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         f
       } finally {
         server.stop().futureValue
+      }
+    }
+  }
+
+  trait MultiRestServerFixture extends Fixture with SocketUtil {
+
+    implicit lazy val networkType: NetworkType = config.network.networkType
+    implicit lazy val blockflowFetchMaxAge     = Duration.zero
+    lazy val groupNumPerBroker                 = config.broker.groupNumPerBroker
+
+    private def buildPeer(id: Int): (PeerInfo, ApiConfig) = {
+      val peerPort = generatePort()
+
+      val address = new InetSocketAddress("127.0.0.1", peerPort)
+      //all same port as only `restPort` is used
+      val peer = PeerInfo.unsafe(
+        id,
+        groupNumPerBroker = groupNumPerBroker,
+        publicAddress = None,
+        privateAddress = address,
+        restPort = peerPort,
+        wsPort = peerPort,
+        minerApiPort = peerPort
+      )
+
+      val peerConf = ApiConfig(
+        networkInterface = address.getAddress,
+        blockflowFetchMaxAge = blockflowFetchMaxAge,
+        askTimeout = Duration.ofMinutesUnsafe(1)
+      )
+
+      (peer, peerConf)
+    }
+
+    private def buildServers(nb: Int) = {
+      val peers = (0 to nb - 1).map(buildPeer)
+
+      val intraCliqueInfo = IntraCliqueInfo.unsafe(
+        dummyIntraCliqueInfo.id,
+        AVector.from(peers.map(_._1)),
+        groupNumPerBroker = groupNumPerBroker,
+        dummyIntraCliqueInfo.priKey
+      )
+
+      AVector.from(peers.zipWithIndex.map { case ((peer, peerConf), id) =>
+        val newConfig = config.copy(broker = config.broker.copy(brokerId = id))
+        val nodeDummy = new NodeDummy(
+          intraCliqueInfo,
+          dummyNeighborPeers,
+          dummyBlock,
+          blockFlowProbe.ref,
+          allHandlers,
+          dummyTx,
+          storages,
+          cliqueManagerOpt = Some(cliqueManager),
+          misbehaviorManagerOpt = Some(misbehaviorManager)
+        )(newConfig)
+
+        new RestServer(
+          nodeDummy,
+          peer.restPort,
+          miner,
+          blocksExporter,
+          Some(walletApp.walletServer)
+        )(
+          newConfig.broker,
+          peerConf,
+          scala.concurrent.ExecutionContext.Implicits.global
+        )
+      })
+    }
+
+    lazy val servers = buildServers(config.broker.groups)
+
+    lazy val port = servers.sample().port
+
+    def withServers(f: => Any) = {
+      try {
+        servers.foreach(_.start().futureValue)
+        f
+      } finally {
+        servers.foreach(_.stop().futureValue)
       }
     }
   }

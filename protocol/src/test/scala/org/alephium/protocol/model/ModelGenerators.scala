@@ -60,6 +60,18 @@ trait LockupScriptGenerators extends Generators {
         privateKey
       )
     }
+
+  def addressStringGen(implicit groupConfig: GroupConfig): Gen[(String, String, String)] =
+    for {
+      groupIndex                      <- groupIndexGen
+      (script, publicKey, privateKey) <- addressGen(groupIndex)
+    } yield {
+      (
+        Address(NetworkType.Devnet, script).toBase58,
+        publicKey.toHexString,
+        privateKey.toHexString
+      )
+    }
 }
 
 trait TxInputGenerators extends Generators {
