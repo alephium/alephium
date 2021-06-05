@@ -16,6 +16,8 @@
 
 package org.alephium.flow.mempool
 
+import io.prometheus.client.Gauge
+
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
@@ -24,8 +26,6 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.AVector
-
-import io.prometheus.client.Gauge
 
 /*
  * MemPool is the class to store all the pending transactions
@@ -166,15 +166,17 @@ class MemPool private (
     sharedPools.foreach(_.clear())
   }
 
+  private val groupString = group.value.toString
+
   private def measurePendingPoolTransactionsTotal() = {
     MemPool.pendingPoolTransactionsTotal
-      .labels(group.value.toString)
+      .labels(groupString)
       .set(pendingPool.txs.size.toDouble)
   }
 
   private def measureSharedPoolTransactionsTotal(toGroup: Int) = {
     MemPool.sharedPoolTransactionsTotal
-      .labels(group.value.toString, toGroup.toString)
+      .labels(groupString, toGroup.toString)
       .set(sharedPools(toGroup).size.toDouble)
   }
 }

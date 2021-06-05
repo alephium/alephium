@@ -16,7 +16,10 @@
 
 package org.alephium.flow.handler
 
+import io.prometheus.client.{Counter, Gauge, Histogram}
+
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.BlockHeaderChain
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
@@ -25,9 +28,8 @@ import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
-import io.prometheus.client.{Gauge, Counter, Histogram}
-import org.alephium.flow.core.BlockHeaderChain
 
+//scalastyle:off magic.number
 object ChainHandler {
   trait Event
 
@@ -51,22 +53,13 @@ object ChainHandler {
     .labelNames("validation_type")
     .register()
 
-  val chainValidationOngoing: Gauge = Gauge
-    .build(
-      "alephium_chain_validation_current",
-      "Current count of chain validations"
-    )
-    .labelNames("validation_type")
-    .register()
-
   val chainValidationDurationMilliSeconds: Histogram = Histogram
     .build(
       "alephium_chain_validation_duration_milliseconds",
       "Duration of the validation"
     )
     .labelNames("validation_type")
-    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
-      600000, 1800000, 3600000)
+    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
     .register()
 
   val blockDurationMilliSeconds: Histogram = Histogram
@@ -101,7 +94,6 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
 
-    chainValidationOngoing.labels(data.`type`).inc()
     chainValidationTotal.labels(data.`type`).inc()
 
     val startTime           = System.nanoTime()
@@ -111,7 +103,6 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     chainValidationDurationMilliSeconds
       .labels(data.`type`)
       .observe(elapsedMilliSeconds)
-    chainValidationOngoing.labels(data.`type`).dec()
 
     validationResult match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
@@ -129,7 +120,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     log.error(
       s"IO failed in block/header ${data.hash.shortHex}: $blockHex validation: $error"
     )
-    ChainHandler.chainValidationFailed.labels(data.`type`, "IOError").inc()
+    chainValidationFailed.labels(data.`type`, "IOError").inc()
 
     broker ! dataAddingFailed()
   }
@@ -191,35 +182,31 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     val chain = blockFlow.getHeaderChain(header)
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
-    val blockTime = getBlockTime(header, chain).map(time => s"${time}ms").getOrElse("?ms")
+    val blockTime = chain.getBlockTime(header).toOption.fold("?ms")(time => s"${time}ms")
 
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
 
   protected def measureCommon(header: BlockHeader): BlockHeaderChain = {
-    val chain      = blockFlow.getHeaderChain(header)
-    val (from, to) = getChainIndexLabels(header)
+    val chain = blockFlow.getHeaderChain(header)
 
-    blockCurrentHeight
-      .labels(from, to)
+    blockCurrentHeightLabeled
       .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
 
-    getBlockTime(header, chain).foreach { blockTime =>
-      blockDurationMilliSeconds.labels(from, to).observe(blockTime.toDouble)
+    chain.getBlockTime(header).foreach { blockTime =>
+      blockDurationMilliSecondsLabeled.observe(blockTime.toDouble)
     }
 
     chain
   }
 
-  protected def getChainIndexLabels(header: BlockHeader): (String, String) = {
-    val index = header.chainIndex
-    (index.from.value.toString, index.to.value.toString)
-  }
+  protected val chainIndexfromString = chainIndex.from.value.toString
 
-  private def getBlockTime(header: BlockHeader, chain: BlockHeaderChain): Option[Long] = {
-    chain
-      .getBlockHeader(header.parentHash)
-      .toOption
-      .map(header.timestamp.millis - _.timestamp.millis)
-  }
+  protected val chainIndexToString = chainIndex.to.value.toString
+
+  private val blockDurationMilliSecondsLabeled = blockDurationMilliSeconds
+    .labels(chainIndexfromString, chainIndexToString)
+
+  private val blockCurrentHeightLabeled = blockCurrentHeight
+    .labels(chainIndexfromString, chainIndexToString)
 }

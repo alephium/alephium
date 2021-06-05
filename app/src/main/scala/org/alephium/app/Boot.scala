@@ -25,13 +25,12 @@ import akka.Done
 import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
+import io.prometheus.client.Gauge
+import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Files => AFiles}
-
-import io.prometheus.client.hotspot.DefaultExports
-import io.prometheus.client.Gauge
 
 object Boot extends App with StrictLogging {
   try {
@@ -61,14 +60,12 @@ class BootUp extends StrictLogging {
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
 
-  // Register the default Hotspot (JVM) collectors for Prometheus
-  DefaultExports.initialize()
-
-  collectBuildInfo()
-
   val server: Server = Server(rootPath, flowSystem)
 
   def init(): Unit = {
+    // Register the default Hotspot (JVM) collectors for Prometheus
+    DefaultExports.initialize()
+    collectBuildInfo()
     logConfig()
 
     server

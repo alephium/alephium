@@ -17,6 +17,7 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
+import io.prometheus.client.{Counter, Gauge}
 
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.handler.FlowHandler.BlockNotify
@@ -30,8 +31,6 @@ import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, SendBlocks, SendHeaders}
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, EventBus, EventStream}
-
-import io.prometheus.client.{Counter, Gauge}
 
 object BlockChainHandler {
   def props(
@@ -135,10 +134,11 @@ class BlockChainHandler(
   override def measure(block: Block): Unit = {
     val chain             = measureCommon(block.header)
     val numOfTransactions = block.transactions.length
-    val (from, to)        = getChainIndexLabels(block.header)
 
-    blocksTotal.labels(from, to).set(chain.numHashes.toDouble)
-    blocksReceivedTotal.labels(from, to).inc()
-    transactionsReceivedTotal.labels(from, to).inc(numOfTransactions.toDouble)
+    blocksTotal.labels(chainIndexfromString, chainIndexToString).set(chain.numHashes.toDouble)
+    blocksReceivedTotal.labels(chainIndexfromString, chainIndexToString).inc()
+    transactionsReceivedTotal
+      .labels(chainIndexfromString, chainIndexToString)
+      .inc(numOfTransactions.toDouble)
   }
 }
