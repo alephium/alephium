@@ -208,6 +208,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
   }
+
+  def getBlockTime(header: BlockHeader): IOResult[Long] = {
+    getBlockHeader(header.parentHash)
+      .map(header.timestamp.millis - _.timestamp.millis)
+  }
 }
 
 object BlockHeaderChain {

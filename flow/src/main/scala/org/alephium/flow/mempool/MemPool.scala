@@ -166,15 +166,17 @@ class MemPool private (
     sharedPools.foreach(_.clear())
   }
 
+  private val groupString = group.value.toString
+
   private def measurePendingPoolTransactionsTotal() = {
     MemPool.pendingPoolTransactionsTotal
-      .labels(group.value.toString)
+      .labels(groupString)
       .set(pendingPool.txs.size.toDouble)
   }
 
   private def measureSharedPoolTransactionsTotal(toGroup: Int) = {
     MemPool.sharedPoolTransactionsTotal
-      .labels(group.value.toString, toGroup.toString)
+      .labels(groupString, toGroup.toString)
       .set(sharedPools(toGroup).size.toDouble)
   }
 }

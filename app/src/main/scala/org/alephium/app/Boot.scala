@@ -60,14 +60,12 @@ class BootUp extends StrictLogging {
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
 
-  // Register the default Hotspot (JVM) collectors for Prometheus
-  DefaultExports.initialize()
-
-  collectBuildInfo()
-
   val server: Server = Server(rootPath, flowSystem)
 
   def init(): Unit = {
+    // Register the default Hotspot (JVM) collectors for Prometheus
+    DefaultExports.initialize()
+    collectBuildInfo()
     logConfig()
 
     server
