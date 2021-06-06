@@ -183,7 +183,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     val chain = blockFlow.getHeaderChain(header)
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
-    val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time}ms")
+    val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
 
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
@@ -194,19 +194,26 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     blockCurrentHeightLabeled
       .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
 
-    chain.getBlockTime(header).foreach { blockTime =>
-      blockDurationMilliSecondsLabeled.observe(blockTime.toDouble)
+    for {
+      isCanonical <- chain.isCanonical(header.hash)
+      blockTime   <- chain.getBlockTime(header)
+    } {
+      // as the genesis time is 0, the first block's blockTime is very large so we exclude it
+      // TODO: remove this check once we introduce proper genesis timestamp
+      if (isCanonical && (blockTime < Duration.ofDaysUnsafe(1))) {
+        blockDurationMilliSecondsLabeled.observe(blockTime.millis.toDouble)
+      }
     }
 
     chain
   }
 
-  protected def chainIndexfromString = chainIndex.from.value.toString
+  protected def chainIndexFromString = chainIndex.from.value.toString
   protected def chainIndexToString   = chainIndex.to.value.toString
 
   private val blockDurationMilliSecondsLabeled = blockDurationMilliSeconds
-    .labels(chainIndexfromString, chainIndexToString)
+    .labels(chainIndexFromString, chainIndexToString)
 
   private val blockCurrentHeightLabeled = blockCurrentHeight
-    .labels(chainIndexfromString, chainIndexToString)
+    .labels(chainIndexFromString, chainIndexToString)
 }

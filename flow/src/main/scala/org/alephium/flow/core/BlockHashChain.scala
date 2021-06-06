@@ -22,7 +22,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Weight
@@ -110,6 +110,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>
       math.max(getHeightUnsafe(hash), height)
     }
+
+  def isCanonical(hash: BlockHash): IOResult[Boolean] = {
+    IOUtils.tryExecute(isCanonicalUnsafe(hash))
+  }
 
   def isCanonicalUnsafe(hash: BlockHash): Boolean = {
     blockStateStorage.getOptUnsafe(hash).exists { state =>

@@ -95,9 +95,9 @@ class HeaderChainHandler(
 
   override def show(header: BlockHeader): String = showHeader(header)
 
-  private val headersTotalLabeled = headersTotal.labels(chainIndexfromString, chainIndexToString)
+  private val headersTotalLabeled = headersTotal.labels(chainIndexFromString, chainIndexToString)
   private val headersReceivedTotalLabeled =
-    headersReceivedTotal.labels(chainIndexfromString, chainIndexToString)
+    headersReceivedTotal.labels(chainIndexFromString, chainIndexToString)
   override def measure(header: BlockHeader): Unit = {
     val chain = measureCommon(header)
 

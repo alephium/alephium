@@ -25,7 +25,7 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target, Weight}
-import org.alephium.util.{AVector, EitherF, LruCache, TimeStamp}
+import org.alephium.util.{AVector, Duration, EitherF, LruCache, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
@@ -209,9 +209,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
   }
 
-  def getBlockTime(header: BlockHeader): IOResult[Long] = {
+  def getBlockTime(header: BlockHeader): IOResult[Duration] = {
     getBlockHeader(header.parentHash)
-      .map(header.timestamp.millis - _.timestamp.millis)
+      .map(header.timestamp deltaUnsafe _.timestamp)
   }
 }
 
