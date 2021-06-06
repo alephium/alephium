@@ -24,6 +24,7 @@ import scala.collection.mutable
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
+import io.prometheus.client.Counter
 
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
@@ -31,7 +32,6 @@ import org.alephium.protocol.message.{Message, Payload}
 import org.alephium.protocol.model.NetworkType
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
-import io.prometheus.client.Counter
 
 object ConnectionHandler {
   def clique(

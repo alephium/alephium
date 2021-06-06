@@ -16,7 +16,9 @@
 
 package org.alephium.flow.handler
 
-import org.alephium.flow.core.BlockFlow
+import io.prometheus.client.{Counter, Gauge, Histogram}
+
+import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
@@ -25,8 +27,6 @@ import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
-import io.prometheus.client.{Gauge, Counter, Histogram}
-import org.alephium.flow.core.BlockHeaderChain
 
 object ChainHandler {
   trait Event
@@ -59,6 +59,7 @@ object ChainHandler {
     .labelNames("validation_type")
     .register()
 
+  // scalastyle:off magic.number
   val chainValidationDurationMilliSeconds: Histogram = Histogram
     .build(
       "alephium_chain_validation_duration_milliseconds",
@@ -78,6 +79,7 @@ object ChainHandler {
     .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
       600000, 1800000, 3600000)
     .register()
+  // scalastyle:on magic.number
 
   val blockCurrentHeight: Gauge = Gauge
     .build(

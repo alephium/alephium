@@ -21,6 +21,7 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.Tcp
+import io.prometheus.client.Gauge
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
@@ -31,8 +32,6 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
-
-import io.prometheus.client.Gauge
 
 object InterCliqueManager {
   // scalastyle:off parameter.number

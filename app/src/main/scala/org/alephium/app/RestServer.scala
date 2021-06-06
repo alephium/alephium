@@ -16,13 +16,16 @@
 
 package org.alephium.app
 
+import java.io.{StringWriter, Writer}
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 import scala.util.Try
 
-import java.io.{StringWriter, Writer}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import io.prometheus.client.CollectorRegistry
+import io.prometheus.client.exporter.common.TextFormat
 import io.vertx.core.Vertx
 import io.vertx.core.http.HttpServer
 import io.vertx.ext.web._
@@ -30,8 +33,6 @@ import io.vertx.ext.web.handler.CorsHandler
 import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
-import io.prometheus.client.exporter.common.TextFormat
-import io.prometheus.client.CollectorRegistry
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson

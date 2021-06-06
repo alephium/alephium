@@ -9,7 +9,10 @@
       "url": "{protocol}://{host}:{port}",
       "variables": {
         "protocol": {
-          "enum": ["http", "https"],
+          "enum": [
+            "http",
+            "https"
+          ],
           "default": "http"
         },
         "host": {

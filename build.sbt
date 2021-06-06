@@ -199,8 +199,8 @@ lazy val app = mainProject("app")
       name,
       scalaVersion,
       sbtVersion,
-      BuildInfoKey("commitId" -> git.gitHeadCommit.value.getOrElse("missing-git-commit")),
-      BuildInfoKey("branch" -> git.gitCurrentBranch.value),
+      BuildInfoKey("commitId"       -> git.gitHeadCommit.value.getOrElse("missing-git-commit")),
+      BuildInfoKey("branch"         -> git.gitCurrentBranch.value),
       BuildInfoKey("releaseVersion" -> version.value)
     ),
     buildInfoPackage := "org.alephium.app",

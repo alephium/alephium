@@ -17,6 +17,7 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
+import io.prometheus.client.{Counter, Gauge}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
@@ -26,7 +27,6 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.{BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
-import io.prometheus.client.{Counter, Gauge}
 
 object HeaderChainHandler {
   def props(
