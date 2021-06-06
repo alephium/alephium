@@ -17,7 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.NoIndexModelGeneratorsLike
+import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike}
 import org.alephium.util.LockFixture
 
 class PendingPoolSpec
@@ -25,9 +25,11 @@ class PendingPoolSpec
     with TxIndexesSpec.Fixture
     with LockFixture
     with NoIndexModelGeneratorsLike {
+  private val dummyIndex = GroupIndex.unsafe(0)
+
   it should "add tx" in {
     val tx   = transactionGen().sample.get
-    val pool = PendingPool.empty
+    val pool = PendingPool.empty(dummyIndex)
     pool.add(tx.toTemplate)
     pool.add(tx.toTemplate) // for idempotent
     pool.txs.contains(tx.id) is true
@@ -36,7 +38,7 @@ class PendingPoolSpec
 
   it should "remove tx" in {
     val tx   = transactionGen().sample.get
-    val pool = PendingPool.empty
+    val pool = PendingPool.empty(dummyIndex)
     pool.remove(tx.toTemplate)
     pool.remove(tx.toTemplate) // for idempotent
     pool.txs.contains(tx.id) is false

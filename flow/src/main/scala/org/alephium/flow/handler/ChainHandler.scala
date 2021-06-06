@@ -91,18 +91,19 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
 
   def consensusConfig: ConsensusConfig
 
+  def chainValidationTotalLabeled: Counter.Child
+  def chainValidationDurationMilliSecondsLabeled: Histogram.Child
+
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
 
-    chainValidationTotal.labels(data.`type`).inc()
+    chainValidationTotalLabeled.inc()
 
     val startTime           = System.nanoTime()
     val validationResult    = validator.validate(data, blockFlow)
     val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
 
-    chainValidationDurationMilliSeconds
-      .labels(data.`type`)
-      .observe(elapsedMilliSeconds)
+    chainValidationDurationMilliSecondsLabeled.observe(elapsedMilliSeconds)
 
     validationResult match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
@@ -182,7 +183,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     val chain = blockFlow.getHeaderChain(header)
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
-    val blockTime = chain.getBlockTime(header).toOption.fold("?ms")(time => s"${time}ms")
+    val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time}ms")
 
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
@@ -200,9 +201,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     chain
   }
 
-  protected val chainIndexfromString = chainIndex.from.value.toString
-
-  protected val chainIndexToString = chainIndex.to.value.toString
+  protected def chainIndexfromString = chainIndex.from.value.toString
+  protected def chainIndexToString   = chainIndex.to.value.toString
 
   private val blockDurationMilliSecondsLabeled = blockDurationMilliSeconds
     .labels(chainIndexfromString, chainIndexToString)

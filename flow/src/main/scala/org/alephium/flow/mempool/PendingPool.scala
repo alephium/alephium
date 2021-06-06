@@ -22,11 +22,12 @@ import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{AssetOutputRef, ChainIndex, TransactionTemplate, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.{AVector, EitherF, RWLock}
 
 class PendingPool(
+    groupIndex: GroupIndex,
     val txs: mutable.HashMap[Hash, TransactionTemplate],
     val indexes: TxIndexes
 ) extends RWLock {
@@ -84,8 +85,15 @@ class PendingPool(
   def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
     indexes.getUtxo(outputRef)
   }
+
+  private val transactionTotalLabeled =
+    MemPool.pendingPoolTransactionsTotal.labels(groupIndex.value.toString)
+  def measureTransactionsTotal(): Unit = {
+    transactionTotalLabeled.set(txs.size.toDouble)
+  }
 }
 
 object PendingPool {
-  def empty: PendingPool = new PendingPool(mutable.HashMap.empty, TxIndexes.emptyPendingPool)
+  def empty(groupIndex: GroupIndex): PendingPool =
+    new PendingPool(groupIndex, mutable.HashMap.empty, TxIndexes.emptyPendingPool)
 }

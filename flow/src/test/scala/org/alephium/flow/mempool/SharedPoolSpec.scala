@@ -22,14 +22,16 @@ import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, LockFixture, U256}
 
 class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGeneratorsLike {
+  val dummyIndex = ChainIndex.unsafe(0, 0)
+
   it should "initialize an empty tx pool" in {
-    val pool = SharedPool.empty(3)
+    val pool = SharedPool.empty(dummyIndex, 3)
     pool.isFull is false
     pool.size is 0
   }
 
   it should "contain/add/remove for new transactions" in {
-    val pool = SharedPool.empty(3)
+    val pool = SharedPool.empty(dummyIndex, 3)
     forAll(blockGen) { block =>
       val txTemplates = block.transactions.map(_.toTemplate)
       val numberAdded = pool.add(txTemplates)
@@ -49,7 +51,7 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
   }
 
   trait Fixture extends WithLock {
-    val pool        = SharedPool.empty(3)
+    val pool        = SharedPool.empty(dummyIndex, 3)
     val block       = blockGen.sample.get
     val txTemplates = block.transactions.map(_.toTemplate)
     val txNum       = block.transactions.length

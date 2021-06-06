@@ -68,7 +68,7 @@ object ConnectionHandler {
     }
 
     override def handleNewMessage(payload: Payload): Unit = {
-      payloadTotal.labels(payload.productPrefix).inc()
+      payload.measure()
       brokerHandler ! BrokerHandler.Received(payload)
     }
   }
@@ -87,14 +87,6 @@ object ConnectionHandler {
       "Total upload bytes"
     )
     .labelNames("remote_address")
-    .register()
-
-  val payloadTotal: Counter = Counter
-    .build(
-      "alephium_payload_total",
-      "Total number of payloads"
-    )
-    .labelNames("payload_type")
     .register()
 }
 
@@ -119,8 +111,9 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   def bufferedCommunicating: Receive = reading orElse bufferedWriting orElse closed
 
+  private val downloadBytesTotalLabeled = downloadBytesTotal.labels(remoteAddress.toString)
   def reading: Receive = { case Tcp.Received(data) =>
-    downloadBytesTotal.labels(remoteAddress.toString).inc(data.length.toDouble)
+    downloadBytesTotalLabeled.inc(data.length.toDouble)
     bufferInMessage(data)
     processInMessageBuffer()
     connection ! Tcp.ResumeReading
@@ -248,9 +241,10 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     }
   }
 
+  private val uploadBytesTotalLabeled = uploadBytesTotal.labels(remoteAddress.toString)
   private def sendData(data: ByteString, ack: Long): Unit = {
     connection ! Tcp.Write(data, Ack(ack))
-    uploadBytesTotal.labels(remoteAddress.toString).inc(data.length.toDouble)
+    uploadBytesTotalLabeled.inc(data.length.toDouble)
   }
 
   final private var inMessageBuffer = ByteString.empty
