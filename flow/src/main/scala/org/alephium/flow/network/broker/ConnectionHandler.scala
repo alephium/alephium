@@ -24,6 +24,7 @@ import scala.collection.mutable
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
+import io.prometheus.client.Counter
 
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
@@ -67,9 +68,34 @@ object ConnectionHandler {
     }
 
     override def handleNewMessage(payload: Payload): Unit = {
+      payloadTotal.labels(payload.productPrefix).inc()
       brokerHandler ! BrokerHandler.Received(payload)
     }
   }
+
+  val uploadBytesTotal: Counter = Counter
+    .build(
+      "alephium_upload_bytes_total",
+      "Total upload bytes"
+    )
+    .labelNames("remote_address")
+    .register()
+
+  val downloadBytesTotal: Counter = Counter
+    .build(
+      "alephium_download_bytes_total",
+      "Total upload bytes"
+    )
+    .labelNames("remote_address")
+    .register()
+
+  val payloadTotal: Counter = Counter
+    .build(
+      "alephium_payload_total",
+      "Total number of payloads"
+    )
+    .labelNames("payload_type")
+    .register()
 }
 
 trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
@@ -94,6 +120,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   def bufferedCommunicating: Receive = reading orElse bufferedWriting orElse closed
 
   def reading: Receive = { case Tcp.Received(data) =>
+    downloadBytesTotal.labels(remoteAddress.toString).inc(data.length.toDouble)
     bufferInMessage(data)
     processInMessageBuffer()
     connection ! Tcp.ResumeReading
@@ -182,7 +209,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   protected def send(data: ByteString): Unit = {
     outMessageCount += 1
-    connection ! Tcp.Write(data, Ack(outMessageCount))
+    sendData(data, outMessageCount)
   }
 
   protected def buffer(data: ByteString): Unit = {
@@ -211,14 +238,19 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   private def writeFirst(): Unit = {
     outMessageBuffer.headOption.foreach { case (id, data) =>
-      connection ! Tcp.Write(data, Ack(id))
+      sendData(data, id)
     }
   }
 
   private def writeAll(): Unit = {
     for ((id, data) <- outMessageBuffer) {
-      connection ! Tcp.Write(data, Ack(id))
+      sendData(data, id)
     }
+  }
+
+  private def sendData(data: ByteString, ack: Long): Unit = {
+    connection ! Tcp.Write(data, Ack(ack))
+    uploadBytesTotal.labels(remoteAddress.toString).inc(data.length.toDouble)
   }
 
   final private var inMessageBuffer = ByteString.empty

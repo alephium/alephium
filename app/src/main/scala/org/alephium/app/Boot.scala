@@ -25,6 +25,8 @@ import akka.Done
 import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
+import io.prometheus.client.Gauge
+import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
@@ -57,6 +59,11 @@ class BootUp extends StrictLogging {
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
+
+  // Register the default Hotspot (JVM) collectors for Prometheus
+  DefaultExports.initialize()
+
+  collectBuildInfo()
 
   val server: Server = Server(rootPath, flowSystem)
 
@@ -99,6 +106,17 @@ class BootUp extends StrictLogging {
 
     val digests = config.genesisBlocks.map(showBlocks).mkString("-")
     logger.info(s"Genesis digests: $digests")
+  }
+
+  def collectBuildInfo(): Unit = {
+    Gauge
+      .build("alephium_build_info", "Alephium full node build info")
+      .labelNames("release_version", "commit_id")
+      .register()
+      .labels(BuildInfo.releaseVersion, BuildInfo.commitId)
+      .set(1)
+
+    logger.info(s"Build info: ${BuildInfo}")
   }
 
   def showBlocks(blocks: AVector[Block]): String = blocks.map(_.shortHex).mkString("-")

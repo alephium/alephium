@@ -17,6 +17,7 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
+import io.prometheus.client.{Counter, Gauge}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
@@ -45,6 +46,22 @@ object HeaderChainHandler {
   final case class HeaderAdded(hash: BlockHash)   extends Event
   case object HeaderAddingFailed                  extends Event
   final case class InvalidHeader(hash: BlockHash) extends Event
+
+  val headersTotal: Gauge = Gauge
+    .build(
+      "alephium_headers_total",
+      "Total number of headers"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val headersReceivedTotal: Counter = Counter
+    .build(
+      "alephium_headers_received_total",
+      "Total number of headers received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 class HeaderChainHandler(
@@ -77,4 +94,12 @@ class HeaderChainHandler(
   }
 
   override def show(header: BlockHeader): String = showHeader(header)
+
+  override def measure(header: BlockHeader): Unit = {
+    val chain      = measureCommon(header)
+    val (from, to) = getChainIndexLabels(header)
+
+    headersTotal.labels(from, to).set(chain.numHashes.toDouble)
+    headersReceivedTotal.labels(from, to).inc()
+  }
 }

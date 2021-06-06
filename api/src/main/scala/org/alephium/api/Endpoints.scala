@@ -279,7 +279,13 @@ trait Endpoints
     baseEndpoint.post
       .in("export-blocks")
       .in(jsonBody[ExportFile])
-      .summary("exports all the blocks")
+      .summary("Exports all the blocks")
+
+  val metrics: BaseEndpoint[Unit, String] =
+    baseEndpoint.get
+      .in("metrics")
+      .out(alfPlainTextBody)
+      .summary("Exports all prometheus metrics")
 }
 
 object Endpoints {

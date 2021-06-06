@@ -16,12 +16,16 @@
 
 package org.alephium.app
 
+import java.io.{StringWriter, Writer}
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 import scala.util.Try
 
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import io.prometheus.client.CollectorRegistry
+import io.prometheus.client.exporter.common.TextFormat
 import io.vertx.core.Vertx
 import io.vertx.core.http.HttpServer
 import io.vertx.ext.web._
@@ -291,6 +295,24 @@ class RestServer(
     }
   }
 
+  private val collectorRegistry = CollectorRegistry.defaultRegistry
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private val metricsRoute = toRoute(metrics) { _ =>
+    Future.successful {
+      val writer: Writer = new StringWriter()
+      try {
+        TextFormat.write004(writer, collectorRegistry.metricFamilySamples())
+        Right(writer.toString)
+      } catch {
+        case error: Throwable =>
+          Left(ApiError.InternalServerError(error.getMessage))
+      } finally {
+        writer.close
+      }
+    }
+  }
+
   val walletEndpoints = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 
   private val swaggerUiRoute = new SwaggerVertx(openApiJson(openAPI)).route
@@ -321,6 +343,7 @@ class RestServer(
     compileRoute,
     exportBlocksRoute,
     buildContractRoute,
+    metricsRoute,
     swaggerUiRoute
   )
 

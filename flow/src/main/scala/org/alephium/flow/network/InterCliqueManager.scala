@@ -21,6 +21,7 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.Tcp
+import io.prometheus.client.Gauge
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
@@ -81,6 +82,10 @@ object InterCliqueManager {
   }
 
   final case class PeerDisconnected(peer: InetSocketAddress)
+
+  val peersTotal: Gauge = Gauge
+    .build("alephium_peers_total", "Number of connected peers")
+    .register()
 }
 
 class InterCliqueManager(
@@ -225,6 +230,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     if (!brokers.contains(peerId)) {
       log.debug(s"Start syncing with inter-clique node: $brokerInfo")
       brokers += peerId -> BrokerState(brokerInfo, connectionType, broker, isSynced = false)
+      InterCliqueManager.peersTotal.set(brokers.size.toDouble)
     } else {
       log.debug(s"Ignore another connection from $peerId")
     }
@@ -282,6 +288,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def removeBroker(peer: InetSocketAddress): Unit = {
     brokers.filterInPlace { case (_, state) => state.info.address != peer }
+    InterCliqueManager.peersTotal.set(brokers.size.toDouble)
   }
 
   def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {
