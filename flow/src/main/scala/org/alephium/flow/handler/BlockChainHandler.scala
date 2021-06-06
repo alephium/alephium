@@ -17,7 +17,7 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
-import io.prometheus.client.{Counter, Gauge}
+import io.prometheus.client.{Counter, Gauge, Histogram}
 
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.handler.FlowHandler.BlockNotify
@@ -131,14 +131,21 @@ class BlockChainHandler(
     showHeader(block.header) + s" #tx: ${block.transactions.length}"
   }
 
+  private val blocksTotalLabeled = blocksTotal.labels(chainIndexfromString, chainIndexToString)
+  private val blocksReceivedTotalLabeled =
+    blocksReceivedTotal.labels(chainIndexfromString, chainIndexToString)
+  private val transactionsReceivedTotalLabeled =
+    transactionsReceivedTotal.labels(chainIndexfromString, chainIndexToString)
   override def measure(block: Block): Unit = {
     val chain             = measureCommon(block.header)
     val numOfTransactions = block.transactions.length
 
-    blocksTotal.labels(chainIndexfromString, chainIndexToString).set(chain.numHashes.toDouble)
-    blocksReceivedTotal.labels(chainIndexfromString, chainIndexToString).inc()
-    transactionsReceivedTotal
-      .labels(chainIndexfromString, chainIndexToString)
-      .inc(numOfTransactions.toDouble)
+    blocksTotalLabeled.set(chain.numHashes.toDouble)
+    blocksReceivedTotalLabeled.inc()
+    transactionsReceivedTotalLabeled.inc(numOfTransactions.toDouble)
   }
+
+  val chainValidationTotalLabeled: Counter.Child = ChainHandler.chainValidationTotal.labels("Block")
+  val chainValidationDurationMilliSecondsLabeled: Histogram.Child =
+    ChainHandler.chainValidationDurationMilliSeconds.labels("Block")
 }

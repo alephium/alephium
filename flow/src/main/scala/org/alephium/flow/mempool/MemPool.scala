@@ -78,25 +78,27 @@ class MemPool private (
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
       pendingPool.add(tx)
-      measurePendingPoolTransactionsTotal()
+      pendingPool.measureTransactionsTotal()
       MemPool.AddedToLocalPool
     } else {
-      addToTxPool(index, AVector(tx))
+      addToTxPool(index, AVector(tx)) // We might disable metrics for this when TPS is high
       MemPool.AddedToSharedPool
     }
   }
 
   def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    val count = getSharedPool(index).add(transactions)
+    val sharedPool = getSharedPool(index)
+    val count      = sharedPool.add(transactions)
     txIndexes.add(transactions)
-    measureSharedPoolTransactionsTotal(index.to.value)
+    sharedPool.measureTransactionsTotal()
     count
   }
 
   def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    val count = getSharedPool(index).remove(transactions)
+    val sharedPool = getSharedPool(index)
+    val count      = sharedPool.remove(transactions)
     txIndexes.remove(transactions)
-    measureSharedPoolTransactionsTotal(index.to.value)
+    sharedPool.measureTransactionsTotal()
     count
   }
 
@@ -114,9 +116,7 @@ class MemPool private (
       sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
     )
 
-    for (group <- 0 until groupConfig.groups) {
-      measureSharedPoolTransactionsTotal(group)
-    }
+    sharedPools.foreach(_.measureTransactionsTotal())
 
     (removed, added)
   }
@@ -141,7 +141,7 @@ class MemPool private (
         addToTxPool(chainIndex, txss)
       }
       pendingPool.remove(txs)
-      measurePendingPoolTransactionsTotal()
+      pendingPool.measureTransactionsTotal()
       txs
     }
   }
@@ -165,20 +165,6 @@ class MemPool private (
   def clear(): Unit = {
     sharedPools.foreach(_.clear())
   }
-
-  private val groupString = group.value.toString
-
-  private def measurePendingPoolTransactionsTotal() = {
-    MemPool.pendingPoolTransactionsTotal
-      .labels(groupString)
-      .set(pendingPool.txs.size.toDouble)
-  }
-
-  private def measureSharedPoolTransactionsTotal(toGroup: Int) = {
-    MemPool.sharedPoolTransactionsTotal
-      .labels(groupString, toGroup.toString)
-      .set(sharedPools(toGroup).size.toDouble)
-  }
 }
 
 object MemPool {
@@ -186,8 +172,11 @@ object MemPool {
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
     val sharedPools =
-      AVector.fill(groupConfig.groups)(SharedPool.empty(memPoolSetting.txPoolCapacity))
-    new MemPool(groupIndex, sharedPools, TxIndexes.emptySharedPool, PendingPool.empty)
+      AVector.tabulate(groupConfig.groups) { toGroup =>
+        val chainIndex = ChainIndex.unsafe(groupIndex.value, toGroup)
+        SharedPool.empty(chainIndex, memPoolSetting.txPoolCapacity)
+      }
+    new MemPool(groupIndex, sharedPools, TxIndexes.emptySharedPool, PendingPool.empty(groupIndex))
   }
 
   sealed trait NewTxCategory

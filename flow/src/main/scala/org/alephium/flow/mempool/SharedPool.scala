@@ -28,6 +28,7 @@ import org.alephium.util.{AVector, RWLock, U256}
  * Transaction pool implementation
  */
 class SharedPool private (
+    chainIndex: ChainIndex,
     pool: mutable.SortedMap[WeightedId, TransactionTemplate],
     weights: mutable.HashMap[Hash, GasPrice],
     val capacity: Int
@@ -87,11 +88,17 @@ class SharedPool private (
     writeOnly {
       pool.clear()
     }
+
+  private val transactionsTotalLabeled = MemPool.sharedPoolTransactionsTotal
+    .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+  def measureTransactionsTotal(): Unit = {
+    transactionsTotalLabeled.set(size.toDouble)
+  }
 }
 
 object SharedPool {
-  def empty(capacity: Int): SharedPool =
-    new SharedPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
+  def empty(chainIndex: ChainIndex, capacity: Int): SharedPool =
+    new SharedPool(chainIndex, mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
 
   final case class WeightedId(weight: GasPrice, id: Hash) {
     override def equals(obj: Any): Boolean =
