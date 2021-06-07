@@ -25,12 +25,14 @@ import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.Weight
+import org.alephium.protocol.model.{ChainIndex, Weight}
 import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
   implicit def brokerConfig: BrokerConfig
+
+  def chainIndex: ChainIndex
 
   def genesisHash: BlockHash
 
@@ -118,16 +120,38 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def contains(hash: BlockHash): IOResult[Boolean]    = blockStateStorage.exists(hash)
-  def containsUnsafe(hash: BlockHash): Boolean        = blockStateStorage.existsUnsafe(hash)
-  def getState(hash: BlockHash): IOResult[BlockState] = blockStateStorage.get(hash)
-  def getStateUnsafe(hash: BlockHash): BlockState     = blockStateStorage.getUnsafe(hash)
-  def getHeight(hash: BlockHash): IOResult[Int]       = blockStateStorage.get(hash).map(_.height)
-  def getHeightUnsafe(hash: BlockHash): Int           = blockStateStorage.getUnsafe(hash).height
-  def getWeight(hash: BlockHash): IOResult[Weight] =
+  def contains(hash: BlockHash): IOResult[Boolean] = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    blockStateStorage.exists(hash)
+  }
+  def containsUnsafe(hash: BlockHash): Boolean = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    blockStateStorage.existsUnsafe(hash)
+  }
+  def getState(hash: BlockHash): IOResult[BlockState] = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    blockStateStorage.get(hash)
+  }
+  def getStateUnsafe(hash: BlockHash): BlockState = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    blockStateStorage.getUnsafe(hash)
+  }
+  def getHeight(hash: BlockHash): IOResult[Int] = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    blockStateStorage.get(hash).map(_.height)
+  }
+  def getHeightUnsafe(hash: BlockHash): Int = {
+    assume(ChainIndex.from(hash) == chainIndex)
+    blockStateStorage.getUnsafe(hash).height
+  }
+  def getWeight(hash: BlockHash): IOResult[Weight] = {
+    assume(ChainIndex.from(hash) == chainIndex)
     blockStateStorage.get(hash).map(_.weight)
-  def getWeightUnsafe(hash: BlockHash): Weight =
+  }
+  def getWeightUnsafe(hash: BlockHash): Weight = {
+    assume(ChainIndex.from(hash) == chainIndex)
     blockStateStorage.getUnsafe(hash).weight
+  }
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 

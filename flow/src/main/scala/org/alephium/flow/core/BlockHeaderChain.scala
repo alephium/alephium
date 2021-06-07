@@ -239,6 +239,7 @@ object BlockHeaderChain {
       override val chainStateStorage =
         storages.nodeStateStorage.chainStateStorage(rootHeader.chainIndex)
       override val genesisHash = rootHeader.hash
+      override val chainIndex  = rootHeader.chainIndex
     }
 
     Utils.unsafe(initialize(headerchain))

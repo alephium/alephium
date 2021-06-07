@@ -23,7 +23,7 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Block, Weight}
+import org.alephium.protocol.model.{Block, ChainIndex, Weight}
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
@@ -149,6 +149,8 @@ object BlockChain {
       override val chainStateStorage =
         storages.nodeStateStorage.chainStateStorage(rootBlock.chainIndex)
       override val genesisHash: BlockHash = rootBlock.hash
+
+      val chainIndex: ChainIndex = rootBlock.chainIndex
     }
 
     Utils.unsafe(initialize(blockchain))
