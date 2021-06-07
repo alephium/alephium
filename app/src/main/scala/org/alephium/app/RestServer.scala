@@ -16,12 +16,16 @@
 
 package org.alephium.app
 
+import java.io.{StringWriter, Writer}
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 import scala.util.Try
 
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import io.prometheus.client.CollectorRegistry
+import io.prometheus.client.exporter.common.TextFormat
 import io.vertx.core.Vertx
 import io.vertx.core.http.HttpServer
 import io.vertx.ext.web._
@@ -29,7 +33,6 @@ import io.vertx.ext.web.handler.CorsHandler
 import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
-import sttp.tapir.swagger.vertx.SwaggerVertx
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
@@ -44,7 +47,7 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.http.ServerOptions
+import org.alephium.http.{ServerOptions, SwaggerVertx}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -292,10 +295,27 @@ class RestServer(
     }
   }
 
+  private val collectorRegistry = CollectorRegistry.defaultRegistry
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private val metricsRoute = toRoute(metrics) { _ =>
+    Future.successful {
+      val writer: Writer = new StringWriter()
+      try {
+        TextFormat.write004(writer, collectorRegistry.metricFamilySamples())
+        Right(writer.toString)
+      } catch {
+        case error: Throwable =>
+          Left(ApiError.InternalServerError(error.getMessage))
+      } finally {
+        writer.close
+      }
+    }
+  }
+
   val walletEndpoints = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 
-  private val swaggerUiRoute =
-    new SwaggerVertx(openApiJson(openAPI), yamlName = "openapi.json").route
+  private val swaggerUiRoute = new SwaggerVertx(openApiJson(openAPI)).route
 
   private val blockFlowRoute: AVector[Router => Route] = AVector(
     getNodeInfoRoute,
@@ -323,6 +343,7 @@ class RestServer(
     compileRoute,
     exportBlocksRoute,
     buildContractRoute,
+    metricsRoute,
     swaggerUiRoute
   )
 

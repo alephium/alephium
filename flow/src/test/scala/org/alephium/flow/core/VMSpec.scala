@@ -190,7 +190,7 @@ class VMSpec extends AlephiumSpec {
 
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
       val contract = Compiler.compileContract(input).toOption.get
-      val txScript = contractCreation(contract, initialState, genesisLockup, ALF.nanoAlf(1))
+      val txScript = contractCreation(contract, initialState, genesisLockup, dustUtxoAmount)
       val block    = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
@@ -479,7 +479,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(ALF.nanoAlf(1), 0)
+    checkSwapBalance(dustUtxoAmount, 0)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -493,7 +493,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(ALF.nanoAlf(1) + 10, 100)
+    checkSwapBalance(dustUtxoAmount + 10, 100)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -506,7 +506,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(ALF.nanoAlf(1) + 20, 50)
+    checkSwapBalance(dustUtxoAmount + 20, 50)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -519,7 +519,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$swapContract
                     |""".stripMargin)
-    checkSwapBalance(ALF.nanoAlf(1) + 10, 100)
+    checkSwapBalance(dustUtxoAmount + 10, 100)
   }
 
   behavior of "random execution"

@@ -70,6 +70,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
     assume(!isGenesis)
     Block.getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
   }
+
+  def `type`: String = "Block"
 }
 
 object Block {

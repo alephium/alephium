@@ -19,6 +19,13 @@ alephium {
     # Timeout for establish a connection with peers
     retry-timeout = 30 second
 
+    # When a node is banned, it will last for 1 day
+    ban-duration = 1 day
+    # When a node operates properly for a certain period of time, its past penalty will be removed
+    penalty-forgiveness = 1 hour
+    # When non-critical misbehavior detected, only one penalty applied for a given period
+    penalty-frequency = 60 second
+
     # Size of the outbound TCP buffer (in bytes).
     connection-buffer-capacity-in-byte = 100000000
 

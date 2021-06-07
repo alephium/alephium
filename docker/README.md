@@ -23,13 +23,28 @@ A container called `alephium/alephium:latest` will be created from an official [
 The provided [docker-compose.yml](./docker-compose.yml] file can also be used to run Alephium:
 
 ```
-docker-compose up -d alephium
+docker-compose up -d
 ```
 
 The default config connects your container to the testnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs):
 
 ```
 curl http://127.0.0.1:12973/infos/self-clique
+```
+
+## Monitoring
+
+A local instance of grafana will be started at `http://192.168.1.90:3000` with two built-in dashboards:
+
+`JVM Overview`:
+
+```
+http://127.0.0.1:3000/d/ME6diT3Mk/jvm-overview?orgId=1&refresh=30s
+```
+
+and `Alephium Overview`:
+```
+http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 ```
 
 # Configuration

@@ -16,7 +16,9 @@
 
 package org.alephium.flow.handler
 
-import org.alephium.flow.core.BlockFlow
+import io.prometheus.client.{Counter, Gauge, Histogram}
+
+import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
@@ -32,6 +34,60 @@ object ChainHandler {
   final case class FlowDataAdded(data: FlowData, origin: DataOrigin, addedAt: TimeStamp)
       extends Event
       with EventStream.Event
+
+  val chainValidationFailed: Counter = Counter
+    .build(
+      "alephium_chain_validation_failed",
+      "Error count of chain validation errors"
+    )
+    .labelNames("validation_type", "invalid_status")
+    .register()
+
+  val chainValidationTotal: Counter = Counter
+    .build(
+      "alephium_chain_validation_total",
+      "Total number of chain validations"
+    )
+    .labelNames("validation_type")
+    .register()
+
+  val chainValidationOngoing: Gauge = Gauge
+    .build(
+      "alephium_chain_validation_current",
+      "Current count of chain validations"
+    )
+    .labelNames("validation_type")
+    .register()
+
+  // scalastyle:off magic.number
+  val chainValidationDurationMilliSeconds: Histogram = Histogram
+    .build(
+      "alephium_chain_validation_duration_milliseconds",
+      "Duration of the validation"
+    )
+    .labelNames("validation_type")
+    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
+      600000, 1800000, 3600000)
+    .register()
+
+  val blockDurationMilliSeconds: Histogram = Histogram
+    .build(
+      "alephium_block_duration_milliseconds",
+      "Block duration"
+    )
+    .labelNames("chain_from", "chain_to")
+    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
+      600000, 1800000, 3600000)
+    .register()
+  // scalastyle:on magic.number
+
+  val blockCurrentHeight: Gauge = Gauge
+    .build(
+      "alephium_block_current_height",
+      "Current height of the block"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
@@ -40,13 +96,26 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     validator: Validation[T, S]
 ) extends IOBaseActor
     with Publisher {
-  import ChainHandler.Event
+  import ChainHandler._
 
   def consensusConfig: ConsensusConfig
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
-    validator.validate(data, blockFlow) match {
+
+    chainValidationOngoing.labels(data.`type`).inc()
+    chainValidationTotal.labels(data.`type`).inc()
+
+    val startTime           = System.nanoTime()
+    val validationResult    = validator.validate(data, blockFlow)
+    val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
+
+    chainValidationDurationMilliSeconds
+      .labels(data.`type`)
+      .observe(elapsedMilliSeconds)
+    chainValidationOngoing.labels(data.`type`).dec()
+
+    validationResult match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
       case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
       case Right(_)                      => handleValidData(data, broker, origin)
@@ -62,6 +131,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     log.error(
       s"IO failed in block/header ${data.hash.shortHex}: $blockHex validation: $error"
     )
+    ChainHandler.chainValidationFailed.labels(data.`type`, "IOError").inc()
+
     broker ! dataAddingFailed()
   }
 
@@ -73,6 +144,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.warning(s"Invalid block/header ${data.shortHex}: $status : $blockHex")
+    chainValidationFailed.labels(data.`type`, status.name).inc()
+
     if (!origin.isLocal) {
       sender() ! DependencyHandler.Invalid(data.hash)
     }
@@ -94,6 +167,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
             publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
             notifyBroker(broker, data)
             log.info(show(data))
+            measure(data)
         }
       case Left(error) => handleIOError(error)
     }
@@ -111,20 +185,43 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
 
   def show(data: T): String
 
+  def measure(data: T): Unit
+
   def showHeader(header: BlockHeader): String = {
     val total = blockFlow.numHashes
     val index = header.chainIndex
     val chain = blockFlow.getHeaderChain(header)
     val targetRatio =
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
-    val blockTime = {
-      chain.getBlockHeader(header.parentHash) match {
-        case Left(_) => "?ms"
-        case Right(parentHeader) =>
-          val span = header.timestamp.millis - parentHeader.timestamp.millis
-          s"${span}ms"
-      }
-    }
+    val blockTime = getBlockTime(header, chain).map(time => s"${time}ms").getOrElse("?ms")
+
     s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
+  }
+
+  protected def measureCommon(header: BlockHeader): BlockHeaderChain = {
+    val chain      = blockFlow.getHeaderChain(header)
+    val (from, to) = getChainIndexLabels(header)
+
+    blockCurrentHeight
+      .labels(from, to)
+      .set(chain.getHeight(header.hash).getOrElse(-1).toDouble)
+
+    getBlockTime(header, chain).foreach { blockTime =>
+      blockDurationMilliSeconds.labels(from, to).observe(blockTime.toDouble)
+    }
+
+    chain
+  }
+
+  protected def getChainIndexLabels(header: BlockHeader): (String, String) = {
+    val index = header.chainIndex
+    (index.from.value.toString, index.to.value.toString)
+  }
+
+  private def getBlockTime(header: BlockHeader, chain: BlockHeaderChain): Option[Long] = {
+    chain
+      .getBlockHeader(header.parentHash)
+      .toOption
+      .map(header.timestamp.millis - _.timestamp.millis)
   }
 }

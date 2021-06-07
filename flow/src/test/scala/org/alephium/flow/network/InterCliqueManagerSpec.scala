@@ -229,7 +229,7 @@ class InterCliqueManagerSpec
 
     lazy val discoveryServer       = TestProbe()
     lazy val blockFlowSynchronizer = TestProbe()
-    lazy val (allHandlers, _)      = TestUtils.createBlockHandlersProbe
+    lazy val (allHandlers, _)      = TestUtils.createAllHandlersProbe
 
     lazy val parentName        = s"InterCliqueManager-${Random.nextInt()}"
     lazy val numBootstrapNodes = 1

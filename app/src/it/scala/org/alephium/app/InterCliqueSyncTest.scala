@@ -198,13 +198,18 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
-  // TODO: should try to reconnect and ban the node eventually
-  ignore should "ban node if send invalid pong" in new TestFixture("2-nodes") {
+  it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
     val injection: PartialFunction[Payload, Payload] = { case Pong(x) =>
-      Pong(x + 1)
+      Pong(if (x + 1 != 0) x + 1 else x + 2)
     }
 
-    val server0 = bootClique(1).head
+    val server0 = bootClique(
+      1,
+      configOverrides = Map(
+        ("alephium.network.ping-frequency", "1 seconds"),
+        ("alephium.network.penalty-frequency", "1 seconds")
+      )
+    ).head
     server0.start().futureValue is ()
 
     val server1 = bootClique(
@@ -217,13 +222,13 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.start().futureValue is ()
 
     eventually {
-      val misbehaviors0 =
+      val misbehaviors =
         request[AVector[PeerMisbehavior]](
           getMisbehaviors,
           restPort(server0.config.network.bindAddress.getPort)
         )
 
-      misbehaviors0.map(_.status).exists {
+      misbehaviors.map(_.status).exists {
         case PeerStatus.Banned(_) => true
         case _                    => false
       } is true

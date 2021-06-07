@@ -17,6 +17,7 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
+import io.prometheus.client.{Counter, Gauge}
 
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.handler.FlowHandler.BlockNotify
@@ -51,6 +52,30 @@ object BlockChainHandler {
   final case class BlockAdded(hash: BlockHash)   extends Event
   case object BlockAddingFailed                  extends Event
   final case class InvalidBlock(hash: BlockHash) extends Event
+
+  val blocksTotal: Gauge = Gauge
+    .build(
+      "alephium_blocks_total",
+      "Total number of blocks"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val blocksReceivedTotal: Counter = Counter
+    .build(
+      "alephium_blocks_received_total",
+      "Total number of blocks received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val transactionsReceivedTotal: Counter = Counter
+    .build(
+      "alephium_transactions_received_total",
+      "Total number of transactions received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 class BlockChainHandler(
@@ -104,5 +129,15 @@ class BlockChainHandler(
 
   override def show(block: Block): String = {
     showHeader(block.header) + s" #tx: ${block.transactions.length}"
+  }
+
+  override def measure(block: Block): Unit = {
+    val chain             = measureCommon(block.header)
+    val numOfTransactions = block.transactions.length
+    val (from, to)        = getChainIndexLabels(block.header)
+
+    blocksTotal.labels(from, to).set(chain.numHashes.toDouble)
+    blocksReceivedTotal.labels(from, to).inc()
+    transactionsReceivedTotal.labels(from, to).inc(numOfTransactions.toDouble)
   }
 }

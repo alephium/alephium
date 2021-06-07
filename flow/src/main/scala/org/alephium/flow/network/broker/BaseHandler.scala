@@ -14,31 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.model
+package org.alephium.flow.network.broker
 
-import org.alephium.protocol.BlockHash
-import org.alephium.util.TimeStamp
+import org.alephium.util.BaseActor
+import org.alephium.util.EventStream.Publisher
 
-trait FlowData {
-  def timestamp: TimeStamp
+trait BaseHandler extends BaseActor with Publisher {
 
-  def target: Target
-
-  def weight: Weight = Weight.from(target)
-
-  def hash: BlockHash
-
-  def chainIndex: ChainIndex
-
-  def isGenesis: Boolean
-
-  def blockDeps: BlockDeps
-
-  def parentHash: BlockHash
-
-  def uncleHash(toIndex: GroupIndex): BlockHash
-
-  def shortHex: String = hash.shortHex
-
-  def `type`: String
+  def handleMisbehavior(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
+    publishEvent(misbehavior)
+    misbehavior match {
+      case _: MisbehaviorManager.Critical => context.stop(self)
+      case _                              => ()
+    }
+  }
 }

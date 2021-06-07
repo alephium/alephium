@@ -25,7 +25,9 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-sealed trait Payload
+sealed trait Payload extends Product {
+  val name = productPrefix
+}
 
 object Payload {
   @SuppressWarnings(

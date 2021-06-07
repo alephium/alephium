@@ -19,8 +19,8 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike}
-import org.alephium.util.LockFixture
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, NoIndexModelGeneratorsLike}
+import org.alephium.util.{AVector, LockFixture}
 
 class MemPoolSpec
     extends AlephiumFlowSpec
@@ -54,5 +54,45 @@ class MemPoolSpec
         assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }
     }
+  }
+
+  it should "calculate the size of mempool" in {
+    val pool = MemPool.empty(GroupIndex.unsafe(0))
+    val tx0  = transactionGen().sample.get.toTemplate
+    pool.addNewTx(ChainIndex.unsafe(0, 0), tx0)
+    pool.size is 1
+    val tx1 = transactionGen().sample.get.toTemplate
+    pool.pendingPool.add(tx1)
+    pool.size is 2
+  }
+
+  trait Fixture {
+    val pool   = MemPool.empty(GroupIndex.unsafe(0))
+    val index0 = ChainIndex.unsafe(0, 0)
+    val index1 = ChainIndex.unsafe(0, 1)
+    val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
+    val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
+    pool.addNewTx(index0, tx0)
+    pool.pendingPool.add(tx1)
+  }
+
+  it should "list transactions for a specific chain" in new Fixture {
+    pool.getAll(index0) is AVector(tx0)
+    pool.getAll(index1) is AVector(tx1)
+  }
+
+  it should "work for utxos" in new Fixture {
+    tx0.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
+    tx1.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
+    pool.isDoubleSpending(index0, tx0) is true
+    pool.isDoubleSpending(index0, tx1) is true
+    tx0.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
+    tx1.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
+    tx0.assetOutputRefs.foreachWithIndex((output, index) =>
+      pool.getUtxo(output) is Some(tx0.getOutput(index))
+    )
+    tx1.assetOutputRefs.foreachWithIndex((output, index) =>
+      pool.getUtxo(output) is Some(tx1.getOutput(index))
+    )
   }
 }

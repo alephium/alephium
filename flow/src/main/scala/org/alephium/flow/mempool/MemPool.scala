@@ -16,6 +16,8 @@
 
 package org.alephium.flow.mempool
 
+import io.prometheus.client.Gauge
+
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
@@ -32,41 +34,40 @@ import org.alephium.util.AVector
  */
 class MemPool private (
     group: GroupIndex,
-    pools: AVector[TxPool],
+    sharedPools: AVector[SharedPool],
     val txIndexes: TxIndexes,
     val pendingPool: PendingPool
 )(implicit
     groupConfig: GroupConfig
 ) {
-  def getPool(index: ChainIndex): TxPool = {
+  def getSharedPool(index: ChainIndex): SharedPool = {
     assume(group == index.from)
-    pools(index.to.value)
+    sharedPools(index.to.value)
   }
 
-  def size: Int = pools.sumBy(_.size)
+  def size: Int = sharedPools.sumBy(_.size) + pendingPool.size
 
   def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = {
     contains(index, transaction.id)
   }
 
   def contains(index: ChainIndex, txId: Hash): Boolean =
-    getPool(index).contains(txId) || pendingPool.contains(txId)
+    getSharedPool(index).contains(txId) || pendingPool.contains(txId)
 
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
-    getPool(index).collectForBlock(maxNum)
+    getSharedPool(index).collectForBlock(maxNum)
 
   def getAll(index: ChainIndex): AVector[TransactionTemplate] =
-    getPool(index).getAll() ++ pendingPool.getAll()
+    getSharedPool(index).getAll() ++ pendingPool.getAll(index)
 
   def isSpent(outputRef: AssetOutputRef): Boolean = {
     pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
   }
 
   def isUnspentInPool(outputRef: AssetOutputRef): Boolean = {
-    (txIndexes.outputIndex
-      .contains(outputRef) || pendingPool.indexes.outputIndex.contains(outputRef)) &&
-    (!txIndexes.inputIndex
-      .contains(outputRef) && !pendingPool.indexes.inputIndex.contains(outputRef))
+    (txIndexes.outputIndex.contains(outputRef) ||
+      pendingPool.indexes.outputIndex.contains(outputRef)) &&
+    (!isSpent(outputRef))
   }
 
   def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean = {
@@ -77,6 +78,7 @@ class MemPool private (
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
       pendingPool.add(tx)
+      measurePendingPoolTransactionsTotal()
       MemPool.AddedToLocalPool
     } else {
       addToTxPool(index, AVector(tx))
@@ -85,18 +87,19 @@ class MemPool private (
   }
 
   def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    val count = getPool(index).add(transactions)
-    transactions.foreach(txIndexes.add)
+    val count = getSharedPool(index).add(transactions)
+    txIndexes.add(transactions)
+    measureSharedPoolTransactionsTotal(index.to.value)
     count
   }
 
   def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    val count = getPool(index).remove(transactions)
-    transactions.foreach(txIndexes.remove)
+    val count = getSharedPool(index).remove(transactions)
+    txIndexes.remove(transactions)
+    measureSharedPoolTransactionsTotal(index.to.value)
     count
   }
 
-  // Note: we lock the mem pool so that we could update all the transaction pools
   def reorg(
       toRemove: AVector[AVector[Transaction]],
       toAdd: AVector[AVector[Transaction]]
@@ -104,11 +107,17 @@ class MemPool private (
     assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
 
     // First, add transactions from short chains, then remove transactions from canonical chains
-    val added =
-      toAdd.foldWithIndex(0)((sum, txs, toGroup) => sum + pools(toGroup).add(txs.map(_.toTemplate)))
-    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
-      sum + pools(toGroup).remove(txs.map(_.toTemplate))
+    val added = toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
+      sum + sharedPools(toGroup).add(txs.map(_.toTemplate))
     )
+    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
+      sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
+    )
+
+    for (group <- 0 until groupConfig.groups) {
+      measureSharedPoolTransactionsTotal(group)
+    }
+
     (removed, added)
   }
 
@@ -132,6 +141,7 @@ class MemPool private (
         addToTxPool(chainIndex, txss)
       }
       pendingPool.remove(txs)
+      measurePendingPoolTransactionsTotal()
       txs
     }
   }
@@ -153,7 +163,19 @@ class MemPool private (
   }
 
   def clear(): Unit = {
-    pools.foreach(_.clear())
+    sharedPools.foreach(_.clear())
+  }
+
+  private def measurePendingPoolTransactionsTotal() = {
+    MemPool.pendingPoolTransactionsTotal
+      .labels(group.value.toString)
+      .set(pendingPool.txs.size.toDouble)
+  }
+
+  private def measureSharedPoolTransactionsTotal(toGroup: Int) = {
+    MemPool.sharedPoolTransactionsTotal
+      .labels(group.value.toString, toGroup.toString)
+      .set(sharedPools(toGroup).size.toDouble)
   }
 }
 
@@ -161,11 +183,29 @@ object MemPool {
   def empty(
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
-    val pools = AVector.fill(groupConfig.groups)(TxPool.empty(memPoolSetting.txPoolCapacity))
-    new MemPool(groupIndex, pools, TxIndexes.emptySharedPool, PendingPool.empty)
+    val sharedPools =
+      AVector.fill(groupConfig.groups)(SharedPool.empty(memPoolSetting.txPoolCapacity))
+    new MemPool(groupIndex, sharedPools, TxIndexes.emptySharedPool, PendingPool.empty)
   }
 
   sealed trait NewTxCategory
   case object AddedToLocalPool  extends NewTxCategory
   case object AddedToSharedPool extends NewTxCategory
+
+  val sharedPoolTransactionsTotal: Gauge = Gauge
+    .build(
+      "alephium_mempool_shared_pool_transactions_total",
+      "Number of transactions in shared pool"
+    )
+    .labelNames("group_index", "chain_index")
+    .register()
+
+  val pendingPoolTransactionsTotal: Gauge = Gauge
+    .build(
+      "alephium_mempool_pending_pool_transactions_total",
+      "Number of transactions in pending pool"
+    )
+    .labelNames("group_index")
+    .register()
+
 }

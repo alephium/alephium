@@ -242,7 +242,8 @@ trait TestFixtureLike
       walletPort: Int,
       brokerId: Int,
       brokerNum: Int,
-      bootstrap: Option[InetSocketAddress]
+      bootstrap: Option[InetSocketAddress],
+      configOverrides: Map[String, Any]
   ) = {
     new AlephiumConfigFixture with StoragesFixture {
       override val configValues = Map(
@@ -259,7 +260,7 @@ trait TestFixtureLike
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
-      )
+      ) ++ configOverrides
       implicit override lazy val config = {
         val tmp = AlephiumConfig.load(newConfig)
         bootstrap match {
@@ -276,7 +277,8 @@ trait TestFixtureLike
   def bootClique(
       nbOfNodes: Int,
       bootstrap: Option[InetSocketAddress] = None,
-      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply,
+      configOverrides: Map[String, Any] = Map.empty
   ): Seq[Server] = {
     val masterPort = generatePort
 
@@ -289,7 +291,8 @@ trait TestFixtureLike
         walletPort = generatePort,
         bootstrap = bootstrap,
         brokerNum = nbOfNodes,
-        connectionBuild = connectionBuild
+        connectionBuild = connectionBuild,
+        configOverrides = configOverrides
       )
     }
 
@@ -303,10 +306,11 @@ trait TestFixtureLike
       masterPort: Int = defaultMasterPort,
       walletPort: Int = defaultWalletPort,
       bootstrap: Option[InetSocketAddress] = None,
-      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+      connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply,
+      configOverrides: Map[String, Any] = Map.empty
   ): Server = {
     val platformEnv =
-      buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap)
+      buildEnv(publicPort, masterPort, walletPort, brokerId, brokerNum, bootstrap, configOverrides)
 
     val server: Server = new Server {
       val flowSystem: ActorSystem =

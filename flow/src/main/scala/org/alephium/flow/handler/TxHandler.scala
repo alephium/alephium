@@ -82,17 +82,17 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       log.debug(s"tx ${tx.id.shortHex} is already included")
       addFailed(tx)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      log.warning(s"tx ${tx.id.shortHex}: ${hex(tx)} is double spending")
+      log.warning(s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
       addFailed(tx)
     } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          log.warning(s"failed in validating tx ${tx.id.shortHex}: ${hex(tx)} due to $s")
+          log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s: ${hex(tx)}")
           addFailed(tx)
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin, acknowledge = true)
         case Left(Left(e)) =>
-          log.warning(s"IO failed in validating tx ${tx.id.shortHex}: ${hex(tx)}, due to $e")
+          log.warning(s"IO failed in validating tx ${tx.id.shortHex} due to $e: ${hex(tx)}")
           addFailed(tx)
       }
     }
