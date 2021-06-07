@@ -226,7 +226,8 @@ trait TxUtils { Self: FlowUtils =>
 
   def getFromGroupConfirmationsUnsafe(hash: BlockHash, chainIndex: ChainIndex): Int = {
     assume(ChainIndex.from(hash) == chainIndex)
-    val header        = getBlockHeaderUnsafe(hash)
+    val targetChain   = getHeaderChain(chainIndex)
+    val header        = targetChain.getBlockHeaderUnsafe(hash)
     val fromChain     = getHeaderChain(chainIndex.from, chainIndex.from)
     val fromTip       = getOutTip(header, chainIndex.from)
     val fromTipHeight = fromChain.getHeightUnsafe(fromTip)
@@ -239,7 +240,7 @@ trait TxUtils { Self: FlowUtils =>
       } else {
         val header   = fromChain.getBlockHeaderUnsafe(hashes.head)
         val chainDep = header.uncleHash(chainIndex.to)
-        if (fromChain.isBeforeUnsafe(hash, chainDep)) Some(height) else iter(height + 1)
+        if (targetChain.isBeforeUnsafe(hash, chainDep)) Some(height) else iter(height + 1)
       }
     }
 
