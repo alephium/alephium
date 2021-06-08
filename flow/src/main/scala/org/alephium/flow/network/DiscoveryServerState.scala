@@ -49,9 +49,10 @@ trait DiscoveryServerState {
 
   private var socketOpt: Option[ActorRefT[UdpServer.Command]] = None
 
-  protected val table    = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val pendings   = mutable.HashMap.empty[PeerId, AwaitPong]
-  private val pendingMax = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+  protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
+  private val pendings     = mutable.HashMap.empty[PeerId, AwaitPong]
+  private val pendingMax   = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+  private val unreachables = mutable.HashMap.empty[InetSocketAddress, TimeStamp]
 
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
@@ -142,6 +143,15 @@ trait DiscoveryServerState {
         cliqueId
     }
     pendings --= deadPendings
+  }
+
+  def setUnreachable(remote: InetSocketAddress): Unit = {
+    unreachables += remote -> TimeStamp.now().plusMinutesUnsafe(10)
+    remove(remote)
+  }
+
+  def mightReachable(remote: InetSocketAddress): Boolean = {
+    !unreachables.contains(remote)
   }
 
   def appendPeer(peerInfo: BrokerInfo): Unit = {

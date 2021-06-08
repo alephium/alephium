@@ -183,7 +183,6 @@ class InterCliqueManager(
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
       removeBroker(peer)
-      discoveryServer ! DiscoveryServer.PeerDisconnected(peer)
   }
 
   def connect(broker: BrokerInfo): Unit = {

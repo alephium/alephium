@@ -22,7 +22,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated, Timers}
 
-import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.network.broker.{MisbehaviorManager, OutboundBrokerHandler}
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
@@ -66,14 +66,13 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetNeighborPeers                               extends Command
-  final case class Disable(peerId: PeerId)                   extends Command
-  final case class Remove(peer: InetSocketAddress)           extends Command
-  case object Scan                                           extends Command
-  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)    extends Command
-  final case class PeerConfirmed(peerInfo: BrokerInfo)       extends Command
-  final case class PeerDenied(peerInfo: BrokerInfo)          extends Command
-  final case class PeerDisconnected(peer: InetSocketAddress) extends Command
+  case object GetNeighborPeers                            extends Command
+  final case class Disable(peerId: PeerId)                extends Command
+  final case class Remove(peer: InetSocketAddress)        extends Command
+  case object Scan                                        extends Command
+  final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
+  final case class PeerConfirmed(peerInfo: BrokerInfo)    extends Command
+  final case class PeerDenied(peerInfo: BrokerInfo)       extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -149,7 +148,10 @@ class DiscoveryServer(
     case _ => stash()
   }
 
-  def ready: Receive = handleUdp orElse handleCommand orElse handleBanning
+  def ready: Receive = {
+    subscribeEvent(self, classOf[OutboundBrokerHandler.Unreachable])
+    handleUdp orElse handleCommand orElse handleBanning
+  }
 
   def handleUdp: Receive = {
     case UdpServer.Received(data, remote) =>
@@ -188,8 +190,8 @@ class DiscoveryServer(
       banPeer(peerInfo.peerId)
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
-    case PeerDisconnected(peer) =>
-      remove(peer)
+    case OutboundBrokerHandler.Unreachable(remote) =>
+      setUnreachable(remote)
       scanAndSchedule()
   }
 
@@ -252,11 +254,11 @@ class DiscoveryServer(
   private def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
       f: BrokerInfo => Unit
   ): Unit = {
-    if (remote == peerInfo.address) {
-      f(peerInfo)
-    } else {
+    if (remote != peerInfo.address) {
       log.debug(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
       misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
+    } else if (mightReachable(remote)) {
+      f(peerInfo)
     }
   }
 

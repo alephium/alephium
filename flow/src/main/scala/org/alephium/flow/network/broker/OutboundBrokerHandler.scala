@@ -16,6 +16,8 @@
 
 package org.alephium.flow.network.broker
 
+import java.net.InetSocketAddress
+
 import akka.io.Tcp
 
 import org.alephium.flow.network.CliqueManager
@@ -27,6 +29,8 @@ import org.alephium.util.{ActorRefT, Duration, EventStream, TimeStamp}
 
 object OutboundBrokerHandler {
   case object Retry
+
+  final case class Unreachable(remote: InetSocketAddress) extends EventStream.Event
 }
 
 trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
@@ -72,6 +76,7 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
         }
         if (!retried) {
           log.info(s"Cannot connect to ${c.remoteAddress}")
+          publishEvent(OutboundBrokerHandler.Unreachable(remoteAddress))
           context stop self
         }
     }
