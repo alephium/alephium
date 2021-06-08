@@ -67,6 +67,7 @@ trait DiscoveryServerState {
   def getActivePeers: AVector[BrokerInfo] = {
     AVector
       .from(table.values.map(_.info))
+      .filter(info => mightReachable(info.address))
       .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
   }
 

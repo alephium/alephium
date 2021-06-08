@@ -30,6 +30,8 @@ trait BrokerGroupInfo {
 
   lazy val groupUntil: Int = (brokerId + 1) * groupNumPerBroker
 
+  def groupRange: Range = groupFrom until groupUntil
+
   def contains(index: GroupIndex): Boolean = containsRaw(index.value)
 
   def containsRaw(index: Int): Boolean = groupFrom <= index && index < groupUntil
