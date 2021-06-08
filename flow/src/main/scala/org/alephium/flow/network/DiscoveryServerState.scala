@@ -185,7 +185,7 @@ trait DiscoveryServerState {
   }
 
   def atLeastOnePeerPerGroup(): Boolean = {
-    (brokerConfig.groupFrom until brokerConfig.groupUntil).forall { group =>
+    brokerConfig.groupRange.forall { group =>
       table.values.count(
         _.info.contains(GroupIndex.unsafe(group))
       ) >= 2 // peers from self clique is counted

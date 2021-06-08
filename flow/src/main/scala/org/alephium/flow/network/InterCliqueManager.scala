@@ -298,7 +298,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {
-    (brokerConfig.groupFrom until brokerConfig.groupUntil).exists { group =>
+    brokerConfig.groupRange.exists { group =>
       getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
     }
   }
