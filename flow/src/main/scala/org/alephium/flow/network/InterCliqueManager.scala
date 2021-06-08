@@ -184,7 +184,7 @@ class InterCliqueManager(
       log.info(s"Peer disconnected: $peer")
       removeBroker(peer)
       if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
-        discoveryServer ! DiscoveryServer.GetNeighborPeers
+        discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
       }
 
     case DiscoveryServer.NeighborPeers(sortedPeers) =>

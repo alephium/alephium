@@ -27,7 +27,7 @@ import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, PeerId}
+import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo, PeerId}
 import org.alephium.util._
 
 object DiscoveryServer {
@@ -66,13 +66,13 @@ object DiscoveryServer {
   final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
 
   sealed trait Command
-  case object GetNeighborPeers                            extends Command
-  final case class Disable(peerId: PeerId)                extends Command
-  final case class Remove(peer: InetSocketAddress)        extends Command
-  case object Scan                                        extends Command
-  final case class SendCliqueInfo(cliqueInfo: CliqueInfo) extends Command
-  final case class PeerConfirmed(peerInfo: BrokerInfo)    extends Command
-  final case class PeerDenied(peerInfo: BrokerInfo)       extends Command
+  final case class GetNeighborPeers(targetGroupInfoOpt: Option[BrokerGroupInfo]) extends Command
+  final case class Disable(peerId: PeerId)                                       extends Command
+  final case class Remove(peer: InetSocketAddress)                               extends Command
+  case object Scan                                                               extends Command
+  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                        extends Command
+  final case class PeerConfirmed(peerInfo: BrokerInfo)                           extends Command
+  final case class PeerDenied(peerInfo: BrokerInfo)                              extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -178,8 +178,8 @@ class DiscoveryServer(
       cleanup()
       log.debug(s"Scanning peers: $getPeersNum in total")
       scanAndSchedule()
-    case GetNeighborPeers =>
-      sender() ! NeighborPeers(getActivePeers)
+    case GetNeighborPeers(targetGroupInfoOpt) =>
+      sender() ! NeighborPeers(getActivePeers(targetGroupInfoOpt))
     case Disable(peerId) =>
       table -= peerId
       ()

@@ -27,7 +27,7 @@ import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, GroupIndex, PeerId}
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -64,11 +64,15 @@ trait DiscoveryServerState {
     socketOpt = None
   }
 
-  def getActivePeers: AVector[BrokerInfo] = {
-    AVector
+  def getActivePeers(targetGroupInfoOpt: Option[BrokerGroupInfo]): AVector[BrokerInfo] = {
+    val candidates = AVector
       .from(table.values.map(_.info))
       .filter(info => mightReachable(info.address))
       .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
+    targetGroupInfoOpt match {
+      case Some(groupInfo) => candidates.filter(_.interBrokerInfo.intersect(groupInfo))
+      case None            => candidates
+    }
   }
 
   def getPeersNum: Int = table.size

@@ -132,7 +132,7 @@ class DiscoveryServerSpec
     eventually {
       servers.foreach { server =>
         val probe = TestProbe()
-        server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
+        server.tell(DiscoveryServer.GetNeighborPeers(None), probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
           (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
@@ -166,9 +166,9 @@ class DiscoveryServerSpec
 
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
       val probe1 = TestProbe()
-      server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
+      server1.tell(DiscoveryServer.GetNeighborPeers(None), probe1.ref)
 
       probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
         peers.length is groups + 1 // self clique peers + server1
@@ -196,9 +196,9 @@ class DiscoveryServerSpec
 
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
       val probe1 = TestProbe()
-      server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
+      server1.tell(DiscoveryServer.GetNeighborPeers(None), probe1.ref)
 
       probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
         peers.length is groups // self clique peers

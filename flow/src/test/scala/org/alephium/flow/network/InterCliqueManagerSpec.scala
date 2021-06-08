@@ -56,7 +56,7 @@ class InterCliqueManagerSpec
       system.stop(connection.ref)
     }
 
-    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers)
+    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
 
     getPeers() is Seq.empty
   }
@@ -73,7 +73,7 @@ class InterCliqueManagerSpec
     }
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers)
+    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
 
     getPeers() is Seq.empty
   }
