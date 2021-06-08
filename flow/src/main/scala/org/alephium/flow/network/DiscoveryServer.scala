@@ -192,13 +192,10 @@ class DiscoveryServer(
       tryPing(peerInfo)
     case OutboundBrokerHandler.Unreachable(remote) =>
       setUnreachable(remote)
-      scanAndSchedule()
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
-    if (banPeerFromAddress(peer)) {
-      scanAndSchedule()
-    }
+    banPeerFromAddress(peer)
   }
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =

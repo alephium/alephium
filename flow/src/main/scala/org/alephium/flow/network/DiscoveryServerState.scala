@@ -118,14 +118,12 @@ trait DiscoveryServerState {
     pendings.get(peerId)
   }
 
-  def banPeerFromAddress(address: InetAddress): Boolean = {
-    val bannedPeer = table.values
-      .filter(status => status.info.address.getAddress == address)
-      .map(_.info.peerId)
-
-    bannedPeer.foreach(banPeer)
-
-    bannedPeer.nonEmpty
+  def banPeerFromAddress(address: InetAddress): Unit = {
+    table.values.foreach { status =>
+      if (status.info.address.getAddress == address) {
+        banPeer(status.info.peerId)
+      }
+    }
   }
 
   def banPeer(peerId: PeerId): Unit = {
