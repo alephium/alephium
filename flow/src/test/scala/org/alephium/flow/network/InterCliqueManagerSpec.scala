@@ -116,7 +116,10 @@ class InterCliqueManagerSpec
 
     val newBroker = newBrokerInfo(broker)
     EventFilter.warning(start = "Too many inbound connections", occurrences = 1).intercept {
-      interCliqueManagerActor.handleNewBroker(newBroker, InboundConnection)
+      val probe = TestProbe()
+      watch(probe.ref)
+      probe.send(interCliqueManager, CliqueManager.HandShaked(newBroker, InboundConnection))
+      expectTerminated(probe.ref)
     }
   }
 
@@ -132,7 +135,10 @@ class InterCliqueManagerSpec
 
     val newBroker = newBrokerInfo(broker)
     EventFilter.warning(start = "Too many outbound connections", occurrences = 1).intercept {
-      interCliqueManagerActor.handleNewBroker(newBroker, OutboundConnection)
+      val probe = TestProbe()
+      watch(probe.ref)
+      probe.send(interCliqueManager, CliqueManager.HandShaked(newBroker, OutboundConnection))
+      expectTerminated(probe.ref)
     }
   }
 
@@ -181,6 +187,35 @@ class InterCliqueManagerSpec
       interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
     }
   }
+
+  behavior of "Extract peers"
+
+  it should "not return self clique" in new Fixture {
+    interCliqueManagerActor.extractPeersToConnect(cliqueInfo.interBrokers.get, 100).isEmpty is true
+  }
+
+  it should "not return already included peers" in new Fixture {
+    val testBroker = relevantBrokerInfo()
+    interCliqueManagerActor.addBroker(testBroker, OutboundConnection, ActorRefT(testActor))
+    interCliqueManagerActor.extractPeersToConnect(AVector(testBroker), 100).isEmpty is true
+  }
+
+  it should "not return non-intersected peers" in new Fixture {
+    val testBroker = irrelevantBrokerInfo()
+    interCliqueManagerActor.extractPeersToConnect(AVector(testBroker), 100).isEmpty is true
+  }
+
+  it should "not return any peers when capacity is 0" in new Fixture {
+    val testBroker = relevantBrokerInfo()
+    interCliqueManagerActor.extractPeersToConnect(AVector(testBroker), 0).isEmpty is true
+  }
+
+  it should "return the peer when capacity is ok" in new Fixture {
+    val testBroker = relevantBrokerInfo()
+    interCliqueManagerActor.extractPeersToConnect(AVector(testBroker), 1) is AVector(testBroker)
+  }
+
+  behavior of "Sync"
 
   trait SyncFixture extends Fixture {
     def checkSynced(expected: Boolean) = {
