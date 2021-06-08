@@ -230,7 +230,7 @@ class DiscoveryServerSpec
       )
     )
     server0 ! UdpServer.Received(
-      DiscoveryMessage.serialize(message, networkConfig.networkType, discoveryPrivateKey),
+      DiscoveryMessage.serialize(message, networkConfig.networkType, cliqueInfo1.priKey),
       address1
     )
 
@@ -273,8 +273,6 @@ class DiscoveryServerSpec
   trait Fixture extends ActorFixture with BrokerConfigFixture.Default {
 
     override val groups = Gen.choose(2, 10).sample.get
-
-    val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 
     val probeTimeout = Duration.ofSecondsUnsafe(5).asScala
 

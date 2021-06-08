@@ -255,7 +255,7 @@ class DiscoveryServer(
       f: BrokerInfo => Unit
   ): Unit = {
     if (remote != peerInfo.address) {
-      log.debug(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
+      log.warning(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
       misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
     } else if (mightReachable(remote)) {
       f(peerInfo)
