@@ -28,7 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfi
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, LinkedBuffer, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait DiscoveryServerState {
@@ -50,8 +50,8 @@ trait DiscoveryServerState {
   private var socketOpt: Option[ActorRefT[UdpServer.Command]] = None
 
   protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val pendings     = mutable.HashMap.empty[PeerId, AwaitPong]
   private val pendingMax   = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+  private val pendings     = LinkedBuffer[PeerId, AwaitPong](pendingMax)
   private val unreachables = mutable.HashMap.empty[InetSocketAddress, TimeStamp]
 
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
@@ -97,8 +97,6 @@ trait DiscoveryServerState {
   }
 
   def isUnknown(peerId: PeerId): Boolean = !isInTable(peerId) && !isPending(peerId)
-
-  def isPendingAvailable: Boolean = pendings.size < pendingMax
 
   def getPeer(peerId: PeerId): Option[BrokerInfo] = {
     table.get(peerId).map(_.info)
@@ -221,7 +219,7 @@ trait DiscoveryServerState {
   }
 
   def tryPing(peerInfo: BrokerInfo): Unit = {
-    if (isUnknown(peerInfo.peerId) && isPendingAvailable) {
+    if (isUnknown(peerInfo.peerId)) {
       ping(peerInfo)
     }
   }
@@ -252,7 +250,10 @@ trait DiscoveryServerState {
         updateStatus(peerId)
         fetchNeighbors(peerInfo)
       case None =>
-        tryPing(peerInfo)
+        // ping for bootstrap nodes are not buffered
+        if (bootstrap.contains(peerInfo.address)) {
+          tryPing(peerInfo)
+        }
     }
   }
 

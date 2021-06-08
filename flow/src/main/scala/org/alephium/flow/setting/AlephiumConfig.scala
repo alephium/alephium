@@ -120,8 +120,6 @@ final case class UpnpSettings(
 
 final case class DiscoverySetting(
     bootstrap: ArraySeq[InetSocketAddress],
-    peersPerGroup: Int,
-    scanMaxPerGroup: Int,
     scanFrequency: Duration,
     scanFastFrequency: Duration,
     neighborsPerGroup: Int

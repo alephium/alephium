@@ -251,7 +251,7 @@ class DiscoveryServer(
     scanScheduled = None
   }
 
-  private def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
+  def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
       f: BrokerInfo => Unit
   ): Unit = {
     if (remote != peerInfo.address) {
