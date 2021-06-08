@@ -20,12 +20,11 @@ import java.net.InetSocketAddress
 
 import akka.io.Tcp
 
-import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.network.TcpController
+import org.alephium.flow.network.{CliqueManager, TcpController}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.message.{Hello, Payload}
 import org.alephium.protocol.model.CliqueInfo
-import org.alephium.util.{ActorRefT, Duration, EventStream, TimeStamp}
+import org.alephium.util.{ActorRefT, Duration, EventStream}
 
 object OutboundBrokerHandler {
   case object Retry

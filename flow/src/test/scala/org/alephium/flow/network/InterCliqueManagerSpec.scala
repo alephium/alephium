@@ -56,7 +56,7 @@ class InterCliqueManagerSpec
       system.stop(connection.ref)
     }
 
-    discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peer))
+    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers)
 
     getPeers() is Seq.empty
   }
@@ -73,7 +73,7 @@ class InterCliqueManagerSpec
     }
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-    discoveryServer.expectMsg(DiscoveryServer.PeerDisconnected(peerInfo.address))
+    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers)
 
     getPeers() is Seq.empty
   }
@@ -126,12 +126,12 @@ class InterCliqueManagerSpec
     )
 
     val broker = relevantBrokerInfo()
-    EventFilter.debug(start = "Too many outbound connections", occurrences = 0).intercept {
+    EventFilter.warning(start = "Too many outbound connections", occurrences = 0).intercept {
       interCliqueManagerActor.handleNewBroker(broker, OutboundConnection)
     }
 
     val newBroker = newBrokerInfo(broker)
-    EventFilter.debug(start = "Too many outbound connections", occurrences = 1).intercept {
+    EventFilter.warning(start = "Too many outbound connections", occurrences = 1).intercept {
       interCliqueManagerActor.handleNewBroker(newBroker, OutboundConnection)
     }
   }
