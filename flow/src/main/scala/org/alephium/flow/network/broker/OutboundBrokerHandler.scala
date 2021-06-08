@@ -43,37 +43,39 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
     publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
   }
 
-  val until: TimeStamp = TimeStamp.now() + networkSetting.retryTimeout
-
   var connection: ActorRefT[Tcp.Command]                            = _
   var brokerConnectionHandler: ActorRefT[ConnectionHandler.Command] = _
 
   override def receive: Receive = connecting
 
   def connecting: Receive = {
-    case OutboundBrokerHandler.Retry =>
-      publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
+    val backoffStrategy = BackoffStrategy.default()
 
-    case _: Tcp.Connected =>
-      log.info(s"Connected to $remoteAddress")
-      connection = networkSetting.connectionBuild(sender())
-      brokerConnectionHandler = {
-        val ref =
-          context.actorOf(ConnectionHandler.clique(remoteAddress, connection, ActorRefT(self)))
-        context watch ref
-        ActorRefT(ref)
-      }
-      context become handShaking
+    val receive: Receive = {
+      case OutboundBrokerHandler.Retry =>
+        publishEvent(TcpController.ConnectTo(remoteAddress, ActorRefT(self)))
 
-    case Tcp.CommandFailed(c: Tcp.Connect) =>
-      val current = TimeStamp.now()
-      if (current isBefore until) {
-        scheduleOnce(self, OutboundBrokerHandler.Retry, Duration.ofSecondsUnsafe(1))
-        ()
-      } else {
-        log.info(s"Cannot connect to ${c.remoteAddress}")
-        context stop self
-      }
+      case _: Tcp.Connected =>
+        log.info(s"Connected to $remoteAddress")
+        connection = networkSetting.connectionBuild(sender())
+        brokerConnectionHandler = {
+          val ref =
+            context.actorOf(ConnectionHandler.clique(remoteAddress, connection, ActorRefT(self)))
+          context watch ref
+          ActorRefT(ref)
+        }
+        context become handShaking
+
+      case Tcp.CommandFailed(c: Tcp.Connect) =>
+        val retried = backoffStrategy.retry { duration =>
+          scheduleOnce(self, OutboundBrokerHandler.Retry, duration)
+        }
+        if (!retried) {
+          log.info(s"Cannot connect to ${c.remoteAddress}")
+          context stop self
+        }
+    }
+    receive
   }
 
   override def handShakeDuration: Duration = networkSetting.handshakeTimeout
