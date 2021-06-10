@@ -2230,48 +2230,50 @@
                 },
                 "example": {
                   "blocks": [
-                    {
-                      "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "timestamp": 1611041396892,
-                      "chainFrom": 1,
-                      "chainTo": 2,
-                      "height": 42,
-                      "deps": [
-                        "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                      ],
-                      "transactions": [
-                        {
-                          "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                          "inputs": [
-                            {
-                              "outputRef": {
-                                "scriptHint": 23412,
-                                "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                              },
-                              "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
-                            }
-                          ],
-                          "outputs": [
-                            {
-                              "amount": "1000000000000000000",
-                              "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                              "tokens": [
-                                {
-                                  "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                                  "amount": "42"
+                    [
+                      {
+                        "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                        "timestamp": 1611041396892,
+                        "chainFrom": 1,
+                        "chainTo": 2,
+                        "height": 42,
+                        "deps": [
+                          "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                          "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                        ],
+                        "transactions": [
+                          {
+                            "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                            "inputs": [
+                              {
+                                "outputRef": {
+                                  "scriptHint": 23412,
+                                  "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                                 },
-                                {
-                                  "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                                  "amount": "1000"
-                                }
-                              ],
-                              "lockTime": 1611041396892
-                            }
-                          ]
-                        }
-                      ]
-                    }
+                                "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                              }
+                            ],
+                            "outputs": [
+                              {
+                                "amount": "1000000000000000000",
+                                "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                                "tokens": [
+                                  {
+                                    "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                    "amount": "42"
+                                  },
+                                  {
+                                    "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                    "amount": "1000"
+                                  }
+                                ],
+                                "lockTime": 1611041396892
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
                   ]
                 }
               }
@@ -4835,7 +4837,10 @@
           "blocks": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/BlockEntry"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/BlockEntry"
+              }
             }
           }
         }

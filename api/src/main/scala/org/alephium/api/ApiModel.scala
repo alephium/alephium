@@ -136,6 +136,8 @@ trait ApiModelCodec {
 
   implicit val blockEntryRW: RW[BlockEntry] = macroRW
 
+  implicit val blockHeaderEntryRW: RW[BlockHeaderEntry] = macroRW
+
   implicit val blockCandidateRW: RW[BlockCandidate] = macroRW
 
   implicit val blockSolutionRW: RW[BlockSolution] = macroRW

@@ -86,7 +86,7 @@ trait EndpointsExamples extends ErrorExamples {
     chainTo = 2,
     height,
     deps = AVector(blockHash, blockHash),
-    transactions = Some(AVector(tx))
+    transactions = AVector(tx)
   )
 
   private val blockCandidate = BlockCandidate(
@@ -163,7 +163,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
 
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
-    simpleExample(FetchResponse(AVector(blockEntry)))
+    simpleExample(FetchResponse(AVector(AVector(blockEntry))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)

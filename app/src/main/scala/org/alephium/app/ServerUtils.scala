@@ -41,8 +41,10 @@ class ServerUtils(networkType: NetworkType) {
 
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
     val entriesEither = for {
-      headers <- blockFlow.getHeightedBlockHeaders(fetchRequest.fromTs, fetchRequest.toTs)
-    } yield headers.map { case (header, height) => BlockEntry.from(header, height) }
+      blocks <- blockFlow.getHeightedBlocks(fetchRequest.fromTs, fetchRequest.toTs)
+    } yield blocks.map(_.map { case (block, height) =>
+      BlockEntry.from(block, height, networkType)
+    })
 
     entriesEither match {
       case Right(entries) => Right(FetchResponse(entries))

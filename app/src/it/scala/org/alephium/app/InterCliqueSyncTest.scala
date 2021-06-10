@@ -125,6 +125,8 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
       eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
 
+      val selfClique2 = request[SelfClique](getSelfClique, restPort(masterPortClique2))
+
       clique2.foreach { server =>
         eventually {
           val interCliquePeers =
@@ -146,14 +148,22 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
       val toTs = TimeStamp.now()
       eventually {
-        request[FetchResponse](
-          blockflowFetch(fromTs, toTs),
-          restPort(masterPortClique1)
-        ).blocks.toSet is
+        val blockflow1 = selfClique1.nodes.flatMap { peer =>
           request[FetchResponse](
             blockflowFetch(fromTs, toTs),
-            restPort(masterPortClique2)
-          ).blocks.toSet
+            peer.restPort
+          ).blocks
+        }
+        val blockflow2 = selfClique2.nodes.flatMap { peer =>
+          request[FetchResponse](
+            blockflowFetch(fromTs, toTs),
+            peer.restPort
+          ).blocks
+        }
+
+        blockflow1.length is blockflow2.length
+
+        blockflow1.map(_.toSet).toSet is blockflow2.map(_.toSet).toSet
       }
 
       clique1.foreach(_.stop().futureValue is ())

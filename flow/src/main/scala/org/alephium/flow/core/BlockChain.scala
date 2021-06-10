@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
@@ -25,7 +27,7 @@ import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.serde.Serde
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def blockStorage: BlockStorage
@@ -37,6 +39,135 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getBlockUnsafe(hash: BlockHash): Block = {
     blockStorage.getUnsafe(hash)
+  }
+
+  def getMainChainBlockByHeight(height: Int): IOResult[Option[Block]] = {
+    getHashes(height).flatMap { hashes =>
+      hashes.headOption match {
+        case Some(hash) => getBlock(hash).map(Some(_))
+        case None       => Right(None)
+      }
+    }
+  }
+
+  def getHeightedBlocks(
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(Block, Int)]] =
+    for {
+      height <- maxHeight
+      result <- searchByTimestampHeight(height, fromTs, toTs)
+    } yield result
+
+  //Binary search until we found an height containing blocks within time range
+  @tailrec
+  private def locateTimeRangedHeight(
+      fromTs: TimeStamp,
+      toTs: TimeStamp,
+      low: Int,
+      high: Int
+  ): IOResult[Option[(Int, Block)]] = {
+    if (low > high) {
+      Right(None)
+    } else {
+      val middle = low + (high - low) / 2
+      getMainChainBlockByHeight(middle) match {
+        case Right(Some(block)) =>
+          if (block.timestamp > toTs) { //search lower
+            locateTimeRangedHeight(fromTs, toTs, low, middle - 1)
+          } else if (block.timestamp >= fromTs) { //got you
+            Right(Some((middle, block)))
+          } else { //search higher
+            locateTimeRangedHeight(fromTs, toTs, middle + 1, high)
+          }
+        case Right(None) =>
+          locateTimeRangedHeight(fromTs, toTs, low, middle - 1)
+        case Left(error) => Left(error)
+      }
+    }
+  }
+
+  private def searchByTimestampHeight(
+      maxHeight: Int,
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(Block, Int)]] = {
+    locateTimeRangedHeight(fromTs, toTs, ALF.GenesisHeight, maxHeight).flatMap {
+      case None => Right(AVector.empty)
+      case Some((height, init)) => {
+        for {
+          previous <- getLowerBlocks(ALF.GenesisHeight, height - 1, fromTs, toTs)
+          later    <- getUpperBlocks(maxHeight, height + 1, fromTs, toTs)
+        } yield {
+          (previous.reverse :+ ((init, height))) ++ later
+        }
+      }
+    }
+  }
+
+  private def getTimeRangedBlocks(
+      threshold: Int,
+      done: (Int, Int) => Boolean,
+      step: Int,
+      initHeight: Int,
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(Block, Int)]] = {
+    @tailrec
+    def rec(
+        height: Int,
+        prev: AVector[(Block, Int)]
+    ): IOResult[AVector[(Block, Int)]] = {
+      if (done(threshold, height)) {
+        Right(prev)
+      } else {
+        getMainChainBlockByHeight(height) match {
+          case Right(blockOpt) =>
+            val filteredHeader =
+              blockOpt.filter(block => block.timestamp >= fromTs && block.timestamp <= toTs)
+            filteredHeader match {
+              case None => Right(prev)
+              case Some(block) =>
+                val next = prev :+ ((block, height))
+                rec(height + step, next)
+            }
+          case Left(error) => Left(error)
+        }
+      }
+    }
+    rec(initHeight, AVector.empty)
+  }
+
+  private def getUpperBlocks(
+      maxHeight: Int,
+      initHeight: Int,
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(Block, Int)]] = {
+    getTimeRangedBlocks(
+      maxHeight,
+      (threshold, height) => height > threshold,
+      1,
+      initHeight,
+      fromTs,
+      toTs
+    )
+  }
+
+  private def getLowerBlocks(
+      minHeight: Int,
+      initHeight: Int,
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(Block, Int)]] = {
+    getTimeRangedBlocks(
+      minHeight,
+      (threshold, height) => height < threshold,
+      -1,
+      initHeight,
+      fromTs,
+      toTs
+    )
   }
 
   def add(block: Block, weight: Weight): IOResult[Unit] = {

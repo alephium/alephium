@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.reflect.ClassTag
+
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
@@ -33,7 +35,9 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   protected def aggregateHashE[T](f: BlockHashPool => IOResult[T])(op: (T, T) => T): IOResult[T]
 
-  protected def aggregateHeaderE[T](f: BlockHeaderPool => IOResult[T])(op: (T, T) => T): IOResult[T]
+  protected def concatOutBlockChainsE[T: ClassTag](
+      f: BlockChain => IOResult[T]
+  ): IOResult[AVector[T]]
 
   def numHashes: Int = aggregateHash(_.numHashes)(_ + _)
 
@@ -65,11 +69,11 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getHashChain(hash).isTip(hash)
   }
 
-  def getHeightedBlockHeaders(
+  def getHeightedBlocks(
       fromTs: TimeStamp,
       toTs: TimeStamp
-  ): IOResult[AVector[(BlockHeader, Int)]] =
-    aggregateHeaderE(_.getHeightedBlockHeaders(fromTs, toTs))(_ ++ _)
+  ): IOResult[AVector[AVector[(Block, Int)]]] =
+    concatOutBlockChainsE(_.getHeightedBlocks(fromTs, toTs))
 
   def getHashesAfter(locator: BlockHash): IOResult[AVector[BlockHash]] =
     getHashChain(locator).getHashesAfter(locator)
