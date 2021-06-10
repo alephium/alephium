@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 
 import akka.util.ByteString
 
-import org.alephium.util.{AVector, I256, U256}
+import org.alephium.util.{AVector, Bytes, I256, TimeStamp, U256}
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
@@ -104,6 +104,16 @@ trait FixedSizeSerde[T] extends Serde[T] {
     } else {
       Left(SerdeError.incompleteData(serdeSize, input.size))
     }
+
+  def deserialize1(input: ByteString, f: ByteString => SerdeResult[T]): SerdeResult[T] = {
+    if (input.size == serdeSize) {
+      f(input)
+    } else if (input.size > serdeSize) {
+      Left(SerdeError.redundant(serdeSize, input.size))
+    } else {
+      Left(SerdeError.incompleteData(serdeSize, input.size))
+    }
+  }
 
   override def _deserialize(input: ByteString): SerdeResult[Staging[T]] =
     if (input.size >= serdeSize) {
@@ -376,4 +386,23 @@ object Serde extends ProductSerde {
         }
       }
     }
+
+  private[serde] object TimeStampSerde extends FixedSizeSerde[TimeStamp] {
+    override val serdeSize: Int = 8
+
+    override def serialize(input: TimeStamp): ByteString = {
+      Bytes.toBytes(input.millis)
+    }
+
+    override def deserialize(input: ByteString): SerdeResult[TimeStamp] = {
+      deserialize1(
+        input,
+        input =>
+          TimeStamp.from(Bytes.toLongUnsafe(input)) match {
+            case Some(ts) => Right(ts)
+            case None     => Left(SerdeError.validation(s"Negative timestamp"))
+          }
+      )
+    }
+  }
 }

@@ -47,7 +47,6 @@ package object serde {
   implicit val boolSerde: Serde[Boolean] = BoolSerde
   implicit val byteSerde: Serde[Byte]    = ByteSerde
   implicit val intSerde: Serde[Int]      = IntSerde
-  implicit val longSerde: Serde[Long]    = LongSerde
   implicit val i256Serde: Serde[I256]    = I256Serde
   implicit val u256Serde: Serde[U256]    = U256Serde
 
@@ -76,7 +75,6 @@ package object serde {
   implicit val boolAVectorSerde: Serde[AVector[Boolean]] = avectorSerde[Boolean]
   implicit val byteAVectorSerde: Serde[AVector[Byte]]    = avectorSerde[Byte]
   implicit val intAVectorSerde: Serde[AVector[Int]]      = avectorSerde[Int]
-  implicit val longAVectorSerde: Serde[AVector[Long]]    = avectorSerde[Long]
   implicit val i256AVectorSerde: Serde[AVector[I256]]    = avectorSerde[I256]
   implicit val u256AVectorSerde: Serde[AVector[U256]]    = avectorSerde[U256]
 
@@ -86,7 +84,6 @@ package object serde {
   implicit val boolArraySeqSerde: Serde[mutable.ArraySeq[Boolean]] = arraySeqSerde[Boolean]
   implicit val byteArraySeqSerde: Serde[mutable.ArraySeq[Byte]]    = arraySeqSerde[Byte]
   implicit val intArraySeqSerde: Serde[mutable.ArraySeq[Int]]      = arraySeqSerde[Int]
-  implicit val longArraySeqSerde: Serde[mutable.ArraySeq[Long]]    = arraySeqSerde[Long]
   implicit val i256ArraySeqSerde: Serde[mutable.ArraySeq[I256]]    = arraySeqSerde[I256]
   implicit val u256ArraySeqSerde: Serde[mutable.ArraySeq[U256]]    = arraySeqSerde[U256]
 
@@ -120,5 +117,5 @@ package object serde {
     catch { case e: IllegalArgumentException => Left(SerdeError.wrongFormat(e.getMessage)) }
   }
 
-  implicit val serdeTS: Serde[TimeStamp] = longSerde.xomap(TimeStamp.from, _.millis)
+  implicit val serdeTS: Serde[TimeStamp] = TimeStampSerde
 }

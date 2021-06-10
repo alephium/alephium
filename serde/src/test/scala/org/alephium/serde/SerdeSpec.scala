@@ -69,13 +69,6 @@ class SerdeSpec extends AlephiumSpec {
     }
   }
 
-  "Serde for Long" should "serde correctly" in {
-    forAll { n: Long =>
-      val nn = deserialize[Long](serialize(n))
-      nn isE n
-    }
-  }
-
   "Serde for I256" should "serde correct" in {
     val cases = List(I256.Zero, I256.One, I256.NegOne, I256.MaxValue, I256.MinValue)
     for (n <- cases) {
@@ -153,11 +146,11 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for either" should "work" in {
-    forAll { (left: Int, right: Long) =>
-      val input1: Either[Int, Long] = Left(left)
-      deserialize[Either[Int, Long]](serialize(input1)) isE input1
-      val input2: Either[Int, Long] = Right(right)
-      deserialize[Either[Int, Long]](serialize(input2)) isE input2
+    forAll { (left: Int, right: Byte) =>
+      val input1: Either[Int, Byte] = Left(left)
+      deserialize[Either[Int, Byte]](serialize(input1)) isE input1
+      val input2: Either[Int, Byte] = Right(right)
+      deserialize[Either[Int, Byte]](serialize(input2)) isE input2
     }
   }
 
@@ -219,4 +212,20 @@ class SerdeSpec extends AlephiumSpec {
     deserialize[InetSocketAddress](address2).left.value is a[SerdeError.WrongFormat]
   }
   // scalastyle:on regex
+
+  it should "serde timestamp" in {
+    forAll { millis: Long =>
+      if (millis >= 0) {
+        val ts = TimeStamp.from(millis).get
+        deserialize[TimeStamp](serialize(ts)) isE ts
+      } else {
+        deserialize[TimeStamp](Bytes.toBytes(millis)).left.value is a[SerdeError.Validation]
+      }
+    }
+
+    serialize(TimeStamp.zero) is ByteString(0, 0, 0, 0, 0, 0, 0, 0)
+    serialize(TimeStamp.unsafe(Long.MaxValue)) is ByteString(127, -1, -1, -1, -1, -1, -1, -1)
+
+    deserialize[TimeStamp](ByteString.empty).left.value is a[SerdeError.WrongFormat]
+  }
 }

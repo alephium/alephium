@@ -23,7 +23,7 @@ import org.alephium.protocol.Protocol
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 sealed trait Payload extends Product {
   val name = productPrefix
@@ -136,23 +136,23 @@ object Payload {
 }
 
 sealed trait HandShake extends Payload {
-  val version: Int
-  val timestamp: Long
-  val brokerInfo: InterBrokerInfo
+  def version: Int
+  def timestamp: TimeStamp
+  def brokerInfo: InterBrokerInfo
 }
 
 sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T] {
-  def unsafe(version: Int, timestamp: Long, brokerInfo: InterBrokerInfo): T
+  def unsafe(version: Int, timestamp: TimeStamp, brokerInfo: InterBrokerInfo): T
 
   def unsafe(brokerInfo: InterBrokerInfo): T =
-    unsafe(Protocol.version, System.currentTimeMillis(), brokerInfo)
+    unsafe(Protocol.version, TimeStamp.now(), brokerInfo)
 
   implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
   val serde: Serde[T] =
     Serde.forProduct3(unsafe, t => (t.version, t.timestamp, t.brokerInfo))
 
   def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] =
-    if (message.version == Protocol.version && message.timestamp > 0) {
+    if (message.version == Protocol.version && message.timestamp > TimeStamp.zero) {
       Right(())
     } else {
       Left(s"invalid HandShake: $message")
@@ -161,16 +161,16 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
 
 final case class Hello private (
     version: Int,
-    timestamp: Long,
+    timestamp: TimeStamp,
     brokerInfo: InterBrokerInfo
 ) extends HandShake
 
 object Hello extends HandShakeSerding[Hello] with Payload.Code {
-  def unsafe(version: Int, timestamp: Long, brokerInfo: InterBrokerInfo): Hello =
+  def unsafe(version: Int, timestamp: TimeStamp, brokerInfo: InterBrokerInfo): Hello =
     new Hello(version, timestamp, brokerInfo)
 }
 
-final case class Ping(nonce: Int, timestamp: Long) extends Payload
+final case class Ping(nonce: Int, timestamp: TimeStamp) extends Payload
 
 object Ping extends Payload.Serding[Ping] with Payload.Code {
   val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
