@@ -113,7 +113,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def cacheBlock(block: Block): Unit = {
     val index = block.chainIndex
-    (brokerConfig.groupFrom until brokerConfig.groupUntil).foreach { group =>
+    brokerConfig.groupRange.foreach { group =>
       val groupIndex = GroupIndex.unsafe(group)
       val groupCache = getGroupCache(groupIndex)
       if (index.relateTo(groupIndex)) {

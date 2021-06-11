@@ -31,7 +31,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, BaseActor, EventStream}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
 
 object InterCliqueManager {
   // scalastyle:off parameter.number
@@ -183,7 +183,13 @@ class InterCliqueManager(
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
       removeBroker(peer)
-      discoveryServer ! DiscoveryServer.PeerDisconnected(peer)
+      if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
+        discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
+      }
+
+    case DiscoveryServer.NeighborPeers(sortedPeers) =>
+      extractPeersToConnect(sortedPeers, networkSetting.maxOutboundConnectionsPerGroup)
+        .foreach(connectUnsafe)
   }
 
   def connect(broker: BrokerInfo): Unit = {
@@ -292,7 +298,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {
-    (brokerConfig.groupFrom until brokerConfig.groupUntil).exists { group =>
+    brokerConfig.groupRange.exists { group =>
       getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
     }
   }
@@ -344,6 +350,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       addBroker(brokerInfo, InboundConnection, ActorRefT(sender()))
     } else {
       log.warning(s"Too many inbound connections, ignore the one from $brokerInfo")
+      context.stop(sender())
     }
   }
 
@@ -351,14 +358,60 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       brokerInfo: BrokerInfo,
       maxOutboundConnectionsPerGroup: Int
   ): Unit = {
-    val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
-    val available = (groupFrom until groupUntil).exists { group =>
-      getOutConnectionPerGroup(GroupIndex.unsafe(group)) < maxOutboundConnectionsPerGroup
-    }
-    if (available) {
+    if (needOutgoingConnections(brokerInfo, maxOutboundConnectionsPerGroup)) {
       addBroker(brokerInfo, OutboundConnection, ActorRefT(sender()))
     } else {
-      log.debug(s"Too many outbound connections, ignore the one from $brokerInfo")
+      log.warning(s"Too many outbound connections, ignore the one from $brokerInfo")
+      context.stop(sender())
+    }
+  }
+
+  def needOutgoingConnections(
+      brokerInfo: BrokerInfo,
+      maxOutboundConnectionsPerGroup: Int
+  ): Boolean = {
+    val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
+    needOutgoingConnections(groupFrom, groupUntil, maxOutboundConnectionsPerGroup)
+  }
+
+  def needOutgoingConnections(
+      maxOutboundConnectionsPerGroup: Int
+  ): Boolean = {
+    needOutgoingConnections(
+      brokerConfig.groupFrom,
+      brokerConfig.groupUntil,
+      maxOutboundConnectionsPerGroup
+    )
+  }
+
+  private def needOutgoingConnections(
+      groupFrom: Int,
+      groupUntil: Int,
+      maxOutboundConnectionsPerGroup: Int
+  ): Boolean = {
+    (groupFrom until groupUntil).exists { group =>
+      getOutConnectionPerGroup(GroupIndex.unsafe(group)) < maxOutboundConnectionsPerGroup
+    }
+  }
+
+  def extractPeersToConnect(
+      sortedPeers: AVector[BrokerInfo],
+      maxOutboundConnectionsPerGroup: Int
+  ): AVector[BrokerInfo] = {
+    val peerPerGroupCount = Array.fill[Int](brokerConfig.groups)(maxOutboundConnectionsPerGroup)
+    brokerConfig.groupRange.foreach { group =>
+      peerPerGroupCount(group) = getOutConnectionPerGroup(GroupIndex.unsafe(group))
+    }
+    sortedPeers.filter { brokerInfo =>
+      val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
+      val ok = {
+        (brokerInfo.peerId.cliqueId != selfCliqueId) &&
+        !containsBroker(brokerInfo) &&
+        (groupUntil > groupFrom) &&
+        (groupFrom until groupUntil).exists(peerPerGroupCount(_) < maxOutboundConnectionsPerGroup)
+      }
+      if (ok) (groupFrom until groupUntil).foreach(peerPerGroupCount(_) += 1)
+      ok
     }
   }
 

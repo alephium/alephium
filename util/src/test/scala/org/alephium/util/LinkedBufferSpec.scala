@@ -14,21 +14,31 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.util
 
-import org.alephium.util.Duration
+class LinkedBufferSpec extends AlephiumSpec {
+  it should "work as map" in {
+    val buffer = LinkedBuffer[Char, Int](100)
+    buffer.addOne('a' -> 0)
+    buffer.contains('a') is true
+    buffer('a') is 0
+    buffer.get('a') is Some(0)
+    buffer.addOne('b'   -> 1)
+    buffer.head is ('a' -> 0)
+    buffer.last is ('b' -> 1)
+    buffer.addOne('a'   -> 2)
+    buffer.head is ('b' -> 1)
+    buffer.last is ('a' -> 2)
+    buffer.remove('b')
+    buffer.remove('a')
+    buffer.isEmpty is true
+  }
 
-trait DiscoveryConfig {
-  /* Wait time between two scan. */
-  def scanFrequency: Duration
-
-  def scanFastFrequency: Duration
-
-  /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
-  def neighborsPerGroup: Int
-
-  /** Duration we wait before considering a peer dead. * */
-  lazy val peersTimeout: Duration = scanFrequency
-
-  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(5)
+  it should "remove elements when there is no capacity" in {
+    val buffer = LinkedBuffer[Char, Int](1)
+    buffer.addOne('a' -> 0)
+    buffer.addOne('b' -> 1)
+    buffer.size is 1
+    buffer.head is ('b' -> 1)
+  }
 }

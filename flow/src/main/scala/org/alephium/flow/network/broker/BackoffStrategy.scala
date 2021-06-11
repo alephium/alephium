@@ -14,21 +14,31 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.flow.network.broker
 
-import org.alephium.util.Duration
+import org.alephium.util.{Duration, Math}
 
-trait DiscoveryConfig {
-  /* Wait time between two scan. */
-  def scanFrequency: Duration
+class BackoffStrategy(var retryCount: Int) {
+  import BackoffStrategy._
 
-  def scanFastFrequency: Duration
+  def retry(f: Duration => Unit): Boolean = {
+    if (retryCount < maxRetry) {
+      val backoff = baseDelay.timesUnsafe(1L << retryCount)
+      retryCount += 1
+      f(Math.min(backoff, maxBackOff))
+      true
+    } else {
+      false
+    }
+  }
+}
 
-  /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
-  def neighborsPerGroup: Int
+object BackoffStrategy {
+  def default(): BackoffStrategy = new BackoffStrategy(0)
 
-  /** Duration we wait before considering a peer dead. * */
-  lazy val peersTimeout: Duration = scanFrequency
-
-  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(5)
+  // scalastyle:off magic.number
+  val baseDelay: Duration  = Duration.ofMillisUnsafe(500)
+  val maxBackOff: Duration = Duration.ofSecondsUnsafe(8)
+  val maxRetry: Int        = 8
+  // scalastyle:on magic.number
 }

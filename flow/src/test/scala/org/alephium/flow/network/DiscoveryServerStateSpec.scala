@@ -91,10 +91,9 @@ class DiscoveryServerStateSpec
   }
 
   it should "add peer into pending list when just pinged the peer" in new Fixture {
-    state.getActivePeers.length is 0
+    state.getActivePeers(None).length is 0
     state.isUnknown(peerInfo.peerId) is true
     state.isPending(peerInfo.peerId) is false
-    state.isPendingAvailable is true
     state.tryPing(peerInfo)
     expectPayload[Ping]
     state.isUnknown(peerInfo.peerId) is false
@@ -128,11 +127,10 @@ class DiscoveryServerStateSpec
     state.isPending(peer0.peerId) is false
   }
 
-  // TODO: use scalacheck
   it should "sort neighbors with respect to target" in new Fixture {
     override def peersPerGroup: Int = 4
 
-    state.getActivePeers.length is 0
+    state.getActivePeers(None).length is 0
     val toAdds = Gen.listOfN(peersPerGroup, peerInfoGen).sample.get
     toAdds.foreach(addToTable)
 
@@ -141,6 +139,15 @@ class DiscoveryServerStateSpec
     val bucket0 =
       peers0.map(p => peerInfo.cliqueId.hammingDist(p.cliqueId)).toIterable.toList
     bucket0 is bucket0.sorted
+  }
+
+  it should "return neighbors" in new Fixture {
+    state.getActivePeers(None).length is 0
+    val toAdds = Gen.listOfN(peersPerGroup, peerInfoGen).sample.get
+    toAdds.foreach(addToTable)
+
+    state.getActivePeers(None).length is toAdds.length
+    state.getActivePeers(Some(peerInfo)).foreach(_.intersect(peerInfo) is true)
   }
 
   it should "clean up a banned peer" in new Fixture {
@@ -186,7 +193,7 @@ class DiscoveryServerStateSpec
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
       brokers.foreach(state.addSelfCliquePeer)
     }
-    state.tableInitialSize is state.getActivePeers.length
+    state.tableInitialSize is state.getActivePeers(None).length
     state.shouldScanFast() is true
     state.atLeastOnePeerPerGroup() is false
 

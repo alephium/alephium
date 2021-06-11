@@ -123,7 +123,7 @@ class RestServer(
 
   private val getDiscoveredNeighborsRoute = toRoute(getDiscoveredNeighbors) { _ =>
     node.discoveryServer
-      .ask(DiscoveryServer.GetNeighborPeers)
+      .ask(DiscoveryServer.GetNeighborPeers(None))
       .mapTo[DiscoveryServer.NeighborPeers]
       .map(response => Right(response.peers))
   }

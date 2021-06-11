@@ -51,5 +51,7 @@ class BlocksExportImportTest extends AlephiumSpec {
     BlocksImporter.importBlocks(file, newServer.node).toOption.get >= blockMinedNum is true
 
     awaitNBlocks(blockMinedNum)
+
+    newServer.stop().futureValue is ()
   }
 }
