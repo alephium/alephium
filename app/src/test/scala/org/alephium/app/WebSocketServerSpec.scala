@@ -56,7 +56,7 @@ class WebSocketServerSpec
         Hash.hash("bar"),
         TimeStamp.zero,
         Target.Max,
-        2
+        Nonce.zero
       )
     val blockNotify = BlockNotify(header, 1)
     val headerHash  = header.hash.toHexString

@@ -19,6 +19,7 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.model.Nonce
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockSolution(
@@ -29,7 +30,7 @@ final case class BlockSolution(
     toGroup: Int,
     miningCount: U256,
     target: ByteString,
-    nonce: U256,
+    nonce: Nonce,
     txsHash: Hash,
     transactions: AVector[String]
 )

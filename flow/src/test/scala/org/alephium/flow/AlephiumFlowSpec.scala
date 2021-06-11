@@ -251,7 +251,7 @@ trait FlowFixture
   def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     @tailrec
     def iter(current: Block): Block = {
-      val tmp = Block(current.header.copy(nonce = UnsecureRandom.nextU256()), current.transactions)
+      val tmp = Block(current.header.copy(nonce = Nonce.unsecureRandom()), current.transactions)
       if (!PoW.checkWork(tmp) && (tmp.chainIndex equals chainIndex)) tmp else iter(tmp)
     }
     iter(mineFromMemPool(blockFlow, chainIndex))
@@ -324,7 +324,14 @@ trait FlowFixture
 
     @tailrec
     def iter(nonce: U256): BlockHeader = {
-      val header = BlockHeader.unsafe(blockDeps, depStateHash, txsHash, blockTs, target, nonce)
+      val header = BlockHeader.unsafe(
+        blockDeps,
+        depStateHash,
+        txsHash,
+        blockTs,
+        target,
+        Nonce.unsecureRandom()
+      )
       if (PoW.checkMined(header, chainIndex)) header else iter(nonce.addOneUnsafe())
     }
 

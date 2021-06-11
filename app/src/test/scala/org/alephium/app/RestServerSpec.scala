@@ -39,7 +39,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType, Target}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType, Nonce, Target}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
@@ -350,12 +350,13 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       val target       = Target.onePhPerBlock
       val ts           = TimeStamp.unsafe(1L)
       val txsHash      = Hash.generate
+      val nonceString  = "00" * Nonce.byteLength
 
       val body =
         s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
           .toHexString(
             target.bits
-          )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""
+          )}","nonce":"$nonceString","txsHash":"${txsHash.toHexString}","transactions":[]}"""
 
       interCliqueSynced = false
 

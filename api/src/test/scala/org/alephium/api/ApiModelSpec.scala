@@ -24,7 +24,7 @@ import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType, Target}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -310,15 +310,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       1,
       U256.One,
       target.bits,
-      U256.One,
+      Nonce.zero,
       txsHash,
       AVector.empty
     )
+    val nonceString = "00" * Nonce.byteLength
     val jsonRaw =
       s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
         .toHexString(
           target.bits
-        )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""
+        )}","nonce":"$nonceString","txsHash":"${txsHash.toHexString}","transactions":[]}"""
     checkData(blockSolution, jsonRaw)
   }
 }

@@ -31,7 +31,7 @@ final case class BlockHeader(
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target,
-    nonce: U256
+    nonce: Nonce
 ) extends FlowData {
   lazy val hash: BlockHash = PoW.hash(this)
 
@@ -96,9 +96,6 @@ final case class BlockHeader(
 }
 
 object BlockHeader {
-  // use fixed width bytes for U256 serialization
-  implicit private val nonceSerde: Serde[U256] = Serde.bytesSerde(32).xmap(U256.unsafe, _.toBytes)
-
   implicit val serde: Serde[BlockHeader] =
     Serde.forProduct7(
       apply,
@@ -106,7 +103,7 @@ object BlockHeader {
         (bh.version, bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target, bh.nonce)
     )
 
-  def genesis(txsHash: Hash, target: Target, nonce: U256)(implicit
+  def genesis(txsHash: Hash, target: Target, nonce: Nonce)(implicit
       config: GroupConfig
   ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
@@ -118,10 +115,11 @@ object BlockHeader {
       consensusConfig: ConsensusConfig
   ): BlockHeader = {
     @tailrec
-    def iter(nonce: U256): BlockHeader = {
+    def iter(count: U256): BlockHeader = {
+      val nonce  = Nonce.unsafe(count.toBytes.takeRight(Nonce.byteLength))
       val header = BlockHeader.genesis(txsHash, consensusConfig.maxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
-      if (header.chainIndex == chainIndex) header else iter(nonce.addOneUnsafe())
+      if (header.chainIndex == chainIndex) header else iter(count.addOneUnsafe())
     }
 
     iter(U256.Zero)
@@ -133,7 +131,7 @@ object BlockHeader {
       txsHash: Hash,
       timestamp: TimeStamp,
       target: Target,
-      nonce: U256
+      nonce: Nonce
   )(implicit config: GroupConfig): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
     BlockHeader(defaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target, nonce)
@@ -145,7 +143,7 @@ object BlockHeader {
       txsHash: Hash,
       timestamp: TimeStamp,
       target: Target,
-      nonce: U256
+      nonce: Nonce
   )(implicit config: GroupConfig): BlockHeader = {
     unsafeWithRawDeps(deps.deps, depStateHash, txsHash, timestamp, target, nonce)
   }

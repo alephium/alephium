@@ -88,7 +88,8 @@ object Miner extends LazyLogging {
     @tailrec
     def iter(current: U256): Option[(Block, U256)] = {
       if (current < nonceEnd) {
-        val header = template.buildHeader(current)
+        val nonce  = Nonce.unsafe(current.toBytes.takeRight(Nonce.byteLength))
+        val header = template.buildHeader(nonce)
         if (PoW.checkMined(header, index)) {
           val numTry = current.subUnsafe(nonceStart).addOneUnsafe()
           Some((Block(header, template.transactions), numTry))

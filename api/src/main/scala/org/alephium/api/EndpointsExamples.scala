@@ -100,7 +100,7 @@ trait EndpointsExamples extends ErrorExamples {
     toGroup = 2,
     miningCount = U256.Two,
     target = Target.onePhPerBlock.bits,
-    nonce = U256.Two,
+    nonce = Nonce.zero,
     txsHash = hash,
     transactions = AVector(hexString)
   )
