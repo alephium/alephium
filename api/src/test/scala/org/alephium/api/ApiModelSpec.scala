@@ -23,7 +23,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
@@ -273,53 +273,28 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BlockCandidate" in {
-    val blockHash    = BlockHash.generate
-    val depStateHash = Hash.generate
-    val target       = Target.onePhPerBlock
-    val ts           = TimeStamp.unsafe(1L)
-    val txsHash      = Hash.generate
+    val target = Target.onePhPerBlock
 
     val blockCandidate = BlockCandidate(
-      AVector(blockHash),
-      depStateHash,
-      target.bits,
-      ts,
-      txsHash,
-      AVector.empty
+      1,
+      0,
+      hex"aaaa",
+      target.value,
+      hex"bbbbbbbbbb",
+      ALF.oneAlf
     )
     val jsonRaw =
-      s"""{"deps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","target":"${Hex
-        .toHexString(
-          target.bits
-        )}","blockTs":${ts.millis},"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+      s"""{"fromGroup":1,"toGroup":0,"headerBlob":"aaaa","target":"${target.value}","txsBlob":"bbbbbbbbbb","expectedReward":"${ALF.oneAlf.v}"}"""
     checkData(blockCandidate, jsonRaw)
   }
 
   it should "encode/decode BlockSolution" in {
-    val blockHash    = BlockHash.generate
-    val depStateHash = Hash.generate
-    val target       = Target.onePhPerBlock
-    val ts           = TimeStamp.unsafe(1L)
-    val txsHash      = Hash.generate
-
     val blockSolution = BlockSolution(
-      AVector(blockHash),
-      depStateHash,
-      ts,
-      1,
-      1,
-      U256.One,
-      target.bits,
-      Nonce.zero,
-      txsHash,
-      AVector.empty
+      blockBlob = hex"bbbbbbbbbb",
+      miningCount = U256.unsafe(1234)
     )
-    val nonceString = "00" * Nonce.byteLength
     val jsonRaw =
-      s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
-        .toHexString(
-          target.bits
-        )}","nonce":"$nonceString","txsHash":"${txsHash.toHexString}","transactions":[]}"""
+      s"""{"blockBlob":"bbbbbbbbbb","miningCount":"1234"}"""
     checkData(blockSolution, jsonRaw)
   }
 }

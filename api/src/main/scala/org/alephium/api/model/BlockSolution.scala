@@ -18,19 +18,9 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.Nonce
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.U256
 
 final case class BlockSolution(
-    blockDeps: AVector[BlockHash],
-    depStateHash: Hash,
-    timestamp: TimeStamp,
-    fromGroup: Int,
-    toGroup: Int,
-    miningCount: U256,
-    target: ByteString,
-    nonce: Nonce,
-    txsHash: Hash,
-    transactions: AVector[String]
+    blockBlob: ByteString,
+    miningCount: U256
 )

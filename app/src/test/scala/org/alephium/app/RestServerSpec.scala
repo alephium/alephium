@@ -38,8 +38,8 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType, Nonce, Target}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
@@ -302,19 +302,17 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       var block: Option[BlockTemplate] = Some(dummyBlockTemplate)
       val blockEntryTemplate           = RestServer.blockTempateToCandidate(dummyBlockTemplate)
 
-      minerProbe.setAutoPilot(new TestActor.AutoPilot {
-        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot = {
-          msg match {
-            case Miner.GetBlockCandidate(_) =>
-              sender ! Miner.BlockCandidate(block)
-              block match {
-                case Some(_) =>
-                  block = None
-                  TestActor.KeepRunning
-                case None =>
-                  TestActor.NoAutoPilot
-              }
-          }
+      minerProbe.setAutoPilot((sender: ActorRef, msg: Any) => {
+        msg match {
+          case Miner.GetBlockCandidate(_) =>
+            sender ! Miner.BlockCandidate(block)
+            block match {
+              case Some(_) =>
+                block = None
+                TestActor.KeepRunning
+              case None =>
+                TestActor.NoAutoPilot
+            }
         }
       })
 
@@ -345,18 +343,13 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   it should "call POST /miners/new-block" in new RestServerFixture {
     withServer {
 
-      val blockHash    = BlockHash.generate
-      val depStateHash = Hash.generate
-      val target       = Target.onePhPerBlock
-      val ts           = TimeStamp.unsafe(1L)
-      val txsHash      = Hash.generate
-      val nonceString  = "00" * Nonce.byteLength
+      val blockBlob = Hex.toHexString(serialize(dummyBlock))
+      val body      = s"""{"blockBlob":"$blockBlob","miningCount":"100"}"""
 
-      val body =
-        s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
-          .toHexString(
-            target.bits
-          )}","nonce":"$nonceString","txsHash":"${txsHash.toHexString}","transactions":[]}"""
+      Post(s"/miners/new-block", body) check { response =>
+        minerProbe.expectMsg(Miner.NewBlockSolution(dummyBlock, U256.unsafe(100)))
+        response.code is StatusCode.Ok
+      }
 
       interCliqueSynced = false
 

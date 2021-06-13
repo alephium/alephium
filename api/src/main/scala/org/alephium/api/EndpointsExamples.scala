@@ -16,6 +16,7 @@
 
 package org.alephium.api
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import sttp.tapir.EndpointIO.Example
@@ -84,25 +85,17 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   private val blockCandidate = BlockCandidate(
-    deps = AVector(blockHash, blockHash),
-    depStateHash = hash,
-    target = Target.onePhPerBlock.bits,
-    blockTs = ts,
-    txsHash = hash,
-    transactions = AVector(hexString)
+    fromGroup = 1,
+    toGroup = 0,
+    headerBlob = Hex.unsafe("aaaa"),
+    target = BigInteger.ONE.shiftLeft(18),
+    txsBlob = Hex.unsafe("bbbbbbbbbb"),
+    expectedReward = ALF.oneAlf
   )
 
   private val blockSolution = BlockSolution(
-    blockDeps = AVector(blockHash),
-    depStateHash = hash,
-    timestamp = ts,
-    fromGroup = 1,
-    toGroup = 2,
-    miningCount = U256.Two,
-    target = Target.onePhPerBlock.bits,
-    nonce = Nonce.zero,
-    txsHash = hash,
-    transactions = AVector(hexString)
+    blockBlob = Hex.unsafe("bbbbbbbb"),
+    miningCount = U256.unsafe(1000)
   )
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")

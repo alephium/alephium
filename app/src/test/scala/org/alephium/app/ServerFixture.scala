@@ -62,11 +62,10 @@ trait ServerFixture
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
-  lazy val dummyBlockTemplate =
-    BlockTemplate(AVector.empty, Hash.zero, Target.onePhPerBlock, now, AVector.empty)
-  lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
-  lazy val dummyBalance       = Balance(U256.Zero, U256.Zero, 0)
-  lazy val dummyGroup         = Group(0)
+  lazy val dummyBlockTemplate   = BlockTemplate.from(dummyBlock)
+  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
+  lazy val dummyBalance         = Balance(U256.Zero, U256.Zero, 0)
+  lazy val dummyGroup           = Group(0)
 
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(0)

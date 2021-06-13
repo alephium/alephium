@@ -132,8 +132,8 @@ object BlockHeader {
       timestamp: TimeStamp,
       target: Target,
       nonce: Nonce
-  )(implicit config: GroupConfig): BlockHeader = {
-    val blockDeps = BlockDeps.build(deps)
+  ): BlockHeader = {
+    val blockDeps = BlockDeps.unsafe(deps)
     BlockHeader(defaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target, nonce)
   }
 
@@ -144,7 +144,7 @@ object BlockHeader {
       timestamp: TimeStamp,
       target: Target,
       nonce: Nonce
-  )(implicit config: GroupConfig): BlockHeader = {
+  ): BlockHeader = {
     unsafeWithRawDeps(deps.deps, depStateHash, txsHash, timestamp, target, nonce)
   }
 }

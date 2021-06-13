@@ -20,7 +20,6 @@ import java.io.{StringWriter, Writer}
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
-import scala.util.Try
 
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -31,8 +30,7 @@ import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute, _}
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
@@ -244,12 +242,8 @@ class RestServer(
   private val minerNewBlockRoute = toRoute(minerNewBlock) { solution =>
     withSyncedClique {
       Future.successful(
-        RestServer.blockSolutionToBlock(solution).map { case (solution, chainIndex, miningCount) =>
-          miner ! Miner.NewBlockSolution(
-            solution,
-            chainIndex,
-            miningCount
-          )
+        RestServer.blockSolutionToBlock(solution).map { case (solution, miningCount) =>
+          miner ! Miner.NewBlockSolution(solution, miningCount)
         }
       )
     }
@@ -446,41 +440,30 @@ object RestServer {
   }
 
   //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
-  def blockTempateToCandidate(template: BlockTemplate): BlockCandidate = {
+  def blockTempateToCandidate(
+      template: BlockTemplate
+  ): BlockCandidate = {
+    val dummyHeader = template.unsafeHeader(Nonce.zero)
+    val dummyBlock  = Block(dummyHeader, template.transactions)
     BlockCandidate(
-      template.deps,
-      template.depStateHash,
-      template.target.bits,
-      template.blockTs,
-      template.txsHash,
-      template.transactions.map(tx => Hex.toHexString(serialize(tx)))
+      fromGroup = dummyHeader.chainIndex.from.value,
+      toGroup = dummyHeader.chainIndex.to.value,
+      headerBlob = serialize(dummyHeader).dropRight(Nonce.byteLength),
+      target = dummyHeader.target.value,
+      txsBlob = serialize(dummyBlock.transactions),
+      expectedReward = dummyBlock.coinbaseReward
     )
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def blockSolutionToBlock(
       solution: BlockSolution
-  )(implicit
-      groupConfig: GroupConfig
-  ): Either[ApiError[_ <: StatusCode], (Block, ChainIndex, U256)] = {
-    Try {
-      val header = BlockHeader.unsafe(
-        BlockDeps.build(solution.blockDeps),
-        solution.depStateHash,
-        solution.txsHash,
-        solution.timestamp,
-        Target(solution.target),
-        solution.nonce
-      )
-      val transactions =
-        solution.transactions.map(tx => deserialize[Transaction](Hex.unsafe(tx)).toOption.get)
-
-      val chainIndex = ChainIndex.unsafe(solution.fromGroup, solution.toGroup)
-
-      (Block(header, transactions), chainIndex, solution.miningCount)
-    }.toEither.left.map { error =>
-      //TODO improve error handling
-      ApiError.BadRequest(error.getMessage)
+  ): Either[ApiError[_ <: StatusCode], (Block, U256)] = {
+    deserialize[Block](solution.blockBlob) match {
+      case Right(block) =>
+        Right(block -> solution.miningCount)
+      case Left(error) =>
+        Left(ApiError.InternalServerError(s"Block deserialization error: ${error.getMessage}"))
     }
   }
 }

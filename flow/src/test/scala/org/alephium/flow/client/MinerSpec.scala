@@ -16,6 +16,8 @@
 
 package org.alephium.flow.client
 
+import scala.annotation.tailrec
+
 import akka.testkit.TestActorRef
 import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
@@ -23,9 +25,17 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
-import org.alephium.flow.model.DataOrigin
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
+import org.alephium.flow.model.{BlockTemplate, DataOrigin}
+import org.alephium.protocol.model.{
+  Address,
+  Block,
+  ChainIndex,
+  GroupIndex,
+  LockupScriptGenerators,
+  Nonce
+}
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde._
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
@@ -135,5 +145,27 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
       .ask(Miner.GetAddresses)
       .mapTo[AVector[LockupScript]]
       .futureValue is newMinderAddresses.map(_.lockupScript)
+  }
+
+  it should "mine from both template and data blob" in {
+    val chainIndex = ChainIndex.unsafe(0, 1)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    val template   = BlockTemplate.from(block)
+    val headerBlob = serialize(block.header).dropRight(Nonce.byteLength)
+
+    @tailrec
+    def iter[T](f: => Option[T]): T = {
+      f match {
+        case Some(t) => t
+        case None    => iter(f)
+      }
+    }
+
+    val block0 = iter(Miner.mine(chainIndex, template))._1
+    addAndCheck(blockFlow, block0)
+    val nonce      = iter(Miner.mine(chainIndex, headerBlob, block.target))._1
+    val block1Blob = headerBlob ++ nonce.value ++ serialize(block.transactions)
+    val block1     = deserialize[Block](block1Blob).rightValue
+    addAndCheck(blockFlow, block1)
   }
 }

@@ -16,16 +16,23 @@
 
 package org.alephium.protocol.mining
 
+import akka.util.ByteString
+
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.BlockHash
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData, Target}
 import org.alephium.serde._
 
 object PoW {
   def hash(header: BlockHeader): BlockHash = {
     val serialized = serialize(header)
-    val hash0      = Blake3.hash(serialized)
-    val hash1      = Blake3.hash(hash0.bytes)
+    hash(serialized)
+  }
+
+  def hash(headerBlob: ByteString): BlockHash = {
+    val hash0 = Blake3.hash(headerBlob)
+    val hash1 = Blake3.hash(hash0.bytes)
     hash1
   }
 
@@ -34,11 +41,22 @@ object PoW {
   }
 
   def checkWork(data: FlowData, target: Target): Boolean = {
-    val current = BigInt(1, data.hash.bytes.toArray)
+    checkWork(data.hash, target)
+  }
+
+  def checkWork(hash: BlockHash, target: Target): Boolean = {
+    val current = BigInt(1, hash.bytes.toArray)
     current.compareTo(target.value) <= 0
   }
 
   def checkMined(data: FlowData, index: ChainIndex): Boolean = {
     data.chainIndex == index && checkWork(data)
+  }
+
+  def checkMined(index: ChainIndex, headerBlob: ByteString, target: Target)(implicit
+      groupConfig: GroupConfig
+  ): Boolean = {
+    val blockHash = hash(headerBlob)
+    ChainIndex.from(blockHash) == index && checkWork(blockHash, target)
   }
 }

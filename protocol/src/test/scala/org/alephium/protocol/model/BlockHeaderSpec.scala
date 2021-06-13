@@ -18,7 +18,8 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.serde.serialize
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class BlockHeaderSpec
     extends AlephiumSpec
@@ -88,5 +89,43 @@ class BlockHeaderSpec
     val header1 = genesis.copy(version = defaultBlockVersionWithPoLW)
     header1.isPoLWEnabled is true
     header1.unmaskedVersion is defaultBlockVersion
+  }
+
+  it should "serialize properly" in {
+    import Hex._
+
+    groups is 3
+
+    val header = BlockHeader(
+      version = defaultBlockVersion,
+      blockDeps = BlockDeps.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero)),
+      depStateHash =
+        Hash.unsafe(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9"),
+      txsHash = Hash.unsafe(hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59"),
+      timestamp = TimeStamp.unsafe(1),
+      target = consensusConfig.maxMiningTarget,
+      nonce = Nonce.zero
+    )
+
+    val headerBlob =
+      // version
+      hex"00" ++
+        // deps
+        hex"05" ++ hex"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" ++
+        // state root hash
+        hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9" ++
+        // tx root hash
+        hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59" ++
+        // timestamp
+        hex"0000000000000001" ++
+        // target
+        hex"20ffffff" ++
+        // nonce
+        hex"000000000000000000000000000000000000000000000000"
+    serialize(header) is headerBlob
+
+    val block     = Block(header, AVector.empty)
+    val blockBlob = headerBlob ++ hex"00"
+    serialize(block) is blockBlob
   }
 }

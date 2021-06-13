@@ -16,6 +16,7 @@
 
 package org.alephium.api
 
+import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
 import scala.reflect.ClassTag
@@ -43,6 +44,7 @@ trait TapirSchemasLike {
   implicit val signatureSchema: Schema[Signature]     = Schema(Schema.schemaForString.schemaType)
   implicit val timestampSchema: Schema[TimeStamp]     = Schema(Schema.schemaForLong.schemaType)
   implicit val u256Schema: Schema[U256]               = Schema(SInteger).format("uint256")
+  implicit val bigIntegerSchema: Schema[BigInteger]   = Schema(SInteger).format("bigint")
   implicit val inetAddressSchema: Schema[InetAddress] = Schema(Schema.schemaForString.schemaType)
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(
     Schema.schemaForString.schemaType

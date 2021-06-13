@@ -14,19 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.mining
 
-import java.math.BigInteger
+import org.alephium.protocol.model.NoIndexModelGenerators
+import org.alephium.serde._
+import org.alephium.util.AlephiumSpec
 
-import akka.util.ByteString
-
-import org.alephium.util.U256
-
-final case class BlockCandidate(
-    fromGroup: Int,
-    toGroup: Int,
-    headerBlob: ByteString,
-    target: BigInteger,
-    txsBlob: ByteString,
-    expectedReward: U256
-)
+class PoWSpec extends AlephiumSpec with NoIndexModelGenerators {
+  it should "check PoW" in {
+    forAll(blockGen) { block =>
+      val headerBlob = serialize(block.header)
+      PoW.checkMined(block, block.chainIndex) is
+        PoW.checkMined(block.chainIndex, headerBlob, block.target)
+    }
+  }
+}
