@@ -25,26 +25,15 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
-import org.alephium.flow.model.{MiningBlob, DataOrigin}
+import org.alephium.flow.model.{DataOrigin, MiningBlob}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, Duration, TimeStamp}
+import org.alephium.util.{AVector, Duration}
 
 class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
   implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
-
-  it should "use proper timestamp" in {
-    val currentTs = TimeStamp.now()
-    val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
-    val futureTs  = currentTs.plusHoursUnsafe(1)
-
-    Thread.sleep(10) // wait until TimStamp.now() > currentTs
-    Miner.nextTimeStamp(pastTs) > currentTs is true
-    Miner.nextTimeStamp(currentTs) > currentTs is true
-    Miner.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
-  }
 
   trait WorkflowFixture extends FlowFixture {
     override val configValues =

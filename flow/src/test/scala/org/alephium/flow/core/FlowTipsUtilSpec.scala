@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
 class FlowTipsUtilSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -177,5 +177,16 @@ class FlowTipsUtilSpec extends AlephiumSpec {
         flowTips.outTips is outTipsExpected
       }
     }
+  }
+
+  it should "use proper timestamp" in {
+    val currentTs = TimeStamp.now()
+    val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
+    val futureTs  = currentTs.plusHoursUnsafe(1)
+
+    Thread.sleep(10) // wait until TimStamp.now() > currentTs
+    FlowUtils.nextTimeStamp(pastTs) > currentTs is true
+    FlowUtils.nextTimeStamp(currentTs) > currentTs is true
+    FlowUtils.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
   }
 }

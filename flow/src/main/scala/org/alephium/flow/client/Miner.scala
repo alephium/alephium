@@ -118,19 +118,6 @@ object Miner extends LazyLogging {
     iter(miningConfig.nonceStep.subUnsafe(U256.One))
   }
 
-  def nextTimeStamp(template: BlockFlowTemplate): TimeStamp = {
-    nextTimeStamp(template.templateTs)
-  }
-
-  def nextTimeStamp(templateTs: TimeStamp): TimeStamp = {
-    val resultTs = TimeStamp.now()
-    if (resultTs <= templateTs) {
-      templateTs.plusMillisUnsafe(1)
-    } else {
-      resultTs
-    }
-  }
-
   def validateAddresses(
       addresses: AVector[Address]
   )(implicit groupConfig: GroupConfig): Either[String, Unit] = {
@@ -277,7 +264,7 @@ class Miner(
 
   def prepareTemplate(fromShift: Int, to: Int, flowTemplate: BlockFlowTemplate): MiningBlob = {
     val index      = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
-    val blockTs    = Miner.nextTimeStamp(flowTemplate)
+    val blockTs    = flowTemplate.templateTs
     val coinbaseTx = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
     MiningBlob(
       flowTemplate.deps,
