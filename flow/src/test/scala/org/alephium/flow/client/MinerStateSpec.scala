@@ -23,6 +23,7 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, TestUtils}
+import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
@@ -40,6 +41,20 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
       val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
       val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
+      BlockTemplate(
+        flowTemplate.deps,
+        flowTemplate.depStateHash,
+        flowTemplate.target,
+        TimeStamp.now(),
+        AVector.empty
+      )
+    }
+
+    override def prepareTemplate(
+        fromShift: Int,
+        to: Int,
+        flowTemplate: BlockFlowTemplate
+    ): BlockTemplate = {
       BlockTemplate(
         flowTemplate.deps,
         flowTemplate.depStateHash,

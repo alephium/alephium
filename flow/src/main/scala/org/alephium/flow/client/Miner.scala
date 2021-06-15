@@ -35,7 +35,6 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
-import org.alephium.util.EventStream.Subscriber
 
 object Miner extends LazyLogging {
   def props(node: Node)(implicit config: AlephiumConfig): Props =
@@ -170,8 +169,7 @@ class Miner(
     val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting
 ) extends BaseActor
-    with MinerState
-    with Subscriber {
+    with MinerState {
   val handlers = allHandlers
 
   def receive: Receive = handleAddresses orElse handleMining()
@@ -183,7 +181,7 @@ class Miner(
     case Miner.Start =>
       if (!miningStarted) {
         log.info("Start mining")
-        subscribeEvent(self, classOf[ViewHandler.ViewUpdated])
+        allHandlers.viewHandler ! ViewHandler.Subscribe
         updateTasks()
         startNewTasks()
         miningStarted = true
@@ -193,7 +191,7 @@ class Miner(
     case Miner.Stop =>
       if (miningStarted) {
         log.info("Stop mining")
-        unsubscribeEvent(self, classOf[ViewHandler.ViewUpdated])
+        allHandlers.viewHandler ! ViewHandler.Unsubscribe
         postMinerStop()
         miningStarted = false
       } else {
@@ -207,11 +205,10 @@ class Miner(
       self ! Miner.MiningResult(Some(block), block.chainIndex, miningCount)
     case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
       handleMiningResult(blockOpt, chainIndex, miningCount)
-    case ViewHandler.ViewUpdated(chainIndex, origin) =>
+    case ViewHandler.ViewUpdated(chainIndex, origin, templates) =>
+      updateTasks(templates)
       if (origin.isLocal) {
         continueWorkFor(chainIndex)
-      } else {
-        updateTasks()
       }
     case BlockChainHandler.BlockAdded(_) => ()
     case BlockChainHandler.InvalidBlock(hash) =>
@@ -222,7 +219,6 @@ class Miner(
   // scalastyle:on method.length
 
   def continueWorkFor(chainIndex: ChainIndex): Unit = {
-    updateTasks()
     if (miningStarted) {
       setIdle(chainIndex)
       startNewTasks()
@@ -286,8 +282,13 @@ class Miner(
     )
     val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
     val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    val blockTs      = Miner.nextTimeStamp(flowTemplate)
-    val coinbaseTx   = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
+    prepareTemplate(fromShift, to, flowTemplate)
+  }
+
+  def prepareTemplate(fromShift: Int, to: Int, flowTemplate: BlockFlowTemplate): BlockTemplate = {
+    val index      = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
+    val blockTs    = Miner.nextTimeStamp(flowTemplate)
+    val coinbaseTx = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
     BlockTemplate(
       flowTemplate.deps,
       flowTemplate.depStateHash,

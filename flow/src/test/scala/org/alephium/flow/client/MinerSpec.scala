@@ -26,14 +26,7 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.{BlockTemplate, DataOrigin}
-import org.alephium.protocol.model.{
-  Address,
-  Block,
-  ChainIndex,
-  GroupIndex,
-  LockupScriptGenerators,
-  Nonce
-}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, Duration, TimeStamp}
@@ -72,7 +65,11 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     def awaitForBlocks(n: Int) = {
       (0 until n).foreach { _ =>
         val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
-        miner ! ViewHandler.ViewUpdated(block.chainIndex, DataOrigin.Local)
+        miner ! ViewHandler.ViewUpdated(
+          block.chainIndex,
+          DataOrigin.Local,
+          ViewHandler.prepareTemplates(blockFlow)
+        )
       }
     }
   }
@@ -87,7 +84,11 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
     miner ! Miner.Stop
     checkMining(false)
-    miner ! ViewHandler.ViewUpdated(block.chainIndex, DataOrigin.Local)
+    miner ! ViewHandler.ViewUpdated(
+      block.chainIndex,
+      DataOrigin.Local,
+      ViewHandler.prepareTemplates(blockFlow)
+    )
     blockHandlerProbe.expectNoMessage()
 
     miner ! Miner.Start

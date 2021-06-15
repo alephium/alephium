@@ -17,6 +17,7 @@
 package org.alephium.flow.client
 
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
+import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
@@ -67,6 +68,16 @@ trait MinerState {
     }
   }
 
+  def updateTasks(templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
+    for {
+      fromShift <- 0 until brokerConfig.groupNumPerBroker
+      to        <- 0 until brokerConfig.groups
+    } {
+      val blockTemplate = prepareTemplate(fromShift, to, templates(fromShift)(to))
+      pendingTasks(fromShift)(to) = blockTemplate
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
     val minCount   = miningCounts.map(_.min).min
@@ -108,6 +119,8 @@ trait MinerState {
   }
 
   def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
+
+  def prepareTemplate(fromShift: Int, to: Int, template: BlockFlowTemplate): BlockTemplate
 
   def startTask(
       fromShift: Int,

@@ -16,13 +16,16 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
+import scala.collection.mutable.ArrayBuffer
+
+import akka.actor.{ActorRef, Props}
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
-import org.alephium.util.{ActorRefT, AVector, Duration, EventStream, TimeStamp}
+import org.alephium.util._
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object ViewHandler {
@@ -33,38 +36,59 @@ object ViewHandler {
   )
 
   sealed trait Command
+  case object Subscribe   extends Command
+  case object Unsubscribe extends Command
 
   sealed trait Event
-  final case class ViewUpdated(chainIndex: ChainIndex, origin: DataOrigin)
-      extends Event
+  final case class ViewUpdated(
+      chainIndex: ChainIndex,
+      origin: DataOrigin,
+      templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
+  ) extends Event
       with EventStream.Event
 
   def needUpdate(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from) || chainIndex.isIntraGroup
   }
+
+  def prepareTemplates(
+      blockFlow: BlockFlow
+  )(implicit brokerConfig: BrokerConfig): IndexedSeq[IndexedSeq[BlockFlowTemplate]] = {
+    brokerConfig.groupRange.map { fromGroup =>
+      (0 until brokerConfig.groups).map { toGroup =>
+        val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+        blockFlow.prepareBlockFlowUnsafe(chainIndex)
+      }
+    }
+  }
 }
 
-class ViewHandler(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])(implicit
-    brokerConfig: BrokerConfig
-) extends IOBaseActor
+class ViewHandler(val blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])(implicit
+    val brokerConfig: BrokerConfig
+) extends ViewHandlerState
     with Subscriber
     with Publisher {
   var lastUpdated: TimeStamp = TimeStamp.zero
 
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
-  override def receive: Receive = { case ChainHandler.FlowDataAdded(data, origin, addedAt) =>
-    // We only update best deps for the following 2 cases:
-    //  1. the block belongs to the groups of the node
-    //  2. the header belongs to intra-group chain
-    val chainIndex = data.chainIndex
-    if (addedAt >= lastUpdated && ViewHandler.needUpdate(chainIndex)) {
-      lastUpdated = TimeStamp.now()
-      escapeIOError(blockFlow.updateBestDeps()) { newReadyTxs =>
-        broadcastReadyTxs(newReadyTxs)
+  override def receive: Receive = {
+    case ChainHandler.FlowDataAdded(data, origin, addedAt) =>
+      // We only update best deps for the following 2 cases:
+      //  1. the block belongs to the groups of the node
+      //  2. the header belongs to intra-group chain
+      val chainIndex = data.chainIndex
+      if (addedAt >= lastUpdated && ViewHandler.needUpdate(chainIndex)) {
+        lastUpdated = TimeStamp.now()
+        escapeIOError(blockFlow.updateBestDeps()) { newReadyTxs =>
+          broadcastReadyTxs(newReadyTxs)
+        }
       }
-    }
-    publishEvent(ViewHandler.ViewUpdated(chainIndex, origin))
+
+      updateSubscribers(chainIndex, origin)
+
+    case ViewHandler.Subscribe   => subscriber()
+    case ViewHandler.Unsubscribe => unsubscribe()
   }
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
@@ -75,6 +99,28 @@ class ViewHandler(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])
         TxHandler.Broadcast(txs),
         Duration.ofSecondsUnsafe(2)
       )
+    }
+  }
+}
+
+trait ViewHandlerState extends IOBaseActor {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+
+  val subscribers: ArrayBuffer[ActorRef] = ArrayBuffer.empty
+
+  def subscriber(): Unit = {
+    subscribers.addOne(sender())
+  }
+
+  def unsubscribe(): Unit = {
+    subscribers.filterInPlace(_ != sender())
+  }
+
+  def updateSubscribers(chainIndex: ChainIndex, origin: DataOrigin): Unit = {
+    if (subscribers.nonEmpty) {
+      val templates = ViewHandler.prepareTemplates(blockFlow)
+      subscribers.foreach(_ ! ViewHandler.ViewUpdated(chainIndex, origin, templates))
     }
   }
 }
