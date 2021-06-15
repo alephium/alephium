@@ -23,7 +23,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
@@ -280,11 +280,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       0,
       hex"aaaa",
       target.value,
-      hex"bbbbbbbbbb",
-      ALF.oneAlf
+      hex"bbbbbbbbbb"
     )
     val jsonRaw =
-      s"""{"fromGroup":1,"toGroup":0,"headerBlob":"aaaa","target":"${target.value}","txsBlob":"bbbbbbbbbb","expectedReward":"${ALF.oneAlf.v}"}"""
+      s"""{"fromGroup":1,"toGroup":0,"headerBlob":"aaaa","target":"${target.value}","txsBlob":"bbbbbbbbbb"}"""
     checkData(blockCandidate, jsonRaw)
   }
 

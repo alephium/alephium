@@ -34,6 +34,7 @@ import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde.deserialize
 import org.alephium.util._
 
 object Miner extends LazyLogging {
@@ -78,27 +79,17 @@ object Miner extends LazyLogging {
   final case class BlockCandidate(maybeBlock: Option[BlockTemplate])
 
   def mine(index: ChainIndex, template: BlockTemplate)(implicit
+      groupConfig: GroupConfig,
       miningConfig: MiningSetting
   ): Option[(Block, U256)] = {
-    val nonceStart = UnsecureRandom.nextU256NonUniform(U256.HalfMaxValue)
-    val nonceEnd   = nonceStart.addUnsafe(miningConfig.nonceStep)
-
-    @tailrec
-    def iter(current: U256): Option[(Block, U256)] = {
-      if (current < nonceEnd) {
-        val nonce  = Nonce.unsafe(current.toBytes.takeRight(Nonce.byteLength))
-        val header = template.unsafeHeader(nonce)
-        if (PoW.checkMined(header, index)) {
-          val numTry = current.subUnsafe(nonceStart).addOneUnsafe()
-          Some((Block(header, template.transactions), numTry))
-        } else {
-          iter(current.addOneUnsafe())
+    mine(index, template.headerBlobWithoutNonce, Target.unsafe(template.target)).map {
+      case (nonce, miningCount) =>
+        val blockBlob = template.headerBlobWithoutNonce ++ nonce.value ++ template.txsBlob
+        deserialize[Block](blockBlob) match {
+          case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
+          case Right(block) => block -> miningCount
         }
-      } else {
-        None
-      }
     }
-    iter(nonceStart)
   }
 
   def mine(index: ChainIndex, headerBlob: ByteString, target: Target)(implicit
@@ -125,7 +116,7 @@ object Miner extends LazyLogging {
       }
     }
 
-    iter(miningConfig.nonceStep.addUnsafe(U256.One))
+    iter(miningConfig.nonceStep.subUnsafe(U256.One))
   }
 
   def nextTimeStamp(template: BlockFlowTemplate): TimeStamp = {
@@ -319,7 +310,7 @@ class Miner(
     }(context.dispatcher)
     task.onComplete {
       case Success(_) => ()
-      case Failure(e) => log.debug("Mining task failed", e)
+      case Failure(e) => log.debug(s"Mining task failed ${e.getMessage}")
     }(context.dispatcher)
   }
 }

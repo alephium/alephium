@@ -16,21 +16,20 @@
 
 package org.alephium.flow.model
 
+import java.math.BigInteger
+
+import akka.util.ByteString
+
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
+import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockTemplate(
-    deps: AVector[BlockHash],
-    depStateHash: Hash,
-    target: Target,
-    blockTs: TimeStamp,
-    txsHash: Hash,
-    transactions: AVector[Transaction]
-) {
-  def unsafeHeader(nonce: Nonce): BlockHeader =
-    BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, nonce)
-}
+    headerBlobWithoutNonce: ByteString,
+    target: BigInteger,
+    txsBlob: ByteString
+)
 
 object BlockTemplate {
   def apply(
@@ -41,7 +40,12 @@ object BlockTemplate {
       transactions: AVector[Transaction]
   ): BlockTemplate = {
     val txsHash = Block.calTxsHash(transactions)
-    BlockTemplate(deps, depStateHash, target, blockTs, txsHash, transactions)
+    val dummyHeader =
+      BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, Nonce.zero)
+
+    val headerBlob = serialize(dummyHeader)
+    val txsBlob    = serialize(transactions)
+    BlockTemplate(headerBlob.dropRight(Nonce.byteLength), target.value, txsBlob)
   }
 
   def from(block: Block): BlockTemplate = {
@@ -51,7 +55,6 @@ object BlockTemplate {
       header.depStateHash,
       header.target,
       header.timestamp,
-      header.txsHash,
       block.transactions
     )
   }

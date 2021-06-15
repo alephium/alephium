@@ -300,7 +300,11 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   it should "call GET /miners/block-candidate" in new RestServerFixture {
     withServer {
       var block: Option[BlockTemplate] = Some(dummyBlockTemplate)
-      val blockEntryTemplate           = RestServer.blockTempateToCandidate(dummyBlockTemplate)
+      val chainIndex                   = dummyBlock.chainIndex
+      val fromGroup                    = chainIndex.from.value
+      val toGroup                      = chainIndex.to.value
+      val blockEntryTemplate =
+        RestServer.blockTempateToCandidate(chainIndex, dummyBlockTemplate)
 
       minerProbe.setAutoPilot((sender: ActorRef, msg: Any) => {
         msg match {
@@ -316,13 +320,13 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         }
       })
 
-      Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") check { response =>
+      Get(s"/miners/block-candidate?fromGroup=$fromGroup&toGroup=$toGroup") check { response =>
         response.code is StatusCode.Ok
         response.as[BlockCandidate] is blockEntryTemplate
       }
 
       //Miner return BlockCandidate(None)
-      Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") check { response =>
+      Get(s"/miners/block-candidate?fromGroup=$fromGroup&toGroup=$toGroup") check { response =>
         response.code is StatusCode.InternalServerError
         response.as[ApiError.InternalServerError] is ApiError.InternalServerError(
           "Cannot compute block candidate for given chain index"

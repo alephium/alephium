@@ -20,13 +20,10 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
-import org.alephium.util.U256
-
 final case class BlockCandidate(
     fromGroup: Int,
     toGroup: Int,
     headerBlob: ByteString,
     target: BigInteger,
-    txsBlob: ByteString,
-    expectedReward: U256
+    txsBlob: ByteString
 )

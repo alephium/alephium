@@ -230,7 +230,7 @@ class RestServer(
         .ask(Miner.GetBlockCandidate(chainIndex))
         .mapTo[Miner.BlockCandidate]
         .map(_.maybeBlock match {
-          case Some(block) => Right(RestServer.blockTempateToCandidate(block))
+          case Some(block) => Right(RestServer.blockTempateToCandidate(chainIndex, block))
           case None =>
             Left(
               ApiError.InternalServerError("Cannot compute block candidate for given chain index")
@@ -441,17 +441,15 @@ object RestServer {
 
   //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
   def blockTempateToCandidate(
+      chainIndex: ChainIndex,
       template: BlockTemplate
   ): BlockCandidate = {
-    val dummyHeader = template.unsafeHeader(Nonce.zero)
-    val dummyBlock  = Block(dummyHeader, template.transactions)
     BlockCandidate(
-      fromGroup = dummyHeader.chainIndex.from.value,
-      toGroup = dummyHeader.chainIndex.to.value,
-      headerBlob = serialize(dummyHeader).dropRight(Nonce.byteLength),
-      target = dummyHeader.target.value,
-      txsBlob = serialize(dummyBlock.transactions),
-      expectedReward = dummyBlock.coinbaseReward
+      fromGroup = chainIndex.from.value,
+      toGroup = chainIndex.to.value,
+      headerBlob = template.headerBlobWithoutNonce,
+      target = template.target,
+      txsBlob = template.txsBlob
     )
   }
 
