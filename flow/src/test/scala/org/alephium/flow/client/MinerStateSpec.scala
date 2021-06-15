@@ -23,8 +23,7 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, TestUtils}
-import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
@@ -38,10 +37,10 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     val handlers: AllHandlers = TestUtils.createAllHandlersProbe._1
     val probes                = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
 
-    override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
+    override def prepareTemplate(fromShift: Int, to: Int): MiningBlob = {
       val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
       val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-      BlockTemplate(
+      MiningBlob(
         flowTemplate.deps,
         flowTemplate.depStateHash,
         flowTemplate.target,
@@ -54,8 +53,8 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
         fromShift: Int,
         to: Int,
         flowTemplate: BlockFlowTemplate
-    ): BlockTemplate = {
-      BlockTemplate(
+    ): MiningBlob = {
+      MiningBlob(
         flowTemplate.deps,
         flowTemplate.depStateHash,
         flowTemplate.target,
@@ -67,7 +66,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     override def startTask(
         fromShift: Int,
         to: Int,
-        template: BlockTemplate,
+        template: MiningBlob,
         blockHandler: ActorRefT[BlockChainHandler.Command]
     ): Unit = {
       probes(fromShift)(to).ref ! template
@@ -85,7 +84,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
 
   it should "start new tasks correctly" in new Fixture {
     startNewTasks()
-    probes.foreach(_.foreach(_.expectMsgType[BlockTemplate]))
+    probes.foreach(_.foreach(_.expectMsgType[MiningBlob]))
     running.foreach(_.foreach(_ is true))
   }
 
@@ -118,7 +117,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
       if (i != to) {
         probes(fromShift)(i).expectNoMessage()
       } else {
-        probes(fromShift)(i).expectMsgType[BlockTemplate]
+        probes(fromShift)(i).expectMsgType[MiningBlob]
       }
     }
   }

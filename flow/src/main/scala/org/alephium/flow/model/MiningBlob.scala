@@ -25,32 +25,32 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
 
-final case class BlockTemplate(
-    headerBlobWithoutNonce: ByteString,
+final case class MiningBlob(
+    headerBlob: ByteString,
     target: BigInteger,
     txsBlob: ByteString
 )
 
-object BlockTemplate {
+object MiningBlob {
   def apply(
       deps: AVector[BlockHash],
       depStateHash: Hash,
       target: Target,
       blockTs: TimeStamp,
       transactions: AVector[Transaction]
-  ): BlockTemplate = {
+  ): MiningBlob = {
     val txsHash = Block.calTxsHash(transactions)
     val dummyHeader =
       BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, Nonce.zero)
 
     val headerBlob = serialize(dummyHeader)
     val txsBlob    = serialize(transactions)
-    BlockTemplate(headerBlob.dropRight(Nonce.byteLength), target.value, txsBlob)
+    MiningBlob(headerBlob.dropRight(Nonce.byteLength), target.value, txsBlob)
   }
 
-  def from(block: Block): BlockTemplate = {
+  def from(block: Block): MiningBlob = {
     val header = block.header
-    BlockTemplate(
+    MiningBlob(
       header.blockDeps.deps,
       header.depStateHash,
       header.target,

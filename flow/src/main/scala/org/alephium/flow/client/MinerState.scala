@@ -17,8 +17,7 @@
 package org.alephium.flow.client
 
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
-import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
@@ -79,7 +78,7 @@ trait MinerState {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
+  protected def pickTasks(): IndexedSeq[(Int, Int, MiningBlob)] = {
     val minCount   = miningCounts.map(_.min).min
     val countBound = minCount.addUnsafe(miningConfig.nonceStep)
     for {
@@ -92,7 +91,7 @@ trait MinerState {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  protected def pickChainTasks(chainIndex: ChainIndex): Option[BlockTemplate] = {
+  protected def pickChainTasks(chainIndex: ChainIndex): Option[MiningBlob] = {
     val minCount   = miningCounts.map(_.min).min
     val countBound = minCount.addUnsafe(miningConfig.nonceStep)
     val fromShift  = chainIndex.from.value - brokerConfig.groupFrom
@@ -118,14 +117,14 @@ trait MinerState {
     } setIdle(fromShift, to)
   }
 
-  def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
+  def prepareTemplate(fromShift: Int, to: Int): MiningBlob
 
-  def prepareTemplate(fromShift: Int, to: Int, template: BlockFlowTemplate): BlockTemplate
+  def prepareTemplate(fromShift: Int, to: Int, template: BlockFlowTemplate): MiningBlob
 
   def startTask(
       fromShift: Int,
       to: Int,
-      template: BlockTemplate,
+      template: MiningBlob,
       blockHandler: ActorRefT[BlockChainHandler.Command]
   ): Unit
 }

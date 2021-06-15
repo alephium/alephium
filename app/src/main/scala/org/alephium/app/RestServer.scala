@@ -39,7 +39,7 @@ import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.TxHandler
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -442,12 +442,12 @@ object RestServer {
   //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
   def blockTempateToCandidate(
       chainIndex: ChainIndex,
-      template: BlockTemplate
+      template: MiningBlob
   ): BlockCandidate = {
     BlockCandidate(
       fromGroup = chainIndex.from.value,
       toGroup = chainIndex.to.value,
-      headerBlob = template.headerBlobWithoutNonce,
+      headerBlob = template.headerBlob,
       target = template.target,
       txsBlob = template.txsBlob
     )

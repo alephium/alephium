@@ -26,8 +26,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
-import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
@@ -70,21 +69,21 @@ object Miner extends LazyLogging {
   case object UpdateTemplate                                         extends Command
   case object GetAddresses                                           extends Command
   final case class GetBlockCandidate(index: ChainIndex)              extends Command
-  final case class Mine(index: ChainIndex, template: BlockTemplate)  extends Command
+  final case class Mine(index: ChainIndex, template: MiningBlob)     extends Command
   final case class NewBlockSolution(block: Block, miningCount: U256) extends Command
   final case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: U256)
       extends Command
   final case class UpdateAddresses(addresses: AVector[Address]) extends Command
 
-  final case class BlockCandidate(maybeBlock: Option[BlockTemplate])
+  final case class BlockCandidate(maybeBlock: Option[MiningBlob])
 
-  def mine(index: ChainIndex, template: BlockTemplate)(implicit
+  def mine(index: ChainIndex, template: MiningBlob)(implicit
       groupConfig: GroupConfig,
       miningConfig: MiningSetting
   ): Option[(Block, U256)] = {
-    mine(index, template.headerBlobWithoutNonce, Target.unsafe(template.target)).map {
+    mine(index, template.headerBlob, Target.unsafe(template.target)).map {
       case (nonce, miningCount) =>
-        val blockBlob = template.headerBlobWithoutNonce ++ nonce.value ++ template.txsBlob
+        val blockBlob = template.headerBlob ++ nonce.value ++ template.txsBlob
         deserialize[Block](blockBlob) match {
           case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
           case Right(block) => block -> miningCount
@@ -267,7 +266,7 @@ class Miner(
     Transaction.coinbase(chainIndex, txs, addresses(to), target, blockTs)
   }
 
-  def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
+  def prepareTemplate(fromShift: Int, to: Int): MiningBlob = {
     assume(
       0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups
     )
@@ -276,11 +275,11 @@ class Miner(
     prepareTemplate(fromShift, to, flowTemplate)
   }
 
-  def prepareTemplate(fromShift: Int, to: Int, flowTemplate: BlockFlowTemplate): BlockTemplate = {
+  def prepareTemplate(fromShift: Int, to: Int, flowTemplate: BlockFlowTemplate): MiningBlob = {
     val index      = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
     val blockTs    = Miner.nextTimeStamp(flowTemplate)
     val coinbaseTx = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
-    BlockTemplate(
+    MiningBlob(
       flowTemplate.deps,
       flowTemplate.depStateHash,
       flowTemplate.target,
@@ -292,14 +291,14 @@ class Miner(
   def startTask(
       fromShift: Int,
       to: Int,
-      template: BlockTemplate,
+      template: MiningBlob,
       blockHandler: ActorRefT[BlockChainHandler.Command]
   ): Unit = {
     val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
     scheduleOnce(self, Miner.Mine(index, template), miningConfig.batchDelay)
   }
 
-  def mine(index: ChainIndex, template: BlockTemplate): Unit = {
+  def mine(index: ChainIndex, template: MiningBlob): Unit = {
     val task = Future {
       Miner.mine(index, template) match {
         case Some((block, miningCount)) =>

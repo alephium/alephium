@@ -32,7 +32,7 @@ import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
@@ -299,10 +299,10 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
   it should "call GET /miners/block-candidate" in new RestServerFixture {
     withServer {
-      var block: Option[BlockTemplate] = Some(dummyBlockTemplate)
-      val chainIndex                   = dummyBlock.chainIndex
-      val fromGroup                    = chainIndex.from.value
-      val toGroup                      = chainIndex.to.value
+      var block: Option[MiningBlob] = Some(dummyBlockTemplate)
+      val chainIndex                = dummyBlock.chainIndex
+      val fromGroup                 = chainIndex.from.value
+      val toGroup                   = chainIndex.to.value
       val blockEntryTemplate =
         RestServer.blockTempateToCandidate(chainIndex, dummyBlockTemplate)
 

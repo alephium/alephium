@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import akka.actor.{Props, Stash}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
@@ -37,14 +37,6 @@ object FlowHandler {
   final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)           extends Command
 
   sealed trait Event
-  final case class BlockFlowTemplate(
-      index: ChainIndex,
-      deps: AVector[BlockHash],
-      depStateHash: Hash,
-      target: Target,
-      templateTs: TimeStamp,
-      transactions: AVector[Transaction]
-  )                                                                     extends Event
   final case class BlocksLocated(blocks: AVector[Block])                extends Event
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Event
   final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[BlockHash]])

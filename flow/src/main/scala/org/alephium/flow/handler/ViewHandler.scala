@@ -21,8 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.actor.{ActorRef, Props}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
-import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.model.{BlockFlowTemplate, DataOrigin}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.util._
