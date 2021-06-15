@@ -18,9 +18,10 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
 import akka.io.{IO, Tcp}
-import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
+import akka.testkit.{EventFilter, SocketUtil, TestActorRef, TestProbe}
+import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -28,6 +29,9 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
 class TcpControllerSpec extends AlephiumActorSpec("TcpController") with AlephiumConfigFixture {
+  implicit override lazy val system: ActorSystem =
+    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.infoConfig))
+
   trait Fixture {
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()
@@ -38,8 +42,9 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
       TestActorRef[TcpController](TcpController.props(bindAddress, misbehaviorManager.ref))
     val controllerActor = controller.underlyingActor
 
-    controller ! TcpController.Start(bootstrapper.ref)
-    Thread.sleep(200) // wait for tcp controller to be bounded
+    EventFilter.info(start = "Node bound to").intercept {
+      controller ! TcpController.Start(bootstrapper.ref)
+    }
 
     def connectToController(): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)

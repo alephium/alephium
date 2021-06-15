@@ -84,11 +84,6 @@ trait FlowFixture
     }
   }
 
-  def minePooledTxs(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex)
-    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions)
-  }
-
   def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     mine(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
@@ -244,8 +239,9 @@ trait FlowFixture
   }
 
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex)
-    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions)
+    val miner         = getGenesisLockupScript(chainIndex)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
   }
 
   def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {

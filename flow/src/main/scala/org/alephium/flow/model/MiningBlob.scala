@@ -32,7 +32,28 @@ final case class MiningBlob(
 )
 
 object MiningBlob {
-  def apply(
+  def from(template: BlockFlowTemplate): MiningBlob = {
+    from(
+      template.deps,
+      template.depStateHash,
+      template.target,
+      template.templateTs,
+      template.transactions
+    )
+  }
+
+  def from(block: Block): MiningBlob = {
+    val header = block.header
+    from(
+      header.blockDeps.deps,
+      header.depStateHash,
+      header.target,
+      header.timestamp,
+      block.transactions
+    )
+  }
+
+  private def from(
       deps: AVector[BlockHash],
       depStateHash: Hash,
       target: Target,
@@ -46,16 +67,5 @@ object MiningBlob {
     val headerBlob = serialize(dummyHeader)
     val txsBlob    = serialize(transactions)
     MiningBlob(headerBlob.dropRight(Nonce.byteLength), target.value, txsBlob)
-  }
-
-  def from(block: Block): MiningBlob = {
-    val header = block.header
-    MiningBlob(
-      header.blockDeps.deps,
-      header.depStateHash,
-      header.target,
-      header.timestamp,
-      block.transactions
-    )
   }
 }

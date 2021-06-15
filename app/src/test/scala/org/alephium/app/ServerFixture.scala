@@ -119,6 +119,7 @@ object ServerFixture {
       neighborPeers: NeighborPeers,
       block: Block,
       blockFlowProbe: ActorRef,
+      _allHandlers: AllHandlers,
       dummyTx: Transaction,
       storages: Storages,
       cliqueManagerOpt: Option[ActorRefT[CliqueManager.Command]] = None,
@@ -163,16 +164,8 @@ object ServerFixture {
 
     val txHandlerRef =
       system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
-    val txHandler = ActorRefT[TxHandler.Command](txHandlerRef)
-
-    val allHandlers: AllHandlers = AllHandlers(
-      flowHandler = ActorRefT(TestProbe().ref),
-      txHandler = txHandler,
-      dependencyHandler = ActorRefT(TestProbe().ref),
-      viewHandler = ActorRefT(TestProbe().ref),
-      blockHandlers = Map.empty,
-      headerHandlers = Map.empty
-    )(config.broker)
+    val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
+    val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)
 
     val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)

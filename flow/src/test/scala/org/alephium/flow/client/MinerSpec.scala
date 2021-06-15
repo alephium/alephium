@@ -23,11 +23,9 @@ import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
-import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
-import org.alephium.flow.model.{DataOrigin, MiningBlob}
+import org.alephium.flow.model.MiningBlob
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AVector, Duration}
 
@@ -35,16 +33,18 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
   implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
 
-  trait WorkflowFixture extends FlowFixture {
+  trait WorkflowFixture extends FlowFixture with NoIndexModelGeneratorsLike {
     override val configValues =
       Map(("alephium.broker.groups", 1), ("alephium.broker.broker-num", 1))
 
-    val (allHandlers, allHandlersProbes) = TestUtils.createAllHandlersProbe
-    val blockHandlerProbe                = allHandlersProbes.blockHandlers(ChainIndex.unsafe(0, 0))
+    val minerAddresses =
+      AVector.tabulate(groups0)(g => getGenesisLockupScript(ChainIndex.unsafe(g, 0)))
 
-    val miner = TestActorRef[Miner](
-      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
-    )
+    val (allHandlers, allHandlersProbes) = TestUtils.createAllHandlersProbe
+    val chainIndex                       = chainIndexGen.sample.get
+    val blockHandlerProbe                = allHandlersProbes.blockHandlers(chainIndex)
+
+    val miner = TestActorRef[Miner](CpuMiner.props(config.network.networkType, allHandlers))
 
     def checkMining(isMining: Boolean) = {
       miner ! Miner.IsMining
@@ -53,12 +53,12 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
     def awaitForBlocks(n: Int) = {
       (0 until n).foreach { _ =>
-        val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
         miner ! ViewHandler.ViewUpdated(
-          block.chainIndex,
-          DataOrigin.Local,
-          ViewHandler.prepareTemplates(blockFlow)
+          ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
         )
+        val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
+        block.chainIndex is chainIndex
+        miner ! BlockChainHandler.BlockAdded(block.hash)
       }
     }
   }
@@ -69,14 +69,11 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     miner ! Miner.Start
     checkMining(true)
     awaitForBlocks(3)
-    val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
 
     miner ! Miner.Stop
     checkMining(false)
     miner ! ViewHandler.ViewUpdated(
-      block.chainIndex,
-      DataOrigin.Local,
-      ViewHandler.prepareTemplates(blockFlow)
+      ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     )
     blockHandlerProbe.expectNoMessage()
 
@@ -85,56 +82,19 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
   }
 
   it should "continue mining after an invalid block" in new WorkflowFixture {
-    miner.underlyingActor.setRunning(0, 0)
     miner ! Miner.Start
-    blockHandlerProbe.expectNoMessage()
+    for {
+      fromShift <- 0 until brokerConfig.groupNumPerBroker
+      to        <- 0 until brokerConfig.groups
+    } {
+      miner.underlyingActor.setRunning(fromShift, to)
+    }
 
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    miner.underlyingActor.isRunning(0, 0) is true
     miner ! BlockChainHandler.InvalidBlock(block.hash)
+    miner.underlyingActor.isRunning(0, 0) is false
     awaitForBlocks(3)
-  }
-
-  it should "ignore handled mining result when it's stopped" in {
-    val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
-    val (allHandlers, _) = TestUtils.createAllHandlersProbe
-    val miner = system.actorOf(
-      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
-    )
-
-    miner ! Miner.MiningResult(None, ChainIndex.unsafe(0, 0), 0)
-  }
-
-  it should "handle its addresses" in new LockupScriptGenerators {
-    val groupConfig      = config.broker
-    val blockFlow        = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
-    val (allHandlers, _) = TestUtils.createAllHandlersProbe
-    val miner = system.actorOf(
-      Miner.props(config.network.networkType, config.minerAddresses, blockFlow, allHandlers)
-    )
-
-    miner
-      .ask(Miner.GetAddresses)
-      .mapTo[AVector[LockupScript]]
-      .futureValue is config.minerAddresses.map(_.lockupScript)
-
-    val newMinderAddresses =
-      AVector.tabulate(groupConfig.groups)(i =>
-        Address(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
-      )
-
-    miner ! Miner.UpdateAddresses(newMinderAddresses)
-
-    miner
-      .ask(Miner.GetAddresses)
-      .mapTo[AVector[LockupScript]]
-      .futureValue is newMinderAddresses.map(_.lockupScript)
-
-    miner ! Miner.UpdateAddresses(AVector.empty)
-
-    miner
-      .ask(Miner.GetAddresses)
-      .mapTo[AVector[LockupScript]]
-      .futureValue is newMinderAddresses.map(_.lockupScript)
   }
 
   it should "mine from both template and data blob" in {

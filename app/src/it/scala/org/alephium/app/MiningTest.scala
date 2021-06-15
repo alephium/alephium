@@ -16,13 +16,11 @@
 
 package org.alephium.app
 
-import scala.annotation.tailrec
-
-import akka.util.ByteString
+import java.net.InetSocketAddress
 
 import org.alephium.api.model._
-import org.alephium.flow.client.Miner
-import org.alephium.protocol.model.{defaultGasFee, ChainIndex, Target}
+import org.alephium.flow.client.{ExternalMinerMock, Miner}
+import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 
 class MiningTest extends AlephiumSpec {
@@ -77,26 +75,10 @@ class MiningTest extends AlephiumSpec {
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
-    val candidate = request[BlockCandidate](blockCandidate(tx.fromGroup, tx.toGroup), restPort)
-
-    @tailrec
-    def mine(): (ByteString, U256) = {
-      Miner.mine(
-        ChainIndex.unsafe(tx.fromGroup, tx.toGroup),
-        candidate.headerBlob,
-        Target.unsafe(candidate.target)
-      ) match {
-        case Some((nonce, miningCount)) =>
-          val blockBlob = candidate.headerBlob ++ nonce.value ++ candidate.txsBlob
-          blockBlob -> miningCount
-        case None => mine()
-      }
-    }
-
-    val (blockBlob, miningCount) = mine()
-    val solution                 = BlockSolution(blockBlob, miningCount)
-
-    unitRequest(newBlock(solution), restPort)
+    server0.minerApiController // need to call this lazy value first
+    val minerApiAddress = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
+    val miner           = system.actorOf(ExternalMinerMock.props(networkType, AVector(minerApiAddress)))
+    miner ! Miner.Start
 
     eventually {
       val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)

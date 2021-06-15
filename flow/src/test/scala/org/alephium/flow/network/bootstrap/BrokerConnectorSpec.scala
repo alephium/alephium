@@ -47,6 +47,7 @@ class BrokerConnectorSpec
         Some(randomAddress),
         randomAddress,
         Random.nextInt(),
+        Random.nextInt(),
         Random.nextInt()
       )
 

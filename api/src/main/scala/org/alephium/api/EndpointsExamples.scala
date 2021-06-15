@@ -43,11 +43,12 @@ trait EndpointsExamples extends ErrorExamples {
   private val address                    = Address(networkType, lockupScript)
   private val cliqueId                   = CliqueId(publicKey)
   private val port                       = 12344
+  private val minerApiPort               = 12355
   private val wsPort                     = 12366
   private val restPort                   = 12377
   private val inetSocketAddress          = new InetSocketAddress("1.2.3.4", port)
   private val inetAddress                = inetSocketAddress.getAddress
-  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort)
+  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers                      = AVector(peerAddress)
   private val balance                    = ALF.alf(U256.unsafe(1)).get
   private val height                     = 42

@@ -28,6 +28,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
@@ -83,11 +84,13 @@ class WebSocketServerSpec
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val system: ActorSystem                = ActorSystem("websocket-server-spec")
     lazy val blockFlowProbe                         = TestProbe()
+    val (allHandlers, _)                            = TestUtils.createAllHandlersProbe
     lazy val node = new NodeDummy(
       dummyIntraCliqueInfo,
       dummyNeighborPeers,
       dummyBlock,
       blockFlowProbe.ref,
+      allHandlers,
       dummyTx,
       storages
     )

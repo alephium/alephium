@@ -20,28 +20,35 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.actor.{ActorRef, Props}
 
+import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.model.{BlockFlowTemplate, DataOrigin}
+import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{Address, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object ViewHandler {
-  def props(blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])(implicit
+  def props(
+      blockFlow: BlockFlow,
+      txHandler: ActorRefT[TxHandler.Command],
+      addressOpt: Option[AVector[Address]]
+  )(implicit
       brokerConfig: BrokerConfig
   ): Props = Props(
-    new ViewHandler(blockFlow, txHandler)
+    new ViewHandler(blockFlow, txHandler, addressOpt.map(_.map(_.lockupScript)))
   )
 
   sealed trait Command
-  case object Subscribe   extends Command
-  case object Unsubscribe extends Command
+  case object Subscribe                                         extends Command
+  case object Unsubscribe                                       extends Command
+  case object GetAddresses                                      extends Command
+  final case class UpdateAddresses(addresses: AVector[Address]) extends Command
 
   sealed trait Event
   final case class ViewUpdated(
-      chainIndex: ChainIndex,
-      origin: DataOrigin,
       templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
   ) extends Event
       with EventStream.Event
@@ -51,18 +58,24 @@ object ViewHandler {
   }
 
   def prepareTemplates(
-      blockFlow: BlockFlow
-  )(implicit brokerConfig: BrokerConfig): IndexedSeq[IndexedSeq[BlockFlowTemplate]] = {
-    brokerConfig.groupRange.map { fromGroup =>
-      (0 until brokerConfig.groups).map { toGroup =>
-        val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-        blockFlow.prepareBlockFlowUnsafe(chainIndex)
+      blockFlow: BlockFlow,
+      minerAddresses: AVector[LockupScript]
+  )(implicit brokerConfig: BrokerConfig): IOResult[IndexedSeq[IndexedSeq[BlockFlowTemplate]]] =
+    IOUtils.tryExecute {
+      brokerConfig.groupRange.map { fromGroup =>
+        (0 until brokerConfig.groups).map { toGroup =>
+          val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+          blockFlow.prepareBlockFlowUnsafe(chainIndex, minerAddresses(toGroup))
+        }
       }
     }
-  }
 }
 
-class ViewHandler(val blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Command])(implicit
+class ViewHandler(
+    val blockFlow: BlockFlow,
+    txHandler: ActorRefT[TxHandler.Command],
+    var minerAddressesOpt: Option[AVector[LockupScript]]
+)(implicit
     val brokerConfig: BrokerConfig
 ) extends ViewHandlerState
     with Subscriber
@@ -72,7 +85,7 @@ class ViewHandler(val blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Comma
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
   override def receive: Receive = {
-    case ChainHandler.FlowDataAdded(data, origin, addedAt) =>
+    case ChainHandler.FlowDataAdded(data, _, addedAt) =>
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
@@ -83,11 +96,17 @@ class ViewHandler(val blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Comma
           broadcastReadyTxs(newReadyTxs)
         }
       }
+      updateSubscribers()
 
-      updateSubscribers(chainIndex, origin)
-
-    case ViewHandler.Subscribe   => subscriber()
+    case ViewHandler.Subscribe   => subscribe()
     case ViewHandler.Unsubscribe => unsubscribe()
+
+    case ViewHandler.GetAddresses => sender() ! minerAddressesOpt
+    case ViewHandler.UpdateAddresses(addresses) =>
+      Miner.validateAddresses(addresses) match {
+        case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
+        case Left(error) => log.error(s"Updating invalid miner addresses: $error")
+      }
   }
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
@@ -103,23 +122,35 @@ class ViewHandler(val blockFlow: BlockFlow, txHandler: ActorRefT[TxHandler.Comma
 }
 
 trait ViewHandlerState extends IOBaseActor {
-  def blockFlow: BlockFlow
   implicit def brokerConfig: BrokerConfig
+
+  def blockFlow: BlockFlow
+  def minerAddressesOpt: Option[AVector[LockupScript]]
 
   val subscribers: ArrayBuffer[ActorRef] = ArrayBuffer.empty
 
-  def subscriber(): Unit = {
-    subscribers.addOne(sender())
+  def subscribe(): Unit = {
+    if (!subscribers.contains(sender())) {
+      subscribers.addOne(sender())
+      minerAddressesOpt.foreach { minerAddresses =>
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          sender() ! ViewHandler.ViewUpdated(templates)
+        }
+      }
+    }
   }
 
   def unsubscribe(): Unit = {
     subscribers.filterInPlace(_ != sender())
   }
 
-  def updateSubscribers(chainIndex: ChainIndex, origin: DataOrigin): Unit = {
-    if (subscribers.nonEmpty) {
-      val templates = ViewHandler.prepareTemplates(blockFlow)
-      subscribers.foreach(_ ! ViewHandler.ViewUpdated(chainIndex, origin, templates))
+  def updateSubscribers(): Unit = {
+    minerAddressesOpt.foreach { minerAddresses =>
+      if (subscribers.nonEmpty) {
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          subscribers.foreach(_ ! ViewHandler.ViewUpdated(templates))
+        }
+      }
     }
   }
 }

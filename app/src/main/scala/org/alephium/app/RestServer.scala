@@ -38,7 +38,7 @@ import org.alephium.api.model._
 import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.{Miner, Node}
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.TxHandler
+import org.alephium.flow.handler.{TxHandler, ViewHandler}
 import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
@@ -69,9 +69,10 @@ class RestServer(
     with ServerOptions
     with StrictLogging {
 
-  private val blockFlow: BlockFlow                    = node.blockFlow
-  private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
-  lazy val blockflowFetchMaxAge                       = apiConfig.blockflowFetchMaxAge
+  private val blockFlow: BlockFlow                        = node.blockFlow
+  private val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
+  private val viewHandler: ActorRefT[ViewHandler.Command] = node.allHandlers.viewHandler
+  lazy val blockflowFetchMaxAge                           = apiConfig.blockflowFetchMaxAge
 
   implicit val groupConfig: GroupConfig = node.config.broker
   implicit val networkType: NetworkType = node.config.network.networkType
@@ -216,44 +217,19 @@ class RestServer(
   }
 
   private val minerListAddressesRoute = toRoute(minerListAddresses) { _ =>
-    miner
-      .ask(Miner.GetAddresses)
+    viewHandler
+      .ask(ViewHandler.GetAddresses)
       .mapTo[AVector[LockupScript]]
       .map { addresses =>
         Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
       }
   }
 
-  private val minerGetBlockCandidateRoute = toRoute(minerGetBlockCandidate) { chainIndex =>
-    withSyncedClique {
-      miner
-        .ask(Miner.GetBlockCandidate(chainIndex))
-        .mapTo[Miner.BlockCandidate]
-        .map(_.maybeBlock match {
-          case Some(block) => Right(RestServer.blockTempateToCandidate(chainIndex, block))
-          case None =>
-            Left(
-              ApiError.InternalServerError("Cannot compute block candidate for given chain index")
-            )
-        })
-    }
-  }
-
-  private val minerNewBlockRoute = toRoute(minerNewBlock) { solution =>
-    withSyncedClique {
-      Future.successful(
-        RestServer.blockSolutionToBlock(solution).map { case (solution, miningCount) =>
-          miner ! Miner.NewBlockSolution(solution, miningCount)
-        }
-      )
-    }
-  }
-
   private val minerUpdateAddressesRoute = toRoute(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
       Miner
         .validateAddresses(minerAddresses.addresses)
-        .map(_ => miner ! Miner.UpdateAddresses(minerAddresses.addresses))
+        .map(_ => viewHandler ! ViewHandler.UpdateAddresses(minerAddresses.addresses))
         .left
         .map(ApiError.BadRequest(_))
     }
@@ -329,8 +305,6 @@ class RestServer(
     sendTransactionRoute,
     getTransactionStatusRoute,
     minerActionRoute,
-    minerGetBlockCandidateRoute,
-    minerNewBlockRoute,
     minerListAddressesRoute,
     minerUpdateAddressesRoute,
     sendContractRoute,
@@ -420,7 +394,7 @@ object RestServer {
       networkType,
       consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
       ),
       synced,
       cliqueInfo.groupNumPerBroker,

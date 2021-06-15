@@ -32,7 +32,7 @@ import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.flow.client.Miner
-import org.alephium.flow.model.MiningBlob
+import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
@@ -249,14 +249,13 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       val address      = Address.fromBase58(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
 
-      minerProbe.setAutoPilot(new TestActor.AutoPilot {
-        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
-          msg match {
-            case Miner.GetAddresses =>
-              sender ! AVector(lockupScript)
-              TestActor.NoAutoPilot
-          }
-      })
+      allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case ViewHandler.GetAddresses =>
+            sender ! AVector(lockupScript)
+            TestActor.NoAutoPilot
+        }
+      )
 
       Get(s"/miners/addresses") check { response =>
         response.code is StatusCode.Ok
@@ -274,7 +273,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
       Put(s"/miners/addresses", body) check { response =>
         val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
-        minerProbe.expectMsg(Miner.UpdateAddresses(addresses))
+        allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateAddresses(addresses))
         response.code is StatusCode.Ok
       }
 
@@ -292,75 +291,6 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
           s"Address ${dummyKeyAddress} doesn't belong to group 1"
-        )
-      }
-    }
-  }
-
-  it should "call GET /miners/block-candidate" in new RestServerFixture {
-    withServer {
-      var block: Option[MiningBlob] = Some(dummyBlockTemplate)
-      val chainIndex                = dummyBlock.chainIndex
-      val fromGroup                 = chainIndex.from.value
-      val toGroup                   = chainIndex.to.value
-      val blockEntryTemplate =
-        RestServer.blockTempateToCandidate(chainIndex, dummyBlockTemplate)
-
-      minerProbe.setAutoPilot((sender: ActorRef, msg: Any) => {
-        msg match {
-          case Miner.GetBlockCandidate(_) =>
-            sender ! Miner.BlockCandidate(block)
-            block match {
-              case Some(_) =>
-                block = None
-                TestActor.KeepRunning
-              case None =>
-                TestActor.NoAutoPilot
-            }
-        }
-      })
-
-      Get(s"/miners/block-candidate?fromGroup=$fromGroup&toGroup=$toGroup") check { response =>
-        response.code is StatusCode.Ok
-        response.as[BlockCandidate] is blockEntryTemplate
-      }
-
-      //Miner return BlockCandidate(None)
-      Get(s"/miners/block-candidate?fromGroup=$fromGroup&toGroup=$toGroup") check { response =>
-        response.code is StatusCode.InternalServerError
-        response.as[ApiError.InternalServerError] is ApiError.InternalServerError(
-          "Cannot compute block candidate for given chain index"
-        )
-      }
-
-      interCliqueSynced = false
-
-      Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") check { response =>
-        response.code is StatusCode.ServiceUnavailable
-        response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
-          "The clique is not synced"
-        )
-      }
-    }
-  }
-
-  it should "call POST /miners/new-block" in new RestServerFixture {
-    withServer {
-
-      val blockBlob = Hex.toHexString(serialize(dummyBlock))
-      val body      = s"""{"blockBlob":"$blockBlob","miningCount":"100"}"""
-
-      Post(s"/miners/new-block", body) check { response =>
-        minerProbe.expectMsg(Miner.NewBlockSolution(dummyBlock, U256.unsafe(100)))
-        response.code is StatusCode.Ok
-      }
-
-      interCliqueSynced = false
-
-      Post(s"/miners/new-block", body) check { response =>
-        response.code is StatusCode.ServiceUnavailable
-        response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
-          "The clique is not synced"
         )
       }
     }
@@ -471,8 +401,9 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   trait RestServerFixture extends ServerFixture with HttpRouteFixture {
-    lazy val minerProbe = TestProbe()
-    lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
+    lazy val minerProbe                      = TestProbe()
+    lazy val miner                           = ActorRefT[Miner.Command](minerProbe.ref)
+    lazy val (allHandlers, allHandlersProbe) = TestUtils.createAllHandlersProbe
 
     var selfCliqueSynced  = true
     var interCliqueSynced = true
@@ -500,6 +431,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       dummyNeighborPeers,
       dummyBlock,
       blockFlowProbe.ref,
+      allHandlers,
       dummyTx,
       storages,
       cliqueManagerOpt = Some(cliqueManager),

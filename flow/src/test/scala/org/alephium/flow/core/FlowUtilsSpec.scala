@@ -110,9 +110,10 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.isTxConflicted(groupIndex, tx1) is true
     blockFlow.getMemPool(groupIndex).addNewTx(chainIndex1, tx1)
 
-    val template = blockFlow.prepareBlockFlow(chainIndex1).rightValue
+    val miner    = getGenesisLockupScript(chainIndex1)
+    val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
     template.deps.contains(block0.hash) is false
-    blockFlow.prepareBlockFlowUnsafe(chainIndex1).transactions.isEmpty is true
+    template.transactions.init.isEmpty is true
   }
 
   it should "deal with large amount of UTXOs" in new FlowFixture {
@@ -188,6 +189,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     val pool = blockFlow.getMemPool(index)
     pool.getSharedPool(index).add(AVector(tx0.toTemplate, tx1.toTemplate))
-    blockFlow.prepareBlockFlowUnsafe(index).transactions is AVector(tx0)
+    val miner = getGenesisLockupScript(index)
+    blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
   }
 }

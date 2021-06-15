@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import java.net.InetAddress
 
-final case class PeerAddress(address: InetAddress, restPort: Int, wsPort: Int)
+final case class PeerAddress(address: InetAddress, restPort: Int, wsPort: Int, minerApiPort: Int)

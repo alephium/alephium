@@ -220,9 +220,15 @@ class BlockFlowSpec extends AlephiumSpec {
 
         val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
+          val conflictedTx = block11.nonCoinbase.head
           blockFlow.getMemPool(chainIndex).size is 1 // the conflicted tx is kept
-          val template = blockFlow.prepareBlockFlow(chainIndex).toOption.get
-          template.transactions.length is 0 // the conflicted tx will not be used
+          blockFlow.getMemPool(chainIndex).contains(chainIndex, conflictedTx.id) is true
+          val miner    = getGenesisLockupScript(chainIndex)
+          val template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+          template.transactions.length is 1 // the conflicted tx will not be used, only coinbase tx
+          template.transactions.map(_.id).contains(conflictedTx.id) is false
+        } else {
+          blockAdded is block11.hash
         }
       }
     }
@@ -506,7 +512,7 @@ class BlockFlowSpec extends AlephiumSpec {
     theMemPool.pendingPool.contains(tx1.id) is true
     theMemPool.pendingPool.contains(tx2.id) is true
 
-    val block0 = minePooledTxs(blockFlow, tx0.chainIndex)
+    val block0 = mineFromMemPool(blockFlow, tx0.chainIndex)
     addAndCheck(blockFlow, block0)
     theMemPool.contains(tx0.chainIndex, tx0.id) is false
     theMemPool.contains(tx1.chainIndex, tx1.id) is true
@@ -514,7 +520,7 @@ class BlockFlowSpec extends AlephiumSpec {
     if (!tx0.chainIndex.isIntraGroup) {
       theMemPool.pendingPool.contains(tx1.id) is true
       theMemPool.pendingPool.contains(tx2.id) is true
-      val block = minePooledTxs(blockFlow, ChainIndex(fromGroup, fromGroup))
+      val block = mineFromMemPool(blockFlow, ChainIndex(fromGroup, fromGroup))
       addAndCheck(blockFlow, block)
       theMemPool.pendingPool.contains(tx1.id) is false
       theMemPool.pendingPool.contains(tx2.id) is true
@@ -523,21 +529,21 @@ class BlockFlowSpec extends AlephiumSpec {
       theMemPool.pendingPool.contains(tx2.id) is true
     }
 
-    val block1 = minePooledTxs(blockFlow, tx1.chainIndex)
+    val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
     theMemPool.contains(tx1.chainIndex, tx1.id) is false
     theMemPool.contains(tx2.chainIndex, tx2.id) is true
 
     if (!tx1.chainIndex.isIntraGroup) {
       theMemPool.pendingPool.contains(tx2.id) is true
-      val block = minePooledTxs(blockFlow, ChainIndex(fromGroup, fromGroup))
+      val block = mineFromMemPool(blockFlow, ChainIndex(fromGroup, fromGroup))
       addAndCheck(blockFlow, block)
       theMemPool.pendingPool.contains(tx2.id) is false
     } else {
       theMemPool.pendingPool.contains(tx2.id) is false
     }
 
-    val block2 = minePooledTxs(blockFlow, tx2.chainIndex)
+    val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
     theMemPool.contains(tx2.chainIndex, tx2.id) is false
   }

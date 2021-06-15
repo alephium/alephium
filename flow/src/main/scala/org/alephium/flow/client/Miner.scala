@@ -20,62 +20,25 @@ import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-import akka.actor.Props
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 
-import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
-import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
-import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
-import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
+import org.alephium.flow.model.MiningBlob
+import org.alephium.flow.setting.MiningSetting
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.deserialize
 import org.alephium.util._
 
 object Miner extends LazyLogging {
-  def props(node: Node)(implicit config: AlephiumConfig): Props =
-    props(config.network.networkType, config.minerAddresses, node.blockFlow, node.allHandlers)(
-      config.broker,
-      config.consensus,
-      config.mining
-    )
-
-  def props(
-      networkType: NetworkType,
-      addresses: AVector[Address],
-      blockFlow: BlockFlow,
-      allHandlers: AllHandlers
-  )(implicit
-      brokerConfig: BrokerConfig,
-      emissionConfig: EmissionConfig,
-      miningConfig: MiningSetting
-  ): Props = {
-    validateAddresses(addresses).left.foreach { error =>
-      logger.error(s"Invalid miner addresses: ${addresses.toString}, due to $error")
-      sys.exit(1)
-    }
-
-    Props(new Miner(networkType, addresses.map(_.lockupScript), blockFlow, allHandlers))
-  }
-
   sealed trait Command
-  case object IsMining                                               extends Command
-  case object Start                                                  extends Command
-  case object Stop                                                   extends Command
-  case object UpdateTemplate                                         extends Command
-  case object GetAddresses                                           extends Command
-  final case class GetBlockCandidate(index: ChainIndex)              extends Command
-  final case class Mine(index: ChainIndex, template: MiningBlob)     extends Command
-  final case class NewBlockSolution(block: Block, miningCount: U256) extends Command
-  final case class MiningResult(blockOpt: Option[Block], chainIndex: ChainIndex, miningCount: U256)
-      extends Command
-  final case class UpdateAddresses(addresses: AVector[Address]) extends Command
-
-  final case class BlockCandidate(maybeBlock: Option[MiningBlob])
+  case object IsMining                                                      extends Command
+  case object Start                                                         extends Command
+  case object Stop                                                          extends Command
+  final case class Mine(index: ChainIndex, template: MiningBlob)            extends Command
+  final case class NewBlockSolution(block: Block, miningCount: U256)        extends Command
+  final case class MiningNoBlock(chainIndex: ChainIndex, miningCount: U256) extends Command
 
   def mine(index: ChainIndex, template: MiningBlob)(implicit
       groupConfig: GroupConfig,
@@ -136,31 +99,17 @@ object Miner extends LazyLogging {
   }
 }
 
-class Miner(
-    networkType: NetworkType,
-    var addresses: AVector[LockupScript],
-    blockFlow: BlockFlow,
-    allHandlers: AllHandlers
-)(implicit
-    val brokerConfig: BrokerConfig,
-    val emissionConfig: EmissionConfig,
-    val miningConfig: MiningSetting
-) extends BaseActor
-    with MinerState {
-  val handlers = allHandlers
-
-  def receive: Receive = handleAddresses orElse handleMining()
+trait Miner extends BaseActor with MinerState {
+  def networkType: NetworkType
 
   var miningStarted: Boolean = false
 
   // scalastyle:off method.length
-  def handleMining(): Receive = {
+  def handleMining: Receive = {
     case Miner.Start =>
       if (!miningStarted) {
         log.info("Start mining")
-        allHandlers.viewHandler ! ViewHandler.Subscribe
-        updateTasks()
-        startNewTasks()
+        subscribeForTasks()
         miningStarted = true
       } else {
         log.info("Mining already started")
@@ -168,7 +117,7 @@ class Miner(
     case Miner.Stop =>
       if (miningStarted) {
         log.info("Stop mining")
-        allHandlers.viewHandler ! ViewHandler.Unsubscribe
+        unsubscribeTasks()
         postMinerStop()
         miningStarted = false
       } else {
@@ -176,110 +125,55 @@ class Miner(
       }
     case Miner.Mine(index, template) => mine(index, template)
     case Miner.NewBlockSolution(block, miningCount) =>
-      log.debug(s"Send the new mined block ${block.hash.shortHex} to blockHandler")
-      val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
-      allHandlers.getBlockHandler(block.chainIndex) ! handlerMessage
-      self ! Miner.MiningResult(Some(block), block.chainIndex, miningCount)
-    case Miner.MiningResult(blockOpt, chainIndex, miningCount) =>
-      handleMiningResult(blockOpt, chainIndex, miningCount)
-    case ViewHandler.ViewUpdated(chainIndex, origin, templates) =>
-      updateTasks(templates)
-      if (origin.isLocal) {
-        continueWorkFor(chainIndex)
-      }
-    case BlockChainHandler.BlockAdded(_) => ()
-    case BlockChainHandler.InvalidBlock(hash) =>
-      log.error(s"Mined an invalid block ${hash.shortHex}")
-      continueWorkFor(ChainIndex.from(hash))
+      log.debug(s"Publish the new mined block ${block.hash.shortHex}")
+      publishNewBlock(block)
+      handleNewBlock(block, miningCount)
+    case Miner.MiningNoBlock(chainIndex, miningCount) =>
+      handleNoBlock(chainIndex, miningCount)
     case Miner.IsMining => sender() ! miningStarted
   }
   // scalastyle:on method.length
 
-  def continueWorkFor(chainIndex: ChainIndex): Unit = {
-    if (miningStarted) {
-      setIdle(chainIndex)
-      startNewTasks()
-    }
-  }
+  def handleViewChange: Receive
 
-  def handleMiningResult(
-      blockOpt: Option[Block],
-      chainIndex: ChainIndex,
-      miningCount: U256
-  ): Unit = {
+  def subscribeForTasks(): Unit
+
+  def unsubscribeTasks(): Unit
+
+  def publishNewBlock(block: Block): Unit
+
+  def handleNewBlock(block: Block, miningCount: U256): Unit = {
+    val chainIndex = block.chainIndex
     assume(brokerConfig.contains(chainIndex.from))
     val fromShift = chainIndex.from.value - brokerConfig.groupFrom
     val to        = chainIndex.to.value
     increaseCounts(fromShift, to, miningCount)
-    blockOpt match {
-      case Some(block) =>
-        val miningCount = getMiningCount(fromShift, to)
-        val txCount     = block.transactions.length
-        log.debug(s"MiningCounts: $countsToString")
-        val minerAddress =
-          Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
-        log.info(
-          s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
-            s"miningCount: $miningCount, target: ${block.header.target}, miner: $minerAddress"
-        )
-      case None =>
-        if (miningStarted) {
-          setIdle(fromShift, to)
-          startNewTasks()
-        }
+
+    val totalCount = getMiningCount(fromShift, to)
+    val txCount    = block.transactions.length
+    log.debug(s"MiningCounts: $countsToString")
+    val minerAddress =
+      Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
+    log.info(
+      s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
+        s"miningCount: $totalCount, target: ${block.header.target}, miner: $minerAddress"
+    )
+  }
+
+  def handleNoBlock(chainIndex: ChainIndex, miningCount: U256): Unit = {
+    val fromShift = chainIndex.from.value - brokerConfig.groupFrom
+    val to        = chainIndex.to.value
+    increaseCounts(fromShift, to, miningCount)
+    if (miningStarted) {
+      setIdle(fromShift, to)
+      startNewTasks()
     }
-  }
-
-  def handleAddresses: Receive = {
-    case Miner.UpdateAddresses(newAddresses) =>
-      Miner.validateAddresses(newAddresses) match {
-        case Right(_) =>
-          addresses = newAddresses.map(_.lockupScript)
-          updateTasks()
-        case Left(error) =>
-          log.debug(s"Invalid new miner addresses: $newAddresses, due to $error")
-      }
-    case Miner.GetAddresses             => sender() ! addresses
-    case Miner.GetBlockCandidate(index) => sender() ! Miner.BlockCandidate(pickChainTasks(index))
-  }
-
-  private def coinbase(
-      chainIndex: ChainIndex,
-      txs: AVector[Transaction],
-      to: Int,
-      target: Target,
-      blockTs: TimeStamp
-  ): Transaction = {
-    Transaction.coinbase(chainIndex, txs, addresses(to), target, blockTs)
-  }
-
-  def prepareTemplate(fromShift: Int, to: Int): MiningBlob = {
-    assume(
-      0 <= fromShift && fromShift < brokerConfig.groupNumPerBroker && 0 <= to && to < brokerConfig.groups
-    )
-    val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
-    val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-    prepareTemplate(fromShift, to, flowTemplate)
-  }
-
-  def prepareTemplate(fromShift: Int, to: Int, flowTemplate: BlockFlowTemplate): MiningBlob = {
-    val index      = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
-    val blockTs    = flowTemplate.templateTs
-    val coinbaseTx = coinbase(index, flowTemplate.transactions, to, flowTemplate.target, blockTs)
-    MiningBlob(
-      flowTemplate.deps,
-      flowTemplate.depStateHash,
-      flowTemplate.target,
-      blockTs,
-      flowTemplate.transactions :+ coinbaseTx
-    )
   }
 
   def startTask(
       fromShift: Int,
       to: Int,
-      template: MiningBlob,
-      blockHandler: ActorRefT[BlockChainHandler.Command]
+      template: MiningBlob
   ): Unit = {
     val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
     scheduleOnce(self, Miner.Mine(index, template), miningConfig.batchDelay)
@@ -291,7 +185,7 @@ class Miner(
         case Some((block, miningCount)) =>
           self ! Miner.NewBlockSolution(block, miningCount)
         case None =>
-          self ! Miner.MiningResult(None, index, miningConfig.nonceStep)
+          self ! Miner.MiningNoBlock(index, miningConfig.nonceStep)
       }
     }(context.dispatcher)
     task.onComplete {

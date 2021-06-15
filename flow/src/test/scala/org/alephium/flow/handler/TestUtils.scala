@@ -31,6 +31,7 @@ object TestUtils {
       flowHandler: TestProbe,
       txHandler: TestProbe,
       dependencyHandler: TestProbe,
+      viewHandler: TestProbe,
       blockHandlers: Map[ChainIndex, TestProbe],
       headerHandlers: Map[ChainIndex, TestProbe]
   )
@@ -77,6 +78,7 @@ object TestUtils {
       flowProbe,
       txProbe,
       dependencyProbe,
+      viewProbe,
       blockHandlers.view.mapValues(_._2).toMap,
       headerHandlers.view.mapValues(_._2).toMap
     )

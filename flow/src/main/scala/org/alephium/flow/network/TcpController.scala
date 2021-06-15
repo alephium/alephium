@@ -87,7 +87,7 @@ class TcpController(
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def binding(bootstrapper: ActorRef): Receive = {
     case Tcp.Bound(localAddress) =>
-      log.debug(s"Server bound to $localAddress")
+      log.info(s"Node bound to $localAddress")
       sender() ! Tcp.ResumeAccepting(batchSize = 1)
       unstashAll()
       context.become(workFor(sender(), bootstrapper))

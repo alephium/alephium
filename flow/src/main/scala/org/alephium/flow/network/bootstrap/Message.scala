@@ -19,36 +19,23 @@ package org.alephium.flow.network.bootstrap
 import akka.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.message.MessageSerde
 import org.alephium.serde._
-import org.alephium.util.Bytes
 
 sealed trait Message
 
-object Message {
+object Message extends SimpleSerde[Message] {
   final case class Peer(info: PeerInfo)          extends Message
   final case class Clique(info: IntraCliqueInfo) extends Message
   final case class Ack(id: Int)                  extends Message
   case object Ready                              extends Message
 
-  def serialize(input: Message): ByteString = {
-    val data = input match {
+  def serializeBody(input: Message): ByteString = {
+    input match {
       case Peer(info)   => ByteString(0) ++ PeerInfo.serialize(info)
       case Clique(info) => ByteString(1) ++ IntraCliqueInfo.serialize(info)
       case Ack(id)      => ByteString(2) ++ intSerde.serialize(id)
       case Ready        => ByteString(3)
     }
-    Bytes.from(data.length) ++ data
-  }
-
-  def deserialize(
-      input: ByteString
-  )(implicit groupConfig: GroupConfig): SerdeResult[Staging[Message]] = {
-    for {
-      lengthRest  <- MessageSerde.extractLength(input)
-      messageRest <- MessageSerde.extractMessageBytes(lengthRest.value, lengthRest.rest)
-      message     <- deserializeBody(messageRest.value)
-    } yield Staging(message, messageRest.rest)
   }
 
   def deserializeBody(
@@ -67,11 +54,5 @@ object Message {
         Left(SerdeError.wrongFormat(s"Invalid bootstrap message code: $byte"))
       }
     }
-  }
-
-  def tryDeserialize(
-      data: ByteString
-  )(implicit groupConfig: GroupConfig): SerdeResult[Option[Staging[Message]]] = {
-    SerdeUtils.unwrap(deserialize(data))
   }
 }

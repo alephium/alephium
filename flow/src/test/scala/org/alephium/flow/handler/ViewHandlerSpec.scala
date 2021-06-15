@@ -16,9 +16,17 @@
 
 package org.alephium.flow.handler
 
-import org.alephium.flow.AlephiumFlowActorSpec
+import akka.testkit.{EventFilter, TestActorRef, TestProbe}
+import akka.util.Timeout
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
+
+import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
+import org.alephium.flow.model.DataOrigin
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
   it should "update when necessary" in {
@@ -40,6 +48,92 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
       to   <- 0 until 4
     } {
       ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is true
+    }
+  }
+
+  trait Fixture
+      extends FlowFixture
+      with Eventually
+      with IntegrationPatience
+      with LockupScriptGenerators {
+    val txProbe = TestProbe()
+    val minderAddresses =
+      AVector.tabulate(groupConfig.groups)(i =>
+        Address(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
+      )
+    val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow, txProbe.ref, None))
+  }
+
+  it should "update deps and txs" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val blockFlow1 = isolatedBlockFlow()
+    val block0     = transfer(blockFlow1, chainIndex)
+    addAndCheck(blockFlow1, block0)
+    val block1 = transfer(blockFlow1, chainIndex)
+
+    val tx1 = block1.nonCoinbase.head.toTemplate
+    blockFlow.getMemPool(chainIndex).pendingPool.add(tx1)
+    blockFlow.add(block0).isRight is true
+
+    viewHandler ! ViewHandler.Subscribe
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    eventually(txProbe.expectMsg(TxHandler.Broadcast(AVector(tx1))))
+    eventually(expectNoMessage())
+
+    viewHandler ! ViewHandler.UpdateAddresses(minderAddresses)
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    eventually(expectMsgType[ViewHandler.ViewUpdated])
+  }
+
+  it should "subscribe and unsubscribe actors" in new Fixture {
+    val probe0 = TestProbe()
+    val probe1 = TestProbe()
+
+    probe0.send(viewHandler, ViewHandler.Subscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref)
+    probe0.send(viewHandler, ViewHandler.Subscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref)
+
+    probe1.send(viewHandler, ViewHandler.Subscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref)
+    probe1.send(viewHandler, ViewHandler.Subscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref)
+
+    viewHandler.underlyingActor.updateSubscribers()
+    eventually(probe0.expectNoMessage())
+    eventually(probe1.expectNoMessage())
+
+    viewHandler ! ViewHandler.UpdateAddresses(minderAddresses)
+    viewHandler.underlyingActor.updateSubscribers()
+    eventually(probe0.expectMsgType[ViewHandler.ViewUpdated])
+    eventually(probe1.expectMsgType[ViewHandler.ViewUpdated])
+
+    probe0.send(viewHandler, ViewHandler.Unsubscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref)
+    probe0.send(viewHandler, ViewHandler.Unsubscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref)
+
+    probe1.send(viewHandler, ViewHandler.Unsubscribe)
+    viewHandler.underlyingActor.subscribers.toSeq is Seq.empty
+  }
+
+  it should "handle miner addresses" in new Fixture with LockupScriptGenerators {
+    implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(1).asScala)
+
+    viewHandler
+      .ask(ViewHandler.GetAddresses)
+      .mapTo[Option[AVector[LockupScript]]]
+      .futureValue is None
+
+    viewHandler ! ViewHandler.UpdateAddresses(minderAddresses)
+
+    viewHandler
+      .ask(ViewHandler.GetAddresses)
+      .mapTo[Option[AVector[LockupScript]]]
+      .futureValue is Some(minderAddresses.map(_.lockupScript))
+
+    EventFilter.error(start = "Updating invalid miner addresses").intercept {
+      viewHandler ! ViewHandler.UpdateAddresses(AVector.empty)
     }
   }
 }
