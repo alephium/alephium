@@ -47,15 +47,24 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     }
 
     def connectToController(): (InetSocketAddress, ActorRef) = {
+      connectToController(10)
+    }
+
+    private def connectToController(n: Int): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)
-      expectMsgType[Tcp.Connected]
+      expectMsgPF() {
+        case _: Tcp.Connected =>
+          val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
+          controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
 
-      val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
-      controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
-
-      bootstrapper.expectMsgType[Tcp.Connected]
-      val connection = bootstrapper.lastSender
-      (confirm.connected.remoteAddress, connection)
+          bootstrapper.expectMsgType[Tcp.Connected]
+          val connection = bootstrapper.lastSender
+          (confirm.connected.remoteAddress, connection)
+        case _: Tcp.CommandFailed =>
+          Thread.sleep(100)
+          assert(n > 0)
+          connectToController(n - 1)
+      }
     }
   }
 
