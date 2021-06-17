@@ -42,13 +42,13 @@ object ViewHandler {
   )
 
   sealed trait Command
-  case object Subscribe                                         extends Command
-  case object Unsubscribe                                       extends Command
-  case object GetAddresses                                      extends Command
-  final case class UpdateAddresses(addresses: AVector[Address]) extends Command
+  case object Subscribe                                              extends Command
+  case object Unsubscribe                                            extends Command
+  case object GetMinerAddresses                                      extends Command
+  final case class UpdateMinerAddresses(addresses: AVector[Address]) extends Command
 
   sealed trait Event
-  final case class ViewUpdated(
+  final case class NewTemplates(
       templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
   ) extends Event
       with EventStream.Event
@@ -101,8 +101,8 @@ class ViewHandler(
     case ViewHandler.Subscribe   => subscribe()
     case ViewHandler.Unsubscribe => unsubscribe()
 
-    case ViewHandler.GetAddresses => sender() ! minerAddressesOpt
-    case ViewHandler.UpdateAddresses(addresses) =>
+    case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
+    case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
@@ -134,7 +134,7 @@ trait ViewHandlerState extends IOBaseActor {
       subscribers.addOne(sender())
       minerAddressesOpt.foreach { minerAddresses =>
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-          sender() ! ViewHandler.ViewUpdated(templates)
+          sender() ! ViewHandler.NewTemplates(templates)
         }
       }
     }
@@ -148,7 +148,7 @@ trait ViewHandlerState extends IOBaseActor {
     minerAddressesOpt.foreach { minerAddresses =>
       if (subscribers.nonEmpty) {
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-          subscribers.foreach(_ ! ViewHandler.ViewUpdated(templates))
+          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
         }
       }
     }

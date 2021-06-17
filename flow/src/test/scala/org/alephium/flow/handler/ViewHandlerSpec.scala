@@ -80,9 +80,9 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     eventually(txProbe.expectMsg(TxHandler.Broadcast(AVector(tx1))))
     eventually(expectNoMessage())
 
-    viewHandler ! ViewHandler.UpdateAddresses(minderAddresses)
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
-    eventually(expectMsgType[ViewHandler.ViewUpdated])
+    eventually(expectMsgType[ViewHandler.NewTemplates])
   }
 
   it should "subscribe and unsubscribe actors" in new Fixture {
@@ -103,10 +103,10 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     eventually(probe0.expectNoMessage())
     eventually(probe1.expectNoMessage())
 
-    viewHandler ! ViewHandler.UpdateAddresses(minderAddresses)
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler.underlyingActor.updateSubscribers()
-    eventually(probe0.expectMsgType[ViewHandler.ViewUpdated])
-    eventually(probe1.expectMsgType[ViewHandler.ViewUpdated])
+    eventually(probe0.expectMsgType[ViewHandler.NewTemplates])
+    eventually(probe1.expectMsgType[ViewHandler.NewTemplates])
 
     probe0.send(viewHandler, ViewHandler.Unsubscribe)
     viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref)
@@ -121,19 +121,19 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(1).asScala)
 
     viewHandler
-      .ask(ViewHandler.GetAddresses)
+      .ask(ViewHandler.GetMinerAddresses)
       .mapTo[Option[AVector[LockupScript]]]
       .futureValue is None
 
-    viewHandler ! ViewHandler.UpdateAddresses(minderAddresses)
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
 
     viewHandler
-      .ask(ViewHandler.GetAddresses)
+      .ask(ViewHandler.GetMinerAddresses)
       .mapTo[Option[AVector[LockupScript]]]
       .futureValue is Some(minderAddresses.map(_.lockupScript))
 
     EventFilter.error(start = "Updating invalid miner addresses").intercept {
-      viewHandler ! ViewHandler.UpdateAddresses(AVector.empty)
+      viewHandler ! ViewHandler.UpdateMinerAddresses(AVector.empty)
     }
   }
 }

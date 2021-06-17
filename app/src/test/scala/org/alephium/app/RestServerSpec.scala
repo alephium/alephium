@@ -251,7 +251,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
         msg match {
-          case ViewHandler.GetAddresses =>
+          case ViewHandler.GetMinerAddresses =>
             sender ! AVector(lockupScript)
             TestActor.NoAutoPilot
         }
@@ -273,7 +273,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
       Put(s"/miners/addresses", body) check { response =>
         val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
-        allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateAddresses(addresses))
+        allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateMinerAddresses(addresses))
         response.code is StatusCode.Ok
       }
 

@@ -41,7 +41,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     val allHandlers: AllHandlers = TestUtils.createAllHandlersProbe._1
     val probes                   = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
 
-    def updateTasks(): Unit = {
+    def updateAndStartTasks(): Unit = {
       val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
       for {
         fromShift <- 0 until brokerConfig.groupNumPerBroker
@@ -72,7 +72,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   }
 
   it should "start new tasks correctly" in new Fixture {
-    updateTasks()
+    updateAndStartTasks()
     startNewTasks()
     probes.foreach(_.foreach(_.expectMsgType[MiningBlob]))
     running.foreach(_.foreach(_ is true))
@@ -102,7 +102,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     (0 until brokerConfig.groups).foreach { i =>
       if (i != to) increaseCounts(fromShift, i, miningConfig.nonceStep + 1)
     }
-    updateTasks()
+    updateAndStartTasks()
     (0 until brokerConfig.groups).foreach { i =>
       if (i != to) {
         probes(fromShift)(i).expectNoMessage()

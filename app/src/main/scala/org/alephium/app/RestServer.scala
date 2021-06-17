@@ -218,7 +218,7 @@ class RestServer(
 
   private val minerListAddressesRoute = toRoute(minerListAddresses) { _ =>
     viewHandler
-      .ask(ViewHandler.GetAddresses)
+      .ask(ViewHandler.GetMinerAddresses)
       .mapTo[AVector[LockupScript]]
       .map { addresses =>
         Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
@@ -229,7 +229,7 @@ class RestServer(
     Future.successful {
       Miner
         .validateAddresses(minerAddresses.addresses)
-        .map(_ => viewHandler ! ViewHandler.UpdateAddresses(minerAddresses.addresses))
+        .map(_ => viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses))
         .left
         .map(ApiError.BadRequest(_))
     }

@@ -134,7 +134,7 @@ trait Miner extends BaseActor with MinerState {
   }
   // scalastyle:on method.length
 
-  def handleViewChange: Receive
+  def handleMiningTasks: Receive
 
   def subscribeForTasks(): Unit
 

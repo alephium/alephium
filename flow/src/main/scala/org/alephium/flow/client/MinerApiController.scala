@@ -115,7 +115,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val submittingBlocks: mutable.HashMap[BlockHash, ActorRefT[ConnectionHandler.Command]] =
     mutable.HashMap.empty
   def handleAPI: Receive = {
-    case ViewHandler.ViewUpdated(templates)                  => publishTemplates(templates)
+    case ViewHandler.NewTemplates(templates)                 => publishTemplates(templates)
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash)                  => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash) =>
@@ -134,9 +134,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   def handleClientMessage(message: ClientMessage): Unit = message match {
     case SubmitBlock(blockBlob) =>
       deserialize[Block](blockBlob) match {
-        case Right(block) =>
-          submit(block)
-          submittingBlocks.addOne(block.hash -> ActorRefT(sender()))
+        case Right(block) => submit(block)
         case Left(error) =>
           log.error(
             s"Deserialization error for submited block: $error : ${Hex.toHexString(blockBlob)}"
@@ -149,6 +147,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       case Some(blockHandler) =>
         val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
         blockHandler ! handlerMessage
+        submittingBlocks.addOne(block.hash -> ActorRefT(sender()))
       case None =>
         log.error(s"Block with index ${block.chainIndex} does not belong to ${brokerConfig}")
     }

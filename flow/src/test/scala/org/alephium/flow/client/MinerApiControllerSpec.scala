@@ -74,7 +74,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
     connectToServer(probe0)
     connectToServer(probe1)
 
-    minerApiController ! ViewHandler.ViewUpdated(
+    minerApiController ! ViewHandler.NewTemplates(
       ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     )
     probe0.expectMsgPF() { case Tcp.Received(data) =>

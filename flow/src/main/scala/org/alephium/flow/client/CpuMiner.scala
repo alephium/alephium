@@ -27,16 +27,11 @@ import org.alephium.protocol.model.{Block, ChainIndex, NetworkType}
 import org.alephium.util.ActorRefT
 
 object CpuMiner {
-  def props(node: Node)(implicit config: AlephiumConfig): Props =
-    props(config.network.networkType, node.allHandlers)(
-      config.broker,
-      config.mining
-    )
+  def props(node: Node)(implicit config: AlephiumConfig): Props = {
+    props(config.network.networkType, node.allHandlers)(config.broker, config.mining)
+  }
 
-  def props(
-      networkType: NetworkType,
-      allHandlers: AllHandlers
-  )(implicit
+  def props(networkType: NetworkType, allHandlers: AllHandlers)(implicit
       brokerConfig: BrokerConfig,
       miningConfig: MiningSetting
   ): Props = {
@@ -49,7 +44,7 @@ class CpuMiner(val networkType: NetworkType, val allHandlers: AllHandlers)(impli
     val miningConfig: MiningSetting
 ) extends Miner {
 
-  def receive: Receive = handleMining orElse handleViewChange
+  def receive: Receive = handleMining orElse handleMiningTasks
 
   def subscribeForTasks(): Unit = {
     allHandlers.viewHandler ! ViewHandler.Subscribe
@@ -64,10 +59,10 @@ class CpuMiner(val networkType: NetworkType, val allHandlers: AllHandlers)(impli
     allHandlers.getBlockHandlerUnsafe(block.chainIndex) ! handlerMessage
   }
 
-  def handleViewChange: Receive = {
-    case ViewHandler.ViewUpdated(templates) =>
+  def handleMiningTasks: Receive = {
+    case ViewHandler.NewTemplates(templates) =>
       if (miningStarted) {
-        updateTasks(templates)
+        updateAndStartTasks(templates)
       }
     case BlockChainHandler.BlockAdded(hash) =>
       setIdle(ChainIndex.from(hash))
@@ -76,7 +71,7 @@ class CpuMiner(val networkType: NetworkType, val allHandlers: AllHandlers)(impli
       setIdle(ChainIndex.from(hash))
   }
 
-  def updateTasks(templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
+  def updateAndStartTasks(templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
     for {
       fromShift <- 0 until brokerConfig.groupNumPerBroker
       to        <- 0 until brokerConfig.groups

@@ -36,6 +36,7 @@ object ExternalMinerMock {
       emissionConfig: EmissionConfig,
       miningConfig: MiningSetting
   ): Props = {
+    // to pretend that there is only 1 node in the clique, so we could reuse MinerState
     implicit val brokerConfig: BrokerConfig = new BrokerConfig {
       override val brokerId: Int  = 0
       override val brokerNum: Int = 1
@@ -79,7 +80,7 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
   private val apiConnections =
     Array.ofDim[Option[ActorRefT[ConnectionHandler.Command]]](nodes.length)
 
-  def receive: Receive = handleMining orElse handleViewChange orElse handleConnection
+  def receive: Receive = handleMining orElse handleMiningTasks orElse handleConnection
 
   def handleConnection: Receive = {
     case c: Tcp.Connected =>
@@ -121,14 +122,14 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
     apiConnections(nodeIndex).foreach(_ ! ConnectionHandler.Send(serialized))
   }
 
-  def handleViewChange: Receive = { case ExternalMinerMock.Received(message) =>
+  def handleMiningTasks: Receive = { case ExternalMinerMock.Received(message) =>
     handleServerMessage(message)
   }
 
   def handleServerMessage(message: ServerMessage): Unit = message match {
     case Jobs(jobs) =>
       if (miningStarted) {
-        updateTasks(jobs)
+        updateAndStartTasks(jobs)
       }
     case m @ SubmitResult(fromGroup, toGroup, status) =>
       ChainIndex.from(fromGroup, toGroup) match {
@@ -141,7 +142,7 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
       }
   }
 
-  def updateTasks(jobs: AVector[Job]): Unit = {
+  def updateAndStartTasks(jobs: AVector[Job]): Unit = {
     jobs.foreach { job =>
       pendingTasks(job.fromGroup)(job.toGroup) = job.toMiningBlob
     }

@@ -53,7 +53,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
     def awaitForBlocks(n: Int) = {
       (0 until n).foreach { _ =>
-        miner ! ViewHandler.ViewUpdated(
+        miner ! ViewHandler.NewTemplates(
           ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
         )
         val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
@@ -72,7 +72,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
 
     miner ! Miner.Stop
     checkMining(false)
-    miner ! ViewHandler.ViewUpdated(
+    miner ! ViewHandler.NewTemplates(
       ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     )
     blockHandlerProbe.expectNoMessage()
