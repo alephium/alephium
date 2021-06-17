@@ -36,9 +36,10 @@ import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model._
 import org.alephium.app.ServerUtils.FutureTry
-import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
+import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo

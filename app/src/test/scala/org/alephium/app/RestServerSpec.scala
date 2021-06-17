@@ -31,8 +31,8 @@ import org.alephium.api.{ApiError, ApiModel}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.flow.client.Miner
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
+import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._

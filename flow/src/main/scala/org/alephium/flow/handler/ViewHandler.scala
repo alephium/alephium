@@ -20,8 +20,8 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.actor.{ActorRef, Props}
 
-import org.alephium.flow.client.Miner
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig

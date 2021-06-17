@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.client
+package org.alephium.flow.mining
 
 import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.MiningSetting

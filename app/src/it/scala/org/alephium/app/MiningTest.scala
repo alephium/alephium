@@ -19,7 +19,7 @@ package org.alephium.app
 import java.net.InetSocketAddress
 
 import org.alephium.api.model._
-import org.alephium.flow.client.{ExternalMinerMock, Miner}
+import org.alephium.flow.mining.{ExternalMinerMock, Miner}
 import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 

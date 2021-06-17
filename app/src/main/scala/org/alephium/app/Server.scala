@@ -23,8 +23,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.client.{CpuMiner, Miner, MinerApiController, Node}
+import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
+import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.util.{ActorRefT, Service}

@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.client
+package org.alephium.flow.mining
 
 import akka.actor.Props
 
+import org.alephium.flow.client.Node
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.model.DataOrigin.Local
