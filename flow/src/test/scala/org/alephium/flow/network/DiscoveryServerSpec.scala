@@ -221,13 +221,10 @@ class DiscoveryServerSpec
       .mapTo[MisbehaviorManager.Peers]
       .futureValue is MisbehaviorManager.Peers(AVector.empty)
 
+    val randomAddress = Generators.socketAddressGen.retryUntil(_ != address1).sample.get
     val message = DiscoveryMessage.from(
       cliqueInfo1.id,
-      DiscoveryMessage.Ping(
-        Some(
-          BrokerInfo.from(Generators.socketAddressGen.sample.get, cliqueInfo1.selfInterBrokerInfo)
-        )
-      )
+      DiscoveryMessage.Ping(Some(BrokerInfo.from(randomAddress, cliqueInfo1.selfInterBrokerInfo)))
     )
     server0 ! UdpServer.Received(
       DiscoveryMessage.serialize(message, networkConfig.networkType, cliqueInfo1.priKey),
