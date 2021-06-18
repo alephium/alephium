@@ -107,7 +107,7 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
 
   def subscribeForTasks(): Unit = {
     nodes.foreach { address =>
-      IO(Tcp)(context.system) ! Tcp.Connect(address, pullMode = true)
+      IO(Tcp)(context.system) ! Tcp.Connect(address)
     }
   }
 
