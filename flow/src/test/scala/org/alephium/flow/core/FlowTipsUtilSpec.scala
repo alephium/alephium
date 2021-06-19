@@ -17,7 +17,6 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.validation.{BlockValidation, InvalidFlowTxs}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
@@ -197,9 +196,8 @@ class FlowTipsUtilSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block2)
 
     val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    val blockValidation =
-      BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-    blockValidation.validate(block3, blockFlow).leftValue isE InvalidFlowTxs
+    Set(block1.hash, block2.hash).intersect(block3.blockDeps.deps.toSet).size is 1
+    addAndCheck(blockFlow, block3)
   }
 
   it should "use proper timestamp" in {
