@@ -252,7 +252,7 @@ object BlockFlow extends StrictLogging {
         .filter(isExtendingUnsafe(_, groupTip))
         .sorted(blockHashOrdering.reverse) // useful for draw situation
         .fold[(FlowTips, Weight)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
-          tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
+          tryMergeUnsafe(tipsCur, tip, group) match {
             case Some(merged) =>
               val weight = calWeightUnsafe(merged, group)
               if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
