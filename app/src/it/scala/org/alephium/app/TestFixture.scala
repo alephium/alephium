@@ -46,6 +46,7 @@ import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -262,7 +263,9 @@ trait TestFixtureLike
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       ) ++ configOverrides
       implicit override lazy val config = {
-        val tmp = AlephiumConfig.load(newConfig)
+        val minerAddresses =
+          genesisKeys.map(p => Address(NetworkType.Testnet, LockupScript.p2pkh(p._2)))
+        val tmp = AlephiumConfig.load(newConfig).copy(minerAddresses = Some(minerAddresses))
         bootstrap match {
           case Some(address) =>
             tmp.copy(discovery = tmp.discovery.copy(bootstrap = ArraySeq(address)))
@@ -432,14 +435,6 @@ trait TestFixtureLike
 
   val startMining = httpPost("/miners?action=start-mining")
   val stopMining  = httpPost("/miners?action=stop-mining")
-
-  def blockCandidate(from: Int, to: Int) =
-    httpGet(s"/miners/block-candidate?fromGroup=$from&toGroup=$to")
-
-  def newBlock(solution: BlockSolution) = {
-    val body = s"""${write(solution)}"""
-    httpPost(s"/miners/new-block", Some(body))
-  }
 
   def exportBlocks(filename: String) =
     httpPost(s"/export-blocks", Some(s"""{"filename": "${filename}"}"""))

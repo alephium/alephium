@@ -38,7 +38,7 @@ class ConnectionHandlerSpec
     connection.expectMsgType[Tcp.Register]
     connection.expectMsg(Tcp.ResumeReading)
 
-    val message      = Ping(1, TimeStamp.now().millis)
+    val message      = Ping(1, TimeStamp.now())
     val messageBytes = Message.serialize(message, config.network.networkType)
   }
 

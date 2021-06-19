@@ -25,12 +25,21 @@ import org.alephium.util.TimeStamp
 trait InfoFixture extends ModelGenerators {
   lazy val intraCliqueInfoGen: Gen[IntraCliqueInfo] = {
     for {
-      info     <- cliqueInfoGen
-      restPort <- portGen
-      wsPort   <- portGen
+      info         <- cliqueInfoGen
+      restPort     <- portGen
+      wsPort       <- portGen
+      minerApiPort <- portGen
     } yield {
       val peers = info.internalAddresses.mapWithIndex { (address, id) =>
-        PeerInfo.unsafe(id, info.groupNumPerBroker, Some(address), address, restPort, wsPort)
+        PeerInfo.unsafe(
+          id,
+          info.groupNumPerBroker,
+          Some(address),
+          address,
+          restPort,
+          wsPort,
+          minerApiPort
+        )
       }
       IntraCliqueInfo.unsafe(info.id, peers, info.groupNumPerBroker, info.priKey)
     }

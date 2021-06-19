@@ -23,8 +23,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
+import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.util.{ActorRefT, Service}
@@ -71,10 +72,15 @@ trait Server extends Service {
 
   lazy val miner: ActorRefT[Miner.Command] = {
     val props =
-      Miner
+      CpuMiner
         .props(node)
         .withDispatcher("akka.actor.mining-dispatcher")
     ActorRefT.build(flowSystem, props, s"Miner")
+  }
+  lazy val minerApiController: ActorRefT[MinerApiController.Command] = {
+    val props =
+      MinerApiController.props(node.allHandlers)(config.broker, config.network, config.mining)
+    ActorRefT.build(flowSystem, props, s"MinerApi")
   }
 
   override lazy val subServices: ArraySeq[Service] = {

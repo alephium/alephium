@@ -16,8 +16,8 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.serde.RandomBytes
 import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
@@ -77,13 +77,13 @@ object ChainIndex {
     0 <= from && from < config.groups && 0 <= to && to < config.groups
   }
 
-  def from(randomBytes: RandomBytes)(implicit config: GroupConfig): ChainIndex = {
-    from(randomBytes, config.groups)
+  def from(hash: BlockHash)(implicit config: GroupConfig): ChainIndex = {
+    from(hash, config.groups)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def from(randomBytes: RandomBytes, groups: Int): ChainIndex = {
-    val bytes = randomBytes.bytes
+  def from(hash: BlockHash, groups: Int): ChainIndex = {
+    val bytes = hash.bytes
     assume(bytes.length >= 2)
 
     val beforeLast = Bytes.toPosInt(bytes(bytes.length - 2))

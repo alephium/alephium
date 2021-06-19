@@ -86,7 +86,7 @@ object Block {
       transactions: AVector[Transaction],
       target: Target,
       timeStamp: TimeStamp,
-      nonce: U256
+      nonce: Nonce
   )(implicit config: GroupConfig): Block = {
     val txsHash     = calTxsHash(transactions)
     val blockDeps   = BlockDeps.build(deps)

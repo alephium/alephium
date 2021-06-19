@@ -5,6 +5,7 @@ alephium {
   }
 
   mining {
+    api-interface = "127.0.0.1"
     nonce-step = 10000
     batch-delay = 0 milli
   }
@@ -52,11 +53,10 @@ alephium {
 
     rest-port = 12973
     ws-port = 11973
+    miner-api-port = 10973
   }
 
   discovery {
-    peers-per-group = 16
-    scan-max-per-group = 8
     scan-frequency = 90.seconds
     scan-fast-frequency = 5.seconds
     neighbors-per-group = 8

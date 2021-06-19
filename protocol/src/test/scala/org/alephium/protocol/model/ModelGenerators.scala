@@ -335,6 +335,8 @@ trait BlockGenerators extends TxGenerators {
   implicit def groupConfig: GroupConfig
   implicit def consensusConfig: ConsensusConfig
 
+  lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
+
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
     blockGenOf(chainIndex, AVector.fill(2 * groupConfig.groups - 1)(BlockHash.zero), Hash.zero)
 
@@ -370,7 +372,7 @@ trait BlockGenerators extends TxGenerators {
         txsWithCoinbase,
         consensusConfig.maxMiningTarget,
         blockTs,
-        nonce
+        Nonce.unsecureRandom()
       )
       if (block.chainIndex equals chainIndex) block else iter(nonce + 1)
     }

@@ -59,6 +59,11 @@ trait ApiModelCodec {
     U256.from(u256).getOrElse(throw new Abort(s"Invalid U256: $u256"))
   }
 
+  implicit val nonceWriter: Writer[Nonce] = byteStringWriter.comap[Nonce](_.value)
+  implicit val nonceReader: Reader[Nonce] = byteStringReader.map { bytes =>
+    Nonce.from(bytes).getOrElse(throw Abort(s"Invalid nonce: $bytes"))
+  }
+
   implicit val gasBoxWriter: Writer[GasBox] = implicitly[Writer[Int]].comap(_.value)
   implicit val gasBoxReader: Reader[GasBox] = implicitly[Reader[Int]].map { value =>
     GasBox.from(value).getOrElse(throw new Abort(s"Invalid Gas: $value"))

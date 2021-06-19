@@ -16,6 +16,7 @@
 
 package org.alephium.api
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import sttp.tapir.EndpointIO.Example
@@ -42,11 +43,12 @@ trait EndpointsExamples extends ErrorExamples {
   private val address                    = Address(networkType, lockupScript)
   private val cliqueId                   = CliqueId(publicKey)
   private val port                       = 12344
+  private val minerApiPort               = 12355
   private val wsPort                     = 12366
   private val restPort                   = 12377
   private val inetSocketAddress          = new InetSocketAddress("1.2.3.4", port)
   private val inetAddress                = inetSocketAddress.getAddress
-  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort)
+  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers                      = AVector(peerAddress)
   private val balance                    = ALF.alf(U256.unsafe(1)).get
   private val height                     = 42
@@ -84,25 +86,16 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   private val blockCandidate = BlockCandidate(
-    deps = AVector(blockHash, blockHash),
-    depStateHash = hash,
-    target = Target.onePhPerBlock.bits,
-    blockTs = ts,
-    txsHash = hash,
-    transactions = AVector(hexString)
+    fromGroup = 1,
+    toGroup = 0,
+    headerBlob = Hex.unsafe("aaaa"),
+    target = BigInteger.ONE.shiftLeft(18),
+    txsBlob = Hex.unsafe("bbbbbbbbbb")
   )
 
   private val blockSolution = BlockSolution(
-    blockDeps = AVector(blockHash),
-    depStateHash = hash,
-    timestamp = ts,
-    fromGroup = 1,
-    toGroup = 2,
-    miningCount = U256.Two,
-    target = Target.onePhPerBlock.bits,
-    nonce = U256.Two,
-    txsHash = hash,
-    transactions = AVector(hexString)
+    blockBlob = Hex.unsafe("bbbbbbbb"),
+    miningCount = U256.unsafe(1000)
   )
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")

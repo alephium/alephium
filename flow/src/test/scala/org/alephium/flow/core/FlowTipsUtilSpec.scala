@@ -17,8 +17,9 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
 class FlowTipsUtilSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -177,5 +178,36 @@ class FlowTipsUtilSpec extends AlephiumSpec {
         flowTips.outTips is outTipsExpected
       }
     }
+  }
+
+  it should "detect tx conflicts" in new FlowFixture {
+    val (genesisPriKey, _, _) = genesisKeys(0)
+    val block                 = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALF.alf(10))
+    val blockFlow1            = isolatedBlockFlow()
+    addAndCheck(blockFlow, block)
+    addAndCheck(blockFlow1, block)
+
+    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow, block0)
+
+    val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block1)
+    addAndCheck(blockFlow, block2)
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    Set(block1.hash, block2.hash).intersect(block3.blockDeps.deps.toSet).size is 1
+    addAndCheck(blockFlow, block3)
+  }
+
+  it should "use proper timestamp" in {
+    val currentTs = TimeStamp.now()
+    val pastTs    = currentTs.minusUnsafe(Duration.ofHoursUnsafe(1))
+    val futureTs  = currentTs.plusHoursUnsafe(1)
+
+    Thread.sleep(10) // wait until TimStamp.now() > currentTs
+    FlowUtils.nextTimeStamp(pastTs) > currentTs is true
+    FlowUtils.nextTimeStamp(currentTs) > currentTs is true
+    FlowUtils.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
   }
 }

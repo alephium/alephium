@@ -100,7 +100,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           chain.txStorage.exists(tx.id) isE false
         }
       }
-      val block1 = block0.copy(header = block0.header.copy(nonce = 123456))
+      val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.secureRandom()))
       chain.add(block1, Weight(1)).isRight is true
       block1.transactions.foreachWithIndex { case (tx, index) =>
         val txIndex0 = TxIndex(block0.hash, index)

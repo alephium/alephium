@@ -27,8 +27,8 @@ import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerInfo, CliqueId, CliqueInfo, GroupIndex, PeerId}
-import org.alephium.util.{ActorRefT, AVector, TimeStamp}
+import org.alephium.protocol.model._
+import org.alephium.util.{ActorRefT, AVector, LinkedBuffer, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait DiscoveryServerState {
@@ -49,9 +49,10 @@ trait DiscoveryServerState {
 
   private var socketOpt: Option[ActorRefT[UdpServer.Command]] = None
 
-  protected val table    = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val pendings   = mutable.HashMap.empty[PeerId, AwaitPong]
-  private val pendingMax = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+  protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
+  private val pendingMax   = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+  private val pendings     = LinkedBuffer[PeerId, AwaitPong](pendingMax)
+  private val unreachables = mutable.HashMap.empty[InetSocketAddress, TimeStamp]
 
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
@@ -63,10 +64,15 @@ trait DiscoveryServerState {
     socketOpt = None
   }
 
-  def getActivePeers: AVector[BrokerInfo] = {
-    AVector
+  def getActivePeers(targetGroupInfoOpt: Option[BrokerGroupInfo]): AVector[BrokerInfo] = {
+    val candidates = AVector
       .from(table.values.map(_.info))
+      .filter(info => mightReachable(info.address))
       .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
+    targetGroupInfoOpt match {
+      case Some(groupInfo) => candidates.filter(_.interBrokerInfo.intersect(groupInfo))
+      case None            => candidates
+    }
   }
 
   def getPeersNum: Int = table.size
@@ -92,8 +98,6 @@ trait DiscoveryServerState {
 
   def isUnknown(peerId: PeerId): Boolean = !isInTable(peerId) && !isPending(peerId)
 
-  def isPendingAvailable: Boolean = pendings.size < pendingMax
-
   def getPeer(peerId: PeerId): Option[BrokerInfo] = {
     table.get(peerId).map(_.info)
   }
@@ -114,14 +118,12 @@ trait DiscoveryServerState {
     pendings.get(peerId)
   }
 
-  def banPeerFromAddress(address: InetAddress): Boolean = {
-    val bannedPeer = table.values
-      .filter(status => status.info.address.getAddress == address)
-      .map(_.info.peerId)
-
-    bannedPeer.foreach(banPeer)
-
-    bannedPeer.nonEmpty
+  def banPeerFromAddress(address: InetAddress): Unit = {
+    table.values.foreach { status =>
+      if (status.info.address.getAddress == address) {
+        banPeer(status.info.peerId)
+      }
+    }
   }
 
   def banPeer(peerId: PeerId): Unit = {
@@ -142,6 +144,15 @@ trait DiscoveryServerState {
         cliqueId
     }
     pendings --= deadPendings
+  }
+
+  def setUnreachable(remote: InetSocketAddress): Unit = {
+    unreachables += remote -> TimeStamp.now().plusMinutesUnsafe(10)
+    remove(remote)
+  }
+
+  def mightReachable(remote: InetSocketAddress): Boolean = {
+    !unreachables.contains(remote)
   }
 
   def appendPeer(peerInfo: BrokerInfo): Unit = {
@@ -174,7 +185,7 @@ trait DiscoveryServerState {
   }
 
   def atLeastOnePeerPerGroup(): Boolean = {
-    (brokerConfig.groupFrom until brokerConfig.groupUntil).forall { group =>
+    brokerConfig.groupRange.forall { group =>
       table.values.count(
         _.info.contains(GroupIndex.unsafe(group))
       ) >= 2 // peers from self clique is counted
@@ -206,7 +217,7 @@ trait DiscoveryServerState {
   }
 
   def tryPing(peerInfo: BrokerInfo): Unit = {
-    if (isUnknown(peerInfo.peerId) && isPendingAvailable) {
+    if (isUnknown(peerInfo.peerId)) {
       ping(peerInfo)
     }
   }
@@ -237,7 +248,10 @@ trait DiscoveryServerState {
         updateStatus(peerId)
         fetchNeighbors(peerInfo)
       case None =>
-        tryPing(peerInfo)
+        // ping for bootstrap nodes are not buffered
+        if (bootstrap.contains(peerInfo.address)) {
+          tryPing(peerInfo)
+        }
     }
   }
 

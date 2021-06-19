@@ -74,8 +74,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ("alephium.miner-addresses", ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava))
     )
 
-    config.minerAddresses is minerAddresses.map(str =>
-      Address.fromBase58(str, NetworkType.Devnet).get
+    config.minerAddresses is Some(
+      minerAddresses.map(str => Address.fromBase58(str, NetworkType.Devnet).get)
     )
   }
 
@@ -90,33 +90,5 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))
-  }
-
-  it should "fail to load if `mainnet` is set but no miner's addresses" in new AlephiumConfigFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.network-type", "mainnet")
-    )
-
-    assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))
-  }
-
-  it should "generate miner's addresses if not set and network is `testnet`" in new AlephiumConfigFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.network-type", "testnet")
-    )
-
-    config.network.networkType is NetworkType.Testnet
-    config.minerAddresses.length is config.broker.groups
-    config.minerAddresses.foreachWithIndex { (miner, i) => miner.groupIndex.value is i }
-  }
-
-  it should "generate miner's addresses if not set and network is `devnet`" in new AlephiumConfigFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.network-type", "devnet")
-    )
-
-    config.network.networkType is NetworkType.Devnet
-    config.minerAddresses.length is config.broker.groups
-    config.minerAddresses.foreachWithIndex { (miner, i) => miner.groupIndex.value is i }
   }
 }

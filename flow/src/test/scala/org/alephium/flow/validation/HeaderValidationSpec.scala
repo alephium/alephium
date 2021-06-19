@@ -118,7 +118,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "allow arbitrary genesis PoW work" in new GenesisFixture {
-    forAll(posLongGen) { nonce =>
+    forAll(nonceGen) { nonce =>
       val modified = genesis.copy(nonce = nonce)
       passCheck(headerValidator.checkGenesisWorkAmount(modified))
     }
@@ -154,7 +154,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     headerValidator.getParentHeader(blockFlow, header) isE header0
 
     def updateNonce(modified: BlockHeader): BlockHeader = {
-      posLongGen
+      nonceGen
         .map(nonce => modified.copy(nonce = nonce))
         .retryUntil { newHeader =>
           (newHeader.chainIndex equals chainIndex) &&
@@ -165,7 +165,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     }
 
     def updateNonceForIndex(modified: BlockHeader): BlockHeader = {
-      posLongGen
+      nonceGen
         .map(nonce => modified.copy(nonce = nonce))
         .retryUntil { newHeader => (newHeader.chainIndex equals chainIndex) }
         .sample
@@ -237,7 +237,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check PoW work amount" in new HeaderFixture {
-    val modified = posLongGen
+    val modified = nonceGen
       .map(nonce => header.copy(nonce = nonce))
       .retryUntil { modified =>
         val work = new BigInteger(1, modified.hash.bytes.toArray)

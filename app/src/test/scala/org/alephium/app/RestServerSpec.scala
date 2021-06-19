@@ -31,15 +31,15 @@ import org.alephium.api.{ApiError, ApiModel}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.flow.client.Miner
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.handler.{TestUtils, ViewHandler}
+import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType, Target}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
@@ -249,14 +249,13 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       val address      = Address.fromBase58(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
 
-      minerProbe.setAutoPilot(new TestActor.AutoPilot {
-        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
-          msg match {
-            case Miner.GetAddresses =>
-              sender ! AVector(lockupScript)
-              TestActor.NoAutoPilot
-          }
-      })
+      allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case ViewHandler.GetMinerAddresses =>
+            sender ! AVector(lockupScript)
+            TestActor.NoAutoPilot
+        }
+      )
 
       Get(s"/miners/addresses") check { response =>
         response.code is StatusCode.Ok
@@ -274,7 +273,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
       Put(s"/miners/addresses", body) check { response =>
         val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
-        minerProbe.expectMsg(Miner.UpdateAddresses(addresses))
+        allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateMinerAddresses(addresses))
         response.code is StatusCode.Ok
       }
 
@@ -292,77 +291,6 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
           s"Address ${dummyKeyAddress} doesn't belong to group 1"
-        )
-      }
-    }
-  }
-
-  it should "call GET /miners/block-candidate" in new RestServerFixture {
-    withServer {
-      var block: Option[BlockTemplate] = Some(dummyBlockTemplate)
-      val blockEntryTemplate           = RestServer.blockTempateToCandidate(dummyBlockTemplate)
-
-      minerProbe.setAutoPilot(new TestActor.AutoPilot {
-        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot = {
-          msg match {
-            case Miner.GetBlockCandidate(_) =>
-              sender ! Miner.BlockCandidate(block)
-              block match {
-                case Some(_) =>
-                  block = None
-                  TestActor.KeepRunning
-                case None =>
-                  TestActor.NoAutoPilot
-              }
-          }
-        }
-      })
-
-      Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") check { response =>
-        response.code is StatusCode.Ok
-        response.as[BlockCandidate] is blockEntryTemplate
-      }
-
-      //Miner return BlockCandidate(None)
-      Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") check { response =>
-        response.code is StatusCode.InternalServerError
-        response.as[ApiError.InternalServerError] is ApiError.InternalServerError(
-          "Cannot compute block candidate for given chain index"
-        )
-      }
-
-      interCliqueSynced = false
-
-      Get(s"/miners/block-candidate?fromGroup=1&toGroup=1") check { response =>
-        response.code is StatusCode.ServiceUnavailable
-        response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
-          "The clique is not synced"
-        )
-      }
-    }
-  }
-
-  it should "call POST /miners/new-block" in new RestServerFixture {
-    withServer {
-
-      val blockHash    = BlockHash.generate
-      val depStateHash = Hash.generate
-      val target       = Target.onePhPerBlock
-      val ts           = TimeStamp.unsafe(1L)
-      val txsHash      = Hash.generate
-
-      val body =
-        s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
-          .toHexString(
-            target.bits
-          )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""
-
-      interCliqueSynced = false
-
-      Post(s"/miners/new-block", body) check { response =>
-        response.code is StatusCode.ServiceUnavailable
-        response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
-          "The clique is not synced"
         )
       }
     }
@@ -473,8 +401,9 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   trait RestServerFixture extends ServerFixture with HttpRouteFixture {
-    lazy val minerProbe = TestProbe()
-    lazy val miner      = ActorRefT[Miner.Command](minerProbe.ref)
+    lazy val minerProbe                      = TestProbe()
+    lazy val miner                           = ActorRefT[Miner.Command](minerProbe.ref)
+    lazy val (allHandlers, allHandlersProbe) = TestUtils.createAllHandlersProbe
 
     var selfCliqueSynced  = true
     var interCliqueSynced = true
@@ -502,6 +431,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       dummyNeighborPeers,
       dummyBlock,
       blockFlowProbe.ref,
+      allHandlers,
       dummyTx,
       storages,
       cliqueManagerOpt = Some(cliqueManager),

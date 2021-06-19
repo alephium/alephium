@@ -100,7 +100,8 @@ object Node {
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
 
-    val allHandlers: AllHandlers = AllHandlers.build(system, blockFlow, eventBus)
+    val allHandlers: AllHandlers =
+      AllHandlers.build(system, blockFlow, eventBus, config.minerAddresses)
 
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
       ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))

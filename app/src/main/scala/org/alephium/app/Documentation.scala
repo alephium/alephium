@@ -49,12 +49,9 @@ trait Documentation extends Endpoints {
     buildContract,
     minerAction,
     minerListAddresses,
-    minerGetBlockCandidate,
-    minerNewBlock,
     minerUpdateAddresses
   )
 
-  // TODO: make https default when CORS is done properly
   private lazy val servers = List(
     Server("{protocol}://{host}:{port}")
       .variables(

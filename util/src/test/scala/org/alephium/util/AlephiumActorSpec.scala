@@ -59,7 +59,7 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
 
   trait ActorCreation {
     implicit val system: ActorSystem =
-      ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
+      ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
     Option(_system) is None
     _system = system
   }
@@ -69,6 +69,7 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
 
 object AlephiumActorSpec {
   lazy val warningConfig = config("WARNING")
+  lazy val infoConfig    = config("INFO")
   lazy val debugConfig   = config("DEBUG")
 
   def config(logLevel: String): String =

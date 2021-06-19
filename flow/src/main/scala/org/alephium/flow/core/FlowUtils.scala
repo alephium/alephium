@@ -22,9 +22,9 @@ import scala.reflect.ClassTag
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.Utils
-import org.alephium.flow.handler.FlowHandler.BlockFlowTemplate
 import org.alephium.flow.mempool._
-import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model._
@@ -40,6 +40,7 @@ trait FlowUtils
     with ConflictedBlocks
     with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
+  implicit def consensusConfig: ConsensusSetting
 
   val grandPool = GrandPool.empty
 
@@ -176,7 +177,7 @@ trait FlowUtils
     }
   }
 
-  def prepareBlockFlow(chainIndex: ChainIndex): IOResult[BlockFlowTemplate] = {
+  def prepareBlockFlow(chainIndex: ChainIndex, miner: LockupScript): IOResult[BlockFlowTemplate] = {
     assume(brokerConfig.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
@@ -186,7 +187,14 @@ trait FlowUtils
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       loosenDeps <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
       candidates <- collectTransactions(chainIndex, loosenDeps, bestDeps)
-      template   <- prepareBlockFlowUnsafe(chainIndex, loosenDeps, candidates, target, templateTs)
+      template <- prepareBlockFlowUnsafe(
+        chainIndex,
+        loosenDeps,
+        candidates,
+        target,
+        templateTs,
+        miner
+      )
     } yield template
   }
 
@@ -195,19 +203,22 @@ trait FlowUtils
       loosenDeps: BlockDeps,
       candidates: AVector[TransactionTemplate],
       target: Target,
-      templateTs: TimeStamp
+      templateTs: TimeStamp,
+      miner: LockupScript
   ): IOResult[BlockFlowTemplate] = {
     for {
       fullTxs      <- executeTxTemplates(chainIndex, loosenDeps, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
+      val coinbaseTx =
+        Transaction.coinbase(chainIndex, fullTxs, miner, target, templateTs)
       BlockFlowTemplate(
         chainIndex,
         loosenDeps.deps,
         depStateHash,
         target,
         templateTs,
-        fullTxs
+        fullTxs :+ coinbaseTx
       )
     }
   }
@@ -243,8 +254,8 @@ trait FlowUtils
     }
   }
 
-  def prepareBlockFlowUnsafe(chainIndex: ChainIndex): BlockFlowTemplate = {
-    Utils.unsafe(prepareBlockFlow(chainIndex))
+  def prepareBlockFlowUnsafe(chainIndex: ChainIndex, miner: LockupScript): BlockFlowTemplate = {
+    Utils.unsafe(prepareBlockFlow(chainIndex, miner))
   }
 }
 

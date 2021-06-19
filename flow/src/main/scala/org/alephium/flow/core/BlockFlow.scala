@@ -252,7 +252,7 @@ object BlockFlow extends StrictLogging {
         .filter(isExtendingUnsafe(_, groupTip))
         .sorted(blockHashOrdering.reverse) // useful for draw situation
         .fold[(FlowTips, Weight)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
-          tryMergeUnsafe(tipsCur, tip, group, checkTxConflicts = true) match {
+          tryMergeUnsafe(tipsCur, tip, group) match {
             case Some(merged) =>
               val weight = calWeightUnsafe(merged, group)
               if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
@@ -292,7 +292,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def updateBestDepsUnsafe(): AVector[TransactionTemplate] =
-      (brokerConfig.groupFrom until brokerConfig.groupUntil).foldLeft(
+      brokerConfig.groupRange.foldLeft(
         AVector.empty[TransactionTemplate]
       ) { case (acc, mainGroup) =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
@@ -304,7 +304,7 @@ object BlockFlow extends StrictLogging {
       }
 
     def updateBestDepsAfterLoadingUnsafe(): Unit =
-      brokerConfig.groupFrom until brokerConfig.groupUntil foreach { mainGroup =>
+      brokerConfig.groupRange.foreach { mainGroup =>
         val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
         updateBestDeps(mainGroup, deps)
       }

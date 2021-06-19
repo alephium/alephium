@@ -18,14 +18,7 @@ package org.alephium.protocol.config
 
 import org.alephium.util.Duration
 
-// TODO: refactor this as two configs
 trait DiscoveryConfig {
-  /* Maximum number of peers to track. */
-  def peersPerGroup: Int
-
-  /* Maximum number of peers used for probing during a scan. */
-  def scanMaxPerGroup: Int
-
   /* Wait time between two scan. */
   def scanFrequency: Duration
 
@@ -35,7 +28,7 @@ trait DiscoveryConfig {
   def neighborsPerGroup: Int
 
   /** Duration we wait before considering a peer dead. * */
-  lazy val peersTimeout: Duration = scanFrequency.timesUnsafe(5)
+  lazy val peersTimeout: Duration = scanFrequency
 
-  val expireDuration: Duration = Duration.ofHoursUnsafe(1)
+  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(5)
 }

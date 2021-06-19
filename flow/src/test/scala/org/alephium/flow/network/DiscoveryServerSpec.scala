@@ -26,7 +26,7 @@ import akka.util.Timeout
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
-import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.flow.network.broker.{MisbehaviorManager, OutboundBrokerHandler}
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol._
 import org.alephium.protocol.config._
@@ -81,8 +81,6 @@ class DiscoveryServerSpec
           val brokerNum: Int = clique.brokerNum
           val groups: Int    = fixture.groups
 
-          val peersPerGroup: Int          = 3
-          val scanMaxPerGroup: Int        = 3
           val scanFrequency: Duration     = Duration.ofMillisUnsafe(2000)
           val scanFastFrequency: Duration = Duration.ofMillisUnsafe(2000)
           val neighborsPerGroup: Int      = 3
@@ -132,7 +130,7 @@ class DiscoveryServerSpec
     eventually {
       servers.foreach { server =>
         val probe = TestProbe()
-        server.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
+        server.tell(DiscoveryServer.GetNeighborPeers(None), probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
           (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
@@ -166,9 +164,9 @@ class DiscoveryServerSpec
 
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
       val probe1 = TestProbe()
-      server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
+      server1.tell(DiscoveryServer.GetNeighborPeers(None), probe1.ref)
 
       probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
         peers.length is groups + 1 // self clique peers + server1
@@ -196,9 +194,9 @@ class DiscoveryServerSpec
 
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
       val probe1 = TestProbe()
-      server1.tell(DiscoveryServer.GetNeighborPeers, probe1.ref)
+      server1.tell(DiscoveryServer.GetNeighborPeers(None), probe1.ref)
 
       probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
         peers.length is groups // self clique peers
@@ -223,16 +221,13 @@ class DiscoveryServerSpec
       .mapTo[MisbehaviorManager.Peers]
       .futureValue is MisbehaviorManager.Peers(AVector.empty)
 
+    val randomAddress = Generators.socketAddressGen.retryUntil(_ != address1).sample.get
     val message = DiscoveryMessage.from(
       cliqueInfo1.id,
-      DiscoveryMessage.Ping(
-        Some(
-          BrokerInfo.from(Generators.socketAddressGen.sample.get, cliqueInfo1.selfInterBrokerInfo)
-        )
-      )
+      DiscoveryMessage.Ping(Some(BrokerInfo.from(randomAddress, cliqueInfo1.selfInterBrokerInfo)))
     )
     server0 ! UdpServer.Received(
-      DiscoveryMessage.serialize(message, networkConfig.networkType, discoveryPrivateKey),
+      DiscoveryMessage.serialize(message, networkConfig.networkType, cliqueInfo1.priKey),
       address1
     )
 
@@ -247,11 +242,34 @@ class DiscoveryServerSpec
     }
   }
 
-  trait Fixture extends BrokerConfigFixture.Default with ActorFixture {
+  trait UnreachableFixture extends Fixture {
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+  }
+
+  it should "mark address as unreachable" in new UnreachableFixture {
+    val remote = Generators.socketAddressGen.sample.get
+    server0 ! OutboundBrokerHandler.Unreachable(remote)
+    eventually {
+      server0.underlyingActor.mightReachable(remote) is false
+    }
+  }
+
+  it should "not accept unreachable peer" in new UnreachableFixture {
+    val peerInfo0 = Generators.peerInfoGen.sample.get
+    val peerInfo1 = Generators.peerInfoGen.sample.get
+    server0 ! OutboundBrokerHandler.Unreachable(peerInfo0.address)
+    eventually {
+      var validated = false
+      server0.underlyingActor.validatePeerInfo(peerInfo0.address, peerInfo0)(_ => validated = true)
+      validated is false
+      server0.underlyingActor.validatePeerInfo(peerInfo1.address, peerInfo1)(_ => validated = true)
+      validated is true
+    }
+  }
+
+  trait Fixture extends ActorFixture with BrokerConfigFixture.Default {
 
     override val groups = Gen.choose(2, 10).sample.get
-
-    val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.generatePriPub()
 
     val probeTimeout = Duration.ofSecondsUnsafe(5).asScala
 
@@ -266,11 +284,11 @@ class DiscoveryServerSpec
     val misbehaviorManager1 = buildMisbehaviorManager(system)
 
     val server0 =
-      system.actorOf(
+      TestActorRef[DiscoveryServer](
         DiscoveryServer.props(address0, misbehaviorManager0)(brokerConfig, config0, networkConfig)
       )
     val server1 =
-      system.actorOf(
+      TestActorRef[DiscoveryServer](
         DiscoveryServer
           .props(address1, misbehaviorManager1, address0)(brokerConfig, config1, networkConfig)
       )
@@ -298,7 +316,7 @@ object DiscoveryServerSpec {
       val scanFastFrequency: Duration = _scanFrequency
       val neighborsPerGroup: Int      = _peersPerGroup
 
-      override val expireDuration: Duration = _expireDuration
+      override lazy val expireDuration: Duration = _expireDuration
 
       val groups: Int    = groupSize
       val brokerNum: Int = groupSize

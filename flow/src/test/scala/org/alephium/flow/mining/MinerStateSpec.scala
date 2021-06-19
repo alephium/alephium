@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.client
+package org.alephium.flow.mining
 
 import scala.util.Random
 
@@ -22,38 +22,41 @@ import akka.testkit.TestProbe
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, TestUtils}
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.handler.{AllHandlers, TestUtils, ViewHandler}
+import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{ActorRefT, AVector, TimeStamp}
+import org.alephium.util.AVector
 
 class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
+
+  val minerAddresses =
+    AVector.tabulate(groups0)(g => getGenesisLockupScript(ChainIndex.unsafe(g, 0)))
+
   trait Fixture extends MinerState {
     implicit override def brokerConfig: BrokerConfig  = config.broker
     implicit override def miningConfig: MiningSetting = config.mining
 
-    val handlers: AllHandlers = TestUtils.createAllHandlersProbe._1
-    val probes                = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
+    val allHandlers: AllHandlers = TestUtils.createAllHandlersProbe._1
+    val probes                   = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
 
-    override def prepareTemplate(fromShift: Int, to: Int): BlockTemplate = {
-      val index        = ChainIndex.unsafe(brokerConfig.groupFrom + fromShift, to)
-      val flowTemplate = blockFlow.prepareBlockFlowUnsafe(index)
-      BlockTemplate(
-        flowTemplate.deps,
-        flowTemplate.depStateHash,
-        flowTemplate.target,
-        TimeStamp.now(),
-        AVector.empty
-      )
+    def updateAndStartTasks(): Unit = {
+      val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
+      for {
+        fromShift <- 0 until brokerConfig.groupNumPerBroker
+        to        <- 0 until brokerConfig.groups
+      } {
+        val miningBlob = MiningBlob.from(templates(fromShift)(to))
+        pendingTasks(fromShift)(to) = miningBlob
+      }
+      startNewTasks()
     }
 
     override def startTask(
         fromShift: Int,
         to: Int,
-        template: BlockTemplate,
-        blockHandler: ActorRefT[BlockChainHandler.Command]
+        template: MiningBlob
     ): Unit = {
       probes(fromShift)(to).ref ! template
     }
@@ -69,8 +72,9 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
   }
 
   it should "start new tasks correctly" in new Fixture {
+    updateAndStartTasks()
     startNewTasks()
-    probes.foreach(_.foreach(_.expectMsgType[BlockTemplate]))
+    probes.foreach(_.foreach(_.expectMsgType[MiningBlob]))
     running.foreach(_.foreach(_ is true))
   }
 
@@ -98,12 +102,12 @@ class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
     (0 until brokerConfig.groups).foreach { i =>
       if (i != to) increaseCounts(fromShift, i, miningConfig.nonceStep + 1)
     }
-    startNewTasks()
+    updateAndStartTasks()
     (0 until brokerConfig.groups).foreach { i =>
       if (i != to) {
         probes(fromShift)(i).expectNoMessage()
       } else {
-        probes(fromShift)(i).expectMsgType[BlockTemplate]
+        probes(fromShift)(i).expectMsgType[MiningBlob]
       }
     }
   }

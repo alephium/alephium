@@ -267,7 +267,7 @@ object WalletAppSpec extends {
       with ScalaFutures {
 
     private val cliqueId = CliqueId.generate
-    private val peer     = PeerAddress(address, port, port)
+    private val peer     = PeerAddress(address, port, port, port)
 
     val blockflowFetchMaxAge = Duration.unsafe(1000)
 

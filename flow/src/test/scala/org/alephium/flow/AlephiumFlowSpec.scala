@@ -84,11 +84,6 @@ trait FlowFixture
     }
   }
 
-  def minePooledTxs(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex)
-    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions)
-  }
-
   def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     mine(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
@@ -127,6 +122,16 @@ trait FlowFixture
     mine(blockFlow, chainIndex)(
       transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount, lockTimeOpt)
     )
+  }
+
+  def transfer(blockFlow: BlockFlow, from: PrivateKey, to: PublicKey, amount: U256): Block = {
+    val unsigned = blockFlow
+      .transfer(from.publicKey, LockupScript.p2pkh(to), None, amount, None, defaultGasPrice)
+      .rightValue
+      .rightValue
+    val tx         = Transaction.from(unsigned, from)
+    val chainIndex = tx.chainIndex
+    mine(blockFlow, chainIndex)((_, _) => AVector(tx))
   }
 
   def transferTxs(
@@ -244,14 +249,15 @@ trait FlowFixture
   }
 
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex)
-    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions)
+    val miner         = getGenesisLockupScript(chainIndex)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
   }
 
   def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     @tailrec
     def iter(current: Block): Block = {
-      val tmp = Block(current.header.copy(nonce = UnsecureRandom.nextU256()), current.transactions)
+      val tmp = Block(current.header.copy(nonce = Nonce.unsecureRandom()), current.transactions)
       if (!PoW.checkWork(tmp) && (tmp.chainIndex equals chainIndex)) tmp else iter(tmp)
     }
     iter(mineFromMemPool(blockFlow, chainIndex))
@@ -324,7 +330,14 @@ trait FlowFixture
 
     @tailrec
     def iter(nonce: U256): BlockHeader = {
-      val header = BlockHeader.unsafe(blockDeps, depStateHash, txsHash, blockTs, target, nonce)
+      val header = BlockHeader.unsafe(
+        blockDeps,
+        depStateHash,
+        txsHash,
+        blockTs,
+        target,
+        Nonce.unsecureRandom()
+      )
       if (PoW.checkMined(header, chainIndex)) header else iter(nonce.addOneUnsafe())
     }
 
