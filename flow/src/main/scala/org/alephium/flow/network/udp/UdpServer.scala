@@ -90,7 +90,7 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
           context.stop(self)
       }
     case Read =>
-      read(3)
+      read(16)
       sharedSelectionHandler.execute {
         selectionKey.interestOps(SelectionKey.OP_READ)
         ()
