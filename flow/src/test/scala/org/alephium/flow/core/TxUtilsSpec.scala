@@ -39,6 +39,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         defaultGasPrice
       )
-      .rightValue is Left(s"Not enough balance for gas fee")
+      .rightValue
+      .isRight is true
   }
 }

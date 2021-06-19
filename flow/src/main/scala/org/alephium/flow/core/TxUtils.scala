@@ -163,6 +163,11 @@ trait TxUtils { Self: FlowUtils =>
         totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
           acc.add(amount).toRight(s"Amount overflow")
         }
+        _ <- gasOpt match {
+          case None => Right(())
+          case Some(gas) =>
+            if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
+        }
         selected <- UtxoUtils.select(
           utxos,
           totalAmount,
@@ -171,7 +176,8 @@ trait TxUtils { Self: FlowUtils =>
           defaultGasPerInput,
           defaultGasPerOutput,
           dustUtxoAmount,
-          outputInfos.length + 1
+          outputInfos.length + 1,
+          minimalGas
         )
         _ <-
           if (selected.assets.length > ALF.MaxTxInputNum) {
