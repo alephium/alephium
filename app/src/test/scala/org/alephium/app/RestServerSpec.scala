@@ -160,14 +160,29 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
   it should "call GET /transactions/build" in new RestServerFixture {
     withServer {
-      Get(
-        s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddress&value=1"
+      Post(
+        s"/transactions/build",
+        body = s"""
+        |{
+        |  "fromKey": "$dummyKey",
+        |  "toAddress": "$dummyToAddress",
+        |  "value": "1"
+        |}
+        """.stripMargin
       ) check { response =>
         response.code is StatusCode.Ok
         response.as[BuildTransactionResult] is dummyBuildTransactionResult
       }
-      Get(
-        s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddress&lockTime=1234&value=1"
+      Post(
+        s"/transactions/build",
+        body = s"""
+        |{
+        |  "fromKey": "$dummyKey",
+        |  "toAddress": "$dummyToAddress",
+        |  "value": "1",
+        |  "lockTime": "1234"
+        |}
+        """.stripMargin
       ) check { response =>
         response.code is StatusCode.Ok
         response.as[BuildTransactionResult] isnot dummyBuildTransactionResult
@@ -175,8 +190,15 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
       interCliqueSynced = false
 
-      Get(
-        s"/transactions/build?fromKey=$dummyKey&toAddress=$dummyToAddress&value=1"
+      Post(
+        s"/transactions/build",
+        body = s"""
+        |{
+        |  "fromKey": "$dummyKey",
+        |  "toAddress": "$dummyToAddress",
+        |  "value": "1"
+        |}
+        """.stripMargin
       ) check { response =>
         response.code is StatusCode.ServiceUnavailable
         response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(

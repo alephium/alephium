@@ -136,4 +136,8 @@ trait HttpRouteFixture extends HttpFixture {
   def Get(endpoint: String): Response[Either[String, String]] = {
     httpGet(endpoint)(port).send(backend)
   }
+
+  def Get(endpoint: String, body: String): Response[Either[String, String]] = {
+    httpGet(endpoint, Some(body))(port).send(backend)
+  }
 }

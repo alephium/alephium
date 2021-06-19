@@ -284,11 +284,10 @@ object WalletAppSpec extends {
       )
     }
 
-    router.route().path("/transactions/build").handler { ctx =>
-      val _          = ctx.request.getParam("fromKey")
-      val _          = ctx.request.getParam("toAddress")
-      val amount     = read[Int](ctx.request.getParam("value"))
-      val unsignedTx = transactionGen().sample.get.unsigned
+    router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
+      val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
+      val amount           = buildTransaction.value
+      val unsignedTx       = transactionGen().sample.get.unsigned
 
       if (amount > 100) {
         complete(

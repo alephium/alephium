@@ -16,19 +16,27 @@
 
 package org.alephium.wallet.web
 
+import org.scalatest.Inside
 import sttp.client3._
 import sttp.tapir.client.sttp._
 
 import org.alephium.api.Endpoints
+import org.alephium.api.model.BuildTransaction
+import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, Duration, U256}
 
-class BlockFlowClientSpec() extends AlephiumSpec {
+class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
+    val buildTransactionIn = BuildTransaction(publicKey, toAddress, value, None, None, None)
     val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://127.0.0.1:1234"))
-      .apply((publicKey, toAddress, value, None, None, None))
-    request.uri is uri"http://127.0.0.1:1234/transactions/build?fromKey=${publicKey.toHexString}&toAddress=${toAddress.toBase58}&value=${value.v}"
+      .apply(buildTransactionIn)
+    request.uri is uri"http://127.0.0.1:1234/transactions/build"
+
+    inside(request.body) { case body: StringBody =>
+      read[BuildTransaction](body.s) is buildTransactionIn
+    }
   }
 
   trait Fixture extends Endpoints with LockupScriptGenerators with SttpClientInterpreter {

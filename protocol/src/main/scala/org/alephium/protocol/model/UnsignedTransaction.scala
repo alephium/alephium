@@ -118,7 +118,7 @@ object UnsignedTransaction {
         outputs = outputs :+ TxOutput.asset(remainder, fromLockupScript)
       }
       UnsignedTransaction(
-        None,
+        scriptOpt = None,
         gas,
         gasPrice,
         inputs.map { case (ref, _) =>

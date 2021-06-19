@@ -112,7 +112,7 @@ object BlockFlowClient {
           requestFromGroup(
             lockupScript.groupIndex,
             buildTransaction,
-            (publicKey, toAddress, value, lockTime, gas, gasPrice)
+            BuildTransaction(publicKey, toAddress, value, lockTime, gas, gasPrice)
           )
       }
     }

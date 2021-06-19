@@ -384,8 +384,15 @@ trait TestFixtureLike
     httpGet(s"/blockflow/chains?fromGroup=$fromGroup&toGroup=$toGroup")
 
   def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
-    httpGet(
-      s"/transactions/build?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
+    httpPost(
+      "/transactions/build",
+      Some(s"""
+        |{
+        |  "fromKey": "$fromPubKey",
+        |  "toAddress": "$toAddress",
+        |  "value": "$amount"
+        |}
+        """.stripMargin)
     )
 
   def restoreWallet(password: String, mnemonic: String) =

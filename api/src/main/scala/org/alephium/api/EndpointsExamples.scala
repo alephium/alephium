@@ -25,7 +25,7 @@ import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -179,6 +179,18 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
+
+  implicit val buildTransactionExamples: List[Example[BuildTransaction]] =
+    simpleExample(
+      BuildTransaction(
+        publicKey,
+        address,
+        U256.Two,
+        Some(ts),
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(U256.One))
+      )
+    )
 
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
     simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))

@@ -2906,64 +2906,30 @@
       }
     },
     "/transactions/build": {
-      "get": {
+      "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Build an unsigned transaction",
-        "operationId": "getTransactionsBuild",
-        "parameters": [
-          {
-            "name": "fromKey",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
+        "summary": "Build an unsigned transaction to a number of recipients",
+        "operationId": "postTransactionsBuild",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildTransaction"
+              },
+              "example": {
+                "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                "value": "2",
+                "lockTime": 1611041396892,
+                "gas": 1,
+                "gasPrice": "1"
+              }
             }
           },
-          {
-            "name": "toAddress",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lockTime",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": "0"
-            }
-          },
-          {
-            "name": "gas",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "gasPrice",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "",
@@ -4612,6 +4578,35 @@
         "properties": {
           "currentHeight": {
             "type": "integer"
+          }
+        }
+      },
+      "BuildTransaction": {
+        "required": [
+          "fromKey",
+          "toAddress",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "fromKey": {
+            "type": "string"
+          },
+          "toAddress": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "lockTime": {
+            "type": "integer"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },
