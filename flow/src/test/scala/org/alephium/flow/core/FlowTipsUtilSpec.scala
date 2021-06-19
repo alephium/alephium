@@ -17,6 +17,8 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.validation.{BlockValidation, InvalidFlowTxs}
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
@@ -177,6 +179,27 @@ class FlowTipsUtilSpec extends AlephiumSpec {
         flowTips.outTips is outTipsExpected
       }
     }
+  }
+
+  it should "detect tx conflicts" in new FlowFixture {
+    val (genesisPriKey, _, _) = genesisKeys(0)
+    val block                 = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALF.alf(10))
+    val blockFlow1            = isolatedBlockFlow()
+    addAndCheck(blockFlow, block)
+    addAndCheck(blockFlow1, block)
+
+    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow, block0)
+
+    val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block1)
+    addAndCheck(blockFlow, block2)
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    val blockValidation =
+      BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+    blockValidation.validate(block3, blockFlow).leftValue isE InvalidFlowTxs
   }
 
   it should "use proper timestamp" in {
