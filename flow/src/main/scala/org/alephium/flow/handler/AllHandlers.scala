@@ -21,8 +21,8 @@ import akka.actor.ActorSystem
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{ActorRefT, EventBus}
+import org.alephium.protocol.model.{Address, ChainIndex}
+import org.alephium.util.{ActorRefT, AVector, EventBus}
 
 final case class AllHandlers(
     flowHandler: ActorRefT[FlowHandler.Command],
@@ -36,31 +36,44 @@ final case class AllHandlers(
     (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
   }
 
-  def getBlockHandler(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
+  def getBlockHandler(chainIndex: ChainIndex): Option[ActorRefT[BlockChainHandler.Command]] = {
+    blockHandlers.get(chainIndex)
+  }
+
+  def getBlockHandlerUnsafe(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
     assume(chainIndex.relateTo(brokerConfig))
     blockHandlers(chainIndex)
   }
 
-  def getHeaderHandler(chainIndex: ChainIndex): ActorRefT[HeaderChainHandler.Command] = {
+  def getHeaderHandler(chainIndex: ChainIndex): Option[ActorRefT[HeaderChainHandler.Command]] = {
+    headerHandlers.get(chainIndex)
+  }
+
+  def getHeaderHandlerUnsafe(chainIndex: ChainIndex): ActorRefT[HeaderChainHandler.Command] = {
     assume(!chainIndex.relateTo(brokerConfig))
     headerHandlers(chainIndex)
   }
 }
 
 object AllHandlers {
-  def build(system: ActorSystem, blockFlow: BlockFlow, eventBus: ActorRefT[EventBus.Message])(
-      implicit
+  def build(
+      system: ActorSystem,
+      blockFlow: BlockFlow,
+      eventBus: ActorRefT[EventBus.Message],
+      addressesOpt: Option[AVector[Address]]
+  )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting
   ): AllHandlers = {
-    build(system, blockFlow, eventBus, "")
+    build(system, blockFlow, eventBus, addressesOpt, "")
   }
 
   def build(
       system: ActorSystem,
       blockFlow: BlockFlow,
       eventBus: ActorRefT[EventBus.Message],
+      addressesOpt: Option[AVector[Address]],
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
@@ -70,14 +83,16 @@ object AllHandlers {
     val flowProps = FlowHandler.props(blockFlow)
     val flowHandler =
       ActorRefT.build[FlowHandler.Command](system, flowProps, s"FlowHandler$namePostfix")
-    buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, namePostfix)
+    buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, addressesOpt, namePostfix)
   }
 
+  // scalastyle:off parameter.number
   def buildWithFlowHandler(
       system: ActorSystem,
       blockFlow: BlockFlow,
       flowHandler: ActorRefT[FlowHandler.Command],
       eventBus: ActorRefT[EventBus.Message],
+      addressesOpt: Option[AVector[Address]],
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
@@ -97,7 +112,7 @@ object AllHandlers {
         s"DependencyHandler$namePostfix"
       )
 
-    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler)
+    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler, addressesOpt)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
     AllHandlers(
@@ -109,6 +124,7 @@ object AllHandlers {
       headerHandlers
     )
   }
+  // scalastyle:on parameter.number
 
   private def buildBlockHandlers(
       system: ActorSystem,

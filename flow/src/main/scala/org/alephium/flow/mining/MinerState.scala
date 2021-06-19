@@ -14,26 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.client
+package org.alephium.flow.mining
 
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler}
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{ActorRefT, U256}
+import org.alephium.util.U256
 
 trait MinerState {
   implicit def brokerConfig: BrokerConfig
   implicit def miningConfig: MiningSetting
 
-  def handlers: AllHandlers
-
   protected val miningCounts =
     Array.fill[U256](brokerConfig.groupNumPerBroker, brokerConfig.groups)(U256.Zero)
   protected val running = Array.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(false)
-  protected lazy val pendingTasks =
-    Array.tabulate(brokerConfig.groupNumPerBroker, brokerConfig.groups)(prepareTemplate)
+  protected val pendingTasks =
+    Array.fill(brokerConfig.groupNumPerBroker)(Array.ofDim[MiningBlob](brokerConfig.groups))
 
   def getMiningCount(fromShift: Int, to: Int): U256 = miningCounts(fromShift)(to)
 
@@ -57,18 +54,8 @@ trait MinerState {
     miningCounts(fromShift)(to) = miningCounts(fromShift)(to).addUnsafe(count)
   }
 
-  def updateTasks(): Unit = {
-    for {
-      fromShift <- 0 until brokerConfig.groupNumPerBroker
-      to        <- 0 until brokerConfig.groups
-    } {
-      val blockTemplate = prepareTemplate(fromShift, to)
-      pendingTasks(fromShift)(to) = blockTemplate
-    }
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  protected def pickTasks(): IndexedSeq[(Int, Int, BlockTemplate)] = {
+  protected def pickTasks(): IndexedSeq[(Int, Int, MiningBlob)] = {
     val minCount   = miningCounts.map(_.min).min
     val countBound = minCount.addUnsafe(miningConfig.nonceStep)
     for {
@@ -80,22 +67,9 @@ trait MinerState {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  protected def pickChainTasks(chainIndex: ChainIndex): Option[BlockTemplate] = {
-    val minCount   = miningCounts.map(_.min).min
-    val countBound = minCount.addUnsafe(miningConfig.nonceStep)
-    val fromShift  = chainIndex.from.value - brokerConfig.groupFrom
-    val to         = chainIndex.to.value
-    Option.when(miningCounts(fromShift)(to) <= countBound && !isRunning(fromShift, to)) {
-      pendingTasks(fromShift)(to)
-    }
-  }
-
   protected def startNewTasks(): Unit = {
     pickTasks().foreach { case (fromShift, to, template) =>
-      val index        = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
-      val blockHandler = handlers.getBlockHandler(index)
-      startTask(fromShift, to, template, blockHandler)
+      startTask(fromShift, to, template)
       setRunning(fromShift, to)
     }
   }
@@ -107,12 +81,9 @@ trait MinerState {
     } setIdle(fromShift, to)
   }
 
-  def prepareTemplate(fromShift: Int, to: Int): BlockTemplate
-
   def startTask(
       fromShift: Int,
       to: Int,
-      template: BlockTemplate,
-      blockHandler: ActorRefT[BlockChainHandler.Command]
+      template: MiningBlob
   ): Unit
 }

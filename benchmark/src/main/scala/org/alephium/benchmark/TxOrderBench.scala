@@ -23,9 +23,9 @@ import org.openjdk.jmh.infra.Blackhole
 
 import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockHeader, Target, Transaction, UnsignedTransaction}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp}
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -42,7 +42,7 @@ class TxOrderBench {
       Hash.zero,
       TimeStamp.zero,
       Target.Max,
-      U256.Zero
+      Nonce.zero
     )
   val txs: AVector[Transaction] =
     AVector.fill(txNum)(

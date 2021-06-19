@@ -52,6 +52,6 @@ object GroupIndex {
   }
 
   @inline
-  private def validate(group: Int)(implicit config: GroupConfig): Boolean =
+  def validate(group: Int)(implicit config: GroupConfig): Boolean =
     0 <= group && group < config.groups
 }

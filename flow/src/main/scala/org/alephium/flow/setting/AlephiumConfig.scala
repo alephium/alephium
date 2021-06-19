@@ -17,7 +17,7 @@
 package org.alephium.flow.setting
 
 import java.math.BigInteger
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.Path
 
 import scala.collection.immutable.ArraySeq
@@ -74,7 +74,11 @@ final case class ConsensusSetting(
 }
 //scalastyle:on
 
-final case class MiningSetting(nonceStep: U256, batchDelay: Duration)
+final case class MiningSetting(
+    nonceStep: U256,
+    batchDelay: Duration,
+    apiInterface: InetAddress
+)
 
 final case class NetworkSetting(
     networkType: NetworkType,
@@ -93,6 +97,7 @@ final case class NetworkSetting(
     externalAddress: Option[InetSocketAddress],
     restPort: Int,
     wsPort: Int,
+    minerApiPort: Int,
     connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
   val isCoordinator: Boolean = internalAddress == coordinatorAddress
@@ -142,7 +147,7 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     genesisBalances: AVector[(LockupScript, U256)],
-    minerAddresses: AVector[Address]
+    minerAddresses: Option[AVector[Address]]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
@@ -186,7 +191,8 @@ object AlephiumConfig {
       coordinatorAddress: InetSocketAddress,
       externalAddress: Option[InetSocketAddress],
       restPort: Int,
-      wsPort: Int
+      wsPort: Int,
+      minerApiPort: Int
   ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
@@ -206,6 +212,7 @@ object AlephiumConfig {
         externalAddress,
         restPort,
         wsPort,
+        minerApiPort,
         connectionBuild
       )
     }
@@ -222,7 +229,7 @@ object AlephiumConfig {
       minerAddresses: Option[Seq[String]]
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
-      parseMiners(minerAddresses, network.networkType, broker).map { minerAddresses =>
+      parseMiners(minerAddresses, network.networkType).map { minerAddresses =>
         val consensusExtracted = consensus.toConsensusSetting(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         AlephiumConfig(

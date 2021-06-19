@@ -16,32 +16,56 @@
 
 package org.alephium.flow.model
 
+import java.math.BigInteger
+
+import akka.util.ByteString
+
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.serde._
+import org.alephium.util.{AVector, TimeStamp}
 
-final case class BlockTemplate(
-    deps: AVector[BlockHash],
-    depStateHash: Hash,
-    target: Target,
-    blockTs: TimeStamp,
-    txsHash: Hash,
-    transactions: AVector[Transaction]
-) {
-  def buildHeader(nonce: U256)(implicit config: GroupConfig): BlockHeader =
-    BlockHeader.unsafe(BlockDeps.build(deps), depStateHash, txsHash, blockTs, target, nonce)
-}
+final case class MiningBlob(
+    headerBlob: ByteString,
+    target: BigInteger,
+    txsBlob: ByteString
+)
 
-object BlockTemplate {
-  def apply(
+object MiningBlob {
+  def from(template: BlockFlowTemplate): MiningBlob = {
+    from(
+      template.deps,
+      template.depStateHash,
+      template.target,
+      template.templateTs,
+      template.transactions
+    )
+  }
+
+  def from(block: Block): MiningBlob = {
+    val header = block.header
+    from(
+      header.blockDeps.deps,
+      header.depStateHash,
+      header.target,
+      header.timestamp,
+      block.transactions
+    )
+  }
+
+  private def from(
       deps: AVector[BlockHash],
       depStateHash: Hash,
       target: Target,
       blockTs: TimeStamp,
       transactions: AVector[Transaction]
-  ): BlockTemplate = {
+  ): MiningBlob = {
     val txsHash = Block.calTxsHash(transactions)
-    BlockTemplate(deps, depStateHash, target, blockTs, txsHash, transactions)
+    val dummyHeader =
+      BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, Nonce.zero)
+
+    val headerBlob = serialize(dummyHeader)
+    val txsBlob    = serialize(transactions)
+    MiningBlob(headerBlob.dropRight(Nonce.byteLength), target.value, txsBlob)
   }
 }

@@ -16,16 +16,14 @@
 
 package org.alephium.api.model
 
+import java.math.BigInteger
+
 import akka.util.ByteString
 
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.util.{AVector, TimeStamp}
-
 final case class BlockCandidate(
-    deps: AVector[BlockHash],
-    depStateHash: Hash,
-    target: ByteString,
-    blockTs: TimeStamp,
-    txsHash: Hash,
-    transactions: AVector[String]
+    fromGroup: Int,
+    toGroup: Int,
+    headerBlob: ByteString,
+    target: BigInteger,
+    txsBlob: ByteString
 )

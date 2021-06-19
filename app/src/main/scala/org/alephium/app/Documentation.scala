@@ -49,8 +49,6 @@ trait Documentation extends Endpoints {
     buildContract,
     minerAction,
     minerListAddresses,
-    minerGetBlockCandidate,
-    minerNewBlock,
     minerUpdateAddresses
   )
 

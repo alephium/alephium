@@ -69,6 +69,7 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
 
 object AlephiumActorSpec {
   lazy val warningConfig = config("WARNING")
+  lazy val infoConfig    = config("INFO")
   lazy val debugConfig   = config("DEBUG")
 
   def config(logLevel: String): String =

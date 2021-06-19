@@ -74,7 +74,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
           Hash.zero,
           TimeStamp.now(),
           Target.Max,
-          0
+          Nonce.zero
         )
       val txs: AVector[Transaction] =
         AVector.fill(3)(
@@ -108,7 +108,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
           Hash.zero,
           TimeStamp.now(),
           Target.Max,
-          0
+          Nonce.zero
         )
       val tx0 = Transaction.from(
         UnsignedTransaction(

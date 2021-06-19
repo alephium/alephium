@@ -72,7 +72,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
         AVector.empty,
         consensusConfig.maxMiningTarget,
         TimeStamp.zero,
-        0
+        Nonce.zero
       )
 
     val input0          = txInputGen.sample.get

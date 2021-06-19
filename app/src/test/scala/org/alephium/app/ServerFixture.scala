@@ -29,7 +29,6 @@ import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
-import org.alephium.flow.model.BlockTemplate
 import org.alephium.flow.network._
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -62,11 +61,9 @@ trait ServerFixture
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
-  lazy val dummyBlockTemplate =
-    BlockTemplate(AVector.empty, Hash.zero, Target.onePhPerBlock, now, AVector.empty)
-  lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
-  lazy val dummyBalance       = Balance(U256.Zero, U256.Zero, 0)
-  lazy val dummyGroup         = Group(0)
+  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
+  lazy val dummyBalance         = Balance(U256.Zero, U256.Zero, 0)
+  lazy val dummyGroup           = Group(0)
 
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(0)
@@ -120,6 +117,7 @@ object ServerFixture {
       neighborPeers: NeighborPeers,
       block: Block,
       blockFlowProbe: ActorRef,
+      _allHandlers: AllHandlers,
       dummyTx: Transaction,
       storages: Storages,
       cliqueManagerOpt: Option[ActorRefT[CliqueManager.Command]] = None,
@@ -164,16 +162,8 @@ object ServerFixture {
 
     val txHandlerRef =
       system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
-    val txHandler = ActorRefT[TxHandler.Command](txHandlerRef)
-
-    val allHandlers: AllHandlers = AllHandlers(
-      flowHandler = ActorRefT(TestProbe().ref),
-      txHandler = txHandler,
-      dependencyHandler = ActorRefT(TestProbe().ref),
-      viewHandler = ActorRefT(TestProbe().ref),
-      blockHandlers = Map.empty,
-      headerHandlers = Map.empty
-    )(config.broker)
+    val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
+    val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)
 
     val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)

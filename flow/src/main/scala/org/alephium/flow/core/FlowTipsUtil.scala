@@ -33,6 +33,7 @@ trait FlowTipsUtil {
   def initialGenesisHashes: AVector[BlockHash]
   def genesisHashes: AVector[AVector[BlockHash]]
 
+  def getHeightUnsafe(hash: BlockHash): Int
   def getBlockUnsafe(hash: BlockHash): Block
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader]
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader
@@ -229,20 +230,19 @@ trait FlowTipsUtil {
   private[core] def tryMergeUnsafe(
       flowTips: FlowTips,
       tip: BlockHash,
-      targetGroup: GroupIndex,
-      checkTxConflicts: Boolean
+      targetGroup: GroupIndex
   ): Option[FlowTips] = {
-    tryMergeUnsafe(flowTips, getLightTipsUnsafe(tip, targetGroup), checkTxConflicts)
+    tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
   }
 
   private[core] def tryMergeUnsafe(
+      targetGroup: GroupIndex,
       flowTips: FlowTips,
-      newTips: FlowTips.Light,
-      checkTxConflicts: Boolean
+      newTips: FlowTips.Light
   ): Option[FlowTips] = {
     for {
       newInTips  <- mergeInTips(flowTips.inTips, newTips.inTips)
-      newOutTips <- mergeOutTips(flowTips.outTips, newTips.outTip, checkTxConflicts)
+      newOutTips <- mergeOutTips(targetGroup, flowTips.outTips, newTips.outTip)
     } yield FlowTips(flowTips.targetGroup, newInTips, newOutTips)
   }
 
@@ -285,21 +285,26 @@ trait FlowTipsUtil {
   }
 
   private[core] def mergeOutTips(
+      targetGroup: GroupIndex,
       outTips: AVector[BlockHash],
-      newTip: BlockHash,
-      checkTxConflicts: Boolean
+      newTip: BlockHash
   ): Option[AVector[BlockHash]] = {
     assume(outTips.length == groups)
-    val newOutTips = getOutTipsUnsafe(newTip, inclusive = true)
+    val newTipIndex = ChainIndex.from(newTip)
 
-    if (checkTxConflicts) {
-      mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
-        val diffs   = getTipsDiffUnsafe(mergedDeps, outTips)
-        val toCheck = (newTip +: diffs) ++ outTips
-        Option.when(diffs.isEmpty || (!isConflicted(toCheck, getBlockUnsafe)))(mergedDeps)
-      }
+    if (outTips(newTipIndex.to.value) == newTip) {
+      Some(outTips)
     } else {
-      mergeTips(outTips, newOutTips)
+      val newOutTips = getOutTipsUnsafe(newTip, inclusive = true)
+      mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
+        val intraDep0 = outTips(targetGroup.value)
+        val intraDep1 = getOutTip(getBlockHeaderUnsafe(newTip), targetGroup)
+        val commonIntraDep =
+          if (getHeightUnsafe(intraDep0) <= getHeightUnsafe(intraDep1)) intraDep0 else intraDep1
+        val commonOutTips = getOutTips(getBlockHeaderUnsafe(commonIntraDep), inclusive = true)
+        val diffs         = getTipsDiffUnsafe(mergedDeps, commonOutTips)
+        Option.when(diffs.isEmpty || (!isConflicted(diffs, getBlockUnsafe)))(mergedDeps)
+      }
     }
   }
 

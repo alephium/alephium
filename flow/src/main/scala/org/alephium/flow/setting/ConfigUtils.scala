@@ -21,8 +21,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.crypto.Sha256
-import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
+import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.util.{AVector, Hex}
 
 object ConfigUtils {
@@ -37,36 +36,12 @@ object ConfigUtils {
 
   def parseMiners(
       minerAddressesOpt: Option[Seq[String]],
-      networkType: NetworkType,
-      brokerConfig: BrokerConfig
-  ): Either[ConfigException, AVector[Address]] = {
+      networkType: NetworkType
+  ): Either[ConfigException, Option[AVector[Address]]] = {
     minerAddressesOpt match {
       case Some(minerAddresses) =>
-        AVector.from(minerAddresses).mapE(parseAddresses(_, networkType))
-      case None => generateMiners(networkType, brokerConfig)
-    }
-  }
-
-  private def generateMiners(
-      networkType: NetworkType,
-      brokerConfig: BrokerConfig
-  ): Either[ConfigException, AVector[Address]] = {
-    networkType match {
-      case NetworkType.Mainnet =>
-        Left(
-          new ConfigException.Missing(
-            "miner-addresses",
-            new Throwable(s"`miner-addresses` field is mandatory for ${networkType.name}")
-          )
-        )
-      case networkType =>
-        Right {
-          AVector.tabulate(brokerConfig.groups) { i =>
-            val index          = GroupIndex.unsafe(i)(brokerConfig)
-            val (_, publicKey) = index.generateKey(brokerConfig)
-            Address.p2pkh(networkType, publicKey)
-          }
-        }
+        AVector.from(minerAddresses).mapE(parseAddresses(_, networkType)).map(Option.apply)
+      case None => Right(None)
     }
   }
 

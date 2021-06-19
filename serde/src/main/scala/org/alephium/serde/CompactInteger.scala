@@ -433,6 +433,6 @@ object CompactInteger {
   }
   case object MultiByte extends Mode {
     override val prefix: Int    = 0xc0 // 0b11000000
-    override val negPrefix: Int = 0x00 // 0b00000000
+    override def negPrefix: Int = ???  // 0x00 // 0b00000000 // not needed at all
   }
 }

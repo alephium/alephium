@@ -23,8 +23,8 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, BrokerInfo, CliqueId, CliqueInfo, NetworkType, Target}
+import org.alephium.protocol._
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -114,10 +114,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode SelfClique" in {
     val cliqueId = CliqueId.generate
     val peerAddress =
-      PeerAddress(inetAddress, 9001, 9002)
+      PeerAddress(inetAddress, 9001, 9002, 9003)
     val selfClique = SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peerAddress), true, 1, 2)
     val jsonRaw =
-      s"""{"cliqueId":"${cliqueId.toHexString}","networkType":"mainnet","numZerosAtLeastInHash":18,"nodes":[{"address":"127.0.0.1","restPort":9001,"wsPort":9002}],"synced":true,"groupNumPerBroker":1,"groups":2}"""
+      s"""{"cliqueId":"${cliqueId.toHexString}","networkType":"mainnet","numZerosAtLeastInHash":18,"nodes":[{"address":"127.0.0.1","restPort":9001,"wsPort":9002,"minerApiPort":9003}],"synced":true,"groupNumPerBroker":1,"groups":2}"""
     checkData(selfClique, jsonRaw)
   }
 
@@ -273,52 +273,27 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BlockCandidate" in {
-    val blockHash    = BlockHash.generate
-    val depStateHash = Hash.generate
-    val target       = Target.onePhPerBlock
-    val ts           = TimeStamp.unsafe(1L)
-    val txsHash      = Hash.generate
+    val target = Target.onePhPerBlock
 
     val blockCandidate = BlockCandidate(
-      AVector(blockHash),
-      depStateHash,
-      target.bits,
-      ts,
-      txsHash,
-      AVector.empty
+      1,
+      0,
+      hex"aaaa",
+      target.value,
+      hex"bbbbbbbbbb"
     )
     val jsonRaw =
-      s"""{"deps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","target":"${Hex
-        .toHexString(
-          target.bits
-        )}","blockTs":${ts.millis},"txsHash":"${txsHash.toHexString}","transactions":[]}"""
+      s"""{"fromGroup":1,"toGroup":0,"headerBlob":"aaaa","target":"${target.value}","txsBlob":"bbbbbbbbbb"}"""
     checkData(blockCandidate, jsonRaw)
   }
 
   it should "encode/decode BlockSolution" in {
-    val blockHash    = BlockHash.generate
-    val depStateHash = Hash.generate
-    val target       = Target.onePhPerBlock
-    val ts           = TimeStamp.unsafe(1L)
-    val txsHash      = Hash.generate
-
     val blockSolution = BlockSolution(
-      AVector(blockHash),
-      depStateHash,
-      ts,
-      1,
-      1,
-      U256.One,
-      target.bits,
-      U256.One,
-      txsHash,
-      AVector.empty
+      blockBlob = hex"bbbbbbbbbb",
+      miningCount = U256.unsafe(1234)
     )
     val jsonRaw =
-      s"""{"blockDeps":["${blockHash.toHexString}"],"depStateHash":"${depStateHash.toHexString}","timestamp":${ts.millis},"fromGroup":1,"toGroup":1,"miningCount":"1","target":"${Hex
-        .toHexString(
-          target.bits
-        )}","nonce":"1","txsHash":"${txsHash.toHexString}","transactions":[]}"""
+      s"""{"blockBlob":"bbbbbbbbbb","miningCount":"1234"}"""
     checkData(blockSolution, jsonRaw)
   }
 }

@@ -1596,7 +1596,8 @@
                     {
                       "address": "1.2.3.4",
                       "restPort": 12377,
-                      "wsPort": 12366
+                      "wsPort": 12366,
+                      "minerApiPort": 12355
                     }
                   ],
                   "synced": true,
@@ -3903,230 +3904,6 @@
           }
         }
       }
-    },
-    "/miners/block-candidate": {
-      "get": {
-        "tags": [
-          "Miners"
-        ],
-        "summary": "Get the next block candidate for a chain",
-        "operationId": "getMinersBlock-candidate",
-        "parameters": [
-          {
-            "name": "fromGroup",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "toGroup",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockCandidate"
-                },
-                "example": {
-                  "deps": [
-                    "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                    "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                  ],
-                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "target": "1a400000",
-                  "blockTs": 1611041396892,
-                  "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "transactions": [
-                    "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/miners/new-block": {
-      "post": {
-        "tags": [
-          "Miners"
-        ],
-        "summary": "Post a block solution",
-        "operationId": "postMinersNew-block",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BlockSolution"
-              },
-              "example": {
-                "blockDeps": [
-                  "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                ],
-                "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                "timestamp": 1611041396892,
-                "fromGroup": 1,
-                "toGroup": 2,
-                "miningCount": "2",
-                "target": "1a400000",
-                "nonce": "2",
-                "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                "transactions": [
-                  "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -4529,7 +4306,8 @@
         "required": [
           "address",
           "restPort",
-          "wsPort"
+          "wsPort",
+          "minerApiPort"
         ],
         "type": "object",
         "properties": {
@@ -4540,6 +4318,9 @@
             "type": "integer"
           },
           "wsPort": {
+            "type": "integer"
+          },
+          "minerApiPort": {
             "type": "integer"
           }
         }
@@ -5035,94 +4816,6 @@
         "type": "object",
         "properties": {
           "addresses": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "BlockCandidate": {
-        "required": [
-          "depStateHash",
-          "target",
-          "blockTs",
-          "txsHash"
-        ],
-        "type": "object",
-        "properties": {
-          "deps": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "depStateHash": {
-            "type": "string"
-          },
-          "target": {
-            "type": "string"
-          },
-          "blockTs": {
-            "type": "integer"
-          },
-          "txsHash": {
-            "type": "string"
-          },
-          "transactions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "BlockSolution": {
-        "required": [
-          "depStateHash",
-          "timestamp",
-          "fromGroup",
-          "toGroup",
-          "miningCount",
-          "target",
-          "nonce",
-          "txsHash"
-        ],
-        "type": "object",
-        "properties": {
-          "blockDeps": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "depStateHash": {
-            "type": "string"
-          },
-          "timestamp": {
-            "type": "integer"
-          },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
-            "type": "integer"
-          },
-          "miningCount": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "target": {
-            "type": "string"
-          },
-          "nonce": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "txsHash": {
-            "type": "string"
-          },
-          "transactions": {
             "type": "array",
             "items": {
               "type": "string"

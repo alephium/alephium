@@ -77,6 +77,12 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     select(utxos, 10, Some(GasBox.unsafe(1))) is Right(Selected(AVector(utxos(1), utxos(0)), 1))
   }
 
+  it should "consider minimal gas" in new Fixture {
+    val utxos = buildUtxos(20, 10, 30)
+    select(utxos, 1) is Right(Selected(AVector(utxos(1)), 3))
+    select(utxos, 1, minimalGas = 40) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 40))
+  }
+
   trait Fixture extends AlephiumConfigFixture {
 
     def buildOutput(lockupScript: LockupScript, amount: U256): AssetOutputInfo = {
@@ -108,7 +114,8 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         utxos: AVector[AssetOutputInfo],
         amount: U256,
         gasOpt: Option[GasBox] = None,
-        dustAmount: U256 = U256.Zero
+        dustAmount: U256 = U256.Zero,
+        minimalGas: Int = 1
     ): Either[String, UtxoUtils.Selected] = {
       UtxoUtils.select(
         utxos,
@@ -118,7 +125,8 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         GasBox.unsafe(1),
         GasBox.unsafe(1),
         dustAmount,
-        2
+        2,
+        GasBox.unsafe(minimalGas)
       )
     }
   }

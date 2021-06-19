@@ -20,7 +20,6 @@ import java.io.{StringWriter, Writer}
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
-import scala.util.Try
 
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -31,17 +30,17 @@ import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute, _}
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model._
 import org.alephium.app.ServerUtils.FutureTry
-import org.alephium.flow.client.{Miner, Node}
+import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.TxHandler
-import org.alephium.flow.model.BlockTemplate
+import org.alephium.flow.handler.{TxHandler, ViewHandler}
+import org.alephium.flow.mining.Miner
+import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -71,9 +70,10 @@ class RestServer(
     with ServerOptions
     with StrictLogging {
 
-  private val blockFlow: BlockFlow                    = node.blockFlow
-  private val txHandler: ActorRefT[TxHandler.Command] = node.allHandlers.txHandler
-  lazy val blockflowFetchMaxAge                       = apiConfig.blockflowFetchMaxAge
+  private val blockFlow: BlockFlow                        = node.blockFlow
+  private val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
+  private val viewHandler: ActorRefT[ViewHandler.Command] = node.allHandlers.viewHandler
+  lazy val blockflowFetchMaxAge                           = apiConfig.blockflowFetchMaxAge
 
   implicit val groupConfig: GroupConfig = node.config.broker
   implicit val networkType: NetworkType = node.config.network.networkType
@@ -218,48 +218,19 @@ class RestServer(
   }
 
   private val minerListAddressesRoute = toRoute(minerListAddresses) { _ =>
-    miner
-      .ask(Miner.GetAddresses)
+    viewHandler
+      .ask(ViewHandler.GetMinerAddresses)
       .mapTo[AVector[LockupScript]]
       .map { addresses =>
         Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
       }
   }
 
-  private val minerGetBlockCandidateRoute = toRoute(minerGetBlockCandidate) { chainIndex =>
-    withSyncedClique {
-      miner
-        .ask(Miner.GetBlockCandidate(chainIndex))
-        .mapTo[Miner.BlockCandidate]
-        .map(_.maybeBlock match {
-          case Some(block) => Right(RestServer.blockTempateToCandidate(block))
-          case None =>
-            Left(
-              ApiError.InternalServerError("Cannot compute block candidate for given chain index")
-            )
-        })
-    }
-  }
-
-  private val minerNewBlockRoute = toRoute(minerNewBlock) { solution =>
-    withSyncedClique {
-      Future.successful(
-        RestServer.blockSolutionToBlock(solution).map { case (solution, chainIndex, miningCount) =>
-          miner ! Miner.NewBlockSolution(
-            solution,
-            chainIndex,
-            miningCount
-          )
-        }
-      )
-    }
-  }
-
   private val minerUpdateAddressesRoute = toRoute(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
       Miner
         .validateAddresses(minerAddresses.addresses)
-        .map(_ => miner ! Miner.UpdateAddresses(minerAddresses.addresses))
+        .map(_ => viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses))
         .left
         .map(ApiError.BadRequest(_))
     }
@@ -335,8 +306,6 @@ class RestServer(
     sendTransactionRoute,
     getTransactionStatusRoute,
     minerActionRoute,
-    minerGetBlockCandidateRoute,
-    minerNewBlockRoute,
     minerListAddressesRoute,
     minerUpdateAddressesRoute,
     sendContractRoute,
@@ -426,7 +395,7 @@ object RestServer {
       networkType,
       consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort)
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
       ),
       synced,
       cliqueInfo.groupNumPerBroker,
@@ -446,41 +415,28 @@ object RestServer {
   }
 
   //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
-  def blockTempateToCandidate(template: BlockTemplate): BlockCandidate = {
+  def blockTempateToCandidate(
+      chainIndex: ChainIndex,
+      template: MiningBlob
+  ): BlockCandidate = {
     BlockCandidate(
-      template.deps,
-      template.depStateHash,
-      template.target.bits,
-      template.blockTs,
-      template.txsHash,
-      template.transactions.map(tx => Hex.toHexString(serialize(tx)))
+      fromGroup = chainIndex.from.value,
+      toGroup = chainIndex.to.value,
+      headerBlob = template.headerBlob,
+      target = template.target,
+      txsBlob = template.txsBlob
     )
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def blockSolutionToBlock(
       solution: BlockSolution
-  )(implicit
-      groupConfig: GroupConfig
-  ): Either[ApiError[_ <: StatusCode], (Block, ChainIndex, U256)] = {
-    Try {
-      val header = BlockHeader.unsafe(
-        BlockDeps.build(solution.blockDeps),
-        solution.depStateHash,
-        solution.txsHash,
-        solution.timestamp,
-        Target(solution.target),
-        solution.nonce
-      )
-      val transactions =
-        solution.transactions.map(tx => deserialize[Transaction](Hex.unsafe(tx)).toOption.get)
-
-      val chainIndex = ChainIndex.unsafe(solution.fromGroup, solution.toGroup)
-
-      (Block(header, transactions), chainIndex, solution.miningCount)
-    }.toEither.left.map { error =>
-      //TODO improve error handling
-      ApiError.BadRequest(error.getMessage)
+  ): Either[ApiError[_ <: StatusCode], (Block, U256)] = {
+    deserialize[Block](solution.blockBlob) match {
+      case Right(block) =>
+        Right(block -> solution.miningCount)
+      case Left(error) =>
+        Left(ApiError.InternalServerError(s"Block deserialization error: ${error.getMessage}"))
     }
   }
 }
