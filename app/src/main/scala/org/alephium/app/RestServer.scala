@@ -95,6 +95,17 @@ class RestServer(
       }
   }
 
+  private def withMinerAddressSet[A](f: FutureTry[A]): FutureTry[A] = {
+    node.allHandlers.viewHandler
+      .ask(ViewHandler.GetMinerAddresses)
+      .mapTo[Option[AVector[LockupScript]]]
+      .flatMap {
+        case Some(_) => f
+        case None =>
+          Future.successful(Left(ApiError.InternalServerError("Miner addresses are not set up")))
+      }
+  }
+
   private val getNodeInfoRoute = toRoute(getNodeInfo) { _ =>
     for {
       isMining <- miner.ask(Miner.IsMining).mapTo[Boolean]
@@ -210,9 +221,11 @@ class RestServer(
 
   private val minerActionRoute = toRoute(minerAction) { action =>
     withSyncedClique {
-      action match {
-        case MinerAction.StartMining => serverUtils.execute(miner ! Miner.Start)
-        case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
+      withMinerAddressSet {
+        action match {
+          case MinerAction.StartMining => serverUtils.execute(miner ! Miner.Start)
+          case MinerAction.StopMining  => serverUtils.execute(miner ! Miner.Stop)
+        }
       }
     }
   }
@@ -220,9 +233,11 @@ class RestServer(
   private val minerListAddressesRoute = toRoute(minerListAddresses) { _ =>
     viewHandler
       .ask(ViewHandler.GetMinerAddresses)
-      .mapTo[AVector[LockupScript]]
-      .map { addresses =>
-        Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
+      .mapTo[Option[AVector[LockupScript]]]
+      .map {
+        case Some(addresses) =>
+          Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
+        case None => Left(ApiError.InternalServerError(s"Miner addresses are not set up"))
       }
   }
 
