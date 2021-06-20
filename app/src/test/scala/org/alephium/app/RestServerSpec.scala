@@ -221,6 +221,31 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
   it should "call POST /miners" in new RestServerFixture {
     withServer {
+      val address      = Address.fromBase58(dummyKeyAddress, networkType).get
+      val lockupScript = address.lockupScript
+      allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case ViewHandler.GetMinerAddresses =>
+            sender ! None
+            TestActor.KeepRunning
+        }
+      )
+
+      Post(s"/miners?action=start-mining") check { response =>
+        minerProbe.expectMsg(Miner.Start)
+        response.code is StatusCode.InternalServerError
+        response.as[ApiError.InternalServerError] is
+          ApiError.InternalServerError("Miner addresses are not set up")
+      }
+
+      allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case ViewHandler.GetMinerAddresses =>
+            sender ! Some(AVector(lockupScript))
+            TestActor.KeepRunning
+        }
+      )
+
       Post(s"/miners?action=start-mining") check { response =>
         minerProbe.expectMsg(Miner.Start)
         response.code is StatusCode.Ok
@@ -252,7 +277,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
         msg match {
           case ViewHandler.GetMinerAddresses =>
-            sender ! AVector(lockupScript)
+            sender ! Some(AVector(lockupScript))
             TestActor.NoAutoPilot
         }
       )
@@ -260,6 +285,20 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       Get(s"/miners/addresses") check { response =>
         response.code is StatusCode.Ok
         response.as[MinerAddresses] is MinerAddresses(AVector(address))
+      }
+
+      allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case ViewHandler.GetMinerAddresses =>
+            sender ! None
+            TestActor.NoAutoPilot
+        }
+      )
+
+      Get(s"/miners/addresses") check { response =>
+        response.code is StatusCode.InternalServerError
+        response.as[ApiError.InternalServerError] is
+          ApiError.InternalServerError("Miner addresses are not set up")
       }
     }
   }
