@@ -16,27 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, AssetOutput, ContractOutput, NetworkType, TxOutput}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.protocol.Hash
+import org.alephium.util.U256
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Output(
-    amount: U256,
-    address: Address,
-    tokens: AVector[Token],
-    lockTime: Option[TimeStamp] = None
-)
-object Output {
-  def from(output: TxOutput, networkType: NetworkType): Output = {
-    val lockTime = output match {
-      case o: AssetOutput    => Some(o.lockTime)
-      case _: ContractOutput => None
-    }
-    Output(
-      output.amount,
-      Address(networkType, output.lockupScript),
-      output.tokens.map((Token.apply).tupled),
-      lockTime
-    )
-  }
-}
+final case class Token(id: Hash, amount: U256)

@@ -2137,6 +2137,16 @@
                             {
                               "amount": "1000000000000000000",
                               "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                              "tokens": [
+                                {
+                                  "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                  "amount": "42"
+                                },
+                                {
+                                  "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                  "amount": "1000"
+                                }
+                              ],
                               "lockTime": 1611041396892
                             }
                           ]
@@ -2268,6 +2278,16 @@
                         {
                           "amount": "1000000000000000000",
                           "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000"
+                            }
+                          ],
                           "lockTime": 1611041396892
                         }
                       ]
@@ -2828,6 +2848,16 @@
                       {
                         "amount": "1000000000000000000",
                         "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000"
+                          }
+                        ],
                         "lockTime": 1611041396892
                       }
                     ]
@@ -4526,8 +4556,30 @@
           "address": {
             "type": "string"
           },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
           "lockTime": {
             "type": "integer"
+          }
+        }
+      },
+      "Token": {
+        "required": [
+          "id",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
           }
         }
       },

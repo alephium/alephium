@@ -162,16 +162,41 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val addressStr = address.toBase58
     val amount     = U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion))
     val amountStr  = "15000000000000000000"
+    val tokenId1   = Hash.hash("token1")
+    val tokenId2   = Hash.hash("token2")
+    val tokens     = AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
 
     {
-      val request = Output(amount, address, None)
-      val jsonRaw = s"""{"amount":"$amountStr","address":"$addressStr"}"""
+      val request = Output(amount, address, tokens, None)
+      val jsonRaw = s"""
+        |{
+        |  "amount": "$amountStr",
+        |  "address": "$addressStr",
+        |  "tokens": [
+        |    {
+        |      "id": "${tokenId1.toHexString}",
+        |      "amount": "42"
+        |    },
+        |    {
+        |      "id": "${tokenId2.toHexString}",
+        |      "amount": "1000"
+        |    }
+        |  ]
+        |}
+        """.stripMargin
       checkData(request, jsonRaw)
     }
 
     {
-      val request = Output(amount, address, Some(TimeStamp.unsafe(1234)))
-      val jsonRaw = s"""{"amount":"$amountStr","address":"$addressStr","lockTime":1234}"""
+      val request = Output(amount, address, AVector.empty, Some(TimeStamp.unsafe(1234)))
+      val jsonRaw = s"""
+        |{
+        |  "amount": "$amountStr",
+        |  "address": "$addressStr",
+        |  "tokens": [],
+        |  "lockTime": 1234
+        |}
+        """.stripMargin
       checkData(request, jsonRaw)
     }
   }

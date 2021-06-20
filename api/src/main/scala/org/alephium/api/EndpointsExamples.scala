@@ -68,11 +68,15 @@ trait EndpointsExamples extends ErrorExamples {
   private val ts        = TimeStamp.unsafe(1611041396892L)
   private val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+  private val tokens = AVector(
+    Token(Hash.hash("token1"), U256.unsafe(42)),
+    Token(Hash.hash("token2"), U256.unsafe(1000))
+  )
 
   private val tx = Tx(
     txId,
     AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
-    AVector(Output(amount = balance, address, Some(ts)))
+    AVector(Output(amount = balance, address, tokens, Some(ts)))
   )
 
   private val blockEntry = BlockEntry(

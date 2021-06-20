@@ -113,6 +113,8 @@ trait ApiModelCodec {
 
   implicit val outputRefRW: RW[OutputRef] = macroRW
 
+  implicit val tokenRW: RW[Token] = macroRW
+
   implicit val outputRW: RW[Output] = macroRW
 
   //macro failed on Input for unknwown reason
