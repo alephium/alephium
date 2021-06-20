@@ -215,6 +215,12 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
+  val decodeUnsignedTransaction: BaseEndpoint[DecodeTransaction, Tx] =
+    transactionsEndpoint.post
+      .in(jsonBody[DecodeTransaction])
+      .out(jsonBody[Tx])
+      .summary("Decode an unsigned transaction")
+
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post
       .in(query[MinerAction]("action").examples(minerActionExamples))

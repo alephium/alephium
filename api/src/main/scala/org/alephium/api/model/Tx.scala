@@ -17,7 +17,12 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{NetworkType, Transaction, TransactionTemplate}
+import org.alephium.protocol.model.{
+  NetworkType,
+  Transaction,
+  TransactionTemplate,
+  UnsignedTransaction
+}
 import org.alephium.util.AVector
 
 final case class Tx(
@@ -36,10 +41,13 @@ object Tx {
         tx.generatedOutputs.map(Output.from(_, networkType))
     )
 
-  def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx =
+  def from(unsignedTx: UnsignedTransaction, networkType: NetworkType): Tx =
     Tx(
-      tx.id,
-      tx.unsigned.inputs.map(Input.from),
-      tx.unsigned.fixedOutputs.map(Output.from(_, networkType))
+      unsignedTx.hash,
+      unsignedTx.inputs.map(Input.from),
+      unsignedTx.fixedOutputs.map(Output.from(_, networkType))
     )
+
+  def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx =
+    from(tx.unsigned, networkType)
 }

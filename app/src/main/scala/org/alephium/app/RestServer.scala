@@ -220,6 +220,12 @@ class RestServer(
     Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, chainIndex))
   }
 
+  private val decodeUnsignedTransactionRoute = toRoute(decodeUnsignedTransaction) { tx =>
+    Future.successful(
+      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(Tx.from(_, networkType))
+    )
+  }
+
   private val minerActionRoute = toRoute(minerAction) { action =>
     withSyncedClique {
       withMinerAddressSet {
@@ -319,6 +325,7 @@ class RestServer(
     buildTransactionRoute,
     sendTransactionRoute,
     getTransactionStatusRoute,
+    decodeUnsignedTransactionRoute,
     minerActionRoute,
     minerListAddressesRoute,
     minerUpdateAddressesRoute,

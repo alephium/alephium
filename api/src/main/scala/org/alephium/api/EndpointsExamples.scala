@@ -160,6 +160,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
+
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(AVector(blockEntry)))
 
@@ -200,6 +202,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val sendTransactionExamples: List[Example[SendTransaction]] =
     simpleExample(SendTransaction(unsignedTx = hexString, signature))
+
+  implicit val decodeTransactionExamples: List[Example[DecodeTransaction]] =
+    simpleExample(DecodeTransaction(unsignedTx = hexString))
 
   implicit val txResultExamples: List[Example[TxResult]] =
     simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))

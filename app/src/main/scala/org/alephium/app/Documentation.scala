@@ -43,6 +43,7 @@ trait Documentation extends Endpoints {
     listUnconfirmedTransactions,
     buildTransaction,
     sendTransaction,
+    decodeUnsignedTransaction,
     getTransactionStatus,
     sendContract,
     compile,

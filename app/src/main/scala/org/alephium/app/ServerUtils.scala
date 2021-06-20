@@ -110,12 +110,7 @@ class ServerUtils(networkType: NetworkType) {
   }
 
   def createTxTemplate(query: SendTransaction): Try[TransactionTemplate] = {
-    for {
-      txByteString <- Hex.from(query.unsignedTx).toRight(badRequest(s"Invalid hex"))
-      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-    } yield {
+    decodeUnsignedTransaction(query.unsignedTx).map { unsignedTx =>
       TransactionTemplate(
         unsignedTx,
         AVector.fill(unsignedTx.inputs.length)(query.signature),
@@ -150,6 +145,15 @@ class ServerUtils(networkType: NetworkType) {
     blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
       case Some(status) => convert(status)
       case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
+    }
+  }
+
+  def decodeUnsignedTransaction(
+      unsignedTx: String
+  ): Try[UnsignedTransaction] = {
+    Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex")).flatMap { txByteString =>
+      deserialize[UnsignedTransaction](txByteString).left
+        .map(serdeError => badRequest(serdeError.getMessage))
     }
   }
 
