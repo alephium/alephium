@@ -2920,8 +2920,12 @@
               },
               "example": {
                 "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                "value": "2",
+                "destinations": [
+                  {
+                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "value": "2"
+                  }
+                ],
                 "lockTime": 1611041396892,
                 "gas": 1,
                 "gasPrice": "1"
@@ -4583,21 +4587,18 @@
       },
       "BuildTransaction": {
         "required": [
-          "fromKey",
-          "toAddress",
-          "value"
+          "fromKey"
         ],
         "type": "object",
         "properties": {
           "fromKey": {
             "type": "string"
           },
-          "toAddress": {
-            "type": "string"
-          },
-          "value": {
-            "type": "integer",
-            "format": "uint256"
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
           },
           "lockTime": {
             "type": "integer"
@@ -4607,6 +4608,22 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "Destination": {
+        "required": [
+          "address",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer",
+            "format": "uint256"
           }
         }
       },

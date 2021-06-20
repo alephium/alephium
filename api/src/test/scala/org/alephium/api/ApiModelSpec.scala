@@ -55,7 +55,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
   def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
-    write(data) is jsonRaw
+    writeJs(data) is read[ujson.Value](jsonRaw)
     read[T](jsonRaw) is data
   }
 
@@ -209,23 +209,43 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val toAddress = Address.p2pkh(networkType, toKey)
 
     {
-      val transfer = BuildTransaction(fromKey, toAddress, 1)
-      val jsonRaw =
-        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1"}"""
+      val transfer = BuildTransaction(fromKey, AVector(Destination(toAddress, 1)))
+      val jsonRaw  = s"""
+        |{
+        |  "fromKey": "${fromKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "value": "1"
+        |    }
+        |  ]
+        |}
+        """.stripMargin
       checkData(transfer, jsonRaw)
     }
 
     {
       val transfer = BuildTransaction(
         fromKey,
-        toAddress,
-        1,
+        AVector(Destination(toAddress, 1)),
         Some(TimeStamp.unsafe(1234)),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )
-      val jsonRaw =
-        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1","lockTime":1234,"gas":1,"gasPrice":"1"}"""
+      val jsonRaw = s"""
+        |{
+        |  "fromKey": "${fromKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "value": "1"
+        |    }
+        |  ],
+        |  "lockTime": 1234,
+        |  "gas": 1,
+        |  "gasPrice": "1"
+        |}
+        """.stripMargin
       checkData(transfer, jsonRaw)
     }
   }

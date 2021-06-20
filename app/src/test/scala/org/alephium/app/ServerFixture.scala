@@ -21,6 +21,7 @@ import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
+import org.scalatest.Assertions.fail
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
@@ -192,19 +193,19 @@ object ServerFixture {
 
     override def transfer(
         fromKey: PublicKey,
-        toLockupScript: LockupScript,
-        lockTimeOpt: Option[TimeStamp],
-        amount: U256,
+        outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice
-    ): IOResult[Either[String, UnsignedTransaction]] =
-      lockTimeOpt match {
-        case None => Right(Right(dummyTx.unsigned))
-        case Some(lockTime) =>
+    ): IOResult[Either[String, UnsignedTransaction]] = {
+      outputInfos.headOption match {
+        case None               => fail("There should be at least one output for a transaction")
+        case Some((_, _, None)) => Right(Right(dummyTx.unsigned))
+        case Some((_, _, Some(lockTime))) =>
           val outputs    = dummyTx.unsigned.fixedOutputs
           val newOutputs = outputs.map(_.copy(lockTime = lockTime))
           Right(Right(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
       }
+    }
 
     override def getTxStatus(
         txId: Hash,

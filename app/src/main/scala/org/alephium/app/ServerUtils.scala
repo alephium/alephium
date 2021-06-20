@@ -84,9 +84,8 @@ class ServerUtils(networkType: NetworkType) {
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         query.fromKey,
-        query.toAddress.lockupScript,
+        query.destinations,
         query.lockTime,
-        query.value,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
@@ -208,13 +207,15 @@ class ServerUtils(networkType: NetworkType) {
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromKey: PublicKey,
-      toLockupScript: LockupScript,
+      destinations: AVector[Destination],
       lockTimeOpt: Option[TimeStamp],
-      value: U256,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    blockFlow.transfer(fromKey, toLockupScript, lockTimeOpt, value, gasOpt, gasPrice) match {
+    val outputInfos = destinations.map { destination =>
+      (destination.address.lockupScript, destination.value, lockTimeOpt)
+    }
+    blockFlow.transfer(fromKey, outputInfos, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

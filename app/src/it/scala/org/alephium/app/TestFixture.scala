@@ -389,8 +389,12 @@ trait TestFixtureLike
       Some(s"""
         |{
         |  "fromKey": "$fromPubKey",
-        |  "toAddress": "$toAddress",
-        |  "value": "$amount"
+        |  "destinations": [
+        |    {
+        |      "address": "$toAddress",
+        |      "value": "$amount"
+        |    }
+        |  ]
         |}
         """.stripMargin)
     )

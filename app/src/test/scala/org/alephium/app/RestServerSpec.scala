@@ -158,15 +158,19 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call GET /transactions/build" in new RestServerFixture {
+  it should "call POST /transactions/build" in new RestServerFixture {
     withServer {
       Post(
         s"/transactions/build",
         body = s"""
         |{
         |  "fromKey": "$dummyKey",
-        |  "toAddress": "$dummyToAddress",
-        |  "value": "1"
+        |  "destinations": [
+        |    {
+        |      "address": "$dummyToAddress",
+        |      "value": "1"
+        |    }
+        |  ]
         |}
         """.stripMargin
       ) check { response =>
@@ -178,8 +182,12 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         body = s"""
         |{
         |  "fromKey": "$dummyKey",
-        |  "toAddress": "$dummyToAddress",
-        |  "value": "1",
+        |  "destinations": [
+        |    {
+        |      "address": "$dummyToAddress",
+        |      "value": "1"
+        |    }
+        |  ],
         |  "lockTime": "1234"
         |}
         """.stripMargin
@@ -195,8 +203,12 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         body = s"""
         |{
         |  "fromKey": "$dummyKey",
-        |  "toAddress": "$dummyToAddress",
-        |  "value": "1"
+        |  "destinations": [
+        |    {
+        |      "address": "$dummyToAddress",
+        |      "value": "1"
+        |    }
+        |  ]
         |}
         """.stripMargin
       ) check { response =>

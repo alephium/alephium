@@ -21,15 +21,16 @@ import sttp.client3._
 import sttp.tapir.client.sttp._
 
 import org.alephium.api.Endpoints
-import org.alephium.api.model.BuildTransaction
+import org.alephium.api.model.{BuildTransaction, Destination}
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, Duration, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
 
 class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
-    val buildTransactionIn = BuildTransaction(publicKey, toAddress, value, None, None, None)
+    val destinations       = AVector(Destination(toAddress, value))
+    val buildTransactionIn = BuildTransaction(publicKey, destinations, None, None, None)
     val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://127.0.0.1:1234"))
       .apply(buildTransactionIn)
     request.uri is uri"http://127.0.0.1:1234/transactions/build"

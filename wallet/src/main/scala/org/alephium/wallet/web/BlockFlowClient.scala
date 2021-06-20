@@ -29,6 +29,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{Duration, Hex, TimeStamp, U256}
+import org.alephium.util.AVector
 
 trait BlockFlowClient {
   def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]]
@@ -112,7 +113,13 @@ object BlockFlowClient {
           requestFromGroup(
             lockupScript.groupIndex,
             buildTransaction,
-            BuildTransaction(publicKey, toAddress, value, lockTime, gas, gasPrice)
+            BuildTransaction(
+              publicKey,
+              AVector(Destination(toAddress, value)),
+              lockTime,
+              gas,
+              gasPrice
+            )
           )
       }
     }

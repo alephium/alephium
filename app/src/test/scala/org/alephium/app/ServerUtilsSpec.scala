@@ -39,10 +39,11 @@ class ServerUtilsSpec extends AlephiumSpec {
       val (_, toPublicKey)                   = chainIndex.to.generateKey
       val toAddress                          = Address.p2pkh(networkType, toPublicKey)
 
+      val destinations = AVector(Destination(Address.p2pkh(networkType, toPublicKey), ALF.oneAlf))
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), ALF.oneAlf)
+          BuildTransaction(fromPublicKey, destinations)
         )
         .rightValue
 
@@ -97,10 +98,11 @@ class ServerUtilsSpec extends AlephiumSpec {
       val (_, toPublicKey)                   = chainIndex.to.generateKey
       val toAddress                          = Address.p2pkh(networkType, toPublicKey)
 
+      val destinations = AVector(Destination(Address.p2pkh(networkType, toPublicKey), ALF.oneAlf))
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, Address.p2pkh(networkType, toPublicKey), ALF.oneAlf)
+          BuildTransaction(fromPublicKey, destinations)
         )
         .rightValue
 

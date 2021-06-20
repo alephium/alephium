@@ -16,19 +16,10 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.protocol.model.Address
+import org.alephium.util.U256
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromKey: PublicKey,
-    destinations: AVector[Destination],
-    lockTime: Option[TimeStamp] = None,
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-) {
-  def fromAddress(networkType: NetworkType): Address =
-    Address(networkType, LockupScript.p2pkh(fromKey))
-}
+final case class Destination(
+    address: Address,
+    value: U256
+)
