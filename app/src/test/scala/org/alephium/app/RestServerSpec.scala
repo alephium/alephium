@@ -168,7 +168,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "value": "1"
+        |      "amount": "1"
         |    }
         |  ]
         |}
@@ -185,7 +185,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "value": "1"
+        |      "amount": "1"
         |    }
         |  ],
         |  "lockTime": "1234"
@@ -206,7 +206,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "value": "1"
+        |      "amount": "1"
         |    }
         |  ]
         |}

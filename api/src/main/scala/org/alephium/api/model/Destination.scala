@@ -21,5 +21,5 @@ import org.alephium.util.U256
 
 final case class Destination(
     address: Address,
-    value: U256
+    amount: U256
 )

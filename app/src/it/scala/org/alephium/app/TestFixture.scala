@@ -392,7 +392,7 @@ trait TestFixtureLike
         |  "destinations": [
         |    {
         |      "address": "$toAddress",
-        |      "value": "$amount"
+        |      "amount": "$amount"
         |    }
         |  ]
         |}

@@ -287,7 +287,7 @@ object WalletAppSpec extends {
     router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
       val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
       val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
-        acc.addUnsafe(destination.value)
+        acc.addUnsafe(destination.amount)
       }
       val unsignedTx = transactionGen().sample.get.unsigned
 

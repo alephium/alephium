@@ -213,7 +213,7 @@ class ServerUtils(networkType: NetworkType) {
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
-      (destination.address.lockupScript, destination.value, lockTimeOpt)
+      (destination.address.lockupScript, destination.amount, lockTimeOpt)
     }
     blockFlow.transfer(fromKey, outputInfos, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)

@@ -2923,7 +2923,7 @@
                 "destinations": [
                   {
                     "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "value": "2"
+                    "amount": "2"
                   }
                 ],
                 "lockTime": 1611041396892,
@@ -4614,14 +4614,14 @@
       "Destination": {
         "required": [
           "address",
-          "value"
+          "amount"
         ],
         "type": "object",
         "properties": {
           "address": {
             "type": "string"
           },
-          "value": {
+          "amount": {
             "type": "integer",
             "format": "uint256"
           }

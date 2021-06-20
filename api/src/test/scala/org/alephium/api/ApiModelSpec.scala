@@ -216,7 +216,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "value": "1"
+        |      "amount": "1"
         |    }
         |  ]
         |}
@@ -238,7 +238,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "value": "1"
+        |      "amount": "1"
         |    }
         |  ],
         |  "lockTime": 1234,
