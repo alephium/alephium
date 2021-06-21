@@ -200,6 +200,13 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
+  val buildSweepAllTransaction: BaseEndpoint[BuildSweepAllTransaction, BuildTransactionResult] =
+    transactionsEndpoint.post
+      .in("build-sweep-all")
+      .in(jsonBody[BuildSweepAllTransaction])
+      .out(jsonBody[BuildTransactionResult])
+      .summary("Build an unsigned transaction to send all unlocked balanced to an address")
+
   val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
     transactionsEndpoint.post
       .in("send")

@@ -210,6 +210,18 @@ class RestServer(
     }
   }
 
+  private val buildSweepAllTransactionRoute = toRoute(buildSweepAllTransaction) {
+    case buildSweepAllTransaction =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils.buildSweepAllTransaction(
+            blockFlow,
+            buildSweepAllTransaction
+          )
+        )
+      }
+  }
+
   private val sendTransactionRoute = toRoute(sendTransaction) { transaction =>
     withSyncedClique {
       serverUtils.sendTransaction(txHandler, transaction)
@@ -323,6 +335,7 @@ class RestServer(
     getChainInfoRoute,
     listUnconfirmedTransactionsRoute,
     buildTransactionRoute,
+    buildSweepAllTransactionRoute,
     sendTransactionRoute,
     getTransactionStatusRoute,
     decodeUnsignedTransactionRoute,

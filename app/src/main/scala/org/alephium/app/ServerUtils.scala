@@ -98,6 +98,28 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
+  def buildSweepAllTransaction(blockFlow: BlockFlow, query: BuildSweepAllTransaction)(implicit
+      groupConfig: GroupConfig
+  ): Try[BuildTransactionResult] = {
+    val resultEither = for {
+      _ <- checkGroup(blockFlow, query.fromKey)
+      unsignedTx <- prepareUnsignedTransaction(
+        blockFlow,
+        query.fromKey,
+        query.toAddress,
+        query.lockTime,
+        query.gas,
+        query.gasPrice.getOrElse(defaultGasPrice)
+      )
+    } yield {
+      BuildTransactionResult.from(unsignedTx)
+    }
+    resultEither match {
+      case Right(result) => Right(result)
+      case Left(error)   => Left(error)
+    }
+  }
+
   def sendTransaction(txHandler: ActorRefT[TxHandler.Command], query: SendTransaction)(implicit
       config: GroupConfig,
       askTimeout: Timeout,
@@ -220,6 +242,21 @@ class ServerUtils(networkType: NetworkType) {
       (destination.address.lockupScript, destination.amount, lockTimeOpt)
     }
     blockFlow.transfer(fromKey, outputInfos, gasOpt, gasPrice) match {
+      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Left(error))                => Left(failed(error))
+      case Left(error)                       => failed(error)
+    }
+  }
+
+  def prepareUnsignedTransaction(
+      blockFlow: BlockFlow,
+      fromKey: PublicKey,
+      toAddress: Address,
+      lockTimeOpt: Option[TimeStamp],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Try[UnsignedTransaction] = {
+    blockFlow.transfer(fromKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

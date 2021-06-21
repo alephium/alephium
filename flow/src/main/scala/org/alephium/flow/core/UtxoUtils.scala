@@ -105,6 +105,21 @@ object UtxoUtils {
     }
   }
 
+  def calculateGas(
+      utxos: AVector[Asset],
+      gasOpt: Option[GasBox],
+      gasPerInput: GasBox,
+      gasPerOutput: GasBox,
+      numOutputs: Int,
+      minimalGas: GasBox
+  ): GasBox = {
+    gasOpt match {
+      case Some(gas) => gas
+      case None =>
+        estimateGas(gasPerInput, gasPerOutput, utxos.length, numOutputs, minimalGas)
+    }
+  }
+
   def validate(sum: U256, amount: U256, dustAmount: U256): Boolean = {
     (sum == amount) || (sum >= amount.addUnsafe(dustAmount))
   }

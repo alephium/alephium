@@ -224,6 +224,53 @@ trait TxUtils { Self: FlowUtils =>
     transfer(fromKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
   }
 
+  def transfer(
+      fromKey: PublicKey,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    val fromLockupScript = LockupScript.p2pkh(fromKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
+
+    getUsableUtxos(fromLockupScript).map { utxos =>
+      for {
+        _ <- gasOpt match {
+          case None => Right(())
+          case Some(gas) =>
+            if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
+        }
+        gas <- Right(
+          UtxoUtils.calculateGas(
+            utxos,
+            gasOpt,
+            defaultGasPerInput,
+            defaultGasPerOutput,
+            1,
+            minimalGas
+          )
+        )
+        _ <-
+          if (utxos.length > ALF.MaxTxInputNum) {
+            Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
+          } else {
+            Right(())
+          }
+        amount <- utxos.foldE(U256.Zero)(_ add _.output.amount toRight s"Input amount overflow")
+        unsignedTx <- UnsignedTransaction
+          .transferAlf(
+            utxos.map(asset => (asset.ref, asset.output)),
+            fromLockupScript,
+            fromUnlockScript,
+            AVector((toLockupScript, amount, lockTimeOpt)),
+            if (gas > minimalGas) gas else minimalGas,
+            gasPrice
+          )
+      } yield unsignedTx
+    }
+  }
+
   def getTxStatus(txId: Hash, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
