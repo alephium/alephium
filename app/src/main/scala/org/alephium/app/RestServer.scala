@@ -175,7 +175,9 @@ class RestServer(
 
   private val misbehaviorActionRoute = toRoute(misbehaviorAction) {
     case MisbehaviorAction.Unban(peers) =>
-      Future.successful(Right(node.misbehaviorManager ! MisbehaviorManager.Unban(peers)))
+      node.misbehaviorManager ! MisbehaviorManager.Unban(peers)
+      node.discoveryServer ! DiscoveryServer.Unban(peers)
+      Future.successful(Right(()))
   }
 
   private val getHashesAtHeightRoute = toRoute(getHashesAtHeight) { case (chainIndex, height) =>

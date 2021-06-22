@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.immutable.ArraySeq
 
@@ -27,7 +27,7 @@ import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo, PeerId}
+import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
 import org.alephium.util._
 
 object DiscoveryServer {
@@ -67,8 +67,8 @@ object DiscoveryServer {
 
   sealed trait Command
   final case class GetNeighborPeers(targetGroupInfoOpt: Option[BrokerGroupInfo]) extends Command
-  final case class Disable(peerId: PeerId)                                       extends Command
   final case class Remove(peer: InetSocketAddress)                               extends Command
+  final case class Unban(peers: AVector[InetAddress])                            extends Command
   case object Scan                                                               extends Command
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                        extends Command
   final case class PeerConfirmed(peerInfo: BrokerInfo)                           extends Command
@@ -180,18 +180,14 @@ class DiscoveryServer(
       scanAndSchedule()
     case GetNeighborPeers(targetGroupInfoOpt) =>
       sender() ! NeighborPeers(getActivePeers(targetGroupInfoOpt))
-    case Disable(peerId) =>
-      table -= peerId
-      ()
-    case Remove(peer) =>
-      remove(peer)
+
+    case Remove(peer) => remove(peer)
     case PeerDenied(peerInfo) =>
       log.debug(s"peer ${peerInfo.peerId} - ${peerInfo.address} is banned, ignoring it")
       banPeer(peerInfo.peerId)
-    case PeerConfirmed(peerInfo) =>
-      tryPing(peerInfo)
-    case OutboundBrokerHandler.Unreachable(remote) =>
-      setUnreachable(remote)
+    case PeerConfirmed(peerInfo)                   => tryPing(peerInfo)
+    case OutboundBrokerHandler.Unreachable(remote) => setUnreachable(remote)
+    case Unban(remotes)                            => remotes.foreach(unsetUnreachable)
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>

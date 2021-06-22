@@ -114,6 +114,10 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   def banPeer(peerId: PeerId): Unit = {
+    table.get(peerId).foreach { status =>
+      table.remove(peerId)
+      setUnreachable(status.info.address)
+    }
     table -= peerId
   }
 
@@ -121,6 +125,7 @@ trait DiscoveryServerState extends SessionManager {
     val now = TimeStamp.now()
     cleanTable(now)
     cleanSessions(now)
+    cleanUnreachables(now)
   }
 
   def cleanTable(now: TimeStamp): Unit = {
@@ -136,8 +141,21 @@ trait DiscoveryServerState extends SessionManager {
     remove(remote)
   }
 
+  def unsetUnreachable(remote: InetAddress): Unit = {
+    unreachables.filterInPlace { case (address, _) =>
+      address.getAddress != remote
+    }
+    ()
+  }
+
   def mightReachable(remote: InetSocketAddress): Boolean = {
     !unreachables.contains(remote)
+  }
+
+  def cleanUnreachables(now: TimeStamp): Unit = {
+    unreachables.filterInPlace { case (_, until) =>
+      until > now
+    }
   }
 
   def appendPeer(peerInfo: BrokerInfo): Unit = {

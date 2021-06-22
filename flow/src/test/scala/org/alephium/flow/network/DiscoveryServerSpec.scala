@@ -218,6 +218,10 @@ class DiscoveryServerSpec
     eventually {
       server0.underlyingActor.mightReachable(remote) is false
     }
+    server0 ! DiscoveryServer.Unban(AVector(remote.getAddress))
+    eventually {
+      server0.underlyingActor.mightReachable(remote) is true
+    }
   }
 
   trait Fixture extends ActorFixture with BrokerConfigFixture.Default {

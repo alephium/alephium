@@ -30,7 +30,7 @@ import org.alephium.protocol.Generators
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration, TimeStamp}
 
 class DiscoveryServerStateSpec
     extends AlephiumActorSpec("DiscoveryServer")
@@ -256,5 +256,19 @@ class DiscoveryServerStateSpec
     expectPayload[Ping]
     state.tryPing(peerInfo1)
     socketProbe.expectNoMessage()
+  }
+
+  it should "work for unreachables" in new Fixture {
+    state.mightReachable(peerInfo.address) is true
+    state.setUnreachable(peerInfo.address)
+    state.mightReachable(peerInfo.address) is false
+    state.unsetUnreachable(peerInfo.address.getAddress)
+    state.mightReachable(peerInfo.address) is true
+
+    state.setUnreachable(peerInfo.address)
+    state.cleanUnreachables(TimeStamp.now())
+    state.mightReachable(peerInfo.address) is false
+    state.cleanUnreachables(TimeStamp.now().plusHoursUnsafe(1))
+    state.mightReachable(peerInfo.address) is true
   }
 }
