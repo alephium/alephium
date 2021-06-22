@@ -17,10 +17,11 @@
 package org.alephium.protocol.message
 
 import scala.language.existentials
+import scala.reflect.ClassTag
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{PrivateKey, Protocol, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{Hash, PrivateKey, Protocol, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -34,32 +35,34 @@ final case class DiscoveryMessage(
 object DiscoveryMessage {
   val version: Int = Protocol.version
 
-  def from(myCliqueId: CliqueId, payload: Payload): DiscoveryMessage = {
-    val header = Header(version, myCliqueId)
+  final case class Id(value: Hash) extends AnyVal
+  object Id {
+    implicit val serde: Serde[Id] = Serde.forProduct1(Id.apply, _.value)
+
+    def random(): Id = Id(Hash.random)
+  }
+
+  def from(payload: Payload): DiscoveryMessage = {
+    val header = Header(version)
     DiscoveryMessage(header, payload)
   }
 
-  final case class Header(version: Int, cliqueId: CliqueId) {
-    val publicKey: PublicKey = cliqueId.publicKey
-  }
+  final case class Header(version: Int) {}
   object Header {
-    private val serde = Serde.tuple2[Int, CliqueId]
-
-    def serialize(header: Header): ByteString =
-      serde.serialize((header.version, header.cliqueId))
-
-    def _deserialize(input: ByteString): SerdeResult[Staging[Header]] = {
-      serde._deserialize(input).flatMap { case Staging((_version, cliqueId), rest) =>
+    implicit val serde: Serde[Header] = intSerde
+      .validate(_version =>
         if (_version == version) {
-          Right(Staging(Header(_version, cliqueId), rest))
+          Right(())
         } else {
-          Left(SerdeError.validation(s"Invalid version: got ${_version}, expect: $version"))
+          Left(s"Invalid version: got ${_version}, expect: $version")
         }
-      }
-    }
+      )
+      .xmap(Header.apply, _.version)
   }
 
-  trait Payload
+  trait Payload {
+    def senderCliqueId: Option[CliqueId]
+  }
   object Payload {
     @SuppressWarnings(
       Array(
@@ -92,11 +95,25 @@ object DiscoveryMessage {
     }
   }
 
-  final case class Ping(brokerInfoOpt: Option[BrokerInfo]) extends Payload
-  object Ping extends Code[Ping] {
-    private val serde: Serde[Option[BrokerInfo]] = optionSerde[BrokerInfo](BrokerInfo._serde)
+  sealed trait Request extends Payload
 
-    def serialize(ping: Ping): ByteString = serde.serialize(ping.brokerInfoOpt)
+  // the sender sends its brokerInfo if possible, otherwise sends its cliqueId
+  final case class Ping(sessionId: Id, senderInfo: Option[BrokerInfo]) extends Request {
+    def senderCliqueId: Option[CliqueId] = senderInfo.map(_.cliqueId)
+  }
+  object Ping extends Code[Ping] {
+    private val senderInfoSerde: Serde[Option[BrokerInfo]] = optionSerde(BrokerInfo._serde)
+    private val serde: Serde[Ping] = {
+      Serde.forProduct2[Id, Option[BrokerInfo], Ping](
+        Ping.apply,
+        t => (t.sessionId, t.senderInfo)
+      )(
+        Id.serde,
+        senderInfoSerde
+      )
+    }
+
+    def serialize(ping: Ping): ByteString = serde.serialize(ping)
 
     def deserialize(
         input: ByteString
@@ -104,55 +121,77 @@ object DiscoveryMessage {
       serde
         .deserialize(input)
         .flatMap {
-          case Some(info) =>
+          case ping @ Ping(_, Some(info)) =>
             BrokerInfo.validate(info) match {
-              case Right(_)       => Right(Some(info))
+              case Right(_)       => Right(ping)
               case Left(errorMsg) => Left(SerdeError.validation(errorMsg))
             }
-          case None => Right(None)
+          case ping => Right(ping)
         }
-        .map(Ping.apply)
     }
   }
 
-  final case class Pong(brokerInfo: BrokerInfo) extends Payload
+  final case class Pong(sessionId: Id, brokerInfo: BrokerInfo) extends Payload {
+    def senderCliqueId: Option[CliqueId] = Some(brokerInfo.cliqueId)
+  }
   object Pong extends Code[Pong] {
-    def serialize(pong: Pong): ByteString = BrokerInfo.serialize(pong.brokerInfo)
+    private val serde: Serde[Pong] =
+      Serde.forProduct2[Id, BrokerInfo, Pong](Pong.apply, t => (t.sessionId, t.brokerInfo))(
+        Id.serde,
+        BrokerInfo._serde
+      )
+
+    def serialize(pong: Pong): ByteString = serde.serialize(pong)
 
     def deserialize(
         input: ByteString
     )(implicit groupConfig: GroupConfig): SerdeResult[Pong] = {
-      BrokerInfo.deserialize(input).map(Pong.apply)
+      serde
+        .deserialize(input)
+        .flatMap { case pong @ Pong(_, info) =>
+          BrokerInfo.validate(info) match {
+            case Right(_)       => Right(pong)
+            case Left(errorMsg) => Left(SerdeError.validation(errorMsg))
+          }
+        }
     }
   }
 
-  final case class FindNode(targetId: CliqueId) extends Payload
+  final case class FindNode(targetId: CliqueId) extends Request {
+    def senderCliqueId: Option[CliqueId] = None
+  }
   object FindNode extends Code[FindNode] {
-    private val serde = Serde.tuple1[CliqueId]
+    private val serde: Serde[FindNode] = Serde.forProduct1(FindNode.apply, t => t.targetId)
 
-    def serialize(data: FindNode): ByteString =
-      serde.serialize(data.targetId)
+    def serialize(data: FindNode): ByteString = serde.serialize(data)
 
     def deserialize(
         input: ByteString
     )(implicit groupConfig: GroupConfig): SerdeResult[FindNode] =
-      serde.deserialize(input).map(FindNode(_))
+      serde.deserialize(input)
   }
 
-  final case class Neighbors(peers: AVector[BrokerInfo]) extends Payload
+  final case class Neighbors(peers: AVector[BrokerInfo]) extends Payload {
+    def senderCliqueId: Option[CliqueId] = None
+  }
   object Neighbors extends Code[Neighbors] {
-    private val serializer = avectorSerializer[BrokerInfo]
+    val serde: Serde[Neighbors] = {
+      val brokersSerde: Serde[AVector[BrokerInfo]] =
+        avectorSerde(implicitly[ClassTag[BrokerInfo]], BrokerInfo._serde)
+      Serde.forProduct1[AVector[BrokerInfo], Neighbors](
+        Neighbors.apply,
+        t => (t.peers)
+      )(brokersSerde)
+    }
 
-    def serialize(data: Neighbors): ByteString = serializer.serialize(data.peers)
+    def serialize(data: Neighbors): ByteString = serde.serialize(data)
 
-    implicit private val infoDeserializer = BrokerInfo._serde
-    private val deserializer              = avectorDeserializer[BrokerInfo]
     def deserialize(input: ByteString)(implicit
         groupConfig: GroupConfig
     ): SerdeResult[Neighbors] = {
-      deserializer.deserialize(input).flatMap { peers =>
+      serde.deserialize(input).flatMap { case message @ Neighbors(peers) =>
         peers.foreachE(BrokerInfo.validate) match {
-          case Right(_)    => Right(Neighbors(peers))
+          case Right(_)    => Right(message)
           case Left(error) => Left(SerdeError.validation(error))
         }
       }
@@ -182,14 +221,16 @@ object DiscoveryMessage {
       networkType: NetworkType,
       privateKey: PrivateKey
   ): ByteString = {
-
-    val magic     = networkType.magicBytes
-    val header    = Header.serialize(message.header)
-    val payload   = Payload.serialize(message.payload)
-    val signature = SignatureSchema.sign(header ++ payload, privateKey).bytes
-    val data      = signature ++ header ++ payload
-    val checksum  = MessageSerde.checksum(data)
-    val length    = MessageSerde.length(data)
+    val magic   = networkType.magicBytes
+    val header  = Header.serde.serialize(message.header)
+    val payload = Payload.serialize(message.payload)
+    val signature = message.payload.senderCliqueId match {
+      case Some(_) => SignatureSchema.sign(header ++ payload, privateKey).bytes
+      case None    => Signature.zero.bytes
+    }
+    val data     = signature ++ header ++ payload
+    val checksum = MessageSerde.checksum(data)
+    val length   = MessageSerde.length(data)
 
     magic ++ checksum ++ length ++ data
   }
@@ -204,13 +245,13 @@ object DiscoveryMessage {
           messageRest   <- MessageSerde.extractMessageBytes(length, rest)
           _             <- MessageSerde.checkChecksum(checksum, messageRest.value)
           signaturePair <- _deserialize[Signature](messageRest.value)
-          headerRest    <- Header._deserialize(signaturePair.rest)
+          headerRest    <- _deserialize[Header](signaturePair.rest)
+          payload       <- Payload.deserialize(headerRest.rest)
           _ <- verifyPayloadSignature(
             signaturePair.rest,
             signaturePair.value,
-            headerRest.value.publicKey
+            payload.senderCliqueId.map(_.publicKey)
           )
-          payload <- deserializeExactPayload(headerRest.rest)
         } yield {
           DiscoveryMessage(headerRest.value, payload)
         }
@@ -220,22 +261,21 @@ object DiscoveryMessage {
   private def verifyPayloadSignature(
       message: ByteString,
       signature: Signature,
-      publicKey: PublicKey
+      publicKeyOpt: Option[PublicKey]
   ) = {
-    if (SignatureSchema.verify(message, signature, publicKey)) {
-      Right(())
-    } else {
-      Left(SerdeError.validation(s"Invalid signature"))
-    }
-  }
-
-  private def deserializeExactPayload(
-      payloadBytes: ByteString
-  )(implicit config: GroupConfig) = {
-    Payload.deserialize(payloadBytes).left.map {
-      case _: SerdeError.NotEnoughBytes =>
-        SerdeError.wrongFormat("Cannot extract a correct payload from the length field")
-      case error => error
+    publicKeyOpt match {
+      case Some(publicKey) =>
+        if (SignatureSchema.verify(message, signature, publicKey)) {
+          Right(())
+        } else {
+          Left(SerdeError.validation(s"Invalid signature"))
+        }
+      case None =>
+        if (signature == Signature.zero) {
+          Right(())
+        } else {
+          Left(SerdeError.validation(s"Expect signature zero"))
+        }
     }
   }
 }

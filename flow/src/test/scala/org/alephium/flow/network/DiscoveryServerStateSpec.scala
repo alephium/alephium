@@ -19,7 +19,6 @@ package org.alephium.flow.network
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
-import scala.reflect.ClassTag
 
 import akka.event.LoggingAdapter
 import akka.testkit.{SocketUtil, TestProbe}
@@ -27,6 +26,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.flow.network.udp.UdpServer
+import org.alephium.protocol.Generators
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
@@ -44,11 +44,19 @@ class DiscoveryServerStateSpec
     def peersPerGroup: Int       = 1
     def scanFrequency: Duration  = Duration.unsafe(500)
     def expireDuration: Duration = Duration.ofHoursUnsafe(1)
+    def peersTimeout: Duration   = Duration.ofSecondsUnsafe(5)
     val socketProbe              = TestProbe()
     val networkConfig            = new NetworkConfig { val networkType = NetworkType.Testnet }
 
     implicit lazy val config: DiscoveryConfig with BrokerConfig =
-      createConfig(groupSize, udpPort, peersPerGroup, scanFrequency, expireDuration)._2
+      createConfig(
+        groupSize,
+        udpPort,
+        peersPerGroup,
+        scanFrequency,
+        expireDuration,
+        peersTimeout
+      )._2
 
     lazy val state = new DiscoveryServerState {
       implicit def brokerConfig: BrokerConfig       = self.config
@@ -67,7 +75,7 @@ class DiscoveryServerStateSpec
     lazy val peerClique: CliqueInfo = cliqueInfoGen(config.groupNumPerBroker).sample.get
     lazy val peerInfo               = peerClique.interBrokers.get.sample()
 
-    def expectPayload[T <: DiscoveryMessage.Payload: ClassTag]: Assertion = {
+    def expectPayload[T <: DiscoveryMessage.Payload]: T = {
       val peerConfig =
         createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
       socketProbe.expectMsgPF() { case send: UdpServer.Send =>
@@ -78,14 +86,16 @@ class DiscoveryServerStateSpec
             )
             .toOption
             .get
-        message.payload is a[T]
+        message.payload.asInstanceOf[T]
       }
     }
 
     def addToTable(peerInfo: BrokerInfo): Assertion = {
       state.tryPing(peerInfo)
       state.isPending(peerInfo.peerId) is true
-      state.handlePong(peerInfo)
+      val ping = expectPayload[Ping]
+      state.handlePong(ping.sessionId, peerInfo)
+      expectPayload[FindNode]
       state.isInTable(peerInfo.peerId) is true
     }
   }
@@ -102,29 +112,41 @@ class DiscoveryServerStateSpec
 
   trait PingedFixture extends Fixture {
     state.tryPing(peerInfo)
-    expectPayload[Ping]
+    val ping = expectPayload[Ping]
     state.isInTable(peerInfo.peerId) is false
+    state.handlePong(ping.sessionId, peerInfo)
   }
 
   it should "remove peer from pending list when received pong back" in new PingedFixture {
-    state.handlePong(peerInfo)
     expectPayload[FindNode]
     state.isUnknown(peerInfo.peerId) is false
     state.isPending(peerInfo.peerId) is false
     state.isInTable(peerInfo.peerId) is true
   }
 
-  it should "clean up everything if timeout is zero" in new Fixture {
-    override def scanFrequency: Duration  = Duration.unsafe(0)
-    override def expireDuration: Duration = Duration.unsafe(0)
-
+  it should "clean up table if expiry is zero" in new Fixture {
+    override def expireDuration: Duration = Duration.ofSecondsUnsafe(0)
     addToTable(peerInfo)
-    val peer0 = peerInfoGen.sample.get
-    state.tryPing(peer0)
-    state.isPending(peer0.peerId) is true
+    state.isInTable(peerInfo.peerId) is true
     state.cleanup()
     state.isInTable(peerInfo.peerId) is false
-    state.isPending(peer0.peerId) is false
+  }
+
+  it should "clean up everything if timeout is zero" in new Fixture {
+    override def peersTimeout: Duration = Duration.ofSecondsUnsafe(0)
+
+    state.tryPing(peerInfo)
+    state.isPending(peerInfo.peerId) is true
+    state.cleanup()
+    state.isPending(peerInfo.peerId) is false
+  }
+
+  it should "not ping pending peer" in new Fixture {
+    val peer = peerInfoGen.sample.get
+    state.tryPing(peer)
+    expectPayload[Ping]
+    state.tryPing(peer)
+    socketProbe.expectNoMessage()
   }
 
   it should "sort neighbors with respect to target" in new Fixture {
@@ -218,11 +240,21 @@ class DiscoveryServerStateSpec
       BrokerInfo.unsafe(info.cliqueId, info.brokerId, info.groupNumPerBroker, state.bootstrap.head)
     }
     state.ping(peer)
-    expectPayload[Ping]
-    state.handlePong(peer)
+    val ping = expectPayload[Ping]
+    state.handlePong(ping.sessionId, peer)
     expectPayload[FindNode]
     state.scan()
     expectPayload[Ping]
+    socketProbe.expectNoMessage()
+  }
+
+  it should "not ping unreachable peer" in new Fixture {
+    val peerInfo0 = Generators.peerInfoGen.sample.get
+    val peerInfo1 = Generators.peerInfoGen.sample.get
+    state.setUnreachable(peerInfo1.address)
+    state.tryPing(peerInfo0)
+    expectPayload[Ping]
+    state.tryPing(peerInfo1)
     socketProbe.expectNoMessage()
   }
 }

@@ -23,6 +23,7 @@ import scala.collection.mutable
 
 import akka.event.LoggingAdapter
 
+import org.alephium.flow.network.DiscoveryServer.AwaitReply
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
@@ -31,7 +32,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, LinkedBuffer, TimeStamp}
 
 // scalastyle:off number.of.methods
-trait DiscoveryServerState {
+trait DiscoveryServerState extends SessionManager {
   implicit def brokerConfig: BrokerConfig
   implicit def discoveryConfig: DiscoveryConfig
   implicit def networkConfig: NetworkConfig
@@ -50,8 +51,6 @@ trait DiscoveryServerState {
   private var socketOpt: Option[ActorRefT[UdpServer.Command]] = None
 
   protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val pendingMax   = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
-  private val pendings     = LinkedBuffer[PeerId, AwaitPong](pendingMax)
   private val unreachables = mutable.HashMap.empty[InetSocketAddress, TimeStamp]
 
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
@@ -92,18 +91,10 @@ trait DiscoveryServerState {
     table.contains(peerId)
   }
 
-  def isPending(peerId: PeerId): Boolean = {
-    pendings.contains(peerId)
-  }
-
   def isUnknown(peerId: PeerId): Boolean = !isInTable(peerId) && !isPending(peerId)
 
   def getPeer(peerId: PeerId): Option[BrokerInfo] = {
     table.get(peerId).map(_.info)
-  }
-
-  def getPending(peerId: PeerId): Option[AwaitPong] = {
-    pendings.get(peerId)
   }
 
   def updateStatus(peerId: PeerId): Unit = {
@@ -112,10 +103,6 @@ trait DiscoveryServerState {
         table(peerId) = status.copy(updateAt = TimeStamp.now())
       case None => ()
     }
-  }
-
-  def getPendingStatus(peerId: PeerId): Option[AwaitPong] = {
-    pendings.get(peerId)
   }
 
   def banPeerFromAddress(address: InetAddress): Unit = {
@@ -128,22 +115,20 @@ trait DiscoveryServerState {
 
   def banPeer(peerId: PeerId): Unit = {
     table -= peerId
-    pendings -= peerId
   }
 
   def cleanup(): Unit = {
     val now = TimeStamp.now()
+    cleanTable(now)
+    cleanSessions(now)
+  }
+
+  def cleanTable(now: TimeStamp): Unit = {
     val expired = table.values.view
       .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.expireDuration))
       .filter(_.info.cliqueId != selfCliqueId)
       .map(_.info.peerId)
     table --= expired
-
-    val deadPendings = pendings.collect {
-      case (cliqueId, status) if (now -- status.pingAt).exists(_ >= discoveryConfig.peersTimeout) =>
-        cliqueId
-    }
-    pendings --= deadPendings
   }
 
   def setUnreachable(remote: InetSocketAddress): Unit = {
@@ -176,7 +161,7 @@ trait DiscoveryServerState {
     bootstrap
       .filter(address => !peerCandidates.exists(_.info.address == address))
       .take(bootstrapNum)
-      .foreach(ping)
+      .foreach(ping(_, None))
   }
 
   private val fastScanThreshold = TimeStamp.now() + fastScanPeriod
@@ -204,7 +189,7 @@ trait DiscoveryServerState {
     socketOpt match {
       case Some(socket) =>
         log.debug(s"Send ${payload.getClass.getSimpleName} to $remote")
-        val message = DiscoveryMessage.from(selfCliqueId, payload)
+        val message = DiscoveryMessage.from(payload)
         socket ! UdpServer.Send(
           DiscoveryMessage.serialize(message, networkConfig.networkType, selfCliqueInfo.priKey),
           remote
@@ -223,42 +208,44 @@ trait DiscoveryServerState {
   }
 
   def ping(peerInfo: BrokerInfo): Unit = {
-    assume(peerInfo.peerId != selfPeerId)
-    val remoteAddress = peerInfo.address
-    send(remoteAddress, Ping(selfPeerInfoOpt))
-    pendings += (peerInfo.peerId -> AwaitPong(remoteAddress, TimeStamp.now()))
+    if (peerInfo.peerId != selfPeerId) {
+      val remoteAddress = peerInfo.address
+      ping(remoteAddress, Some(peerInfo))
+    }
   }
 
-  def ping(remote: InetSocketAddress): Unit = {
-    send(remote, Ping(selfPeerInfoOpt))
+  def ping(remote: InetSocketAddress, peerInfoOpt: Option[BrokerInfo]): Unit = {
+    if (mightReachable(remote)) {
+      withNewSession(remote, peerInfoOpt)(sessionId =>
+        send(remote, Ping(sessionId, selfPeerInfoOpt))
+      )
+    }
   }
 
-  def handlePong(peerInfo: BrokerInfo): Unit = {
-    val peerId = peerInfo.peerId
-    pendings.get(peerId) match {
-      case Some(AwaitPong(_, _)) =>
-        pendings.remove(peerId)
-        if (!isInTable(peerInfo.peerId)) {
-          if (getPeersWeight < neighborMax) {
-            appendPeer(peerInfo)
-          } else {
-            tryInsert(peerInfo)
-          }
-        }
+  def handlePong(id: Id, peerInfo: BrokerInfo): Unit = {
+    if (validateSessionId(id, peerInfo)) {
+      val peerId = peerInfo.peerId
+      if (isInTable(peerId)) {
         updateStatus(peerId)
-        fetchNeighbors(peerInfo)
-      case None =>
-        // ping for bootstrap nodes are not buffered
-        if (bootstrap.contains(peerInfo.address)) {
-          tryPing(peerInfo)
+      } else {
+        if (getPeersWeight < neighborMax) {
+          appendPeer(peerInfo)
+        } else {
+          tryInsert(peerInfo)
         }
+      }
+      fetchNeighbors(peerInfo)
     }
   }
 
   def remove(peer: InetSocketAddress): Unit = {
+    removeFromTable(peer)
+    removeFromSession(peer)
+  }
+
+  def removeFromTable(peer: InetSocketAddress): Unit = {
     val peersToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
     table --= peersToRemove
-    pendings --= peersToRemove
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -268,6 +255,57 @@ trait DiscoveryServerState {
     if (myself.hammingDist(peerInfo.cliqueId) < myself.hammingDist(furthest.cliqueId)) {
       table -= furthest
       appendPeer(peerInfo)
+    }
+  }
+}
+
+trait SessionManager {
+  import DiscoveryMessage.Id
+
+  def brokerConfig: BrokerConfig
+  def discoveryConfig: DiscoveryConfig
+
+  private val pendingMax = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
+
+  val sessions = LinkedBuffer[Id, AwaitReply](pendingMax)
+  val pendings = LinkedBuffer[PeerId, TimeStamp](pendingMax)
+
+  def isPending(peerId: PeerId): Boolean = pendings.contains(peerId)
+
+  def withNewSession[T](remote: InetSocketAddress, peerInfoOpt: Option[BrokerInfo])(
+      f: Id => T
+  ): T = {
+    val id  = Id.random()
+    val now = TimeStamp.now()
+    sessions.addOne(id -> AwaitReply(remote, now))
+    peerInfoOpt.foreach(peer => pendings.addOne(peer.peerId -> now))
+    f(id)
+  }
+
+  def validateSessionId(id: Id, brokerInfo: BrokerInfo): Boolean = {
+    sessions.get(id).exists { session =>
+      sessions.remove(id)
+      pendings.remove(brokerInfo.peerId)
+      if (session.remote == brokerInfo.address) {
+        true
+      } else {
+        false
+      }
+    }
+  }
+
+  def cleanSessions(now: TimeStamp): Unit = {
+    sessions.filterInPlace { case (_, status) =>
+      now.deltaUnsafe(status.requestAt) < discoveryConfig.peersTimeout
+    }
+    pendings.filterInPlace { case (_, timestamp) =>
+      now.deltaUnsafe(timestamp) < discoveryConfig.peersTimeout
+    }
+  }
+
+  def removeFromSession(peer: InetSocketAddress): Unit = {
+    sessions.filterInPlace { case (_, awaitReply: AwaitReply) =>
+      awaitReply.remote != peer
     }
   }
 }

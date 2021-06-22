@@ -27,8 +27,6 @@ trait DiscoveryConfig {
   /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
   def neighborsPerGroup: Int
 
-  /** Duration we wait before considering a peer dead. * */
-  lazy val peersTimeout: Duration = scanFrequency
-
-  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(5)
+  val peersTimeout: Duration        = Duration.ofSecondsUnsafe(5)
+  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(10)
 }

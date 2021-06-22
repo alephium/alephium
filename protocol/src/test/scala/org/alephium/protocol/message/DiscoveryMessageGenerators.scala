@@ -27,16 +27,23 @@ trait DiscoveryMessageGenerators extends Generators {
   import DiscoveryMessage._
 
   def discoveryPublicKey: PublicKey
+  private def cliqueId = CliqueId(discoveryPublicKey)
+
+  lazy val idGen: Gen[Id] = Gen.const(()).map(_ => Id.random())
 
   lazy val findNodeGen: Gen[FindNode] = for {
     target <- cliqueIdGen
   } yield FindNode(target)
 
-  def pingGen(implicit config: CliqueConfig): Gen[Ping] =
-    brokerInfoGen.map(info => Ping.apply(Some(info)))
+  def pingGen(implicit config: CliqueConfig): Gen[Ping] = for {
+    id     <- idGen
+    broker <- brokerInfoGen(cliqueId)
+  } yield Ping(id, Some(broker))
 
-  def pongGen(implicit config: CliqueConfig): Gen[Pong] =
-    brokerInfoGen.map(Pong.apply)
+  def pongGen(implicit config: CliqueConfig): Gen[Pong] = for {
+    id     <- idGen
+    broker <- brokerInfoGen(cliqueId)
+  } yield Pong(id, broker)
 
   def neighborsGen(implicit config: CliqueConfig): Gen[Neighbors] =
     for {
@@ -47,7 +54,6 @@ trait DiscoveryMessageGenerators extends Generators {
       cliqueConfig: CliqueConfig
   ): Gen[DiscoveryMessage] =
     for {
-      cliqueId <- Gen.const(()).map(_ => CliqueId(discoveryPublicKey))
-      payload  <- Gen.oneOf[Payload](findNodeGen, pingGen, pongGen, neighborsGen)
-    } yield DiscoveryMessage.from(cliqueId, payload)
+      payload <- Gen.oneOf[Payload](findNodeGen, pingGen, pongGen, neighborsGen)
+    } yield DiscoveryMessage.from(payload)
 }

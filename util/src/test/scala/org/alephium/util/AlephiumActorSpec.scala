@@ -51,16 +51,13 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
     super.afterEach()
     if (_system != null) {
       Await.result(_system.terminate(), Duration.ofSecondsUnsafe(10).asScala)
-      // scalastyle:off null
-      _system = null
-      // scalastyle:on null
+      ()
     }
   }
 
   trait ActorCreation {
     implicit val system: ActorSystem =
       ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
-    Option(_system) is None
     _system = system
   }
 
