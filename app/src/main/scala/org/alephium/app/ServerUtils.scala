@@ -256,7 +256,7 @@ class ServerUtils(networkType: NetworkType) {
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    blockFlow.transfer(fromKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
+    blockFlow.sweepAll(fromKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
+import org.alephium.flow.core.UtxoUtils.Asset
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
@@ -176,13 +177,9 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {
         totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
-          acc.add(amount).toRight(s"Amount overflow")
+          acc.add(amount).toRight("Amount overflow")
         }
-        _ <- gasOpt match {
-          case None => Right(())
-          case Some(gas) =>
-            if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
-        }
+        _ <- checkWithMinimalGas(gasOpt, minimalGas)
         selected <- UtxoUtils.select(
           utxos,
           totalAmount,
@@ -194,19 +191,14 @@ trait TxUtils { Self: FlowUtils =>
           outputInfos.length + 1,
           minimalGas
         )
-        _ <-
-          if (selected.assets.length > ALF.MaxTxInputNum) {
-            Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
-          } else {
-            Right(())
-          }
+        _ <- checkWithMaxTxInputNum(selected.assets)
         unsignedTx <- UnsignedTransaction
           .transferAlf(
             selected.assets.map(asset => (asset.ref, asset.output)),
             fromLockupScript,
             fromUnlockScript,
             outputInfos,
-            if (selected.gas > minimalGas) selected.gas else minimalGas,
+            selected.gas,
             gasPrice
           )
       } yield unsignedTx
@@ -224,7 +216,7 @@ trait TxUtils { Self: FlowUtils =>
     transfer(fromKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
   }
 
-  def transfer(
+  def sweepAll(
       fromKey: PublicKey,
       toLockupScript: LockupScript,
       lockTimeOpt: Option[TimeStamp],
@@ -236,35 +228,20 @@ trait TxUtils { Self: FlowUtils =>
 
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {
-        _ <- gasOpt match {
-          case None => Right(())
-          case Some(gas) =>
-            if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
-        }
-        gas <- Right(
-          UtxoUtils.calculateGas(
-            utxos,
-            gasOpt,
-            defaultGasPerInput,
-            defaultGasPerOutput,
-            1,
-            minimalGas
-          )
+        _   <- checkWithMinimalGas(gasOpt, minimalGas)
+        gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateGas(utxos.length, 1)))
+        _   <- checkWithMaxTxInputNum(utxos)
+        totalAmount <- utxos.foldE(U256.Zero)(
+          _ add _.output.amount toRight "Input amount overflow"
         )
-        _ <-
-          if (utxos.length > ALF.MaxTxInputNum) {
-            Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
-          } else {
-            Right(())
-          }
-        amount <- utxos.foldE(U256.Zero)(_ add _.output.amount toRight s"Input amount overflow")
+        amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
         unsignedTx <- UnsignedTransaction
           .transferAlf(
             utxos.map(asset => (asset.ref, asset.output)),
             fromLockupScript,
             fromUnlockScript,
             AVector((toLockupScript, amount, lockTimeOpt)),
-            if (gas > minimalGas) gas else minimalGas,
+            gas,
             gasPrice
           )
       } yield unsignedTx
@@ -353,15 +330,6 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def ableToUse(
-      output: TxOutput,
-      lockupScript: LockupScript
-  ): Boolean =
-    output match {
-      case o: AssetOutput    => o.lockupScript == lockupScript
-      case _: ContractOutput => false
-    }
-
   def getUtxosInCache(
       groupIndex: GroupIndex,
       bestDeps: BlockDeps,
@@ -444,6 +412,34 @@ trait TxUtils { Self: FlowUtils =>
       } else {
         worldState.existOutput(input.outputRef)
       }
+    }
+  }
+
+  private def checkWithMinimalGas(
+      gasOpt: Option[GasBox],
+      minimalGas: GasBox
+  ): Either[String, Unit] = {
+    gasOpt match {
+      case None => Right(())
+      case Some(gas) =>
+        if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
+    }
+  }
+
+  private def ableToUse(
+      output: TxOutput,
+      lockupScript: LockupScript
+  ): Boolean =
+    output match {
+      case o: AssetOutput    => o.lockupScript == lockupScript
+      case _: ContractOutput => false
+    }
+
+  private def checkWithMaxTxInputNum(assets: AVector[Asset]): Either[String, Unit] = {
+    if (assets.length > ALF.MaxTxInputNum) {
+      Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
+    } else {
+      Right(())
     }
   }
 }

@@ -19,7 +19,8 @@ package org.alephium.app
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.{ALF, SignatureSchema}
-import org.alephium.protocol.model.{Address, ChainIndex}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, ChainIndex, NetworkType}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ServerUtilsSpec extends AlephiumSpec {
@@ -36,10 +37,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
-      val (_, toPublicKey)                   = chainIndex.to.generateKey
-      val toAddress                          = Address.p2pkh(networkType, toPublicKey)
+      val destination1                       = generateDestination(chainIndex, networkType)
+      val destination2                       = generateDestination(chainIndex, networkType)
 
-      val destinations = AVector(Destination(Address.p2pkh(networkType, toPublicKey), ALF.oneAlf))
+      val destinations = AVector(destination1, destination2)
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
@@ -54,11 +55,16 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
+      val senderBalanceWithGas = genesisBalance - destination1.amount - destination2.amount
+
       blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
+        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
+        Balance(destination1.amount, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
+        Balance(destination2.amount, 0, 1)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       block0.chainIndex is chainIndex
@@ -66,16 +72,22 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
+        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
+        Balance(destination1.amount, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
+        Balance(destination2.amount, 0, 1)
 
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 2, 2, 2)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
+        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
+        Balance(destination1.amount, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
+        Balance(destination2.amount, 0, 1)
     }
   }
 
@@ -95,10 +107,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
-      val (_, toPublicKey)                   = chainIndex.to.generateKey
-      val toAddress                          = Address.p2pkh(networkType, toPublicKey)
+      val destination1                       = generateDestination(chainIndex, networkType)
+      val destination2                       = generateDestination(chainIndex, networkType)
 
-      val destinations = AVector(Destination(Address.p2pkh(networkType, toPublicKey), ALF.oneAlf))
+      val destinations = AVector(destination1, destination2)
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
@@ -113,11 +125,13 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
+      val senderBalanceWithGas = genesisBalance - destination1.amount - destination2.amount
+
       blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(0, 0, 0)
+        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE Balance(0, 0, 0)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       block0.chainIndex is chainIndex
@@ -125,25 +139,43 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE
+        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
+        Balance(0, 0, 0)
+      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
         Balance(0, 0, 0)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
+        Balance(destination1.amount, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
+        Balance(destination2.amount, 0, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
+        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
 
       val block2 = emptyBlock(blockFlow, ChainIndex(chainIndex.to, chainIndex.to))
       addAndCheck(blockFlow, block2)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - ALF.oneAlf - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE Balance(ALF.oneAlf, 0, 1)
+        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
+        Balance(destination1.amount, 0, 1)
+      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
+        Balance(destination2.amount, 0, 1)
     }
+  }
+
+  private def generateDestination(chainIndex: ChainIndex, networkType: NetworkType)(implicit
+      groupConfig: GroupConfig
+  ): Destination = {
+    val (_, toPublicKey) = chainIndex.to.generateKey
+    val address          = Address.p2pkh(networkType, toPublicKey)
+    val amount           = ALF.oneAlf
+
+    Destination(address, amount)
   }
 }

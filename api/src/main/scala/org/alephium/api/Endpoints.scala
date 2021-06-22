@@ -224,6 +224,7 @@ trait Endpoints
 
   val decodeUnsignedTransaction: BaseEndpoint[DecodeTransaction, Tx] =
     transactionsEndpoint.post
+      .in("decode")
       .in(jsonBody[DecodeTransaction])
       .out(jsonBody[Tx])
       .summary("Decode an unsigned transaction")

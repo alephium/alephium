@@ -3156,13 +3156,13 @@
         }
       }
     },
-    "/transactions": {
+    "/transactions/decode": {
       "post": {
         "tags": [
           "Transactions"
         ],
         "summary": "Decode an unsigned transaction",
-        "operationId": "postTransactions",
+        "operationId": "postTransactionsDecode",
         "requestBody": {
           "content": {
             "application/json": {
