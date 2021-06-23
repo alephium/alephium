@@ -129,11 +129,11 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   def cleanTable(now: TimeStamp): Unit = {
-    val expired = table.values.view
-      .filter(status => (now -- status.updateAt).exists(_ >= discoveryConfig.expireDuration))
-      .filter(_.info.cliqueId != selfCliqueId)
-      .map(_.info.peerId)
-    table --= expired
+    table.filterInPlace { case (peerId, status) =>
+      now.deltaUnsafe(status.updateAt) < discoveryConfig.expireDuration ||
+        peerId.cliqueId == selfCliqueId
+    }
+    ()
   }
 
   def setUnreachable(remote: InetSocketAddress): Unit = {
