@@ -91,17 +91,17 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
-      log.debug(s"Miner API connection from $remote")
+      log.info(s"Miner API connection from $remote")
       val connection = ActorRefT[Tcp.Command](sender())
       val connectionHandler = ActorRefT[ConnectionHandler.Command](
         context.actorOf(MinerApiController.connection(remote, connection))
       )
       context.watch(connectionHandler.ref)
       connections.addOne(connectionHandler)
-      allHandlers.viewHandler ! ViewHandler.Subscribe // it might be resubscribing to get initial templates for new miners
+      allHandlers.viewHandler ! ViewHandler.Subscribe
 
     case Terminated(actor) =>
-      log.debug(s"The connection to $actor is closed")
+      log.info(s"The miner API connection to $actor is closed")
       removeConnection(actor)
   }
 

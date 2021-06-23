@@ -18,11 +18,12 @@ package org.alephium.flow.handler
 
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, Cancellable, Props}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Address, ChainIndex, TransactionTemplate}
@@ -33,17 +34,15 @@ import org.alephium.util.EventStream.{Publisher, Subscriber}
 object ViewHandler {
   def props(
       blockFlow: BlockFlow,
-      txHandler: ActorRefT[TxHandler.Command],
-      addressOpt: Option[AVector[Address]]
-  )(implicit
-      brokerConfig: BrokerConfig
-  ): Props = Props(
-    new ViewHandler(blockFlow, txHandler, addressOpt.map(_.map(_.lockupScript)))
+      txHandler: ActorRefT[TxHandler.Command]
+  )(implicit brokerConfig: BrokerConfig, miningSetting: MiningSetting): Props = Props(
+    new ViewHandler(blockFlow, txHandler, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
   )
 
   sealed trait Command
   case object Subscribe                                              extends Command
   case object Unsubscribe                                            extends Command
+  case object UpdateSubscribers                                      extends Command
   case object GetMinerAddresses                                      extends Command
   final case class UpdateMinerAddresses(addresses: AVector[Address]) extends Command
 
@@ -76,7 +75,8 @@ class ViewHandler(
     txHandler: ActorRefT[TxHandler.Command],
     var minerAddressesOpt: Option[AVector[LockupScript]]
 )(implicit
-    val brokerConfig: BrokerConfig
+    val brokerConfig: BrokerConfig,
+    val miningSetting: MiningSetting
 ) extends ViewHandlerState
     with Subscriber
     with Publisher {
@@ -98,8 +98,9 @@ class ViewHandler(
       }
       updateSubscribers()
 
-    case ViewHandler.Subscribe   => subscribe()
-    case ViewHandler.Unsubscribe => unsubscribe()
+    case ViewHandler.Subscribe         => subscribe()
+    case ViewHandler.Unsubscribe       => unsubscribe()
+    case ViewHandler.UpdateSubscribers => updateSubscribers()
 
     case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
@@ -123,25 +124,45 @@ class ViewHandler(
 
 trait ViewHandlerState extends IOBaseActor {
   implicit def brokerConfig: BrokerConfig
+  implicit def miningSetting: MiningSetting
 
   def blockFlow: BlockFlow
   def minerAddressesOpt: Option[AVector[LockupScript]]
 
-  val subscribers: ArrayBuffer[ActorRef] = ArrayBuffer.empty
+  var updateScheduled: Option[Cancellable] = None
+  val subscribers: ArrayBuffer[ActorRef]   = ArrayBuffer.empty
 
   def subscribe(): Unit = {
     if (!subscribers.contains(sender())) {
-      subscribers.addOne(sender())
-      minerAddressesOpt.foreach { minerAddresses =>
-        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-          sender() ! ViewHandler.NewTemplates(templates)
-        }
+      minerAddressesOpt match {
+        case Some(_) =>
+          subscribers.addOne(sender())
+          scheduleUpdate()
+        case None =>
+          log.warning(s"Unable to subscribe the miner, as miner addresses are not set")
       }
+    } else {
+      log.debug(s"The miner is already subscribed")
     }
+  }
+
+  def scheduleUpdate(): Unit = {
+    updateScheduled.foreach(_.cancel())
+    updateScheduled = Some(
+      scheduleCancellableOnce(
+        self,
+        ViewHandler.UpdateSubscribers,
+        miningSetting.pollingInterval
+      )
+    )
   }
 
   def unsubscribe(): Unit = {
     subscribers.filterInPlace(_ != sender())
+    if (subscribers.isEmpty) {
+      updateScheduled.foreach(_.cancel())
+      updateScheduled = None
+    }
   }
 
   def updateSubscribers(): Unit = {
@@ -150,6 +171,7 @@ trait ViewHandlerState extends IOBaseActor {
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
           subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
         }
+        scheduleUpdate()
       }
     }
   }

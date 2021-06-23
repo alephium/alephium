@@ -265,11 +265,13 @@ trait TestFixtureLike
       implicit override lazy val config = {
         val minerAddresses =
           genesisKeys.map(p => Address(NetworkType.Testnet, LockupScript.p2pkh(p._2)))
-        val tmp = AlephiumConfig.load(newConfig).copy(minerAddresses = Some(minerAddresses))
+
+        val tmp0 = AlephiumConfig.load(newConfig)
+        val tmp1 = tmp0.copy(mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses)))
         bootstrap match {
           case Some(address) =>
-            tmp.copy(discovery = tmp.discovery.copy(bootstrap = ArraySeq(address)))
-          case None => tmp
+            tmp1.copy(discovery = tmp1.discovery.copy(bootstrap = ArraySeq(address)))
+          case None => tmp1
         }
       }
 

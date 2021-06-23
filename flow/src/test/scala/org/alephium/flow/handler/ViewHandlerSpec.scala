@@ -57,11 +57,32 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
       with IntegrationPatience
       with LockupScriptGenerators {
     val txProbe = TestProbe()
-    val minderAddresses =
+    lazy val minderAddresses =
       AVector.tabulate(groupConfig.groups)(i =>
         Address(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
       )
-    val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow, txProbe.ref, None))
+    lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow, txProbe.ref))
+  }
+
+  it should "not subscribe when miner addresses are not set" in new Fixture {
+    EventFilter.warning("Unable to subscribe the miner, as miner addresses are not set").intercept {
+      viewHandler ! ViewHandler.Subscribe
+      viewHandler.underlyingActor.subscribers.isEmpty is true
+      viewHandler.underlyingActor.updateScheduled is None
+    }
+
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
+    viewHandler ! ViewHandler.Subscribe
+    eventually {
+      viewHandler.underlyingActor.subscribers.nonEmpty is true
+      viewHandler.underlyingActor.updateScheduled.nonEmpty is true
+    }
+
+    viewHandler ! ViewHandler.Unsubscribe
+    eventually {
+      viewHandler.underlyingActor.subscribers.isEmpty is true
+      viewHandler.underlyingActor.updateScheduled is None
+    }
   }
 
   it should "update deps and txs" in new Fixture {
@@ -75,6 +96,7 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     blockFlow.getMemPool(chainIndex).pendingPool.add(tx1)
     blockFlow.add(block0).isRight is true
 
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ViewHandler.Subscribe
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
     eventually(txProbe.expectMsg(TxHandler.Broadcast(AVector(tx1))))
@@ -85,19 +107,30 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     eventually(expectMsgType[ViewHandler.NewTemplates])
   }
 
+  it should "update templates automatically" in new Fixture {
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
+    viewHandler ! ViewHandler.Subscribe
+
+    Thread.sleep(miningSetting.pollingInterval.millis)
+    eventually(expectMsgType[ViewHandler.NewTemplates])
+  }
+
   it should "subscribe and unsubscribe actors" in new Fixture {
+    override val configValues = Map(("alephium.mining.polling-interval", "100 seconds"))
+
     val probe0 = TestProbe()
     val probe1 = TestProbe()
 
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     probe0.send(viewHandler, ViewHandler.Subscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref)
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref))
     probe0.send(viewHandler, ViewHandler.Subscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref)
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref))
 
     probe1.send(viewHandler, ViewHandler.Subscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref)
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref))
     probe1.send(viewHandler, ViewHandler.Subscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref)
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref))
 
     viewHandler.underlyingActor.updateSubscribers()
     eventually(probe0.expectNoMessage())
@@ -109,12 +142,12 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     eventually(probe1.expectMsgType[ViewHandler.NewTemplates])
 
     probe0.send(viewHandler, ViewHandler.Unsubscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref)
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref))
     probe0.send(viewHandler, ViewHandler.Unsubscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref)
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe1.ref))
 
     probe1.send(viewHandler, ViewHandler.Unsubscribe)
-    viewHandler.underlyingActor.subscribers.toSeq is Seq.empty
+    eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq.empty)
   }
 
   it should "handle miner addresses" in new Fixture with LockupScriptGenerators {
