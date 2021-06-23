@@ -29,7 +29,7 @@ import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfi
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, LinkedBuffer, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Duration, LinkedBuffer, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait DiscoveryServerState extends SessionManager {
@@ -137,7 +137,10 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   def setUnreachable(remote: InetSocketAddress): Unit = {
-    unreachables += remote -> TimeStamp.now().plusMinutesUnsafe(10)
+    unreachables.get(remote) match {
+      case Some(until) => unreachables(remote) = until + Duration.ofMinutesUnsafe(1)
+      case None        => unreachables(remote) = TimeStamp.now().plusMinutesUnsafe(1)
+    }
     remove(remote)
   }
 
