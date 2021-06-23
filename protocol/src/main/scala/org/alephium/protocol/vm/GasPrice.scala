@@ -19,11 +19,13 @@ package org.alephium.protocol.vm
 import org.alephium.serde.Serde
 import org.alephium.util.U256
 
-final case class GasPrice(value: U256) {
+final case class GasPrice(value: U256) extends Ordered[GasPrice] {
   // this is safe as value <= ALF.MaxALFValue
   def *(gas: GasBox): U256 = {
     value.mulUnsafe(gas.toU256)
   }
+
+  override def compare(that: GasPrice): Int = this.value.compare(that.value)
 }
 
 object GasPrice {

@@ -29,7 +29,7 @@ class PendingPoolSpec
 
   it should "add tx" in {
     val tx   = transactionGen().sample.get
-    val pool = PendingPool.empty(dummyIndex)
+    val pool = PendingPool.empty(dummyIndex, 10)
     pool.add(tx.toTemplate)
     pool.add(tx.toTemplate) // for idempotent
     pool.txs.contains(tx.id) is true
@@ -38,10 +38,24 @@ class PendingPoolSpec
 
   it should "remove tx" in {
     val tx   = transactionGen().sample.get
-    val pool = PendingPool.empty(dummyIndex)
+    val pool = PendingPool.empty(dummyIndex, 10)
     pool.remove(tx.toTemplate)
     pool.remove(tx.toTemplate) // for idempotent
     pool.txs.contains(tx.id) is false
     pool.indexes is TxIndexes.emptyPendingPool
+  }
+
+  it should "work with capacity" in {
+    val tx0  = transactionGen().sample.get.toTemplate
+    val pool = PendingPool.empty(dummyIndex, 1)
+    pool.isFull() is false
+    pool.add(tx0) is true
+    pool.isFull() is true
+    pool.add(tx0) is true
+
+    val tx1 = transactionGen().sample.get.toTemplate
+    pool.add(tx1) is false
+    pool.remove(tx0)
+    pool.add(tx1) is true
   }
 }

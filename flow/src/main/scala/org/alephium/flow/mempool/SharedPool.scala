@@ -28,66 +28,87 @@ import org.alephium.util.{AVector, RWLock, U256}
  * Transaction pool implementation
  */
 class SharedPool private (
-    chainIndex: ChainIndex,
-    pool: mutable.SortedMap[WeightedId, TransactionTemplate],
-    weights: mutable.HashMap[Hash, GasPrice],
+    val chainIndex: ChainIndex,
+    val pool: mutable.SortedMap[WeightedId, TransactionTemplate],
+    val weights: mutable.HashMap[Hash, GasPrice],
+    val sharedTxIndex: TxIndexes,
     val capacity: Int
-) extends Pool
-    with RWLock {
+) extends RWLock {
 
   def isFull: Boolean = pool.size == capacity
 
   def size: Int = pool.size
 
-  def contains(txId: Hash): Boolean =
-    readOnly {
-      weights.contains(txId)
-    }
+  def contains(txId: Hash): Boolean = readOnly {
+    weights.contains(txId)
+  }
 
-  def collectForBlock(maxNum: Int): AVector[TransactionTemplate] =
-    readOnly {
-      AVector.from(pool.values.take(maxNum))
-    }
+  def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
+    AVector.from(pool.values.take(maxNum))
+  }
 
-  def getAll(): AVector[TransactionTemplate] =
-    readOnly {
-      AVector.from(pool.values)
-    }
+  def getAll(): AVector[TransactionTemplate] = readOnly {
+    AVector.from(pool.values)
+  }
 
-  def add(transactions: AVector[TransactionTemplate]): Int =
-    writeOnly {
-      val sizeBefore = size
-      transactions.foreachE { case (tx) =>
-        if (isFull) {
-          Left(())
-        } else {
-          weights += tx.id                                -> tx.unsigned.gasPrice
-          pool += WeightedId(tx.unsigned.gasPrice, tx.id) -> tx
-          Right(())
-        }
+  def add(transactions: AVector[TransactionTemplate]): Int = writeOnly {
+    val result = transactions.fold(0) { case (acc, tx) =>
+      acc + _add(tx)
+    }
+    measureTransactionsTotal()
+    result
+  }
+
+  def add(tx: TransactionTemplate): Boolean = writeOnly {
+    _add(tx) != 0
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def _add(tx: TransactionTemplate): Int = {
+    val txGasPrice = tx.unsigned.gasPrice
+    val txWeight   = WeightedId(txGasPrice, tx.id)
+    if (isFull) {
+      val lowestWeight = pool.head._1
+      if (txGasPrice > lowestWeight.gasPrice) {
+        _remove(lowestWeight.id)
+        _add(txWeight, tx)
+        1
+      } else {
+        0
       }
-      val sizeAfter = size
-      sizeAfter - sizeBefore
+    } else {
+      _add(txWeight, tx)
+      1
     }
+  }
 
-  def remove(transactions: AVector[TransactionTemplate]): Int =
-    writeOnly {
-      val sizeBefore = size
-      transactions.foreach { tx =>
-        if (contains(tx.id)) {
-          val weight = weights(tx.id)
-          weights -= tx.id
-          pool -= WeightedId(weight, tx.id)
-        }
-      }
-      val sizeAfter = size
-      sizeBefore - sizeAfter
-    }
+  def _add(weightedId: WeightedId, tx: TransactionTemplate): Unit = {
+    weights += tx.id   -> tx.unsigned.gasPrice
+    pool += weightedId -> tx
+    sharedTxIndex.add(tx)
+  }
 
-  def clear(): Unit =
-    writeOnly {
-      pool.clear()
+  def remove(transactions: AVector[TransactionTemplate]): Int = writeOnly {
+    val sizeBefore = size
+    transactions.foreach(tx => _remove(tx.id))
+    measureTransactionsTotal()
+    val sizeAfter = size
+    sizeBefore - sizeAfter
+  }
+
+  def _remove(txId: Hash): Unit = {
+    weights.get(txId).foreach { weight =>
+      val weightedId = WeightedId(weight, txId)
+      val tx         = pool(weightedId)
+      weights -= txId
+      pool -= weightedId
+      sharedTxIndex.remove(tx)
     }
+  }
+
+  def clear(): Unit = writeOnly {
+    pool.clear()
+  }
 
   private val transactionsTotalLabeled = MemPool.sharedPoolTransactionsTotal
     .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
@@ -97,10 +118,16 @@ class SharedPool private (
 }
 
 object SharedPool {
-  def empty(chainIndex: ChainIndex, capacity: Int): SharedPool =
-    new SharedPool(chainIndex, mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
+  def empty(chainIndex: ChainIndex, capacity: Int, sharedTxIndex: TxIndexes): SharedPool =
+    new SharedPool(
+      chainIndex,
+      mutable.SortedMap.empty,
+      mutable.HashMap.empty,
+      sharedTxIndex,
+      capacity
+    )
 
-  final case class WeightedId(weight: GasPrice, id: Hash) {
+  final case class WeightedId(gasPrice: GasPrice, id: Hash) {
     override def equals(obj: Any): Boolean =
       obj match {
         case that: WeightedId => this.id == that.id
@@ -112,7 +139,7 @@ object SharedPool {
 
   implicit val ord: Ordering[WeightedId] = {
     Ordering
-      .by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight.value, weightedId.id))
+      .by[WeightedId, (U256, Hash)](weightedId => (weightedId.gasPrice.value, weightedId.id))
       .reverse
   }
 }

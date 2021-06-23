@@ -28,7 +28,7 @@ import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.AVector
 
 /*
- * MemPool is the class to store all the pending transactions
+ * MemPool is the class to store all the unconfirmed transactions
  *
  * Transactions should be ordered according to weights. The weight is calculated based on fees
  */
@@ -77,29 +77,27 @@ class MemPool private (
 
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
-      pendingPool.add(tx)
-      pendingPool.measureTransactionsTotal()
-      MemPool.AddedToLocalPool
+      if (pendingPool.add(tx)) {
+        MemPool.AddedToPendingPool
+      } else {
+        MemPool.PendingPoolIsFull
+      }
     } else {
-      addToTxPool(index, AVector(tx)) // We might disable metrics for this when TPS is high
-      MemPool.AddedToSharedPool
+      if (getSharedPool(index).add(tx)) {
+        MemPool.AddedToSharedPool
+      } else {
+        MemPool.SharedPoolIsFull
+      }
     }
   }
 
   def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    val sharedPool = getSharedPool(index)
-    val count      = sharedPool.add(transactions)
-    txIndexes.add(transactions)
-    sharedPool.measureTransactionsTotal()
-    count
+    getSharedPool(index).add(transactions)
   }
 
   def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
     val sharedPool = getSharedPool(index)
-    val count      = sharedPool.remove(transactions)
-    txIndexes.remove(transactions)
-    sharedPool.measureTransactionsTotal()
-    count
+    sharedPool.remove(transactions)
   }
 
   def reorg(
@@ -115,8 +113,6 @@ class MemPool private (
     val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
       sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
     )
-
-    sharedPools.foreach(_.measureTransactionsTotal())
 
     (removed, added)
   }
@@ -157,7 +153,7 @@ class MemPool private (
       case None         => txIndexes.getUtxo(outputRef)
     }
     result match {
-      case Left(_)      => None // utxo is spent already
+      case Left(_)      => None // the output is spent already
       case Right(value) => value
     }
   }
@@ -171,17 +167,21 @@ object MemPool {
   def empty(
       groupIndex: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
+    val sharedTxIndex = TxIndexes.emptySharedPool
     val sharedPools =
       AVector.tabulate(groupConfig.groups) { toGroup =>
         val chainIndex = ChainIndex.unsafe(groupIndex.value, toGroup)
-        SharedPool.empty(chainIndex, memPoolSetting.txPoolCapacity)
+        SharedPool.empty(chainIndex, memPoolSetting.sharedPoolCapacity, sharedTxIndex)
       }
-    new MemPool(groupIndex, sharedPools, TxIndexes.emptySharedPool, PendingPool.empty(groupIndex))
+    val pendingPool = PendingPool.empty(groupIndex, memPoolSetting.pendingPoolCapacity)
+    new MemPool(groupIndex, sharedPools, sharedTxIndex, pendingPool)
   }
 
   sealed trait NewTxCategory
-  case object AddedToLocalPool  extends NewTxCategory
-  case object AddedToSharedPool extends NewTxCategory
+  case object AddedToSharedPool  extends NewTxCategory
+  case object SharedPoolIsFull   extends NewTxCategory
+  case object AddedToPendingPool extends NewTxCategory
+  case object PendingPoolIsFull  extends NewTxCategory
 
   val sharedPoolTransactionsTotal: Gauge = Gauge
     .build(

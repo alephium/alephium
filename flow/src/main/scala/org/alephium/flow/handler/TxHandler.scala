@@ -107,9 +107,11 @@ class TxHandler(blockFlow: BlockFlow)(implicit
   ): Unit = {
     val result = mempool.addNewTx(chainIndex, tx)
     log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
-    if (result == MemPool.AddedToSharedPool) {
-      // We don't broadcast txs that are pending locally
-      broadCast(chainIndex, AVector(tx), origin)
+    result match {
+      case MemPool.AddedToSharedPool =>
+        // We don't broadcast txs that are pending locally
+        broadCast(chainIndex, AVector(tx), origin)
+      case _ => ()
     }
     if (acknowledge) {
       addSucceeded(tx)

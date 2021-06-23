@@ -132,7 +132,11 @@ final case class DiscoverySetting(
     neighborsPerGroup: Int
 ) extends DiscoveryConfig
 
-final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
+final case class MemPoolSetting(
+    sharedPoolCapacity: Int,
+    pendingPoolCapacity: Int,
+    txMaxNumberPerBlock: Int
+)
 
 final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
 

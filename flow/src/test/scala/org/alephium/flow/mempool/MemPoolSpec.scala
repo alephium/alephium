@@ -95,4 +95,23 @@ class MemPoolSpec
       pool.getUtxo(output) is Some(tx1.getOutput(index))
     )
   }
+
+  it should "work for sequential txs" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = transfer(blockFlow, chainIndex)
+    val tx2        = block0.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, chainIndex)
+    val tx3    = block1.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow, block1)
+
+    pool.addNewTx(chainIndex, tx2)
+    pool.pendingPool.add(tx3)
+    val tx2Outputs = tx2.assetOutputRefs
+    tx2Outputs.length is 2
+    pool.isUnspentInPool(tx2Outputs.head) is true
+    pool.isUnspentInPool(tx2Outputs.last) is false
+    pool.isSpent(tx2Outputs.last)
+    tx3.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
+  }
 }

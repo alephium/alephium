@@ -16,7 +16,10 @@
 
 package org.alephium.flow.mempool
 
+import org.scalatest.Assertion
+
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.core.FlowUtils.SharedPoolOutput
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, LockFixture, U256}
@@ -25,13 +28,15 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
   val dummyIndex = ChainIndex.unsafe(0, 0)
 
   it should "initialize an empty tx pool" in {
-    val pool = SharedPool.empty(dummyIndex, 3)
+    val indexes = TxIndexes.emptySharedPool
+    val pool    = SharedPool.empty(dummyIndex, 3, indexes)
     pool.isFull is false
     pool.size is 0
   }
 
   it should "contain/add/remove for new transactions" in {
-    val pool = SharedPool.empty(dummyIndex, 3)
+    val indexes = TxIndexes.emptySharedPool
+    val pool    = SharedPool.empty(dummyIndex, 3, indexes)
     forAll(blockGen) { block =>
       val txTemplates = block.transactions.map(_.toTemplate)
       val numberAdded = pool.add(txTemplates)
@@ -51,7 +56,8 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
   }
 
   trait Fixture extends WithLock {
-    val pool        = SharedPool.empty(dummyIndex, 3)
+    val indexes     = TxIndexes.emptySharedPool
+    val pool        = SharedPool.empty(dummyIndex, 3, indexes)
     val block       = blockGen.sample.get
     val txTemplates = block.transactions.map(_.toTemplate)
     val txNum       = block.transactions.length
@@ -90,5 +96,37 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
     pool.collectForBlock(1) is AVector(tx2)
     pool.collectForBlock(2) is AVector(tx2, tx3)
     pool.collectForBlock(10) is AVector(tx2, tx3, tx1)
+  }
+
+  it should "consider capacity" in {
+    val indexes = TxIndexes.emptySharedPool
+    val pool    = SharedPool.empty(dummyIndex, 1, indexes)
+
+    def checkTx(tx: TransactionTemplate): Assertion = {
+      pool.weights.keys.toSet is Set(tx.id)
+      pool.pool.keys.map(_.id).toSet is Set(tx.id)
+      pool.sharedTxIndex.inputIndex.toSet is tx.unsigned.inputs.map(_.outputRef).toSet
+      pool.sharedTxIndex.outputIndex.toMap is
+        tx.assetOutputRefs.toIterable.zip(tx.unsigned.fixedOutputs.toIterable).toMap
+      pool.sharedTxIndex.outputType is SharedPoolOutput
+    }
+
+    val tx0 = transactionGen().sample.get.toTemplate
+    pool.add(tx0) is true
+    checkTx(tx0)
+
+    val tx1 = {
+      val tmp = transactionGen().sample.get.toTemplate
+      tmp.copy(unsigned = tmp.unsigned.copy(gasPrice = GasPrice(tx0.unsigned.gasPrice.value / 2)))
+    }
+    pool.add(tx1) is false
+    checkTx(tx0)
+
+    val tx2 = {
+      val tmp = transactionGen().sample.get.toTemplate
+      tmp.copy(unsigned = tmp.unsigned.copy(gasPrice = GasPrice(tx0.unsigned.gasPrice.value * 2)))
+    }
+    pool.add(tx2) is true
+    checkTx(tx2)
   }
 }
