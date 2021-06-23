@@ -17,7 +17,10 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.model.{defaultGasFee, defaultGasPrice, ChainIndex}
+import org.alephium.flow.validation.{NonExistInput, TxValidation}
+import org.alephium.protocol.ALF
+import org.alephium.protocol.model.{defaultGasFee, defaultGasPrice, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.AlephiumSpec
 
 class TxUtilsSpec extends AlephiumSpec {
@@ -41,5 +44,27 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .isRight is true
+  }
+
+  it should "consider outputs for inter-group blocks" in new FlowFixture {
+    val chainIndex            = ChainIndex.unsafe(0, 1)
+    val (genesisPriKey, _, _) = genesisKeys(0)
+    val (_, toPubKey)         = chainIndex.to.generateKey
+    val block                 = transfer(blockFlow, genesisPriKey, toPubKey, ALF.alf(1))
+    addAndCheck(blockFlow, block)
+
+    val unsignedTx = blockFlow
+      .transfer(
+        genesisPriKey.publicKey,
+        LockupScript.p2pkh(toPubKey),
+        None,
+        ALF.cent(50),
+        None,
+        defaultGasPrice
+      )
+      .rightValue
+      .rightValue
+    val tx = TransactionTemplate.from(unsignedTx, genesisPriKey)
+    TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow).leftValue isE NonExistInput
   }
 }
