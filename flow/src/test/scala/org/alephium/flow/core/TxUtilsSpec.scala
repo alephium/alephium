@@ -17,7 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.validation.{NonExistInput, TxValidation}
+import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{defaultGasFee, defaultGasPrice, ChainIndex, TransactionTemplate}
 import org.alephium.protocol.vm.LockupScript
@@ -65,6 +65,6 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
     val tx = TransactionTemplate.from(unsignedTx, genesisPriKey)
-    TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow).leftValue isE NonExistInput
+    TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
   }
 }

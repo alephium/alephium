@@ -70,7 +70,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
+  def getPreOutputsIncludingPools(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
     val chainIndex = tx.chainIndex
     val mainGroup  = chainIndex.from
     val bestDeps   = getBestDeps(mainGroup)
@@ -78,20 +78,27 @@ trait TxUtils { Self: FlowUtils =>
       worldState <- getPersistedWorldState(bestDeps, mainGroup)
       result <- tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
         case (Some(outputs), input) =>
-          getPreOutput(mainGroup, worldState, input).map(_.map(outputs :+ _))
+          getPreOutputIncludingPools(mainGroup, bestDeps, worldState, input).map(
+            _.map(outputs :+ _)
+          )
         case (None, _) => Right(None)
       }
     } yield result
   }
 
-  def getPreOutput(
+  def getPreOutputIncludingPools(
       mainGroup: GroupIndex,
+      bestDeps: BlockDeps,
       worldState: WorldState.Persisted,
       outputRef: TxOutputRef
   ): IOResult[Option[TxOutput]] = {
     getMemPool(mainGroup).getUtxo(outputRef) match {
       case Some(output) => Right(Some(output))
-      case None         => worldState.getOutputOpt(outputRef)
+      case None =>
+        getPreoutputsInCache(mainGroup, bestDeps, outputRef).flatMap {
+          case Some(output) => Right(Some(output))
+          case None         => worldState.getOutputOpt(outputRef)
+        }
     }
   }
 
@@ -330,5 +337,31 @@ trait TxUtils { Self: FlowUtils =>
       }
       (usedUtxos, newUtxos)
     }
+  }
+
+  def getPreoutputsInCache(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      txOutputRef: TxOutputRef
+  ): IOResult[Option[TxOutput]] = {
+    getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
+      val index = blockCaches.indexWhere(_.relatedOutputs.contains(txOutputRef))
+      if (index != -1) {
+        Some(blockCaches(index).relatedOutputs(txOutputRef))
+      } else {
+        None
+      }
+    }
+  }
+
+  def getPreoutputInState(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      txOutputRef: TxOutputRef
+  ): IOResult[Option[TxOutput]] = {
+    for {
+      bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
+      txOutputOpt    <- bestWorldState.getOutputOpt(txOutputRef)
+    } yield txOutputOpt
   }
 }
