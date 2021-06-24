@@ -88,4 +88,37 @@ class MiningTest extends AlephiumSpec {
     selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     server0.stop().futureValue is ()
   }
+
+  it should "mine all the txs" in new TestFixture("many-txs") {
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
+    Seq(server0.start()).foreach(_.futureValue is ())
+
+    val selfClique = request[SelfClique](getSelfClique)
+    val group      = request[Group](getGroup(address))
+    val index      = group.group / selfClique.groupNumPerBroker
+    val restPort   = selfClique.nodes(index).restPort
+
+    request[Balance](getBalance(address), restPort) is initialBalance
+
+    startWS(defaultWsMasterPort)
+
+    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
+
+    val n = 10
+
+    val txs = (0 until n).map { _ =>
+      val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
+      Thread.sleep(100)
+      tx
+    }
+    txs.foreach(tx => confirmTx(tx, restPort))
+
+    eventually {
+      request[Balance](getBalance(address), restPort) is
+        Balance(initialBalance.balance - (transferAmount + defaultGasFee) * n, 0, 1)
+    }
+
+    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
+    server0.stop().futureValue is ()
+  }
 }
