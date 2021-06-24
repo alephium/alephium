@@ -26,26 +26,26 @@ import org.alephium.util._
  */
 class SharedPool private (
     val chainIndex: ChainIndex,
-    val pool: ValueSortedMap[Hash, TransactionTemplate],
+    val txs: ValueSortedMap[Hash, TransactionTemplate],
     val timestamps: ValueSortedMap[Hash, TimeStamp],
     val sharedTxIndex: TxIndexes,
     val capacity: Int
 ) extends RWLock {
 
-  def isFull: Boolean = pool.size == capacity
+  def isFull(): Boolean = size == capacity
 
-  def size: Int = pool.size
+  def size: Int = readOnly(txs.size)
 
   def contains(txId: Hash): Boolean = readOnly {
-    pool.contains(txId)
+    txs.contains(txId)
   }
 
   def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
-    pool.getMaxValues(maxNum)
+    txs.getMaxValues(maxNum)
   }
 
   def getAll(): AVector[TransactionTemplate] = readOnly {
-    pool.getAll()
+    txs.getAll()
   }
 
   def add(transactions: AVector[TransactionTemplate], timeStamp: TimeStamp): Int = writeOnly {
@@ -62,9 +62,9 @@ class SharedPool private (
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def _add(tx: TransactionTemplate, timeStamp: TimeStamp): Int = {
-    if (isFull) {
-      val lowestWeightTxId = pool.min
-      val lowestWeightTx   = pool.unsafe(lowestWeightTxId)
+    if (isFull()) {
+      val lowestWeightTxId = txs.min
+      val lowestWeightTx   = txs.unsafe(lowestWeightTxId)
       if (SharedPool.txOrdering.gt(tx, lowestWeightTx)) {
         _remove(lowestWeightTxId)
         __add(tx, timeStamp)
@@ -79,7 +79,7 @@ class SharedPool private (
   }
 
   def __add(tx: TransactionTemplate, timeStamp: TimeStamp): Unit = {
-    pool.put(tx.id, tx)
+    txs.put(tx.id, tx)
     timestamps.put(tx.id, timeStamp)
     sharedTxIndex.add(tx)
   }
@@ -93,15 +93,15 @@ class SharedPool private (
   }
 
   def _remove(txId: Hash): Unit = {
-    pool.get(txId).foreach { tx =>
-      pool.remove(txId)
+    txs.get(txId).foreach { tx =>
+      txs.remove(txId)
       timestamps.remove(txId)
       sharedTxIndex.remove(tx)
     }
   }
 
   def clear(): Unit = writeOnly {
-    pool.clear()
+    txs.clear()
     timestamps.clear()
   }
 
@@ -117,7 +117,7 @@ class SharedPool private (
       timestamps
         .entries()
         .takeWhile(_.getValue <= timeStampThreshold)
-        .map(entry => pool.unsafe(entry.getKey))
+        .map(entry => txs.unsafe(entry.getKey))
     )
   }
 

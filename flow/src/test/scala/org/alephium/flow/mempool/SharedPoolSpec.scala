@@ -30,7 +30,7 @@ class SharedPoolSpec
   def now        = TimeStamp.now()
 
   def checkTx(pool: SharedPool, tx: TransactionTemplate): Unit = {
-    pool.pool.contains(tx.id) is true
+    pool.txs.contains(tx.id) is true
     pool.timestamps.contains(tx.id) is true
     checkTx(pool.sharedTxIndex, tx)
   }
@@ -38,7 +38,7 @@ class SharedPoolSpec
   it should "initialize an empty tx pool" in {
     val indexes = TxIndexes.emptySharedPool
     val pool    = SharedPool.empty(dummyIndex, 3, indexes)
-    pool.isFull is false
+    pool.isFull() is false
     pool.size is 0
   }
 
@@ -49,9 +49,9 @@ class SharedPoolSpec
       val txTemplates = block.transactions.map(_.toTemplate)
       val numberAdded = pool.add(txTemplates, now)
       if (block.transactions.length > pool.capacity) {
-        pool.isFull is true
+        pool.isFull() is true
         (numberAdded >= pool.size) is true
-        pool.pool.getAll().toSet is block.transactions
+        pool.txs.getAll().toSet is block.transactions
           .map(_.toTemplate)
           .sorted(SharedPool.txOrdering)
           .takeRight(3)
@@ -63,8 +63,8 @@ class SharedPoolSpec
       val numberRemoved = pool.remove(txTemplates)
       numberRemoved is poolSize
       pool.size is 0
-      pool.isFull is false
-      pool.pool.isEmpty is true
+      pool.isFull() is false
+      pool.txs.isEmpty is true
       pool.timestamps.isEmpty is true
       pool.sharedTxIndex is TxIndexes.emptySharedPool
     }
