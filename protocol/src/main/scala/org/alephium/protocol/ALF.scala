@@ -29,12 +29,12 @@ object ALF {
 
   val GenesisHeight: Int          = 0
   val GenesisWeight: Weight       = Weight.zero
-  val GenesisTimestamp: TimeStamp = TimeStamp.zero
+  val GenesisTimestamp: TimeStamp = TimeStamp.unsafe(1231006505000L) // BTC genesis timestamp
+  val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1622462400000L) // GMT May 31, 2021 12:00:00 PM
 
   val MaxTxInputNum: Int     = 1024
   val MaxTxOutputNum: Int    = 1024
   val MaxOutputDataSize: Int = 256
-
   //scalastyle:on magic.number
 
   def alf(amount: U256): Option[U256] = amount.mul(CoinInOneALF)

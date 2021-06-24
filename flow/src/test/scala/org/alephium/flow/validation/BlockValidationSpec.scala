@@ -59,7 +59,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   }
 
   def coinbase(chainIndex: ChainIndex, gasFee: U256, lockupScript: LockupScript): Transaction = {
-    Transaction.coinbase(chainIndex, gasFee, lockupScript, Target.Max, TimeStamp.zero)
+    Transaction.coinbase(chainIndex, gasFee, lockupScript, Target.Max, TimeStamp.now())
   }
 
   it should "validate coinbase transaction simple format" in new Fixture {
@@ -261,7 +261,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   it should "validate old blocks" in new DoubleSpendingFixture {
     val block0     = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val newBlockTs = ALF.GenesisTimestamp.plusSecondsUnsafe(1)
+    val newBlockTs = ALF.LaunchTimestamp.plusSecondsUnsafe(1)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
 
     val newOutTips = block1.header.outDeps

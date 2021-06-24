@@ -21,7 +21,7 @@ import scala.util.Random
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.vm.{GasPrice, LockupScript, StatefulScript}
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
@@ -135,7 +135,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         U256.Zero,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
-        TimeStamp.zero
+        ALF.LaunchTimestamp
       )
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
