@@ -24,11 +24,12 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
-import org.alephium.util.{AVector, EitherF, RWLock}
+import org.alephium.util.{AVector, EitherF, RWLock, TimeStamp, ValueSortedMap}
 
 class PendingPool(
     groupIndex: GroupIndex,
     val txs: mutable.HashMap[Hash, TransactionTemplate],
+    val timestamps: ValueSortedMap[Hash, TimeStamp],
     val indexes: TxIndexes,
     capacity: Int
 ) extends RWLock {
@@ -46,12 +47,13 @@ class PendingPool(
     tx.unsigned.inputs.exists(input => indexes.isSpent(input.outputRef))
   }
 
-  def add(tx: TransactionTemplate): Boolean = writeOnly {
+  def add(tx: TransactionTemplate, timeStamp: TimeStamp): Boolean = writeOnly {
     if (!txs.contains(tx.id)) {
       if (isFull()) {
         false
       } else {
-        txs.addOne(tx.id -> tx)
+        txs.put(tx.id, tx)
+        timestamps.put(tx.id, timeStamp)
         indexes.add(tx)
         measureTransactionsTotal()
         true
@@ -73,6 +75,7 @@ class PendingPool(
   def _remove(tx: TransactionTemplate): Unit = {
     if (txs.contains(tx.id)) {
       txs.remove(tx.id)
+      timestamps.remove(tx.id)
       indexes.remove(tx)
     }
   }
@@ -111,5 +114,11 @@ class PendingPool(
 
 object PendingPool {
   def empty(groupIndex: GroupIndex, capacity: Int): PendingPool =
-    new PendingPool(groupIndex, mutable.HashMap.empty, TxIndexes.emptyPendingPool, capacity)
+    new PendingPool(
+      groupIndex,
+      mutable.HashMap.empty,
+      ValueSortedMap.empty,
+      TxIndexes.emptyPendingPool,
+      capacity
+    )
 }

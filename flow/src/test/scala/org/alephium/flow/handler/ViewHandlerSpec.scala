@@ -93,7 +93,7 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
     val block1 = transfer(blockFlow1, chainIndex)
 
     val tx1 = block1.nonCoinbase.head.toTemplate
-    blockFlow.getMemPool(chainIndex).pendingPool.add(tx1)
+    blockFlow.getMemPool(chainIndex).pendingPool.add(tx1, TimeStamp.now())
     blockFlow.add(block0).isRight is true
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)

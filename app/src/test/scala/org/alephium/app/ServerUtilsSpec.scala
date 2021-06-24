@@ -20,7 +20,7 @@ import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model.{Address, ChainIndex}
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ServerUtilsSpec extends AlephiumSpec {
   it should "check tx status for intra group txs" in new FlowFixture {
@@ -53,7 +53,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
-      blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate))
+      blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
         Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)
@@ -111,7 +111,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
-      blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate))
+      blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
       serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
         Balance(genesisBalance - ALF.oneAlf - txTemplate.gasFeeUnsafe, 0, 1)

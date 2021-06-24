@@ -17,8 +17,8 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike}
-import org.alephium.util.LockFixture
+import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike, TransactionTemplate}
+import org.alephium.util.{LockFixture, TimeStamp}
 
 class PendingPoolSpec
     extends AlephiumFlowSpec
@@ -26,22 +26,27 @@ class PendingPoolSpec
     with LockFixture
     with NoIndexModelGeneratorsLike {
   private val dummyIndex = GroupIndex.unsafe(0)
+  def now                = TimeStamp.now()
 
-  it should "add tx" in {
-    val tx   = transactionGen().sample.get
-    val pool = PendingPool.empty(dummyIndex, 10)
-    pool.add(tx.toTemplate)
-    pool.add(tx.toTemplate) // for idempotent
+  def checkTx(pool: PendingPool, tx: TransactionTemplate): Unit = {
     pool.txs.contains(tx.id) is true
+    pool.timestamps.contains(tx.id) is true
     checkTx(pool.indexes, tx)
   }
 
-  it should "remove tx" in {
-    val tx   = transactionGen().sample.get
+  it should "add/remove tx" in {
+    val tx   = transactionGen().sample.get.toTemplate
     val pool = PendingPool.empty(dummyIndex, 10)
-    pool.remove(tx.toTemplate)
-    pool.remove(tx.toTemplate) // for idempotent
-    pool.txs.contains(tx.id) is false
+    pool.add(tx, now)
+    pool.add(tx, now) // for idempotent
+    pool.txs.contains(tx.id) is true
+    pool.timestamps.contains(tx.id) is true
+    checkTx(pool, tx)
+
+    pool.remove(tx)
+    pool.remove(tx) // for idempotent
+    pool.txs.isEmpty is true
+    pool.timestamps.isEmpty is true
     pool.indexes is TxIndexes.emptyPendingPool
   }
 
@@ -49,13 +54,13 @@ class PendingPoolSpec
     val tx0  = transactionGen().sample.get.toTemplate
     val pool = PendingPool.empty(dummyIndex, 1)
     pool.isFull() is false
-    pool.add(tx0) is true
+    pool.add(tx0, now) is true
     pool.isFull() is true
-    pool.add(tx0) is true
+    pool.add(tx0, now) is true
 
     val tx1 = transactionGen().sample.get.toTemplate
-    pool.add(tx1) is false
+    pool.add(tx1, now) is false
     pool.remove(tx0)
-    pool.add(tx1) is true
+    pool.add(tx1, now) is true
   }
 }

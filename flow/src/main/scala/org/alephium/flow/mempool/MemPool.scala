@@ -25,7 +25,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 /*
  * MemPool is the class to store all the unconfirmed transactions
@@ -77,13 +77,13 @@ class MemPool private (
 
   def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
-      if (pendingPool.add(tx)) {
+      if (pendingPool.add(tx, TimeStamp.now())) {
         MemPool.AddedToPendingPool
       } else {
         MemPool.PendingPoolIsFull
       }
     } else {
-      if (getSharedPool(index).add(tx)) {
+      if (getSharedPool(index).add(tx, TimeStamp.now())) {
         MemPool.AddedToSharedPool
       } else {
         MemPool.SharedPoolIsFull
@@ -91,8 +91,12 @@ class MemPool private (
     }
   }
 
-  def addToTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    getSharedPool(index).add(transactions)
+  def addToTxPool(
+      index: ChainIndex,
+      transactions: AVector[TransactionTemplate],
+      timeStamp: TimeStamp
+  ): Int = {
+    getSharedPool(index).add(transactions, timeStamp)
   }
 
   def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
@@ -105,10 +109,11 @@ class MemPool private (
       toAdd: AVector[AVector[Transaction]]
   ): (Int, Int) = {
     assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
+    val now = TimeStamp.now()
 
     // First, add transactions from short chains, then remove transactions from canonical chains
     val added = toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
-      sum + sharedPools(toGroup).add(txs.map(_.toTemplate))
+      sum + sharedPools(toGroup).add(txs.map(_.toTemplate), now)
     )
     val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
       sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
@@ -132,9 +137,10 @@ class MemPool private (
   def updatePendingPool(
       worldState: WorldState.Persisted
   ): IOResult[AVector[TransactionTemplate]] = {
+    val now = TimeStamp.now()
     pendingPool.extractReadyTxs(worldState).map { txs =>
       txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
-        addToTxPool(chainIndex, txss)
+        addToTxPool(chainIndex, txss, now)
       }
       pendingPool.remove(txs)
       pendingPool.measureTransactionsTotal()

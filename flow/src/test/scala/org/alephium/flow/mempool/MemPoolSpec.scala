@@ -20,13 +20,15 @@ import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, NoIndexModelGeneratorsLike}
-import org.alephium.util.{AVector, LockFixture}
+import org.alephium.util.{AVector, LockFixture, TimeStamp}
 
 class MemPoolSpec
     extends AlephiumFlowSpec
     with TxIndexesSpec.Fixture
     with LockFixture
     with NoIndexModelGeneratorsLike {
+  def now = TimeStamp.now()
+
   it should "initialize an empty pool" in {
     val pool = MemPool.empty(GroupIndex.unsafe(0))
     pool.size is 0
@@ -43,9 +45,9 @@ class MemPoolSpec
       val index = block.chainIndex
       if (index.from.equals(group)) {
         txTemplates.foreach(pool.contains(index, _) is false)
-        pool.addToTxPool(index, txTemplates) is block.transactions.length
+        pool.addToTxPool(index, txTemplates, now) is block.transactions.length
         pool.size is block.transactions.length
-        block.transactions.foreach(checkTx(pool.txIndexes, _))
+        block.transactions.foreach(tx => checkTx(pool.txIndexes, tx.toTemplate))
         txTemplates.foreach(pool.contains(index, _) is true)
         pool.removeFromTxPool(index, txTemplates) is block.transactions.length
         pool.size is 0
@@ -62,7 +64,7 @@ class MemPoolSpec
     pool.addNewTx(ChainIndex.unsafe(0, 0), tx0)
     pool.size is 1
     val tx1 = transactionGen().sample.get.toTemplate
-    pool.pendingPool.add(tx1)
+    pool.pendingPool.add(tx1, now)
     pool.size is 2
   }
 
@@ -73,7 +75,7 @@ class MemPoolSpec
     val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
     val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
     pool.addNewTx(index0, tx0)
-    pool.pendingPool.add(tx1)
+    pool.pendingPool.add(tx1, now)
   }
 
   it should "list transactions for a specific chain" in new Fixture {
@@ -106,7 +108,7 @@ class MemPoolSpec
     addAndCheck(blockFlow, block1)
 
     pool.addNewTx(chainIndex, tx2)
-    pool.pendingPool.add(tx3)
+    pool.pendingPool.add(tx3, now)
     val tx2Outputs = tx2.assetOutputRefs
     tx2Outputs.length is 2
     pool.isUnspentInPool(tx2Outputs.head) is true

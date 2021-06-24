@@ -16,16 +16,24 @@
 
 package org.alephium.flow.mempool
 
-import org.scalatest.Assertion
-
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.core.FlowUtils.SharedPoolOutput
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
-import org.alephium.util.{AVector, LockFixture, U256}
+import org.alephium.util.{AVector, LockFixture, TimeStamp, U256}
 
-class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModelGeneratorsLike {
+class SharedPoolSpec
+    extends AlephiumFlowSpec
+    with LockFixture
+    with NoIndexModelGeneratorsLike
+    with TxIndexesSpec.Fixture {
   val dummyIndex = ChainIndex.unsafe(0, 0)
+  def now        = TimeStamp.now()
+
+  def checkTx(pool: SharedPool, tx: TransactionTemplate): Unit = {
+    pool.pool.contains(tx.id) is true
+    pool.timestamps.contains(tx.id) is true
+    checkTx(pool.sharedTxIndex, tx)
+  }
 
   it should "initialize an empty tx pool" in {
     val indexes = TxIndexes.emptySharedPool
@@ -39,31 +47,38 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
     val pool    = SharedPool.empty(dummyIndex, 3, indexes)
     forAll(blockGen) { block =>
       val txTemplates = block.transactions.map(_.toTemplate)
-      val numberAdded = pool.add(txTemplates)
-      pool.size is numberAdded
+      val numberAdded = pool.add(txTemplates, now)
       if (block.transactions.length > pool.capacity) {
         pool.isFull is true
+        (numberAdded >= pool.size) is true
+        pool.pool.getAll().toSet is block.transactions
+          .map(_.toTemplate)
+          .sorted(SharedPool.txOrdering)
+          .takeRight(3)
+          .toSet
+      } else {
+        pool.size is numberAdded
       }
-      block.transactions.foreachWithIndex { (tx, i) =>
-        if (i < pool.size) pool.contains(tx.id) is true else pool.contains(tx.id) is false
-      }
+      val poolSize      = pool.size
       val numberRemoved = pool.remove(txTemplates)
-      numberRemoved is numberAdded
+      numberRemoved is poolSize
       pool.size is 0
       pool.isFull is false
-      block.transactions.foreach(tx => pool.contains(tx.id) is false)
+      pool.pool.isEmpty is true
+      pool.timestamps.isEmpty is true
+      pool.sharedTxIndex is TxIndexes.emptySharedPool
     }
   }
 
   trait Fixture extends WithLock {
     val indexes     = TxIndexes.emptySharedPool
-    val pool        = SharedPool.empty(dummyIndex, 3, indexes)
+    val pool        = SharedPool.empty(dummyIndex, Int.MaxValue, indexes)
     val block       = blockGen.sample.get
     val txTemplates = block.transactions.map(_.toTemplate)
     val txNum       = block.transactions.length
     lazy val rwl    = pool._getLock
 
-    val sizeAfterAdd = if (txNum >= 3) 3 else txNum
+    val sizeAfterAdd = txNum
   }
 
   it should "use read lock for containing" in new Fixture {
@@ -71,11 +86,11 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
   }
 
   it should "use write lock for adding" in new Fixture {
-    checkWriteLock(rwl)(0, pool.add(txTemplates), sizeAfterAdd)
+    checkWriteLock(rwl)(0, pool.add(txTemplates, now), sizeAfterAdd)
   }
 
   it should "use write lock for removing" in new Fixture {
-    pool.add(txTemplates)
+    pool.add(txTemplates, now)
     checkWriteLock(rwl)(0, pool.remove(txTemplates), sizeAfterAdd)
   }
 
@@ -89,9 +104,9 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
     val tx2 = txGen(U256.unsafe(3))
     val tx3 = txGen(U256.unsafe(2))
 
-    pool.add(AVector(tx1, tx2, tx3))
+    pool.add(AVector(tx1, tx2, tx3), now)
 
-    pool.getAll() is AVector(tx2, tx3, tx1)
+    pool.getAll().toSet is Set(tx2, tx3, tx1)
 
     pool.collectForBlock(1) is AVector(tx2)
     pool.collectForBlock(2) is AVector(tx2, tx3)
@@ -102,31 +117,22 @@ class SharedPoolSpec extends AlephiumFlowSpec with LockFixture with NoIndexModel
     val indexes = TxIndexes.emptySharedPool
     val pool    = SharedPool.empty(dummyIndex, 1, indexes)
 
-    def checkTx(tx: TransactionTemplate): Assertion = {
-      pool.weights.keys.toSet is Set(tx.id)
-      pool.pool.keys.map(_.id).toSet is Set(tx.id)
-      pool.sharedTxIndex.inputIndex.toSet is tx.unsigned.inputs.map(_.outputRef).toSet
-      pool.sharedTxIndex.outputIndex.toMap is
-        tx.assetOutputRefs.toIterable.zip(tx.unsigned.fixedOutputs.toIterable).toMap
-      pool.sharedTxIndex.outputType is SharedPoolOutput
-    }
-
     val tx0 = transactionGen().sample.get.toTemplate
-    pool.add(tx0) is true
-    checkTx(tx0)
+    pool.add(tx0, now) is true
+    checkTx(pool, tx0)
 
     val tx1 = {
       val tmp = transactionGen().sample.get.toTemplate
       tmp.copy(unsigned = tmp.unsigned.copy(gasPrice = GasPrice(tx0.unsigned.gasPrice.value / 2)))
     }
-    pool.add(tx1) is false
-    checkTx(tx0)
+    pool.add(tx1, now) is false
+    checkTx(pool, tx0)
 
     val tx2 = {
       val tmp = transactionGen().sample.get.toTemplate
       tmp.copy(unsigned = tmp.unsigned.copy(gasPrice = GasPrice(tx0.unsigned.gasPrice.value * 2)))
     }
-    pool.add(tx2) is true
-    checkTx(tx2)
+    pool.add(tx2, now) is true
+    checkTx(pool, tx2)
   }
 }

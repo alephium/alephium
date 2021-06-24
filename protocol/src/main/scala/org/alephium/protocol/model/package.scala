@@ -28,7 +28,7 @@ package object model {
   val cliqueIdLength: Int = PublicKey.length
 
   // TODO: use proper lockup period before mainnet launch
-  val coinbaseLockupPeriod: Duration = Duration.ofMinutesUnsafe(1)
+  val coinbaseLockupPeriod: Duration = Duration.ofMinutesUnsafe(10)
 
   //scalastyle:off magic.number
   // TODO: improve gas mechanism
