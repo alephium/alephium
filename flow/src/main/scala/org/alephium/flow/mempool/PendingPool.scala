@@ -24,7 +24,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
-import org.alephium.util.{AVector, EitherF, RWLock, TimeStamp, ValueSortedMap}
+import org.alephium.util._
 
 class PendingPool(
     groupIndex: GroupIndex,
@@ -103,6 +103,15 @@ class PendingPool(
   // Left means the output is spent
   def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
     indexes.getUtxo(outputRef)
+  }
+
+  def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
+    AVector.fromIterator(
+      timestamps
+        .iterator()
+        .takeWhile(_.getValue < timeStampThreshold)
+        .map(entry => txs(entry.getKey))
+    )
   }
 
   private val transactionTotalLabeled =

@@ -18,6 +18,7 @@ package org.alephium.flow.mempool
 
 import io.prometheus.client.Gauge
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
@@ -166,6 +167,10 @@ class MemPool private (
 
   def clear(): Unit = {
     sharedPools.foreach(_.clear())
+  }
+
+  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
+    sharedPools.foreach(_.clean(blockFlow, timeStampThreshold))
   }
 }
 

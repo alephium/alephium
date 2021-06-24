@@ -43,4 +43,12 @@ class ValueSortedMapSpec extends AlephiumSpec {
     map.clear()
     map.isEmpty is true
   }
+
+  it should "handle same value" in {
+    val map = ValueSortedMap.empty[Char, Int]
+    map.put('a', 2)
+    map.put('b', 2)
+    map.min is 'a'
+    map.max is 'b'
+  }
 }

@@ -19,7 +19,7 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, NoIndexModelGeneratorsLike}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, LockFixture, TimeStamp}
 
 class MemPoolSpec
@@ -99,6 +99,7 @@ class MemPoolSpec
   }
 
   it should "work for sequential txs" in new Fixture {
+    val blockFlow  = isolatedBlockFlow()
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block0     = transfer(blockFlow, chainIndex)
     val tx2        = block0.nonCoinbase.head.toTemplate
@@ -115,5 +116,31 @@ class MemPoolSpec
     pool.isUnspentInPool(tx2Outputs.last) is false
     pool.isSpent(tx2Outputs.last)
     tx3.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
+  }
+
+  it should "clean mempool" in {
+    val blockFlow = isolatedBlockFlow()
+
+    val pool   = MemPool.empty(GroupIndex.unsafe(0))
+    val index0 = ChainIndex.unsafe(0, 0)
+    val index1 = ChainIndex.unsafe(0, 1)
+    val index2 = ChainIndex.unsafe(0, 2)
+    val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
+    val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
+    val block2 = transfer(blockFlow, index2)
+    val tx2    = block2.nonCoinbase.head.toTemplate
+    val tx3 =
+      tx2.copy(unsigned = tx2.unsigned.copy(inputs = tx2.unsigned.inputs ++ tx1.unsigned.inputs))
+
+    blockFlow.recheckInputs(index2.from, AVector(tx2, tx3)) isE AVector(tx3)
+
+    pool.addNewTx(index0, tx0)
+    pool.addNewTx(index1, tx1)
+    pool.addNewTx(index2, tx2)
+    pool.addNewTx(index2, tx3)
+    pool.size is 4
+    pool.clean(blockFlow, TimeStamp.now().plusMinutesUnsafe(1))
+    pool.size is 1
+    pool.contains(index2, tx2) is true
   }
 }

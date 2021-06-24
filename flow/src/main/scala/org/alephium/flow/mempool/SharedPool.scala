@@ -16,6 +16,7 @@
 
 package org.alephium.flow.mempool
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -102,6 +103,22 @@ class SharedPool private (
   def clear(): Unit = writeOnly {
     pool.clear()
     timestamps.clear()
+  }
+
+  // don't lock this function, only lock it's internal calls
+  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
+    val oldTxs = takeOldTxs(timeStampThreshold)
+    blockFlow.recheckInputs(chainIndex.from, oldTxs).map(remove)
+    ()
+  }
+
+  def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
+    AVector.fromIterator(
+      timestamps
+        .iterator()
+        .takeWhile(_.getValue <= timeStampThreshold)
+        .map(entry => pool(entry.getKey))
+    )
   }
 
   private val transactionsTotalLabeled = MemPool.sharedPoolTransactionsTotal

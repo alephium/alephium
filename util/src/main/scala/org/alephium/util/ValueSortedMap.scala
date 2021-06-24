@@ -16,18 +16,24 @@
 
 package org.alephium.util
 
-import java.util.{Comparator, TreeMap}
+import java.util.{Comparator, Map, TreeMap}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
 object ValueSortedMap {
-  def empty[K: ClassTag, V: Ordering: ClassTag]: ValueSortedMap[K, V] = {
+  def empty[K: Ordering: ClassTag, V: Ordering: ClassTag]: ValueSortedMap[K, V] = {
     val map = mutable.HashMap.empty[K, V]
     val comparator = new Comparator[K] {
-      override def compare(k1: K, k2: K): Int =
-        implicitly[Ordering[V]].compare(map(k1), map(k2))
+      override def compare(k1: K, k2: K): Int = {
+        val c0 = implicitly[Ordering[V]].compare(map(k1), map(k2))
+        if (c0 != 0) {
+          c0
+        } else {
+          implicitly[Ordering[K]].compare(k1, k2)
+        }
+      }
     }
     val orderedMap = new TreeMap[K, V](comparator)
     new ValueSortedMap[K, V](map, orderedMap)
@@ -64,6 +70,7 @@ class ValueSortedMap[K: ClassTag, V: ClassTag](
     AVector.fromIterator(orderedMap.navigableKeySet().iterator().asScala.take(n))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def getAll(): AVector[V] = {
     AVector.unsafe(orderedMap.values.toArray.asInstanceOf[Array[V]])
   }
@@ -83,6 +90,8 @@ class ValueSortedMap[K: ClassTag, V: ClassTag](
   def get(key: K): Option[V] = map.get(key)
 
   def apply(key: K): V = map(key)
+
+  def iterator(): Iterator[Map.Entry[K, V]] = orderedMap.entrySet().iterator().asScala
 
   def clear(): Unit = {
     orderedMap.clear()
