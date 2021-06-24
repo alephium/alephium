@@ -56,17 +56,17 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     Target.unsafe(target.value.divide(BigInteger.valueOf(groupConfig.chainNum.toLong)))
 
   def miningReward(header: BlockHeader): U256 =
-    reward(header.target, header.timestamp, ALF.GenesisTimestamp)
+    reward(header.target, header.timestamp, ALF.LaunchTimestamp)
 
-  def reward(target: Target, blockTs: TimeStamp, genesisTs: TimeStamp): U256 = {
-    val maxReward      = rewardMax(blockTs, genesisTs)
+  def reward(target: Target, blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
+    val maxReward      = rewardMax(blockTs, launchTs)
     val adjustedReward = rewardWrtTarget(target)
     if (maxReward > adjustedReward) adjustedReward else maxReward
   }
 
-  def rewardMax(blockTs: TimeStamp, genesisTs: TimeStamp): U256 = {
-    require(blockTs >= genesisTs)
-    val elapsed = blockTs.deltaUnsafe(genesisTs)
+  def rewardMax(blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
+    require(blockTs >= launchTs)
+    val elapsed = blockTs.deltaUnsafe(launchTs)
     if (elapsed >= durationToStableMaxReward) {
       stableMaxRewardPerChain
     } else {

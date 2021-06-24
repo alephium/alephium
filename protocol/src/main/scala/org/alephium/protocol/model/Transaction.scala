@@ -245,7 +245,7 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig): Transaction = {
-    val reward       = emissionConfig.emission.reward(target, blockTs, ALF.GenesisTimestamp)
+    val reward       = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
     val lockTime     = blockTs + coinbaseLockupPeriod

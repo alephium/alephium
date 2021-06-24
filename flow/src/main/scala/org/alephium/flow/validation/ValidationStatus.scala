@@ -41,6 +41,7 @@ final case object InvalidGenesisWorkAmount               extends InvalidHeaderSt
 final case object InvalidGenesisWorkTarget               extends InvalidHeaderStatus
 final case object InvalidBlockVersion                    extends InvalidHeaderStatus
 final case object NoIncreasingTimeStamp                  extends InvalidHeaderStatus
+final case object EarlierThanLaunchTimeStamp             extends InvalidHeaderStatus
 final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
 final case object InvalidWorkAmount                      extends InvalidHeaderStatus
 final case object InvalidPoLWWorkAmount                  extends InvalidHeaderStatus

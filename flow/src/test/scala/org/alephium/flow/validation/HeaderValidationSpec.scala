@@ -201,8 +201,11 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check header timestamp increasing" in new HeaderFixture {
-    val modified = updateNonce(header.copy(timestamp = header0.timestamp))
-    failValidation(modified, NoIncreasingTimeStamp)
+    val modified0 = updateNonce(header.copy(timestamp = header0.timestamp))
+    failValidation(modified0, NoIncreasingTimeStamp)
+
+    val modified1 = updateNonce(header.copy(timestamp = ALF.LaunchTimestamp.plusMillisUnsafe(-1)))
+    failValidation(modified1, EarlierThanLaunchTimeStamp)
   }
 
   it should "check timestamp drift" in new HeaderFixture {

@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{ALF, Hash, PublicKey}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, TimeStamp, U256}
@@ -35,7 +35,7 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
           script,
           Hash.generate.bytes,
           Target.Max,
-          TimeStamp.zero
+          ALF.LaunchTimestamp
         )
     )
 
@@ -57,14 +57,14 @@ class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = TimeStamp.zero
+      blockTs = ALF.LaunchTimestamp
     )
     val coinbase1 = Transaction.coinbase(
       ChainIndex.unsafe(0, 1),
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = TimeStamp.zero
+      blockTs = ALF.LaunchTimestamp
     )
     val coinbase2 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),

@@ -199,7 +199,9 @@ object HeaderValidation {
         header: BlockHeader,
         parent: BlockHeader
     ): HeaderValidationResult[Unit] = {
-      if (header.timestamp <= parent.timestamp) {
+      if (header.timestamp < ALF.LaunchTimestamp) {
+        invalidHeader(EarlierThanLaunchTimeStamp)
+      } else if (header.timestamp <= parent.timestamp) {
         invalidHeader(NoIncreasingTimeStamp)
       } else {
         validHeader(())
