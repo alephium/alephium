@@ -18,9 +18,6 @@ package org.alephium.util
 
 import java.util.{LinkedHashMap, Map}
 
-import scala.collection.mutable
-import scala.jdk.CollectionConverters._
-
 object LinkedBuffer {
   def apply[K, V](maxCapacity: Int): LinkedBuffer[K, V] = {
     val m = new Inner[K, V](maxCapacity, 32, 0.75f)
@@ -35,21 +32,28 @@ object LinkedBuffer {
   }
 }
 
-class LinkedBuffer[K, V](m: LinkedBuffer.Inner[K, V]) extends mutable.Map[K, V] {
-  override def get(key: K): Option[V] = Option(m.get(key))
+class LinkedBuffer[K, V](m: LinkedBuffer.Inner[K, V]) extends SimpleMap[K, V] {
+  protected def underlying: Map[K, V] = m
 
-  override def subtractOne(key: K): LinkedBuffer.this.type = {
+  def contains(key: K): Boolean = m.containsKey(key)
+
+  def unsafe(key: K): V = m.get(key)
+
+  def get(key: K): Option[V] = Option(m.get(key))
+
+  def put(key: K, value: V): Unit = {
     m.remove(key)
-    this
+    m.put(key, value)
+    ()
   }
 
-  override def addOne(elem: (K, V)): LinkedBuffer.this.type = {
-    m.remove(elem._1)
-    m.put(elem._1, elem._2)
-    this
+  def remove(key: K): Unit = {
+    m.remove(key)
+    ()
   }
 
-  override def iterator: Iterator[(K, V)] = {
-    m.asScala.iterator
+  def removeIf(p: (K, V) => Boolean): Unit = {
+    m.entrySet().removeIf(entry => p(entry.getKey, entry.getValue))
+    ()
   }
 }

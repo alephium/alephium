@@ -106,9 +106,9 @@ class PendingPool(
   }
 
   def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
-    AVector.fromIterator(
+    AVector.from(
       timestamps
-        .iterator()
+        .entries()
         .takeWhile(_.getValue < timeStampThreshold)
         .map(entry => txs(entry.getKey))
     )

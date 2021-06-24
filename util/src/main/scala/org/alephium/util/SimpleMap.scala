@@ -17,39 +17,29 @@
 package org.alephium.util
 
 import java.util.Map
-import java.util.concurrent.{ConcurrentHashMap => JCHashMap}
 
-object ConcurrentHashMap {
-  def empty[K, V]: ConcurrentHashMap[K, V] = {
-    val m = new JCHashMap[K, V]()
-    new ConcurrentHashMap[K, V](m)
-  }
-}
+import scala.jdk.CollectionConverters._
 
-class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) extends SimpleMap[K, V] {
-  protected def underlying: Map[K, V] = m
+trait SimpleMap[K, V] {
+  protected def underlying: Map[K, V]
 
-  def getUnsafe(k: K): V = {
-    val v = m.get(k)
-    assume(v != null)
-    v
-  }
+  def size: Int = underlying.size()
 
-  def get(k: K): Option[V] = {
-    Option(m.get(k))
-  }
+  def isEmpty: Boolean = underlying.isEmpty
 
-  def contains(k: K): Boolean = m.containsKey(k)
+  def contains(key: K): Boolean
 
-  def put(k: K, v: V): Unit = {
-    m.put(k, v)
-    ()
-  }
+  def unsafe(key: K): V
 
-  def remove(k: K): Unit = {
-    m.remove(k)
-    ()
-  }
+  def get(key: K): Option[V]
 
-  def unsafe(key: K): V = ???
+  def put(key: K, value: V): Unit
+
+  def remove(key: K): Unit
+
+  def keys(): Iterator[K] = underlying.keySet().iterator().asScala
+
+  def values(): Iterator[V] = underlying.values().iterator().asScala
+
+  def entries(): Iterator[Map.Entry[K, V]] = underlying.entrySet().iterator().asScala
 }

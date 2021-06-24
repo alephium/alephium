@@ -298,8 +298,8 @@ trait SessionManager {
   ): T = {
     val id  = Id.random()
     val now = TimeStamp.now()
-    sessions.addOne(id -> AwaitReply(remote, now))
-    peerInfoOpt.foreach(peer => pendings.addOne(peer.peerId -> now))
+    sessions.put(id, AwaitReply(remote, now))
+    peerInfoOpt.foreach(peer => pendings.put(peer.peerId, now))
     f(id)
   }
 
@@ -316,17 +316,17 @@ trait SessionManager {
   }
 
   def cleanSessions(now: TimeStamp): Unit = {
-    sessions.filterInPlace { case (_, status) =>
-      now.deltaUnsafe(status.requestAt) < discoveryConfig.peersTimeout
+    sessions.removeIf { case (_, status) =>
+      now.deltaUnsafe(status.requestAt) >= discoveryConfig.peersTimeout
     }
-    pendings.filterInPlace { case (_, timestamp) =>
-      now.deltaUnsafe(timestamp) < discoveryConfig.peersTimeout
+    pendings.removeIf { case (_, timestamp) =>
+      now.deltaUnsafe(timestamp) >= discoveryConfig.peersTimeout
     }
   }
 
   def removeFromSession(peer: InetSocketAddress): Unit = {
-    sessions.filterInPlace { case (_, awaitReply: AwaitReply) =>
-      awaitReply.remote != peer
+    sessions.removeIf { case (_, awaitReply: AwaitReply) =>
+      awaitReply.remote == peer
     }
   }
 }

@@ -19,16 +19,16 @@ package org.alephium.util
 class LinkedBufferSpec extends AlephiumSpec {
   it should "work as map" in {
     val buffer = LinkedBuffer[Char, Int](100)
-    buffer.addOne('a' -> 0)
+    buffer.put('a', 0)
     buffer.contains('a') is true
-    buffer('a') is 0
+    buffer.unsafe('a') is 0
     buffer.get('a') is Some(0)
-    buffer.addOne('b'   -> 1)
-    buffer.head is ('a' -> 0)
-    buffer.last is ('b' -> 1)
-    buffer.addOne('a'   -> 2)
-    buffer.head is ('b' -> 1)
-    buffer.last is ('a' -> 2)
+    buffer.put('b', 1)
+    buffer.keys().toSeq is Seq('a', 'b')
+    buffer.values().toSeq is Seq(0, 1)
+    buffer.put('a', 2)
+    buffer.keys().toSeq is Seq('b', 'a')
+    buffer.values().toSeq is Seq(1, 2)
     buffer.remove('b')
     buffer.remove('a')
     buffer.isEmpty is true
@@ -36,9 +36,10 @@ class LinkedBufferSpec extends AlephiumSpec {
 
   it should "remove elements when there is no capacity" in {
     val buffer = LinkedBuffer[Char, Int](1)
-    buffer.addOne('a' -> 0)
-    buffer.addOne('b' -> 1)
+    buffer.put('a', 0)
+    buffer.put('b', 1)
     buffer.size is 1
-    buffer.head is ('b' -> 1)
+    buffer.keys().toSeq is Seq('b')
+    buffer.values().toSeq is Seq(1)
   }
 }

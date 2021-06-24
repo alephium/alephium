@@ -216,7 +216,7 @@ class InterCliqueManager(
           blockFlowSynchronizer
         )
       val out = context.actorOf(props)
-      connecting.addOne(brokerInfo.address -> ())
+      connecting.put(brokerInfo.address, ())
       context.watchWith(out, PeerDisconnected(brokerInfo.address))
       ()
     }

@@ -48,7 +48,7 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
 
     def checkState(numHashes: Int, expected: Set[BlockHash]): Assertion = {
       chainState.numHashes is numHashes
-      chainState.allTipsInMem.keys.toSet is expected
+      chainState.allTipsInMem.keys().toSet is expected
       chainState.state.tips.toSet is expected
     }
   }

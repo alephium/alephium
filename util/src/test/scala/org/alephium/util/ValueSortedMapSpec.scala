@@ -23,9 +23,9 @@ class ValueSortedMapSpec extends AlephiumSpec {
     map.put('b', 3)
     map.put('c', 1)
 
-    map('a') is 2
-    map('b') is 3
-    map('c') is 1
+    map.unsafe('a') is 2
+    map.unsafe('b') is 3
+    map.unsafe('c') is 1
 
     map.min is 'c'
     map.max is 'b'

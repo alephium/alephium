@@ -79,7 +79,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   private def checkCanonicality(hash: BlockHash, weight: Weight): IOResult[Boolean] = {
-    EitherF.forallTry(tips.keys) { tip =>
+    EitherF.forallTry(tips.keys()) { tip =>
       getWeight(tip).map(BlockHashPool.compare(hash, weight, tip, _) > 0)
     }
   }

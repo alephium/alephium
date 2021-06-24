@@ -24,7 +24,7 @@ class ConcurrentHashMapSpec extends AlephiumSpec {
   it should "add / remove /contains" in new Fixture {
     forAll { (k: Int, v: Long) =>
       map.contains(k) is false
-      map.add(k, v)
+      map.put(k, v)
       map.contains(k) is true
       map.remove(k)
       map.contains(k) is false

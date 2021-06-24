@@ -64,7 +64,7 @@ class SharedPool private (
   def _add(tx: TransactionTemplate, timeStamp: TimeStamp): Int = {
     if (isFull) {
       val lowestWeightTxId = pool.min
-      val lowestWeightTx   = pool(lowestWeightTxId)
+      val lowestWeightTx   = pool.unsafe(lowestWeightTxId)
       if (SharedPool.txOrdering.gt(tx, lowestWeightTx)) {
         _remove(lowestWeightTxId)
         __add(tx, timeStamp)
@@ -113,11 +113,11 @@ class SharedPool private (
   }
 
   def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
-    AVector.fromIterator(
+    AVector.from(
       timestamps
-        .iterator()
+        .entries()
         .takeWhile(_.getValue <= timeStampThreshold)
-        .map(entry => pool(entry.getKey))
+        .map(entry => pool.unsafe(entry.getKey))
     )
   }
 

@@ -16,18 +16,17 @@
 
 package org.alephium.util
 
-import java.util.{Comparator, Map, TreeMap}
+import java.util.{Comparator, HashMap, Map, TreeMap}
 
-import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
 object ValueSortedMap {
   def empty[K: Ordering: ClassTag, V: Ordering: ClassTag]: ValueSortedMap[K, V] = {
-    val map = mutable.HashMap.empty[K, V]
+    val map = new HashMap[K, V]()
     val comparator = new Comparator[K] {
       override def compare(k1: K, k2: K): Int = {
-        val c0 = implicitly[Ordering[V]].compare(map(k1), map(k2))
+        val c0 = implicitly[Ordering[V]].compare(map.get(k1), map.get(k2))
         if (c0 != 0) {
           c0
         } else {
@@ -41,33 +40,31 @@ object ValueSortedMap {
 }
 
 class ValueSortedMap[K: ClassTag, V: ClassTag](
-    val map: mutable.HashMap[K, V],
+    val map: HashMap[K, V],
     val orderedMap: TreeMap[K, V]
-) {
-  def size: Int = map.size
+) extends SimpleMap[K, V] {
+  protected def underlying: Map[K, V] = orderedMap
 
-  def isEmpty: Boolean = size == 0
-
-  def contains(key: K): Boolean = map.contains(key)
+  def contains(key: K): Boolean = map.containsKey(key)
 
   def min: K = orderedMap.firstKey()
 
   def max: K = orderedMap.lastKey()
 
   def getMaxValues(n: Int): AVector[V] = {
-    AVector.fromIterator(orderedMap.descendingMap().values().iterator().asScala.take(n))
+    AVector.from(orderedMap.descendingMap().values().iterator().asScala.take(n))
   }
 
   def getMinValues(n: Int): AVector[V] = {
-    AVector.fromIterator(orderedMap.values().iterator().asScala.take(n))
+    AVector.from(orderedMap.values().iterator().asScala.take(n))
   }
 
   def getMaxKeys(n: Int): AVector[K] = {
-    AVector.fromIterator(orderedMap.descendingKeySet().iterator().asScala.take(n))
+    AVector.from(orderedMap.descendingKeySet().iterator().asScala.take(n))
   }
 
   def getMinKeys(n: Int): AVector[K] = {
-    AVector.fromIterator(orderedMap.navigableKeySet().iterator().asScala.take(n))
+    AVector.from(orderedMap.navigableKeySet().iterator().asScala.take(n))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -75,23 +72,21 @@ class ValueSortedMap[K: ClassTag, V: ClassTag](
     AVector.unsafe(orderedMap.values.toArray.asInstanceOf[Array[V]])
   }
 
-  def put(key: K, value: V): ValueSortedMap.this.type = {
+  def put(key: K, value: V): Unit = {
     map.put(key, value)
     orderedMap.put(key, value)
-    this
+    ()
   }
 
-  def remove(elem: K): ValueSortedMap.this.type = {
+  def remove(elem: K): Unit = {
     orderedMap.remove(elem)
     map.remove(elem)
-    this
+    ()
   }
 
-  def get(key: K): Option[V] = map.get(key)
+  def get(key: K): Option[V] = Option(map.get(key))
 
-  def apply(key: K): V = map(key)
-
-  def iterator(): Iterator[Map.Entry[K, V]] = orderedMap.entrySet().iterator().asScala
+  def unsafe(key: K): V = map.get(key)
 
   def clear(): Unit = {
     orderedMap.clear()

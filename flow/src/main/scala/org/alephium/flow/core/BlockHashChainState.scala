@@ -35,7 +35,7 @@ trait BlockHashChainState {
 
   def setGenesisState(newTip: BlockHash, timeStamp: TimeStamp): IOResult[Unit] = {
     numHashes += 1
-    tips.add(newTip, timeStamp)
+    tips.put(newTip, timeStamp)
     pruneDueto(timeStamp)
     updateDB()
   }
@@ -47,14 +47,14 @@ trait BlockHashChainState {
     } yield {
       numHashes = state.numHashes
       pairs.foreach { case (tip, timestamp) =>
-        tips.add(tip, timestamp)
+        tips.put(tip, timestamp)
       }
     }
   }
 
   def updateState(newTip: BlockHash, timeStamp: TimeStamp, parent: BlockHash): IOResult[Unit] = {
     numHashes += 1
-    tips.add(newTip, timeStamp)
+    tips.put(newTip, timeStamp)
     tips.remove(parent)
     pruneDueto(timeStamp)
     updateDB()
@@ -62,13 +62,13 @@ trait BlockHashChainState {
 
   @inline
   private def updateDB(): IOResult[Unit] = {
-    val state = BlockHashChain.State(numHashes, AVector.from(tips.keys))
+    val state = BlockHashChain.State(numHashes, AVector.from(tips.keys()))
     chainStateStorage.updateState(state)
   }
 
   @inline
   private def pruneDueto(timeStamp: TimeStamp): Unit = {
-    tips.entries.foreach { entry =>
+    tips.entries().foreach { entry =>
       if (entry.getValue + consensusConfig.tipsPruneDuration < timeStamp) {
         tips.remove(entry.getKey)
       }
