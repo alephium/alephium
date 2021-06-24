@@ -23,7 +23,7 @@ import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, StatefulScript}
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp, U256}
 
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
@@ -188,7 +188,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow1, block1)
 
     val pool = blockFlow.getMemPool(index)
-    pool.getSharedPool(index).add(AVector(tx0.toTemplate, tx1.toTemplate))
+    pool.getSharedPool(index).add(AVector(tx0.toTemplate, tx1.toTemplate), TimeStamp.now())
     val miner = getGenesisLockupScript(index)
     blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
   }

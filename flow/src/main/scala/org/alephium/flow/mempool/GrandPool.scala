@@ -16,12 +16,13 @@
 
 package org.alephium.flow.mempool
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 class GrandPool(val mempools: AVector[MemPool])(implicit
     val brokerConfig: BrokerConfig
@@ -40,6 +41,10 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
       utxosInBlock: AVector[AssetOutputInfo]
   ): AVector[AssetOutputInfo] = {
     getMemPool(groupIndex).getRelevantUtxos(lockupScript, utxosInBlock)
+  }
+
+  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
+    mempools.foreach(_.clean(blockFlow, timeStampThreshold))
   }
 }
 

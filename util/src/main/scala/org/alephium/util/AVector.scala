@@ -696,12 +696,8 @@ object AVector {
     tabulate(n1, n2)((_, _) => elem)
   }
 
-  def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {
-    unsafe(elems.toArray)
-  }
-
-  def fromIterator[@sp A: ClassTag](it: Iterator[A]): AVector[A] = {
-    unsafe(it.toArray)
+  def from[@sp A: ClassTag](elems: IterableOnce[A]): AVector[A] = {
+    unsafe(elems.iterator.toArray)
   }
 
   @inline def unsafe[@sp A: ClassTag](elems: Array[A], start: Int): AVector[A] = {

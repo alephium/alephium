@@ -16,10 +16,8 @@
 
 package org.alephium.util
 
-import java.util.Map.Entry
+import java.util.Map
 import java.util.concurrent.{ConcurrentHashMap => JCHashMap}
-
-import scala.jdk.CollectionConverters._
 
 object ConcurrentHashMap {
   def empty[K, V]: ConcurrentHashMap[K, V] = {
@@ -28,8 +26,8 @@ object ConcurrentHashMap {
   }
 }
 
-class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) {
-  def size: Int = m.size()
+class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) extends SimpleMap[K, V] {
+  protected def underlying: Map[K, V] = m
 
   def getUnsafe(k: K): V = {
     val v = m.get(k)
@@ -43,7 +41,7 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) {
 
   def contains(k: K): Boolean = m.containsKey(k)
 
-  def add(k: K, v: V): Unit = {
+  def put(k: K, v: V): Unit = {
     m.put(k, v)
     ()
   }
@@ -53,9 +51,5 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) {
     ()
   }
 
-  def keys: Iterable[K] = m.keySet().asScala.toIndexedSeq
-
-  def values: Iterable[V] = m.values().asScala.toIndexedSeq
-
-  def entries: Iterable[Entry[K, V]] = m.entrySet().asScala
+  def unsafe(key: K): V = ???
 }

@@ -34,7 +34,7 @@ curl http://127.0.0.1:12973/infos/self-clique
 
 ## Monitoring
 
-A local instance of grafana will be started at `http://192.168.1.90:3000` with two built-in dashboards:
+A local instance of grafana will be started at `http://127.0.0.1:3000` with two built-in dashboards:
 
 `JVM Overview`:
 

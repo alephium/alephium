@@ -29,7 +29,7 @@ class TxIndexesSpec
     val tx      = transactionGen().sample.get
     val indexes = TxIndexes.emptySharedPool
     indexes.add(tx.toTemplate)
-    checkTx(indexes, tx)
+    checkTx(indexes, tx.toTemplate)
   }
 
   it should "be idempotent for adding" in {
@@ -72,7 +72,7 @@ class TxIndexesSpec
 
 object TxIndexesSpec {
   trait Fixture extends AlephiumFixture {
-    def checkTx(indexes: TxIndexes, tx: Transaction): Unit = {
+    def checkTx(indexes: TxIndexes, tx: TransactionTemplate): Unit = {
       tx.unsigned.inputs.foreach { input =>
         indexes.inputIndex.contains(input.outputRef) is true
       }

@@ -175,7 +175,9 @@ class RestServer(
 
   private val misbehaviorActionRoute = toRoute(misbehaviorAction) {
     case MisbehaviorAction.Unban(peers) =>
-      Future.successful(Right(node.misbehaviorManager ! MisbehaviorManager.Unban(peers)))
+      node.misbehaviorManager ! MisbehaviorManager.Unban(peers)
+      node.discoveryServer ! DiscoveryServer.Unban(peers)
+      Future.successful(Right(()))
   }
 
   private val getHashesAtHeightRoute = toRoute(getHashesAtHeight) { case (chainIndex, height) =>
@@ -281,14 +283,12 @@ class RestServer(
     }
   }
 
-  private val collectorRegistry = CollectorRegistry.defaultRegistry
-
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private val metricsRoute = toRoute(metrics) { _ =>
     Future.successful {
       val writer: Writer = new StringWriter()
       try {
-        TextFormat.write004(writer, collectorRegistry.metricFamilySamples())
+        TextFormat.write004(writer, CollectorRegistry.defaultRegistry.metricFamilySamples())
         Right(writer.toString)
       } catch {
         case error: Throwable =>

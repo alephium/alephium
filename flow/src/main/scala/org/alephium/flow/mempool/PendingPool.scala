@@ -22,17 +22,22 @@ import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{AssetOutputRef, ChainIndex, TransactionTemplate, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
-import org.alephium.util.{AVector, EitherF, RWLock}
+import org.alephium.util._
 
 class PendingPool(
+    groupIndex: GroupIndex,
     val txs: mutable.HashMap[Hash, TransactionTemplate],
-    val indexes: TxIndexes
+    val timestamps: ValueSortedMap[Hash, TimeStamp],
+    val indexes: TxIndexes,
+    capacity: Int
 ) extends RWLock {
   def size: Int = readOnly {
     txs.size
   }
+
+  def isFull(): Boolean = txs.size >= capacity
 
   def contains(txId: Hash): Boolean = readOnly {
     txs.contains(txId)
@@ -42,20 +47,35 @@ class PendingPool(
     tx.unsigned.inputs.exists(input => indexes.isSpent(input.outputRef))
   }
 
-  def add(tx: TransactionTemplate): Unit = writeOnly {
+  def add(tx: TransactionTemplate, timeStamp: TimeStamp): Boolean = writeOnly {
     if (!txs.contains(tx.id)) {
-      txs.addOne(tx.id -> tx)
-      indexes.add(tx)
+      if (isFull()) {
+        false
+      } else {
+        txs.put(tx.id, tx)
+        timestamps.put(tx.id, timeStamp)
+        indexes.add(tx)
+        measureTransactionsTotal()
+        true
+      }
+    } else {
+      true
     }
   }
 
   def remove(txs: AVector[TransactionTemplate]): Unit = writeOnly {
-    txs.foreach(remove)
+    txs.foreach(_remove)
+    measureTransactionsTotal()
   }
 
   def remove(tx: TransactionTemplate): Unit = writeOnly {
+    _remove(tx)
+  }
+
+  def _remove(tx: TransactionTemplate): Unit = {
     if (txs.contains(tx.id)) {
       txs.remove(tx.id)
+      timestamps.remove(tx.id)
       indexes.remove(tx)
     }
   }
@@ -84,8 +104,30 @@ class PendingPool(
   def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
     indexes.getUtxo(outputRef)
   }
+
+  def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
+    AVector.from(
+      timestamps
+        .entries()
+        .takeWhile(_.getValue < timeStampThreshold)
+        .map(entry => txs(entry.getKey))
+    )
+  }
+
+  private val transactionTotalLabeled =
+    MemPool.pendingPoolTransactionsTotal.labels(groupIndex.value.toString)
+  def measureTransactionsTotal(): Unit = {
+    transactionTotalLabeled.set(txs.size.toDouble)
+  }
 }
 
 object PendingPool {
-  def empty: PendingPool = new PendingPool(mutable.HashMap.empty, TxIndexes.emptyPendingPool)
+  def empty(groupIndex: GroupIndex, capacity: Int): PendingPool =
+    new PendingPool(
+      groupIndex,
+      mutable.HashMap.empty,
+      ValueSortedMap.empty,
+      TxIndexes.emptyPendingPool,
+      capacity
+    )
 }

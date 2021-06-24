@@ -22,7 +22,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Weight
@@ -91,13 +91,13 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def getParentHash(hash: BlockHash): IOResult[BlockHash]
 
   def maxWeight: IOResult[Weight] =
-    EitherF.foldTry(tips.keys, Weight.zero) { (weight, hash) =>
+    EitherF.foldTry(tips.keys(), Weight.zero) { (weight, hash) =>
       getWeight(hash).map(Math.max(weight, _))
     }
 
   // the max height is the height of the tip of max weight
   def maxHeight: IOResult[Int] = {
-    val maxWeighted = EitherF.foldTry(tips.keys, (ALF.GenesisHeight, ALF.GenesisWeight)) {
+    val maxWeighted = EitherF.foldTry(tips.keys(), (ALF.GenesisHeight, ALF.GenesisWeight)) {
       case ((height, weight), tip) =>
         getState(tip).map { case BlockState(tipHeight, tipWeight) =>
           if (tipWeight.compareTo(weight) > 0) (tipHeight, tipWeight) else (height, weight)
@@ -107,9 +107,13 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def maxHeightUnsafe: Int =
-    tips.keys.foldLeft(ALF.GenesisHeight) { (height, hash) =>
+    tips.keys().foldLeft(ALF.GenesisHeight) { (height, hash) =>
       math.max(getHeightUnsafe(hash), height)
     }
+
+  def isCanonical(hash: BlockHash): IOResult[Boolean] = {
+    IOUtils.tryExecute(isCanonicalUnsafe(hash))
+  }
 
   def isCanonicalUnsafe(hash: BlockHash): Boolean = {
     blockStateStorage.getOptUnsafe(hash).exists { state =>
@@ -144,7 +148,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def getAllTips: AVector[BlockHash] = {
-    AVector.from(tips.keys)
+    AVector.from(tips.keys())
   }
 
   private def getLink(hash: BlockHash): IOResult[BlockHashChain.Link] = {

@@ -263,6 +263,7 @@ lazy val protocol = project("protocol")
   .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
+      `prometheus-simple-client`,
       fastparse
     )
   )

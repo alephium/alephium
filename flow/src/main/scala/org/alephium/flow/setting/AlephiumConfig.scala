@@ -75,9 +75,11 @@ final case class ConsensusSetting(
 //scalastyle:on
 
 final case class MiningSetting(
+    minerAddresses: Option[AVector[Address]],
     nonceStep: U256,
     batchDelay: Duration,
-    apiInterface: InetAddress
+    apiInterface: InetAddress,
+    pollingInterval: Duration
 )
 
 final case class NetworkSetting(
@@ -130,7 +132,12 @@ final case class DiscoverySetting(
     neighborsPerGroup: Int
 ) extends DiscoveryConfig
 
-final case class MemPoolSetting(txPoolCapacity: Int, txMaxNumberPerBlock: Int)
+final case class MemPoolSetting(
+    sharedPoolCapacity: Int,
+    pendingPoolCapacity: Int,
+    txMaxNumberPerBlock: Int,
+    cleanFrequency: Duration
+)
 
 final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
 
@@ -146,8 +153,7 @@ final case class AlephiumConfig(
     discovery: DiscoverySetting,
     mempool: MemPoolSetting,
     wallet: WalletSetting,
-    genesisBalances: AVector[(LockupScript, U256)],
-    minerAddresses: Option[AVector[Address]]
+    genesisBalances: AVector[(LockupScript, U256)]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
@@ -218,30 +224,46 @@ object AlephiumConfig {
     }
   }
 
+  final private case class TempMiningSetting(
+      minerAddresses: Option[Seq[String]],
+      nonceStep: U256,
+      batchDelay: Duration,
+      apiInterface: InetAddress,
+      pollingInterval: Duration
+  ) {
+    def toMiningSetting(addresses: Option[AVector[Address]]): MiningSetting = {
+      MiningSetting(
+        addresses,
+        nonceStep,
+        batchDelay,
+        apiInterface,
+        pollingInterval
+      )
+    }
+  }
+
   final private case class TempAlephiumConfig(
       broker: BrokerSetting,
       consensus: TempConsensusSetting,
-      mining: MiningSetting,
+      mining: TempMiningSetting,
       network: TempNetworkSetting,
       discovery: DiscoverySetting,
       mempool: MemPoolSetting,
-      wallet: WalletSetting,
-      minerAddresses: Option[Seq[String]]
+      wallet: WalletSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
-      parseMiners(minerAddresses, network.networkType).map { minerAddresses =>
+      parseMiners(mining.minerAddresses, network.networkType).map { minerAddresses =>
         val consensusExtracted = consensus.toConsensusSetting(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         AlephiumConfig(
           broker,
           consensusExtracted,
-          mining,
+          mining.toMiningSetting(minerAddresses),
           networkExtracted,
           discovery,
           mempool,
           wallet,
-          Genesis(network.networkType),
-          minerAddresses
+          Genesis(network.networkType)
         )
       } match {
         case Right(value) => value
@@ -255,12 +277,11 @@ object AlephiumConfig {
       TempAlephiumConfig(
         as[BrokerSetting]("broker"),
         as[TempConsensusSetting]("consensus"),
-        as[MiningSetting]("mining"),
+        as[TempMiningSetting]("mining"),
         as[TempNetworkSetting]("network"),
         as[DiscoverySetting]("discovery"),
         as[MemPoolSetting]("mempool"),
-        as[WalletSetting]("wallet"),
-        as[Option[Seq[String]]]("minerAddresses")
+        as[WalletSetting]("wallet")
       ).toAlephiumConfig
     }
 

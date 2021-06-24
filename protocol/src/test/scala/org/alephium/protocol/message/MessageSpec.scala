@@ -103,4 +103,8 @@ class MessageSpec extends AlephiumSpec {
         .swap isE a[SerdeError.NotEnoughBytes]
     }
   }
+
+  it should "produce the same code name" in {
+    pong.name is Pong.codeName
+  }
 }

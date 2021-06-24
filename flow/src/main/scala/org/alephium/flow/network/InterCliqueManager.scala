@@ -31,7 +31,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
+import org.alephium.util._
 
 object InterCliqueManager {
   // scalastyle:off parameter.number
@@ -136,6 +136,7 @@ class InterCliqueManager(
         sender() ! Tcp.Close
       }
     case CliqueManager.HandShaked(brokerInfo, connectionType) =>
+      connecting.remove(brokerInfo.address)
       handleNewBroker(brokerInfo, connectionType)
     case CliqueManager.Synced(brokerInfo) =>
       log.debug(s"No new blocks from $brokerInfo")
@@ -182,6 +183,7 @@ class InterCliqueManager(
 
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
+      connecting.remove(peer)
       removeBroker(peer)
       if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
         discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
@@ -198,20 +200,26 @@ class InterCliqueManager(
     }
   }
 
+  val connecting: LinkedBuffer[InetSocketAddress, Unit] = LinkedBuffer(
+    networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups
+  )
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
-    log.debug(s"Try to connect to $brokerInfo")
-    val props =
-      OutboundBrokerHandler.props(
-        selfCliqueInfo,
-        brokerInfo,
-        blockflow,
-        allHandlers,
-        ActorRefT(self),
-        blockFlowSynchronizer
-      )
-    val out = context.actorOf(props)
-    context.watchWith(out, PeerDisconnected(brokerInfo.address))
-    ()
+    if (!connecting.contains(brokerInfo.address)) {
+      log.info(s"Try to connect to $brokerInfo")
+      val props =
+        OutboundBrokerHandler.props(
+          selfCliqueInfo,
+          brokerInfo,
+          blockflow,
+          allHandlers,
+          ActorRefT(self),
+          blockFlowSynchronizer
+        )
+      val out = context.actorOf(props)
+      connecting.put(brokerInfo.address, ())
+      context.watchWith(out, PeerDisconnected(brokerInfo.address))
+      ()
+    }
   }
 }
 

@@ -68,6 +68,8 @@ object Node {
     implicit private val consensusConfig      = config.consensus
     implicit private val networkSetting       = config.network
     implicit private val discoveryConfig      = config.discovery
+    implicit private val miningSetting        = config.mining
+    implicit private val memPoolSetting       = config.mempool
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
@@ -101,7 +103,7 @@ object Node {
       ActorRefT.build[EventBus.Message](system, EventBus.props())
 
     val allHandlers: AllHandlers =
-      AllHandlers.build(system, blockFlow, eventBus, config.minerAddresses)
+      AllHandlers.build(system, blockFlow, eventBus)
 
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
       ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))

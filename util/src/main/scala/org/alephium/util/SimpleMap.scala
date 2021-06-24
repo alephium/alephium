@@ -14,13 +14,32 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.mempool
+package org.alephium.util
 
-import org.alephium.protocol.model.TransactionTemplate
-import org.alephium.util.AVector
+import java.util.Map
 
-trait Pool {
-  def add(transactions: AVector[TransactionTemplate]): Int
+import scala.jdk.CollectionConverters._
 
-  def remove(transactions: AVector[TransactionTemplate]): Int
+trait SimpleMap[K, V] {
+  protected def underlying: Map[K, V]
+
+  def size: Int = underlying.size()
+
+  def isEmpty: Boolean = underlying.isEmpty
+
+  def contains(key: K): Boolean
+
+  def unsafe(key: K): V
+
+  def get(key: K): Option[V]
+
+  def put(key: K, value: V): Unit
+
+  def remove(key: K): Unit
+
+  def keys(): Iterator[K] = underlying.keySet().iterator().asScala
+
+  def values(): Iterator[V] = underlying.values().iterator().asScala
+
+  def entries(): Iterator[Map.Entry[K, V]] = underlying.entrySet().iterator().asScala
 }

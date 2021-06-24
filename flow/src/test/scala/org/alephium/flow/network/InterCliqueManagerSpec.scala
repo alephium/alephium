@@ -62,9 +62,17 @@ class InterCliqueManagerSpec
   }
 
   it should "publish `PeerDisconnected` on outbound peer disconnection" in new Fixture {
-    interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
+    EventFilter.info(start = "Try to connect to").intercept {
+      interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
+      interCliqueManager.underlyingActor.connecting.contains(peerInfo.address) is true
+    }
 
-    eventually {
+    // It's already connecting, so there is no retry
+    EventFilter.info(start = "Try to connect to", occurrences = 0).intercept {
+      interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
+    }
+
+    EventFilter.info(start = "Peer disconnected:").intercept {
       val connection = getActor("*")(system.dispatcher).futureValue.get
       interCliqueManager.tell(CliqueManager.HandShaked(peerInfo, OutboundConnection), connection)
       getPeers() is Seq(peer)
@@ -74,6 +82,7 @@ class InterCliqueManagerSpec
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
     discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
+    interCliqueManager.underlyingActor.connecting.contains(peerInfo.address) is false
 
     getPeers() is Seq.empty
   }

@@ -71,10 +71,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     override val configValues: Map[String, Any] = Map(
-      ("alephium.miner-addresses", ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava))
+      (
+        "alephium.mining.miner-addresses",
+        ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava)
+      )
     )
 
-    config.minerAddresses is Some(
+    config.mining.minerAddresses is Some(
       minerAddresses.map(str => Address.fromBase58(str, NetworkType.Devnet).get)
     )
   }
@@ -86,7 +89,10 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     override val configValues: Map[String, Any] = Map(
-      ("alephium.miner-addresses", ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava))
+      (
+        "alephium.mining.miner-addresses",
+        ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava)
+      )
     )
 
     assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))

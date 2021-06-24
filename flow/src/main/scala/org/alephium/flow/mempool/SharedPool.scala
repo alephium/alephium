@@ -16,96 +16,128 @@
 
 package org.alephium.flow.mempool
 
-import scala.collection.mutable
-
-import org.alephium.flow.mempool.SharedPool.WeightedId
+import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasPrice
-import org.alephium.util.{AVector, RWLock, U256}
+import org.alephium.util._
 
 /*
  * Transaction pool implementation
  */
 class SharedPool private (
-    pool: mutable.SortedMap[WeightedId, TransactionTemplate],
-    weights: mutable.HashMap[Hash, GasPrice],
+    val chainIndex: ChainIndex,
+    val txs: ValueSortedMap[Hash, TransactionTemplate],
+    val timestamps: ValueSortedMap[Hash, TimeStamp],
+    val sharedTxIndex: TxIndexes,
     val capacity: Int
-) extends Pool
-    with RWLock {
+) extends RWLock {
 
-  def isFull: Boolean = pool.size == capacity
+  def isFull(): Boolean = size == capacity
 
-  def size: Int = pool.size
+  def size: Int = readOnly(txs.size)
 
-  def contains(txId: Hash): Boolean =
-    readOnly {
-      weights.contains(txId)
+  def contains(txId: Hash): Boolean = readOnly {
+    txs.contains(txId)
+  }
+
+  def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
+    txs.getMaxValues(maxNum)
+  }
+
+  def getAll(): AVector[TransactionTemplate] = readOnly {
+    txs.getAll()
+  }
+
+  def add(transactions: AVector[TransactionTemplate], timeStamp: TimeStamp): Int = writeOnly {
+    val result = transactions.fold(0) { case (acc, tx) =>
+      acc + _add(tx, timeStamp)
     }
+    measureTransactionsTotal()
+    result
+  }
 
-  def collectForBlock(maxNum: Int): AVector[TransactionTemplate] =
-    readOnly {
-      AVector.from(pool.values.take(maxNum))
-    }
+  def add(tx: TransactionTemplate, timeStamp: TimeStamp): Boolean = writeOnly {
+    _add(tx, timeStamp) != 0
+  }
 
-  def getAll(): AVector[TransactionTemplate] =
-    readOnly {
-      AVector.from(pool.values)
-    }
-
-  def add(transactions: AVector[TransactionTemplate]): Int =
-    writeOnly {
-      val sizeBefore = size
-      transactions.foreachE { case (tx) =>
-        if (isFull) {
-          Left(())
-        } else {
-          weights += tx.id                                -> tx.unsigned.gasPrice
-          pool += WeightedId(tx.unsigned.gasPrice, tx.id) -> tx
-          Right(())
-        }
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def _add(tx: TransactionTemplate, timeStamp: TimeStamp): Int = {
+    if (isFull()) {
+      val lowestWeightTxId = txs.min
+      val lowestWeightTx   = txs.unsafe(lowestWeightTxId)
+      if (SharedPool.txOrdering.gt(tx, lowestWeightTx)) {
+        _remove(lowestWeightTxId)
+        __add(tx, timeStamp)
+        1
+      } else {
+        0
       }
-      val sizeAfter = size
-      sizeAfter - sizeBefore
+    } else {
+      __add(tx, timeStamp)
+      1
     }
+  }
 
-  def remove(transactions: AVector[TransactionTemplate]): Int =
-    writeOnly {
-      val sizeBefore = size
-      transactions.foreach { tx =>
-        if (contains(tx.id)) {
-          val weight = weights(tx.id)
-          weights -= tx.id
-          pool -= WeightedId(weight, tx.id)
-        }
-      }
-      val sizeAfter = size
-      sizeBefore - sizeAfter
-    }
+  def __add(tx: TransactionTemplate, timeStamp: TimeStamp): Unit = {
+    txs.put(tx.id, tx)
+    timestamps.put(tx.id, timeStamp)
+    sharedTxIndex.add(tx)
+  }
 
-  def clear(): Unit =
-    writeOnly {
-      pool.clear()
+  def remove(transactions: AVector[TransactionTemplate]): Int = writeOnly {
+    val sizeBefore = size
+    transactions.foreach(tx => _remove(tx.id))
+    measureTransactionsTotal()
+    val sizeAfter = size
+    sizeBefore - sizeAfter
+  }
+
+  def _remove(txId: Hash): Unit = {
+    txs.get(txId).foreach { tx =>
+      txs.remove(txId)
+      timestamps.remove(txId)
+      sharedTxIndex.remove(tx)
     }
+  }
+
+  def clear(): Unit = writeOnly {
+    txs.clear()
+    timestamps.clear()
+  }
+
+  // don't lock this function, only lock it's internal calls
+  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
+    val oldTxs = takeOldTxs(timeStampThreshold)
+    blockFlow.recheckInputs(chainIndex.from, oldTxs).map(remove)
+    ()
+  }
+
+  def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
+    AVector.from(
+      timestamps
+        .entries()
+        .takeWhile(_.getValue <= timeStampThreshold)
+        .map(entry => txs.unsafe(entry.getKey))
+    )
+  }
+
+  private val transactionsTotalLabeled = MemPool.sharedPoolTransactionsTotal
+    .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+  def measureTransactionsTotal(): Unit = {
+    transactionsTotalLabeled.set(size.toDouble)
+  }
 }
 
 object SharedPool {
-  def empty(capacity: Int): SharedPool =
-    new SharedPool(mutable.SortedMap.empty, mutable.HashMap.empty, capacity)
+  def empty(chainIndex: ChainIndex, capacity: Int, sharedTxIndex: TxIndexes): SharedPool =
+    new SharedPool(
+      chainIndex,
+      ValueSortedMap.empty,
+      ValueSortedMap.empty,
+      sharedTxIndex,
+      capacity
+    )
 
-  final case class WeightedId(weight: GasPrice, id: Hash) {
-    override def equals(obj: Any): Boolean =
-      obj match {
-        case that: WeightedId => this.id == that.id
-        case _                => false
-      }
-
-    override def hashCode(): Int = id.hashCode()
-  }
-
-  implicit val ord: Ordering[WeightedId] = {
-    Ordering
-      .by[WeightedId, (U256, Hash)](weightedId => (weightedId.weight.value, weightedId.id))
-      .reverse
-  }
+  implicit val txOrdering: Ordering[TransactionTemplate] =
+    Ordering.by[TransactionTemplate, (U256, Hash)](tx => (tx.unsigned.gasPrice.value, tx.id))
 }

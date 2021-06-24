@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
-import org.alephium.flow.core.BlockFlowState.TxStatus
+import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
@@ -70,7 +70,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
+  def getPreOutputsIncludingPools(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
     val chainIndex = tx.chainIndex
     val mainGroup  = chainIndex.from
     val bestDeps   = getBestDeps(mainGroup)
@@ -78,18 +78,33 @@ trait TxUtils { Self: FlowUtils =>
       worldState <- getPersistedWorldState(bestDeps, mainGroup)
       result <- tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
         case (Some(outputs), input) =>
-          getPreOutput(mainGroup, worldState, input).map(_.map(outputs :+ _))
+          getPreOutputIncludingPools(mainGroup, bestDeps, worldState, input).map(
+            _.map(outputs :+ _)
+          )
         case (None, _) => Right(None)
       }
     } yield result
   }
 
-  def getPreOutput(
+  def getPreOutputIncludingPools(
       mainGroup: GroupIndex,
+      bestDeps: BlockDeps,
       worldState: WorldState.Persisted,
       outputRef: TxOutputRef
   ): IOResult[Option[TxOutput]] = {
     getMemPool(mainGroup).getUtxo(outputRef) match {
+      case Some(output) => Right(Some(output))
+      case None         => getPreOutputInBlocks(mainGroup, bestDeps, worldState, outputRef)
+    }
+  }
+
+  def getPreOutputInBlocks(
+      mainGroup: GroupIndex,
+      bestDeps: BlockDeps,
+      worldState: WorldState.Persisted,
+      outputRef: TxOutputRef
+  ): IOResult[Option[TxOutput]] = {
+    getPreoutputsInCache(mainGroup, bestDeps, outputRef).flatMap {
       case Some(output) => Right(Some(output))
       case None         => worldState.getOutputOpt(outputRef)
     }
@@ -329,6 +344,59 @@ trait TxUtils { Self: FlowUtils =>
           )
       }
       (usedUtxos, newUtxos)
+    }
+  }
+
+  def getPreoutputsInCache(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      txOutputRef: TxOutputRef
+  ): IOResult[Option[TxOutput]] = {
+    getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
+      val index = blockCaches.indexWhere(_.relatedOutputs.contains(txOutputRef))
+      if (index != -1) {
+        Some(blockCaches(index).relatedOutputs(txOutputRef))
+      } else {
+        None
+      }
+    }
+  }
+
+  def getPreoutputInState(
+      groupIndex: GroupIndex,
+      bestDeps: BlockDeps,
+      txOutputRef: TxOutputRef
+  ): IOResult[Option[TxOutput]] = {
+    for {
+      bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
+      txOutputOpt    <- bestWorldState.getOutputOpt(txOutputRef)
+    } yield txOutputOpt
+  }
+
+  // return all the txs that are not valid
+  def recheckInputs(
+      groupIndex: GroupIndex,
+      txs: AVector[TransactionTemplate]
+  ): IOResult[AVector[TransactionTemplate]] = {
+    val bestDeps = getBestDeps(groupIndex)
+    for {
+      blockCaches <- getBlocksForUpdates(groupIndex, bestDeps)
+      worldState  <- getPersistedWorldState(bestDeps, groupIndex)
+      failedTxs   <- txs.filterNotE(recheckInputs(_, worldState, blockCaches))
+    } yield failedTxs
+  }
+
+  private def recheckInputs(
+      tx: TransactionTemplate,
+      worldState: WorldState.Persisted,
+      blockCaches: AVector[BlockCache]
+  ): IOResult[Boolean] = {
+    tx.unsigned.inputs.forallE { input =>
+      if (blockCaches.exists(_.relatedOutputs.contains(input.outputRef))) {
+        Right(true)
+      } else {
+        worldState.existOutput(input.outputRef)
+      }
     }
   }
 }

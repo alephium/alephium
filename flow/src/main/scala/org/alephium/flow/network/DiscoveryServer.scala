@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.immutable.ArraySeq
 
@@ -27,7 +27,7 @@ import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
-import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo, PeerId}
+import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
 import org.alephium.util._
 
 object DiscoveryServer {
@@ -63,12 +63,12 @@ object DiscoveryServer {
 
   object Timer
 
-  final case class AwaitPong(remote: InetSocketAddress, pingAt: TimeStamp)
+  final case class AwaitReply(remote: InetSocketAddress, requestAt: TimeStamp)
 
   sealed trait Command
   final case class GetNeighborPeers(targetGroupInfoOpt: Option[BrokerGroupInfo]) extends Command
-  final case class Disable(peerId: PeerId)                                       extends Command
   final case class Remove(peer: InetSocketAddress)                               extends Command
+  final case class Unban(peers: AVector[InetAddress])                            extends Command
   case object Scan                                                               extends Command
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                        extends Command
   final case class PeerConfirmed(peerInfo: BrokerInfo)                           extends Command
@@ -137,7 +137,7 @@ class DiscoveryServer(
       log.info(s"UDP server bound to $address")
       setSocket(ActorRefT[UdpServer.Command](sender()))
       context.watch(sender())
-      bootstrap.foreach(ping)
+      bootstrap.foreach(fetchNeighbors)
       scheduleScan()
       unstashAll()
       context.become(ready)
@@ -180,18 +180,14 @@ class DiscoveryServer(
       scanAndSchedule()
     case GetNeighborPeers(targetGroupInfoOpt) =>
       sender() ! NeighborPeers(getActivePeers(targetGroupInfoOpt))
-    case Disable(peerId) =>
-      table -= peerId
-      ()
-    case Remove(peer) =>
-      remove(peer)
+
+    case Remove(peer) => remove(peer)
     case PeerDenied(peerInfo) =>
       log.debug(s"peer ${peerInfo.peerId} - ${peerInfo.address} is banned, ignoring it")
       banPeer(peerInfo.peerId)
-    case PeerConfirmed(peerInfo) =>
-      tryPing(peerInfo)
-    case OutboundBrokerHandler.Unreachable(remote) =>
-      setUnreachable(remote)
+    case PeerConfirmed(peerInfo)                   => tryPing(peerInfo)
+    case OutboundBrokerHandler.Unreachable(remote) => setUnreachable(remote)
+    case Unban(remotes)                            => remotes.foreach(unsetUnreachable)
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
@@ -200,24 +196,22 @@ class DiscoveryServer(
 
   def handlePayload(remote: InetSocketAddress)(payload: Payload): Unit =
     payload match {
-      case Ping(peerInfoOpt) =>
-        peerInfoOpt match {
+      case Ping(id, senderInfo) =>
+        senderInfo match {
           case None =>
-            selfPeerInfoOpt.foreach(info => send(remote, Pong(info)))
-          case Some(peerInfo) =>
-            validatePeerInfo(remote, peerInfo) { validPeerInfo =>
-              selfPeerInfoOpt.foreach(info => send(remote, Pong(info)))
-              misbehaviorManager ! MisbehaviorManager.ConfirmPeer(validPeerInfo)
-            }
+            selfPeerInfoOpt.foreach(info => send(remote, Pong(id, info)))
+          case Some(info) =>
+            selfPeerInfoOpt.foreach(info => send(remote, Pong(id, info)))
+            misbehaviorManager ! MisbehaviorManager.ConfirmPeer(info)
         }
-      case Pong(peerInfo) =>
-        validatePeerInfo(remote, peerInfo) { validPeerInfo => handlePong(validPeerInfo) }
+      case Pong(id, peerInfo) =>
+        handlePong(id, peerInfo)
       case FindNode(targetId) =>
         val neighbors = getNeighbors(targetId)
         send(remote, Neighbors(neighbors))
       case Neighbors(peers) =>
         peers.foreach { peerInfo =>
-          if (!table.contains(peerInfo.peerId)) {
+          if (isUnknown(peerInfo.peerId)) {
             misbehaviorManager ! MisbehaviorManager.ConfirmPeer(peerInfo)
           }
         }
@@ -246,17 +240,6 @@ class DiscoveryServer(
   def cancelScan(): Unit = {
     scanScheduled.foreach(_.cancel())
     scanScheduled = None
-  }
-
-  def validatePeerInfo(remote: InetSocketAddress, peerInfo: BrokerInfo)(
-      f: BrokerInfo => Unit
-  ): Unit = {
-    if (remote != peerInfo.address) {
-      log.warning(s"Peer info mismatch with remote address: ${peerInfo.address} <> ${remote}")
-      misbehaviorManager ! MisbehaviorManager.InvalidMessage(remote)
-    } else if (mightReachable(remote)) {
-      f(peerInfo)
-    }
   }
 
   private var silentDuration: Duration = Duration.ofSecondsUnsafe(1)

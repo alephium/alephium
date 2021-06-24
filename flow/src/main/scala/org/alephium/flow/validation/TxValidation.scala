@@ -89,7 +89,7 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
-      preOutputs <- flow.getPreOutputs(tx) match {
+      preOutputs <- flow.getPreOutputsIncludingPools(tx) match {
         case Right(Some(outputs)) => Right(outputs)
         case Right(None)          => Left(Right(NonExistInput))
         case Left(error)          => Left(Left(error))

@@ -19,10 +19,10 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.setting.NetworkSetting
+import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.{Address, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector, EventBus}
+import org.alephium.protocol.model.ChainIndex
+import org.alephium.util.{ActorRefT, EventBus}
 
 final case class AllHandlers(
     flowHandler: ActorRefT[FlowHandler.Command],
@@ -59,32 +59,36 @@ object AllHandlers {
   def build(
       system: ActorSystem,
       blockFlow: BlockFlow,
-      eventBus: ActorRefT[EventBus.Message],
-      addressesOpt: Option[AVector[Address]]
+      eventBus: ActorRefT[EventBus.Message]
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
-      networkSetting: NetworkSetting
+      networkSetting: NetworkSetting,
+      miningSetting: MiningSetting,
+      memPoolSetting: MemPoolSetting
   ): AllHandlers = {
-    build(system, blockFlow, eventBus, addressesOpt, "")
+    build(system, blockFlow, eventBus, "")
   }
 
+  // scalastyle:off parameter.number
   def build(
       system: ActorSystem,
       blockFlow: BlockFlow,
       eventBus: ActorRefT[EventBus.Message],
-      addressesOpt: Option[AVector[Address]],
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
-      networkSetting: NetworkSetting
+      networkSetting: NetworkSetting,
+      miningSetting: MiningSetting,
+      memPoolSetting: MemPoolSetting
   ): AllHandlers = {
     val flowProps = FlowHandler.props(blockFlow)
     val flowHandler =
       ActorRefT.build[FlowHandler.Command](system, flowProps, s"FlowHandler$namePostfix")
-    buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, addressesOpt, namePostfix)
+    buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, namePostfix)
   }
+  // scalastyle:on parameter.number
 
   // scalastyle:off parameter.number
   def buildWithFlowHandler(
@@ -92,12 +96,13 @@ object AllHandlers {
       blockFlow: BlockFlow,
       flowHandler: ActorRefT[FlowHandler.Command],
       eventBus: ActorRefT[EventBus.Message],
-      addressesOpt: Option[AVector[Address]],
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
-      networkSetting: NetworkSetting
+      networkSetting: NetworkSetting,
+      miningSetting: MiningSetting,
+      memPoolSetting: MemPoolSetting
   ): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
@@ -112,7 +117,7 @@ object AllHandlers {
         s"DependencyHandler$namePostfix"
       )
 
-    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler, addressesOpt)
+    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
     AllHandlers(

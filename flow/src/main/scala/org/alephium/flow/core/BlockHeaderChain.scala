@@ -25,7 +25,7 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target, Weight}
-import org.alephium.util.{AVector, EitherF, LruCache, TimeStamp}
+import org.alephium.util.{AVector, Duration, EitherF, LruCache, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
@@ -79,7 +79,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   private def checkCanonicality(hash: BlockHash, weight: Weight): IOResult[Boolean] = {
-    EitherF.forallTry(tips.keys) { tip =>
+    EitherF.forallTry(tips.keys()) { tip =>
       getWeight(tip).map(BlockHashPool.compare(hash, weight, tip, _) > 0)
     }
   }
@@ -207,6 +207,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
+  }
+
+  def getBlockTime(header: BlockHeader): IOResult[Duration] = {
+    getBlockHeader(header.parentHash)
+      .map(header.timestamp deltaUnsafe _.timestamp)
   }
 }
 

@@ -22,15 +22,12 @@ import scala.util.Random
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import akka.util.Timeout
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
 import org.alephium.flow.network.broker.{MisbehaviorManager, OutboundBrokerHandler}
-import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol._
 import org.alephium.protocol.config._
-import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
 import org.alephium.util._
 
@@ -83,7 +80,7 @@ class DiscoveryServerSpec
 
           val scanFrequency: Duration     = Duration.ofMillisUnsafe(2000)
           val scanFastFrequency: Duration = Duration.ofMillisUnsafe(2000)
-          val neighborsPerGroup: Int      = 3
+          val neighborsPerGroup: Int      = 20
         }
         (brokerInfo, config)
       }
@@ -97,7 +94,7 @@ class DiscoveryServerSpec
 
     val networkConfig = new NetworkConfig { val networkType = NetworkType.Testnet }
 
-    val cliqueNum = 8
+    val cliqueNum = 16
     val cliques   = AVector.fill(cliqueNum)(generateClique())
 
     val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
@@ -133,7 +130,7 @@ class DiscoveryServerSpec
         server.tell(DiscoveryServer.GetNeighborPeers(None), probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
-          (peers.sumBy(_.groupNumPerBroker) >= 3 * groups) is true
+          (peers.sumBy(_.groupNumPerBroker) >= 5 * groups) is true
         }
       }
     }
@@ -211,37 +208,6 @@ class DiscoveryServerSpec
     }
   }
 
-  it should "refuse to ping a peer with unmatched peer info" in new Fixture {
-    implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
-
-    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
-
-    misbehaviorManager0
-      .ask(MisbehaviorManager.GetPeers)
-      .mapTo[MisbehaviorManager.Peers]
-      .futureValue is MisbehaviorManager.Peers(AVector.empty)
-
-    val randomAddress = Generators.socketAddressGen.retryUntil(_ != address1).sample.get
-    val message = DiscoveryMessage.from(
-      cliqueInfo1.id,
-      DiscoveryMessage.Ping(Some(BrokerInfo.from(randomAddress, cliqueInfo1.selfInterBrokerInfo)))
-    )
-    server0 ! UdpServer.Received(
-      DiscoveryMessage.serialize(message, networkConfig.networkType, cliqueInfo1.priKey),
-      address1
-    )
-
-    eventually {
-      misbehaviorManager0
-        .ask(MisbehaviorManager.GetPeers)
-        .mapTo[MisbehaviorManager.Peers]
-        .futureValue
-        .peers
-        .head
-        .peer is address1.getAddress
-    }
-  }
-
   trait UnreachableFixture extends Fixture {
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
   }
@@ -252,18 +218,9 @@ class DiscoveryServerSpec
     eventually {
       server0.underlyingActor.mightReachable(remote) is false
     }
-  }
-
-  it should "not accept unreachable peer" in new UnreachableFixture {
-    val peerInfo0 = Generators.peerInfoGen.sample.get
-    val peerInfo1 = Generators.peerInfoGen.sample.get
-    server0 ! OutboundBrokerHandler.Unreachable(peerInfo0.address)
+    server0 ! DiscoveryServer.Unban(AVector(remote.getAddress))
     eventually {
-      var validated = false
-      server0.underlyingActor.validatePeerInfo(peerInfo0.address, peerInfo0)(_ => validated = true)
-      validated is false
-      server0.underlyingActor.validatePeerInfo(peerInfo1.address, peerInfo1)(_ => validated = true)
-      validated is true
+      server0.underlyingActor.mightReachable(remote) is true
     }
   }
 
@@ -305,18 +262,18 @@ object DiscoveryServerSpec {
       port: Int,
       _peersPerGroup: Int,
       _scanFrequency: Duration = Duration.unsafe(200),
-      _expireDuration: Duration = Duration.ofHoursUnsafe(1)
+      _expireDuration: Duration = Duration.ofHoursUnsafe(1),
+      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5)
   ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
-      val peersPerGroup: Int          = _peersPerGroup
-      val scanMaxPerGroup: Int        = _peersPerGroup
       val scanFrequency: Duration     = _scanFrequency
       val scanFastFrequency: Duration = _scanFrequency
       val neighborsPerGroup: Int      = _peersPerGroup
 
       override lazy val expireDuration: Duration = _expireDuration
+      override val peersTimeout: Duration        = _peersTimeout
 
       val groups: Int    = groupSize
       val brokerNum: Int = groupSize

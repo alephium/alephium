@@ -17,7 +17,7 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
-import io.prometheus.client.{Counter, Gauge}
+import io.prometheus.client.{Counter, Gauge, Histogram}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
@@ -95,11 +95,18 @@ class HeaderChainHandler(
 
   override def show(header: BlockHeader): String = showHeader(header)
 
+  private val headersTotalLabeled = headersTotal.labels(chainIndexFromString, chainIndexToString)
+  private val headersReceivedTotalLabeled =
+    headersReceivedTotal.labels(chainIndexFromString, chainIndexToString)
   override def measure(header: BlockHeader): Unit = {
-    val chain      = measureCommon(header)
-    val (from, to) = getChainIndexLabels(header)
+    val chain = measureCommon(header)
 
-    headersTotal.labels(from, to).set(chain.numHashes.toDouble)
-    headersReceivedTotal.labels(from, to).inc()
+    headersTotalLabeled.set(chain.numHashes.toDouble)
+    headersReceivedTotalLabeled.inc()
   }
+
+  val chainValidationTotalLabeled: Counter.Child =
+    ChainHandler.chainValidationTotal.labels("BlockHeader")
+  val chainValidationDurationMilliSecondsLabeled: Histogram.Child =
+    ChainHandler.chainValidationDurationMilliSeconds.labels("BlockHeader")
 }

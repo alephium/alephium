@@ -16,30 +16,39 @@
 
 package org.alephium.util
 
-class LinkedBufferSpec extends AlephiumSpec {
+class ValueSortedMapSpec extends AlephiumSpec {
   it should "work as map" in {
-    val buffer = LinkedBuffer[Char, Int](100)
-    buffer.put('a', 0)
-    buffer.contains('a') is true
-    buffer.unsafe('a') is 0
-    buffer.get('a') is Some(0)
-    buffer.put('b', 1)
-    buffer.keys().toSeq is Seq('a', 'b')
-    buffer.values().toSeq is Seq(0, 1)
-    buffer.put('a', 2)
-    buffer.keys().toSeq is Seq('b', 'a')
-    buffer.values().toSeq is Seq(1, 2)
-    buffer.remove('b')
-    buffer.remove('a')
-    buffer.isEmpty is true
+    val map = ValueSortedMap.empty[Char, Int]
+    map.put('a', 2)
+    map.put('b', 3)
+    map.put('c', 1)
+
+    map.unsafe('a') is 2
+    map.unsafe('b') is 3
+    map.unsafe('c') is 1
+
+    map.min is 'c'
+    map.max is 'b'
+
+    map.getMaxValues(2) is AVector(3, 2)
+    map.getMinValues(2) is AVector(1, 2)
+    map.getMaxKeys(2) is AVector('b', 'a')
+    map.getMinKeys(2) is AVector('c', 'a')
+    map.getAll().toSet is Set(1, 2, 3)
+
+    map.remove('a')
+    map.get('a') is None
+    map.getAll().toSet is Set(1, 3)
+
+    map.clear()
+    map.isEmpty is true
   }
 
-  it should "remove elements when there is no capacity" in {
-    val buffer = LinkedBuffer[Char, Int](1)
-    buffer.put('a', 0)
-    buffer.put('b', 1)
-    buffer.size is 1
-    buffer.keys().toSeq is Seq('b')
-    buffer.values().toSeq is Seq(1)
+  it should "handle same value" in {
+    val map = ValueSortedMap.empty[Char, Int]
+    map.put('a', 2)
+    map.put('b', 2)
+    map.min is 'a'
+    map.max is 'b'
   }
 }

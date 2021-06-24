@@ -19,14 +19,16 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, NoIndexModelGeneratorsLike}
-import org.alephium.util.{AVector, LockFixture}
+import org.alephium.protocol.model._
+import org.alephium.util.{AVector, LockFixture, TimeStamp}
 
 class MemPoolSpec
     extends AlephiumFlowSpec
     with TxIndexesSpec.Fixture
     with LockFixture
     with NoIndexModelGeneratorsLike {
+  def now = TimeStamp.now()
+
   it should "initialize an empty pool" in {
     val pool = MemPool.empty(GroupIndex.unsafe(0))
     pool.size is 0
@@ -43,9 +45,9 @@ class MemPoolSpec
       val index = block.chainIndex
       if (index.from.equals(group)) {
         txTemplates.foreach(pool.contains(index, _) is false)
-        pool.addToTxPool(index, txTemplates) is block.transactions.length
+        pool.addToTxPool(index, txTemplates, now) is block.transactions.length
         pool.size is block.transactions.length
-        block.transactions.foreach(checkTx(pool.txIndexes, _))
+        block.transactions.foreach(tx => checkTx(pool.txIndexes, tx.toTemplate))
         txTemplates.foreach(pool.contains(index, _) is true)
         pool.removeFromTxPool(index, txTemplates) is block.transactions.length
         pool.size is 0
@@ -62,7 +64,7 @@ class MemPoolSpec
     pool.addNewTx(ChainIndex.unsafe(0, 0), tx0)
     pool.size is 1
     val tx1 = transactionGen().sample.get.toTemplate
-    pool.pendingPool.add(tx1)
+    pool.pendingPool.add(tx1, now)
     pool.size is 2
   }
 
@@ -73,7 +75,7 @@ class MemPoolSpec
     val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
     val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
     pool.addNewTx(index0, tx0)
-    pool.pendingPool.add(tx1)
+    pool.pendingPool.add(tx1, now)
   }
 
   it should "list transactions for a specific chain" in new Fixture {
@@ -94,5 +96,51 @@ class MemPoolSpec
     tx1.assetOutputRefs.foreachWithIndex((output, index) =>
       pool.getUtxo(output) is Some(tx1.getOutput(index))
     )
+  }
+
+  it should "work for sequential txs" in new Fixture {
+    val blockFlow  = isolatedBlockFlow()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = transfer(blockFlow, chainIndex)
+    val tx2        = block0.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, chainIndex)
+    val tx3    = block1.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow, block1)
+
+    pool.addNewTx(chainIndex, tx2)
+    pool.pendingPool.add(tx3, now)
+    val tx2Outputs = tx2.assetOutputRefs
+    tx2Outputs.length is 2
+    pool.isUnspentInPool(tx2Outputs.head) is true
+    pool.isUnspentInPool(tx2Outputs.last) is false
+    pool.isSpent(tx2Outputs.last)
+    tx3.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
+  }
+
+  it should "clean mempool" in {
+    val blockFlow = isolatedBlockFlow()
+
+    val pool   = MemPool.empty(GroupIndex.unsafe(0))
+    val index0 = ChainIndex.unsafe(0, 0)
+    val index1 = ChainIndex.unsafe(0, 1)
+    val index2 = ChainIndex.unsafe(0, 2)
+    val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
+    val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
+    val block2 = transfer(blockFlow, index2)
+    val tx2    = block2.nonCoinbase.head.toTemplate
+    val tx3 =
+      tx2.copy(unsigned = tx2.unsigned.copy(inputs = tx2.unsigned.inputs ++ tx1.unsigned.inputs))
+
+    blockFlow.recheckInputs(index2.from, AVector(tx2, tx3)) isE AVector(tx3)
+
+    pool.addNewTx(index0, tx0)
+    pool.addNewTx(index1, tx1)
+    pool.addNewTx(index2, tx2)
+    pool.addNewTx(index2, tx3)
+    pool.size is 4
+    pool.clean(blockFlow, TimeStamp.now().plusMinutesUnsafe(1))
+    pool.size is 1
+    pool.contains(index2, tx2) is true
   }
 }
