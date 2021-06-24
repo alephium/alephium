@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
+import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{ActorRefT, EventBus}
@@ -64,11 +64,13 @@ object AllHandlers {
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting,
-      miningSetting: MiningSetting
+      miningSetting: MiningSetting,
+      memPoolSetting: MemPoolSetting
   ): AllHandlers = {
     build(system, blockFlow, eventBus, "")
   }
 
+  // scalastyle:off parameter.number
   def build(
       system: ActorSystem,
       blockFlow: BlockFlow,
@@ -78,13 +80,15 @@ object AllHandlers {
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting,
-      miningSetting: MiningSetting
+      miningSetting: MiningSetting,
+      memPoolSetting: MemPoolSetting
   ): AllHandlers = {
     val flowProps = FlowHandler.props(blockFlow)
     val flowHandler =
       ActorRefT.build[FlowHandler.Command](system, flowProps, s"FlowHandler$namePostfix")
     buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, namePostfix)
   }
+  // scalastyle:on parameter.number
 
   // scalastyle:off parameter.number
   def buildWithFlowHandler(
@@ -97,7 +101,8 @@ object AllHandlers {
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting,
-      miningSetting: MiningSetting
+      miningSetting: MiningSetting,
+      memPoolSetting: MemPoolSetting
   ): AllHandlers = {
     val txProps        = TxHandler.props(blockFlow)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")

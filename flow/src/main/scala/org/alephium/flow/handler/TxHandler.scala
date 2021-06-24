@@ -22,19 +22,23 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.setting.NetworkSetting
+import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{Message, SendTxs}
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, BaseActor, EventStream, Hex}
+import org.alephium.util.{AVector, BaseActor, EventStream, Hex, TimeStamp}
 
 object TxHandler {
   def props(
       blockFlow: BlockFlow
-  )(implicit groupConfig: GroupConfig, networkSetting: NetworkSetting): Props =
+  )(implicit
+      groupConfig: GroupConfig,
+      networkSetting: NetworkSetting,
+      memPoolSetting: MemPoolSetting
+  ): Props =
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
@@ -43,6 +47,7 @@ object TxHandler {
   final case class Broadcast(txs: AVector[TransactionTemplate]) extends Command
   final case class AddToGrandPool(txs: AVector[TransactionTemplate], origin: DataOrigin)
       extends Command
+  case object CleanMempool extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: Hash) extends Event
@@ -51,10 +56,16 @@ object TxHandler {
 
 class TxHandler(blockFlow: BlockFlow)(implicit
     groupConfig: GroupConfig,
-    networkSetting: NetworkSetting
+    networkSetting: NetworkSetting,
+    memPoolSetting: MemPoolSetting
 ) extends BaseActor
     with EventStream.Publisher {
   private val nonCoinbaseValidation = TxValidation.build
+
+  override def preStart(): Unit = {
+    super.preStart()
+    schedule(self, TxHandler.CleanMempool, memPoolSetting.cleanFrequency)
+  }
 
   override def receive: Receive = {
     case TxHandler.AddToSharedPool(txs, origin) =>
@@ -65,6 +76,12 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       txs.groupBy(_.chainIndex).foreach { case (chainIndex, txs) =>
         broadCast(chainIndex, txs, DataOrigin.Local)
       }
+    case TxHandler.CleanMempool =>
+      log.debug(s"Start to clean tx pools")
+      blockFlow.grandPool.clean(
+        blockFlow,
+        TimeStamp.now().minusUnsafe(memPoolSetting.cleanFrequency)
+      )
   }
 
   private def hex(tx: TransactionTemplate): String = {

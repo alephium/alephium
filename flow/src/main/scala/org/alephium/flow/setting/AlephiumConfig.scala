@@ -135,7 +135,8 @@ final case class DiscoverySetting(
 final case class MemPoolSetting(
     sharedPoolCapacity: Int,
     pendingPoolCapacity: Int,
-    txMaxNumberPerBlock: Int
+    txMaxNumberPerBlock: Int,
+    cleanFrequency: Duration
 )
 
 final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
