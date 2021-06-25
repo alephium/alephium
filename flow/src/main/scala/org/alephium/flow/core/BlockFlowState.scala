@@ -313,8 +313,8 @@ trait BlockFlowState extends FlowTipsUtil {
     val chainIndex = block.chainIndex
     assume(chainIndex.isIntraGroup)
     for {
-      diff   <- getHashesForUpdates(chainIndex.from, block.blockDeps)
-      blocks <- (diff :+ block.hash).mapE(hash => getBlockChain(hash).getBlock(hash))
+      diffs  <- getHashesForUpdates(chainIndex.from, block.blockDeps)
+      blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash)).map(_ :+ block)
     } yield blocks
   }
 
@@ -328,7 +328,7 @@ trait BlockFlowState extends FlowTipsUtil {
     val bestIntraDep = outDeps(groupIndex.value)
     for {
       newTips <- deps.inDeps.mapE(getInTip(_, groupIndex)).map(_ ++ outDeps)
-      oldTips <- getInOutTips(bestIntraDep, groupIndex, inclusive = true)
+      oldTips <- getInOutTips(bestIntraDep, groupIndex)
       diff    <- getTipsDiff(newTips, oldTips)
     } yield diff
   }

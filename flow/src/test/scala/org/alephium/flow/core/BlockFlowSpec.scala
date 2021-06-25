@@ -103,6 +103,14 @@ class BlockFlowSpec extends AlephiumSpec {
     cache0.contains(newBlocks(1).hash) is true
     cache0.contains(newBlocks(2).hash) is false
     cache0.contains(newBlocks(3).hash) is false
+
+    val block  = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    val cache1 = blockFlow.getBlocksForUpdates(block).rightValue.map(_.hash)
+    cache1.contains(block.hash) is true
+    cache1.contains(newBlocks(1).hash) is true
+    cache1.contains(newBlocks(2).hash) is false
+    cache1.contains(newBlocks(3).hash) is false
+    block.blockDeps.inDeps(0) is newBlocks(3).hash
   }
 
   it should "work for at least 2 user group when adding blocks in parallel" in new FlowFixture {

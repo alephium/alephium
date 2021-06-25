@@ -21,7 +21,6 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
-import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, LockupScript}
@@ -269,16 +268,6 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block0     = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val newBlockTs = ALF.LaunchTimestamp.plusSecondsUnsafe(1)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
-
-    val newOutTips = block1.header.outDeps
-    val intraDep   = block1.header.intraDep
-    val oldOutTips =
-      blockFlow.getOutTips(blockFlow.getBlockHeaderUnsafe(intraDep), inclusive = false)
-    val diff = blockFlow.getTipsDiffUnsafe(newOutTips, oldOutTips)
-    assertThrows[IOError.KeyNotFound[_]](
-      !blockFlow.isConflicted(block1.hash +: diff, blockFlow.getBlockUnsafe)
-    )
-
     blockValidation.validate(block1, blockFlow) isE ()
   }
 }
