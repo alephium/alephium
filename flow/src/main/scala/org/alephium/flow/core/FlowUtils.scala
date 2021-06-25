@@ -93,7 +93,7 @@ trait FlowUtils
         }
       case Reorg(toRemove, toAdd) =>
         val (removed, added) = getMemPool(mainGroup).reorg(toRemove, toAdd)
-        logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
+        logger.info(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
     }
   }
 
