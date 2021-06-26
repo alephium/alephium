@@ -1291,14 +1291,14 @@
         }
       }
     },
-    "/wallets/{wallet_name}/deriveNextAddress": {
+    "/wallets/{wallet_name}/derive-next-address": {
       "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Derive your next address",
         "description": "Cannot be called from a miner wallet",
-        "operationId": "postWalletsWallet_nameDerivenextaddress",
+        "operationId": "postWalletsWallet_nameDerive-next-address",
         "parameters": [
           {
             "name": "wallet_name",
@@ -1392,14 +1392,14 @@
         }
       }
     },
-    "/wallets/{wallet_name}/deriveNextMinerAddresses": {
+    "/wallets/{wallet_name}/derive-next-miner-addresses": {
       "post": {
         "tags": [
           "Miners"
         ],
         "summary": "Derive your next miner addresses for each group",
         "description": "Your wallet need to have been created with the miner flag set to true",
-        "operationId": "postWalletsWallet_nameDerivenextmineraddresses",
+        "operationId": "postWalletsWallet_nameDerive-next-miner-addresses",
         "parameters": [
           {
             "name": "wallet_name",
@@ -1499,13 +1499,13 @@
         }
       }
     },
-    "/wallets/{wallet_name}/changeActiveAddress": {
+    "/wallets/{wallet_name}/change-active-address": {
       "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Choose the active address",
-        "operationId": "postWalletsWallet_nameChangeactiveaddress",
+        "operationId": "postWalletsWallet_nameChange-active-address",
         "parameters": [
           {
             "name": "wallet_name",

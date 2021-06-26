@@ -120,14 +120,14 @@ trait WalletEndpoints
 
   val deriveNextAddress: BaseEndpoint[String, DeriveNextAddress.Result] =
     wallet.post
-      .in("deriveNextAddress")
+      .in("derive-next-address")
       .out(jsonBody[DeriveNextAddress.Result])
       .summary("Derive your next address")
       .description("Cannot be called from a miner wallet")
 
   val changeActiveAddress: BaseEndpoint[(String, ChangeActiveAddress), Unit] =
     wallet.post
-      .in("changeActiveAddress")
+      .in("change-active-address")
       .in(jsonBody[ChangeActiveAddress])
       .summary("Choose the active address")
 
@@ -139,7 +139,7 @@ trait WalletEndpoints
 
   val deriveNextMinerAddresses: BaseEndpoint[String, AVector[AddressInfo]] =
     minerWallet.post
-      .in("deriveNextMinerAddresses")
+      .in("derive-next-miner-addresses")
       .out(jsonBody[AVector[AddressInfo]])
       .summary("Derive your next miner addresses for each group")
       .description(s"Your wallet need to have been created with the miner flag set to true")
