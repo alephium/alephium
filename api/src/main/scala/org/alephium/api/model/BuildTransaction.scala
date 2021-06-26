@@ -19,13 +19,12 @@ package org.alephium.api.model
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildTransaction(
     fromKey: PublicKey,
     destinations: AVector[Destination],
-    lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 ) {

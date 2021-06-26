@@ -115,8 +115,7 @@ object BlockFlowClient {
             buildTransaction,
             BuildTransaction(
               publicKey,
-              AVector(Destination(toAddress, value)),
-              lockTime,
+              AVector(Destination(toAddress, value, lockTime)),
               gas,
               gasPrice
             )

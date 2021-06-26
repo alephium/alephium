@@ -252,8 +252,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     {
       val transfer = BuildTransaction(
         fromKey,
-        AVector(Destination(toAddress, 1)),
-        Some(TimeStamp.unsafe(1234)),
+        AVector(Destination(toAddress, 1, Some(TimeStamp.unsafe(1234)))),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )

@@ -2953,9 +2953,119 @@
                 "destinations": [
                   {
                     "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "amount": "2"
+                    "amount": "2",
+                    "lockTime": 1611041396892
                   }
                 ],
+                "gas": 1,
+                "gasPrice": "1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTransactionResult"
+                },
+                "example": {
+                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "fromGroup": 2,
+                  "toGroup": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/build-sweep-all": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Build an unsigned transaction to send all unlocked balanced to an address",
+        "operationId": "postTransactionsBuild-sweep-all",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildSweepAllTransaction"
+              },
+              "example": {
+                "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                 "lockTime": 1611041396892,
                 "gas": 1,
                 "gasPrice": "1"
@@ -4781,9 +4891,6 @@
               "$ref": "#/components/schemas/Destination"
             }
           },
-          "lockTime": {
-            "type": "integer"
-          },
           "gas": {
             "type": "integer"
           },
@@ -4805,6 +4912,9 @@
           "amount": {
             "type": "integer",
             "format": "uint256"
+          },
+          "lockTime": {
+            "type": "integer"
           }
         }
       },
@@ -4828,6 +4938,30 @@
           },
           "toGroup": {
             "type": "integer"
+          }
+        }
+      },
+      "BuildSweepAllTransaction": {
+        "required": [
+          "fromKey",
+          "toAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "fromKey": {
+            "type": "string"
+          },
+          "toAddress": {
+            "type": "string"
+          },
+          "lockTime": {
+            "type": "integer"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },

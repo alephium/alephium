@@ -85,7 +85,6 @@ class ServerUtils(networkType: NetworkType) {
         blockFlow,
         query.fromKey,
         query.destinations,
-        query.lockTime,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
@@ -234,12 +233,11 @@ class ServerUtils(networkType: NetworkType) {
       blockFlow: BlockFlow,
       fromKey: PublicKey,
       destinations: AVector[Destination],
-      lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
-      (destination.address.lockupScript, destination.amount, lockTimeOpt)
+      (destination.address.lockupScript, destination.amount, destination.lockTime)
     }
     blockFlow.transfer(fromKey, outputInfos, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)

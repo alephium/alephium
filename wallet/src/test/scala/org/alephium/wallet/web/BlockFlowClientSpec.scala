@@ -29,8 +29,8 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
 
 class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
-    val destinations       = AVector(Destination(toAddress, value))
-    val buildTransactionIn = BuildTransaction(publicKey, destinations, None, None, None)
+    val destinations       = AVector(Destination(toAddress, value, None))
+    val buildTransactionIn = BuildTransaction(publicKey, destinations, None, None)
     val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://127.0.0.1:1234"))
       .apply(buildTransactionIn)
     request.uri is uri"http://127.0.0.1:1234/transactions/build"
