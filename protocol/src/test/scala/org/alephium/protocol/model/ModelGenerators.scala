@@ -52,12 +52,12 @@ trait LockupScriptGenerators extends Generators {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield (LockupScript.p2pkh(publicKey), publicKey, privateKey)
 
-  def addressStringGen(groupIndex: GroupIndex): Gen[(String, String, String)] =
+  def addressStringGen(groupIndex: GroupIndex): Gen[(String, PublicKey, PrivateKey)] =
     addressGen(groupIndex).map { case (script, publicKey, privateKey) =>
       (
         Address(NetworkType.Devnet, script).toBase58,
-        publicKey.toHexString,
-        privateKey.toHexString
+        publicKey,
+        privateKey
       )
     }
 }

@@ -164,7 +164,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKey",
+        |  "fromKey": "$dummyKeyHex",
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
@@ -175,13 +175,15 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         """.stripMargin
       ) check { response =>
         response.code is StatusCode.Ok
-        response.as[BuildTransactionResult] is dummyBuildTransactionResult
+        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+          dummyTransferTx(dummyTx, AVector((dummyToLockupScript, U256.One, None)))
+        )
       }
       Post(
         s"/transactions/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKey",
+        |  "fromKey": "$dummyKeyHex",
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
@@ -193,7 +195,12 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         """.stripMargin
       ) check { response =>
         response.code is StatusCode.Ok
-        response.as[BuildTransactionResult] isnot dummyBuildTransactionResult
+        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+          dummyTransferTx(
+            dummyTx,
+            AVector((dummyToLockupScript, U256.One, Some(TimeStamp.unsafe(1234))))
+          )
+        )
       }
 
       interCliqueSynced = false
@@ -202,7 +209,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKey",
+        |  "fromKey": "$dummyKeyHex",
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
@@ -234,6 +241,57 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       interCliqueSynced = false
 
       Post(s"/transactions/send", tx) check { response =>
+        response.code is StatusCode.ServiceUnavailable
+        response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+          "The clique is not synced"
+        )
+      }
+    }
+  }
+
+  it should "call POST /transactions/build-sweep-all" in new RestServerFixture {
+    withServer {
+      Post(
+        s"/transactions/build-sweep-all",
+        body = s"""
+        |{
+        |  "fromKey": "$dummyKeyHex",
+        |  "toAddress": "$dummyToAddress"
+        |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+          dummySweepAllTx(dummyTx, dummyToLockupScript, None)
+        )
+      }
+      Post(
+        s"/transactions/build-sweep-all",
+        body = s"""
+        |{
+        |  "fromKey": "$dummyKeyHex",
+        |  "toAddress": "$dummyToAddress",
+        |  "lockTime": "1234"
+        |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+          dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
+        )
+      }
+
+      interCliqueSynced = false
+
+      Post(
+        s"/transactions/build-sweep-all",
+        body = s"""
+        |{
+        |  "fromKey": "$dummyKeyHex",
+        |  "toAddress": "$dummyToAddress"
+        |}
+        """.stripMargin
+      ) check { response =>
         response.code is StatusCode.ServiceUnavailable
         response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
           "The clique is not synced"
