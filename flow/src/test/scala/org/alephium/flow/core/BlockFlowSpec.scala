@@ -27,7 +27,7 @@ import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.core.BlockFlowState.TxStatus
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALF, BlockHash, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -706,6 +706,17 @@ class BlockFlowSpec extends AlephiumSpec {
       to   <- 0 until groups0
     } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
     blocks1.foreach(addAndCheck(blockFlow, _, brokerConfig.depsNum + 1))
+  }
+
+  it should "support sequential transactions" in new FlowFixture with Generators {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    forAll(groupIndexGen, groupIndexGen, groupIndexGen) { case (fromGroup, toGroup0, toGroup1) =>
+      val block0 = transfer(blockFlow, ChainIndex(fromGroup, toGroup0))
+      addAndCheck(blockFlow, block0)
+      val block1 = transfer(blockFlow, ChainIndex(fromGroup, toGroup1))
+      addAndCheck(blockFlow, block1)
+    }
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

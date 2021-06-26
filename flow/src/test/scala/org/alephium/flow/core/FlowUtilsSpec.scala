@@ -147,7 +147,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
-    txValidation.validateMempoolTx(chainIndex, tx0, blockFlow) isE ()
+    txValidation.validateTx(tx0, blockFlow) isE ()
 
     blockFlow
       .transfer(

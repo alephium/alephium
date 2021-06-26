@@ -166,7 +166,14 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       for {
         worldState <- ValidationStatus.from(flow.getCachedWorldState(block))
         _ <- convert(
-          nonCoinbaseValidation.checkCoinbase(block.coinbase, block.header, worldState, netReward)
+          nonCoinbaseValidation.checkBlockTx(
+            block.chainIndex,
+            block.coinbase,
+            block.header,
+            worldState,
+            flow,
+            Some(netReward)
+          )
         )
       } yield ()
     } else {
@@ -243,7 +250,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
               chainIndex,
               block.transactions(index),
               block.header,
-              worldState
+              worldState,
+              flow,
+              None
             )
           })
       } yield ()

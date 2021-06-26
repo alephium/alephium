@@ -19,7 +19,7 @@ package org.alephium.flow.validation
 import scala.collection.mutable
 
 import org.alephium.flow.core.{BlockFlow, FlowUtils}
-import org.alephium.io.IOError
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -31,18 +31,26 @@ trait TxValidation {
 
   implicit def groupConfig: GroupConfig
 
-  def validateTxTemplate(
+  private def validateTxTemplate(
       tx: TransactionTemplate,
       flow: BlockFlow,
-      validate: (ChainIndex, Transaction, BlockFlow) => TxValidationResult[Unit]
+      getPreOutputs: Transaction => IOResult[Option[AVector[TxOutput]]]
   ): TxValidationResult[Unit] = {
+    for {
+      fullTx <- buildFullTx(tx, flow)
+      chainIndex = fullTx.chainIndex
+      _          <- checkStateless(chainIndex, fullTx, checkDoubleSpending = true)
+      preOutputs <- fromGetPreOutputs(getPreOutputs(fullTx))
+      _          <- checkStatefulExceptTxScript(fullTx, TimeStamp.now(), preOutputs, None)
+    } yield ()
+  }
+
+  private def buildFullTx(
+      tx: TransactionTemplate,
+      flow: BlockFlow
+  ): TxValidationResult[Transaction] = {
     tx.unsigned.scriptOpt match {
-      case None =>
-        val fullTx = FlowUtils.convertNonScriptTx(tx)
-        for {
-          chainIndex <- getChainIndex(tx)
-          _          <- validate(chainIndex, fullTx, flow)
-        } yield ()
+      case None => validTx(FlowUtils.convertNonScriptTx(tx))
       case Some(script) =>
         for {
           chainIndex <- getChainIndex(tx)
@@ -51,8 +59,7 @@ trait TxValidation {
             case Left(error)   => invalidTx(TxScriptExeFailed(error))
             case Right(result) => validTx(FlowUtils.convertSuccessfulTx(tx, result))
           }
-          _ <- validate(chainIndex, fullTx, flow)
-        } yield ()
+        } yield fullTx
     }
   }
 
@@ -60,78 +67,80 @@ trait TxValidation {
       tx: TransactionTemplate,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
-    validateTxTemplate(tx, flow, validateMempoolTx)
-  }
-
-  def validateMempoolTx(
-      chainIndex: ChainIndex,
-      tx: Transaction,
-      flow: BlockFlow
-  ): TxValidationResult[Unit] = {
-    for {
-      _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
-      worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
-      _          <- checkStateful(chainIndex, tx, TimeStamp.now(), worldState, None)
-    } yield ()
+    validateTxTemplate(tx, flow, flow.getPreOutputsInGroupView)
   }
 
   def validateGrandPoolTxTemplate(
       tx: TransactionTemplate,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
-    validateTxTemplate(tx, flow, validateGrandPoolTx)
+    validateTxTemplate(tx, flow, flow.getPreOutputsIncludingPools)
   }
 
-  def validateGrandPoolTx(
-      chainIndex: ChainIndex,
+  def validateTx(
       tx: Transaction,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
     for {
-      _ <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
-      preOutputs <- flow.getPreOutputsIncludingPools(tx) match {
-        case Right(Some(outputs)) => Right(outputs)
-        case Right(None)          => Left(Right(NonExistInput))
-        case Left(error)          => Left(Left(error))
-      }
-      _ <- checkStatefulExceptTxScript(tx, TimeStamp.now(), preOutputs, None)
+      chainIndex <- getChainIndex(tx)
+      bestDeps = flow.getBestDeps(chainIndex.from)
+      worldState <- from(flow.getCachedWorldState(bestDeps, chainIndex.from))
+      _ <- validateTx(
+        tx,
+        chainIndex,
+        TimeStamp.now(),
+        flow.getPreOutputsInGroupView(chainIndex.from, bestDeps, worldState, _),
+        worldState,
+        None,
+        checkDoubleSpending = true
+      )
     } yield ()
+  }
+
+  private def validateTx(
+      tx: Transaction,
+      chainIndex: ChainIndex,
+      timestamp: TimeStamp,
+      getPreOutputs: Transaction => IOResult[Option[AVector[TxOutput]]],
+      worldState: WorldState.Cached,
+      coinbaseNetReward: Option[U256],
+      checkDoubleSpending: Boolean // for block txs, this has been checked in block validation
+  ): TxValidationResult[Unit] = {
+    for {
+      _          <- checkStateless(chainIndex, tx, checkDoubleSpending)
+      preOutputs <- fromGetPreOutputs(getPreOutputs(tx))
+      _          <- checkStateful(chainIndex, tx, timestamp, worldState, preOutputs, coinbaseNetReward)
+    } yield ()
+  }
+
+  def fromGetPreOutputs(
+      getPreOutputs: IOResult[Option[AVector[TxOutput]]]
+  ): TxValidationResult[AVector[TxOutput]] = {
+    getPreOutputs match {
+      case Right(Some(outputs)) => Right(outputs)
+      case Right(None)          => Left(Right(NonExistInput))
+      case Left(error)          => Left(Left(error))
+    }
   }
 
   protected[validation] def checkBlockTx(
       chainIndex: ChainIndex,
       tx: Transaction,
       header: BlockHeader,
-      worldState: WorldState.Cached
-  ): TxValidationResult[Unit] = {
-    for {
-      _ <- checkStateless(
-        header.chainIndex,
-        tx,
-        checkDoubleSpending = false
-      ) // it's already checked in BlockValidation
-      _ <- checkStateful(chainIndex, tx, header.timestamp, worldState, None)
-    } yield ()
-  }
-
-  protected[validation] def checkCoinbase(
-      tx: Transaction,
-      header: BlockHeader,
       worldState: WorldState.Cached,
-      coinbaseNetReward: U256
+      flow: BlockFlow,
+      coinbaseNetReward: Option[U256]
   ): TxValidationResult[Unit] = {
     for {
-      _ <- checkStateless(
-        header.chainIndex,
+      _ <- validateTx(
         tx,
-        checkDoubleSpending = false
-      )
-      _ <- checkStateful(
-        header.chainIndex,
-        tx,
+        chainIndex,
         header.timestamp,
+        flow.getPreOutputsInGroupView(chainIndex.from, header.blockDeps, worldState, _),
         worldState,
-        Some(coinbaseNetReward)
+        coinbaseNetReward,
+        checkDoubleSpending =
+          false // checkDoubleSpending = true as it has been checked in block validation
       )
     } yield ()
   }
@@ -156,10 +165,10 @@ trait TxValidation {
       tx: Transaction,
       headerTs: TimeStamp,
       worldState: WorldState.Cached,
+      preOutputs: AVector[TxOutput],
       coinbaseNetReward: Option[U256]
   ): TxValidationResult[Unit] = {
     for {
-      preOutputs   <- getPreOutputs(tx, worldState)
       gasRemaining <- checkStatefulExceptTxScript(tx, headerTs, preOutputs, coinbaseNetReward)
       _            <- checkTxScript(chainIndex, tx, gasRemaining, worldState)
     } yield ()

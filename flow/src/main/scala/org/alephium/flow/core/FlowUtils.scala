@@ -129,6 +129,7 @@ trait FlowUtils
     txs.filter(tx => Utils.unsafe(cachedWorldState.containsAllInputs(tx)))
   }
 
+  // TODO: truncate txs in advance for efficiency
   def collectTransactions(
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,

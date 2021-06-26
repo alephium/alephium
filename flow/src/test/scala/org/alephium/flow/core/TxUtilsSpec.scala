@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{defaultGasFee, defaultGasPrice, ChainIndex, TransactionTemplate}
@@ -66,5 +67,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
     val tx = TransactionTemplate.from(unsignedTx, genesisPriKey)
     TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
+    blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx) is MemPool.AddedToSharedPool
+    TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
   }
 }

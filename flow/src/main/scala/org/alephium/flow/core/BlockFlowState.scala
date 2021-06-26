@@ -197,7 +197,7 @@ trait BlockFlowState extends FlowTipsUtil {
     getBlockChainWithState(groupIndex).getWorldStateHash(intraGroupDep)
   }
 
-  protected def getCachedWorldState(
+  def getCachedWorldState(
       deps: BlockDeps,
       groupIndex: GroupIndex
   ): IOResult[WorldState.Cached] = {
@@ -212,7 +212,10 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getCachedWorldState(block: Block): IOResult[WorldState.Cached] = {
-    val header = block.header
+    getCachedWorldState(block.header)
+  }
+
+  def getCachedWorldState(header: BlockHeader): IOResult[WorldState.Cached] = {
     getCachedWorldState(header.blockDeps, header.chainIndex.from)
   }
 
@@ -293,7 +296,9 @@ trait BlockFlowState extends FlowTipsUtil {
     } else {
       for {
         blocks <- getBlocksForUpdates(block)
-        _      <- blocks.foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
+        _ <- blocks
+          .sortBy(_.timestamp)
+          .foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
       } yield ()
     }
   }
