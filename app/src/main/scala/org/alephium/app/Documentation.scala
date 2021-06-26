@@ -42,6 +42,7 @@ trait Documentation extends Endpoints {
     getChainInfo,
     listUnconfirmedTransactions,
     buildTransaction,
+    buildSweepAllTransaction,
     sendTransaction,
     decodeUnsignedTransaction,
     getTransactionStatus,
