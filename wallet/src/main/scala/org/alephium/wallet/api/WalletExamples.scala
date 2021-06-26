@@ -121,6 +121,9 @@ trait WalletExamples extends ErrorExamples {
   implicit val transferExamples: List[Example[Transfer]] =
     simpleExample(Transfer(AVector(Destination(address, U256.Million))))
 
+  implicit val sweepAllExamples: List[Example[SweepAll]] =
+    simpleExample(SweepAll(address))
+
   implicit val transferResultExamples: List[Example[Transfer.Result]] =
     simpleExample(Transfer.Result(txId, fromGroup, toGroup))
 

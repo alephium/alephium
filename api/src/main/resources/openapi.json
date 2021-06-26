@@ -962,6 +962,121 @@
         }
       }
     },
+    "/wallets/{wallet_name}/sweep-all": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Transfer all ALF to an address",
+        "operationId": "postWalletsWallet_nameSweep-all",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SweepAll"
+              },
+              "example": {
+                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result2"
+                },
+                "example": {
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "fromGroup": 2,
+                  "toGroup": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets/{wallet_name}/addresses": {
       "get": {
         "tags": [
@@ -4418,6 +4533,26 @@
           },
           "toGroup": {
             "type": "integer"
+          }
+        }
+      },
+      "SweepAll": {
+        "required": [
+          "toAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "toAddress": {
+            "type": "string"
+          },
+          "lockTime": {
+            "type": "integer"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },

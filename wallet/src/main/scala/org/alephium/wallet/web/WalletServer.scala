@@ -148,6 +148,13 @@ class WalletServer(
           model.Transfer.Result(txId, fromGroup, toGroup)
         }.left.map(toApiError))
     },
+    toRoute(sweepAll) { case (wallet, sa) =>
+      walletService
+        .sweepAll(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice)
+        .map(_.map { case (txId, fromGroup, toGroup) =>
+          model.Transfer.Result(txId, fromGroup, toGroup)
+        }.left.map(toApiError))
+    },
     toRoute(deriveNextAddress) { wallet =>
       Future.successful(
         walletService

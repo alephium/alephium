@@ -105,6 +105,13 @@ trait WalletEndpoints
       .out(jsonBody[Transfer.Result])
       .summary("Transfer ALF")
 
+  val sweepAll: BaseEndpoint[(String, SweepAll), Transfer.Result] =
+    wallet.post
+      .in("sweep-all")
+      .in(jsonBody[SweepAll])
+      .out(jsonBody[Transfer.Result])
+      .summary("Transfer all ALF to an address")
+
   val getAddresses: BaseEndpoint[String, Addresses] =
     wallet.get
       .in("addresses")

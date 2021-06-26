@@ -14,34 +14,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet
+package org.alephium.wallet.api.model
 
-import sttp.tapir.Endpoint
-import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
-import sttp.tapir.openapi.OpenAPI
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.TimeStamp
 
-import org.alephium.wallet.api.WalletEndpoints
-
-trait WalletDocumentation extends WalletEndpoints {
-
-  val walletEndpoints: List[Endpoint[_, _, _, _]] = List(
-    createWallet,
-    restoreWallet,
-    listWallets,
-    getWallet,
-    lockWallet,
-    unlockWallet,
-    deleteWallet,
-    getBalances,
-    transfer,
-    sweepAll,
-    getAddresses,
-    getMinerAddresses,
-    deriveNextAddress,
-    deriveNextMinerAddresses,
-    changeActiveAddress
-  )
-
-  lazy val walletOpenAPI: OpenAPI =
-    OpenAPIDocsInterpreter.toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
-}
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class SweepAll(
+    toAddress: Address,
+    lockTime: Option[TimeStamp] = None,
+    gas: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None
+)

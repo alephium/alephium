@@ -75,6 +75,13 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
+  def sweepAll(
+      wallet: String,
+      address: Address,
+      lockTime: Option[TimeStamp],
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
+  ): Future[Either[WalletError, (Hash, Int, Int)]]
   def deriveNextAddress(wallet: String): Either[WalletError, Address]
   def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[Address]]
   def changeActiveAddress(wallet: String, address: Address): Either[WalletError, Unit]
@@ -317,6 +324,29 @@ object WalletService {
         val pubKey = privateKey.publicKey
         blockFlowClient
           .prepareTransaction(pubKey.toHexString, destinations, gas, gasPrice)
+          .flatMap {
+            case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
+            case Right(buildTxResult) =>
+              val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
+              blockFlowClient
+                .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
+                .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
+                .map(_.left.map(BlockFlowClientError))
+          }
+      }
+    }
+
+    override def sweepAll(
+        wallet: String,
+        address: Address,
+        lockTime: Option[TimeStamp],
+        gas: Option[GasBox],
+        gasPrice: Option[GasPrice]
+    ): Future[Either[WalletError, (Hash, Int, Int)]] = {
+      withPrivateKeyFut(wallet) { privateKey =>
+        val pubKey = privateKey.publicKey
+        blockFlowClient
+          .prepareSweepAllTransaction(pubKey.toHexString, address, lockTime, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>
