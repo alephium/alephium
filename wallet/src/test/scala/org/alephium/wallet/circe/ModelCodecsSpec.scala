@@ -18,6 +18,7 @@ package org.alephium.wallet.json
 
 import org.scalatest.Assertion
 
+import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PublicKey}
@@ -41,7 +42,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val bool                 = true
 
   def check[T: ReadWriter](input: T, rawJson: String): Assertion = {
-    write(input) is rawJson
+    writeJs(input) is read[ujson.Value](rawJson)
     read[T](rawJson) is input
   }
 
@@ -89,8 +90,17 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Transfer" in {
-    val json     = s"""{"address":"$address","amount":"$balance"}"""
-    val transfer = Transfer(address, balance)
+    val json     = s"""
+        |{
+        |  "destinations": [
+        |    {
+        |      "address": "$address",
+        |      "amount": "$balance"
+        |    }
+        |  ]
+        |}
+        """.stripMargin
+    val transfer = Transfer(AVector(Destination(address, balance)))
     check(transfer, json)
   }
 

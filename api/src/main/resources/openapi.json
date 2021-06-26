@@ -866,8 +866,12 @@
                 "$ref": "#/components/schemas/Transfer"
               },
               "example": {
-                "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                "amount": "1000000"
+                "destinations": [
+                  {
+                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "amount": "1000000"
+                  }
+                ]
               }
             }
           },
@@ -4351,6 +4355,23 @@
         }
       },
       "Transfer": {
+        "type": "object",
+        "properties": {
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "Destination": {
         "required": [
           "address",
           "amount"
@@ -4366,12 +4387,6 @@
           },
           "lockTime": {
             "type": "integer"
-          },
-          "gas": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },
@@ -4896,25 +4911,6 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
-          }
-        }
-      },
-      "Destination": {
-        "required": [
-          "address",
-          "amount"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "lockTime": {
-            "type": "integer"
           }
         }
       },

@@ -262,10 +262,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "lockTime": 1234
         |    }
         |  ],
-        |  "lockTime": 1234,
         |  "gas": 1,
         |  "gasPrice": "1"
         |}

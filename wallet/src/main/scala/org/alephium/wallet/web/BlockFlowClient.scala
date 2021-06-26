@@ -28,16 +28,14 @@ import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.{Duration, Hex, TimeStamp, U256}
+import org.alephium.util.{Duration, Hex, U256}
 import org.alephium.util.AVector
 
 trait BlockFlowClient {
   def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]]
   def prepareTransaction(
       fromKey: String,
-      toAddress: Address,
-      value: U256,
-      lockTime: Option[TimeStamp],
+      destinations: AVector[Destination],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
@@ -100,9 +98,7 @@ object BlockFlowClient {
 
     def prepareTransaction(
         fromKey: String,
-        toAddress: Address,
-        value: U256,
-        lockTime: Option[TimeStamp],
+        destinations: AVector[Destination],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
@@ -115,7 +111,7 @@ object BlockFlowClient {
             buildTransaction,
             BuildTransaction(
               publicKey,
-              AVector(Destination(toAddress, value, lockTime)),
+              destinations,
               gas,
               gasPrice
             )

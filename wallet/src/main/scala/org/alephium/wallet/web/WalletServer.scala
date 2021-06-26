@@ -143,7 +143,7 @@ class WalletServer(
     },
     toRoute(transfer) { case (wallet, tr) =>
       walletService
-        .transfer(wallet, tr.address, tr.amount, tr.lockTime, tr.gas, tr.gasPrice)
+        .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice)
         .map(_.map { case (txId, fromGroup, toGroup) =>
           model.Transfer.Result(txId, fromGroup, toGroup)
         }.left.map(toApiError))

@@ -73,9 +73,10 @@ class WalletAppSpec
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
       .map(name => s""","walletName":"$name"""")
       .getOrElse("")}}"""
-  val unlockJson                                = s"""{"password":"$password"}"""
-  val deleteJson                                = s"""{"password":"$password"}"""
-  def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":"$amount"}"""
+  val unlockJson = s"""{"password":"$password"}"""
+  val deleteJson = s"""{"password":"$password"}"""
+  def transferJson(amount: Int) =
+    s"""{"destinations":[{"address":"$transferAddress","amount":"$amount"}]}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""

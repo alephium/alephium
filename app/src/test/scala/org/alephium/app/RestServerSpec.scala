@@ -185,10 +185,10 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "lockTime": "1234"
         |    }
-        |  ],
-        |  "lockTime": "1234"
+        |  ]
         |}
         """.stripMargin
       ) check { response =>

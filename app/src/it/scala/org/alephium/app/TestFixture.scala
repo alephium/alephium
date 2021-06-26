@@ -408,7 +408,7 @@ trait TestFixtureLike
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
-      Some(s"""{"address":"${address}","amount":"${amount}"}""")
+      Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}"}]}""")
     )
   }
   def sendTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
