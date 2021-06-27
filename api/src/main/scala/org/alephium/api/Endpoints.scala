@@ -208,12 +208,12 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to send all unlocked balanced to an address")
 
-  val sendTransaction: BaseEndpoint[SendTransaction, TxResult] =
+  val submitTransaction: BaseEndpoint[SubmitTransaction, TxResult] =
     transactionsEndpoint.post
-      .in("send")
-      .in(jsonBody[SendTransaction])
+      .in("submit")
+      .in(jsonBody[SubmitTransaction])
       .out(jsonBody[TxResult])
-      .summary("Send a signed transaction")
+      .summary("Submit a signed transaction")
 
   lazy val getTransactionStatus: BaseEndpoint[(Hash, ChainIndex), TxStatus] =
     transactionsEndpoint.get

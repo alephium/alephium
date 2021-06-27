@@ -210,8 +210,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
     simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
 
-  implicit val sendTransactionExamples: List[Example[SendTransaction]] =
-    simpleExample(SendTransaction(unsignedTx = hexString, signature))
+  implicit val submitTransactionExamples: List[Example[SubmitTransaction]] =
+    simpleExample(SubmitTransaction(unsignedTx = hexString, signature))
 
   implicit val decodeTransactionExamples: List[Example[DecodeTransaction]] =
     simpleExample(DecodeTransaction(unsignedTx = hexString))

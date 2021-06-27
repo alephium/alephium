@@ -311,8 +311,8 @@ object WalletAppSpec extends {
       }
     }
 
-    router.route().path("/transactions/send").handler(BodyHandler.create()).handler { ctx =>
-      val _ = read[SendTransaction](ctx.getBodyAsString())
+    router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
+      val _ = read[SubmitTransaction](ctx.getBodyAsString())
       complete(ctx, TxResult(Hash.generate, 0, 0))
     }
 

@@ -164,7 +164,7 @@ trait ApiModelCodec {
 
   implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
 
-  implicit val sendTransactionRW: RW[SendTransaction] = macroRW
+  implicit val submitTransactionRW: RW[SubmitTransaction] = macroRW
 
   implicit val decodeTransactionRW: RW[DecodeTransaction] = macroRW
 

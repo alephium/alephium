@@ -51,7 +51,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val signature = SignatureSchema.sign(buildTransaction.txId.bytes, fromPrivateKey)
       val txTemplate =
         serverUtils
-          .createTxTemplate(SendTransaction(buildTransaction.unsignedTx, signature))
+          .createTxTemplate(SubmitTransaction(buildTransaction.unsignedTx, signature))
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 
@@ -121,7 +121,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val signature = SignatureSchema.sign(buildTransaction.txId.bytes, fromPrivateKey)
       val txTemplate =
         serverUtils
-          .createTxTemplate(SendTransaction(buildTransaction.unsignedTx, signature))
+          .createTxTemplate(SubmitTransaction(buildTransaction.unsignedTx, signature))
           .rightValue
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE NotFound
 

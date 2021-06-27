@@ -227,20 +227,20 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call POST /transactions/send" in new RestServerFixture {
+  it should "call POST /transactions/submit" in new RestServerFixture {
     withServer {
       val tx =
         s"""{"unsignedTx":"${Hex.toHexString(
           serialize(dummyTx.unsigned)
         )}","signature":"${dummySignature.toHexString}","publicKey":"dummyKey),"}"""
-      Post(s"/transactions/send", tx) check { response =>
+      Post(s"/transactions/submit", tx) check { response =>
         response.code is StatusCode.Ok
         response.as[TxResult] is dummyTransferResult
       }
 
       interCliqueSynced = false
 
-      Post(s"/transactions/send", tx) check { response =>
+      Post(s"/transactions/submit", tx) check { response =>
         response.code is StatusCode.ServiceUnavailable
         response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
           "The clique is not synced"

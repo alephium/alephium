@@ -119,7 +119,7 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def sendTransaction(txHandler: ActorRefT[TxHandler.Command], query: SendTransaction)(implicit
+  def submitTransaction(txHandler: ActorRefT[TxHandler.Command], query: SubmitTransaction)(implicit
       config: GroupConfig,
       askTimeout: Timeout,
       executionContext: ExecutionContext
@@ -130,7 +130,7 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def createTxTemplate(query: SendTransaction): Try[TransactionTemplate] = {
+  def createTxTemplate(query: SubmitTransaction): Try[TransactionTemplate] = {
     decodeUnsignedTransaction(query.unsignedTx).map { unsignedTx =>
       TransactionTemplate(
         unsignedTx,

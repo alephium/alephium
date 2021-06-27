@@ -281,9 +281,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(result, jsonRaw)
   }
 
-  it should "encode/decode SendTransaction" in {
+  it should "encode/decode SubmitTransaction" in {
     val signature = Signature.generate
-    val transfer  = SendTransaction("tx", signature)
+    val transfer  = SubmitTransaction("tx", signature)
     val jsonRaw =
       s"""{"unsignedTx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)

@@ -222,9 +222,9 @@ class RestServer(
       }
   }
 
-  private val sendTransactionRoute = toRoute(sendTransaction) { transaction =>
+  private val submitTransactionRoute = toRoute(submitTransaction) { transaction =>
     withSyncedClique {
-      serverUtils.sendTransaction(txHandler, transaction)
+      serverUtils.submitTransaction(txHandler, transaction)
     }
   }
 
@@ -336,7 +336,7 @@ class RestServer(
     listUnconfirmedTransactionsRoute,
     buildTransactionRoute,
     buildSweepAllTransactionRoute,
-    sendTransactionRoute,
+    submitTransactionRoute,
     getTransactionStatusRoute,
     decodeUnsignedTransactionRoute,
     minerActionRoute,

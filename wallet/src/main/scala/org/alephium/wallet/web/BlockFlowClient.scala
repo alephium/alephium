@@ -157,8 +157,8 @@ object BlockFlowClient {
     ): Future[Either[ApiError[_ <: StatusCode], TxResult]] = {
       requestFromGroup(
         GroupIndex.unsafe(fromGroup),
-        sendTransaction,
-        SendTransaction(tx, signature)
+        submitTransaction,
+        SubmitTransaction(tx, signature)
       )
     }
 
