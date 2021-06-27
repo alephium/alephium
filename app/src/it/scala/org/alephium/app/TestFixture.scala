@@ -442,8 +442,8 @@ trait TestFixtureLike
     httpPost(s"/contracts/build", Some(query))
   }
 
-  def sendContract(contract: String) = {
-    httpPost(s"/contracts/send", Some(contract))
+  def submitContract(contract: String) = {
+    httpPost(s"/contracts/submit", Some(contract))
   }
 
   val startMining = httpPost("/miners?action=start-mining")

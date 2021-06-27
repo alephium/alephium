@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Signature
 
-final case class SendContract(code: String, tx: String, signature: Signature, fromGroup: Int)
+final case class SubmitContract(code: String, tx: String, signature: Signature, fromGroup: Int)

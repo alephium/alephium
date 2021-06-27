@@ -248,8 +248,8 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractResult(unsignedTx = hexString, hash = hash, fromGroup = 2, toGroup = 1)
     )
 
-  implicit val sendContractExamples: List[Example[SendContract]] =
-    simpleExample(SendContract(code = hexString, tx = hexString, signature, fromGroup = 2))
+  implicit val submitContractExamples: List[Example[SubmitContract]] =
+    simpleExample(SubmitContract(code = hexString, tx = hexString, signature, fromGroup = 2))
 
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))

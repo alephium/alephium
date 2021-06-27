@@ -412,7 +412,7 @@ class ServerUtils(networkType: NetworkType) {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def sendContract(txHandler: ActorRefT[TxHandler.Command], query: SendContract)(implicit
+  def submitContract(txHandler: ActorRefT[TxHandler.Command], query: SubmitContract)(implicit
       groupConfig: GroupConfig,
       askTimeout: Timeout,
       executionContext: ExecutionContext

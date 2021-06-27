@@ -3651,18 +3651,18 @@
         }
       }
     },
-    "/contracts/send": {
+    "/contracts/submit": {
       "post": {
         "tags": [
           "Contracts"
         ],
-        "summary": "Send a signed smart contract",
-        "operationId": "postContractsSend",
+        "summary": "Submit a signed smart contract",
+        "operationId": "postContractsSubmit",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendContract"
+                "$ref": "#/components/schemas/SubmitContract"
               },
               "example": {
                 "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
@@ -5187,7 +5187,7 @@
       "NotFound1": {
         "type": "object"
       },
-      "SendContract": {
+      "SubmitContract": {
         "required": [
           "code",
           "tx",

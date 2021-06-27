@@ -270,9 +270,9 @@ class RestServer(
     }
   }
 
-  private val sendContractRoute = toRoute(sendContract) { query =>
+  private val submitContractRoute = toRoute(submitContract) { query =>
     withSyncedClique {
-      serverUtils.sendContract(txHandler, query)
+      serverUtils.submitContract(txHandler, query)
     }
   }
 
@@ -342,7 +342,7 @@ class RestServer(
     minerActionRoute,
     minerListAddressesRoute,
     minerUpdateAddressesRoute,
-    sendContractRoute,
+    submitContractRoute,
     compileRoute,
     exportBlocksRoute,
     buildContractRoute,

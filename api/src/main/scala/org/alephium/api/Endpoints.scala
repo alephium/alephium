@@ -262,12 +262,12 @@ trait Endpoints
       .out(jsonBody[BuildContractResult])
       .summary("Build an unsigned contract")
 
-  val sendContract: BaseEndpoint[SendContract, TxResult] =
+  val submitContract: BaseEndpoint[SubmitContract, TxResult] =
     contractsEndpoint.post
-      .in("send")
-      .in(jsonBody[SendContract])
+      .in("submit")
+      .in(jsonBody[SubmitContract])
       .out(jsonBody[TxResult])
-      .summary("Send a signed smart contract")
+      .summary("Submit a signed smart contract")
 
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post

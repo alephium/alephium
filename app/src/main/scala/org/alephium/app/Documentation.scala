@@ -46,7 +46,7 @@ trait Documentation extends Endpoints {
     submitTransaction,
     decodeUnsignedTransaction,
     getTransactionStatus,
-    sendContract,
+    submitContract,
     compile,
     buildContract,
     minerAction,
