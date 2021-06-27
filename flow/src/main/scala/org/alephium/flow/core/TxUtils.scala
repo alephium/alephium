@@ -71,22 +71,28 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getPreOutputsIncludingPools(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(tx, getPreOutputIncludingPools)
+  def getPreOutputsIncludingPools(
+      mainGroup: GroupIndex,
+      inputs: AVector[TxOutputRef]
+  ): IOResult[Option[AVector[TxOutput]]] = {
+    getPreOutputs(mainGroup, inputs, getPreOutputIncludingPools)
   }
 
-  def getPreOutputsInGroupView(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(tx, (_, b, c, d) => getPreOutputInGroupView(b, c, d))
+  def getPreOutputsInGroupView(
+      mainGroup: GroupIndex,
+      inputs: AVector[TxOutputRef]
+  ): IOResult[Option[AVector[TxOutput]]] = {
+    getPreOutputs(mainGroup, inputs, (_, b, c, d) => getPreOutputInGroupView(b, c, d))
   }
 
   def getPreOutputsInGroupView(
       mainGroup: GroupIndex,
       blockDeps: BlockDeps,
       worldState: WorldState.Cached,
-      tx: Transaction
+      inputs: AVector[TxOutputRef]
   ): IOResult[Option[AVector[TxOutput]]] = {
     getPreOutputs(
-      tx,
+      inputs,
       mainGroup,
       blockDeps,
       worldState,
@@ -96,7 +102,8 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def getPreOutputs(
-      tx: Transaction,
+      mainGroup: GroupIndex,
+      inputs: AVector[TxOutputRef],
       getPreOutput: (
           GroupIndex,
           WorldState.Persisted,
@@ -104,17 +111,15 @@ trait TxUtils { Self: FlowUtils =>
           TxOutputRef
       ) => IOResult[Option[TxOutput]]
   ): IOResult[Option[AVector[TxOutput]]] = {
-    val chainIndex = tx.chainIndex
-    val mainGroup  = chainIndex.from
-    val bestDeps   = getBestDeps(mainGroup)
+    val bestDeps = getBestDeps(mainGroup)
     for {
       worldState <- getPersistedWorldState(bestDeps, mainGroup)
-      result     <- getPreOutputs(tx, mainGroup, bestDeps, worldState, getPreOutput)
+      result     <- getPreOutputs(inputs, mainGroup, bestDeps, worldState, getPreOutput)
     } yield result
   }
 
   private def getPreOutputs[WS <: WorldState[_]](
-      tx: Transaction,
+      inputs: AVector[TxOutputRef],
       mainGroup: GroupIndex,
       blockDeps: BlockDeps,
       worldState: WS,
@@ -127,7 +132,7 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Option[AVector[TxOutput]]] = {
     for {
       blockCaches <- getBlocksForUpdates(mainGroup, blockDeps)
-      result <- tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
+      result <- inputs.foldE(Option(AVector.empty[TxOutput])) {
         case (Some(outputs), input) =>
           getPreOutput(mainGroup, worldState, blockCaches, input).map(
             _.map(outputs :+ _)

@@ -55,6 +55,7 @@ final case class IOErrorUpdateState(error: IOError)            extends ExeFailur
 final case class IOErrorLoadContract(error: IOError)           extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
 final case class IOErrorLoadOutputs(error: IOError)            extends ExeFailure
+final case class NonExistTxInput(err: IOError.KeyNotFound[_])  extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object UninitializedAddress                               extends ExeFailure
 case object NonPayableFrame                                    extends ExeFailure

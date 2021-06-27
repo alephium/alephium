@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.io.IOError
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector}
@@ -110,14 +111,16 @@ object StatefulContext {
   def apply(
       tx: TransactionAbstract,
       gasRemaining: GasBox,
-      worldState: WorldState.Cached
+      worldState: WorldState.Cached,
+      preOutputsOpt: Option[AVector[TxOutput]]
   ): StatefulContext = {
-    new Impl(tx, worldState, gasRemaining)
+    new Impl(tx, worldState, preOutputsOpt, gasRemaining)
   }
 
   final class Impl(
       val tx: TransactionAbstract,
       val initWorldState: WorldState.Cached,
+      val preOutputsOpt: Option[AVector[TxOutput]],
       var gasRemaining: GasBox
   ) extends StatefulContext {
     override val worldState: WorldState.Staging = initWorldState.staging()
@@ -136,10 +139,7 @@ object StatefulContext {
     override def getInitialBalances: ExeResult[Frame.Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
-          preOutputs <- initWorldState
-            .getPreOutputsForVM(tx)
-            .left
-            .map[ExeFailure](IOErrorLoadOutputs)
+          preOutputs <- getPreOutputs()
           balances <- Frame.Balances
             .from(preOutputs, tx.unsigned.fixedOutputs)
             .toRight[ExeFailure](InvalidBalances)
@@ -150,6 +150,17 @@ object StatefulContext {
       } else {
         Left(NonPayableFrame)
       }
+
+    private def getPreOutputs(): ExeResult[AVector[TxOutput]] = preOutputsOpt match {
+      case Some(outputs) =>
+        Right(outputs.filter(_.isInstanceOf[AssetOutput]))
+      case None =>
+        initWorldState.getPreOutputsForVM(tx) match {
+          case Right(outputs)                      => Right(outputs)
+          case Left(error: IOError.KeyNotFound[_]) => Left(NonExistTxInput(error))
+          case Left(error)                         => Left(IOErrorLoadOutputs(error))
+        }
+    }
 
     override val outputBalances: Frame.Balances = Frame.Balances.empty
   }

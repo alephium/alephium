@@ -213,7 +213,7 @@ sealed trait ContractObj[Ctx <: Context] {
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
-    ctx.getInitialBalances.map(balances =>
+    ctx.getInitialBalances.map { balances =>
       buildPayableFrame(
         ctx,
         Frame.BalanceState.from(balances),
@@ -223,7 +223,7 @@ sealed trait ContractObj[Ctx <: Context] {
         operandStack,
         returnTo
       )
-    )
+    }
   }
 
   protected def startNonPayableFrame(

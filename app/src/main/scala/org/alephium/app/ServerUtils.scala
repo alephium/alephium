@@ -367,31 +367,6 @@ class ServerUtils(networkType: NetworkType) {
     } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
   }
 
-  def txFromScript(
-      blockFlow: BlockFlow,
-      script: StatefulScript,
-      fromGroup: GroupIndex,
-      contractTx: TransactionAbstract
-  ): ExeResult[Transaction] = {
-    for {
-      worldState <- blockFlow
-        .getBestCachedWorldState(fromGroup)
-        .left
-        .map[ExeFailure](error => NonCategorized(error.getMessage))
-      result <- StatefulVM.runTxScript(worldState, contractTx, script, contractTx.unsigned.startGas)
-    } yield {
-      val contractInputs  = result.contractInputs
-      val generateOutputs = result.generatedOutputs
-      Transaction(
-        contractTx.unsigned,
-        contractInputs,
-        generateOutputs,
-        contractTx.inputSignatures,
-        contractTx.contractSignatures
-      )
-    }
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(blockFlow: BlockFlow, query: BuildContract)(implicit
       groupConfig: GroupConfig

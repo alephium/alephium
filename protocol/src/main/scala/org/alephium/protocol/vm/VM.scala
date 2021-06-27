@@ -262,7 +262,27 @@ object StatefulVM {
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(tx, gasRemaining, worldState)
+    runTxScript(worldState, tx, None, script, gasRemaining)
+  }
+
+  def runTxScript(
+      worldState: WorldState.Cached,
+      tx: TransactionAbstract,
+      preOutputs: AVector[TxOutput],
+      script: StatefulScript,
+      gasRemaining: GasBox
+  ): ExeResult[TxScriptExecution] = {
+    runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
+  }
+
+  private def runTxScript(
+      worldState: WorldState.Cached,
+      tx: TransactionAbstract,
+      preOutputsOpt: Option[AVector[TxOutput]],
+      script: StatefulScript,
+      gasRemaining: GasBox
+  ): ExeResult[TxScriptExecution] = {
+    val context = StatefulContext(tx, gasRemaining, worldState, preOutputsOpt)
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map { _ =>
       context.worldState.commit()

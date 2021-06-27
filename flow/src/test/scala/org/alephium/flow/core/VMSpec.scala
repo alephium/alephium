@@ -384,6 +384,20 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "use correct utxos" in new ContractFixture {
+    val block = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block)
+    val input =
+      s"""
+         |TxContract Foo(mut x: U256) {
+         |  pub payable fn foo() -> () {
+         |    issueToken!(10000000)
+         |  }
+         |}
+         |""".stripMargin
+    createContract(input, 2, 2)
+  }
+
   behavior of "constant product market"
 
   it should "swap" in new ContractFixture {
