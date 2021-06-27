@@ -90,9 +90,9 @@ class WalletAppSpec
   def getBalance()                = Get(s"/wallets/$wallet/balances")
   def getAddresses()              = Get(s"/wallets/$wallet/addresses")
   def transfer(amount: Int)       = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def deriveNextAddress()         = Post(s"/wallets/$wallet/deriveNextAddress")
+  def deriveNextAddress()         = Post(s"/wallets/$wallet/derive-next-address")
   def changeActiveAddress(address: Address) =
-    Post(s"/wallets/$wallet/changeActiveAddress", changeActiveAddressJson(address))
+    Post(s"/wallets/$wallet/change-active-address", changeActiveAddressJson(address))
   def listWallets() = Get("/wallets")
   def getWallet()   = Get(s"/wallets/$wallet")
 

@@ -3169,13 +3169,13 @@
         }
       }
     },
-    "/transactions/build-sweep-all": {
+    "/transactions/sweep-all/build": {
       "post": {
         "tags": [
           "Transactions"
         ],
         "summary": "Build an unsigned transaction to send all unlocked balanced to an address",
-        "operationId": "postTransactionsBuild-sweep-all",
+        "operationId": "postTransactionsSweep-allBuild",
         "requestBody": {
           "content": {
             "application/json": {

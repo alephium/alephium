@@ -202,7 +202,8 @@ trait Endpoints
 
   val buildSweepAllTransaction: BaseEndpoint[BuildSweepAllTransaction, BuildTransactionResult] =
     transactionsEndpoint.post
-      .in("build-sweep-all")
+      .in("sweep-all")
+      .in("build")
       .in(jsonBody[BuildSweepAllTransaction])
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to send all unlocked balanced to an address")

@@ -249,10 +249,10 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call POST /transactions/build-sweep-all" in new RestServerFixture {
+  it should "call POST /transactions/sweep-all/build" in new RestServerFixture {
     withServer {
       Post(
-        s"/transactions/build-sweep-all",
+        s"/transactions/sweep-all/build",
         body = s"""
         |{
         |  "fromKey": "$dummyKeyHex",
@@ -266,7 +266,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         )
       }
       Post(
-        s"/transactions/build-sweep-all",
+        s"/transactions/sweep-all/build",
         body = s"""
         |{
         |  "fromKey": "$dummyKeyHex",
@@ -284,7 +284,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       interCliqueSynced = false
 
       Post(
-        s"/transactions/build-sweep-all",
+        s"/transactions/sweep-all/build",
         body = s"""
         |{
         |  "fromKey": "$dummyKeyHex",
