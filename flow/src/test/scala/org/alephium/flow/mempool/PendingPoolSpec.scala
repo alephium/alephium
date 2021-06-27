@@ -27,6 +27,7 @@ class PendingPoolSpec
     with NoIndexModelGeneratorsLike {
   private val dummyIndex = GroupIndex.unsafe(0)
   def now                = TimeStamp.now()
+  def emptyTxIndexes     = TxIndexes.emptyPendingPool(dummyIndex)
 
   def checkTx(pool: PendingPool, tx: TransactionTemplate): Unit = {
     pool.txs.contains(tx.id) is true
@@ -35,7 +36,7 @@ class PendingPoolSpec
   }
 
   it should "add/remove tx" in {
-    val tx   = transactionGen().sample.get.toTemplate
+    val tx   = transactionGen().retryUntil(_.chainIndex.from equals dummyIndex).sample.get.toTemplate
     val pool = PendingPool.empty(dummyIndex, 10)
     pool.add(tx, now)
     pool.add(tx, now) // for idempotent
@@ -47,7 +48,7 @@ class PendingPoolSpec
     pool.remove(tx) // for idempotent
     pool.txs.isEmpty is true
     pool.timestamps.isEmpty is true
-    pool.indexes is TxIndexes.emptyPendingPool
+    pool.indexes is emptyTxIndexes
   }
 
   it should "work with capacity" in {

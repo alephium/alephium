@@ -100,9 +100,9 @@ class PendingPool(
       }
     }
 
-  // Left means the output is spent
-  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
-    indexes.getUtxo(outputRef)
+  // the output might have been spent
+  def getUtxo(outputRef: AssetOutputRef): Option[TxOutput] = {
+    indexes.getOutput(outputRef)
   }
 
   def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
@@ -122,12 +122,12 @@ class PendingPool(
 }
 
 object PendingPool {
-  def empty(groupIndex: GroupIndex, capacity: Int): PendingPool =
+  def empty(mainGroup: GroupIndex, capacity: Int)(implicit groupConfig: GroupConfig): PendingPool =
     new PendingPool(
-      groupIndex,
+      mainGroup,
       mutable.HashMap.empty,
       ValueSortedMap.empty,
-      TxIndexes.emptyPendingPool,
+      TxIndexes.emptyPendingPool(mainGroup),
       capacity
     )
 }

@@ -17,6 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumFixture, LockFixture}
 
@@ -25,19 +26,21 @@ class TxIndexesSpec
     with TxIndexesSpec.Fixture
     with LockFixture
     with NoIndexModelGeneratorsLike {
+  def emptyTxIndexes = TxIndexes.emptySharedPool(GroupIndex.unsafe(0))
+
   it should "add txs" in {
     val tx      = transactionGen().sample.get
-    val indexes = TxIndexes.emptySharedPool
+    val indexes = emptyTxIndexes
     indexes.add(tx.toTemplate)
     checkTx(indexes, tx.toTemplate)
   }
 
   it should "be idempotent for adding" in {
     val tx       = transactionGen().sample.get
-    val indexes0 = TxIndexes.emptySharedPool
+    val indexes0 = emptyTxIndexes
     indexes0.add(tx.toTemplate)
 
-    val indexes1 = TxIndexes.emptySharedPool
+    val indexes1 = emptyTxIndexes
     indexes1.add(tx.toTemplate)
     indexes1.add(tx.toTemplate)
 
@@ -46,18 +49,18 @@ class TxIndexesSpec
 
   it should "remove tx" in {
     val tx      = transactionGen().sample.get
-    val indexes = TxIndexes.emptySharedPool
+    val indexes = emptyTxIndexes
     indexes.add(tx.toTemplate)
     indexes.remove(tx.toTemplate)
-    indexes is TxIndexes.emptySharedPool
+    indexes is emptyTxIndexes
 
     // check for idempotent
     indexes.remove(tx.toTemplate)
-    indexes is TxIndexes.emptySharedPool
+    indexes is emptyTxIndexes
   }
 
   trait LockFixture extends WithLock {
-    val indexes  = TxIndexes.emptySharedPool
+    val indexes  = emptyTxIndexes
     lazy val rwl = indexes._getLock
 
     val tx = transactionGen().sample.get.toTemplate
@@ -72,14 +75,24 @@ class TxIndexesSpec
 
 object TxIndexesSpec {
   trait Fixture extends AlephiumFixture {
-    def checkTx(indexes: TxIndexes, tx: TransactionTemplate): Unit = {
+    def checkTx(indexes: TxIndexes, tx: TransactionTemplate)(implicit
+        groupConfig: GroupConfig
+    ): Unit = {
       tx.unsigned.inputs.foreach { input =>
         indexes.inputIndex.contains(input.outputRef) is true
       }
       tx.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
         val outputRef = AssetOutputRef.from(output, TxOutputRef.key(tx.id, index))
-        indexes.outputIndex.contains(outputRef) is true
-        indexes.addressIndex(output.lockupScript).contains(outputRef) is true
+        if (output.toGroup equals indexes.mainGroup) {
+          indexes.outputIndex.contains(outputRef) is true
+          indexes.addressIndex(output.lockupScript).contains(outputRef) is true
+        } else {
+          indexes.outputIndex.contains(outputRef) is false
+          indexes.addressIndex.get(output.lockupScript) match {
+            case Some(outputs) => outputs.contains(outputRef) is false
+            case None          => ()
+          }
+        }
       }
     }
   }

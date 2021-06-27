@@ -76,7 +76,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getPreOutputsInGroupView(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(tx, getPreOutputInGroupView)
+    getPreOutputs(tx, (_, b, c, d) => getPreOutputInGroupView(b, c, d))
   }
 
   def getPreOutputsInGroupView(
@@ -85,15 +85,22 @@ trait TxUtils { Self: FlowUtils =>
       worldState: WorldState.Cached,
       tx: Transaction
   ): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(tx, mainGroup, blockDeps, worldState, getPreOutputInGroupView)
+    getPreOutputs(
+      tx,
+      mainGroup,
+      blockDeps,
+      worldState,
+      (_: GroupIndex, b: WorldState.Cached, c: AVector[BlockCache], d: TxOutputRef) =>
+        getPreOutputInGroupView(b, c, d)
+    )
   }
 
   private def getPreOutputs(
       tx: Transaction,
       getPreOutput: (
           GroupIndex,
-          BlockDeps,
           WorldState.Persisted,
+          AVector[BlockCache],
           TxOutputRef
       ) => IOResult[Option[TxOutput]]
   ): IOResult[Option[AVector[TxOutput]]] = {
@@ -113,41 +120,58 @@ trait TxUtils { Self: FlowUtils =>
       worldState: WS,
       getPreOutput: (
           GroupIndex,
-          BlockDeps,
           WS,
+          AVector[BlockCache],
           TxOutputRef
       ) => IOResult[Option[TxOutput]]
   ): IOResult[Option[AVector[TxOutput]]] = {
-    tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
-      case (Some(outputs), input) =>
-        getPreOutput(mainGroup, blockDeps, worldState, input).map(
-          _.map(outputs :+ _)
-        )
-      case (None, _) => Right(None)
-    }
+    for {
+      blockCaches <- getBlocksForUpdates(mainGroup, blockDeps)
+      result <- tx.allInputRefs.foldE(Option(AVector.empty[TxOutput])) {
+        case (Some(outputs), input) =>
+          getPreOutput(mainGroup, worldState, blockCaches, input).map(
+            _.map(outputs :+ _)
+          )
+        case (None, _) => Right(None)
+      }
+    } yield result
   }
 
-  def getPreOutputIncludingPools(
+  def getPreOutputIncludingPools[WS <: WorldState[_]](
       mainGroup: GroupIndex,
-      bestDeps: BlockDeps,
-      worldState: WorldState.Persisted,
+      worldState: WS,
+      blockCaches: AVector[BlockCache],
       outputRef: TxOutputRef
   ): IOResult[Option[TxOutput]] = {
-    getMemPool(mainGroup).getUtxo(outputRef) match {
-      case Some(output) => Right(Some(output))
-      case None         => getPreOutputInGroupView(mainGroup, bestDeps, worldState, outputRef)
+    val mempool = getMemPool(mainGroup)
+    if (mempool.isSpent(outputRef)) {
+      Right(None)
+    } else {
+      mempool.getOutput(outputRef) match {
+        case Some(output) => Right(Some(output))
+        case None         => getPreOutputInGroupView(worldState, blockCaches, outputRef)
+      }
     }
   }
 
   def getPreOutputInGroupView[WS <: WorldState[_]](
-      mainGroup: GroupIndex,
-      bestDeps: BlockDeps,
       worldState: WS,
+      blockCaches: AVector[BlockCache],
       outputRef: TxOutputRef
   ): IOResult[Option[TxOutput]] = {
-    getPreoutputsInCache(mainGroup, bestDeps, outputRef).flatMap {
-      case Some(output) => Right(Some(output))
-      case None         => worldState.getOutputOpt(outputRef)
+    if (TxUtils.isSpent(blockCaches, outputRef)) {
+      Right(None)
+    } else {
+      worldState.getOutputOpt(outputRef).map {
+        case Some(output) => Some(output)
+        case None =>
+          val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
+          if (index != -1) {
+            Some(blockCaches(index).relatedOutputs(outputRef))
+          } else {
+            None
+          }
+      }
     }
   }
 
@@ -403,32 +427,6 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getPreoutputsInCache(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      txOutputRef: TxOutputRef
-  ): IOResult[Option[TxOutput]] = {
-    getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
-      val index = blockCaches.indexWhere(_.relatedOutputs.contains(txOutputRef))
-      if (index != -1) {
-        Some(blockCaches(index).relatedOutputs(txOutputRef))
-      } else {
-        None
-      }
-    }
-  }
-
-  def getPreoutputInState(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      txOutputRef: TxOutputRef
-  ): IOResult[Option[TxOutput]] = {
-    for {
-      bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
-      txOutputOpt    <- bestWorldState.getOutputOpt(txOutputRef)
-    } yield txOutputOpt
-  }
-
   // return all the txs that are not valid
   def recheckInputs(
       groupIndex: GroupIndex,
@@ -498,5 +496,11 @@ trait TxUtils { Self: FlowUtils =>
         Left("Different groups for transaction outputs")
       }
     }
+  }
+}
+
+object TxUtils {
+  def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
+    blockCaches.exists(_.inputs.contains(outputRef))
   }
 }
