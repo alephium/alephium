@@ -167,13 +167,13 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def transfer(
-      fromKey: PublicKey,
+      fromPublicKey: PublicKey,
       outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    val fromLockupScript = LockupScript.p2pkh(fromKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {
         totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
@@ -206,25 +206,25 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def transfer(
-      fromKey: PublicKey,
+      fromPublicKey: PublicKey,
       toLockupScript: LockupScript,
       lockTimeOpt: Option[TimeStamp],
       amount: U256,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    transfer(fromKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
+    transfer(fromPublicKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
   }
 
   def sweepAll(
-      fromKey: PublicKey,
+      fromPublicKey: PublicKey,
       toLockupScript: LockupScript,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    val fromLockupScript = LockupScript.p2pkh(fromKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromKey)
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {

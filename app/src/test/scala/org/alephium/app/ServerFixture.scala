@@ -212,7 +212,7 @@ object ServerFixture extends ServerFixture {
       Right((U256.Zero, U256.Zero, 0))
 
     override def transfer(
-        fromKey: PublicKey,
+        fromPublicKey: PublicKey,
         outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice
@@ -221,7 +221,7 @@ object ServerFixture extends ServerFixture {
     }
 
     override def sweepAll(
-        fromKey: PublicKey,
+        fromPublicKey: PublicKey,
         toLockupScript: LockupScript,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],

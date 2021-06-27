@@ -33,13 +33,13 @@ import org.alephium.util.{AVector, Duration, Hex, TimeStamp, U256}
 trait BlockFlowClient {
   def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]]
   def prepareTransaction(
-      fromKey: String,
+      fromPublicKey: String,
       destinations: AVector[Destination],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def prepareSweepAllTransaction(
-      fromKey: String,
+      fromPublicKey: String,
       address: Address,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
@@ -103,13 +103,14 @@ object BlockFlowClient {
       requestFromGroup(address.groupIndex, getBalance, address).map(_.map(_.balance))
 
     def prepareTransaction(
-        fromKey: String,
+        fromPublicKey: String,
         destinations: AVector[Destination],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
-      Hex.from(fromKey).flatMap(PublicKey.from) match {
-        case None => Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromKey")))
+      Hex.from(fromPublicKey).flatMap(PublicKey.from) match {
+        case None =>
+          Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromPublicKey")))
         case Some(publicKey) =>
           val lockupScript = LockupScript.p2pkh(publicKey)
           requestFromGroup(
@@ -126,14 +127,15 @@ object BlockFlowClient {
     }
 
     def prepareSweepAllTransaction(
-        fromKey: String,
+        fromPublicKey: String,
         address: Address,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
-      Hex.from(fromKey).flatMap(PublicKey.from) match {
-        case None => Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromKey")))
+      Hex.from(fromPublicKey).flatMap(PublicKey.from) match {
+        case None =>
+          Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromPublicKey")))
         case Some(publicKey) =>
           val lockupScript = LockupScript.p2pkh(publicKey)
           requestFromGroup(

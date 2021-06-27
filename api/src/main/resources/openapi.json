@@ -3068,7 +3068,7 @@
                 "$ref": "#/components/schemas/BuildTransaction"
               },
               "example": {
-                "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                 "destinations": [
                   {
                     "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
@@ -3183,7 +3183,7 @@
                 "$ref": "#/components/schemas/BuildSweepAllTransaction"
               },
               "example": {
-                "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                 "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                 "lockTime": 1611041396892,
                 "gas": 1,
@@ -3879,7 +3879,7 @@
                 "$ref": "#/components/schemas/BuildContract"
               },
               "example": {
-                "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                 "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
               }
             }
@@ -5028,11 +5028,11 @@
       },
       "BuildTransaction": {
         "required": [
-          "fromKey"
+          "fromPublicKey"
         ],
         "type": "object",
         "properties": {
-          "fromKey": {
+          "fromPublicKey": {
             "type": "string"
           },
           "destinations": {
@@ -5074,12 +5074,12 @@
       },
       "BuildSweepAllTransaction": {
         "required": [
-          "fromKey",
+          "fromPublicKey",
           "toAddress"
         ],
         "type": "object",
         "properties": {
-          "fromKey": {
+          "fromPublicKey": {
             "type": "string"
           },
           "toAddress": {
@@ -5245,12 +5245,12 @@
       },
       "BuildContract": {
         "required": [
-          "fromKey",
+          "fromPublicKey",
           "code"
         ],
         "type": "object",
         "properties": {
-          "fromKey": {
+          "fromPublicKey": {
             "type": "string"
           },
           "code": {

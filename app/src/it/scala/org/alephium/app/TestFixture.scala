@@ -388,7 +388,7 @@ trait TestFixtureLike
       "/transactions/build",
       Some(s"""
         |{
-        |  "fromKey": "$fromPubKey",
+        |  "fromPublicKey": "$fromPubKey",
         |  "destinations": [
         |    {
         |      "address": "$toAddress",

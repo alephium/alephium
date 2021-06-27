@@ -80,10 +80,10 @@ class ServerUtils(networkType: NetworkType) {
       groupConfig: GroupConfig
   ): Try[BuildTransactionResult] = {
     val resultEither = for {
-      _ <- checkGroup(blockFlow, query.fromKey)
+      _ <- checkGroup(blockFlow, query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromKey,
+        query.fromPublicKey,
         query.destinations,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
@@ -101,10 +101,10 @@ class ServerUtils(networkType: NetworkType) {
       groupConfig: GroupConfig
   ): Try[BuildTransactionResult] = {
     val resultEither = for {
-      _ <- checkGroup(blockFlow, query.fromKey)
+      _ <- checkGroup(blockFlow, query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromKey,
+        query.fromPublicKey,
         query.toAddress,
         query.lockTime,
         query.gas,
@@ -231,7 +231,7 @@ class ServerUtils(networkType: NetworkType) {
 
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
-      fromKey: PublicKey,
+      fromPublicKey: PublicKey,
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -239,7 +239,7 @@ class ServerUtils(networkType: NetworkType) {
     val outputInfos = destinations.map { destination =>
       (destination.address.lockupScript, destination.amount, destination.lockTime)
     }
-    blockFlow.transfer(fromKey, outputInfos, gasOpt, gasPrice) match {
+    blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
@@ -248,13 +248,13 @@ class ServerUtils(networkType: NetworkType) {
 
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
-      fromKey: PublicKey,
+      fromPublicKey: PublicKey,
       toAddress: Address,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    blockFlow.sweepAll(fromKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
+    blockFlow.sweepAll(fromPublicKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
@@ -405,8 +405,8 @@ class ServerUtils(networkType: NetworkType) {
       utx <- unignedTxFromScript(
         blockFlow,
         script,
-        LockupScript.p2pkh(query.fromKey),
-        query.fromKey
+        LockupScript.p2pkh(query.fromPublicKey),
+        query.fromPublicKey
       ).left.map(error => badRequest(error.toString))
     } yield utx).map(BuildContractResult.from))
   }

@@ -56,7 +56,7 @@ class SmartContractTest extends AlephiumSpec {
       val buildResult = request[BuildContractResult](
         buildContract(s"""
         {
-          "fromKey": "$publicKey",
+          "fromPublicKey": "$publicKey",
           "code": "${compileResult.code}"
         }"""),
         restPort

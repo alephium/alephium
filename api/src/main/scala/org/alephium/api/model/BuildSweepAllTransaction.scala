@@ -23,7 +23,7 @@ import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildSweepAllTransaction(
-    fromKey: PublicKey,
+    fromPublicKey: PublicKey,
     toAddress: Address,
     lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,

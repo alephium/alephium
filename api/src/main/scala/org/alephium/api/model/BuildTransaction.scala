@@ -23,11 +23,11 @@ import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildTransaction(
-    fromKey: PublicKey,
+    fromPublicKey: PublicKey,
     destinations: AVector[Destination],
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 ) {
   def fromAddress(networkType: NetworkType): Address =
-    Address(networkType, LockupScript.p2pkh(fromKey))
+    Address(networkType, LockupScript.p2pkh(fromPublicKey))
 }

@@ -164,7 +164,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKeyHex",
+        |  "fromPublicKey": "$dummyKeyHex",
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
@@ -183,7 +183,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKeyHex",
+        |  "fromPublicKey": "$dummyKeyHex",
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
@@ -209,7 +209,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKeyHex",
+        |  "fromPublicKey": "$dummyKeyHex",
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
@@ -255,7 +255,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/sweep-all/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKeyHex",
+        |  "fromPublicKey": "$dummyKeyHex",
         |  "toAddress": "$dummyToAddress"
         |}
         """.stripMargin
@@ -269,7 +269,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/sweep-all/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKeyHex",
+        |  "fromPublicKey": "$dummyKeyHex",
         |  "toAddress": "$dummyToAddress",
         |  "lockTime": "1234"
         |}
@@ -287,7 +287,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         s"/transactions/sweep-all/build",
         body = s"""
         |{
-        |  "fromKey": "$dummyKeyHex",
+        |  "fromPublicKey": "$dummyKeyHex",
         |  "toAddress": "$dummyToAddress"
         |}
         """.stripMargin

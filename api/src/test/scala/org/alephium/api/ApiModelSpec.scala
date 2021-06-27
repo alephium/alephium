@@ -229,15 +229,15 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BuildTransaction" in {
-    val fromKey   = PublicKey.generate
-    val toKey     = PublicKey.generate
-    val toAddress = Address.p2pkh(networkType, toKey)
+    val fromPublicKey = PublicKey.generate
+    val toKey         = PublicKey.generate
+    val toAddress     = Address.p2pkh(networkType, toKey)
 
     {
-      val transfer = BuildTransaction(fromKey, AVector(Destination(toAddress, 1)))
+      val transfer = BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1)))
       val jsonRaw  = s"""
         |{
-        |  "fromKey": "${fromKey.toHexString}",
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
@@ -251,14 +251,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
     {
       val transfer = BuildTransaction(
-        fromKey,
+        fromPublicKey,
         AVector(Destination(toAddress, 1, Some(TimeStamp.unsafe(1234)))),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )
       val jsonRaw = s"""
         |{
-        |  "fromKey": "${fromKey.toHexString}",
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
