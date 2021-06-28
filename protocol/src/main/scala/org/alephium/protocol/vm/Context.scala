@@ -19,7 +19,6 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.IOError
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector}
@@ -163,9 +162,9 @@ object StatefulContext {
         Right(outputs.filter(_.isInstanceOf[AssetOutput]))
       case None =>
         initWorldState.getPreOutputsForVM(tx) match {
-          case Right(outputs)                      => Right(outputs)
-          case Left(error: IOError.KeyNotFound[_]) => failed(NonExistTxInput(error))
-          case Left(error)                         => ioFailed(IOErrorLoadOutputs(error))
+          case Right(Some(outputs)) => Right(outputs)
+          case Right(None)          => failed(NonExistTxInput)
+          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
         }
     }
 

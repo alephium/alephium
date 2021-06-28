@@ -541,32 +541,14 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0)
     theMemPool.contains(tx0.chainIndex, tx0.id) is false
     theMemPool.contains(tx1.chainIndex, tx1.id) is true
-
-    if (!tx0.chainIndex.isIntraGroup) {
-      theMemPool.pendingPool.contains(tx1.id) is true
-      theMemPool.pendingPool.contains(tx2.id) is true
-      val block = mineFromMemPool(blockFlow, ChainIndex(fromGroup, fromGroup))
-      addAndCheck(blockFlow, block)
-      theMemPool.pendingPool.contains(tx1.id) is false
-      theMemPool.pendingPool.contains(tx2.id) is true
-    } else {
-      theMemPool.pendingPool.contains(tx1.id) is false
-      theMemPool.pendingPool.contains(tx2.id) is true
-    }
+    theMemPool.pendingPool.contains(tx1.id) is false
+    theMemPool.pendingPool.contains(tx2.id) is true
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
     theMemPool.contains(tx1.chainIndex, tx1.id) is false
     theMemPool.contains(tx2.chainIndex, tx2.id) is true
-
-    if (!tx1.chainIndex.isIntraGroup) {
-      theMemPool.pendingPool.contains(tx2.id) is true
-      val block = mineFromMemPool(blockFlow, ChainIndex(fromGroup, fromGroup))
-      addAndCheck(blockFlow, block)
-      theMemPool.pendingPool.contains(tx2.id) is false
-    } else {
-      theMemPool.pendingPool.contains(tx2.id) is false
-    }
+    theMemPool.pendingPool.contains(tx2.id) is false
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)

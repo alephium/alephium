@@ -77,7 +77,7 @@ trait FlowUtils
       oldDeps: BlockDeps
   ): AVector[TransactionTemplate] = {
     updateMemPoolUnsafe(mainGroup, newDeps, oldDeps)
-    updatePendingPoolUnsafe(mainGroup, newDeps)
+    getMemPool(mainGroup).updatePendingPool()
   }
 
   def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps, oldDeps: BlockDeps): Unit = {
@@ -94,17 +94,6 @@ trait FlowUtils
       case Reorg(toRemove, toAdd) =>
         val (removed, added) = getMemPool(mainGroup).reorg(toRemove, toAdd)
         logger.debug(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
-    }
-  }
-
-  // TODO: we could update this purely based on mempool, but we need to consider the tradeoffs
-  // it returns the list of txs added to shared pool
-  def updatePendingPoolUnsafe(
-      mainGroup: GroupIndex,
-      newDeps: BlockDeps
-  ): AVector[TransactionTemplate] = Utils.unsafe {
-    getPersistedWorldState(newDeps, mainGroup).flatMap { worldState =>
-      getMemPool(mainGroup).updatePendingPool(worldState)
     }
   }
 
@@ -126,7 +115,18 @@ trait FlowUtils
       txs: AVector[TransactionTemplate]
   ): AVector[TransactionTemplate] = {
     val cachedWorldState = Utils.unsafe(getCachedWorldState(deps, chainIndex.from))
-    txs.filter(tx => Utils.unsafe(cachedWorldState.containsAllInputs(tx)))
+    txs.filter { tx =>
+      Utils
+        .unsafe(
+          getPreOutputsInGroupView(
+            chainIndex.from,
+            deps,
+            cachedWorldState,
+            tx.unsigned.inputs.map(_.outputRef)
+          )
+        )
+        .nonEmpty
+    }
   }
 
   // TODO: truncate txs in advance for efficiency
@@ -168,8 +168,7 @@ trait FlowUtils
         cachedWorldState <- getCachedWorldState(deps, chainIndex.from)
         _ <- order.foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
-          FlowUtils
-            .generateFullTx(cachedWorldState, tx, tx.unsigned.scriptOpt.get)
+          generateFullTx(chainIndex.from, cachedWorldState, deps, tx, tx.unsigned.scriptOpt.get)
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
       } yield AVector.unsafe(fullTxs, 0, txTemplates.length)
@@ -258,6 +257,32 @@ trait FlowUtils
   def prepareBlockFlowUnsafe(chainIndex: ChainIndex, miner: LockupScript): BlockFlowTemplate = {
     Utils.unsafe(prepareBlockFlow(chainIndex, miner))
   }
+
+  def generateFullTx(
+      mainGroup: GroupIndex,
+      worldState: WorldState.Cached,
+      blockDeps: BlockDeps,
+      tx: TransactionTemplate,
+      script: StatefulScript
+  ): IOResult[Transaction] = {
+    for {
+      preOutputs <- getPreOutputsInGroupView(
+        mainGroup,
+        blockDeps,
+        worldState,
+        tx.unsigned.inputs.map(_.outputRef)
+      ).flatMap {
+        case None =>
+          Left(IOError.Other(new RuntimeException(s"Inputs should exist, but not actually")))
+        case Some(outputs) => Right(outputs)
+      }
+    } yield {
+      StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
+        case Left(_)       => FlowUtils.convertFailedScriptTx(preOutputs, tx)
+        case Right(result) => FlowUtils.convertSuccessfulTx(tx, result)
+      }
+    }
+  }
 }
 
 object FlowUtils {
@@ -319,31 +344,17 @@ object FlowUtils {
   }
 
   def convertFailedScriptTx(
-      worldState: MutableWorldState,
+      preOutputs: AVector[TxOutput],
       txTemplate: TransactionTemplate
-  ): IOResult[Transaction] = {
-    worldState.getPreOutputsForVM(txTemplate).map { inputs =>
-      assume(inputs.forall(_.isAsset))
-      val remainingBalances = deductGas(inputs, txTemplate.gasFeeUnsafe)
-      Transaction(
-        txTemplate.unsigned,
-        AVector.empty,
-        generatedOutputs = remainingBalances,
-        txTemplate.inputSignatures,
-        txTemplate.contractSignatures
-      )
-    }
-  }
-
-  def generateFullTx(
-      worldState: WorldState.Cached,
-      tx: TransactionTemplate,
-      script: StatefulScript
-  ): IOResult[Transaction] = {
-    StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
-      case Left(_)       => convertFailedScriptTx(worldState, tx)
-      case Right(result) => Right(FlowUtils.convertSuccessfulTx(tx, result))
-    }
+  ): Transaction = {
+    val remainingBalances = deductGas(preOutputs, txTemplate.gasFeeUnsafe)
+    Transaction(
+      txTemplate.unsigned,
+      AVector.empty,
+      generatedOutputs = remainingBalances,
+      txTemplate.inputSignatures,
+      txTemplate.contractSignatures
+    )
   }
 
   def nextTimeStamp(parentTs: TimeStamp): TimeStamp = {

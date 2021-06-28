@@ -52,7 +52,7 @@ case object InvalidReturnType                                  extends ExeFailur
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
-final case class NonExistTxInput(err: IOError.KeyNotFound[_])  extends ExeFailure
+case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object UninitializedAddress                               extends ExeFailure
 case object NonPayableFrame                                    extends ExeFailure
