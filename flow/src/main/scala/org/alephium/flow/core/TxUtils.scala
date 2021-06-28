@@ -179,6 +179,7 @@ trait TxUtils { Self: FlowUtils =>
         totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
           acc.add(amount).toRight("Amount overflow")
         }
+        _ <- if (outputInfos.isEmpty) Left("Zero transaction outputs") else Right(())
         _ <- checkWithMinimalGas(gasOpt, minimalGas)
         selected <- UtxoUtils.select(
           utxos,

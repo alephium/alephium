@@ -341,6 +341,24 @@ class ServerUtilsSpec extends AlephiumSpec {
     decodedUnsignedTx is unsignedTx
   }
 
+  "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixture {
+    val networkType = networkSetting.networkType
+    val serverUtils = new ServerUtils(networkType)
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val destinations          = AVector.empty[Destination]
+
+    val buildTransaction = serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, destinations)
+      )
+      .leftValue
+
+    buildTransaction.detail is "Zero transaction outputs"
+  }
+
   private def generateDestination(chainIndex: ChainIndex, networkType: NetworkType)(implicit
       groupConfig: GroupConfig
   ): Destination = {

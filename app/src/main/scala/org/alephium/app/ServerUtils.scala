@@ -239,6 +239,7 @@ class ServerUtils(networkType: NetworkType) {
     val outputInfos = destinations.map { destination =>
       (destination.address.lockupScript, destination.amount, destination.lockTime)
     }
+
     blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
