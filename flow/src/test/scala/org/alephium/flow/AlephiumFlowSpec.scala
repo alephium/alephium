@@ -251,7 +251,11 @@ trait FlowFixture
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     val miner         = getGenesisLockupScript(chainIndex)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
+    val block         = mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
+
+    block.chainIndex is chainIndex
+
+    block
   }
 
   def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
