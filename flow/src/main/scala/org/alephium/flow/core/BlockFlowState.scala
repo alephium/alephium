@@ -431,9 +431,9 @@ object BlockFlowState {
       case Some(script) =>
         // we set gasRemaining = initial gas as the tx is already validated
         StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
-          case Right(_)                        => Right(())
-          case Left(IOErrorUpdateState(error)) => Left(error)
-          case Left(error) =>
+          case Right(_)          => Right(())
+          case Left(Left(error)) => Left(error.error)
+          case Left(Right(error)) =>
             throw new RuntimeException(s"Updating world state for invalid tx: $error")
         }
       case None => Right(())

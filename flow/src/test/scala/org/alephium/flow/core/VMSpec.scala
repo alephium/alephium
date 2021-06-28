@@ -97,7 +97,7 @@ class VMSpec extends AlephiumSpec {
     }
     val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).toOption.get
     StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
-      Left(StackOverflow)
+      failed(StackOverflow)
   }
 
   trait CallFixture extends FlowFixture {

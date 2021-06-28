@@ -44,9 +44,9 @@ abstract class Frame[Ctx <: Context] {
     val newPC = pc + offset
     if (newPC >= 0 && newPC < method.instrs.length) {
       pc = newPC
-      Right(())
+      okay
     } else {
-      Left(InvalidInstrOffset)
+      failed(InvalidInstrOffset)
     }
   }
 
@@ -63,17 +63,17 @@ abstract class Frame[Ctx <: Context] {
     pop().flatMap { elem =>
       try Right(elem.asInstanceOf[T])
       catch {
-        case _: ClassCastException => Left(InvalidType(elem))
+        case _: ClassCastException => failed(InvalidType(elem))
       }
     }
 
   def getLocal(index: Int): ExeResult[Val] = {
-    if (locals.isDefinedAt(index)) Right(locals(index)) else Left(InvalidLocalIndex)
+    if (locals.isDefinedAt(index)) Right(locals(index)) else failed(InvalidLocalIndex)
   }
 
   def setLocal(index: Int, v: Val): ExeResult[Unit] = {
     if (!locals.isDefinedAt(index)) {
-      Left(InvalidLocalIndex)
+      failed(InvalidLocalIndex)
     } else {
       Right(locals.update(index, v))
     }
@@ -81,22 +81,22 @@ abstract class Frame[Ctx <: Context] {
 
   def getField(index: Int): ExeResult[Val] = {
     val fields = obj.fields
-    if (fields.isDefinedAt(index)) Right(fields(index)) else Left(InvalidFieldIndex)
+    if (fields.isDefinedAt(index)) Right(fields(index)) else failed(InvalidFieldIndex)
   }
 
   def setField(index: Int, v: Val): ExeResult[Unit] = {
     val fields = obj.fields
     if (!fields.isDefinedAt(index)) {
-      Left(InvalidFieldIndex)
+      failed(InvalidFieldIndex)
     } else if (fields(index).tpe != v.tpe) {
-      Left(InvalidFieldType)
+      failed(InvalidFieldType)
     } else {
       Right(fields.update(index, v))
     }
   }
 
   protected def getMethod(index: Int): ExeResult[Method[Ctx]] = {
-    obj.getMethod(index).toRight(InvalidMethodIndex(index))
+    obj.getMethod(index).toRight(Right(InvalidMethodIndex(index)))
   }
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
@@ -153,7 +153,7 @@ final class StatelessFrame(
     } else if (pc == pcMax) {
       runReturn()
     } else {
-      Left(PcOverflow)
+      failed(PcOverflow)
     }
   }
 
@@ -177,7 +177,7 @@ final class StatefulFrame(
   ): ExeResult[Option[Frame.BalanceState]] = {
     if (method.isPayable) {
       for {
-        state <- balanceStateOpt.toRight[ExeFailure](EmptyBalanceForPayableMethod)
+        state <- balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
         balanceStateOpt <- {
           val newFrameBalances = state.useApproved()
           contractObj.addressOpt match {
@@ -215,8 +215,8 @@ final class StatefulFrame(
   ): ExeResult[Frame[StatefulContext]] = {
     for {
       contractObj        <- ctx.loadContract(contractKey)
-      method             <- contractObj.getMethod(index).toRight[ExeFailure](InvalidMethodIndex(index))
-      _                  <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
+      method             <- contractObj.getMethod(index).toRight(Right(InvalidMethodIndex(index)))
+      _                  <- if (method.isPublic) okay else failed(PrivateExternalMethodCall)
       args               <- opStack.pop(method.argsType.length)
       _                  <- method.check(args)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
@@ -230,7 +230,7 @@ final class StatefulFrame(
     for {
       _           <- ctx.chargeGas(GasSchedule.callGas)
       byteVec     <- popT[Val.ByteVec]()
-      contractKey <- Hash.from(byteVec.a).toRight(InvalidContractAddress)
+      contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
       newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
     } yield Some(newFrame)
   }
@@ -254,7 +254,7 @@ final class StatefulFrame(
     } else if (pc == pcMax) {
       runReturn()
     } else {
-      Left(PcOverflow)
+      failed(PcOverflow)
     }
   }
 
@@ -529,7 +529,7 @@ object Frame {
     def toTxOutput(lockupScript: LockupScript): ExeResult[Option[TxOutput]] = {
       val tokens = tokenVector
       if (alfAmount.isZero) {
-        if (tokens.isEmpty) Right(None) else Left(InvalidOutputBalances)
+        if (tokens.isEmpty) Right(None) else failed(InvalidOutputBalances)
       } else {
         Right(Some(TxOutput.from(alfAmount, tokens, lockupScript)))
       }

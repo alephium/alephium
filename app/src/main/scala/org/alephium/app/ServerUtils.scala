@@ -362,7 +362,7 @@ class ServerUtils(networkType: NetworkType) {
   ): ExeResult[UnsignedTransaction] = {
     val unlockScript = UnlockScript.p2pkh(publicKey)
     for {
-      balances <- blockFlow.getUsableUtxos(lockupScript).left.map[ExeFailure](IOErrorLoadOutputs)
+      balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => Left(IOErrorLoadOutputs(e)))
       inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
     } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
   }

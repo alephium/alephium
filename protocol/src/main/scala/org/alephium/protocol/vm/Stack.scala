@@ -71,7 +71,7 @@ class Stack[@sp T: ClassTag](
       currentIndex += 1
       Right(())
     } else {
-      Left(StackOverflow)
+      failed(StackOverflow)
     }
   }
 
@@ -81,7 +81,7 @@ class Stack[@sp T: ClassTag](
       currentIndex += elems.length
       Right(())
     } else {
-      Left(StackOverflow)
+      failed(StackOverflow)
     }
   }
 
@@ -92,7 +92,7 @@ class Stack[@sp T: ClassTag](
       currentIndex = elemIndex
       Right(elem)
     } else {
-      Left(StackUnderflow)
+      failed(StackUnderflow)
     }
   }
 
@@ -105,13 +105,13 @@ class Stack[@sp T: ClassTag](
       currentIndex = start
       Right(elems)
     } else {
-      Left(StackUnderflow)
+      failed(StackUnderflow)
     }
   }
 
   def remove(total: Int): ExeResult[Unit] = {
     if (size < total) {
-      Left(StackUnderflow)
+      failed(StackUnderflow)
     } else {
       currentIndex -= total
       Right(())
@@ -122,9 +122,9 @@ class Stack[@sp T: ClassTag](
   def peek(index: Int): ExeResult[T] = {
     val elemIndex = currentIndex - index
     if (index < 1) {
-      Left(StackOverflow)
+      failed(StackOverflow)
     } else if (elemIndex < offset) {
-      Left(StackUnderflow)
+      failed(StackUnderflow)
     } else {
       Right(underlying(elemIndex))
     }
@@ -140,9 +140,9 @@ class Stack[@sp T: ClassTag](
     val fromIndex = currentIndex - 1
     val toIndex   = currentIndex - index
     if (index <= 1) {
-      Left(StackOverflow)
+      failed(StackOverflow)
     } else if (toIndex < offset) {
-      Left(StackUnderflow)
+      failed(StackUnderflow)
     } else {
       val tmp = underlying(fromIndex)
       underlying(fromIndex) = underlying(toIndex)

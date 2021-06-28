@@ -39,15 +39,15 @@ trait ContractPool extends CostStrategy {
   }
 
   private def loadFromWorldState(contractKey: ContractId): ExeResult[StatefulContractObject] = {
-    worldState.getContractObj(contractKey).left.map[ExeFailure](IOErrorLoadContract)
+    worldState.getContractObj(contractKey).left.map(e => Left(IOErrorLoadContract(e)))
   }
 
   private def add(contractKey: ContractId, obj: StatefulContractObject): ExeResult[Unit] = {
     if (pool.size < contractPoolMaxSize) {
       pool.addOne(contractKey -> obj)
-      Right(())
+      okay
     } else {
-      Left(ContractPoolOverflow)
+      failed(ContractPoolOverflow)
     }
   }
 
@@ -65,7 +65,7 @@ trait ContractPool extends CostStrategy {
   }
 
   private def updateState(contractKey: ContractId, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.updateContract(contractKey, state).left.map(IOErrorUpdateState)
+    worldState.updateContract(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
   }
 }
 

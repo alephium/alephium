@@ -115,9 +115,12 @@ final class StatefulVM(
         _               <- merge(nextBalances.remaining, currentBalances.remaining)
         _               <- merge(nextBalances.remaining, currentBalances.approved)
       } yield ()
-      resultOpt.toRight(InvalidBalances)
+      resultOpt match {
+        case Some(_) => okay
+        case None    => failed(InvalidBalances)
+      }
     } else {
-      Right(())
+      okay
     }
   }
 
@@ -157,7 +160,10 @@ final class StatefulVM(
         _        <- ctx.outputBalances.merge(balances.remaining)
       } yield ()
       for {
-        _ <- resultOpt.toRight(InvalidBalances)
+        _ <- resultOpt match {
+          case Some(_) => okay
+          case None    => failed(InvalidBalances)
+        }
         _ <- outputGeneratedBalances(ctx.outputBalances)
       } yield ()
     } else {
@@ -170,7 +176,7 @@ final class StatefulVM(
     @tailrec
     def iter(index: Int): ExeResult[Unit] = {
       if (index >= outputBalances.all.length) {
-        Right(())
+        okay
       } else {
         val (lockupScript, balances) = outputBalances.all(index)
         balances.toTxOutput(lockupScript) match {

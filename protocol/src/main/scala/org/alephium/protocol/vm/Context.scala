@@ -48,7 +48,7 @@ object StatelessContext {
 
   final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
       extends StatelessContext {
-    override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
+    override def getInitialBalances: ExeResult[Frame.Balances] = failed(NonPayableFrame)
   }
 }
 
@@ -81,7 +81,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       .createContract(code, initialFields, outputRef, contractOutput)
       .map(_ => discard(generatedOutputs.addOne(contractOutput)))
       .left
-      .map(IOErrorUpdateState)
+      .map(e => Left(IOErrorUpdateState(e)))
   }
 
   def useContractAsset(contractId: ContractId): ExeResult[Frame.BalancesPerLockup] = {
@@ -92,7 +92,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         Frame.BalancesPerLockup.from(contractAsset)
       }
       .left
-      .map(IOErrorLoadContract)
+      .map(e => Left(IOErrorLoadContract(e)))
   }
 
   def updateContractAsset(
@@ -103,7 +103,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     worldState
       .updateContract(contractId, outputRef, output)
       .left
-      .map(IOErrorUpdateState)
+      .map(e => Left(IOErrorUpdateState(e)))
   }
 }
 
@@ -136,19 +136,26 @@ object StatefulContext {
      * 1. inputs are not empty
      * 2. gas fee bounds are validated
      */
+    @SuppressWarnings(
+      Array(
+        "org.wartremover.warts.JavaSerializable",
+        "org.wartremover.warts.Product",
+        "org.wartremover.warts.Serializable"
+      )
+    )
     override def getInitialBalances: ExeResult[Frame.Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
           preOutputs <- getPreOutputs()
           balances <- Frame.Balances
             .from(preOutputs, tx.unsigned.fixedOutputs)
-            .toRight[ExeFailure](InvalidBalances)
+            .toRight(Right(InvalidBalances))
           _ <- balances
             .subAlf(preOutputs.head.lockupScript, tx.gasFeeUnsafe)
-            .toRight[ExeFailure](UnableToPayGasFee)
+            .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {
-        Left(NonPayableFrame)
+        failed(NonPayableFrame)
       }
 
     private def getPreOutputs(): ExeResult[AVector[TxOutput]] = preOutputsOpt match {
@@ -157,8 +164,8 @@ object StatefulContext {
       case None =>
         initWorldState.getPreOutputsForVM(tx) match {
           case Right(outputs)                      => Right(outputs)
-          case Left(error: IOError.KeyNotFound[_]) => Left(NonExistTxInput(error))
-          case Left(error)                         => Left(IOErrorLoadOutputs(error))
+          case Left(error: IOError.KeyNotFound[_]) => failed(NonExistTxInput(error))
+          case Left(error)                         => ioFailed(IOErrorLoadOutputs(error))
         }
     }
 

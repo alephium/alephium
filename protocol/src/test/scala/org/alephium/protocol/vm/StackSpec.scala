@@ -30,12 +30,12 @@ class StackSpec extends AlephiumSpec {
     stack.push(1).isRight is true
     stack.size is 1
     stack.peek(1) isE 1
-    stack.peek(0).left.value is StackOverflow
-    stack.peek(2).left.value is StackUnderflow
+    stack.peek(0).left.value isE StackOverflow
+    stack.peek(2).left.value isE StackUnderflow
     stack.push(2).isRight is true
     stack.peek(1) isE 2
     stack.peek(2) isE 1
-    stack.peek(3).left.value is StackUnderflow
+    stack.peek(3).left.value isE StackUnderflow
     stack.size is 2
     stack.push(3).isLeft is true
     stack.peek(1) isE 2
@@ -62,7 +62,7 @@ class StackSpec extends AlephiumSpec {
 
   it should "pop a number of elements" in {
     val stack = Stack.unsafe(AVector(1, 2, 3), 3)
-    stack.pop(4).left.value is StackUnderflow
+    stack.pop(4).left.value isE StackUnderflow
     stack.size is 3
     stack.pop(2) isE AVector(2, 3)
   }
@@ -79,13 +79,13 @@ class StackSpec extends AlephiumSpec {
     stack.push(2)
     stack.push(3)
     check(stack, 3, 2, 1)
-    stack.swap(4).left.value is StackUnderflow
+    stack.swap(4).left.value isE StackUnderflow
     stack.swap(3).isRight is true
     check(stack, 1, 2, 3)
     stack.swap(2).isRight is true
     check(stack, 2, 1, 3)
     stack.swap(1).isLeft is true
-    stack.remove(4).left.value is StackUnderflow
+    stack.remove(4).left.value isE StackUnderflow
     stack.remove(3).isRight is true
     stack.isEmpty is true
   }

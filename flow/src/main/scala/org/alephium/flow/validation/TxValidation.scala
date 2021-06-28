@@ -67,16 +67,9 @@ trait TxValidation {
         for {
           chainIndex <- getChainIndex(tx)
           worldState <- from(flow.getBestCachedWorldState(chainIndex.from))
-          fullTx <- StatefulVM.runTxScript(
-            worldState,
-            tx,
-            preOutputs,
-            script,
-            tx.unsigned.startGas
-          ) match {
-            case Left(error)   => invalidTx(TxScriptExeFailed(error))
-            case Right(result) => validTx(FlowUtils.convertSuccessfulTx(tx, result))
-          }
+          fullTx <- fromExeResult(
+            StatefulVM.runTxScript(worldState, tx, preOutputs, script, tx.unsigned.startGas)
+          ).map { result => FlowUtils.convertSuccessfulTx(tx, result) }
         } yield fullTx
     }
   }
@@ -565,8 +558,9 @@ object TxValidation {
         signatures: Stack[Signature]
     ): TxValidationResult[GasBox] = {
       StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {
-        case Right(result) => validTx(result.gasRemaining)
-        case Left(e)       => invalidTx(InvalidUnlockScript(e))
+        case Right(result)  => validTx(result.gasRemaining)
+        case Left(Right(e)) => invalidTx(InvalidUnlockScript(e))
+        case Left(Left(e))  => Left(Left(e.error))
       }
     }
 
@@ -580,8 +574,8 @@ object TxValidation {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
-            StatefulVM.runTxScript(worldState, tx, preOutputs, script, gasRemaining) match {
-              case Right(StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs)) =>
+            fromExeResult(StatefulVM.runTxScript(worldState, tx, preOutputs, script, gasRemaining))
+              .flatMap { case StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs) =>
                 if (contractInputs != tx.contractInputs) {
                   invalidTx(InvalidContractInputs)
                 } else if (generatedOutputs != tx.generatedOutputs) {
@@ -589,8 +583,7 @@ object TxValidation {
                 } else {
                   validTx(())
                 }
-              case Left(error) => invalidTx(TxScriptExeFailed(error))
-            }
+              }
           case None => validTx(())
         }
       } else {

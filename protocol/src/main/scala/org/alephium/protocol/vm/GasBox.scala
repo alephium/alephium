@@ -25,7 +25,7 @@ final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox]
     if (this >= amount) {
       Right(GasBox(value - amount.value))
     } else {
-      Left(OutOfGas)
+      failed(OutOfGas)
     }
   }
 

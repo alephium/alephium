@@ -374,8 +374,8 @@ object BinaryArithmeticInstr {
   )(x: Val, y: Val): ExeResult[Val.I256] =
     (x, y) match {
       case (a: Val.I256, b: Val.I256) =>
-        op(a.v, b.v).map(Val.I256.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
-      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
+        op(a.v, b.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(a, b, instr)))
+      case _ => failed(BinaryArithmeticInstr.error(x, y, instr))
     }
 
   @inline def u256SafeOp(
@@ -384,8 +384,8 @@ object BinaryArithmeticInstr {
   )(x: Val, y: Val): ExeResult[Val.U256] =
     (x, y) match {
       case (a: Val.U256, b: Val.U256) =>
-        op(a.v, b.v).map(Val.U256.apply).toRight(BinaryArithmeticInstr.error(a, b, instr))
-      case _ => Left(BinaryArithmeticInstr.error(x, y, instr))
+        op(a.v, b.v).map(Val.U256.apply).toRight(Right(BinaryArithmeticInstr.error(a, b, instr)))
+      case _ => failed(BinaryArithmeticInstr.error(x, y, instr))
     }
 
   @inline def i256Comp(
@@ -394,7 +394,7 @@ object BinaryArithmeticInstr {
   )(x: Val, y: Val): ExeResult[Val.Bool] =
     (x, y) match {
       case (a: Val.I256, b: Val.I256) => Right(Val.Bool(op(a.v, b.v)))
-      case _                          => Left(BinaryArithmeticInstr.error(x, y, instr))
+      case _                          => failed(BinaryArithmeticInstr.error(x, y, instr))
     }
 
   @inline def u256Comp(
@@ -403,7 +403,7 @@ object BinaryArithmeticInstr {
   )(x: Val, y: Val): ExeResult[Val.Bool] =
     (x, y) match {
       case (a: Val.U256, b: Val.U256) => Right(Val.Bool(op(a.v, b.v)))
-      case _                          => Left(BinaryArithmeticInstr.error(x, y, instr))
+      case _                          => failed(BinaryArithmeticInstr.error(x, y, instr))
     }
 }
 object I256Add extends BinaryArithmeticInstr with GasVeryLow {
@@ -555,23 +555,23 @@ case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] with GasVeryL
 
 case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] with GasVeryLow {
   override def converse(from: Val.I256): ExeResult[Val.Byte] = {
-    from.v.toByte.map(Val.Byte.apply).toRight(InvalidConversion(from, Val.Byte))
+    from.v.toByte.map(Val.Byte.apply).toRight(Right(InvalidConversion(from, Val.Byte)))
   }
 }
 case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] with GasVeryLow {
   override def converse(from: Val.I256): ExeResult[Val.U256] = {
-    util.U256.fromI256(from.v).map(Val.U256.apply).toRight(InvalidConversion(from, Val.U256))
+    util.U256.fromI256(from.v).map(Val.U256.apply).toRight(Right(InvalidConversion(from, Val.U256)))
   }
 }
 
 case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] with GasVeryLow {
   override def converse(from: Val.U256): ExeResult[Val.Byte] = {
-    from.v.toByte.map(Val.Byte.apply).toRight(InvalidConversion(from, Val.U256))
+    from.v.toByte.map(Val.Byte.apply).toRight(Right(InvalidConversion(from, Val.U256)))
   }
 }
 case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryLow {
   override def converse(from: Val.U256): ExeResult[Val.I256] = {
-    util.I256.fromU256(from.v).map(Val.I256.apply).toRight(InvalidConversion(from, Val.I256))
+    util.I256.fromU256(from.v).map(Val.I256.apply).toRight(Right(InvalidConversion(from, Val.I256)))
   }
 }
 
@@ -611,7 +611,7 @@ sealed trait IfJumpInstr extends ControlInstr {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       value <- frame.popT[Val.Bool]()
-      _     <- if (condition(value)) frame.offsetPC(Bytes.toPosInt(offset)) else Right(())
+      _     <- if (condition(value)) frame.offsetPC(Bytes.toPosInt(offset)) else okay
     } yield ()
   }
 }
@@ -639,7 +639,7 @@ sealed trait BranchInstr[T <: Val] extends ControlInstr {
     for {
       value2 <- frame.popT[T]()
       value1 <- frame.popT[T]()
-      _      <- if (condition(value1, value2)) frame.offsetPC(Bytes.toPosInt(offset)) else Right(())
+      _      <- if (condition(value1, value2)) frame.offsetPC(Bytes.toPosInt(offset)) else okay
     } yield ()
   }
 }
@@ -761,7 +761,7 @@ case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0
     val returnType = frame.method.returnType
     for {
       value <- frame.opStack.pop(returnType.length)
-      _     <- if (value.map(_.tpe) == returnType) Right(()) else Left(InvalidReturnType)
+      _     <- if (value.map(_.tpe) == returnType) okay else failed(InvalidReturnType)
       _     <- frame.returnTo(value)
     } yield frame.complete()
   }
@@ -775,7 +775,7 @@ sealed trait CheckEqT[T <: Val]
     with StatelessInstrCompanion0
     with GasVeryLow {
   def check(x: T, y: T): ExeResult[Unit] = {
-    if (x == y) Right(()) else Left(EqualityFailed)
+    if (x == y) okay else failed(EqualityFailed)
   }
 
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -847,13 +847,13 @@ case object CheckSignature extends Signature with StatelessInstrCompanion0 with 
     val signatures = frame.ctx.signatures
     for {
       rawPublicKey <- frame.popT[Val.ByteVec]()
-      publicKey    <- PublicKey.from(rawPublicKey.a).toRight(InvalidPublicKey)
+      publicKey    <- PublicKey.from(rawPublicKey.a).toRight(Right(InvalidPublicKey))
       signature    <- signatures.pop()
       _ <- {
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
-          Right(())
+          okay
         } else {
-          Left(VerificationFailed)
+          failed(VerificationFailed)
         }
       }
     } yield ()
@@ -863,29 +863,43 @@ case object CheckSignature extends Signature with StatelessInstrCompanion0 with 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance
 
 object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.JavaSerializable",
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"
+    )
+  )
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       amount       <- frame.popT[Val.U256]()
       address      <- frame.popT[Val.Address]()
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
       _ <- balanceState
         .approveALF(address.lockupScript, amount.v)
-        .toRight(NotEnoughBalance)
+        .toRight(Right(NotEnoughBalance))
     } yield ()
   }
 }
 
 object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.JavaSerializable",
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"
+    )
+  )
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       amount       <- frame.popT[Val.U256]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
+      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
       address      <- frame.popT[Val.Address]()
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
       _ <- balanceState
         .approveToken(address.lockupScript, tokenId, amount.v)
-        .toRight(NotEnoughBalance)
+        .toRight(Right(NotEnoughBalance))
     } yield ()
   }
 }
@@ -894,9 +908,11 @@ object AlfRemaining extends AssetInstr with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address      <- frame.popT[Val.Address]()
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
-      amount       <- balanceState.alfRemaining(address.lockupScript).toRight(NoAlfBalanceForTheAddress)
-      _            <- frame.push(Val.U256(amount))
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      amount <- balanceState
+        .alfRemaining(address.lockupScript)
+        .toRight(Right(NoAlfBalanceForTheAddress))
+      _ <- frame.push(Val.U256(amount))
     } yield ()
   }
 }
@@ -906,11 +922,11 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
     for {
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
       address      <- frame.popT[Val.Address]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
       amount <- balanceState
         .tokenRemaining(address.lockupScript, tokenId)
-        .toRight(NoTokenBalanceForTheAddress)
+        .toRight(Right(NoTokenBalanceForTheAddress))
       _ <- frame.push(Val.U256(amount))
     } yield ()
   }
@@ -918,7 +934,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
 
 sealed trait Transfer extends AssetInstr {
   def getContractLockupScript[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
-    frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract).map(LockupScript.p2c)
+    frame.obj.addressOpt.toRight(Right(ExpectAContract)).map(LockupScript.p2c)
   }
 
   def transferAlf[C <: StatefulContext](
@@ -930,11 +946,11 @@ sealed trait Transfer extends AssetInstr {
       amount       <- frame.popT[Val.U256]()
       to           <- toThunk
       from         <- fromThunk
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
-      _            <- balanceState.useAlf(from, amount.v).toRight[ExeFailure](NotEnoughBalance)
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      _            <- balanceState.useAlf(from, amount.v).toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.outputBalances
         .addAlf(to, amount.v)
-        .toRight[ExeFailure](BalanceOverflow)
+        .toRight(Right(BalanceOverflow))
     } yield ()
   }
 
@@ -946,16 +962,16 @@ sealed trait Transfer extends AssetInstr {
     for {
       amount       <- frame.popT[Val.U256]()
       tokenIdRaw   <- frame.popT[Val.ByteVec]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(InvalidTokenId)
+      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
       to           <- toThunk
       from         <- fromThunk
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
       _ <- balanceState
         .useToken(from, tokenId, amount.v)
-        .toRight[ExeFailure](NotEnoughBalance)
+        .toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.outputBalances
         .addToken(to, tokenId, amount.v)
-        .toRight[ExeFailure](BalanceOverflow)
+        .toRight(Right(BalanceOverflow))
     } yield ()
   }
 }
@@ -1028,13 +1044,16 @@ sealed trait ContractInstr
 object CreateContract extends ContractInstr with GasCreate {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      fieldsRaw       <- frame.popT[Val.ByteVec]()
-      fields          <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(SerdeErrorCreateContract)
+      fieldsRaw <- frame.popT[Val.ByteVec]()
+      fields <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(e =>
+        Right(SerdeErrorCreateContract(e))
+      )
       contractCodeRaw <- frame.popT[Val.ByteVec]()
-      contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left
-        .map(SerdeErrorCreateContract)
-      balanceState <- frame.balanceStateOpt.toRight[ExeFailure](NonPayableFrame)
-      balances     <- balanceState.approved.useForNewContract().toRight(InvalidBalances)
+      contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left.map(e =>
+        Right(SerdeErrorCreateContract(e))
+      )
+      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       _            <- frame.ctx.createContract(contractCode, balances, fields)
     } yield ()
   }
@@ -1043,7 +1062,7 @@ object CreateContract extends ContractInstr with GasCreate {
 object SelfAddress extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
       _           <- frame.push(Val.Address(LockupScript.p2c(addressHash)))
     } yield ()
   }
@@ -1052,7 +1071,7 @@ object SelfAddress extends ContractInstr with GasVeryLow {
 object SelfTokenId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
       tokenId = addressHash // tokenId is addressHash
       _ <- frame.push(Val.ByteVec(mutable.ArraySeq.from(tokenId.bytes)))
     } yield ()
@@ -1062,13 +1081,13 @@ object SelfTokenId extends ContractInstr with GasVeryLow {
 object IssueToken extends ContractInstr with GasBalance {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _           <- Either.cond(frame.method.isPayable, (), NonPayableFrame)
-      addressHash <- frame.obj.addressOpt.toRight[ExeFailure](ExpectAContract)
+      _           <- Either.cond(frame.method.isPayable, (), Right(NonPayableFrame))
+      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
       amount      <- frame.popT[Val.U256]()
       tokenId = addressHash // tokenId is addressHash
       _ <- frame.ctx.outputBalances
         .addToken(LockupScript.p2c(addressHash), tokenId, amount.v)
-        .toRight[ExeFailure](BalanceOverflow)
+        .toRight(Right(BalanceOverflow))
     } yield ()
   }
 }

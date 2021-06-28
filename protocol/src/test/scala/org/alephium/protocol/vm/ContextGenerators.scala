@@ -40,7 +40,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       override def nextOutputIndex: Int                          = ???
       override def txId: Hash                                    = Hash.zero
       override def signatures: Stack[protocol.Signature]         = Stack.ofCapacity(0)
-      override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
+      override def getInitialBalances: ExeResult[Frame.Balances] = failed(NonPayableFrame)
       override var gasRemaining: GasBox                          = gasLimit
     }
     obj -> context

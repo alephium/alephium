@@ -17,7 +17,11 @@
 package org.alephium.protocol
 
 package object vm {
-  type ExeResult[T] = Either[ExeFailure, T]
+  type ExeResult[T] = Either[Either[IOFailure, ExeFailure], T]
+
+  val okay: ExeResult[Unit]                       = Right(())
+  def failed[T](error: ExeFailure): ExeResult[T]  = Left(Right(error))
+  def ioFailed[T](error: IOFailure): ExeResult[T] = Left(Left(error))
 
   val opStackMaxSize: Int      = 0x400
   val frameStackMaxSize: Int   = 0x400
