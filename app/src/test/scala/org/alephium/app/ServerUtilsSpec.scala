@@ -359,6 +359,26 @@ class ServerUtilsSpec extends AlephiumSpec {
     buildTransaction.detail is "Zero transaction outputs"
   }
 
+  it should "fail when outputs belong to different groups" in new FlowFixture {
+    val networkType = networkSetting.networkType
+    val serverUtils = new ServerUtils(networkType)
+
+    val chainIndex1           = ChainIndex.unsafe(0, 0)
+    val chainIndex2           = ChainIndex.unsafe(0, 1)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex1.from.value)
+    val destination1          = generateDestination(chainIndex1, networkType)
+    val destination2          = generateDestination(chainIndex2, networkType)
+    val destinations          = AVector(destination1, destination2)
+
+    val buildTransaction = serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, destinations)
+      )
+      .leftValue
+
+    buildTransaction.detail is "Different groups for transaction outputs"
+  }
   private def generateDestination(chainIndex: ChainIndex, networkType: NetworkType)(implicit
       groupConfig: GroupConfig
   ): Destination = {

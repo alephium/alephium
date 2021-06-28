@@ -179,7 +179,7 @@ trait TxUtils { Self: FlowUtils =>
         totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
           acc.add(amount).toRight("Amount overflow")
         }
-        _ <- if (outputInfos.isEmpty) Left("Zero transaction outputs") else Right(())
+        _ <- checkOutputInfos(outputInfos)
         _ <- checkWithMinimalGas(gasOpt, minimalGas)
         selected <- UtxoUtils.select(
           utxos,
@@ -442,5 +442,20 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       Right(())
     }
+  }
+
+  private def checkOutputInfos(
+      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
+  ): Either[String, Unit] = {
+    val groupIndexes = outputInfos.map(_._1.groupIndex)
+    for {
+      _ <- if (groupIndexes.nonEmpty) Right(()) else Left("Zero transaction outputs")
+      _ <-
+        if (groupIndexes.forall(_ == groupIndexes.head)) {
+          Right(())
+        } else {
+          Left("Different groups for transaction outputs")
+        }
+    } yield ()
   }
 }
