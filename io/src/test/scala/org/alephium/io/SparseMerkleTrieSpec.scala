@@ -205,6 +205,9 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
 
     (1 to 1001).foreach { k =>
+      val (key, _) = fixture.generateKV()
+      trie.getOpt(key).map(_.isEmpty) isE true
+      trie.get(key).leftValue is a[IOError.KeyNotFound[_]]
       trie.getAll(ByteString.empty, k).rightValue.length is k
     }
     keys.foreach { key =>
