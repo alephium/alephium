@@ -24,7 +24,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockChain.TxIndex
-import org.alephium.flow.core.BlockFlowState.TxStatus
+import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALF, BlockHash, Generators}
@@ -257,6 +257,30 @@ class BlockFlowSpec extends AlephiumSpec {
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
+  }
+
+  it should "calculate hashes and blocks for update" in new FlowFixture {
+    val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block0)
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block1)
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block2)
+
+    val mainGroup = GroupIndex.unsafe(0)
+    blockFlow.getHashesForUpdates(mainGroup) isE AVector.empty[BlockHash]
+    blockFlow.getBlocksForUpdates(block2) isE AVector(block1, block2)
+    val bestDeps0 = blockFlow.getBestDeps(mainGroup)
+    blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps0) isE AVector.empty[BlockCache]
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block3)
+    val block4 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow, block4)
+    blockFlow.getHashesForUpdates(mainGroup) isE AVector(block3.hash, block4.hash)
+    val bestDeps1 = blockFlow.getBestDeps(mainGroup)
+    blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps1) isE
+      AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
   }
 
   behavior of "Sync"

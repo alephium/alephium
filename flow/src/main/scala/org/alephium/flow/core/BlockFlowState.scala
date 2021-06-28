@@ -18,7 +18,6 @@ package org.alephium.flow.core
 
 import scala.collection.mutable
 
-import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
@@ -247,14 +246,12 @@ trait BlockFlowState extends FlowTipsUtil {
     bestDeps(groupShift) = deps
   }
 
-  protected def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
+  def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.isIntraGroup)
     for {
-      newTips <- getInOutTips(block.header, chainIndex.from, inclusive = false)
-      oldTips <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
-      diff    <- getTipsDiff(newTips, oldTips)
-      blocks  <- (diff :+ block.hash).mapE(hash => getBlockChain(hash).getBlock(hash))
+      diff   <- getHashesForUpdates(chainIndex.from, block.blockDeps)
+      blocks <- (diff :+ block.hash).mapE(hash => getBlockChain(hash).getBlock(hash))
     } yield blocks
   }
 
@@ -273,11 +270,7 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield diff
   }
 
-  def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash] = {
-    Utils.unsafe(getHashesForUpdates(groupIndex, deps))
-  }
-
-  def getBlocksForUpdates(
+  def getBlockCachesForUpdates(
       groupIndex: GroupIndex,
       deps: BlockDeps
   ): IOResult[AVector[BlockCache]] = {

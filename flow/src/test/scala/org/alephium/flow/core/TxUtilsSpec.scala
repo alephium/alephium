@@ -83,7 +83,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val tx         = block.nonCoinbase.head
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val blockCaches = blockFlow
-        .getBlocksForUpdates(chainIndex.from, blockFlow.getBestDeps(chainIndex.from))
+        .getBlockCachesForUpdates(chainIndex.from, blockFlow.getBestDeps(chainIndex.from))
         .rightValue
       blockFlow.getPreOutputInGroupView(
         worldState,
@@ -123,7 +123,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val worldState = blockFlow.getBestPersistedWorldState(fromGroup).rightValue
       val blockCaches = blockFlow
-        .getBlocksForUpdates(fromGroup, blockFlow.getBestDeps(fromGroup))
+        .getBlockCachesForUpdates(fromGroup, blockFlow.getBestDeps(fromGroup))
         .rightValue
       blockFlow.getPreOutputIncludingPools(
         fromGroup,

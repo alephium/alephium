@@ -131,7 +131,7 @@ trait TxUtils { Self: FlowUtils =>
       ) => IOResult[Option[TxOutput]]
   ): IOResult[Option[AVector[TxOutput]]] = {
     for {
-      blockCaches <- getBlocksForUpdates(mainGroup, blockDeps)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
       result <- inputs.foldE(Option(AVector.empty[TxOutput])) {
         case (Some(outputs), input) =>
           getPreOutput(mainGroup, worldState, blockCaches, input).map(
@@ -406,7 +406,7 @@ trait TxUtils { Self: FlowUtils =>
       lockupScript: LockupScript,
       persistedUtxos: AVector[AssetOutputInfo]
   ): IOResult[(AVector[AssetOutputRef], AVector[AssetOutputInfo])] = {
-    getBlocksForUpdates(groupIndex, bestDeps).map { blockCaches =>
+    getBlockCachesForUpdates(groupIndex, bestDeps).map { blockCaches =>
       val usedUtxos = blockCaches.flatMap[AssetOutputRef] { blockCache =>
         AVector.from(
           blockCache.inputs.view
@@ -439,7 +439,7 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[AVector[TransactionTemplate]] = {
     val bestDeps = getBestDeps(groupIndex)
     for {
-      blockCaches <- getBlocksForUpdates(groupIndex, bestDeps)
+      blockCaches <- getBlockCachesForUpdates(groupIndex, bestDeps)
       worldState  <- getPersistedWorldState(bestDeps, groupIndex)
       failedTxs   <- txs.filterNotE(recheckInputs(_, worldState, blockCaches))
     } yield failedTxs
