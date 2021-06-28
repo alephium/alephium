@@ -22,7 +22,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, ChainIndex, NetworkType, TransactionTemplate}
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
   it should "check tx status for intra group txs" in new FlowFixture {
@@ -53,40 +53,30 @@ class ServerUtilsSpec extends AlephiumSpec {
         buildTransaction.txId,
         buildTransaction.unsignedTx,
         chainIndex,
-        fromPrivateKey,
-        blockFlow
+        fromPrivateKey
       )
 
       val senderBalanceWithGas = genesisBalance - destination1.amount - destination2.amount
 
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
-        Balance(destination1.amount, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
-        Balance(destination2.amount, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
+      checkDestinationBalance(destination1)
+      checkDestinationBalance(destination2)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
-        Balance(destination1.amount, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
-        Balance(destination2.amount, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
+      checkDestinationBalance(destination1)
+      checkDestinationBalance(destination2)
 
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 2, 2, 2)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
-        Balance(destination1.amount, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
-        Balance(destination2.amount, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
+      checkDestinationBalance(destination1)
+      checkDestinationBalance(destination2)
     }
   }
 
@@ -101,7 +91,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       to   <- 0 until groups0
       if from != to
     } {
-      val blockFlow                          = isolatedBlockFlow()
+      implicit val blockFlow                 = isolatedBlockFlow()
       val chainIndex                         = ChainIndex.unsafe(from, to)
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
@@ -121,49 +111,38 @@ class ServerUtilsSpec extends AlephiumSpec {
         buildTransaction.txId,
         buildTransaction.unsignedTx,
         chainIndex,
-        fromPrivateKey,
-        blockFlow
+        fromPrivateKey
       )
 
       val senderBalanceWithGas = genesisBalance - destination1.amount - destination2.amount
 
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE Balance(0, 0, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE Balance(0, 0, 0)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
+      checkAddressBalance(destination1.address, U256.unsafe(0), 0)
+      checkAddressBalance(destination2.address, U256.unsafe(0), 0)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
-        Balance(0, 0, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
-        Balance(0, 0, 0)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
+      checkAddressBalance(destination1.address, U256.unsafe(0), 0)
+      checkAddressBalance(destination2.address, U256.unsafe(0), 0)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
-        Balance(destination1.amount, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
-        Balance(destination2.amount, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
+      checkDestinationBalance(destination1)
+      checkDestinationBalance(destination2)
 
       val block2 = emptyBlock(blockFlow, ChainIndex(chainIndex.to, chainIndex.to))
       addAndCheck(blockFlow, block2)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination1.address)) isE
-        Balance(destination1.amount, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(destination2.address)) isE
-        Balance(destination2.amount, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
+      checkDestinationBalance(destination1)
+      checkDestinationBalance(destination2)
     }
   }
 
@@ -195,21 +174,18 @@ class ServerUtilsSpec extends AlephiumSpec {
         buildTransaction.txId,
         buildTransaction.unsignedTx,
         chainIndex,
-        fromPrivateKey,
-        blockFlow
+        fromPrivateKey
       )
 
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - txTemplate.gasFeeUnsafe, 0, 3)
+      checkAddressBalance(fromAddress, genesisBalance - txTemplate.gasFeeUnsafe, 3)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(genesisBalance - block0.transactions.head.gasFeeUnsafe, 0, 3)
+      checkAddressBalance(fromAddress, genesisBalance - block0.transactions.head.gasFeeUnsafe, 3)
 
-      info("Sweep coins from the 3 UTXOs for this public key to another address")
+      info("Sweep coins from the 3 UTXOs of this public key to another address")
       val senderBalanceBeforeSweep = genesisBalance - block0.transactions.head.gasFeeUnsafe
       val sweepAllToAddress        = generateAddress(chainIndex, networkType)
       val buildSweepAllTransaction = serverUtils
@@ -223,19 +199,23 @@ class ServerUtilsSpec extends AlephiumSpec {
         buildSweepAllTransaction.txId,
         buildSweepAllTransaction.unsignedTx,
         chainIndex,
-        fromPrivateKey,
-        blockFlow
+        fromPrivateKey
       )
 
-      serverUtils.getBalance(blockFlow, GetBalance(sweepAllToAddress)) isE
-        Balance(senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe, 0, 1)
+      checkAddressBalance(
+        sweepAllToAddress,
+        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+      )
 
       val block1 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, sweepAllTxTemplate.id, chainIndex) isE
         Confirmed(block1.hash, 0, 1, 1, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(sweepAllToAddress)) isE
-        Balance(senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe, 0, 1)
+      checkAddressBalance(
+        sweepAllToAddress,
+        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+      )
+      checkAddressBalance(fromAddress, U256.unsafe(0), 0)
     }
   }
 
@@ -250,17 +230,17 @@ class ServerUtilsSpec extends AlephiumSpec {
       to   <- 0 until groups0
       if from != to
     } {
-      val blockFlow                          = isolatedBlockFlow()
+      implicit val blockFlow                 = isolatedBlockFlow()
       val chainIndex                         = ChainIndex.unsafe(from, to)
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
       val toGroup                            = chainIndex.to
-      val (toPrivateKey @ _, toPublicKey, _) = genesisKeys(toGroup.value)
+      val (toPrivateKey, toPublicKey, _)     = genesisKeys(toGroup.value)
       val toAddress                          = Address.p2pkh(networkType, toPublicKey)
       val destination                        = Destination(toAddress, ALF.oneAlf)
 
-      info("Sending some coins to a destination, creating 3 UTXOs in total for the same public key")
+      info("Sending some coins to an address, resulting 3 UTXOs for its corresponding public key")
       val destinations = AVector(destination, destination)
       val buildTransaction = serverUtils
         .buildTransaction(
@@ -273,33 +253,27 @@ class ServerUtilsSpec extends AlephiumSpec {
         buildTransaction.txId,
         buildTransaction.unsignedTx,
         chainIndex,
-        fromPrivateKey,
-        blockFlow
+        fromPrivateKey
       )
 
       val senderBalanceWithGas   = genesisBalance - ALF.alf(2)
       val receiverInitialBalance = genesisBalance
 
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - txTemplate.gasFeeUnsafe, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE
-        Balance(receiverInitialBalance, 0, 1)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
+      checkAddressBalance(toAddress, receiverInitialBalance)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 0)
-      serverUtils.getBalance(blockFlow, GetBalance(fromAddress)) isE
-        Balance(senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe, 0, 1)
-      serverUtils.getBalance(blockFlow, GetBalance(toAddress)) isE
-        Balance(receiverInitialBalance + ALF.alf(2), 0, 3)
+      checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
+      checkAddressBalance(toAddress, receiverInitialBalance + ALF.alf(2), 3)
 
       info("Sweep coins from the 3 UTXOs for the same public key to another address")
       val senderBalanceBeforeSweep = receiverInitialBalance + ALF.alf(2)
@@ -316,17 +290,21 @@ class ServerUtilsSpec extends AlephiumSpec {
         buildSweepAllTransaction.txId,
         buildSweepAllTransaction.unsignedTx,
         sweepAllChainIndex,
-        fromPrivateKey,
-        blockFlow
+        toPrivateKey
       )
 
-      serverUtils.getBalance(blockFlow, GetBalance(sweepAllToAddress)) isE
-        Balance(senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe, 0, 1)
+      checkAddressBalance(
+        sweepAllToAddress,
+        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+      )
 
       val block2 = mineFromMemPool(blockFlow, sweepAllChainIndex)
       addAndCheck(blockFlow, block2)
-      serverUtils.getBalance(blockFlow, GetBalance(sweepAllToAddress)) isE
-        Balance(senderBalanceBeforeSweep - block2.transactions.head.gasFeeUnsafe, 0, 1)
+      checkAddressBalance(
+        sweepAllToAddress,
+        senderBalanceBeforeSweep - block2.transactions.head.gasFeeUnsafe
+      )
+      checkAddressBalance(toAddress, 0, 0)
     }
   }
 
@@ -349,10 +327,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       txId: Hash,
       unsignedTx: String,
       chainIndex: ChainIndex,
-      fromPrivateKey: PrivateKey,
-      blockFlow: BlockFlow
+      fromPrivateKey: PrivateKey
   )(implicit
-      serverUtils: ServerUtils
+      serverUtils: ServerUtils,
+      blockFlow: BlockFlow
   ): TransactionTemplate = {
     val signature = SignatureSchema.sign(txId.bytes, fromPrivateKey)
     val txTemplate =
@@ -366,5 +344,23 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled
 
     txTemplate
+  }
+
+  private def checkAddressBalance(address: Address, amount: U256, utxoNum: Int = 1)(implicit
+      serverUtils: ServerUtils,
+      blockFlow: BlockFlow
+  ) = {
+    serverUtils.getBalance(blockFlow, GetBalance(address)) isE Balance(
+      amount,
+      U256.unsafe(0),
+      utxoNum
+    )
+  }
+
+  private def checkDestinationBalance(destination: Destination, utxoNum: Int = 1)(implicit
+      serverUtils: ServerUtils,
+      blockFlow: BlockFlow
+  ) = {
+    checkAddressBalance(destination.address, destination.amount, utxoNum)
   }
 }

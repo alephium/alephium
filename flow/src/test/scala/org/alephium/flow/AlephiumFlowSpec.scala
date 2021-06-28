@@ -39,7 +39,7 @@ trait FlowFixture
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NumericHelpers {
-  lazy val blockFlow: BlockFlow = genesisBlockFlow()
+  implicit lazy val blockFlow: BlockFlow = genesisBlockFlow()
 
   lazy val keyManager: mutable.Map[LockupScript, PrivateKey] = mutable.Map.empty
 
