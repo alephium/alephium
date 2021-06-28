@@ -21,7 +21,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ChainIndex, NetworkType, TransactionTemplate}
+import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
@@ -306,6 +306,39 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       checkAddressBalance(toAddress, 0, 0)
     }
+  }
+
+  "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixture {
+    val networkType = networkSetting.networkType
+    val serverUtils = new ServerUtils(networkType)
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val destination1          = generateDestination(chainIndex, networkType)
+    val destination2          = generateDestination(chainIndex, networkType)
+    val destinations          = AVector(destination1, destination2)
+
+    val unsignedTx = serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        destinations,
+        gasOpt = None,
+        defaultGasPrice
+      )
+      .rightValue
+
+    val buildTransaction = serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, destinations)
+      )
+      .rightValue
+
+    val decodedUnsignedTx =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    decodedUnsignedTx is unsignedTx
   }
 
   private def generateDestination(chainIndex: ChainIndex, networkType: NetworkType)(implicit
