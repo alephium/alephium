@@ -170,8 +170,8 @@ trait TestFixtureLike
   ): TxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, toAddress, amount)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
-    val sendTx     = sendTransaction(unsignedTx, privateKey)
-    val res        = request[TxResult](sendTx, restPort)
+    val submitTx   = submitTransaction(unsignedTx, privateKey)
+    val res        = request[TxResult](submitTx, restPort)
     res
   }
 
@@ -384,8 +384,19 @@ trait TestFixtureLike
     httpGet(s"/blockflow/chains?fromGroup=$fromGroup&toGroup=$toGroup")
 
   def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
-    httpGet(
-      s"/transactions/build?fromKey=$fromPubKey&toAddress=$toAddress&value=$amount"
+    httpPost(
+      "/transactions/build",
+      Some(s"""
+        |{
+        |  "fromPublicKey": "$fromPubKey",
+        |  "destinations": [
+        |    {
+        |      "address": "$toAddress",
+        |      "amount": "$amount"
+        |    }
+        |  ]
+        |}
+        """.stripMargin)
     )
 
   def restoreWallet(password: String, mnemonic: String) =
@@ -397,16 +408,16 @@ trait TestFixtureLike
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
-      Some(s"""{"address":"${address}","amount":"${amount}"}""")
+      Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}"}]}""")
     )
   }
-  def sendTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
+  def submitTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,
       PrivateKey.unsafe(Hex.unsafe(privateKey))
     )
     httpPost(
-      "/transactions/send",
+      "/transactions/submit",
       Some(
         s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signature":"${signature.toHexString}"}"""
       )
@@ -431,8 +442,8 @@ trait TestFixtureLike
     httpPost(s"/contracts/build", Some(query))
   }
 
-  def sendContract(contract: String) = {
-    httpPost(s"/contracts/send", Some(contract))
+  def submitContract(contract: String) = {
+    httpPost(s"/contracts/submit", Some(contract))
   }
 
   val startMining = httpPost("/miners?action=start-mining")

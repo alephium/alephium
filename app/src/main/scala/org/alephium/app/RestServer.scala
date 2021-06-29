@@ -199,26 +199,43 @@ class RestServer(
       Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
   }
 
-  private val buildTransactionRoute = toRoute(buildTransaction) {
-    case (fromKey, toAddress, value, lockTime, gas, gasPrice) =>
+  private val buildTransactionRoute = toRoute(buildTransaction) { case buildTransaction =>
+    withSyncedClique {
+      Future.successful(
+        serverUtils.buildTransaction(
+          blockFlow,
+          buildTransaction
+        )
+      )
+    }
+  }
+
+  private val buildSweepAllTransactionRoute = toRoute(buildSweepAllTransaction) {
+    case buildSweepAllTransaction =>
       withSyncedClique {
         Future.successful(
-          serverUtils.buildTransaction(
+          serverUtils.buildSweepAllTransaction(
             blockFlow,
-            BuildTransaction(fromKey, toAddress, value, lockTime, gas, gasPrice)
+            buildSweepAllTransaction
           )
         )
       }
   }
 
-  private val sendTransactionRoute = toRoute(sendTransaction) { transaction =>
+  private val submitTransactionRoute = toRoute(submitTransaction) { transaction =>
     withSyncedClique {
-      serverUtils.sendTransaction(txHandler, transaction)
+      serverUtils.submitTransaction(txHandler, transaction)
     }
   }
 
   private val getTransactionStatusRoute = toRoute(getTransactionStatus) { case (txId, chainIndex) =>
     Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, chainIndex))
+  }
+
+  private val decodeUnsignedTransactionRoute = toRoute(decodeUnsignedTransaction) { tx =>
+    Future.successful(
+      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(Tx.from(_, networkType))
+    )
   }
 
   private val minerActionRoute = toRoute(minerAction) { action =>
@@ -253,9 +270,9 @@ class RestServer(
     }
   }
 
-  private val sendContractRoute = toRoute(sendContract) { query =>
+  private val submitContractRoute = toRoute(submitContract) { query =>
     withSyncedClique {
-      serverUtils.sendContract(txHandler, query)
+      serverUtils.submitContract(txHandler, query)
     }
   }
 
@@ -318,12 +335,14 @@ class RestServer(
     getChainInfoRoute,
     listUnconfirmedTransactionsRoute,
     buildTransactionRoute,
-    sendTransactionRoute,
+    buildSweepAllTransactionRoute,
+    submitTransactionRoute,
     getTransactionStatusRoute,
+    decodeUnsignedTransactionRoute,
     minerActionRoute,
     minerListAddressesRoute,
     minerUpdateAddressesRoute,
-    sendContractRoute,
+    submitContractRoute,
     compileRoute,
     exportBlocksRoute,
     buildContractRoute,

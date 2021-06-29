@@ -56,7 +56,7 @@ class SmartContractTest extends AlephiumSpec {
       val buildResult = request[BuildContractResult](
         buildContract(s"""
         {
-          "fromKey": "$publicKey",
+          "fromPublicKey": "$publicKey",
           "code": "${compileResult.code}"
         }"""),
         restPort
@@ -65,7 +65,7 @@ class SmartContractTest extends AlephiumSpec {
       val signature: Signature =
         SignatureSchema.sign(buildResult.hash.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
       val tx = request[TxResult](
-        sendContract(s"""
+        submitContract(s"""
           {
             "tx": "${buildResult.unsignedTx}",
             "code": "${compileResult.code}",

@@ -30,6 +30,7 @@ import akka.util.ByteString
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
+import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
@@ -70,8 +71,13 @@ trait WalletService extends Service {
   ): Either[WalletError, AVector[AVector[(GroupIndex, Address)]]]
   def transfer(
       wallet: String,
+      destinations: AVector[Destination],
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
+  ): Future[Either[WalletError, (Hash, Int, Int)]]
+  def sweepAll(
+      wallet: String,
       address: Address,
-      amount: U256,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
@@ -310,8 +316,29 @@ object WalletService {
 
     override def transfer(
         wallet: String,
+        destinations: AVector[Destination],
+        gas: Option[GasBox],
+        gasPrice: Option[GasPrice]
+    ): Future[Either[WalletError, (Hash, Int, Int)]] = {
+      withPrivateKeyFut(wallet) { privateKey =>
+        val pubKey = privateKey.publicKey
+        blockFlowClient
+          .prepareTransaction(pubKey.toHexString, destinations, gas, gasPrice)
+          .flatMap {
+            case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
+            case Right(buildTxResult) =>
+              val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
+              blockFlowClient
+                .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
+                .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
+                .map(_.left.map(BlockFlowClientError))
+          }
+      }
+    }
+
+    override def sweepAll(
+        wallet: String,
         address: Address,
-        amount: U256,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]
@@ -319,7 +346,7 @@ object WalletService {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareTransaction(pubKey.toHexString, address, amount, lockTime, gas, gasPrice)
+          .prepareSweepAllTransaction(pubKey.toHexString, address, lockTime, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>

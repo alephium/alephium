@@ -866,8 +866,127 @@
                 "$ref": "#/components/schemas/Transfer"
               },
               "example": {
-                "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                "amount": "1000000"
+                "destinations": [
+                  {
+                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "amount": "1000000"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result2"
+                },
+                "example": {
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "fromGroup": 2,
+                  "toGroup": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{wallet_name}/sweep-all": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Transfer all ALF to an address",
+        "operationId": "postWalletsWallet_nameSweep-all",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SweepAll"
+              },
+              "example": {
+                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
               }
             }
           },
@@ -1172,14 +1291,14 @@
         }
       }
     },
-    "/wallets/{wallet_name}/deriveNextAddress": {
+    "/wallets/{wallet_name}/derive-next-address": {
       "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Derive your next address",
         "description": "Cannot be called from a miner wallet",
-        "operationId": "postWalletsWallet_nameDerivenextaddress",
+        "operationId": "postWalletsWallet_nameDerive-next-address",
         "parameters": [
           {
             "name": "wallet_name",
@@ -1273,14 +1392,14 @@
         }
       }
     },
-    "/wallets/{wallet_name}/deriveNextMinerAddresses": {
+    "/wallets/{wallet_name}/derive-next-miner-addresses": {
       "post": {
         "tags": [
           "Miners"
         ],
         "summary": "Derive your next miner addresses for each group",
         "description": "Your wallet need to have been created with the miner flag set to true",
-        "operationId": "postWalletsWallet_nameDerivenextmineraddresses",
+        "operationId": "postWalletsWallet_nameDerive-next-miner-addresses",
         "parameters": [
           {
             "name": "wallet_name",
@@ -1380,13 +1499,13 @@
         }
       }
     },
-    "/wallets/{wallet_name}/changeActiveAddress": {
+    "/wallets/{wallet_name}/change-active-address": {
       "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Choose the active address",
-        "operationId": "postWalletsWallet_nameChangeactiveaddress",
+        "operationId": "postWalletsWallet_nameChange-active-address",
         "parameters": [
           {
             "name": "wallet_name",
@@ -2137,6 +2256,16 @@
                             {
                               "amount": "1000000000000000000",
                               "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                              "tokens": [
+                                {
+                                  "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                  "amount": "42"
+                                },
+                                {
+                                  "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                  "amount": "1000"
+                                }
+                              ],
                               "lockTime": 1611041396892
                             }
                           ]
@@ -2268,6 +2397,16 @@
                         {
                           "amount": "1000000000000000000",
                           "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000"
+                            }
+                          ],
                           "lockTime": 1611041396892
                         }
                       ]
@@ -2828,6 +2967,16 @@
                       {
                         "amount": "1000000000000000000",
                         "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000"
+                          }
+                        ],
                         "lockTime": 1611041396892
                       }
                     ]
@@ -2906,64 +3055,34 @@
       }
     },
     "/transactions/build": {
-      "get": {
+      "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Build an unsigned transaction",
-        "operationId": "getTransactionsBuild",
-        "parameters": [
-          {
-            "name": "fromKey",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
+        "summary": "Build an unsigned transaction to a number of recipients",
+        "operationId": "postTransactionsBuild",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildTransaction"
+              },
+              "example": {
+                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "destinations": [
+                  {
+                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "amount": "2",
+                    "lockTime": 1611041396892
+                  }
+                ],
+                "gas": 1,
+                "gasPrice": "1"
+              }
             }
           },
-          {
-            "name": "toAddress",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lockTime",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": "0"
-            }
-          },
-          {
-            "name": "gas",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "gasPrice",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "",
@@ -3050,18 +3169,128 @@
         }
       }
     },
-    "/transactions/send": {
+    "/transactions/sweep-all/build": {
       "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Send a signed transaction",
-        "operationId": "postTransactionsSend",
+        "summary": "Build an unsigned transaction to send all unlocked balanced to an address",
+        "operationId": "postTransactionsSweep-allBuild",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendTransaction"
+                "$ref": "#/components/schemas/BuildSweepAllTransaction"
+              },
+              "example": {
+                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                "lockTime": 1611041396892,
+                "gas": 1,
+                "gasPrice": "1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTransactionResult"
+                },
+                "example": {
+                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "fromGroup": 2,
+                  "toGroup": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/submit": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Submit a signed transaction",
+        "operationId": "postTransactionsSubmit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitTransaction"
               },
               "example": {
                 "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
@@ -3083,6 +3312,135 @@
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "fromGroup": 2,
                   "toGroup": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/decode": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Decode an unsigned transaction",
+        "operationId": "postTransactionsDecode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecodeTransaction"
+              },
+              "example": {
+                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tx"
+                },
+                "example": {
+                  "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "inputs": [
+                    {
+                      "outputRef": {
+                        "scriptHint": 23412,
+                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                      },
+                      "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "amount": "1000000000000000000",
+                      "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "tokens": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000"
+                        }
+                      ],
+                      "lockTime": 1611041396892
+                    }
+                  ]
                 }
               }
             }
@@ -3293,18 +3651,18 @@
         }
       }
     },
-    "/contracts/send": {
+    "/contracts/submit": {
       "post": {
         "tags": [
           "Contracts"
         ],
-        "summary": "Send a signed smart contract",
-        "operationId": "postContractsSend",
+        "summary": "Submit a signed smart contract",
+        "operationId": "postContractsSubmit",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendContract"
+                "$ref": "#/components/schemas/SubmitContract"
               },
               "example": {
                 "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
@@ -3521,7 +3879,7 @@
                 "$ref": "#/components/schemas/BuildContract"
               },
               "example": {
-                "fromKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                 "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
               }
             }
@@ -4112,6 +4470,23 @@
         }
       },
       "Transfer": {
+        "type": "object",
+        "properties": {
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "Destination": {
         "required": [
           "address",
           "amount"
@@ -4127,12 +4502,6 @@
           },
           "lockTime": {
             "type": "integer"
-          },
-          "gas": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },
@@ -4164,6 +4533,26 @@
           },
           "toGroup": {
             "type": "integer"
+          }
+        }
+      },
+      "SweepAll": {
+        "required": [
+          "toAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "toAddress": {
+            "type": "string"
+          },
+          "lockTime": {
+            "type": "integer"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },
@@ -4556,8 +4945,30 @@
           "address": {
             "type": "string"
           },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
           "lockTime": {
             "type": "integer"
+          }
+        }
+      },
+      "Token": {
+        "required": [
+          "id",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
           }
         }
       },
@@ -4615,6 +5026,29 @@
           }
         }
       },
+      "BuildTransaction": {
+        "required": [
+          "fromPublicKey"
+        ],
+        "type": "object",
+        "properties": {
+          "fromPublicKey": {
+            "type": "string"
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
       "BuildTransactionResult": {
         "required": [
           "unsignedTx",
@@ -4638,7 +5072,31 @@
           }
         }
       },
-      "SendTransaction": {
+      "BuildSweepAllTransaction": {
+        "required": [
+          "fromPublicKey",
+          "toAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "fromPublicKey": {
+            "type": "string"
+          },
+          "toAddress": {
+            "type": "string"
+          },
+          "lockTime": {
+            "type": "integer"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "SubmitTransaction": {
         "required": [
           "unsignedTx",
           "signature"
@@ -4669,6 +5127,17 @@
           },
           "toGroup": {
             "type": "integer"
+          }
+        }
+      },
+      "DecodeTransaction": {
+        "required": [
+          "unsignedTx"
+        ],
+        "type": "object",
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
           }
         }
       },
@@ -4718,7 +5187,7 @@
       "NotFound1": {
         "type": "object"
       },
-      "SendContract": {
+      "SubmitContract": {
         "required": [
           "code",
           "tx",
@@ -4776,12 +5245,12 @@
       },
       "BuildContract": {
         "required": [
-          "fromKey",
+          "fromPublicKey",
           "code"
         ],
         "type": "object",
         "properties": {
-          "fromKey": {
+          "fromPublicKey": {
             "type": "string"
           },
           "code": {

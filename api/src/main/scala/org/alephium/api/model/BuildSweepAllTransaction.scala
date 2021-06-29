@@ -16,6 +16,16 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.TimeStamp
 
-final case class SendContract(code: String, tx: String, signature: Signature, fromGroup: Int)
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildSweepAllTransaction(
+    fromPublicKey: PublicKey,
+    toAddress: Address,
+    lockTime: Option[TimeStamp] = None,
+    gas: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None
+)

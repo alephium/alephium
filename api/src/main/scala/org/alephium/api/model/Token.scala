@@ -17,32 +17,6 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.U256
 
-final case class Tx(
-    id: Hash,
-    inputs: AVector[Input],
-    outputs: AVector[Output]
-)
-
-object Tx {
-  def from(tx: Transaction, networkType: NetworkType): Tx =
-    Tx(
-      tx.id,
-      tx.unsigned.inputs.map(Input.from) ++
-        tx.contractInputs.map(Input.from),
-      tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
-        tx.generatedOutputs.map(Output.from(_, networkType))
-    )
-
-  def from(unsignedTx: UnsignedTransaction, networkType: NetworkType): Tx =
-    Tx(
-      unsignedTx.hash,
-      unsignedTx.inputs.map(Input.from),
-      unsignedTx.fixedOutputs.map(Output.from(_, networkType))
-    )
-
-  def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx =
-    from(tx.unsigned, networkType)
-}
+final case class Token(id: Hash, amount: U256)

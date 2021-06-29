@@ -80,13 +80,11 @@ class ServerUtils(networkType: NetworkType) {
       groupConfig: GroupConfig
   ): Try[BuildTransactionResult] = {
     val resultEither = for {
-      _ <- checkGroup(blockFlow, query.fromKey)
+      _ <- checkGroup(blockFlow, query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromKey,
-        query.toAddress.lockupScript,
-        query.lockTime,
-        query.value,
+        query.fromPublicKey,
+        query.destinations,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
@@ -99,7 +97,29 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def sendTransaction(txHandler: ActorRefT[TxHandler.Command], query: SendTransaction)(implicit
+  def buildSweepAllTransaction(blockFlow: BlockFlow, query: BuildSweepAllTransaction)(implicit
+      groupConfig: GroupConfig
+  ): Try[BuildTransactionResult] = {
+    val resultEither = for {
+      _ <- checkGroup(blockFlow, query.fromPublicKey)
+      unsignedTx <- prepareUnsignedTransaction(
+        blockFlow,
+        query.fromPublicKey,
+        query.toAddress,
+        query.lockTime,
+        query.gas,
+        query.gasPrice.getOrElse(defaultGasPrice)
+      )
+    } yield {
+      BuildTransactionResult.from(unsignedTx)
+    }
+    resultEither match {
+      case Right(result) => Right(result)
+      case Left(error)   => Left(error)
+    }
+  }
+
+  def submitTransaction(txHandler: ActorRefT[TxHandler.Command], query: SubmitTransaction)(implicit
       config: GroupConfig,
       askTimeout: Timeout,
       executionContext: ExecutionContext
@@ -110,13 +130,8 @@ class ServerUtils(networkType: NetworkType) {
     }
   }
 
-  def createTxTemplate(query: SendTransaction): Try[TransactionTemplate] = {
-    for {
-      txByteString <- Hex.from(query.unsignedTx).toRight(badRequest(s"Invalid hex"))
-      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-    } yield {
+  def createTxTemplate(query: SubmitTransaction): Try[TransactionTemplate] = {
+    decodeUnsignedTransaction(query.unsignedTx).map { unsignedTx =>
       TransactionTemplate(
         unsignedTx,
         AVector.fill(unsignedTx.inputs.length)(query.signature),
@@ -151,6 +166,15 @@ class ServerUtils(networkType: NetworkType) {
     blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
       case Some(status) => convert(status)
       case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
+    }
+  }
+
+  def decodeUnsignedTransaction(
+      unsignedTx: String
+  ): Try[UnsignedTransaction] = {
+    Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex")).flatMap { txByteString =>
+      deserialize[UnsignedTransaction](txByteString).left
+        .map(serdeError => badRequest(serdeError.getMessage))
     }
   }
 
@@ -207,14 +231,31 @@ class ServerUtils(networkType: NetworkType) {
 
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
-      fromKey: PublicKey,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      value: U256,
+      fromPublicKey: PublicKey,
+      destinations: AVector[Destination],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    blockFlow.transfer(fromKey, toLockupScript, lockTimeOpt, value, gasOpt, gasPrice) match {
+    val outputInfos = destinations.map { destination =>
+      (destination.address.lockupScript, destination.amount, destination.lockTime)
+    }
+
+    blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice) match {
+      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Left(error))                => Left(failed(error))
+      case Left(error)                       => failed(error)
+    }
+  }
+
+  def prepareUnsignedTransaction(
+      blockFlow: BlockFlow,
+      fromPublicKey: PublicKey,
+      toAddress: Address,
+      lockTimeOpt: Option[TimeStamp],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Try[UnsignedTransaction] = {
+    blockFlow.sweepAll(fromPublicKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
@@ -365,14 +406,14 @@ class ServerUtils(networkType: NetworkType) {
       utx <- unignedTxFromScript(
         blockFlow,
         script,
-        LockupScript.p2pkh(query.fromKey),
-        query.fromKey
+        LockupScript.p2pkh(query.fromPublicKey),
+        query.fromPublicKey
       ).left.map(error => badRequest(error.toString))
     } yield utx).map(BuildContractResult.from))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def sendContract(txHandler: ActorRefT[TxHandler.Command], query: SendContract)(implicit
+  def submitContract(txHandler: ActorRefT[TxHandler.Command], query: SubmitContract)(implicit
       groupConfig: GroupConfig,
       askTimeout: Timeout,
       executionContext: ExecutionContext

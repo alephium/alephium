@@ -25,7 +25,7 @@ import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -68,11 +68,15 @@ trait EndpointsExamples extends ErrorExamples {
   private val ts        = TimeStamp.unsafe(1611041396892L)
   private val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+  private val tokens = AVector(
+    Token(Hash.hash("token1"), U256.unsafe(42)),
+    Token(Hash.hash("token2"), U256.unsafe(1000))
+  )
 
   private val tx = Tx(
     txId,
     AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
-    AVector(Output(amount = balance, address, Some(ts)))
+    AVector(Output(amount = balance, address, tokens, Some(ts)))
   )
 
   private val blockEntry = BlockEntry(
@@ -156,6 +160,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
+
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(AVector(blockEntry)))
 
@@ -180,11 +186,35 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
 
+  implicit val buildTransactionExamples: List[Example[BuildTransaction]] =
+    simpleExample(
+      BuildTransaction(
+        publicKey,
+        AVector(Destination(address, U256.Two, Some(ts))),
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(U256.One))
+      )
+    )
+
+  implicit val buildSweepAllTransactionExamples: List[Example[BuildSweepAllTransaction]] =
+    simpleExample(
+      BuildSweepAllTransaction(
+        publicKey,
+        address,
+        Some(ts),
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(U256.One))
+      )
+    )
+
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
     simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
 
-  implicit val sendTransactionExamples: List[Example[SendTransaction]] =
-    simpleExample(SendTransaction(unsignedTx = hexString, signature))
+  implicit val submitTransactionExamples: List[Example[SubmitTransaction]] =
+    simpleExample(SubmitTransaction(unsignedTx = hexString, signature))
+
+  implicit val decodeTransactionExamples: List[Example[DecodeTransaction]] =
+    simpleExample(DecodeTransaction(unsignedTx = hexString))
 
   implicit val txResultExamples: List[Example[TxResult]] =
     simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))
@@ -218,8 +248,8 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractResult(unsignedTx = hexString, hash = hash, fromGroup = 2, toGroup = 1)
     )
 
-  implicit val sendContractExamples: List[Example[SendContract]] =
-    simpleExample(SendContract(code = hexString, tx = hexString, signature, fromGroup = 2))
+  implicit val submitContractExamples: List[Example[SubmitContract]] =
+    simpleExample(SubmitContract(code = hexString, tx = hexString, signature, fromGroup = 2))
 
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))

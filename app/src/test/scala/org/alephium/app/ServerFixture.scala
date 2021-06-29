@@ -68,7 +68,9 @@ trait ServerFixture
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(0)
   ).sample.get
+  lazy val dummyKeyHex                     = dummyKey.toHexString
   lazy val (dummyToAddress, dummyToKey, _) = addressStringGen(GroupIndex.unsafe(1)).sample.get
+  lazy val dummyToLockupScript             = LockupScript.p2pkh(dummyToKey)
 
   lazy val dummyHashesAtHeight = HashesAtHeight(AVector.empty)
   lazy val dummyChainInfo      = ChainInfo(0)
@@ -76,26 +78,45 @@ trait ServerFixture
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
     .get
+  def dummySweepAllTx(
+      tx: Transaction,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp]
+  ): Transaction = {
+    val output = TxOutput.asset(U256.Ten, toLockupScript, lockTimeOpt)
+    tx.copy(
+      unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
+    )
+  }
+  def dummyTransferTx(
+      tx: Transaction,
+      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
+  ): Transaction = {
+    val newOutputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
+      TxOutput.asset(amount, toLockupScript, lockTimeOpt)
+    }
+    tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
+  }
   lazy val dummySignature =
     SignatureSchema.sign(
       dummyTx.unsigned.hash.bytes,
-      PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey))
+      PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey.toHexString))
     )
   lazy val dummyTransferResult = TxResult(
     dummyTx.id,
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
-  lazy val dummyBuildTransactionResult = BuildTransactionResult(
-    Hex.toHexString(serialize(dummyTx.unsigned)),
-    dummyTx.unsigned.hash,
-    dummyTx.unsigned.fromGroup.value,
-    dummyTx.unsigned.toGroup.value
+  def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult(
+    Hex.toHexString(serialize(tx.unsigned)),
+    tx.unsigned.hash,
+    tx.unsigned.fromGroup.value,
+    tx.unsigned.toGroup.value
   )
   lazy val dummyTxStatus: TxStatus = Confirmed(BlockHash.zero, 0, 1, 2, 3)
 }
 
-object ServerFixture {
+object ServerFixture extends ServerFixture {
   def show[T: Writer](t: T): String = {
     write(t)
   }
@@ -191,20 +212,23 @@ object ServerFixture {
       Right((U256.Zero, U256.Zero, 0))
 
     override def transfer(
-        fromKey: PublicKey,
-        toLockupScript: LockupScript,
-        lockTimeOpt: Option[TimeStamp],
-        amount: U256,
+        fromPublicKey: PublicKey,
+        outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice
-    ): IOResult[Either[String, UnsignedTransaction]] =
-      lockTimeOpt match {
-        case None => Right(Right(dummyTx.unsigned))
-        case Some(lockTime) =>
-          val outputs    = dummyTx.unsigned.fixedOutputs
-          val newOutputs = outputs.map(_.copy(lockTime = lockTime))
-          Right(Right(dummyTx.unsigned.copy(fixedOutputs = newOutputs)))
-      }
+    ): IOResult[Either[String, UnsignedTransaction]] = {
+      Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
+    }
+
+    override def sweepAll(
+        fromPublicKey: PublicKey,
+        toLockupScript: LockupScript,
+        lockTimeOpt: Option[TimeStamp],
+        gasOpt: Option[GasBox],
+        gasPrice: GasPrice
+    ): IOResult[Either[String, UnsignedTransaction]] = {
+      Right(Right(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned))
+    }
 
     override def getTxStatus(
         txId: Hash,

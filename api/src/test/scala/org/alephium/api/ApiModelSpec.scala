@@ -55,7 +55,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
   def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
-    write(data) is jsonRaw
+    write(data) is jsonRaw.filterNot(_.isWhitespace)
     read[T](jsonRaw) is data
   }
 
@@ -162,16 +162,41 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val addressStr = address.toBase58
     val amount     = U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion))
     val amountStr  = "15000000000000000000"
+    val tokenId1   = Hash.hash("token1")
+    val tokenId2   = Hash.hash("token2")
+    val tokens     = AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
 
     {
-      val request = Output(amount, address, None)
-      val jsonRaw = s"""{"amount":"$amountStr","address":"$addressStr"}"""
+      val request = Output(amount, address, tokens, None)
+      val jsonRaw = s"""
+        |{
+        |  "amount": "$amountStr",
+        |  "address": "$addressStr",
+        |  "tokens": [
+        |    {
+        |      "id": "${tokenId1.toHexString}",
+        |      "amount": "42"
+        |    },
+        |    {
+        |      "id": "${tokenId2.toHexString}",
+        |      "amount": "1000"
+        |    }
+        |  ]
+        |}
+        """.stripMargin
       checkData(request, jsonRaw)
     }
 
     {
-      val request = Output(amount, address, Some(TimeStamp.unsafe(1234)))
-      val jsonRaw = s"""{"amount":"$amountStr","address":"$addressStr","lockTime":1234}"""
+      val request = Output(amount, address, AVector.empty, Some(TimeStamp.unsafe(1234)))
+      val jsonRaw = s"""
+        |{
+        |  "amount": "$amountStr",
+        |  "address": "$addressStr",
+        |  "tokens": [],
+        |  "lockTime": 1234
+        |}
+        """.stripMargin
       checkData(request, jsonRaw)
     }
   }
@@ -204,28 +229,47 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BuildTransaction" in {
-    val fromKey   = PublicKey.generate
-    val toKey     = PublicKey.generate
-    val toAddress = Address.p2pkh(networkType, toKey)
+    val fromPublicKey = PublicKey.generate
+    val toKey         = PublicKey.generate
+    val toAddress     = Address.p2pkh(networkType, toKey)
 
     {
-      val transfer = BuildTransaction(fromKey, toAddress, 1)
-      val jsonRaw =
-        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1"}"""
+      val transfer = BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1)))
+      val jsonRaw  = s"""
+        |{
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "amount": "1"
+        |    }
+        |  ]
+        |}
+        """.stripMargin
       checkData(transfer, jsonRaw)
     }
 
     {
       val transfer = BuildTransaction(
-        fromKey,
-        toAddress,
-        1,
-        Some(TimeStamp.unsafe(1234)),
+        fromPublicKey,
+        AVector(Destination(toAddress, 1, Some(TimeStamp.unsafe(1234)))),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )
-      val jsonRaw =
-        s"""{"fromKey":"${fromKey.toHexString}","toAddress":"${toAddress.toBase58}","value":"1","lockTime":1234,"gas":1,"gasPrice":"1"}"""
+      val jsonRaw = s"""
+        |{
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "amount": "1",
+        |      "lockTime": 1234
+        |    }
+        |  ],
+        |  "gas": 1,
+        |  "gasPrice": "1"
+        |}
+        """.stripMargin
       checkData(transfer, jsonRaw)
     }
   }
@@ -237,9 +281,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(result, jsonRaw)
   }
 
-  it should "encode/decode SendTransaction" in {
+  it should "encode/decode SubmitTransaction" in {
     val signature = Signature.generate
-    val transfer  = SendTransaction("tx", signature)
+    val transfer  = SubmitTransaction("tx", signature)
     val jsonRaw =
       s"""{"unsignedTx":"tx","signature":"${signature.toHexString}"}"""
     checkData(transfer, jsonRaw)

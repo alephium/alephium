@@ -113,6 +113,8 @@ trait ApiModelCodec {
 
   implicit val outputRefRW: RW[OutputRef] = macroRW
 
+  implicit val tokenRW: RW[Token] = macroRW
+
   implicit val outputRW: RW[Output] = macroRW
 
   //macro failed on Input for unknwown reason
@@ -152,13 +154,19 @@ trait ApiModelCodec {
 
   implicit val balanceRW: RW[Balance] = macroRW
 
+  implicit val destinationRW: RW[Destination] = macroRW
+
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
+
+  implicit val buildSweepAllTransactionRW: RW[BuildSweepAllTransaction] = macroRW
 
   implicit val groupRW: RW[Group] = macroRW
 
   implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
 
-  implicit val sendTransactionRW: RW[SendTransaction] = macroRW
+  implicit val submitTransactionRW: RW[SubmitTransaction] = macroRW
+
+  implicit val decodeTransactionRW: RW[DecodeTransaction] = macroRW
 
   implicit val txStatusRW: RW[TxStatus] =
     RW.merge(macroRW[Confirmed], macroRW[MemPooled.type], macroRW[NotFound.type])
@@ -167,7 +175,7 @@ trait ApiModelCodec {
 
   implicit val buildContractResultRW: RW[BuildContractResult] = macroRW
 
-  implicit val sendContractRW: RW[SendContract] = macroRW
+  implicit val submitContractRW: RW[SubmitContract] = macroRW
 
   implicit val compileRW: RW[Compile] = macroRW
 

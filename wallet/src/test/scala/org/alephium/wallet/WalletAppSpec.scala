@@ -73,9 +73,10 @@ class WalletAppSpec
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
       .map(name => s""","walletName":"$name"""")
       .getOrElse("")}}"""
-  val unlockJson                                = s"""{"password":"$password"}"""
-  val deleteJson                                = s"""{"password":"$password"}"""
-  def transferJson(amount: Int)                 = s"""{"address":"$transferAddress","amount":"$amount"}"""
+  val unlockJson = s"""{"password":"$password"}"""
+  val deleteJson = s"""{"password":"$password"}"""
+  def transferJson(amount: Int) =
+    s"""{"destinations":[{"address":"$transferAddress","amount":"$amount"}]}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""
@@ -89,9 +90,9 @@ class WalletAppSpec
   def getBalance()                = Get(s"/wallets/$wallet/balances")
   def getAddresses()              = Get(s"/wallets/$wallet/addresses")
   def transfer(amount: Int)       = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def deriveNextAddress()         = Post(s"/wallets/$wallet/deriveNextAddress")
+  def deriveNextAddress()         = Post(s"/wallets/$wallet/derive-next-address")
   def changeActiveAddress(address: Address) =
-    Post(s"/wallets/$wallet/changeActiveAddress", changeActiveAddressJson(address))
+    Post(s"/wallets/$wallet/change-active-address", changeActiveAddressJson(address))
   def listWallets() = Get("/wallets")
   def getWallet()   = Get(s"/wallets/$wallet")
 
@@ -284,10 +285,11 @@ object WalletAppSpec extends {
       )
     }
 
-    router.route().path("/transactions/build").handler { ctx =>
-      val _          = ctx.request.getParam("fromKey")
-      val _          = ctx.request.getParam("toAddress")
-      val amount     = read[Int](ctx.request.getParam("value"))
+    router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
+      val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
+      val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
+        acc.addUnsafe(destination.amount)
+      }
       val unsignedTx = transactionGen().sample.get.unsigned
 
       if (amount > 100) {
@@ -309,8 +311,8 @@ object WalletAppSpec extends {
       }
     }
 
-    router.route().path("/transactions/send").handler(BodyHandler.create()).handler { ctx =>
-      val _ = read[SendTransaction](ctx.getBodyAsString())
+    router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
+      val _ = read[SubmitTransaction](ctx.getBodyAsString())
       complete(ctx, TxResult(Hash.generate, 0, 0))
     }
 

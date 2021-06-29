@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import org.alephium.protocol.PublicKey
 
-final case class BuildContract(fromKey: PublicKey, code: String)
+final case class BuildContract(fromPublicKey: PublicKey, code: String)

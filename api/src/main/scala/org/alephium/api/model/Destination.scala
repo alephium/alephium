@@ -14,20 +14,14 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api.model
+package org.alephium.api.model
 
-import org.alephium.api.model.Destination
-import org.alephium.protocol.Hash
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.protocol.model.Address
+import org.alephium.util.{TimeStamp, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Transfer(
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+final case class Destination(
+    address: Address,
+    amount: U256,
+    lockTime: Option[TimeStamp] = None
 )
-
-object Transfer {
-  final case class Result(txId: Hash, fromGroup: Int, toGroup: Int)
-}

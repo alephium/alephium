@@ -118,7 +118,7 @@ object UnsignedTransaction {
         outputs = outputs :+ TxOutput.asset(remainder, fromLockupScript)
       }
       UnsignedTransaction(
-        None,
+        scriptOpt = None,
         gas,
         gasPrice,
         inputs.map { case (ref, _) =>
@@ -127,25 +127,5 @@ object UnsignedTransaction {
         outputs
       )
     }
-  }
-
-  def transferAlf(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
-      fromLockupScript: LockupScript,
-      fromUnlockScript: UnlockScript,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      amount: U256,
-      gas: GasBox,
-      gasPrice: GasPrice
-  ): Either[String, UnsignedTransaction] = {
-    transferAlf(
-      inputs,
-      fromLockupScript,
-      fromUnlockScript,
-      AVector((toLockupScript, amount, lockTimeOpt)),
-      gas,
-      gasPrice
-    )
   }
 }

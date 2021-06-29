@@ -16,6 +16,4 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Signature
-
-final case class SendTransaction(unsignedTx: String, signature: Signature)
+final case class DecodeTransaction(unsignedTx: String)

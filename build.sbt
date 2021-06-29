@@ -386,3 +386,18 @@ val wartsTestExcludes = wartsCompileExcludes ++ Seq(
   Wart.TraversableOps,
   Wart.OptionPartial
 )
+
+addCommandAlias(
+  "format",
+  "scalafmtSbt;scalafmt;test:scalafmt;scalastyle;test:scalastyle;it:scalafmt;it:scalastyle;doc"
+)
+
+addCommandAlias(
+  "unitTest",
+  "scalafmtSbtCheck;scalafmtCheck;test:scalafmtCheck;scalastyle;test:scalastyle;coverage;test;coverageReport;doc"
+)
+
+addCommandAlias(
+  "integrationTest",
+  "it:scalafmtCheck;it:scalastyle;it:test"
+)

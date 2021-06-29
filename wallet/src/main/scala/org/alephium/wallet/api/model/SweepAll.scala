@@ -16,18 +16,14 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.api.model.Destination
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Transfer(
-    destinations: AVector[Destination],
+final case class SweepAll(
+    toAddress: Address,
+    lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 )
-
-object Transfer {
-  final case class Result(txId: Hash, fromGroup: Int, toGroup: Int)
-}

@@ -18,6 +18,7 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import org.alephium.protocol.model.{defaultGasPerInput, defaultGasPerOutput, minimalGas}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
 
@@ -180,5 +181,12 @@ object UtxoUtils {
   ): GasBox = {
     val gas = GasBox.unsafe(gasPerInput.value * numInputs + gasPerOutput.value * numOutputs)
     Math.max(gas, minimalGas)
+  }
+
+  def estimateGas(
+      numInputs: Int,
+      numOutputs: Int
+  ): GasBox = {
+    estimateGas(defaultGasPerInput, defaultGasPerOutput, numInputs, numOutputs, minimalGas)
   }
 }

@@ -34,6 +34,7 @@ trait WalletDocumentation extends WalletEndpoints {
     deleteWallet,
     getBalances,
     transfer,
+    sweepAll,
     getAddresses,
     getMinerAddresses,
     deriveNextAddress,
