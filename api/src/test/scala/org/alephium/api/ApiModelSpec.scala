@@ -55,7 +55,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
 
   def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
-    writeJs(data) is read[ujson.Value](jsonRaw)
+    write(data) is jsonRaw.filterNot(_.isWhitespace)
     read[T](jsonRaw) is data
   }
 

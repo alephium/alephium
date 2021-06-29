@@ -17,12 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{
-  NetworkType,
-  Transaction,
-  TransactionTemplate,
-  UnsignedTransaction
-}
+import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 final case class Tx(

@@ -25,7 +25,11 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
-  it should "check tx status for intra group txs" in new FlowFixture {
+  trait Fixture extends FlowFixture {
+    implicit def flowImplicit: BlockFlow = blockFlow
+  }
+
+  it should "check tx status for intra group txs" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     val networkType          = networkSetting.networkType
@@ -146,7 +150,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check sweep all tx status for intra group txs" in new FlowFixture {
+  it should "check sweep all tx status for intra group txs" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     val networkType          = networkSetting.networkType
@@ -379,6 +383,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     buildTransaction.detail is "Different groups for transaction outputs"
   }
+
   private def generateDestination(chainIndex: ChainIndex, networkType: NetworkType)(implicit
       groupConfig: GroupConfig
   ): Destination = {

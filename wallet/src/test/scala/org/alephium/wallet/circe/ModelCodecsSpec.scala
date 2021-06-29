@@ -42,7 +42,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val bool                 = true
 
   def check[T: ReadWriter](input: T, rawJson: String): Assertion = {
-    writeJs(input) is read[ujson.Value](rawJson)
+    write(input) is rawJson
     read[T](rawJson) is input
   }
 
@@ -90,16 +90,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Transfer" in {
-    val json     = s"""
-        |{
-        |  "destinations": [
-        |    {
-        |      "address": "$address",
-        |      "amount": "$balance"
-        |    }
-        |  ]
-        |}
-        """.stripMargin
+    val json     = s"""{"destinations":[{"address":"$address","amount":"$balance"}]}"""
     val transfer = Transfer(AVector(Destination(address, balance)))
     check(transfer, json)
   }
