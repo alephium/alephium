@@ -80,32 +80,15 @@ class TxUtilsSpec extends AlephiumSpec {
       val block = transfer(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
 
-      val tx         = block.nonCoinbase.head
-      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
-      val blockCaches = blockFlow
-        .getBlockCachesForUpdates(chainIndex.from, blockFlow.getBestDeps(chainIndex.from))
-        .rightValue
-      blockFlow.getPreOutputInGroupView(
-        worldState,
-        blockCaches,
-        tx.unsigned.inputs.head.outputRef
-      ) isE None
+      val tx        = block.nonCoinbase.head
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
       tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
-          blockFlow
-            .getPreOutputInGroupView(
-              worldState,
-              blockCaches,
-              outputRef
-            ) isE Some(output)
+          groupView.getPreOutput(outputRef) isE Some(output)
         } else {
-          blockFlow
-            .getPreOutputInGroupView(
-              worldState,
-              blockCaches,
-              outputRef
-            ) isE None
+          groupView.getPreOutput(outputRef) isE None
         }
       }
     }
@@ -121,34 +104,23 @@ class TxUtilsSpec extends AlephiumSpec {
       val tx    = block.nonCoinbase.head
       blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx.toTemplate)
 
-      val worldState = blockFlow.getBestPersistedWorldState(fromGroup).rightValue
-      val blockCaches = blockFlow
-        .getBlockCachesForUpdates(fromGroup, blockFlow.getBestDeps(fromGroup))
-        .rightValue
-      blockFlow.getPreOutputIncludingPools(
-        fromGroup,
-        worldState,
-        blockCaches,
-        tx.unsigned.inputs.head.outputRef
-      ) isE None
-      tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
-        val output = tx.unsigned.fixedOutputs(index)
-        if (output.toGroup equals chainIndex.from) {
-          blockFlow
-            .getPreOutputIncludingPools(
-              fromGroup,
-              worldState,
-              blockCaches,
-              outputRef
-            ) isE Some(output)
-        } else {
-          blockFlow
-            .getPreOutputIncludingPools(
-              fromGroup,
-              worldState,
-              blockCaches,
-              outputRef
-            ) isE None
+      {
+        val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
+        tx.assetOutputRefs.foreach { outputRef =>
+          groupView.getPreOutput(outputRef) isE None
+        }
+      }
+
+      {
+        val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
+        groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+        tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+          val output = tx.unsigned.fixedOutputs(index)
+          if (output.toGroup equals chainIndex.from) {
+            groupView.getPreOutput(outputRef) isE Some(output)
+          } else {
+            groupView.getPreOutput(outputRef) isE None
+          }
         }
       }
     }
