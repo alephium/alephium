@@ -158,8 +158,7 @@ object StatefulContext {
       }
 
     private def getPreOutputs(): ExeResult[AVector[TxOutput]] = preOutputsOpt match {
-      case Some(outputs) =>
-        Right(outputs.filter(_.isInstanceOf[AssetOutput]))
+      case Some(outputs) => Right(outputs)
       case None =>
         initWorldState.getPreOutputsForVM(tx) match {
           case Right(Some(outputs)) => Right(outputs)

@@ -466,7 +466,7 @@ object BlockFlowState {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
         // we set gasRemaining = initial gas as the tx is already validated
-        StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
+        StatefulVM.runTxScript(worldState, tx, None, script, tx.unsigned.startGas) match {
           case Right(_)          => Right(())
           case Left(Left(error)) => Left(error.error)
           case Left(Right(error)) =>

@@ -266,7 +266,13 @@ trait FlowUtils
           case Some(outputs) => Right(outputs)
         }
     } yield {
-      StatefulVM.runTxScript(groupView.worldState, tx, script, tx.unsigned.startGas) match {
+      StatefulVM.runTxScript(
+        groupView.worldState,
+        tx,
+        preOutputs,
+        script,
+        tx.unsigned.startGas
+      ) match {
         case Left(_)       => FlowUtils.convertFailedScriptTx(preOutputs, tx)
         case Right(result) => FlowUtils.convertSuccessfulTx(tx, result)
       }

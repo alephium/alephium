@@ -96,7 +96,7 @@ class VMSpec extends AlephiumSpec {
       txTemplate.copy(unsigned = txTemplate.unsigned.copy(startGas = 1000000))
     }
     val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).toOption.get
-    StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
+    StatefulVM.runTxScript(worldState, tx, None, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
       failed(StackOverflow)
   }
 

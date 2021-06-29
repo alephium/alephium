@@ -584,7 +584,10 @@ object TxValidation {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
-            fromExeResult(StatefulVM.runTxScript(worldState, tx, preOutputs, script, gasRemaining))
+            val preAssetOutputs = preOutputs.take(tx.unsigned.inputs.length)
+            fromExeResult(
+              StatefulVM.runTxScript(worldState, tx, preAssetOutputs, script, gasRemaining)
+            )
               .flatMap { case StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs) =>
                 if (contractInputs != tx.contractInputs) {
                   invalidTx(InvalidContractInputs)

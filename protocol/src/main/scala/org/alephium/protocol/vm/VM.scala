@@ -265,15 +265,6 @@ object StatefulVM {
   def runTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
-      script: StatefulScript,
-      gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
-    runTxScript(worldState, tx, None, script, gasRemaining)
-  }
-
-  def runTxScript(
-      worldState: WorldState.Cached,
-      tx: TransactionAbstract,
       preOutputs: AVector[TxOutput],
       script: StatefulScript,
       gasRemaining: GasBox
@@ -281,7 +272,7 @@ object StatefulVM {
     runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
   }
 
-  private def runTxScript(
+  def runTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
       preOutputsOpt: Option[AVector[TxOutput]],

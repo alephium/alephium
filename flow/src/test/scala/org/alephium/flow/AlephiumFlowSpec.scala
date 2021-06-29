@@ -60,18 +60,6 @@ trait FlowFixture
     LockupScript.p2pkh(publicKey)
   }
 
-  def tryToTransfer(
-      blockFlow: BlockFlow,
-      chainIndex: ChainIndex,
-      amount: U256 = ALF.alf(1)
-  ): Block = {
-    if (blockFlow.brokerConfig.contains(chainIndex.from)) {
-      transfer(blockFlow, chainIndex, amount)
-    } else {
-      emptyBlock(blockFlow, chainIndex)
-    }
-  }
-
   def transferOnlyForIntraGroup(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -357,19 +345,10 @@ trait FlowFixture
       tx: TransactionTemplate,
       txScript: StatefulScript
   ): (AVector[ContractOutputRef], AVector[TxOutput]) = {
-    val bestDeps   = blockFlow.getBestDeps(mainGroup)
-    val worldState = blockFlow.getCachedWorldState(bestDeps, mainGroup).rightValue
-    val preOutputs = blockFlow
-      .getPreOutputsInGroupView(
-        mainGroup,
-        bestDeps,
-        worldState,
-        tx.unsigned.inputs.map(_.outputRef)
-      )
-      .rightValue
-      .get
+    val groupView  = blockFlow.getMutableGroupView(mainGroup).rightValue
+    val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
-      .runTxScript(worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
+      .runTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
       .rightValue
     result.contractInputs -> result.generatedOutputs
   }
