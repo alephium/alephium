@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
-import org.alephium.flow.core.{BlockFlow, FlowUtils}
+import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
@@ -33,19 +33,18 @@ trait TxValidation {
 
   private def validateTxTemplate(
       tx: TransactionTemplate,
+      chainIndex: ChainIndex,
       flow: BlockFlow,
-      getPreOutputs: (GroupIndex, AVector[TxOutputRef]) => IOResult[Option[AVector[TxOutput]]]
+      groupView: BlockFlowGroupView[WorldState.Cached]
   ): TxValidationResult[Unit] = {
     for {
-      chainIndex <- getChainIndex(tx)
       preOutputs <- fromGetPreOutputs(
-        getPreOutputs(chainIndex.from, tx.unsigned.inputs.map(_.outputRef))
+        groupView.getPreOutputs(tx.unsigned.inputs)
       )
       fullTx <- buildFullTx(tx, flow, preOutputs)
-      chainIndex = fullTx.chainIndex
-      _ <- checkStateless(chainIndex, fullTx, checkDoubleSpending = true)
+      _      <- checkStateless(chainIndex, fullTx, checkDoubleSpending = true)
       preContractOutputs <- fromGetPreOutputs(
-        getPreOutputs(chainIndex.from, fullTx.contractInputs.as[TxOutputRef])
+        groupView.getPreContractOutputs(fullTx.contractInputs)
       )
       _ <- checkStatefulExceptTxScript(
         fullTx,
@@ -78,14 +77,22 @@ trait TxValidation {
       tx: TransactionTemplate,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
-    validateTxTemplate(tx, flow, flow.getPreOutputsInGroupView)
+    for {
+      chainIndex <- getChainIndex(tx)
+      groupView  <- from(flow.getMutableGroupView(chainIndex.from))
+      _          <- validateTxTemplate(tx, chainIndex, flow, groupView)
+    } yield ()
   }
 
   def validateGrandPoolTxTemplate(
       tx: TransactionTemplate,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
-    validateTxTemplate(tx, flow, flow.getPreOutputsIncludingPools)
+    for {
+      chainIndex <- getChainIndex(tx)
+      groupView  <- from(flow.getMutableGroupViewIncludePool(chainIndex.from))
+      _          <- validateTxTemplate(tx, chainIndex, flow, groupView)
+    } yield ()
   }
 
   def validateTx(
@@ -95,13 +102,12 @@ trait TxValidation {
     for {
       chainIndex <- getChainIndex(tx)
       bestDeps = flow.getBestDeps(chainIndex.from)
-      worldState <- from(flow.getCachedWorldState(bestDeps, chainIndex.from))
+      groupView <- from(flow.getMutableGroupView(chainIndex.from, bestDeps))
       _ <- validateTx(
         tx,
         chainIndex,
         TimeStamp.now(),
-        flow.getPreOutputsInGroupView(chainIndex.from, bestDeps, worldState, _),
-        worldState,
+        groupView,
         None,
         checkDoubleSpending = true
       )
@@ -112,15 +118,21 @@ trait TxValidation {
       tx: Transaction,
       chainIndex: ChainIndex,
       timestamp: TimeStamp,
-      getPreOutputs: AVector[TxOutputRef] => IOResult[Option[AVector[TxOutput]]],
-      worldState: WorldState.Cached,
+      groupView: BlockFlowGroupView[WorldState.Cached],
       coinbaseNetReward: Option[U256],
       checkDoubleSpending: Boolean // for block txs, this has been checked in block validation
   ): TxValidationResult[Unit] = {
     for {
       _          <- checkStateless(chainIndex, tx, checkDoubleSpending)
-      preOutputs <- fromGetPreOutputs(getPreOutputs(tx.allInputRefs))
-      _          <- checkStateful(chainIndex, tx, timestamp, worldState, preOutputs, coinbaseNetReward)
+      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx))
+      _ <- checkStateful(
+        chainIndex,
+        tx,
+        timestamp,
+        groupView.worldState,
+        preOutputs,
+        coinbaseNetReward
+      )
     } yield ()
   }
 
@@ -138,8 +150,7 @@ trait TxValidation {
       chainIndex: ChainIndex,
       tx: Transaction,
       header: BlockHeader,
-      worldState: WorldState.Cached,
-      flow: BlockFlow,
+      groupView: BlockFlowGroupView[WorldState.Cached],
       coinbaseNetReward: Option[U256]
   ): TxValidationResult[Unit] = {
     for {
@@ -147,8 +158,7 @@ trait TxValidation {
         tx,
         chainIndex,
         header.timestamp,
-        flow.getPreOutputsInGroupView(chainIndex.from, header.blockDeps, worldState, _),
-        worldState,
+        groupView,
         coinbaseNetReward,
         checkDoubleSpending =
           false // checkDoubleSpending = true as it has been checked in block validation

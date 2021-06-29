@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import scala.collection.mutable
 
 import org.alephium.flow.core.BlockChain.TxIndex
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{BlockHash, Hash}
@@ -238,6 +239,48 @@ trait BlockFlowState extends FlowTipsUtil {
     assume(brokerConfig.contains(groupIndex))
     val deps = getBestDeps(groupIndex)
     getCachedWorldState(deps, groupIndex)
+  }
+
+  def getMutableGroupView(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupView(mainGroup, getBestDeps(mainGroup))
+  }
+
+  def getMemPool(mainGroup: GroupIndex): MemPool
+
+  def getMutableGroupViewIncludePool(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    val blockDeps = getBestDeps(mainGroup)
+    for {
+      worldState  <- getCachedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
+  }
+
+  def getMutableGroupView(block: Block): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupView(block.chainIndex.from, block.blockDeps)
+  }
+
+  def getMutableGroupView(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    for {
+      worldState  <- getCachedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+  }
+
+  def getMutableGroupView(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps,
+      worldState: WorldState.Cached
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getBlockCachesForUpdates(mainGroup, blockDeps).map { blockCaches =>
+      BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+    }
   }
 
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {

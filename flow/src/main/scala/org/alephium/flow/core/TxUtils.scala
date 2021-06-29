@@ -71,20 +71,6 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getPreOutputsIncludingPools(
-      mainGroup: GroupIndex,
-      inputs: AVector[TxOutputRef]
-  ): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(mainGroup, inputs, getPreOutputIncludingPools)
-  }
-
-  def getPreOutputsInGroupView(
-      mainGroup: GroupIndex,
-      inputs: AVector[TxOutputRef]
-  ): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(mainGroup, inputs, (_, b, c, d) => getPreOutputInGroupView(b, c, d))
-  }
-
   def getPreOutputsInGroupView(
       mainGroup: GroupIndex,
       blockDeps: BlockDeps,
@@ -99,23 +85,6 @@ trait TxUtils { Self: FlowUtils =>
       (_: GroupIndex, b: WorldState.Cached, c: AVector[BlockCache], d: TxOutputRef) =>
         getPreOutputInGroupView(b, c, d)
     )
-  }
-
-  private def getPreOutputs(
-      mainGroup: GroupIndex,
-      inputs: AVector[TxOutputRef],
-      getPreOutput: (
-          GroupIndex,
-          WorldState.Persisted,
-          AVector[BlockCache],
-          TxOutputRef
-      ) => IOResult[Option[TxOutput]]
-  ): IOResult[Option[AVector[TxOutput]]] = {
-    val bestDeps = getBestDeps(mainGroup)
-    for {
-      worldState <- getPersistedWorldState(bestDeps, mainGroup)
-      result     <- getPreOutputs(inputs, mainGroup, bestDeps, worldState, getPreOutput)
-    } yield result
   }
 
   private def getPreOutputs[WS <: WorldState[_]](

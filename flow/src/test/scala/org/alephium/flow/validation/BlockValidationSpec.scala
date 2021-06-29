@@ -20,6 +20,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -44,7 +45,12 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     result.left.value isE error
   }
 
-  class Fixture extends BlockValidation.Impl()
+  class Fixture extends BlockValidation.Impl() {
+    def checkCoinbase(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+      val groupView = flow.getMutableGroupView(block).rightValue
+      checkCoinbase(block, groupView)
+    }
+  }
 
   it should "validate group for block" in new Fixture {
     forAll(blockGenOf(brokerConfig)) { block => passCheck(checkGroup(block)) }
