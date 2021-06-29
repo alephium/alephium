@@ -447,15 +447,16 @@ trait TxUtils { Self: FlowUtils =>
   private def checkOutputInfos(
       outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
   ): Either[String, Unit] = {
-    val groupIndexes = outputInfos.map(_._1.groupIndex)
-    for {
-      _ <- if (groupIndexes.nonEmpty) Right(()) else Left("Zero transaction outputs")
-      _ <-
-        if (groupIndexes.forall(_ == groupIndexes.head)) {
-          Right(())
-        } else {
-          Left("Different groups for transaction outputs")
-        }
-    } yield ()
+    if (outputInfos.isEmpty) {
+      Left("Zero transaction outputs")
+    } else {
+      val groupIndexes = outputInfos.map(_._1.groupIndex)
+
+      if (groupIndexes.forall(_ == groupIndexes.head)) {
+        Right(())
+      } else {
+        Left("Different groups for transaction outputs")
+      }
+    }
   }
 }

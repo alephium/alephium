@@ -128,48 +128,4 @@ object UnsignedTransaction {
       )
     }
   }
-
-  def transferAlf(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
-      fromLockupScript: LockupScript,
-      fromUnlockScript: UnlockScript,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      amount: U256,
-      gas: GasBox,
-      gasPrice: GasPrice
-  ): Either[String, UnsignedTransaction] = {
-    transferAlf(
-      inputs,
-      fromLockupScript,
-      fromUnlockScript,
-      AVector((toLockupScript, amount, lockTimeOpt)),
-      gas,
-      gasPrice
-    )
-  }
-
-  def transferAlf(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
-      fromLockupScript: LockupScript,
-      fromUnlockScript: UnlockScript,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp],
-      gas: GasBox,
-      gasPrice: GasPrice
-  ): Either[String, UnsignedTransaction] = {
-    val gasFee = gasPrice * gas
-    for {
-      inputSum  <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight s"Input amount overflow")
-      outputSum <- inputSum.sub(gasFee).toRight(s"Not enough balance")
-      result <- transferAlf(
-        inputs,
-        fromLockupScript,
-        fromUnlockScript,
-        AVector((toLockupScript, outputSum, lockTimeOpt)),
-        gas,
-        gasPrice
-      )
-    } yield result
-  }
 }
