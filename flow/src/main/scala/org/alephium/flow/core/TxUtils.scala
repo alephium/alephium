@@ -28,48 +28,6 @@ import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript, W
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TxUtils { Self: FlowUtils =>
-  def getPersistedUtxos(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript,
-      maxUtxosToRead: Int
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    for {
-      bestWorldState <- getPersistedWorldState(bestDeps, groupIndex)
-      persistedUtxos <- bestWorldState
-        .getAssetOutputs(
-          lockupScript.assetHintBytes,
-          maxUtxosToRead,
-          (_, output) => output.lockupScript == lockupScript
-        )
-        .map(
-          _.map(p => AssetOutputInfo(p._1, p._2, PersistedOutput))
-        )
-    } yield persistedUtxos
-  }
-
-  def mergeUtxos(
-      persistedUtxos: AVector[AssetOutputInfo],
-      usedInCache: AVector[AssetOutputRef],
-      newInCache: AVector[AssetOutputInfo]
-  ): AVector[AssetOutputInfo] = {
-    persistedUtxos.filter(p => !usedInCache.contains(p.ref)) ++ newInCache
-  }
-
-  def getRelevantUtxos(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript,
-      maxUtxosToRead: Int
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    for {
-      persistedUtxos <- getPersistedUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToRead)
-      cachedResult   <- getUtxosInCache(groupIndex, bestDeps, lockupScript, persistedUtxos)
-    } yield {
-      val utxosInBlock = mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
-      grandPool.getRelevantUtxos(groupIndex, lockupScript, utxosInBlock)
-    }
-  }
 
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
   // In this way, we can guarantee that no concurrent utxos operations are making trouble
@@ -95,29 +53,25 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
-    val bestDeps = getBestDeps(groupIndex)
-    getUsableUtxosOnce(groupIndex, bestDeps, lockupScript)
-  }
-
-  def getUsableUtxosOnce(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript
-  ): IOResult[AVector[AssetOutputInfo]] = {
-    val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript, maxUtxosToReadForTransfer).map(
-      _.filter(_.output.lockTime <= currentTs)
-    )
+    for {
+      groupView <- getImmutableGroupViewIncludePool(groupIndex)
+      outputs   <- groupView.getRelevantUtxos(lockupScript, maxUtxosToReadForTransfer)
+    } yield {
+      val currentTs = TimeStamp.now()
+      outputs.filter(_.output.lockTime <= currentTs)
+    }
   }
 
   // return the total balance, the locked balance, and the number of all utxos
   def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
-    val bestDeps = getBestDeps(groupIndex)
 
     val currentTs = TimeStamp.now()
-    getRelevantUtxos(groupIndex, bestDeps, lockupScript, Int.MaxValue).map { utxos =>
+    for {
+      groupView <- getImmutableGroupViewIncludePool(groupIndex)
+      utxos     <- groupView.getRelevantUtxos(lockupScript, Int.MaxValue)
+    } yield {
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
         if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
@@ -291,38 +245,6 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getUtxosInCache(
-      groupIndex: GroupIndex,
-      bestDeps: BlockDeps,
-      lockupScript: LockupScript,
-      persistedUtxos: AVector[AssetOutputInfo]
-  ): IOResult[(AVector[AssetOutputRef], AVector[AssetOutputInfo])] = {
-    getBlockCachesForUpdates(groupIndex, bestDeps).map { blockCaches =>
-      val usedUtxos = blockCaches.flatMap[AssetOutputRef] { blockCache =>
-        AVector.from(
-          blockCache.inputs.view
-            .filter(input => persistedUtxos.exists(_.ref == input))
-            .map(_.asInstanceOf[AssetOutputRef])
-        )
-      }
-      val newUtxos = blockCaches.flatMap { blockCache =>
-        AVector
-          .from(
-            blockCache.relatedOutputs.view
-              .filter(p => ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset)
-              .map(p =>
-                AssetOutputInfo(
-                  p._1.asInstanceOf[AssetOutputRef],
-                  p._2.asInstanceOf[AssetOutput],
-                  UnpersistedBlockOutput
-                )
-              )
-          )
-      }
-      (usedUtxos, newUtxos)
-    }
-  }
-
   // return all the txs that are not valid
   def recheckInputs(
       groupIndex: GroupIndex,
@@ -360,15 +282,6 @@ trait TxUtils { Self: FlowUtils =>
         if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
     }
   }
-
-  private def ableToUse(
-      output: TxOutput,
-      lockupScript: LockupScript
-  ): Boolean =
-    output match {
-      case o: AssetOutput    => o.lockupScript == lockupScript
-      case _: ContractOutput => false
-    }
 
   private def checkWithMaxTxInputNum(assets: AVector[Asset]): Either[String, Unit] = {
     if (assets.length > ALF.MaxTxInputNum) {

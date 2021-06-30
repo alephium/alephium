@@ -17,10 +17,11 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.core.BlockFlowState.BlockCache
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
 import org.alephium.flow.mempool.MemPool
 import org.alephium.io.IOResult
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.WorldState
+import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.AVector
 
 trait BlockFlowGroupView[WS <: WorldState[_]] {
@@ -54,6 +55,11 @@ trait BlockFlowGroupView[WS <: WorldState[_]] {
       case (None, _)              => Right(None)
     }
   }
+
+  def getRelevantUtxos(
+      lockupScript: LockupScript,
+      maxUtxosToRead: Int
+  ): IOResult[AVector[AssetOutputInfo]]
 }
 
 object BlockFlowGroupView {
@@ -94,6 +100,80 @@ object BlockFlowGroupView {
         }
       }
     }
+
+    private def getPersistedUtxos(
+        lockupScript: LockupScript,
+        maxUtxosToRead: Int
+    ): IOResult[AVector[AssetOutputInfo]] = {
+      for {
+        persistedUtxos <- worldState
+          .getAssetOutputs(
+            lockupScript.assetHintBytes,
+            maxUtxosToRead,
+            (_, output) => output.lockupScript == lockupScript
+          )
+          .map(
+            _.map(p => AssetOutputInfo(p._1, p._2, PersistedOutput))
+          )
+      } yield persistedUtxos
+    }
+
+    private def getUtxosInCache(
+        lockupScript: LockupScript,
+        persistedUtxos: AVector[AssetOutputInfo]
+    ): (AVector[AssetOutputRef], AVector[AssetOutputInfo]) = {
+      val persistedUtxosIndx = Set.from[TxOutputRef](persistedUtxos.toIterable.map(_.ref))
+      val usedUtxos = blockCaches.flatMap[AssetOutputRef] { blockCache =>
+        AVector.from(
+          blockCache.inputs.view
+            .filter(input => persistedUtxosIndx.contains(input))
+            .map(_.asInstanceOf[AssetOutputRef])
+        )
+      }
+      val outputsInCaches = blockCaches.flatMap { blockCache =>
+        AVector
+          .from(
+            blockCache.relatedOutputs.view
+              .filter(p => ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset)
+              .map(p =>
+                AssetOutputInfo(
+                  p._1.asInstanceOf[AssetOutputRef],
+                  p._2.asInstanceOf[AssetOutput],
+                  UnpersistedBlockOutput
+                )
+              )
+          )
+      }
+      val newUtxos = outputsInCaches.filter(info => !TxUtils.isSpent(blockCaches, info.ref))
+      (usedUtxos, newUtxos)
+    }
+
+    private def ableToUse(
+        output: TxOutput,
+        lockupScript: LockupScript
+    ): Boolean =
+      output match {
+        case o: AssetOutput    => o.lockupScript == lockupScript
+        case _: ContractOutput => false
+      }
+
+    private def mergeUtxos(
+        persistedUtxos: AVector[AssetOutputInfo],
+        usedInCache: AVector[AssetOutputRef],
+        newInCache: AVector[AssetOutputInfo]
+    ): AVector[AssetOutputInfo] = {
+      persistedUtxos.filter(p => !usedInCache.contains(p.ref)) ++ newInCache
+    }
+
+    def getRelevantUtxos(
+        lockupScript: LockupScript,
+        maxUtxosToRead: Int
+    ): IOResult[AVector[AssetOutputInfo]] = {
+      getPersistedUtxos(lockupScript, maxUtxosToRead).map { persistedUtxos =>
+        val cachedResult = getUtxosInCache(lockupScript, persistedUtxos)
+        mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
+      }
+    }
   }
 
   private class Impl1[WS <: WorldState[_]](
@@ -109,6 +189,15 @@ object BlockFlowGroupView {
           case Some(output) => Right(Some(output))
           case None         => super.getPreOutput(outputRef)
         }
+      }
+    }
+
+    override def getRelevantUtxos(
+        lockupScript: LockupScript,
+        maxUtxosToRead: Int
+    ): IOResult[AVector[AssetOutputInfo]] = {
+      super.getRelevantUtxos(lockupScript, maxUtxosToRead).map { utxosInBlocks =>
+        mempool.getRelevantUtxos(lockupScript, utxosInBlocks)
       }
     }
   }

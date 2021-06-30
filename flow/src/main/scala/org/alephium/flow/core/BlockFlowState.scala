@@ -241,6 +241,16 @@ trait BlockFlowState extends FlowTipsUtil {
     getCachedWorldState(deps, groupIndex)
   }
 
+  def getImmutableGroupView(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    val blockDeps = getBestDeps(mainGroup)
+    for {
+      worldState  <- getPersistedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+  }
+
   def getMutableGroupView(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
@@ -248,6 +258,16 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getMemPool(mainGroup: GroupIndex): MemPool
+
+  def getImmutableGroupViewIncludePool(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    val blockDeps = getBestDeps(mainGroup)
+    for {
+      worldState  <- getPersistedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
+  }
 
   def getMutableGroupViewIncludePool(
       mainGroup: GroupIndex

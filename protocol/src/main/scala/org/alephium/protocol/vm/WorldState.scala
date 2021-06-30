@@ -80,6 +80,12 @@ trait WorldState[T] {
   def containsAllInputs(tx: TransactionTemplate): IOResult[Boolean] = {
     tx.unsigned.inputs.forallE(input => existOutput(input.outputRef))
   }
+
+  def getAssetOutputs(
+      outputRefPrefix: ByteString,
+      maxOutputs: Int,
+      predicate: (TxOutputRef, TxOutput) => Boolean
+  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]]
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit] {
@@ -375,6 +381,13 @@ object WorldState {
         _     <- contractState.remove(contractKey)
       } yield ()
     }
+
+    // Not supported, use persisted worldstate instead
+    def getAssetOutputs(
+        outputRefPrefix: ByteString,
+        maxOutputs: Int,
+        predicate: (TxOutputRef, TxOutput) => Boolean
+    ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
   }
 
   final case class Cached(

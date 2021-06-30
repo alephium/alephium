@@ -530,9 +530,10 @@ class BlockFlowSpec extends AlephiumSpec {
       tx
     }
 
-    val tx0 = transfer()
-    val tx1 = transfer()
-    val tx2 = transfer()
+    val tx0         = transfer()
+    val tx1         = transfer()
+    val tx2         = transfer()
+    val fromBalance = blockFlow.getBalance(fromLockup).rightValue
     theMemPool.pendingPool.contains(tx0.id) is false
     theMemPool.pendingPool.contains(tx1.id) is true
     theMemPool.pendingPool.contains(tx2.id) is true
@@ -543,16 +544,22 @@ class BlockFlowSpec extends AlephiumSpec {
     theMemPool.contains(tx1.chainIndex, tx1.id) is true
     theMemPool.pendingPool.contains(tx1.id) is false
     theMemPool.pendingPool.contains(tx2.id) is true
+    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block0.hash) is true
+    blockFlow.getBalance(fromLockup).rightValue is fromBalance
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
     theMemPool.contains(tx1.chainIndex, tx1.id) is false
     theMemPool.contains(tx2.chainIndex, tx2.id) is true
     theMemPool.pendingPool.contains(tx2.id) is false
+    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block1.hash) is true
+    blockFlow.getBalance(fromLockup).rightValue is fromBalance
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
     theMemPool.contains(tx2.chainIndex, tx2.id) is false
+    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block2.hash) is true
+    blockFlow.getBalance(fromLockup).rightValue is fromBalance
   }
 
   behavior of "confirmations"
