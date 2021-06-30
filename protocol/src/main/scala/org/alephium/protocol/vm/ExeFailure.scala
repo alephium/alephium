@@ -51,10 +51,8 @@ case object PcOverflow                                         extends ExeFailur
 case object InvalidReturnType                                  extends ExeFailure
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
-final case class IOErrorUpdateState(error: IOError)            extends ExeFailure
-final case class IOErrorLoadContract(error: IOError)           extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
-final case class IOErrorLoadOutputs(error: IOError)            extends ExeFailure
+case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object UninitializedAddress                               extends ExeFailure
 case object NonPayableFrame                                    extends ExeFailure
@@ -70,3 +68,11 @@ case object InvalidTokenId                                     extends ExeFailur
 case object ExpectAContract                                    extends ExeFailure
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
+
+sealed trait IOFailure {
+  def error: IOError
+}
+final case class IOErrorUpdateState(error: IOError)  extends IOFailure
+final case class IOErrorLoadContract(error: IOError) extends IOFailure
+final case class IOErrorLoadOutputs(error: IOError)  extends IOFailure
+final case class OtherIOError(error: IOError)        extends IOFailure

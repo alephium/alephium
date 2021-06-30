@@ -47,7 +47,7 @@ object StatelessContext {
 
   final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
       extends StatelessContext {
-    override def getInitialBalances: ExeResult[Frame.Balances] = Left(NonPayableFrame)
+    override def getInitialBalances: ExeResult[Frame.Balances] = failed(NonPayableFrame)
   }
 }
 
@@ -80,7 +80,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       .createContract(code, initialFields, outputRef, contractOutput)
       .map(_ => discard(generatedOutputs.addOne(contractOutput)))
       .left
-      .map(IOErrorUpdateState)
+      .map(e => Left(IOErrorUpdateState(e)))
   }
 
   def useContractAsset(contractId: ContractId): ExeResult[Frame.BalancesPerLockup] = {
@@ -91,7 +91,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         Frame.BalancesPerLockup.from(contractAsset)
       }
       .left
-      .map(IOErrorLoadContract)
+      .map(e => Left(IOErrorLoadContract(e)))
   }
 
   def updateContractAsset(
@@ -102,7 +102,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     worldState
       .updateContract(contractId, outputRef, output)
       .left
-      .map(IOErrorUpdateState)
+      .map(e => Left(IOErrorUpdateState(e)))
   }
 }
 
@@ -110,14 +110,16 @@ object StatefulContext {
   def apply(
       tx: TransactionAbstract,
       gasRemaining: GasBox,
-      worldState: WorldState.Cached
+      worldState: WorldState.Cached,
+      preOutputsOpt: Option[AVector[TxOutput]]
   ): StatefulContext = {
-    new Impl(tx, worldState, gasRemaining)
+    new Impl(tx, worldState, preOutputsOpt, gasRemaining)
   }
 
   final class Impl(
       val tx: TransactionAbstract,
       val initWorldState: WorldState.Cached,
+      val preOutputsOpt: Option[AVector[TxOutput]],
       var gasRemaining: GasBox
   ) extends StatefulContext {
     override val worldState: WorldState.Staging = initWorldState.staging()
@@ -133,23 +135,37 @@ object StatefulContext {
      * 1. inputs are not empty
      * 2. gas fee bounds are validated
      */
+    @SuppressWarnings(
+      Array(
+        "org.wartremover.warts.JavaSerializable",
+        "org.wartremover.warts.Product",
+        "org.wartremover.warts.Serializable"
+      )
+    )
     override def getInitialBalances: ExeResult[Frame.Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
-          preOutputs <- initWorldState
-            .getPreOutputsForVM(tx)
-            .left
-            .map[ExeFailure](IOErrorLoadOutputs)
+          preOutputs <- getPreOutputs()
           balances <- Frame.Balances
             .from(preOutputs, tx.unsigned.fixedOutputs)
-            .toRight[ExeFailure](InvalidBalances)
+            .toRight(Right(InvalidBalances))
           _ <- balances
             .subAlf(preOutputs.head.lockupScript, tx.gasFeeUnsafe)
-            .toRight[ExeFailure](UnableToPayGasFee)
+            .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {
-        Left(NonPayableFrame)
+        failed(NonPayableFrame)
       }
+
+    private def getPreOutputs(): ExeResult[AVector[TxOutput]] = preOutputsOpt match {
+      case Some(outputs) => Right(outputs)
+      case None =>
+        initWorldState.getPreOutputsForVM(tx) match {
+          case Right(Some(outputs)) => Right(outputs)
+          case Right(None)          => failed(NonExistTxInput)
+          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
+        }
+    }
 
     override val outputBalances: Frame.Balances = Frame.Balances.empty
   }

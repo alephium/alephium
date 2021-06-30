@@ -26,7 +26,7 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.{BlockValidation, HeaderValidation}
+import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValidation}
 import org.alephium.protocol._
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
@@ -58,18 +58,6 @@ trait FlowFixture
     val mainGroup         = chainIndex.from
     val (_, publicKey, _) = genesisKeys(mainGroup.value)
     LockupScript.p2pkh(publicKey)
-  }
-
-  def tryToTransfer(
-      blockFlow: BlockFlow,
-      chainIndex: ChainIndex,
-      amount: U256 = ALF.alf(1)
-  ): Block = {
-    if (blockFlow.brokerConfig.contains(chainIndex.from)) {
-      transfer(blockFlow, chainIndex, amount)
-    } else {
-      emptyBlock(blockFlow, chainIndex)
-    }
   }
 
   def transferOnlyForIntraGroup(
@@ -242,6 +230,9 @@ trait FlowFixture
     val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
     val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
 
+    val txValidation = TxValidation.build
+    txValidation.validateMempoolTxTemplate(contractTx, blockFlow) isE ()
+
     val (contractInputs, generateOutputs) =
       genInputsOutputs(blockFlow, mainGroup, contractTx, script)
     val fullTx = Transaction.from(unsignedTx, contractInputs, generateOutputs, privateKey)
@@ -354,9 +345,10 @@ trait FlowFixture
       tx: TransactionTemplate,
       txScript: StatefulScript
   ): (AVector[ContractOutputRef], AVector[TxOutput]) = {
-    val worldState = blockFlow.getBestCachedWorldState(mainGroup).toOption.get
+    val groupView  = blockFlow.getMutableGroupView(mainGroup).rightValue
+    val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
-      .runTxScript(worldState, tx, txScript, tx.unsigned.startGas)
+      .runTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
       .rightValue
     result.contractInputs -> result.generatedOutputs
   }

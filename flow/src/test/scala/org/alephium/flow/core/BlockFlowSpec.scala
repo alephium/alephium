@@ -24,10 +24,10 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockChain.TxIndex
-import org.alephium.flow.core.BlockFlowState.TxStatus
+import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALF, BlockHash, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -257,6 +257,30 @@ class BlockFlowSpec extends AlephiumSpec {
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
+  }
+
+  it should "calculate hashes and blocks for update" in new FlowFixture {
+    val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block0)
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block1)
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block2)
+
+    val mainGroup = GroupIndex.unsafe(0)
+    blockFlow.getHashesForUpdates(mainGroup) isE AVector.empty[BlockHash]
+    blockFlow.getBlocksForUpdates(block2) isE AVector(block1, block2)
+    val bestDeps0 = blockFlow.getBestDeps(mainGroup)
+    blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps0) isE AVector.empty[BlockCache]
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block3)
+    val block4 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow, block4)
+    blockFlow.getHashesForUpdates(mainGroup) isE AVector(block3.hash, block4.hash)
+    val bestDeps1 = blockFlow.getBestDeps(mainGroup)
+    blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps1) isE
+      AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
   }
 
   behavior of "Sync"
@@ -506,9 +530,10 @@ class BlockFlowSpec extends AlephiumSpec {
       tx
     }
 
-    val tx0 = transfer()
-    val tx1 = transfer()
-    val tx2 = transfer()
+    val tx0         = transfer()
+    val tx1         = transfer()
+    val tx2         = transfer()
+    val fromBalance = blockFlow.getBalance(fromLockup).rightValue
     theMemPool.pendingPool.contains(tx0.id) is false
     theMemPool.pendingPool.contains(tx1.id) is true
     theMemPool.pendingPool.contains(tx2.id) is true
@@ -517,36 +542,24 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0)
     theMemPool.contains(tx0.chainIndex, tx0.id) is false
     theMemPool.contains(tx1.chainIndex, tx1.id) is true
-
-    if (!tx0.chainIndex.isIntraGroup) {
-      theMemPool.pendingPool.contains(tx1.id) is true
-      theMemPool.pendingPool.contains(tx2.id) is true
-      val block = mineFromMemPool(blockFlow, ChainIndex(fromGroup, fromGroup))
-      addAndCheck(blockFlow, block)
-      theMemPool.pendingPool.contains(tx1.id) is false
-      theMemPool.pendingPool.contains(tx2.id) is true
-    } else {
-      theMemPool.pendingPool.contains(tx1.id) is false
-      theMemPool.pendingPool.contains(tx2.id) is true
-    }
+    theMemPool.pendingPool.contains(tx1.id) is false
+    theMemPool.pendingPool.contains(tx2.id) is true
+    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block0.hash) is true
+    blockFlow.getBalance(fromLockup).rightValue is fromBalance
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
     theMemPool.contains(tx1.chainIndex, tx1.id) is false
     theMemPool.contains(tx2.chainIndex, tx2.id) is true
-
-    if (!tx1.chainIndex.isIntraGroup) {
-      theMemPool.pendingPool.contains(tx2.id) is true
-      val block = mineFromMemPool(blockFlow, ChainIndex(fromGroup, fromGroup))
-      addAndCheck(blockFlow, block)
-      theMemPool.pendingPool.contains(tx2.id) is false
-    } else {
-      theMemPool.pendingPool.contains(tx2.id) is false
-    }
+    theMemPool.pendingPool.contains(tx2.id) is false
+    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block1.hash) is true
+    blockFlow.getBalance(fromLockup).rightValue is fromBalance
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
     theMemPool.contains(tx2.chainIndex, tx2.id) is false
+    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block2.hash) is true
+    blockFlow.getBalance(fromLockup).rightValue is fromBalance
   }
 
   behavior of "confirmations"
@@ -706,6 +719,17 @@ class BlockFlowSpec extends AlephiumSpec {
       to   <- 0 until groups0
     } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
     blocks1.foreach(addAndCheck(blockFlow, _, brokerConfig.depsNum + 1))
+  }
+
+  it should "support sequential transactions" in new FlowFixture with Generators {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    forAll(groupIndexGen, groupIndexGen, groupIndexGen) { case (fromGroup, toGroup0, toGroup1) =>
+      val block0 = transfer(blockFlow, ChainIndex(fromGroup, toGroup0))
+      addAndCheck(blockFlow, block0)
+      val block1 = transfer(blockFlow, ChainIndex(fromGroup, toGroup1))
+      addAndCheck(blockFlow, block1)
+    }
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

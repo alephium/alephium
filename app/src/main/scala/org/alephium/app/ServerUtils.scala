@@ -362,34 +362,9 @@ class ServerUtils(networkType: NetworkType) {
   ): ExeResult[UnsignedTransaction] = {
     val unlockScript = UnlockScript.p2pkh(publicKey)
     for {
-      balances <- blockFlow.getUsableUtxos(lockupScript).left.map[ExeFailure](IOErrorLoadOutputs)
+      balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => Left(IOErrorLoadOutputs(e)))
       inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
     } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
-  }
-
-  def txFromScript(
-      blockFlow: BlockFlow,
-      script: StatefulScript,
-      fromGroup: GroupIndex,
-      contractTx: TransactionAbstract
-  ): ExeResult[Transaction] = {
-    for {
-      worldState <- blockFlow
-        .getBestCachedWorldState(fromGroup)
-        .left
-        .map[ExeFailure](error => NonCategorized(error.getMessage))
-      result <- StatefulVM.runTxScript(worldState, contractTx, script, contractTx.unsigned.startGas)
-    } yield {
-      val contractInputs  = result.contractInputs
-      val generateOutputs = result.generatedOutputs
-      Transaction(
-        contractTx.unsigned,
-        contractInputs,
-        generateOutputs,
-        contractTx.inputSignatures,
-        contractTx.contractSignatures
-      )
-    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

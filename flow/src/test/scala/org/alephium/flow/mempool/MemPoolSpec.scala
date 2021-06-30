@@ -29,8 +29,11 @@ class MemPoolSpec
     with NoIndexModelGeneratorsLike {
   def now = TimeStamp.now()
 
+  val mainGroup      = GroupIndex.unsafe(0)
+  val emptyTxIndexes = TxIndexes.emptySharedPool(mainGroup)
+
   it should "initialize an empty pool" in {
-    val pool = MemPool.empty(GroupIndex.unsafe(0))
+    val pool = MemPool.empty(mainGroup)
     pool.size is 0
   }
 
@@ -51,7 +54,7 @@ class MemPoolSpec
         txTemplates.foreach(pool.contains(index, _) is true)
         pool.removeFromTxPool(index, txTemplates) is block.transactions.length
         pool.size is 0
-        pool.txIndexes is TxIndexes.emptySharedPool
+        pool.txIndexes is emptyTxIndexes
       } else {
         assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }
@@ -59,7 +62,7 @@ class MemPoolSpec
   }
 
   it should "calculate the size of mempool" in {
-    val pool = MemPool.empty(GroupIndex.unsafe(0))
+    val pool = MemPool.empty(mainGroup)
     val tx0  = transactionGen().sample.get.toTemplate
     pool.addNewTx(ChainIndex.unsafe(0, 0), tx0)
     pool.size is 1
@@ -88,13 +91,21 @@ class MemPoolSpec
     tx1.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
     pool.isDoubleSpending(index0, tx0) is true
     pool.isDoubleSpending(index0, tx1) is true
-    tx0.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
-    tx1.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
+    tx0.assetOutputRefs.foreach(output =>
+      pool.isUnspentInPool(output) is (output.fromGroup equals mainGroup)
+    )
+    tx1.assetOutputRefs.foreach(output =>
+      pool.isUnspentInPool(output) is (output.fromGroup equals mainGroup)
+    )
     tx0.assetOutputRefs.foreachWithIndex((output, index) =>
-      pool.getUtxo(output) is Some(tx0.getOutput(index))
+      if (output.fromGroup equals mainGroup) {
+        pool.getOutput(output) is Some(tx0.getOutput(index))
+      }
     )
     tx1.assetOutputRefs.foreachWithIndex((output, index) =>
-      pool.getUtxo(output) is Some(tx1.getOutput(index))
+      if (output.fromGroup equals mainGroup) {
+        pool.getOutput(output) is Some(tx1.getOutput(index))
+      }
     )
   }
 
@@ -114,14 +125,14 @@ class MemPoolSpec
     tx2Outputs.length is 2
     pool.isUnspentInPool(tx2Outputs.head) is true
     pool.isUnspentInPool(tx2Outputs.last) is false
-    pool.isSpent(tx2Outputs.last)
+    pool.isSpent(tx2Outputs.last) is true
     tx3.assetOutputRefs.foreach(output => pool.isUnspentInPool(output) is true)
   }
 
   it should "clean mempool" in {
     val blockFlow = isolatedBlockFlow()
 
-    val pool   = MemPool.empty(GroupIndex.unsafe(0))
+    val pool   = MemPool.empty(mainGroup)
     val index0 = ChainIndex.unsafe(0, 0)
     val index1 = ChainIndex.unsafe(0, 1)
     val index2 = ChainIndex.unsafe(0, 2)

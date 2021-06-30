@@ -33,11 +33,11 @@ final case class Method[Ctx <: Context](
 ) {
   def check(args: AVector[Val]): ExeResult[Unit] = {
     if (args.length != argsType.length) {
-      Left(InvalidMethodArgLength(args.length, argsType.length))
+      failed(InvalidMethodArgLength(args.length, argsType.length))
     } else if (!args.forallWithIndex((v, index) => v.tpe == argsType(index))) {
-      Left(InvalidMethodParamsType)
+      failed(InvalidMethodParamsType)
     } else {
-      Right(())
+      okay
     }
   }
 }
@@ -192,11 +192,11 @@ sealed trait ContractObj[Ctx <: Context] {
       operandStack: Stack[Val]
   ): ExeResult[Frame[Ctx]] = {
     for {
-      method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
-      _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
+      method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
+      _      <- if (method.isPublic) okay else failed(PrivateExternalMethodCall)
       frame <- {
         val returnTo: AVector[Val] => ExeResult[Unit] = returns =>
-          if (returns.nonEmpty) Left(NonEmptyReturnForMainFunction) else Right(())
+          if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
         if (method.isPayable) {
           startPayableFrame(ctx, method, args, operandStack, returnTo)
         } else {
@@ -213,7 +213,7 @@ sealed trait ContractObj[Ctx <: Context] {
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
-    ctx.getInitialBalances.map(balances =>
+    ctx.getInitialBalances.map { balances =>
       buildPayableFrame(
         ctx,
         Frame.BalanceState.from(balances),
@@ -223,7 +223,7 @@ sealed trait ContractObj[Ctx <: Context] {
         operandStack,
         returnTo
       )
-    )
+    }
   }
 
   protected def startNonPayableFrame(
@@ -244,8 +244,8 @@ sealed trait ContractObj[Ctx <: Context] {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     for {
-      method <- getMethod(methodIndex).toRight[ExeFailure](InvalidMethodIndex(methodIndex))
-      _      <- if (method.isPublic) Right(()) else Left(PrivateExternalMethodCall)
+      method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
+      _      <- if (method.isPublic) Right(()) else failed(PrivateExternalMethodCall)
       frame <-
         if (method.isPayable) {
           startPayableFrame(ctx, method, args, operandStack, returnTo)

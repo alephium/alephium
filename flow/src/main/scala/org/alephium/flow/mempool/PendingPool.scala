@@ -19,11 +19,10 @@ package org.alephium.flow.mempool
 import scala.collection.mutable
 
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
-import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, WorldState}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 class PendingPool(
@@ -90,19 +89,26 @@ class PendingPool(
     indexes.getRelevantUtxos(lockupScript)
   }
 
-  def extractReadyTxs(worldState: WorldState.Persisted): IOResult[AVector[TransactionTemplate]] =
+  def extractReadyTxs(sharedPoolIndexes: TxIndexes): AVector[TransactionTemplate] =
     readOnly {
-      EitherF.foldTry(txs.values, AVector.empty[TransactionTemplate]) { case (acc, tx) =>
-        worldState.containsAllInputs(tx).map {
-          case true  => acc :+ tx
-          case false => acc
+      txs.values.foldLeft(AVector.empty[TransactionTemplate]) { case (acc, tx) =>
+        if (
+          tx.unsigned.inputs
+            .exists(input =>
+              sharedPoolIndexes.outputIndex.contains(input.outputRef) ||
+                indexes.outputIndex.contains(input.outputRef)
+            )
+        ) {
+          acc
+        } else {
+          acc :+ tx
         }
       }
     }
 
-  // Left means the output is spent
-  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = {
-    indexes.getUtxo(outputRef)
+  // the output might have been spent
+  def getUtxo(outputRef: AssetOutputRef): Option[TxOutput] = {
+    indexes.getOutput(outputRef)
   }
 
   def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
@@ -122,12 +128,12 @@ class PendingPool(
 }
 
 object PendingPool {
-  def empty(groupIndex: GroupIndex, capacity: Int): PendingPool =
+  def empty(mainGroup: GroupIndex, capacity: Int)(implicit groupConfig: GroupConfig): PendingPool =
     new PendingPool(
-      groupIndex,
+      mainGroup,
       mutable.HashMap.empty,
       ValueSortedMap.empty,
-      TxIndexes.emptyPendingPool,
+      TxIndexes.emptyPendingPool(mainGroup),
       capacity
     )
 }

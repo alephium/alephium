@@ -26,8 +26,9 @@ class SharedPoolSpec
     with LockFixture
     with NoIndexModelGeneratorsLike
     with TxIndexesSpec.Fixture {
-  val dummyIndex = ChainIndex.unsafe(0, 0)
-  def now        = TimeStamp.now()
+  val dummyIndex     = ChainIndex.unsafe(0, 0)
+  def now            = TimeStamp.now()
+  def emptyTxIndexes = TxIndexes.emptySharedPool(dummyIndex.from)
 
   def checkTx(pool: SharedPool, tx: TransactionTemplate): Unit = {
     pool.txs.contains(tx.id) is true
@@ -36,15 +37,13 @@ class SharedPoolSpec
   }
 
   it should "initialize an empty tx pool" in {
-    val indexes = TxIndexes.emptySharedPool
-    val pool    = SharedPool.empty(dummyIndex, 3, indexes)
+    val pool = SharedPool.empty(dummyIndex, 3, emptyTxIndexes)
     pool.isFull() is false
     pool.size is 0
   }
 
   it should "contain/add/remove for new transactions" in {
-    val indexes = TxIndexes.emptySharedPool
-    val pool    = SharedPool.empty(dummyIndex, 3, indexes)
+    val pool = SharedPool.empty(dummyIndex, 3, emptyTxIndexes)
     forAll(blockGen) { block =>
       val txTemplates = block.transactions.map(_.toTemplate)
       val numberAdded = pool.add(txTemplates, now)
@@ -66,13 +65,12 @@ class SharedPoolSpec
       pool.isFull() is false
       pool.txs.isEmpty is true
       pool.timestamps.isEmpty is true
-      pool.sharedTxIndex is TxIndexes.emptySharedPool
+      pool.sharedTxIndex is emptyTxIndexes
     }
   }
 
   trait Fixture extends WithLock {
-    val indexes     = TxIndexes.emptySharedPool
-    val pool        = SharedPool.empty(dummyIndex, Int.MaxValue, indexes)
+    val pool        = SharedPool.empty(dummyIndex, Int.MaxValue, emptyTxIndexes)
     val block       = blockGen.sample.get
     val txTemplates = block.transactions.map(_.toTemplate)
     val txNum       = block.transactions.length
@@ -114,8 +112,7 @@ class SharedPoolSpec
   }
 
   it should "consider capacity" in {
-    val indexes = TxIndexes.emptySharedPool
-    val pool    = SharedPool.empty(dummyIndex, 1, indexes)
+    val pool = SharedPool.empty(dummyIndex, 1, emptyTxIndexes)
 
     val tx0 = transactionGen().sample.get.toTemplate
     pool.add(tx0, now) is true

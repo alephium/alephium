@@ -115,9 +115,12 @@ final class StatefulVM(
         _               <- merge(nextBalances.remaining, currentBalances.remaining)
         _               <- merge(nextBalances.remaining, currentBalances.approved)
       } yield ()
-      resultOpt.toRight(InvalidBalances)
+      resultOpt match {
+        case Some(_) => okay
+        case None    => failed(InvalidBalances)
+      }
     } else {
-      Right(())
+      okay
     }
   }
 
@@ -157,7 +160,10 @@ final class StatefulVM(
         _        <- ctx.outputBalances.merge(balances.remaining)
       } yield ()
       for {
-        _ <- resultOpt.toRight(InvalidBalances)
+        _ <- resultOpt match {
+          case Some(_) => okay
+          case None    => failed(InvalidBalances)
+        }
         _ <- outputGeneratedBalances(ctx.outputBalances)
       } yield ()
     } else {
@@ -170,7 +176,7 @@ final class StatefulVM(
     @tailrec
     def iter(index: Int): ExeResult[Unit] = {
       if (index >= outputBalances.all.length) {
-        Right(())
+        okay
       } else {
         val (lockupScript, balances) = outputBalances.all(index)
         balances.toTxOutput(lockupScript) match {
@@ -259,10 +265,21 @@ object StatefulVM {
   def runTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
+      preOutputs: AVector[TxOutput],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(tx, gasRemaining, worldState)
+    runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
+  }
+
+  def runTxScript(
+      worldState: WorldState.Cached,
+      tx: TransactionAbstract,
+      preOutputsOpt: Option[AVector[TxOutput]],
+      script: StatefulScript,
+      gasRemaining: GasBox
+  ): ExeResult[TxScriptExecution] = {
+    val context = StatefulContext(tx, gasRemaining, worldState, preOutputsOpt)
     val obj     = script.toObject
     execute(context, obj, AVector.empty).map { _ =>
       context.worldState.commit()

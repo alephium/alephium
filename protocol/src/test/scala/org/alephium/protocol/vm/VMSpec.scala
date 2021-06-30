@@ -39,7 +39,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val contract = StatefulContract(AVector.empty, methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val]())
-    StatefulVM.execute(context, obj, AVector(Val.U256(U256.Two))) is Left(PrivateExternalMethodCall)
+    StatefulVM.execute(context, obj, AVector(Val.U256(U256.Two))) is
+      failed(PrivateExternalMethodCall)
   }
 
   it should "overflow oprand stack" in {
@@ -71,7 +72,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       context,
       obj,
       AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1)))
-    ) is Left(StackOverflow)
+    ) is failed(StackOverflow)
   }
 
   it should "execute the following script" in {
@@ -165,7 +166,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     }
 
     def fail(instrs: AVector[Instr[StatefulContext]], expected: ExeFailure) = {
-      testInstrs(instrs, Left(expected))
+      testInstrs(instrs, failed(expected))
     }
   }
 

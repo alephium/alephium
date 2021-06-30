@@ -324,7 +324,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       )
 
       Post(s"/miners?action=start-mining") check { response =>
-        minerProbe.expectMsg(Miner.Start)
+        minerProbe.expectNoMessage()
         response.code is StatusCode.InternalServerError
         response.as[ApiError.InternalServerError] is
           ApiError.InternalServerError("Miner addresses are not set up")

@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import scala.util.Random
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
@@ -44,7 +45,9 @@ class FlowUtilsSpec extends AlephiumSpec {
       }
       val firstInput  = assets.head.referredOutput.asInstanceOf[AssetOutput]
       val firstOutput = firstInput.copy(amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe))
-      FlowUtils.generateFullTx(worldState, tx, script).rightValue is
+      val bestDeps    = blockFlow.getBestDeps(groupIndex)
+      val groupView   = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
+      blockFlow.generateFullTx(groupView, tx, script).rightValue is
         Transaction(
           unsignedTx,
           AVector.empty,
@@ -147,7 +150,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
-    txValidation.validateMempoolTx(chainIndex, tx0, blockFlow) isE ()
+    txValidation.validateTx(tx0, blockFlow) isE ()
 
     blockFlow
       .transfer(
@@ -191,5 +194,56 @@ class FlowUtilsSpec extends AlephiumSpec {
     pool.getSharedPool(index).add(AVector(tx0.toTemplate, tx1.toTemplate), TimeStamp.now())
     val miner = getGenesisLockupScript(index)
     blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
+  }
+
+  it should "reorg" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val mainGroup = GroupIndex.unsafe(0)
+    val deps0     = blockFlow.getBestDeps(mainGroup)
+    val block0    = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block1)
+    val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block2)
+    val deps1 = blockFlow.getBestDeps(mainGroup)
+
+    val blockFlow1 = isolatedBlockFlow()
+
+    val block3 = transfer(blockFlow1, ChainIndex.unsafe(1, 1))
+    addAndCheck(blockFlow1, block3)
+    val block4 = transfer(blockFlow1, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow1, block4)
+    val block5 = transfer(blockFlow1, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow1, block5)
+    val block6 = transfer(blockFlow1, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow1, block6)
+
+    addAndCheck(blockFlow, block3)
+    addAndCheck(blockFlow, block4)
+    addAndCheck(blockFlow, block5)
+    addAndCheck(blockFlow, block6)
+    val deps2 = blockFlow.getBestDeps(mainGroup)
+
+    blockFlow.calMemPoolChangesUnsafe(mainGroup, deps0, deps1) is
+      Normal(
+        AVector
+          .fill(groups0)(AVector.empty[Transaction])
+          .replace(0, block0.nonCoinbase)
+          .replace(1, block1.nonCoinbase ++ block2.nonCoinbase)
+      )
+    blockFlow.calMemPoolChangesUnsafe(mainGroup, deps1, deps2) is
+      Reorg(
+        toRemove = AVector
+          .fill(groups0)(AVector.empty[Transaction])
+          .replace(0, block4.nonCoinbase)
+          .replace(1, block5.nonCoinbase)
+          .replace(2, block6.nonCoinbase),
+        toAdd = AVector
+          .fill(groups0)(AVector.empty[Transaction])
+          .replace(0, block0.nonCoinbase)
+          .replace(1, block2.nonCoinbase ++ block1.nonCoinbase)
+      )
   }
 }

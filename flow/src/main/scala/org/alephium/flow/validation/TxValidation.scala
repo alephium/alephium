@@ -18,8 +18,8 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
-import org.alephium.flow.core.{BlockFlow, FlowUtils}
-import org.alephium.io.IOError
+import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -31,28 +31,45 @@ trait TxValidation {
 
   implicit def groupConfig: GroupConfig
 
-  def validateTxTemplate(
+  private def validateTxTemplate(
+      tx: TransactionTemplate,
+      chainIndex: ChainIndex,
+      flow: BlockFlow,
+      groupView: BlockFlowGroupView[WorldState.Cached]
+  ): TxValidationResult[Unit] = {
+    for {
+      preOutputs <- fromGetPreOutputs(
+        groupView.getPreOutputs(tx.unsigned.inputs)
+      )
+      fullTx <- buildFullTx(tx, flow, preOutputs)
+      _      <- checkStateless(chainIndex, fullTx, checkDoubleSpending = true)
+      preContractOutputs <- fromGetPreOutputs(
+        groupView.getPreContractOutputs(fullTx.contractInputs)
+      )
+      _ <- checkStatefulExceptTxScript(
+        fullTx,
+        TimeStamp.now(),
+        preOutputs ++ preContractOutputs,
+        None
+      )
+    } yield ()
+  }
+
+  private def buildFullTx(
       tx: TransactionTemplate,
       flow: BlockFlow,
-      validate: (ChainIndex, Transaction, BlockFlow) => TxValidationResult[Unit]
-  ): TxValidationResult[Unit] = {
+      preOutputs: AVector[TxOutput]
+  ): TxValidationResult[Transaction] = {
     tx.unsigned.scriptOpt match {
-      case None =>
-        val fullTx = FlowUtils.convertNonScriptTx(tx)
-        for {
-          chainIndex <- getChainIndex(tx)
-          _          <- validate(chainIndex, fullTx, flow)
-        } yield ()
+      case None => validTx(FlowUtils.convertNonScriptTx(tx))
       case Some(script) =>
         for {
           chainIndex <- getChainIndex(tx)
           worldState <- from(flow.getBestCachedWorldState(chainIndex.from))
-          fullTx <- StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
-            case Left(error)   => invalidTx(TxScriptExeFailed(error))
-            case Right(result) => validTx(FlowUtils.convertSuccessfulTx(tx, result))
-          }
-          _ <- validate(chainIndex, fullTx, flow)
-        } yield ()
+          fullTx <- fromExeResult(
+            StatefulVM.runTxScript(worldState, tx, preOutputs, script, tx.unsigned.startGas)
+          ).map { result => FlowUtils.convertSuccessfulTx(tx, result) }
+        } yield fullTx
     }
   }
 
@@ -60,18 +77,10 @@ trait TxValidation {
       tx: TransactionTemplate,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
-    validateTxTemplate(tx, flow, validateMempoolTx)
-  }
-
-  def validateMempoolTx(
-      chainIndex: ChainIndex,
-      tx: Transaction,
-      flow: BlockFlow
-  ): TxValidationResult[Unit] = {
     for {
-      _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
-      worldState <- from(flow.getBestCachedWorldState(tx.chainIndex.from))
-      _          <- checkStateful(chainIndex, tx, TimeStamp.now(), worldState, None)
+      chainIndex <- getChainIndex(tx)
+      groupView  <- from(flow.getMutableGroupView(chainIndex.from))
+      _          <- validateTxTemplate(tx, chainIndex, flow, groupView)
     } yield ()
   }
 
@@ -79,59 +88,80 @@ trait TxValidation {
       tx: TransactionTemplate,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
-    validateTxTemplate(tx, flow, validateGrandPoolTx)
+    for {
+      chainIndex <- getChainIndex(tx)
+      groupView  <- from(flow.getMutableGroupViewIncludePool(chainIndex.from))
+      _          <- validateTxTemplate(tx, chainIndex, flow, groupView)
+    } yield ()
   }
 
-  def validateGrandPoolTx(
-      chainIndex: ChainIndex,
+  def validateTx(
       tx: Transaction,
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
     for {
-      _ <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
-      preOutputs <- flow.getPreOutputsIncludingPools(tx) match {
-        case Right(Some(outputs)) => Right(outputs)
-        case Right(None)          => Left(Right(NonExistInput))
-        case Left(error)          => Left(Left(error))
-      }
-      _ <- checkStatefulExceptTxScript(tx, TimeStamp.now(), preOutputs, None)
+      chainIndex <- getChainIndex(tx)
+      bestDeps = flow.getBestDeps(chainIndex.from)
+      groupView <- from(flow.getMutableGroupView(chainIndex.from, bestDeps))
+      _ <- validateTx(
+        tx,
+        chainIndex,
+        TimeStamp.now(),
+        groupView,
+        None,
+        checkDoubleSpending = true
+      )
     } yield ()
+  }
+
+  private def validateTx(
+      tx: Transaction,
+      chainIndex: ChainIndex,
+      timestamp: TimeStamp,
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      coinbaseNetReward: Option[U256],
+      checkDoubleSpending: Boolean // for block txs, this has been checked in block validation
+  ): TxValidationResult[Unit] = {
+    for {
+      _          <- checkStateless(chainIndex, tx, checkDoubleSpending)
+      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx))
+      _ <- checkStateful(
+        chainIndex,
+        tx,
+        timestamp,
+        groupView.worldState,
+        preOutputs,
+        coinbaseNetReward
+      )
+    } yield ()
+  }
+
+  def fromGetPreOutputs(
+      getPreOutputs: IOResult[Option[AVector[TxOutput]]]
+  ): TxValidationResult[AVector[TxOutput]] = {
+    getPreOutputs match {
+      case Right(Some(outputs)) => Right(outputs)
+      case Right(None)          => Left(Right(NonExistInput))
+      case Left(error)          => Left(Left(error))
+    }
   }
 
   protected[validation] def checkBlockTx(
       chainIndex: ChainIndex,
       tx: Transaction,
       header: BlockHeader,
-      worldState: WorldState.Cached
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      coinbaseNetReward: Option[U256]
   ): TxValidationResult[Unit] = {
     for {
-      _ <- checkStateless(
-        header.chainIndex,
+      _ <- validateTx(
         tx,
-        checkDoubleSpending = false
-      ) // it's already checked in BlockValidation
-      _ <- checkStateful(chainIndex, tx, header.timestamp, worldState, None)
-    } yield ()
-  }
-
-  protected[validation] def checkCoinbase(
-      tx: Transaction,
-      header: BlockHeader,
-      worldState: WorldState.Cached,
-      coinbaseNetReward: U256
-  ): TxValidationResult[Unit] = {
-    for {
-      _ <- checkStateless(
-        header.chainIndex,
-        tx,
-        checkDoubleSpending = false
-      )
-      _ <- checkStateful(
-        header.chainIndex,
-        tx,
+        chainIndex,
         header.timestamp,
-        worldState,
-        Some(coinbaseNetReward)
+        groupView,
+        coinbaseNetReward,
+        checkDoubleSpending =
+          false // checkDoubleSpending = true as it has been checked in block validation
       )
     } yield ()
   }
@@ -156,12 +186,12 @@ trait TxValidation {
       tx: Transaction,
       headerTs: TimeStamp,
       worldState: WorldState.Cached,
+      preOutputs: AVector[TxOutput],
       coinbaseNetReward: Option[U256]
   ): TxValidationResult[Unit] = {
     for {
-      preOutputs   <- getPreOutputs(tx, worldState)
       gasRemaining <- checkStatefulExceptTxScript(tx, headerTs, preOutputs, coinbaseNetReward)
-      _            <- checkTxScript(chainIndex, tx, gasRemaining, worldState)
+      _            <- checkTxScript(chainIndex, tx, gasRemaining, worldState, preOutputs)
     } yield ()
   }
   protected[validation] def checkStatefulExceptTxScript(
@@ -202,7 +232,8 @@ trait TxValidation {
       chainIndex: ChainIndex,
       tx: Transaction,
       gasRemaining: GasBox,
-      worldState: WorldState.Cached): TxValidationResult[Unit] // TODO: optimize it with preOutputs
+      worldState: WorldState.Cached,
+      preOutputs: AVector[TxOutput]): TxValidationResult[Unit] // TODO: optimize it with preOutputs
   // format: on
 }
 
@@ -537,8 +568,9 @@ object TxValidation {
         signatures: Stack[Signature]
     ): TxValidationResult[GasBox] = {
       StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {
-        case Right(result) => validTx(result.gasRemaining)
-        case Left(e)       => invalidTx(InvalidUnlockScript(e))
+        case Right(result)  => validTx(result.gasRemaining)
+        case Left(Right(e)) => invalidTx(InvalidUnlockScript(e))
+        case Left(Left(e))  => Left(Left(e.error))
       }
     }
 
@@ -546,13 +578,17 @@ object TxValidation {
         chainIndex: ChainIndex,
         tx: Transaction,
         gasRemaining: GasBox,
-        worldState: WorldState.Cached
+        worldState: WorldState.Cached,
+        preOutputs: AVector[TxOutput]
     ): TxValidationResult[Unit] = {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
-            StatefulVM.runTxScript(worldState, tx, script, gasRemaining) match {
-              case Right(StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs)) =>
+            val preAssetOutputs = preOutputs.take(tx.unsigned.inputs.length)
+            fromExeResult(
+              StatefulVM.runTxScript(worldState, tx, preAssetOutputs, script, gasRemaining)
+            )
+              .flatMap { case StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs) =>
                 if (contractInputs != tx.contractInputs) {
                   invalidTx(InvalidContractInputs)
                 } else if (generatedOutputs != tx.generatedOutputs) {
@@ -560,8 +596,7 @@ object TxValidation {
                 } else {
                   validTx(())
                 }
-              case Left(error) => invalidTx(TxScriptExeFailed(error))
-            }
+              }
           case None => validTx(())
         }
       } else {

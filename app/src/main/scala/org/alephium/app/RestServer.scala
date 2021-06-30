@@ -82,7 +82,7 @@ class RestServer(
   private val serverUtils: ServerUtils = new ServerUtils(networkType)
 
   //TODO Do we want to cache the result once it's synced?
-  private def withSyncedClique[A](f: FutureTry[A]): FutureTry[A] = {
+  private def withSyncedClique[A](f: => FutureTry[A]): FutureTry[A] = {
     node.cliqueManager
       .ask(InterCliqueManager.IsSynced)
       .mapTo[InterCliqueManager.SyncedResult]
@@ -95,7 +95,7 @@ class RestServer(
       }
   }
 
-  private def withMinerAddressSet[A](f: FutureTry[A]): FutureTry[A] = {
+  private def withMinerAddressSet[A](f: => FutureTry[A]): FutureTry[A] = {
     node.allHandlers.viewHandler
       .ask(ViewHandler.GetMinerAddresses)
       .mapTo[Option[AVector[LockupScript]]]

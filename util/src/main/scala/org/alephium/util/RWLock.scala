@@ -19,7 +19,7 @@ package org.alephium.util
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 trait RWLock {
-  private val lock      = new ReentrantReadWriteLock(true)
+  private val lock      = new ReentrantReadWriteLock()
   private val readLock  = lock.readLock()
   private val writeLock = lock.writeLock()
 

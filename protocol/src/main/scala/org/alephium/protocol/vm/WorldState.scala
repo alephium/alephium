@@ -58,7 +58,17 @@ trait WorldState[T] {
 
   def persist(): IOResult[WorldState.Persisted]
 
-  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]]
+  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[Option[AVector[TxOutput]]] = {
+    val inputs = tx.unsigned.inputs
+    inputs.foldE[IOError, Option[AVector[TxOutput]]](Some(AVector.ofSize(inputs.length))) {
+      case (Some(outputs), input) =>
+        getOutputOpt(input.outputRef).map {
+          case Some(output) => Some(outputs :+ output)
+          case None         => None
+        }
+      case (None, _) => Right(None)
+    }
+  }
 
   def getPreOutputs(tx: Transaction): IOResult[AVector[TxOutput]] = {
     for {
@@ -70,6 +80,12 @@ trait WorldState[T] {
   def containsAllInputs(tx: TransactionTemplate): IOResult[Boolean] = {
     tx.unsigned.inputs.forallE(input => existOutput(input.outputRef))
   }
+
+  def getAssetOutputs(
+      outputRefPrefix: ByteString,
+      maxOutputs: Int,
+      predicate: (TxOutputRef, TxOutput) => Boolean
+  ): IOResult[AVector[(AssetOutputRef, AssetOutput)]]
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit] {
@@ -128,10 +144,6 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): IOResult[Unit]
-
-  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
-    tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
-  }
 }
 
 sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState] {
@@ -185,10 +197,6 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
       oldState <- getContractState(key)
       newState <- updateContract(key, oldState.copy(fields = fields))
     } yield newState
-  }
-
-  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[AVector[TxOutput]] = {
-    tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
   }
 }
 
@@ -373,6 +381,13 @@ object WorldState {
         _     <- contractState.remove(contractKey)
       } yield ()
     }
+
+    // Not supported, use persisted worldstate instead
+    def getAssetOutputs(
+        outputRefPrefix: ByteString,
+        maxOutputs: Int,
+        predicate: (TxOutputRef, TxOutput) => Boolean
+    ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
   }
 
   final case class Cached(

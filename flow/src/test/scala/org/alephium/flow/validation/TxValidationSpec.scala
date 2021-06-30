@@ -24,7 +24,6 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
@@ -32,6 +31,8 @@ import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, VMFactory}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
+  override val configValues = Map(("alephium.broker.broker-num", 1))
+
   def passCheck[T](result: TxValidationResult[T]): Assertion = {
     result.isRight is true
   }
@@ -65,17 +66,14 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       for {
         chainIndex <- getChainIndex(tx)
         _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
-        _          <- checkStateful(chainIndex, tx, headerTs, cachedWorldState, None)
-      } yield ()
-    }
-
-    def validateMempoolTx(
-        tx: Transaction,
-        flow: BlockFlow
-    ): TxValidationResult[Unit] = {
-      for {
-        chainIndex <- getChainIndex(tx)
-        _          <- validateMempoolTx(chainIndex, tx, flow)
+        _ <- checkStateful(
+          chainIndex,
+          tx,
+          headerTs,
+          cachedWorldState,
+          preOutputs.map(_.referredOutput),
+          None
+        )
       } yield ()
     }
   }
@@ -126,7 +124,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
       val txNew       = tx.copy(unsigned = unsignedNew)
       failCheck(checkOutputNum(txNew, tx.chainIndex.isIntraGroup), NoOutputs)
-      failValidation(validateMempoolTx(txNew, blockFlow), NoOutputs)
+      failValidation(validateTx(txNew, blockFlow), NoOutputs)
       failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
     }
   }
@@ -164,13 +162,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val txNew0 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(-1)))
     failCheck(checkGasBound(txNew0), InvalidStartGas)
-    failValidation(validateMempoolTx(txNew0, blockFlow), InvalidStartGas)
+    failValidation(validateTx(txNew0, blockFlow), InvalidStartGas)
     val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
     failCheck(checkGasBound(txNew1), InvalidStartGas)
-    failValidation(validateMempoolTx(txNew1, blockFlow), InvalidStartGas)
+    failValidation(validateTx(txNew1, blockFlow), InvalidStartGas)
     val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).rightValue))
     failCheck(checkGasBound(txNew2), InvalidStartGas)
-    failValidation(validateMempoolTx(txNew2, blockFlow), InvalidStartGas)
+    failValidation(validateTx(txNew2, blockFlow), InvalidStartGas)
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
     passCheck(checkGasBound(txNew3))
 
@@ -187,7 +185,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val delta     = U256.MaxValue - alfAmount + 1
         val txNew     = modifyAlfAmount(tx, delta)
         failCheck(checkOutputAmount(txNew), BalanceOverFlow)
-        failValidation(validateMempoolTx(txNew, blockFlow), BalanceOverFlow)
+        failValidation(validateTx(txNew, blockFlow), BalanceOverFlow)
         failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
       }
     }
@@ -198,7 +196,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroAlfAmount(tx)
         failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
-        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsDustOrZero)
+        failValidation(validateTx(txNew, blockFlow), AmountIsDustOrZero)
         failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
@@ -209,7 +207,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroTokenAmount(tx)
         failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
-        failValidation(validateMempoolTx(txNew, blockFlow), AmountIsDustOrZero)
+        failValidation(validateTx(txNew, blockFlow), AmountIsDustOrZero)
         failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
@@ -233,7 +231,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       forAll(localUnsignedGen) { unsignedNew =>
         val txNew = tx.copy(unsigned = unsignedNew)
         failCheck(getChainIndex(txNew), InvalidInputGroupIndex)
-        failValidation(validateMempoolTx(txNew, blockFlow), InvalidInputGroupIndex)
+        failValidation(validateTx(txNew, blockFlow), InvalidInputGroupIndex)
         failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
       }
     }
@@ -259,7 +257,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         forAll(localUnsignedGen) { unsignedNew =>
           val txNew = tx.copy(unsigned = unsignedNew)
           failCheck(getChainIndex(txNew), InvalidOutputGroupIndex)
-          failValidation(validateMempoolTx(txNew, blockFlow), InvalidOutputGroupIndex)
+          failValidation(validateTx(txNew, blockFlow), InvalidOutputGroupIndex)
           failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
         }
       }
@@ -272,7 +270,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
       val txNew       = tx.copy(unsigned = unsignedNew)
       failCheck(checkUniqueInputs(txNew, checkDoubleSpending = true), TxDoubleSpending)
-      failValidation(validateMempoolTx(txNew, blockFlow), TxDoubleSpending)
+      failValidation(validateTx(txNew, blockFlow), TxDoubleSpending)
       failCheck(checkBlockTx(txNew, preOutputs), TxDoubleSpending)
     }
   }
@@ -307,7 +305,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           tx.copy(generatedOutputs = outputsNew)
         }
         failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-        failValidation(validateMempoolTx(txNew, blockFlow), OutputDataSizeExceeded)
+        failValidation(validateTx(txNew, blockFlow), OutputDataSizeExceeded)
         failCheck(checkBlockTx(txNew, preOutputs), OutputDataSizeExceeded)
       }
     }

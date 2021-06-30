@@ -19,16 +19,19 @@ package org.alephium.flow.mempool
 import scala.collection.mutable
 
 import org.alephium.flow.core.FlowUtils._
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, RWLock}
 
 final case class TxIndexes(
+    mainGroup: GroupIndex,
     inputIndex: mutable.HashSet[AssetOutputRef],
-    outputIndex: mutable.HashMap[AssetOutputRef, TxOutput],
+    outputIndex: mutable.HashMap[AssetOutputRef, AssetOutput],
     addressIndex: mutable.HashMap[LockupScript, mutable.ArrayBuffer[AssetOutputRef]],
     outputType: OutputType
-) extends RWLock {
+)(implicit groupConfig: GroupConfig)
+    extends RWLock {
   def add(transaction: TransactionTemplate): Unit = writeOnly {
     _add(transaction)
   }
@@ -40,14 +43,16 @@ final case class TxIndexes(
   private def _add(transaction: TransactionTemplate): Unit = {
     transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
-      val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))
-      outputIndex.addOne(outputRef -> output)
-      addressIndex.get(output.lockupScript) match {
-        case Some(outputs) =>
-          if (!outputs.contains(outputRef)) {
-            outputs.addOne(outputRef)
-          }
-        case None => addressIndex.addOne(output.lockupScript -> mutable.ArrayBuffer(outputRef))
+      if (output.toGroup == mainGroup) {
+        val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))
+        outputIndex.addOne(outputRef -> output)
+        addressIndex.get(output.lockupScript) match {
+          case Some(outputs) =>
+            if (!outputs.contains(outputRef)) {
+              outputs.addOne(outputRef)
+            }
+          case None => addressIndex.addOne(output.lockupScript -> mutable.ArrayBuffer(outputRef))
+        }
       }
     }
   }
@@ -94,22 +99,24 @@ final case class TxIndexes(
       .getOrElse(AVector.empty)
   }
 
-  // Left means the output is spent
-  def getUtxo(outputRef: AssetOutputRef): Either[Unit, Option[TxOutput]] = readOnly {
-    if (inputIndex.contains(outputRef)) {
-      Left(())
-    } else {
-      Right(outputIndex.get(outputRef))
-    }
+  def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = readOnly {
+    outputIndex.get(outputRef)
   }
 }
 
 object TxIndexes {
-  def emptySharedPool: TxIndexes =
-    TxIndexes(mutable.HashSet.empty, mutable.HashMap.empty, mutable.HashMap.empty, SharedPoolOutput)
-
-  def emptyPendingPool: TxIndexes =
+  def emptySharedPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
     TxIndexes(
+      mainGroup,
+      mutable.HashSet.empty,
+      mutable.HashMap.empty,
+      mutable.HashMap.empty,
+      SharedPoolOutput
+    )
+
+  def emptyPendingPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
+    TxIndexes(
+      mainGroup,
       mutable.HashSet.empty,
       mutable.HashMap.empty,
       mutable.HashMap.empty,

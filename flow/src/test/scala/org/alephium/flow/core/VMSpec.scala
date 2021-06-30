@@ -96,8 +96,8 @@ class VMSpec extends AlephiumSpec {
       txTemplate.copy(unsigned = txTemplate.unsigned.copy(startGas = 1000000))
     }
     val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).toOption.get
-    StatefulVM.runTxScript(worldState, tx, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
-      Left(StackOverflow)
+    StatefulVM.runTxScript(worldState, tx, None, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
+      failed(StackOverflow)
   }
 
   trait CallFixture extends FlowFixture {
@@ -382,6 +382,20 @@ class VMSpec extends AlephiumSpec {
           output.tokens.head is (contractKey -> U256.unsafe(20000000))
         }
     }
+  }
+
+  it should "use correct utxos" in new ContractFixture {
+    val block = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block)
+    val input =
+      s"""
+         |TxContract Foo(mut x: U256) {
+         |  pub payable fn foo() -> () {
+         |    issueToken!(10000000)
+         |  }
+         |}
+         |""".stripMargin
+    createContract(input, 2, 2)
   }
 
   behavior of "constant product market"

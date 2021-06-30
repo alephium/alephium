@@ -21,11 +21,10 @@ import io.prometheus.client.Gauge
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.setting.MemPoolSetting
-import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, WorldState}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp}
 
 /*
@@ -60,6 +59,11 @@ class MemPool private (
 
   def getAll(index: ChainIndex): AVector[TransactionTemplate] =
     getSharedPool(index).getAll() ++ pendingPool.getAll(index)
+
+  def isSpent(outputRef: TxOutputRef): Boolean = outputRef match {
+    case ref: AssetOutputRef => isSpent(ref)
+    case _                   => false
+  }
 
   def isSpent(outputRef: AssetOutputRef): Boolean = {
     pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
@@ -135,33 +139,27 @@ class MemPool private (
     )
   }
 
-  def updatePendingPool(
-      worldState: WorldState.Persisted
-  ): IOResult[AVector[TransactionTemplate]] = {
+  def updatePendingPool(): AVector[TransactionTemplate] = {
     val now = TimeStamp.now()
-    pendingPool.extractReadyTxs(worldState).map { txs =>
-      txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
-        addToTxPool(chainIndex, txss, now)
-      }
-      pendingPool.remove(txs)
-      pendingPool.measureTransactionsTotal()
-      txs
+    val txs = pendingPool.extractReadyTxs(txIndexes)
+    txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
+      addToTxPool(chainIndex, txss, now)
     }
+    pendingPool.remove(txs)
+    pendingPool.measureTransactionsTotal()
+    txs
   }
 
-  def getUtxo(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
-    case ref: AssetOutputRef => getUtxo(ref)
+  def getOutput(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
+    case ref: AssetOutputRef => getOutput(ref)
     case _                   => None
   }
 
-  def getUtxo(outputRef: AssetOutputRef): Option[TxOutput] = {
-    val result = pendingPool.getUtxo(outputRef).flatMap {
-      case Some(output) => Right(Some(output))
-      case None         => txIndexes.getUtxo(outputRef)
-    }
-    result match {
-      case Left(_)      => None // the output is spent already
-      case Right(value) => value
+  // the output might have been spent
+  def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = {
+    pendingPool.getUtxo(outputRef) match {
+      case Some(output) => Some(output)
+      case None         => txIndexes.getOutput(outputRef)
     }
   }
 
@@ -176,16 +174,16 @@ class MemPool private (
 
 object MemPool {
   def empty(
-      groupIndex: GroupIndex
+      mainGroup: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
-    val sharedTxIndex = TxIndexes.emptySharedPool
+    val sharedTxIndex = TxIndexes.emptySharedPool(mainGroup)
     val sharedPools =
       AVector.tabulate(groupConfig.groups) { toGroup =>
-        val chainIndex = ChainIndex.unsafe(groupIndex.value, toGroup)
+        val chainIndex = ChainIndex.unsafe(mainGroup.value, toGroup)
         SharedPool.empty(chainIndex, memPoolSetting.sharedPoolCapacity, sharedTxIndex)
       }
-    val pendingPool = PendingPool.empty(groupIndex, memPoolSetting.pendingPoolCapacity)
-    new MemPool(groupIndex, sharedPools, sharedTxIndex, pendingPool)
+    val pendingPool = PendingPool.empty(mainGroup, memPoolSetting.pendingPoolCapacity)
+    new MemPool(mainGroup, sharedPools, sharedTxIndex, pendingPool)
   }
 
   sealed trait NewTxCategory

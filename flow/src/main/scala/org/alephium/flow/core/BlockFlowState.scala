@@ -18,8 +18,8 @@ package org.alephium.flow.core
 
 import scala.collection.mutable
 
-import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.TxIndex
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{BlockHash, Hash}
@@ -197,7 +197,7 @@ trait BlockFlowState extends FlowTipsUtil {
     getBlockChainWithState(groupIndex).getWorldStateHash(intraGroupDep)
   }
 
-  protected def getCachedWorldState(
+  def getCachedWorldState(
       deps: BlockDeps,
       groupIndex: GroupIndex
   ): IOResult[WorldState.Cached] = {
@@ -212,7 +212,10 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getCachedWorldState(block: Block): IOResult[WorldState.Cached] = {
-    val header = block.header
+    getCachedWorldState(block.header)
+  }
+
+  def getCachedWorldState(header: BlockHeader): IOResult[WorldState.Cached] = {
     getCachedWorldState(header.blockDeps, header.chainIndex.from)
   }
 
@@ -238,20 +241,80 @@ trait BlockFlowState extends FlowTipsUtil {
     getCachedWorldState(deps, groupIndex)
   }
 
+  def getImmutableGroupView(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    val blockDeps = getBestDeps(mainGroup)
+    for {
+      worldState  <- getPersistedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+  }
+
+  def getMutableGroupView(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupView(mainGroup, getBestDeps(mainGroup))
+  }
+
+  def getMemPool(mainGroup: GroupIndex): MemPool
+
+  def getImmutableGroupViewIncludePool(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    val blockDeps = getBestDeps(mainGroup)
+    for {
+      worldState  <- getPersistedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
+  }
+
+  def getMutableGroupViewIncludePool(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    val blockDeps = getBestDeps(mainGroup)
+    for {
+      worldState  <- getCachedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
+  }
+
+  def getMutableGroupView(block: Block): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupView(block.chainIndex.from, block.blockDeps)
+  }
+
+  def getMutableGroupView(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    for {
+      worldState  <- getCachedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+  }
+
+  def getMutableGroupView(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps,
+      worldState: WorldState.Cached
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getBlockCachesForUpdates(mainGroup, blockDeps).map { blockCaches =>
+      BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+    }
+  }
+
   def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
     assume(brokerConfig.containsRaw(mainGroup))
     val groupShift = mainGroup - brokerConfig.groupFrom
     bestDeps(groupShift) = deps
   }
 
-  protected def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
+  def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.isIntraGroup)
     for {
-      newTips <- getInOutTips(block.header, chainIndex.from, inclusive = false)
-      oldTips <- getInOutTips(block.parentHash, chainIndex.from, inclusive = true)
-      diff    <- getTipsDiff(newTips, oldTips)
-      blocks  <- (diff :+ block.hash).mapE(hash => getBlockChain(hash).getBlock(hash))
+      diff   <- getHashesForUpdates(chainIndex.from, block.blockDeps)
+      blocks <- (diff :+ block.hash).mapE(hash => getBlockChain(hash).getBlock(hash))
     } yield blocks
   }
 
@@ -270,11 +333,7 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield diff
   }
 
-  def getHashesForUpdatesUnsafe(groupIndex: GroupIndex, deps: BlockDeps): AVector[BlockHash] = {
-    Utils.unsafe(getHashesForUpdates(groupIndex, deps))
-  }
-
-  def getBlocksForUpdates(
+  def getBlockCachesForUpdates(
       groupIndex: GroupIndex,
       deps: BlockDeps
   ): IOResult[AVector[BlockCache]] = {
@@ -293,7 +352,9 @@ trait BlockFlowState extends FlowTipsUtil {
     } else {
       for {
         blocks <- getBlocksForUpdates(block)
-        _      <- blocks.foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
+        _ <- blocks
+          .sortBy(_.timestamp)
+          .foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
       } yield ()
     }
   }
@@ -425,10 +486,10 @@ object BlockFlowState {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
         // we set gasRemaining = initial gas as the tx is already validated
-        StatefulVM.runTxScript(worldState, tx, script, tx.unsigned.startGas) match {
-          case Right(_)                        => Right(())
-          case Left(IOErrorUpdateState(error)) => Left(error)
-          case Left(error) =>
+        StatefulVM.runTxScript(worldState, tx, None, script, tx.unsigned.startGas) match {
+          case Right(_)          => Right(())
+          case Left(Left(error)) => Left(error.error)
+          case Left(Right(error)) =>
             throw new RuntimeException(s"Updating world state for invalid tx: $error")
         }
       case None => Right(())

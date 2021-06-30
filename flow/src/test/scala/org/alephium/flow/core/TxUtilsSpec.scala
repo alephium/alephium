@@ -17,8 +17,9 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Generators}
 import org.alephium.protocol.model.{defaultGasFee, defaultGasPrice, ChainIndex, TransactionTemplate}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.AlephiumSpec
@@ -66,5 +67,62 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
     val tx = TransactionTemplate.from(unsignedTx, genesisPriKey)
     TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
+    blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx) is MemPool.AddedToSharedPool
+    TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+  }
+
+  it should "calculate preOutputs for txs in new blocks" in new FlowFixture with Generators {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
+      val chainIndex = ChainIndex(fromGroup, toGroup)
+
+      val block = transfer(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+
+      val tx        = block.nonCoinbase.head
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+      tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+        val output = tx.unsigned.fixedOutputs(index)
+        if (output.toGroup equals chainIndex.from) {
+          groupView.getPreOutput(outputRef) isE Some(output)
+        } else {
+          groupView.getPreOutput(outputRef) isE None
+        }
+      }
+    }
+  }
+
+  it should "calculate preOutputs for txs in shared pool" in new FlowFixture with Generators {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
+      val chainIndex = ChainIndex(fromGroup, toGroup)
+
+      val block = transfer(blockFlow, chainIndex)
+      val tx    = block.nonCoinbase.head
+      blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx.toTemplate)
+
+      {
+        val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
+        tx.assetOutputRefs.foreach { outputRef =>
+          groupView.getPreOutput(outputRef) isE None
+        }
+      }
+
+      {
+        val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
+        groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+        tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+          val output = tx.unsigned.fixedOutputs(index)
+          if (output.toGroup equals chainIndex.from) {
+            groupView.getPreOutput(outputRef) isE Some(output)
+          } else {
+            groupView.getPreOutput(outputRef) isE None
+          }
+        }
+      }
+    }
   }
 }
