@@ -24,7 +24,7 @@ import org.alephium.flow.core.UtxoUtils.Asset
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript, WorldState}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TxUtils { Self: FlowUtils =>
@@ -250,26 +250,10 @@ trait TxUtils { Self: FlowUtils =>
       groupIndex: GroupIndex,
       txs: AVector[TransactionTemplate]
   ): IOResult[AVector[TransactionTemplate]] = {
-    val bestDeps = getBestDeps(groupIndex)
     for {
-      blockCaches <- getBlockCachesForUpdates(groupIndex, bestDeps)
-      worldState  <- getPersistedWorldState(bestDeps, groupIndex)
-      failedTxs   <- txs.filterNotE(recheckInputs(_, worldState, blockCaches))
+      groupView <- getImmutableGroupView(groupIndex)
+      failedTxs <- txs.filterE(tx => groupView.getPreOutputs(tx.unsigned.inputs).map(_.isEmpty))
     } yield failedTxs
-  }
-
-  private def recheckInputs(
-      tx: TransactionTemplate,
-      worldState: WorldState.Persisted,
-      blockCaches: AVector[BlockCache]
-  ): IOResult[Boolean] = {
-    tx.unsigned.inputs.forallE { input =>
-      if (blockCaches.exists(_.relatedOutputs.contains(input.outputRef))) {
-        Right(true)
-      } else {
-        worldState.existOutput(input.outputRef)
-      }
-    }
   }
 
   private def checkWithMinimalGas(
