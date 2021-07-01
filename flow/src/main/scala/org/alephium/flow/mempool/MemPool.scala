@@ -169,6 +169,8 @@ class MemPool private (
 
   def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
     sharedPools.foreach(_.clean(blockFlow, timeStampThreshold))
+    updatePendingPool()
+    ()
   }
 }
 

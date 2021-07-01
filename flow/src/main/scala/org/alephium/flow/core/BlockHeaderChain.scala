@@ -108,10 +108,6 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     headerStorage.put(header)
   }
 
-  protected def addHeaderUnsafe(header: BlockHeader): Unit = {
-    headerStorage.putUnsafe(header)
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
     getHeight(hash).flatMap {

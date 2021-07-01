@@ -210,4 +210,18 @@ class FlowTipsUtilSpec extends AlephiumSpec {
     FlowUtils.nextTimeStamp(currentTs) > currentTs is true
     FlowUtils.nextTimeStamp(futureTs) is futureTs.plusMillisUnsafe(1)
   }
+
+  it should "calculate proper groupTips" in new FlowFixture {
+    blockFlow.genesisBlocks.foreach {
+      _.foreach { block =>
+        (0 until groups0).foreach { g =>
+          blockFlow.getGroupTip(block.header, GroupIndex.unsafe(g)) is
+            blockFlow.genesisBlocks(g)(g).hash
+        }
+      }
+    }
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    blockFlow.getGroupTip(block.header, GroupIndex.unsafe(0)) is block.header.hash
+  }
 }

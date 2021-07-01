@@ -42,8 +42,6 @@ trait BlockHeaderPool extends BlockHashPool {
 
   def getWeight(bh: BlockHeader): IOResult[Weight] = getWeight(bh.hash)
 
-  def isTip(bh: BlockHeader): Boolean = isTip(bh.hash)
-
   def getHeightedBlockHeaders(
       fromTs: TimeStamp,
       toTs: TimeStamp

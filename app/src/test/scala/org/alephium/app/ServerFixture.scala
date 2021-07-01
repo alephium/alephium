@@ -239,5 +239,6 @@ object ServerFixture extends ServerFixture {
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
+    override def calWeight(block: Block): IOResult[Weight]              = ???
   }
 }

@@ -44,6 +44,8 @@ trait BlockFlow
 
   def addAndUpdateView(header: BlockHeader): IOResult[Unit]
 
+  def calWeight(block: Block): IOResult[Weight]
+
   override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
     getSyncLocatorsUnsafe(brokerConfig)
   }
@@ -202,7 +204,7 @@ object BlockFlow extends StrictLogging {
       } yield ()
     }
 
-    private def calWeight(block: Block): IOResult[Weight] = {
+    def calWeight(block: Block): IOResult[Weight] = {
       calWeight(block.header)
     }
 
@@ -212,7 +214,7 @@ object BlockFlow extends StrictLogging {
 
     private def calWeightUnsafe(header: BlockHeader): Weight = {
       if (header.isGenesis) {
-        ALF.GenesisWeight * brokerConfig.chainNum
+        ALF.GenesisWeight
       } else {
         val targetGroup  = header.chainIndex.from
         val depsFlowTips = FlowTips.from(header.blockDeps, targetGroup)

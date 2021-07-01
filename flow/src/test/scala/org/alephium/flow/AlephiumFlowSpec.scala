@@ -46,7 +46,7 @@ trait FlowFixture
   implicit def target2BigInt(target: Target): BigInt = BigInt(target.value)
 
   def genesisBlockFlow(): BlockFlow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)
-  def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)
+  def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   def isolatedBlockFlow(): BlockFlow = {
     val newStorages =
