@@ -71,11 +71,6 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     blockStorage.put(block)
   }
 
-  protected def persistBlockUnsafe(block: Block): Unit = {
-    blockStorage.putUnsafe(block)
-    ()
-  }
-
   protected def persistTxs(block: Block): IOResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
       block.transactions.foreachWithIndexE { case (tx, index) =>

@@ -185,6 +185,14 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
+  it should "compute genesis weight" in new FlowFixture {
+    blockFlow.genesisBlocks.foreach {
+      _.foreach { block =>
+        blockFlow.getWeight(block) is blockFlow.calWeight(block)
+      }
+    }
+  }
+
   it should "compute block weight" in new FlowFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
@@ -479,7 +487,11 @@ class BlockFlowSpec extends AlephiumSpec {
     val block          = transfer(blockFlow, ChainIndex.unsafe(0, 0), lockTimeOpt = Some(lockTime))
     val toLockupScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
     val toPrivateKey   = keyManager(toLockupScript)
+
     addAndCheck(blockFlow, block)
+    val lockedBalance = ALF.alf(1) - defaultGasFee
+    blockFlow.getBalance(toLockupScript) is Right((lockedBalance, lockedBalance, 1))
+
     blockFlow
       .transfer(
         toPrivateKey.publicKey,

@@ -206,27 +206,9 @@ trait BlockFlowState extends FlowTipsUtil {
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
   }
 
-  def getPersistedWorldState(block: Block): IOResult[WorldState.Persisted] = {
-    val header = block.header
-    getPersistedWorldState(header.blockDeps, header.chainIndex.from)
-  }
-
-  def getCachedWorldState(block: Block): IOResult[WorldState.Cached] = {
-    getCachedWorldState(block.header)
-  }
-
-  def getCachedWorldState(header: BlockHeader): IOResult[WorldState.Cached] = {
-    getCachedWorldState(header.blockDeps, header.chainIndex.from)
-  }
-
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
     val groupShift = groupIndex.value - brokerConfig.groupFrom
     bestDeps(groupShift)
-  }
-
-  def getBestHeight(chainIndex: ChainIndex): IOResult[Int] = {
-    val bestParent = getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
-    getHashChain(chainIndex.from, chainIndex.to).getHeight(bestParent)
   }
 
   def getBestPersistedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {

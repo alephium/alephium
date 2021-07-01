@@ -42,10 +42,6 @@ class PendingPool(
     txs.contains(txId)
   }
 
-  def isDoubleSpending(tx: TransactionTemplate): Boolean = readOnly {
-    tx.unsigned.inputs.exists(input => indexes.isSpent(input.outputRef))
-  }
-
   def add(tx: TransactionTemplate, timeStamp: TimeStamp): Boolean = writeOnly {
     if (!txs.contains(tx.id)) {
       if (isFull()) {

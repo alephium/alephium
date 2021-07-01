@@ -50,10 +50,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     chain.containsUnsafe(hash)
   }
 
-  def getIndex(hash: BlockHash): ChainIndex = {
-    ChainIndex.from(hash)
-  }
-
   protected def getHashChain(from: GroupIndex, to: GroupIndex): BlockHashChain
 
   def getHashChain(chainIndex: ChainIndex): BlockHashChain = {
