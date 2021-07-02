@@ -25,8 +25,11 @@ object Forest {
   def tryBuild[K, T](values: AVector[T], toKey: T => K, toParent: T => K): Option[Forest[K, T]] = {
     val rootParents = mutable.HashMap.empty[K, mutable.ArrayBuffer[Node[K, T]]]
     val nodes       = mutable.HashMap.empty[K, Node[K, T]]
-    values.foreach { value =>
-      val key = toKey(value)
+
+    import org.alephium.macros.HPC.cfor
+    cfor(0)(_ < values.length, _ + 1) { i =>
+      val value = values(i)
+      val key   = toKey(value)
       if (rootParents.contains(key)) {
         // scalastyle:off return
         return None

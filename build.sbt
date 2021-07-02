@@ -71,7 +71,6 @@ lazy val macros = project("macros")
 lazy val util = project("util")
   .dependsOn(macros)
   .settings(
-    scalacOptions -= "-Xlint:nonlocal-return",
     libraryDependencies ++= Seq(
       akka,
       `akka-slf4j`,

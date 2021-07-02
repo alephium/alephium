@@ -78,9 +78,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     AVector.unsafe(elems, start + 1, end, false)
   }
 
+  @inline
   def apply(i: Int): A = {
-    assume(i >= 0 && i < length)
-
     elems(start + i)
   }
 
@@ -151,12 +150,18 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def exists(f: A => Boolean): Boolean = {
-    foreach { a => if (f(a)) { return true } }
+    cfor(start)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      if (f(a)) { return true }
+    }
     false
   }
 
   def existsWithIndex(f: (A, Int) => Boolean): Boolean = {
-    foreachWithIndex { (a, i) => if (f(a, i)) { return true } }
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      if (f(a, i)) { return true }
+    }
     false
   }
 
@@ -166,12 +171,16 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def forall(f: A => Boolean): Boolean = {
-    foreach { a => if (!f(a)) { return false } }
+    cfor(start)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      if (!f(a)) { return false }
+    }
     true
   }
 
   def forallE[L](f: A => Either[L, Boolean]): Either[L, Boolean] = {
-    foreach { a =>
+    cfor(start)(_ < end, _ + 1) { i =>
+      val a = elems(i)
       f(a) match {
         case Left(l)      => return Left(l)
         case Right(false) => return Right(false)
@@ -182,7 +191,10 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def forallWithIndex(f: (A, Int) => Boolean): Boolean = {
-    foreachWithIndex { (a, i) => if (!f(a, i)) { return false } }
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      if (!f(a, i)) { return false }
+    }
     true
   }
 
@@ -248,8 +260,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def foreachWithIndex[U](f: (A, Int) => U): Unit = {
-    cfor(start)(_ < end, _ + 1) { i =>
-      f(elems(i), i - start)
+    cfor(0)(_ < length, _ + 1) { i =>
+      f(apply(i), i)
       ()
     }
   }
@@ -259,13 +271,14 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def mapE[L, R: ClassTag](f: A => Either[L, R]): Either[L, AVector[R]] = {
-    val res = AVector.tabulate(length) { i =>
+    val array = Array.ofDim[R](length)
+    cfor(0)(_ < length, _ + 1) { i =>
       f(apply(i)) match {
         case Left(l)  => return Left(l)
-        case Right(r) => r
+        case Right(r) => array(i) = r
       }
     }
-    Right(res)
+    Right(AVector.unsafe(array))
   }
 
   def mapToArray[@sp B: ClassTag](f: A => B): Array[B] = {
@@ -277,13 +290,14 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def mapWithIndexE[L, B: ClassTag](f: (A, Int) => Either[L, B]): Either[L, AVector[B]] = {
-    val res = AVector.tabulate(length) { i =>
+    val array = Array.ofDim[B](length)
+    cfor(0)(_ < length, _ + 1) { i =>
       f(apply(i), i) match {
         case Left(l)  => return Left(l)
-        case Right(r) => r
+        case Right(r) => array(i) = r
       }
     }
-    Right(res)
+    Right(AVector.unsafe(array))
   }
 
   def filter(p: A => Boolean): AVector[A] = {
@@ -309,18 +323,22 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   @inline
   private def filterEImpl[L](p: A => Either[L, Boolean], target: Boolean): Either[L, AVector[A]] = {
-    Right(fold(AVector.empty[A]) { (acc, elem) =>
-      p(elem) match {
+    var acc = AVector.empty[A]
+    cfor(start)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      p(a) match {
         case Left(l)                 => return Left(l)
-        case Right(t) if t == target => acc :+ elem
-        case Right(_)                => acc
+        case Right(t) if t == target => acc = acc :+ a
+        case Right(_)                => ()
       }
-    })
+    }
+    Right(acc)
   }
 
   def foreachE[L](f: A => Either[L, Unit]): Either[L, Unit] = {
-    foreach { elem =>
-      f(elem) match {
+    cfor(start)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      f(a) match {
         case Left(l)  => return Left(l)
         case Right(_) => ()
       }
@@ -329,8 +347,9 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def foreachWithIndexE[L](f: (A, Int) => Either[L, Unit]): Either[L, Unit] = {
-    foreachWithIndex { (elem, i) =>
-      f(elem, i) match {
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      f(a, i) match {
         case Left(l)  => return Left(l)
         case Right(_) => ()
       }
@@ -364,25 +383,31 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def foldWithIndex[B](zero: B)(f: (B, A, Int) => B): B = {
     var res = zero
-    foreachWithIndex { (elem, i) => res = f(res, elem, i) }
+    cfor(0)(_ < length, _ + 1) { i =>
+      res = f(res, apply(i), i)
+    }
     res
   }
 
   def foldE[L, R](zero: R)(f: (R, A) => Either[L, R]): Either[L, R] = {
-    val res = fold(zero) {
-      f(_, _) match {
+    var res = zero
+    cfor(start)(_ < end, _ + 1) { i =>
+      val a = elems(i)
+      f(res, a) match {
         case Left(l)  => return Left(l)
-        case Right(r) => r
+        case Right(r) => res = r
       }
     }
     Right(res)
   }
 
   def foldWithIndexE[L, R](zero: R)(f: (R, A, Int) => Either[L, R]): Either[L, R] = {
-    val res = foldWithIndex(zero) {
-      f(_, _, _) match {
+    var res = zero
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      f(res, a, i) match {
         case Left(l)  => return Left(l)
-        case Right(r) => r
+        case Right(r) => res = r
       }
     }
     Right(res)
@@ -438,16 +463,26 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def flatMapWithIndex[@sp B: ClassTag](f: (A, Int) => AVector[B]): AVector[B] = {
-    val (_, xs) = fold((0, AVector.empty[B])) { case ((i, acc), elem) =>
-      (i + 1, acc ++ f(elem, i))
+    var res = AVector.empty[B]
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      res = res ++ f(a, i)
     }
-    xs
+    res
   }
 
   def flatMapWithIndexE[L, R: ClassTag](
       f: (A, Int) => Either[L, AVector[R]]
   ): Either[L, AVector[R]] = {
-    foldWithIndexE(AVector.empty[R]) { (acc, elem, index) => f(elem, index).map(acc ++ _) }
+    var res = AVector.empty[R]
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      f(a, i) match {
+        case Left(l)   => return Left(l)
+        case Right(as) => res = res ++ as
+      }
+    }
+    Right(res)
   }
 
   def scanLeft[@sp B: ClassTag](zero: B)(op: (B, A) => B): AVector[B] = {
