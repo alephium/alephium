@@ -96,7 +96,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     val chainIndex = tx.chainIndex
     val mempool    = blockFlow.getMemPool(chainIndex)
     if (mempool.contains(chainIndex, tx)) {
-      log.debug(s"tx ${tx.id.shortHex} is already included")
+      log.debug(s"tx ${tx.id.toHexString} is already included")
       addFailed(tx)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       log.warning(s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
@@ -104,12 +104,12 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          log.warning(s"failed in validating tx ${tx.id.shortHex} due to $s: ${hex(tx)}")
+          log.warning(s"failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
           addFailed(tx)
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, origin, acknowledge = true)
         case Left(Left(e)) =>
-          log.warning(s"IO failed in validating tx ${tx.id.shortHex} due to $e: ${hex(tx)}")
+          log.warning(s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
           addFailed(tx)
       }
     }
