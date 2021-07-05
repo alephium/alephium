@@ -20,11 +20,10 @@ import scala.util.Random
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.{Normal, Reorg}
-import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALF, SignatureSchema}
+import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, StatefulScript}
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp}
 
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
@@ -117,52 +116,6 @@ class FlowUtilsSpec extends AlephiumSpec {
     val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
     template.deps.contains(block0.hash) is false
     template.transactions.init.isEmpty is true
-  }
-
-  it should "deal with large amount of UTXOs" in new FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = transfer(blockFlow, chainIndex)
-    val tx         = block.nonCoinbase.head
-    val output     = tx.unsigned.fixedOutputs.head
-
-    val n = ALF.MaxTxInputNum + 1
-
-    val outputs  = AVector.fill(n)(output.copy(amount = ALF.oneAlf))
-    val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
-    val newBlock = block.copy(transactions = AVector(newTx))
-    blockFlow.addAndUpdateView(newBlock).isRight is true
-
-    val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
-    balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
-    lockedBalance is 0
-    utxos is n
-
-    val txValidation = TxValidation.build
-    val unsignedTx0 = blockFlow
-      .transfer(
-        keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        ALF.alf((n - 2).toLong),
-        None,
-        defaultGasPrice
-      )
-      .rightValue
-      .rightValue
-    val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
-    txValidation.validateTx(tx0, blockFlow) isE ()
-
-    blockFlow
-      .transfer(
-        keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        ALF.alf((n - 1).toLong),
-        None,
-        defaultGasPrice
-      )
-      .rightValue
-      .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
   }
 
   it should "truncate txs w.r.t. tx number and gas" in new FlowFixture {

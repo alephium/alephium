@@ -20,9 +20,15 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALF, Generators}
-import org.alephium.protocol.model.{defaultGasFee, defaultGasPrice, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{
+  defaultGasFee,
+  defaultGasPrice,
+  ChainIndex,
+  Transaction,
+  TransactionTemplate
+}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, AVector, U256}
 
 class TxUtilsSpec extends AlephiumSpec {
   it should "consider minimal gas fee" in new FlowFixture {
@@ -124,5 +130,51 @@ class TxUtilsSpec extends AlephiumSpec {
         }
       }
     }
+  }
+
+  it should "transfer with large amount of UTXOs" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = transfer(blockFlow, chainIndex)
+    val tx         = block.nonCoinbase.head
+    val output     = tx.unsigned.fixedOutputs.head
+
+    val n = ALF.MaxTxInputNum + 1
+
+    val outputs  = AVector.fill(n)(output.copy(amount = ALF.oneAlf))
+    val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
+    val newBlock = block.copy(transactions = AVector(newTx))
+    blockFlow.addAndUpdateView(newBlock).isRight is true
+
+    val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
+    balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
+    lockedBalance is 0
+    utxos is n
+
+    val txValidation = TxValidation.build
+    val unsignedTx0 = blockFlow
+      .transfer(
+        keyManager(output.lockupScript).publicKey,
+        output.lockupScript,
+        None,
+        ALF.alf((n - 2).toLong),
+        None,
+        defaultGasPrice
+      )
+      .rightValue
+      .rightValue
+    val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
+    txValidation.validateTx(tx0, blockFlow) isE ()
+
+    blockFlow
+      .transfer(
+        keyManager(output.lockupScript).publicKey,
+        output.lockupScript,
+        None,
+        ALF.alf((n - 1).toLong),
+        None,
+        defaultGasPrice
+      )
+      .rightValue
+      .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
   }
 }
