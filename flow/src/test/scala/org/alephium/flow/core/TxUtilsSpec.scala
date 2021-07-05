@@ -132,7 +132,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "transfer with large amount of UTXOs" in new FlowFixture {
+  trait LargeUtxos extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)
     val tx         = block.nonCoinbase.head
@@ -149,7 +149,9 @@ class TxUtilsSpec extends AlephiumSpec {
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
     utxos is n
+  }
 
+  it should "transfer with large amount of UTXOs" in new LargeUtxos {
     val txValidation = TxValidation.build
     val unsignedTx0 = blockFlow
       .transfer(
@@ -176,5 +178,21 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
+  }
+
+  it should "sweep as much as we can" in new LargeUtxos {
+    val txValidation = TxValidation.build
+    val unsignedTx = blockFlow
+      .sweepAll(
+        keyManager(output.lockupScript).publicKey,
+        output.lockupScript,
+        None,
+        None,
+        defaultGasPrice
+      )
+      .rightValue
+      .rightValue
+    val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
+    txValidation.validateTx(sweepTx, blockFlow) isE ()
   }
 }
