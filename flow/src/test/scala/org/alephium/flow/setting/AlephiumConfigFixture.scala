@@ -36,7 +36,7 @@ trait AlephiumConfigFixture {
 
   lazy val newConfig = ConfigFactory
     .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)
-    .withFallback(Configs.parseConfig(rootPath))
+    .withFallback(Configs.parseConfig(rootPath, overwrite = true))
 
   lazy val groups0 = newConfig.getInt("alephium.broker.groups")
 

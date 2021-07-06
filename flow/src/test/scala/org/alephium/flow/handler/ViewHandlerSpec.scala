@@ -69,6 +69,7 @@ class ViewHandlerSpec extends AlephiumFlowActorSpec("ViewHandlerSpec") {
       viewHandler ! ViewHandler.Subscribe
       viewHandler.underlyingActor.subscribers.isEmpty is true
       viewHandler.underlyingActor.updateScheduled is None
+      expectMsg(ViewHandler.SubscribeFailed)
     }
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)

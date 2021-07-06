@@ -155,7 +155,7 @@ trait Miner extends BaseActor with MinerState {
     val minerAddress =
       Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
     log.info(
-      s"A new block ${block.shortHex} got mined for $chainIndex, tx: $txCount, " +
+      s"A new block ${block.hash.toHexString} got mined for $chainIndex, tx: $txCount, " +
         s"miningCount: $totalCount, target: ${block.header.target}, miner: $minerAddress"
     )
   }

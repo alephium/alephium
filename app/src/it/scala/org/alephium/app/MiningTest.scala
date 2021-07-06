@@ -75,7 +75,6 @@ class MiningTest extends AlephiumSpec {
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
-    server0.minerApiController // need to call this lazy value first
     val minerApiAddress = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
     val miner           = system.actorOf(ExternalMinerMock.props(networkType, AVector(minerApiAddress)))
     miner ! Miner.Start
@@ -85,7 +84,6 @@ class MiningTest extends AlephiumSpec {
       txStatus is a[Confirmed]
     }
 
-    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     server0.stop().futureValue is ()
   }
 

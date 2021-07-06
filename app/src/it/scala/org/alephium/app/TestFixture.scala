@@ -125,8 +125,9 @@ trait TestFixtureLike
     }
   }
 
-  def wsPort(port: Int)   = port - 1
-  def restPort(port: Int) = port - 2
+  def wsPort(port: Int)    = port - 1
+  def restPort(port: Int)  = port - 2
+  def minerPort(port: Int) = port - 3
 
   val defaultMasterPort     = generatePort
   val defaultRestMasterPort = restPort(defaultMasterPort)
@@ -254,6 +255,7 @@ trait TestFixtureLike
         ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.ws-port", wsPort(publicPort)),
         ("alephium.network.rest-port", restPort(publicPort)),
+        ("alephium.network.miner-api-port", minerPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),

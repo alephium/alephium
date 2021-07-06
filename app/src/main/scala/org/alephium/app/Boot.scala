@@ -51,7 +51,7 @@ object Boot extends App with StrictLogging {
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class BootUp extends StrictLogging {
   val rootPath: Path                  = Platform.getRootPath()
-  val typesafeConfig: Config          = Configs.parseConfigAndValidate(rootPath)
+  val typesafeConfig: Config          = Configs.parseConfigAndValidate(rootPath, overwrite = true)
   implicit val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
