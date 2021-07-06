@@ -25,7 +25,7 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   trait Fixture extends AlephiumConfigFixture with NoIndexModelGeneratorsLike {
@@ -525,5 +525,38 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val expected1 = ChainDiff(hashes0.reverse, hashes1)
     chain.calHashDiff(chain0.last.hash, chain1.last.hash) isE expected0
     chain.calHashDiff(chain1.last.hash, chain0.last.hash) isE expected1
+  }
+
+  it should "test getHeightedBlocks" in new Fixture {
+    val longChain = chainGenOf(9, genesis).sample.get
+    val chain     = buildBlockChain()
+    addBlocks(chain, longChain)
+    val all = chain.getHeightedBlocks(TimeStamp.zero, TimeStamp.unsafe(Long.MaxValue))
+
+    val ts      = all.rightValue.map { case (header, _) => header.timestamp }
+    val heights = all.rightValue.map { case (_, heights) => heights }
+
+    heights is AVector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+    def subset(from: TimeStamp, to: TimeStamp): AVector[Int] = {
+      chain
+        .getHeightedBlocks(from, to)
+        .rightValue
+        .map { case (_, heights) => heights }
+    }
+
+    subset(ts(0), ts(9)) is heights
+    subset(ts(2), ts(8)) is AVector(2, 3, 4, 5, 6, 7, 8)
+    subset(ts(0), ts(0)) is AVector(0)
+    subset(ts(9), ts(9)) is AVector(9)
+    (0 to 8).foreach { i =>
+      subset(ts(i), ts(i + 1)) is AVector(i, i + 1)
+    }
+    (0 to 8).foreach { i =>
+      subset(ts(i + 1), ts(i)) is AVector.empty[Int]
+    }
+    subset(ts(6), ts(9).minusUnsafe(Duration.ofMillisUnsafe(1))) is AVector(6, 7, 8)
+    val ten = ts(9).plusMillisUnsafe(1)
+    subset(ten, ten) is AVector.empty[Int]
   }
 }

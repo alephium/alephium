@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{BlockHeader, Weight}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.AVector
 
 trait BlockHeaderPool extends BlockHashPool {
 
@@ -42,8 +42,5 @@ trait BlockHeaderPool extends BlockHashPool {
 
   def getWeight(bh: BlockHeader): IOResult[Weight] = getWeight(bh.hash)
 
-  def getHeightedBlockHeaders(
-      fromTs: TimeStamp,
-      toTs: TimeStamp
-  ): IOResult[AVector[(BlockHeader, Int)]]
+  def isTip(bh: BlockHeader): Boolean = isTip(bh.hash)
 }

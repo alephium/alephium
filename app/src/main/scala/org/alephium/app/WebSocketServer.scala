@@ -139,7 +139,7 @@ object WebSocketServer {
   }
 
   def handleEvent(event: EventBus.Event)(implicit
-      writer: Writer[BlockEntry]
+      writer: Writer[BlockHeaderEntry]
   ): String = {
     event match {
       case bn @ FlowHandler.BlockNotify(_, _) =>
@@ -148,12 +148,12 @@ object WebSocketServer {
         write(notification)
     }
   }
-  private def blockEntryfrom(blockNotify: BlockNotify): BlockEntry = {
-    BlockEntry.from(blockNotify.header, blockNotify.height)
+  private def blockHeaderEntryfrom(blockNotify: BlockNotify): BlockHeaderEntry = {
+    BlockHeaderEntry.from(blockNotify.header, blockNotify.height)
   }
 
   def blockNotifyEncode(blockNotify: BlockNotify)(implicit
-      writer: Writer[BlockEntry]
+      writer: Writer[BlockHeaderEntry]
   ): ujson.Value =
-    writeJs(blockEntryfrom(blockNotify))
+    writeJs(blockHeaderEntryfrom(blockNotify))
 }

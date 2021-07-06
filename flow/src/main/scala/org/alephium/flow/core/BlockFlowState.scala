@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
@@ -83,6 +84,7 @@ trait BlockFlowState extends FlowTipsUtil {
         blockchainBuilder(genesisBlock)
       }
     }
+
   private val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
     AVector.tabulate(groups, groups) { case (from, to) =>
       if (brokerConfig.containsRaw(from)) {
@@ -137,10 +139,10 @@ trait BlockFlowState extends FlowTipsUtil {
     blockHeaderChains.reduceByE { chains => chains.reduceByE(f)(op) }(op)
   }
 
-  protected def aggregateHeaderE[T](
-      f: BlockHeaderPool => IOResult[T]
-  )(op: (T, T) => T): IOResult[T] = {
-    blockHeaderChains.reduceByE { chains => chains.reduceByE(f)(op) }(op)
+  protected def concatOutBlockChainsE[T: ClassTag](
+      f: BlockChain => IOResult[T]
+  ): IOResult[AVector[T]] = {
+    outBlockChains.flatMapE { chains => chains.mapE(f) }
   }
 
   def getBlockChain(hash: BlockHash): BlockChain

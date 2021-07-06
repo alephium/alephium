@@ -33,7 +33,15 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   val zeroHash: String = BlockHash.zero.toHexString
   def entryDummy(i: Int): BlockEntry =
-    BlockEntry(BlockHash.zero, TimeStamp.unsafe(i.toLong), i, i, i, AVector(BlockHash.zero), None)
+    BlockEntry(
+      BlockHash.zero,
+      TimeStamp.unsafe(i.toLong),
+      i,
+      i,
+      i,
+      AVector(BlockHash.zero),
+      AVector.empty
+    )
   val dummyAddress     = new InetSocketAddress("127.0.0.1", 9000)
   val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
   val dummyCliqueInfo =
@@ -98,9 +106,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode FetchResponse" in {
-    val response = FetchResponse(AVector.tabulate(2)(entryDummy))
+    val response = FetchResponse(AVector(AVector.tabulate(2)(entryDummy)))
     val jsonRaw =
-      s"""{"blocks":[{"hash":"$zeroHash","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["$zeroHash"]},{"hash":"$zeroHash","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["$zeroHash"]}]}"""
+      s"""{"blocks":[[{"hash":"$zeroHash","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["$zeroHash"],"transactions":[]},{"hash":"$zeroHash","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["$zeroHash"],"transactions":[]}]]}"""
     checkData(response, jsonRaw)
   }
 

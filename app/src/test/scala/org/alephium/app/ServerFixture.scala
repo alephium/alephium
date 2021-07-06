@@ -56,8 +56,10 @@ trait ServerFixture
 
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
-  lazy val dummyBlock           = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyFetchResponse   = FetchResponse(AVector(BlockEntry.from(dummyBlockHeader, 1)))
+  lazy val dummyBlock = blockGen.sample.get.copy(header = dummyBlockHeader)
+  lazy val dummyFetchResponse = FetchResponse(
+    AVector(AVector(BlockEntry.from(dummyBlock, 1, networkType)))
+  )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
@@ -200,12 +202,12 @@ object ServerFixture extends ServerFixture {
   )(implicit val config: AlephiumConfig)
       extends EmptyBlockFlow {
 
-    override def getHeightedBlockHeaders(
+    override def getHeightedBlocks(
         fromTs: TimeStamp,
         toTs: TimeStamp
-    ): IOResult[AVector[(BlockHeader, Int)]] = {
+    ): IOResult[AVector[AVector[(Block, Int)]]] = {
       blockFlowProbe ! (block.header.timestamp >= fromTs && block.header.timestamp <= toTs)
-      Right(AVector((block.header, 1)))
+      Right(AVector(AVector((block, 1))))
     }
 
     override def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] =

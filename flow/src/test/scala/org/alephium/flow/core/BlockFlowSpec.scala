@@ -582,6 +582,34 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.getBalance(fromLockup).rightValue is fromBalance
   }
 
+  it should "fetch bocks for the corresponding groups" in {
+    trait Fixture extends FlowFixture {
+      def test(): Assertion = {
+        val blocks = blockFlow
+          .getHeightedBlocks(
+            ALF.GenesisTimestamp.plusMinutesUnsafe(-1),
+            ALF.GenesisTimestamp.plusMinutesUnsafe(1)
+          )
+          .rightValue
+        val expected = brokerConfig.groupRange.flatMap { fromGroup =>
+          (0 until groups0).map { toGroup =>
+            AVector(blockFlow.genesisBlocks(fromGroup)(toGroup) -> 0)
+          }
+        }
+        blocks is AVector.from(expected)
+      }
+    }
+
+    new Fixture {
+      test()
+    }
+
+    new Fixture {
+      override val configValues = Map(("alephium.broker.broker-num", 1))
+      test()
+    }
+  }
+
   behavior of "confirmations"
 
   it should "return correct confirmations for genesis txs" in new FlowFixture {
