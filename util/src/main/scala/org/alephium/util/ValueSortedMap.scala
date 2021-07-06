@@ -79,9 +79,11 @@ class ValueSortedMap[K: ClassTag, V: ClassTag](
   }
 
   def remove(elem: K): Unit = {
-    orderedMap.remove(elem)
-    map.remove(elem)
-    ()
+    if (map.containsKey(elem)) {
+      orderedMap.remove(elem)
+      map.remove(elem)
+      ()
+    }
   }
 
   def get(key: K): Option[V] = Option(map.get(key))

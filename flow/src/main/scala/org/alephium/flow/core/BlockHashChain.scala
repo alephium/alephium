@@ -97,19 +97,20 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   // the max height is the height of the tip of max weight
   def maxHeight: IOResult[Int] = {
-    val maxWeighted = EitherF.foldTry(tips.keys(), (ALF.GenesisHeight, ALF.GenesisWeight)) {
-      case ((height, weight), tip) =>
-        getState(tip).map { case BlockState(tipHeight, tipWeight) =>
-          if (tipWeight.compareTo(weight) > 0) (tipHeight, tipWeight) else (height, weight)
-        }
-    }
-    maxWeighted.map(_._1)
+    IOUtils.tryExecute(maxHeightUnsafe)
   }
 
-  def maxHeightUnsafe: Int =
-    tips.keys().foldLeft(ALF.GenesisHeight) { (height, hash) =>
-      math.max(getHeightUnsafe(hash), height)
-    }
+  def maxHeightUnsafe: Int = {
+    val (maxHeight, _) =
+      tips.keys().foldLeft((ALF.GenesisHeight, ALF.GenesisWeight)) { case ((height, weight), tip) =>
+        getStateUnsafe(tip) match {
+          case BlockState(tipHeight, tipWeight) =>
+            if (tipWeight > weight) (tipHeight, tipWeight) else (height, weight)
+        }
+      }
+
+    maxHeight
+  }
 
   def isCanonical(hash: BlockHash): IOResult[Boolean] = {
     IOUtils.tryExecute(isCanonicalUnsafe(hash))

@@ -245,6 +245,8 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val arr = new Array[A](vc.length)
       vc.foreachWithIndex { (elem, i) => arr(i) = elem }
       checkEq(vc, arr)
+      vc.foreachWithIndexE { (_, i) => Right(require(i >= 0 && i < vc.length)) } isE ()
+      vc.foreachWithIndexE { (_, _) => Left(()) }.isLeft is true
     }
   }
 
@@ -259,6 +261,16 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
         elem
       }
       checkEq(vc1, vc.toArray)
+
+      val vc2 = vc.mapWithIndexE { (elem, _) =>
+        Right(elem)
+      }
+      vc2.rightValue is vc1
+
+      val vc3 = vc.mapWithIndexE { (_, _) =>
+        Left(())
+      }
+      vc3.isLeft is true
 
       val arr = vc.mapToArray(identity)
       checkEq(vc, arr)
@@ -330,6 +342,24 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       checkEq(vc0, arr)
       val vc1 = vc0.flatMap(elem => AVector(elem, elem))
       checkEq(vc1, arr.flatMap(x => Array(x, x)))
+
+      val vc2 = vc.flatMapWithIndex { case (elem, i) =>
+        vc(i) is elem
+        AVector(elem)
+      }
+      vc2 is vc
+
+      val vc3 = vc.flatMapWithIndexE { case (elem, i) =>
+        vc(i) is elem
+        Right(AVector(elem))
+      }
+      vc3 isE vc
+
+      val vc4 = vc.flatMapWithIndexE { case (elem, i) =>
+        vc(i) is elem
+        Left(())
+      }
+      vc4.isLeft is true
     }
   }
 
@@ -383,6 +413,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       vc.indices.length is vc.length
       vc.indices.start is 0
       vc.indices.step is 1
+    }
+  }
+
+  it should "toIterable" in new Fixture {
+    forAll(vectorGen) { vc =>
+      vc.toIterable.toSeq is vc.toArray.toIterable.toSeq
     }
   }
 }
@@ -467,6 +503,8 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     AVector(-1, 2, 3).forall(_ > 0) is false
     AVector(1, -2, 3).forall(_ > 0) is false
     AVector(1, 2, -3).forall(_ > 0) is false
+    AVector(1, 2, 3).forallWithIndex(_ > _) is true
+    AVector(1, 2, 2).forallWithIndex(_ > _) is false
   }
 
   it should "forallE" in new FixtureF {
@@ -549,6 +587,42 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     vc3.appendable is true
     vc2 is AVector(1, 2, 3, 3)
     vc3 is AVector(2, 3, 4)
+  }
+
+  it should "group" in new Fixture {
+    val vc0 = AVector(0, 1, 2, 3, 4, 5)
+    vc0.grouped(1) is vc0.map(AVector(_))
+    vc0.grouped(3) is AVector(AVector(0, 1, 2), AVector(3, 4, 5))
+  }
+
+  it should "withFilter (2)" in new Fixture {
+    forAll(vectorGen) { vc =>
+      val vc0 = for {
+        a <- vc
+      } yield a + 1
+      vc0 is vc.map(_ + 1)
+
+      val vc1 = for {
+        a <- vc
+        b <- AVector(a)
+      } yield b - 1
+      vc1 is vc.map(_ - 1)
+
+      var vc2 = AVector.empty[Int]
+      for {
+        a <- vc
+      } yield {
+        vc2 = vc2 :+ a
+      }
+      vc2 is vc
+    }
+  }
+
+  it should "sort" in new Fixture {
+    forAll(vectorGen) { vc =>
+      checkEq(vc.sorted, vc.toArray.sorted)
+      checkEq(vc.sortBy(-_), vc.toArray.sortBy(-_))
+    }
   }
 }
 

@@ -70,4 +70,21 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       updateCount is initialCount + blocks.length
     }
   }
+
+  it should "get maximal height based on weights" in new Fixture {
+    val longChain  = chainGenOf(3, genesis).sample.get
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val chain      = buildGenesis()
+    longChain.foreachWithIndex { case (block, index) =>
+      chain.add(block, Weight(index)) isE ()
+    }
+    shortChain.foreachWithIndex { case (block, index) =>
+      chain.add(block, Weight(index * 3)) isE ()
+    }
+    chain.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)
+    chain.getBestTipUnsafe is shortChain.last.hash
+    chain.maxWeight isE Weight(3)
+    chain.maxHeight isE 2
+    chain.maxHeightUnsafe is 2
+  }
 }

@@ -119,7 +119,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.error(
-      s"IO failed in block/header ${data.hash.shortHex}: $blockHex validation: $error"
+      s"IO failed in block/header ${data.hash.toHexString}: $blockHex validation: $error"
     )
     chainValidationFailed.labels(data.`type`, "IOError").inc()
 
@@ -133,7 +133,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
       status: InvalidStatus
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
-    log.warning(s"Invalid block/header ${data.shortHex}: $status : $blockHex")
+    log.warning(s"Invalid block/header ${data.hash.toHexString}: $status : $blockHex")
     chainValidationFailed.labels(data.`type`, status.name).inc()
 
     if (!origin.isLocal) {
@@ -185,7 +185,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
       (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
     val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
 
-    s"hash: ${header.shortHex}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
+    s"hash: ${header.hash.toHexString}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
   }
 
   protected def measureCommon(header: BlockHeader): BlockHeaderChain = {

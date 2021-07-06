@@ -51,4 +51,15 @@ class ValueSortedMapSpec extends AlephiumSpec {
     map.min is 'a'
     map.max is 'b'
   }
+
+  it should "remove elements" in {
+    import akka.util.ByteString
+    import Bytes.byteStringOrdering
+    val map    = ValueSortedMap.empty[ByteString, TimeStamp]
+    val hashes = (0 until 100).map(_ => UnsecureRandom.nextU256().toBytes)
+    val now    = TimeStamp.now()
+    hashes.foreach(map.put(_, now))
+    map.remove(hashes.head)
+    map.remove(hashes.head)
+  }
 }

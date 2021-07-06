@@ -73,9 +73,12 @@ object Base58 {
     val zeros      = ByteString.fromArrayUnsafe(Array.fill(zeroLength)(0))
     val trim       = input.drop(zeroLength)
 
-    val decodedBi = trim.foldLeft(zero) { (bi, c) =>
+    import org.alephium.macros.HPC.cfor
+    var decodedBi = zero
+    cfor(0)(_ < trim.length, _ + 1) { i =>
+      val c = trim.charAt(i)
       val n = toBase58(c)
-      if (n == -1) return None else (bi * base + n)
+      if (n == -1) return None else decodedBi = decodedBi * base + n
     }
 
     if (decodedBi == zero) {

@@ -141,11 +141,11 @@ trait TxUtils { Self: FlowUtils =>
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-    getUsableUtxos(fromLockupScript).map { utxos =>
+    getUsableUtxos(fromLockupScript).map { allUtxos =>
+      val utxos = allUtxos.takeUpto(ALF.MaxTxInputNum) // sweep as much as we can
       for {
         _   <- checkWithMinimalGas(gasOpt, minimalGas)
         gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateGas(utxos.length, 1)))
-        _   <- checkWithMaxTxInputNum(utxos)
         totalAmount <- utxos.foldE(U256.Zero)(
           _ add _.output.amount toRight "Input amount overflow"
         )

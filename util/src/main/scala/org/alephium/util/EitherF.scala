@@ -19,8 +19,9 @@ package org.alephium.util
 object EitherF {
   // scalastyle:off return
   def foreachTry[E, L](elems: IterableOnce[E])(f: E => Either[L, Unit]): Either[L, Unit] = {
-    elems.iterator.foreach { e =>
-      f(e) match {
+    val iterator = elems.iterator
+    while (iterator.hasNext) {
+      f(iterator.next()) match {
         case Left(l)  => return Left(l)
         case Right(_) => ()
       }
@@ -31,9 +32,10 @@ object EitherF {
   def foldTry[E, L, R](elems: IterableOnce[E], zero: R)(
       op: (R, E) => Either[L, R]
   ): Either[L, R] = {
-    var result = zero
-    elems.iterator.foreach { e =>
-      op(result, e) match {
+    var result   = zero
+    val iterator = elems.iterator
+    while (iterator.hasNext) {
+      op(result, iterator.next()) match {
         case Left(l)  => return Left(l)
         case Right(r) => result = r
       }
@@ -44,8 +46,9 @@ object EitherF {
   def forallTry[E, L](
       elems: IterableOnce[E]
   )(predicate: E => Either[L, Boolean]): Either[L, Boolean] = {
-    elems.iterator.foreach { e =>
-      predicate(e) match {
+    val iterator = elems.iterator
+    while (iterator.hasNext) {
+      predicate(iterator.next()) match {
         case Right(true) => ()
         case result      => return result
       }

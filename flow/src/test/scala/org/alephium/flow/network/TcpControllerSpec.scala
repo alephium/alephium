@@ -23,6 +23,8 @@ import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, SocketUtil, TestActorRef, TestProbe}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually.eventually
+import org.scalatest.concurrent.PatienceConfiguration
+import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -128,10 +130,16 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     }
   }
 
-  it should "forward connection failure" in new Fixture {
+  it should "forward connection failure" in new Fixture with PatienceConfiguration {
+    implicit override val patienceConfig: PatienceConfig =
+      PatienceConfig(
+        timeout = (Span(15, Seconds)),
+        interval = (Span(150, Millis))
+      )
+
     val freeAddress = SocketUtil.temporaryServerAddress()
     val probe       = TestProbe()
     controller ! TcpController.ConnectTo(freeAddress, probe.ref)
-    probe.expectMsgType[Tcp.CommandFailed]
+    eventually(probe.expectMsgType[Tcp.CommandFailed])
   }
 }
