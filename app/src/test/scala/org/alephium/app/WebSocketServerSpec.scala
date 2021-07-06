@@ -117,7 +117,7 @@ class WebSocketServerSpec
     def checkWS[A](f: => A) = {
       server.start().futureValue
 
-      implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
+      implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(5).asScala)
       eventually {
         node.eventBus
           .ask(EventBus.ListSubscribers)
