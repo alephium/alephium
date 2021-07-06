@@ -115,20 +115,11 @@ trait ApiModelCodec {
 
   implicit val tokenRW: RW[Token] = macroRW
 
-  implicit val outputRW: RW[Output] = macroRW
+  implicit val outputRW: RW[Output] =
+    RW.merge(macroRW[Output.Asset], macroRW[Output.Contract])
 
-  //macro failed on Input for unknwown reason
-  implicit val inputRW: ReadWriter[Input] = readwriter[ujson.Value].bimap[Input](
-    { input =>
-      input.unlockScript match {
-        case Some(unlockScript) =>
-          ujson
-            .Obj("outputRef" -> writeJs(input.outputRef), "unlockScript" -> writeJs(unlockScript))
-        case None => ujson.Obj("outputRef" -> writeJs(input.outputRef))
-      }
-    },
-    json => Input(read[OutputRef](json("outputRef")), readOpt[ByteString](json("unlockScript")))
-  )
+  implicit val inputRW: RW[Input] =
+    RW.merge(macroRW[Input.Asset], macroRW[Input.Contract])
 
   implicit val txRW: RW[Tx] = macroRW
 

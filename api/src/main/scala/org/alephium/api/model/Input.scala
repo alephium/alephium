@@ -22,18 +22,26 @@ import org.alephium.protocol.model.{ContractOutputRef, TxInput, TxOutputRef}
 import org.alephium.protocol.vm.UnlockScript
 import org.alephium.serde.serialize
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Input(outputRef: OutputRef, unlockScript: Option[ByteString] = None)
+sealed trait Input {
+  def outputRef: OutputRef
+}
 
 object Input {
-  def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Input = {
-    Input(OutputRef.from(outputRef), Some(serialize(unlockScript)))
+
+  @upickle.implicits.key("asset")
+  final case class Asset(outputRef: OutputRef, unlockScript: ByteString) extends Input
+
+  @upickle.implicits.key("contract")
+  final case class Contract(outputRef: OutputRef) extends Input
+
+  def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Asset = {
+    Asset(OutputRef.from(outputRef), serialize(unlockScript))
   }
 
-  def from(input: TxInput): Input = {
-    Input(input.outputRef, input.unlockScript)
+  def from(input: TxInput): Asset = {
+    apply(input.outputRef, input.unlockScript)
   }
 
-  def from(input: ContractOutputRef): Input =
-    Input(OutputRef.from(input), unlockScript = None)
+  def from(input: ContractOutputRef): Contract =
+    Contract(OutputRef.from(input))
 }

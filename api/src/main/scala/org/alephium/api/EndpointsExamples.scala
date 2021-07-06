@@ -19,6 +19,7 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.InetSocketAddress
 
+import akka.util.ByteString
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.model._
@@ -75,8 +76,10 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val tx = Tx(
     txId,
-    AVector(Input(OutputRef(scriptHint = 23412, key = hash), Some(serialize(unlockScript)))),
-    AVector(Output(amount = balance, address, tokens, Some(ts)))
+    AVector(Input.Asset(OutputRef(scriptHint = 23412, key = hash), serialize(unlockScript))),
+    AVector(Output.Asset(amount = balance, address, tokens, ts, ByteString.empty)),
+    1,
+    U256.unsafe(1000)
   )
 
   private val blockEntry = BlockEntry(

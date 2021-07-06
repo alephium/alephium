@@ -16,27 +16,52 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, AssetOutput, ContractOutput, NetworkType, TxOutput}
+import akka.util.ByteString
+
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Address, NetworkType, TxOutput}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Output(
-    amount: U256,
-    address: Address,
-    tokens: AVector[Token],
-    lockTime: Option[TimeStamp] = None
-)
+sealed trait Output {
+  def amount: U256
+  def address: Address
+  def tokens: AVector[Token]
+}
+
 object Output {
+
+  @upickle.implicits.key("asset")
+  final case class Asset(
+      amount: U256,
+      address: Address,
+      tokens: AVector[Token],
+      lockTime: TimeStamp,
+      additionalData: ByteString
+  ) extends Output
+
+  @upickle.implicits.key("contract")
+  final case class Contract(
+      amount: U256,
+      address: Address,
+      tokens: AVector[Token]
+  ) extends Output
+
   def from(output: TxOutput, networkType: NetworkType): Output = {
-    val lockTime = output match {
-      case o: AssetOutput    => Some(o.lockTime)
-      case _: ContractOutput => None
+    output match {
+      case o: model.AssetOutput =>
+        Asset(
+          o.amount,
+          Address(networkType, o.lockupScript),
+          o.tokens.map((Token.apply).tupled),
+          o.lockTime,
+          o.additionalData
+        )
+      case o: model.ContractOutput =>
+        Contract(
+          o.amount,
+          Address(networkType, o.lockupScript),
+          o.tokens.map((Token.apply).tupled)
+        )
     }
-    Output(
-      output.amount,
-      Address(networkType, output.lockupScript),
-      output.tokens.map((Token.apply).tupled),
-      lockTime
-    )
   }
 }

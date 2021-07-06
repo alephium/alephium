@@ -2246,6 +2246,7 @@
                             "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                             "inputs": [
                               {
+                                "type": "asset",
                                 "outputRef": {
                                   "scriptHint": 23412,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -2255,6 +2256,7 @@
                             ],
                             "outputs": [
                               {
+                                "type": "asset",
                                 "amount": "1000000000000000000",
                                 "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                                 "tokens": [
@@ -2267,9 +2269,12 @@
                                     "amount": "1000"
                                   }
                                 ],
-                                "lockTime": 1611041396892
+                                "lockTime": 1611041396892,
+                                "additionalData": ""
                               }
-                            ]
+                            ],
+                            "startGas": 1,
+                            "gasPrice": "1000"
                           }
                         ]
                       }
@@ -2388,6 +2393,7 @@
                       "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                       "inputs": [
                         {
+                          "type": "asset",
                           "outputRef": {
                             "scriptHint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -2397,6 +2403,7 @@
                       ],
                       "outputs": [
                         {
+                          "type": "asset",
                           "amount": "1000000000000000000",
                           "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                           "tokens": [
@@ -2409,9 +2416,12 @@
                               "amount": "1000"
                             }
                           ],
-                          "lockTime": 1611041396892
+                          "lockTime": 1611041396892,
+                          "additionalData": ""
                         }
-                      ]
+                      ],
+                      "startGas": 1,
+                      "gasPrice": "1000"
                     }
                   ]
                 }
@@ -2958,6 +2968,7 @@
                     "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                     "inputs": [
                       {
+                        "type": "asset",
                         "outputRef": {
                           "scriptHint": 23412,
                           "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -2967,6 +2978,7 @@
                     ],
                     "outputs": [
                       {
+                        "type": "asset",
                         "amount": "1000000000000000000",
                         "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                         "tokens": [
@@ -2979,9 +2991,12 @@
                             "amount": "1000"
                           }
                         ],
-                        "lockTime": 1611041396892
+                        "lockTime": 1611041396892,
+                        "additionalData": ""
                       }
-                    ]
+                    ],
+                    "startGas": 1,
+                    "gasPrice": "1000"
                   }
                 ]
               }
@@ -3419,6 +3434,7 @@
                   "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "inputs": [
                     {
+                      "type": "asset",
                       "outputRef": {
                         "scriptHint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -3428,6 +3444,7 @@
                   ],
                   "outputs": [
                     {
+                      "type": "asset",
                       "amount": "1000000000000000000",
                       "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                       "tokens": [
@@ -3440,9 +3457,12 @@
                           "amount": "1000"
                         }
                       ],
-                      "lockTime": 1611041396892
+                      "lockTime": 1611041396892,
+                      "additionalData": ""
                     }
-                  ]
+                  ],
+                  "startGas": 1,
+                  "gasPrice": "1000"
                 }
               }
             }
@@ -4886,7 +4906,9 @@
       },
       "Tx": {
         "required": [
-          "id"
+          "id",
+          "startGas",
+          "gasPrice"
         ],
         "type": "object",
         "properties": {
@@ -4904,12 +4926,30 @@
             "items": {
               "$ref": "#/components/schemas/Output"
             }
+          },
+          "startGas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "type": "integer",
+            "format": "uint256"
           }
         }
       },
       "Input": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Asset"
+          },
+          {
+            "$ref": "#/components/schemas/Contract"
+          }
+        ]
+      },
+      "Asset": {
         "required": [
-          "outputRef"
+          "outputRef",
+          "unlockScript"
         ],
         "type": "object",
         "properties": {
@@ -4936,10 +4976,33 @@
           }
         }
       },
+      "Contract": {
+        "required": [
+          "outputRef"
+        ],
+        "type": "object",
+        "properties": {
+          "outputRef": {
+            "$ref": "#/components/schemas/OutputRef"
+          }
+        }
+      },
       "Output": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Asset1"
+          },
+          {
+            "$ref": "#/components/schemas/Contract1"
+          }
+        ]
+      },
+      "Asset1": {
         "required": [
           "amount",
-          "address"
+          "address",
+          "lockTime",
+          "additionalData"
         ],
         "type": "object",
         "properties": {
@@ -4958,6 +5021,9 @@
           },
           "lockTime": {
             "type": "integer"
+          },
+          "additionalData": {
+            "type": "string"
           }
         }
       },
@@ -4974,6 +5040,28 @@
           "amount": {
             "type": "integer",
             "format": "uint256"
+          }
+        }
+      },
+      "Contract1": {
+        "required": [
+          "amount",
+          "address"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
           }
         }
       },

@@ -18,6 +18,7 @@ package org.alephium.api
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import akka.util.ByteString
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.UtilJson._
@@ -152,15 +153,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val outputRef = OutputRef(1234, key)
 
     {
-      val data    = Input(outputRef, None)
-      val jsonRaw = s"""{"outputRef":{"scriptHint":1234,"key":"${key.toHexString}"}}"""
+      val data: Input = Input.Contract(outputRef)
+      val jsonRaw =
+        s"""{"type":"contract","outputRef":{"scriptHint":1234,"key":"${key.toHexString}"}}"""
       checkData(data, jsonRaw)
     }
 
     {
-      val data = Input(outputRef, Some(hex"abcd"))
+      val data: Input = Input.Asset(outputRef, hex"abcd")
       val jsonRaw =
-        s"""{"outputRef":{"scriptHint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
+        s"""{"type":"asset","outputRef":{"scriptHint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
       checkData(data, jsonRaw)
     }
   }
@@ -175,9 +177,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val tokens     = AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
 
     {
-      val request = Output(amount, address, tokens, None)
-      val jsonRaw = s"""
+      val request: Output = Output.Contract(amount, address, tokens)
+      val jsonRaw         = s"""
         |{
+        |  "type": "contract",
         |  "amount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [
@@ -196,17 +199,28 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
 
     {
-      val request = Output(amount, address, AVector.empty, Some(TimeStamp.unsafe(1234)))
+      val request: Output =
+        Output.Asset(amount, address, AVector.empty, TimeStamp.unsafe(1234), ByteString.empty)
       val jsonRaw = s"""
         |{
+        |  "type": "asset",
         |  "amount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [],
-        |  "lockTime": 1234
+        |  "lockTime": 1234,
+        |  "additionalData": ""
         |}
         """.stripMargin
       checkData(request, jsonRaw)
     }
+  }
+
+  it should "encode/decode Tx" in {
+    val hash = Hash.generate
+    val tx   = Tx(hash, AVector.empty, AVector.empty, 1, U256.unsafe(100))
+    val jsonRaw =
+      s"""{"id":"${hash.toHexString}","inputs":[],"outputs":[],"startGas":1,"gasPrice":"100"}"""
+    checkData(tx, jsonRaw)
   }
 
   it should "encode/decode GetGroup" in {
