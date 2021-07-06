@@ -80,9 +80,8 @@ akka {
       type = Dispatcher
       executor = "fork-join-executor"
       fork-join-executor {
-        parallelism-min = 2
+        parallelism-min = 1
         parallelism-factor = 0.5
-        parallelism-max = 4
       }
       throughput = 1
     }
