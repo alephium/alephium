@@ -77,18 +77,18 @@ trait Server extends Service {
         .withDispatcher("akka.actor.mining-dispatcher")
     ActorRefT.build(flowSystem, props, s"Miner")
   }
-  lazy val minerApiController: ActorRefT[MinerApiController.Command] = {
-    val props =
-      MinerApiController.props(node.allHandlers)(config.broker, config.network, config.mining)
-    ActorRefT.build(flowSystem, props, s"MinerApi")
-  }
 
   override lazy val subServices: ArraySeq[Service] = {
     ArraySeq(restServer, webSocketServer, node) ++ ArraySeq.from[Service](walletService.toList)
   }
 
-  override protected def startSelfOnce(): Future[Unit] = Future.successful(())
-  override protected def stopSelfOnce(): Future[Unit]  = Future.successful(())
+  override protected def startSelfOnce(): Future[Unit] = Future.successful {
+    val props =
+      MinerApiController.props(node.allHandlers)(config.broker, config.network, config.mining)
+    ActorRefT.build(flowSystem, props, s"MinerApi")
+    ()
+  }
+  override protected def stopSelfOnce(): Future[Unit] = Future.successful(())
 }
 
 object Server {

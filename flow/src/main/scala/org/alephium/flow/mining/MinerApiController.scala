@@ -100,6 +100,10 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       connections.addOne(connectionHandler)
       allHandlers.viewHandler ! ViewHandler.Subscribe
 
+    case ViewHandler.SubscribeFailed =>
+      log.info(s"Failed in subscribing mining tasks. Closing all the connections")
+      connections.foreach(context stop _.ref)
+
     case Terminated(actor) =>
       log.info(s"The miner API connection to $actor is closed")
       removeConnection(actor)

@@ -30,7 +30,7 @@ class ServerSpec extends AlephiumSpec with ScalaFutures {
 
   it should "start and stop correctly" in {
     val rootPath                        = Platform.getRootPath()
-    val rawConfig                       = Configs.parseConfig(rootPath)
+    val rawConfig                       = Configs.parseConfig(rootPath, overwrite = true)
     implicit val config: AlephiumConfig = AlephiumConfig.load(rawConfig)
     implicit val apiConfig: ApiConfig   = ApiConfig.load(rawConfig)
     val flowSystem: ActorSystem         = ActorSystem("flow", rawConfig)

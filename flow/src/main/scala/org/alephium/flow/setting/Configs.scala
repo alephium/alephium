@@ -47,13 +47,19 @@ object Configs extends StrictLogging {
     }
   }
 
-  def getConfigTemplate(rootPath: Path, confName: String, templateName: String): File = {
+  def getConfigTemplate(
+      rootPath: Path,
+      confName: String,
+      templateName: String,
+      overwrite: Boolean
+  ): File = {
     val file = getConfigFile(rootPath, confName)
 
-    if (file.exists) file.delete()
-
-    Files.copyFromResource(s"/$templateName.conf.tmpl", file.toPath)
-    file.setWritable(false)
+    if (overwrite && file.exists()) { file.delete() }
+    if (!file.exists()) {
+      Files.copyFromResource(s"/$templateName.conf.tmpl", file.toPath)
+      file.setWritable(false)
+    }
 
     file
   }
@@ -65,12 +71,12 @@ object Configs extends StrictLogging {
     path.toFile
   }
 
-  def getConfigNetwork(rootPath: Path, networkType: NetworkType): File =
-    getConfigTemplate(rootPath, "network", s"network_${networkType.name}")
+  def getConfigNetwork(rootPath: Path, networkType: NetworkType, overwrite: Boolean): File =
+    getConfigTemplate(rootPath, "network", s"network_${networkType.name}", overwrite)
 
-  def getConfigSystem(rootPath: Path): File = {
+  def getConfigSystem(rootPath: Path, overwrite: Boolean): File = {
     val env = Env.resolve().name
-    getConfigTemplate(rootPath, "system", s"system_$env")
+    getConfigTemplate(rootPath, "system", s"system_$env", overwrite)
   }
 
   def getConfigUser(rootPath: Path): File = {
@@ -102,12 +108,12 @@ object Configs extends StrictLogging {
     }
   }
 
-  def parseConfig(rootPath: Path): Config = {
+  def parseConfig(rootPath: Path, overwrite: Boolean): Config = {
     val resultEither = for {
       userConfig    <- parseConfigFile(getConfigUser(rootPath))
-      systemConfig  <- parseConfigFile(getConfigSystem(rootPath))
+      systemConfig  <- parseConfigFile(getConfigSystem(rootPath, overwrite))
       networkType   <- parseNetworkType(rootPath, userConfig.withFallback(systemConfig).resolve())
-      networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType))
+      networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
       case Right(config) => config
@@ -117,8 +123,8 @@ object Configs extends StrictLogging {
     }
   }
 
-  def parseConfigAndValidate(rootPath: Path): Config = {
-    val config = parseConfig(rootPath)
+  def parseConfigAndValidate(rootPath: Path, overwrite: Boolean): Config = {
+    val config = parseConfig(rootPath, overwrite)
     if (!config.hasPath("alephium.discovery.bootstrap")) {
       logger.error(s"""|The bootstrap nodes are not defined!
                        |

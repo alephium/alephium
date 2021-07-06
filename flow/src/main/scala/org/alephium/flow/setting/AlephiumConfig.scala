@@ -285,7 +285,8 @@ object AlephiumConfig {
       ).toAlephiumConfig
     }
 
-  def load(rootPath: Path, path: String): AlephiumConfig = load(Configs.parseConfig(rootPath), path)
+  def load(rootPath: Path, path: String): AlephiumConfig =
+    load(Configs.parseConfig(rootPath, overwrite = true), path)
   def load(config: Config, path: String): AlephiumConfig = config.as[AlephiumConfig](path)
   def load(config: Config): AlephiumConfig               = config.as[AlephiumConfig]("alephium")
 }

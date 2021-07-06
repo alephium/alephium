@@ -23,13 +23,27 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import org.alephium.flow.network.broker.ConnectionHandler
-import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
+import org.alephium.flow.setting.{AlephiumConfig, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
 import org.alephium.protocol.model.{Block, ChainIndex, NetworkType}
 import org.alephium.serde.{serialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector}
 
 object ExternalMinerMock {
+  def props(config: AlephiumConfig): Props = {
+    require(config.broker.brokerNum == 1, "Only clique of 1 broker is supported")
+
+    props(
+      config.network.networkType,
+      AVector(new InetSocketAddress(config.mining.apiInterface, config.network.minerApiPort))
+    )(
+      config.broker,
+      config.network,
+      config.consensus,
+      config.mining
+    )
+  }
+
   def props(networkType: NetworkType, nodes: AVector[InetSocketAddress])(implicit
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting,
@@ -87,7 +101,7 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
       val remoteAddress = c.remoteAddress
       val addressIndex  = nodes.indexWhere(_ == remoteAddress)
       if (addressIndex != -1) {
-        log.debug(s"Connected to master: $remoteAddress")
+        log.info(s"Connected to miner API: $remoteAddress")
         val connection = sender()
         val connectionHandler = ActorRefT[ConnectionHandler.Command](
           context.actorOf(ExternalMinerMock.connection(remoteAddress, ActorRefT(connection)))
@@ -96,13 +110,13 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
         apiConnections(addressIndex) = Some(connectionHandler)
       }
     case Tcp.CommandFailed(c: Tcp.Connect) =>
-      log.error(s"Cannot connect to ${c.remoteAddress}, stopping self ...")
+      log.error(s"Cannot connect to miner API ${c.remoteAddress}, stopping self ...")
       context.stop(self)
-    case Terminated(connection) =>
-      val index = apiConnections.indexWhere(_.exists(_.ref == connection))
-      if (index != -1) {
-        apiConnections(index) = None
-      }
+    case Terminated(_) =>
+      log.info(
+        s"Connection to miner API is closed, please check the nodes for more information. Shutdown the system now ..."
+      )
+      terminateSystem()
   }
 
   def subscribeForTasks(): Unit = {

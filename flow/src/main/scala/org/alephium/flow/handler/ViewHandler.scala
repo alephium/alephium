@@ -21,6 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.actor.{ActorRef, Cancellable, Props}
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.ViewHandler.SubscribeFailed
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.MiningSetting
@@ -51,6 +52,7 @@ object ViewHandler {
       templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
   ) extends Event
       with EventStream.Event
+  case object SubscribeFailed extends Event
 
   def needUpdate(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from) || chainIndex.isIntraGroup
@@ -96,7 +98,9 @@ class ViewHandler(
           broadcastReadyTxs(newReadyTxs)
         }
       }
-      updateSubscribers()
+      if (blockFlow.isRecent(data)) {
+        updateSubscribers()
+      }
 
     case ViewHandler.Subscribe         => subscribe()
     case ViewHandler.Unsubscribe       => unsubscribe()
@@ -140,6 +144,7 @@ trait ViewHandlerState extends IOBaseActor {
           scheduleUpdate()
         case None =>
           log.warning(s"Unable to subscribe the miner, as miner addresses are not set")
+          sender() ! SubscribeFailed
       }
     } else {
       log.debug(s"The miner is already subscribed")
