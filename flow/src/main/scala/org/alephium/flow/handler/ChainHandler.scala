@@ -144,9 +144,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
 
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.info(s"${data.shortHex} is validated")
-    if (blockFlow.isRecent(data)) {
-      broadcast(data, origin)
-    }
+    broadcast(data, origin)
     blockFlow.contains(data.hash) match {
       case Right(true) =>
         log.debug(s"Block/Header ${data.shortHex} exists already")
