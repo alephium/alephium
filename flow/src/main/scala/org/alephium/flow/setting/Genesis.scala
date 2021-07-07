@@ -43,7 +43,8 @@ object Genesis {
     build("T1DSVCXhFC8sFjXzuXWKcRfDfBuet6MPSoknijfKghqrq8", ALF.alf(Number.million), Testnet),
     build("T1Bz5Lri6ensLeYQaPujQKBnRSuxjwCRDsToHyavDxP6Jh", ALF.alf(Number.million), Testnet),
     build("T14RX14eXnNhE8XoB18msvzbTxVjEgpoAEPWGW1MzMseyk", ALF.alf(Number.million), Testnet),
-    build("T1CVKEQ33CKfBoVx9S8RQALW3tGD4YN1J6n6428oqNkYzJ", ALF.alf(Number.million), Testnet)
+    build("T1CVKEQ33CKfBoVx9S8RQALW3tGD4YN1J6n6428oqNkYzJ", ALF.alf(Number.million), Testnet),
+    build("T1EEFFBGYac9ZbXKscqTdfbCd4siW1Yn8YYTo9CPGT811c", ALF.alf(Number.million), Testnet)
   )
 
   private val devnet: AVector[(LockupScript, U256)] = AVector(

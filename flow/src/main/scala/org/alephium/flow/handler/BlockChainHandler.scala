@@ -101,14 +101,17 @@ class BlockChainHandler(
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
-    val blockMessage =
-      Message.serialize(SendBlocks(AVector(block)), networkSetting.networkType)
-    val headerMessage =
-      Message.serialize(SendHeaders(AVector(block.header)), networkSetting.networkType)
     if (brokerConfig.contains(block.chainIndex.from)) {
       val isRecent = blockFlow.isRecent(block)
-      val event    = CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin, isRecent)
-      publishEvent(event)
+      if (isRecent || brokerConfig.brokerNum != 1) {
+        val blockMessage =
+          Message.serialize(SendBlocks(AVector(block)), networkSetting.networkType)
+        val headerMessage =
+          Message.serialize(SendHeaders(AVector(block.header)), networkSetting.networkType)
+        val event =
+          CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin, isRecent)
+        publishEvent(event)
+      }
     }
   }
 
