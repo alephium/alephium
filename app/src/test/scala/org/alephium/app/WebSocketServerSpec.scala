@@ -59,16 +59,18 @@ class WebSocketServerSpec
         Target.Max,
         Nonce.zero
       )
-    val blockNotify = BlockNotify(header, 1)
+
+    val block       = Block(header, AVector.empty)
+    val blockNotify = BlockNotify(block, 1)
     val headerHash  = header.hash.toHexString
     val chainIndex  = header.chainIndex
 
-    val result = WebSocketServer.blockNotifyEncode(blockNotify)
+    val result = WebSocketServer.blockNotifyEncode(blockNotify, networkType)
 
     val depsString = AVector.fill(groupConfig.depsNum)(s""""${dep.toHexString}"""").mkString(",")
     show(
       result
-    ) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":[$depsString]}"""
+    ) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":[$depsString],"transactions":[]}"""
   }
 
   behavior of "ws"
@@ -104,7 +106,7 @@ class WebSocketServerSpec
     val port               = node.config.network.wsPort
     val blockNotifyProbe   = TestProbe()
 
-    val blockNotify = BlockNotify(blockGen.sample.get.header, height = 0)
+    val blockNotify = BlockNotify(blockGen.sample.get, height = 0)
     def sendEventAndCheck: Assertion = {
       node.eventBus ! blockNotify
 

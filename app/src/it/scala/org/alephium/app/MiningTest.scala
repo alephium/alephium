@@ -74,7 +74,8 @@ class MiningTest extends AlephiumSpec {
 
     request[Balance](getBalance(address), restPort) is initialBalance
 
-    startWS(defaultWsMasterPort)
+    startWS(server0.config.network.wsPort)
+    startWS(server1.config.network.wsPort)
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
@@ -94,6 +95,8 @@ class MiningTest extends AlephiumSpec {
       val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
       txStatus is a[Confirmed]
     }
+
+    awaitNBlocksPerChain(1)
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
