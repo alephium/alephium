@@ -56,13 +56,16 @@ class MiningTest extends AlephiumSpec {
     }
 
     selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
-    server1.stop().futureValue is ()
     server0.stop().futureValue is ()
+    server1.stop().futureValue is ()
   }
 
-  it should "work with external miner" in new TestFixture("1-nodes-external-miner") {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
-    Seq(server0.start()).foreach(_.futureValue is (()))
+  it should "work with external miner" in new TestFixture("2-nodes-external-miner") {
+    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
+    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
+    Seq(server0.start(), server1.start()).foreach(_.futureValue is ())
+
+    eventually(request[SelfClique](getSelfClique).synced is true)
 
     val selfClique = request[SelfClique](getSelfClique)
     val group      = request[Group](getGroup(address))
@@ -75,8 +78,16 @@ class MiningTest extends AlephiumSpec {
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
-    val minerApiAddress = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
-    val miner           = system.actorOf(ExternalMinerMock.props(networkType, AVector(minerApiAddress)))
+    val minerApiAddress0 = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
+    val minerApiAddress1 = new InetSocketAddress("127.0.0.1", server1.config.network.minerApiPort)
+    val miner = system.actorOf(
+      ExternalMinerMock.props(networkType, AVector(minerApiAddress0, minerApiAddress1))(
+        server0.config.broker,
+        server0.config.network,
+        server0.config.consensus,
+        server0.config.mining
+      )
+    )
     miner ! Miner.Start
 
     eventually {
@@ -85,6 +96,7 @@ class MiningTest extends AlephiumSpec {
     }
 
     server0.stop().futureValue is ()
+    server1.stop().futureValue is ()
   }
 
   it should "mine all the txs" in new TestFixture("many-txs") {
