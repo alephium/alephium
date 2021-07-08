@@ -24,22 +24,33 @@ import akka.util.ByteString
 
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting, NetworkSetting}
-import org.alephium.protocol.config.{BrokerConfig, EmissionConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{Block, ChainIndex, NetworkType}
 import org.alephium.serde.{serialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector}
 
 object ExternalMinerMock {
-  def props(config: AlephiumConfig): Props = {
+  def singleNode(config: AlephiumConfig): Props = {
     require(config.broker.brokerNum == 1, "Only clique of 1 broker is supported")
 
     props(
-      config.network.networkType,
+      config,
       AVector(new InetSocketAddress(config.mining.apiInterface, config.network.minerApiPort))
+    )
+  }
+
+  def props(config: AlephiumConfig, nodes: AVector[InetSocketAddress]): Props = {
+    require(
+      config.broker.groups % nodes.length == 0,
+      s"Invalid number of nodes ${nodes.length} for groups ${config.broker.groups}"
+    )
+
+    props(
+      config.network.networkType,
+      nodes
     )(
       config.broker,
       config.network,
-      config.consensus,
       config.mining
     )
   }
@@ -47,7 +58,6 @@ object ExternalMinerMock {
   def props(networkType: NetworkType, nodes: AVector[InetSocketAddress])(implicit
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting,
-      emissionConfig: EmissionConfig,
       miningConfig: MiningSetting
   ): Props = {
     // to pretend that there is only 1 node in the clique, so we could reuse MinerState
@@ -88,7 +98,6 @@ object ExternalMinerMock {
 class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketAddress])(implicit
     val brokerConfig: BrokerConfig,
     val networkSetting: NetworkSetting,
-    val emissionConfig: EmissionConfig,
     val miningConfig: MiningSetting
 ) extends Miner {
   private val apiConnections =

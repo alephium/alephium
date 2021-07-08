@@ -16,22 +16,45 @@
 
 package org.alephium.app
 
+import java.net.InetSocketAddress
 import java.nio.file.Path
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
+import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.mining.{ExternalMinerMock, Miner}
-import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
+import org.alephium.flow.setting.{AlephiumConfig, Configs, ConfigUtils, Platform}
+import org.alephium.util.AVector
 
-object CpuSoloMiner extends App {
+object CpuSoloMiner extends App with StrictLogging {
   val rootPath: Path         = Platform.getRootPath()
   val typesafeConfig: Config = Configs.parseConfigAndValidate(rootPath, overwrite = false)
   val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
+  val system: ActorSystem    = ActorSystem("cpu-miner", typesafeConfig)
 
-  val system: ActorSystem = ActorSystem("cpu-miner", typesafeConfig)
+  val miner: ActorRef = {
+    val props = if (args.length == 0) {
+      ExternalMinerMock.singleNode(config).withDispatcher("akka.actor.mining-dispatcher")
+    } else {
+      val addresses = args(0).split(",").map(parseHostAndPort)
+      ExternalMinerMock
+        .props(config, AVector.unsafe(addresses))
+        .withDispatcher("akka.actor.mining-dispatcher")
+    }
+    system.actorOf(props)
+  }
 
-  val miner: ActorRef =
-    system.actorOf(ExternalMinerMock.props(config).withDispatcher("akka.actor.mining-dispatcher"))
   miner ! Miner.Start
+
+  private def parseHostAndPort(unparsedHostAndPort: String): InetSocketAddress = {
+    val hostAndPort = """([a-zA-Z0-9\.\-]+)\s*:\s*(\d+)""".r
+    unparsedHostAndPort match {
+      case hostAndPort(host, port) =>
+        new InetSocketAddress(host, port.toInt)
+      case _ =>
+        logger.error(s"Invalid miner API address: $unparsedHostAndPort")
+        sys.exit(1)
+    }
+  }
 }
