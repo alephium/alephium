@@ -24,23 +24,29 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.mining.{ExternalMinerMock, Miner}
-import org.alephium.flow.setting.{AlephiumConfig, Configs, ConfigUtils, Platform}
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.AVector
 
-object CpuSoloMiner extends App with StrictLogging {
+object CpuSoloMiner extends App {
   val rootPath: Path         = Platform.getRootPath()
   val typesafeConfig: Config = Configs.parseConfigAndValidate(rootPath, overwrite = false)
   val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   val system: ActorSystem    = ActorSystem("cpu-miner", typesafeConfig)
 
+  new CpuSoloMiner(config, system, args.headOption)
+}
+
+class CpuSoloMiner(config: AlephiumConfig, system: ActorSystem, rawApiAddresses: Option[String])
+    extends StrictLogging {
   val miner: ActorRef = {
-    val props = if (args.length == 0) {
-      ExternalMinerMock.singleNode(config).withDispatcher("akka.actor.mining-dispatcher")
-    } else {
-      val addresses = args(0).split(",").map(parseHostAndPort)
-      ExternalMinerMock
-        .props(config, AVector.unsafe(addresses))
-        .withDispatcher("akka.actor.mining-dispatcher")
+    val props = rawApiAddresses match {
+      case None =>
+        ExternalMinerMock.singleNode(config).withDispatcher("akka.actor.mining-dispatcher")
+      case Some(rawAddresses) =>
+        val addresses = rawAddresses.split(",").map(parseHostAndPort)
+        ExternalMinerMock
+          .props(config, AVector.unsafe(addresses))
+          .withDispatcher("akka.actor.mining-dispatcher")
     }
     system.actorOf(props)
   }

@@ -16,10 +16,7 @@
 
 package org.alephium.app
 
-import java.net.InetSocketAddress
-
 import org.alephium.api.model._
-import org.alephium.flow.mining.{ExternalMinerMock, Miner}
 import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 
@@ -79,16 +76,9 @@ class MiningTest extends AlephiumSpec {
 
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
-    val minerApiAddress0 = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
-    val minerApiAddress1 = new InetSocketAddress("127.0.0.1", server1.config.network.minerApiPort)
-    val miner = system.actorOf(
-      ExternalMinerMock.props(networkType, AVector(minerApiAddress0, minerApiAddress1))(
-        server0.config.broker,
-        server0.config.network,
-        server0.config.mining
-      )
-    )
-    miner ! Miner.Start
+    val apiAddresses =
+      s"127.0.0.1:${server0.config.network.minerApiPort},127.0.0.1:${server1.config.network.minerApiPort}"
+    new CpuSoloMiner(server0.config, server0.flowSystem, Some(apiAddresses))
 
     eventually {
       val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
