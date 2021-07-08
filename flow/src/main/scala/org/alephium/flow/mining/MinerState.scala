@@ -67,10 +67,16 @@ trait MinerState {
     }
   }
 
+  var tasksReady: Boolean = false
   protected def startNewTasks(): Unit = {
-    pickTasks().foreach { case (fromShift, to, template) =>
-      startTask(fromShift, to, template)
-      setRunning(fromShift, to)
+    if (!tasksReady) {
+      tasksReady = pendingTasks.forall(_.forall(_ != null))
+    }
+    if (tasksReady) {
+      pickTasks().foreach { case (fromShift, to, template) =>
+        startTask(fromShift, to, template)
+        setRunning(fromShift, to)
+      }
     }
   }
 
