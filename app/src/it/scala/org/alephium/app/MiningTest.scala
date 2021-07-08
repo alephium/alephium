@@ -85,7 +85,6 @@ class MiningTest extends AlephiumSpec {
       ExternalMinerMock.props(networkType, AVector(minerApiAddress0, minerApiAddress1))(
         server0.config.broker,
         server0.config.network,
-        server0.config.consensus,
         server0.config.mining
       )
     )
