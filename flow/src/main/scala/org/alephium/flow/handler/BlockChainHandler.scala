@@ -125,8 +125,10 @@ class BlockChainHandler(
 
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {
     broker ! BlockAdded(block.hash)
-    escapeIOError(blockFlow.getHeight(block)) { height =>
-      eventBus ! BlockNotify(block.header, height)
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      escapeIOError(blockFlow.getHeight(block)) { height =>
+        eventBus ! BlockNotify(block, height)
+      }
     }
   }
 

@@ -210,18 +210,22 @@ trait TestFixtureLike
       res
     }
 
-  final def awaitNewBlock(from: Int, to: Int): Unit = {
+  final def awaitNBlocksPerChain(number: Int): Unit = {
+    val buffer  = Array.fill(groups0)(Array.ofDim[Int](groups0))
     val timeout = Duration.ofMinutesUnsafe(2).asScala
-    blockNotifyProbe.receiveOne(max = timeout) match {
-      case text: String =>
-        val notification = read[NotificationUnsafe](text).asNotification.toOption.get
-        val blockEntry   = read[BlockEntry](notification.params)
-        if ((blockEntry.chainFrom equals from) && (blockEntry.chainTo equals to)) {
-          ()
-        } else {
-          awaitNewBlock(from, to)
-        }
+
+    @tailrec
+    def iter(): Unit = {
+      blockNotifyProbe.receiveOne(max = timeout) match {
+        case text: String =>
+          val notification = read[NotificationUnsafe](text).asNotification.toOption.get
+          val blockEntry   = read[BlockEntry](notification.params)
+          buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
+          if (buffer.forall(_.forall(_ >= number))) () else iter()
+      }
     }
+
+    iter()
   }
 
   @tailrec

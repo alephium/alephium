@@ -53,7 +53,7 @@ object FlowHandler {
       }
     }
   }
-  final case class BlockNotify(header: BlockHeader, height: Int) extends EventBus.Event
+  final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
 }
 
 // Queue all the work related to miner, rpc server, etc. in this actor

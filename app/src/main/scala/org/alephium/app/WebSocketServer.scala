@@ -128,7 +128,9 @@ object WebSocketServer {
 
     def receive: Receive = {
       case event: EventBus.Event =>
-        subscribers.foreach { subscriber => vertxEventBus.send(subscriber, handleEvent(event)) }
+        subscribers.foreach { subscriber =>
+          vertxEventBus.send(subscriber, handleEvent(event, networkType))
+        }
       case EventHandler.Subscribe(subscriber) =>
         if (!subscribers.contains(subscriber)) { subscribers += subscriber }
       case EventHandler.Unsubscribe(subscriber) =>
@@ -138,22 +140,25 @@ object WebSocketServer {
     }
   }
 
-  def handleEvent(event: EventBus.Event)(implicit
-      writer: Writer[BlockHeaderEntry]
+  def handleEvent(event: EventBus.Event, networkType: NetworkType)(implicit
+      writer: Writer[BlockEntry]
   ): String = {
     event match {
       case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params       = blockNotifyEncode(bn)
+        val params       = blockNotifyEncode(bn, networkType)
         val notification = Notification("block_notify", params)
         write(notification)
     }
   }
-  private def blockHeaderEntryfrom(blockNotify: BlockNotify): BlockHeaderEntry = {
-    BlockHeaderEntry.from(blockNotify.header, blockNotify.height)
+  private def blockHeaderEntryfrom(
+      blockNotify: BlockNotify,
+      networkType: NetworkType
+  ): BlockEntry = {
+    BlockEntry.from(blockNotify.block, blockNotify.height, networkType)
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit
-      writer: Writer[BlockHeaderEntry]
+  def blockNotifyEncode(blockNotify: BlockNotify, networkType: NetworkType)(implicit
+      writer: Writer[BlockEntry]
   ): ujson.Value =
-    writeJs(blockHeaderEntryfrom(blockNotify))
+    writeJs(blockHeaderEntryfrom(blockNotify, networkType))
 }
