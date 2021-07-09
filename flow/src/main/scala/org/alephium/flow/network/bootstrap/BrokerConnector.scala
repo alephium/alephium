@@ -108,7 +108,7 @@ class BrokerConnector(
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
-    log.debug(s"Unexpected message, shutdown the system")
+    log.error(s"Unexpected message $message, shutdown the system")
     terminateSystem()
   }
 }

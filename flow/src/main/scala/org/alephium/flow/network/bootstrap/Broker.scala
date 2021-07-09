@@ -101,7 +101,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
         scheduleOnce(self, Broker.Retry, Duration.ofSecondsUnsafe(1))
         ()
       } else {
-        log.info(s"Cannot connect to ${c.remoteAddress}, shutdown the system")
+        log.error(s"Cannot connect to ${c.remoteAddress}, shutdown the system")
         terminateSystem()
       }
   }
@@ -131,7 +131,7 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
-    log.debug(s"Unexpected message, shutdown the system")
+    log.error(s"Unexpected message $message, shutdown the system")
     terminateSystem()
   }
 }
