@@ -68,6 +68,8 @@ object InterCliqueManager {
       groupNumPerBroker: Int
   ) extends Event
 
+  final case class Unreachable(remote: InetSocketAddress) extends Event with EventStream.Event
+
   final case class BrokerState(
       info: BrokerInfo,
       connectionType: ConnectionType,
@@ -301,8 +303,13 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def removeBroker(peer: InetSocketAddress): Unit = {
-    brokers.filterInPlace { case (_, state) => state.info.address != peer }
-    InterCliqueManager.peersTotal.set(brokers.size.toDouble)
+    brokers.find(_._2.info.address == peer).foreach { case (peerId, state) =>
+      brokers.remove(peerId)
+      if (state.connectionType == OutboundConnection) {
+        publishEvent(Unreachable(peer))
+      }
+      InterCliqueManager.peersTotal.set(brokers.size.toDouble)
+    }
   }
 
   def checkForInConnection(maxInboundConnectionsPerGroup: Int): Boolean = {

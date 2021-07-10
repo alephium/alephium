@@ -22,7 +22,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated, Timers}
 
-import org.alephium.flow.network.broker.{MisbehaviorManager, OutboundBrokerHandler}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
@@ -149,7 +149,7 @@ class DiscoveryServer(
   }
 
   def ready: Receive = {
-    subscribeEvent(self, classOf[OutboundBrokerHandler.Unreachable])
+    subscribeEvent(self, classOf[InterCliqueManager.Unreachable])
     handleUdp orElse handleCommand orElse handleBanning
   }
 
@@ -185,9 +185,9 @@ class DiscoveryServer(
     case PeerDenied(peerInfo) =>
       log.debug(s"peer ${peerInfo.peerId} - ${peerInfo.address} is banned, ignoring it")
       banPeer(peerInfo.peerId)
-    case PeerConfirmed(peerInfo)                   => tryPing(peerInfo)
-    case OutboundBrokerHandler.Unreachable(remote) => setUnreachable(remote)
-    case Unban(remotes)                            => remotes.foreach(unsetUnreachable)
+    case PeerConfirmed(peerInfo)                => tryPing(peerInfo)
+    case InterCliqueManager.Unreachable(remote) => setUnreachable(remote)
+    case Unban(remotes)                         => remotes.foreach(unsetUnreachable)
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
