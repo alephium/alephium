@@ -117,7 +117,11 @@ object Server {
       val executionContext: ExecutionContext
   ) extends Server {
     val storages: Storages = {
-      Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
+      if (config.node.dbSyncWrite) {
+        Storages.createUnsafe(rootPath, storageFolder, Settings.syncWrite)(config.broker)
+      } else {
+        Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
+      }
     }
 
     val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
