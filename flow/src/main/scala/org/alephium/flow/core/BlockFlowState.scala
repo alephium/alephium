@@ -101,6 +101,32 @@ trait BlockFlowState extends FlowTipsUtil {
       }
     }
 
+  def sanityCheckUnsafe(): Unit = {
+    inBlockChains.foreach(_.foreach { chain =>
+      chain.getAllTips.foreach { tip =>
+        require(chain.blockStorage.existsUnsafe(tip), "Tip should be stored in block storage")
+        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
+      }
+    })
+    outBlockChains.foreach(_.foreach { chain =>
+      chain.getAllTips.foreach { tip =>
+        require(chain.blockStorage.existsUnsafe(tip), "Tip should be stored in block storage")
+        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
+      }
+    })
+    intraGroupChains.foreach { chain =>
+      chain.getAllTips.foreach { tip =>
+        require(chain.worldStateStorage.existsUnsafe(tip), "Tip should have its state trie stored")
+      }
+    }
+    blockHeaderChains.foreach(_.foreach { chain =>
+      chain.getAllTips.map { tip =>
+        require(chain.headerStorage.existsUnsafe(tip), "Tip should be stored in header storage")
+        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
+      }
+    })
+  }
+
   // Cache latest blocks for assisting merkle trie
   private val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
     LruCache[BlockHash, BlockCache, IOError](
