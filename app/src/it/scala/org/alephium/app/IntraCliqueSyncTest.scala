@@ -19,6 +19,7 @@ package org.alephium.app
 import sttp.model.StatusCode
 
 import org.alephium.api.model.SelfClique
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.util._
 
 class IntraCliqueSyncTest extends AlephiumSpec {
@@ -34,13 +35,16 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server0.start().futureValue is ()
 
-    Thread.sleep(2000) // wait until the server is fully operating
-    requestFailed(getSelfClique, statusCode = StatusCode.InternalServerError)
+    val block = mineAndAndOneBlock(server0, ChainIndex.unsafe(0, 2))
+
+    eventually(requestFailed(getSelfClique, statusCode = StatusCode.InternalServerError))
 
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
+    eventually(server1.node.blockFlow.containsUnsafe(block.hash) is false)
     server1.start().futureValue is ()
 
     eventually(request[SelfClique](getSelfClique).synced is true)
+    eventually(server1.node.blockFlow.containsUnsafe(block.hash) is true)
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
