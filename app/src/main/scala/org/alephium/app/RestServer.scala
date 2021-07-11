@@ -116,10 +116,26 @@ class RestServer(
 
   private val getSelfCliqueRoute = toRoute(getSelfClique) { _ =>
     for {
-      synced     <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
+      selfReady <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
+      synced <-
+        if (selfReady) {
+          node.cliqueManager
+            .ask(InterCliqueManager.IsSynced)
+            .mapTo[InterCliqueManager.SyncedResult]
+            .map(_.isSynced)
+        } else {
+          Future.successful(false)
+        }
       cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
     } yield {
-      Right(RestServer.selfCliqueFrom(cliqueInfo, node.config.consensus, synced))
+      Right(
+        RestServer.selfCliqueFrom(
+          cliqueInfo,
+          node.config.consensus,
+          selfReady = selfReady,
+          synced = synced
+        )
+      )
     }
   }
 
@@ -421,6 +437,7 @@ object RestServer {
   def selfCliqueFrom(
       cliqueInfo: IntraCliqueInfo,
       consensus: ConsensusSetting,
+      selfReady: Boolean,
       synced: Boolean
   )(implicit groupConfig: GroupConfig, networkType: NetworkType): SelfClique = {
 
@@ -431,7 +448,8 @@ object RestServer {
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
       ),
-      synced,
+      selfReady = selfReady,
+      synced = synced,
       cliqueInfo.groupNumPerBroker,
       groupConfig.groups
     )

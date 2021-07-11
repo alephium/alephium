@@ -1719,6 +1719,7 @@
                       "minerApiPort": 12355
                     }
                   ],
+                  "selfReady": true,
                   "synced": true,
                   "groupNumPerBroker": 1,
                   "groups": 2
@@ -4659,6 +4660,7 @@
           "cliqueId",
           "networkType",
           "numZerosAtLeastInHash",
+          "selfReady",
           "synced",
           "groupNumPerBroker",
           "groups"
@@ -4679,6 +4681,9 @@
             "items": {
               "$ref": "#/components/schemas/PeerAddress"
             }
+          },
+          "selfReady": {
+            "type": "boolean"
           },
           "synced": {
             "type": "boolean"

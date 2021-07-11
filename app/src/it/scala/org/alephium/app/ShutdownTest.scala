@@ -47,7 +47,7 @@ class ShutdownTest extends AlephiumSpec {
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
     Seq(server0.start(), server1.start()).foreach(_.futureValue is ())
 
-    eventually(request[SelfClique](getSelfClique).synced is true)
+    eventually(request[SelfClique](getSelfClique).selfReady is true)
 
     server0.stop().futureValue is ()
     server1.flowSystem.whenTerminated.futureValue is a[Terminated]

@@ -29,7 +29,7 @@ class BroadcastTxTest extends AlephiumSpec {
     val server2 = bootNode(publicPort = port2, brokerId = 1)
     Seq(server1.start(), server2.start()).foreach(_.futureValue is (()))
 
-    eventually(request[SelfClique](getSelfClique).synced is true)
+    eventually(request[SelfClique](getSelfClique).selfReady is true)
 
     val selfClique1 = request[SelfClique](getSelfClique)
     val group1      = request[Group](getGroup(address))

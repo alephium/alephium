@@ -317,7 +317,10 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/infos/self-clique").handler { ctx =>
-      complete(ctx, SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peer, peer), true, 1, 2))
+      complete(
+        ctx,
+        SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peer, peer), true, true, 1, 2)
+      )
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>

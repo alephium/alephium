@@ -61,11 +61,12 @@ trait ServerFixture
     AVector(AVector(BlockEntry.from(dummyBlock, 1, networkType)))
   )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
-  lazy val dummySelfClique      = RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true)
-  lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1, networkType)
-  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
-  lazy val dummyBalance         = Balance(U256.Zero, U256.Zero, 0)
-  lazy val dummyGroup           = Group(0)
+  lazy val dummySelfClique =
+    RestServer.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true, true)
+  lazy val dummyBlockEntry    = BlockEntry.from(dummyBlock, 1, networkType)
+  lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
+  lazy val dummyBalance       = Balance(U256.Zero, U256.Zero, 0)
+  lazy val dummyGroup         = Group(0)
 
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(0)
