@@ -86,7 +86,6 @@ object Boilerplate {
     override def content(tv: TemplateVals): String = {
       import tv._
 
-      val serInstances   = synTypes.map(t => s"ser$t: Serializer[$t]").mkString(", ")
       val serdeInstances = synTypes.map(t => s"serde$t: Serde[$t]").mkString(", ")
       val serializes = synVals
         .zip(synTypes)

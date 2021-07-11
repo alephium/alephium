@@ -160,8 +160,8 @@ trait TxValidation {
         header.timestamp,
         groupView,
         coinbaseNetReward,
-        checkDoubleSpending =
-          false // checkDoubleSpending = true as it has been checked in block validation
+        // checkDoubleSpending is false as it has been checked in block validation
+        checkDoubleSpending = false
       )
     } yield ()
   }

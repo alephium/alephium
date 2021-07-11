@@ -131,6 +131,7 @@ trait EndpointsExamples extends ErrorExamples {
         networkType,
         numZerosAtLeastInHash = 18,
         peers,
+        selfReady = true,
         synced = true,
         groupNumPerBroker = 1,
         groups = 2

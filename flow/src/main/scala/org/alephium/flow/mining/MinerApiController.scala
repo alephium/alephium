@@ -28,6 +28,7 @@ import akka.util.ByteString
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.model.DataOrigin.Local
+import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.BlockHash
@@ -37,12 +38,12 @@ import org.alephium.serde.{deserialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Hex}
 
 object MinerApiController {
-  def props(allHandlers: AllHandlers)(implicit
+  def props(cliqueManager: ActorRefT[CliqueManager.Command], allHandlers: AllHandlers)(implicit
       brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
   ): Props =
-    Props(new MinerApiController(allHandlers))
+    Props(new MinerApiController(cliqueManager, allHandlers))
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
@@ -69,7 +70,8 @@ object MinerApiController {
   }
 }
 
-class MinerApiController(allHandlers: AllHandlers)(implicit
+class MinerApiController(cliqueManager: ActorRefT[CliqueManager.Command], allHandlers: AllHandlers)(
+    implicit
     brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     miningSetting: MiningSetting
@@ -87,18 +89,29 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
-  val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]] = ArrayBuffer.empty
+  val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
+  val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
-      log.info(s"Miner API connection from $remote")
-      val connection = ActorRefT[Tcp.Command](sender())
-      val connectionHandler = ActorRefT[ConnectionHandler.Command](
-        context.actorOf(MinerApiController.connection(remote, connection))
-      )
-      context.watch(connectionHandler.ref)
-      connections.addOne(connectionHandler)
-      allHandlers.viewHandler ! ViewHandler.Subscribe
+      cliqueManager ! InterCliqueManager.IsSynced
+      pendings.addOne(remote -> ActorRefT[Tcp.Command](sender()))
+
+    case InterCliqueManager.SyncedResult(isSynced) =>
+      if (isSynced) {
+        pendings.foreach { case (remote, connection) =>
+          val connectionHandler = ActorRefT[ConnectionHandler.Command](
+            context.actorOf(MinerApiController.connection(remote, connection))
+          )
+          context.watch(connectionHandler.ref)
+          connections.addOne(connectionHandler)
+          allHandlers.viewHandler ! ViewHandler.Subscribe
+        }
+      } else {
+        log.error(s"The node is not synced yet, closing miner connections")
+        pendings.foreach(_._2 ! Tcp.Abort)
+      }
+      pendings.clear()
 
     case ViewHandler.SubscribeFailed =>
       log.info(s"Failed in subscribing mining tasks. Closing all the connections")
@@ -107,6 +120,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     case Terminated(actor) =>
       log.info(s"The miner API connection to $actor is closed")
       removeConnection(actor)
+
+    case Tcp.Aborted => ()
   }
 
   def removeConnection(actor: ActorRef): Unit = {

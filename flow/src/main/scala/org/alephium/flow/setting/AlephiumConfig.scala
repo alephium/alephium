@@ -145,6 +145,8 @@ object WalletSetting {
   final case class BlockFlow(host: String, port: Int, groups: Int)
 }
 
+final case class NodeSetting(dbSyncWrite: Boolean)
+
 final case class AlephiumConfig(
     broker: BrokerSetting,
     consensus: ConsensusSetting,
@@ -153,6 +155,7 @@ final case class AlephiumConfig(
     discovery: DiscoverySetting,
     mempool: MemPoolSetting,
     wallet: WalletSetting,
+    node: NodeSetting,
     genesisBalances: AVector[(LockupScript, U256)]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
@@ -249,7 +252,8 @@ object AlephiumConfig {
       network: TempNetworkSetting,
       discovery: DiscoverySetting,
       mempool: MemPoolSetting,
-      wallet: WalletSetting
+      wallet: WalletSetting,
+      node: NodeSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses, network.networkType).map { minerAddresses =>
@@ -263,6 +267,7 @@ object AlephiumConfig {
           discovery,
           mempool,
           wallet,
+          node,
           Genesis(network.networkType)
         )
       } match {
@@ -281,7 +286,8 @@ object AlephiumConfig {
         as[TempNetworkSetting]("network"),
         as[DiscoverySetting]("discovery"),
         as[MemPoolSetting]("mempool"),
-        as[WalletSetting]("wallet")
+        as[WalletSetting]("wallet"),
+        as[NodeSetting]("node")
       ).toAlephiumConfig
     }
 

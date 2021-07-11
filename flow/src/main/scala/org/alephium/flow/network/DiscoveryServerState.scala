@@ -50,10 +50,10 @@ trait DiscoveryServerState extends SessionManager {
 
   private var socketOpt: Option[ActorRefT[UdpServer.Command]] = None
 
-  protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val unreachables = mutable.HashMap.empty[InetSocketAddress, TimeStamp]
-
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
+
+  protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
+  private val unreachables = LinkedBuffer[InetSocketAddress, TimeStamp](neighborMax)
 
   def setSocket(s: ActorRefT[UdpServer.Command]): Unit = {
     socketOpt = Some(s)
@@ -138,17 +138,15 @@ trait DiscoveryServerState extends SessionManager {
 
   def setUnreachable(remote: InetSocketAddress): Unit = {
     unreachables.get(remote) match {
-      case Some(until) => unreachables(remote) = until + Duration.ofMinutesUnsafe(1)
-      case None        => unreachables(remote) = TimeStamp.now().plusMinutesUnsafe(1)
+      case Some(until) => unreachables.put(remote, until + Duration.ofMinutesUnsafe(1))
+      case None        => unreachables.put(remote, TimeStamp.now().plusMinutesUnsafe(1))
     }
     remove(remote)
   }
 
   def unsetUnreachable(remote: InetAddress): Unit = {
-    unreachables.filterInPlace { case (address, _) =>
-      address.getAddress != remote
-    }
-    ()
+    val toRemove = AVector.from(unreachables.keys().filter(_.getAddress == remote))
+    toRemove.foreach(unreachables.remove)
   }
 
   def mightReachable(remote: InetSocketAddress): Boolean = {
@@ -156,9 +154,8 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   def cleanUnreachables(now: TimeStamp): Unit = {
-    unreachables.filterInPlace { case (_, until) =>
-      until > now
-    }
+    val toRemove = AVector.from(unreachables.entries().filter(_.getValue <= now).map(_.getKey))
+    toRemove.foreach(unreachables.remove)
   }
 
   def appendPeer(peerInfo: BrokerInfo): Unit = {

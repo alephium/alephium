@@ -20,10 +20,9 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.io.{IO, Tcp}
-import akka.testkit.{EventFilter, SocketUtil, TestActorRef, TestProbe}
+import akka.testkit.{EventFilter, SocketUtil, TestProbe}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.concurrent.Eventually.eventually
-import org.scalatest.concurrent.PatienceConfiguration
+import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -32,16 +31,16 @@ import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
 class TcpControllerSpec extends AlephiumActorSpec("TcpController") with AlephiumConfigFixture {
   implicit override lazy val system: ActorSystem =
-    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.infoConfig))
+    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
 
-  trait Fixture {
+  trait Fixture extends Eventually {
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()
     val bootstrapper       = TestProbe()
 
     val bindAddress = SocketUtil.temporaryServerAddress()
     val controller =
-      TestActorRef[TcpController](TcpController.props(bindAddress, misbehaviorManager.ref))
+      newTestActorRef[TcpController](TcpController.props(bindAddress, misbehaviorManager.ref))
     val controllerActor = controller.underlyingActor
 
     EventFilter.info(start = "Node bound to").intercept {
@@ -118,7 +117,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     }
   }
 
-  it should "handle outgoing connections" in {
+  it should "handle outgoing connections" in new Eventually {
     val fixture1 = new Fixture {}
     val fixture2 = new Fixture {}
     eventually {
@@ -140,6 +139,6 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     val freeAddress = SocketUtil.temporaryServerAddress()
     val probe       = TestProbe()
     controller ! TcpController.ConnectTo(freeAddress, probe.ref)
-    eventually(probe.expectMsgType[Tcp.CommandFailed])
+    probe.expectMsgType[Tcp.CommandFailed]
   }
 }

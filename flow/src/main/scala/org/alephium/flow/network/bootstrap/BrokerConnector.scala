@@ -60,8 +60,8 @@ object BrokerConnector {
     }
 
     override def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
-      log.debug("Malicious behavior detected in bootstrap, shutdown the system")
-      terminateSystem()
+      log.warning("Might be unexpected message during bootstrap phase, ignoring it")
+      context.stop(self)
     }
   }
 }
@@ -108,7 +108,7 @@ class BrokerConnector(
 
   override def unhandled(message: Any): Unit = {
     super.unhandled(message)
-    log.debug(s"Unexpected message, shutdown the system")
+    log.error(s"Unexpected message $message, shutdown the system")
     terminateSystem()
   }
 }

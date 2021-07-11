@@ -19,8 +19,8 @@ package org.alephium.util
 import scala.concurrent.Await
 import scala.language.implicitConversions
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{ImplicitSender, TestKit, TestKitBase}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestKitBase}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatest.concurrent.ScalaFutures
@@ -33,6 +33,15 @@ trait AlephiumActorSpecLike
     with AlephiumSpec
     with BeforeAndAfterAll {
   implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
+
+  // TestActorRef can't be used together with Stash sometimes, ref: internet
+  def newTestActorRef[T <: Actor](props: Props): TestActorRef[T] = {
+    newTestActorRef(props, SecureAndSlowRandom.nextU256().toString)
+  }
+
+  def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
+    akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
+  }
 
   def name: String
 

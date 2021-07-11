@@ -20,12 +20,13 @@ import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.io.{IO, Tcp}
-import akka.testkit.{EventFilter, TestActorRef, TestProbe}
+import akka.testkit.{EventFilter, TestActor, TestActorRef, TestProbe}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
+import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumActorSpec, AVector, SocketUtil}
@@ -34,12 +35,13 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
   implicit override lazy val system: ActorSystem =
     ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.infoConfig))
 
-  trait Fixture {
+  trait Fixture extends Eventually {
     val apiPort                         = generatePort()
+    val cliqueManager                   = TestProbe()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     val minerApiController = EventFilter.info(start = "Miner API server bound").intercept {
       TestActorRef[MinerApiController](
-        MinerApiController.props(allHandlers)(
+        MinerApiController.props(cliqueManager.ref, allHandlers)(
           brokerConfig,
           networkSetting.copy(minerApiPort = apiPort),
           miningSetting
@@ -51,6 +53,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
     def connectToServer(probe: TestProbe): ActorRef = {
       probe.send(IO(Tcp), Tcp.Connect(bindAddress))
       allHandlerProbes.viewHandler.expectMsg(ViewHandler.Subscribe)
+      eventually(minerApiController.underlyingActor.pendings.length is 0)
       probe.expectMsgType[Tcp.Connected]
       val connection = probe.lastSender
       probe.reply(Tcp.Register(probe.ref))
@@ -59,16 +62,30 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
 
     val minerAddresses =
       AVector.tabulate(groups0)(g => getGenesisLockupScript(ChainIndex.unsafe(g, 0)))
+
+    def setSynced(isSynced: Boolean): Unit = {
+      cliqueManager.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case InterCliqueManager.IsSynced =>
+            sender ! InterCliqueManager.SyncedResult(isSynced)
+            TestActor.KeepRunning
+        }
+      )
+    }
   }
 
-  it should "accept new connections" in new Fixture {
+  trait SyncedFixture extends Fixture {
+    setSynced(true)
+  }
+
+  it should "accept new connections" in new SyncedFixture {
     connectToServer(TestProbe())
     minerApiController.underlyingActor.connections.length is 1
     connectToServer(TestProbe())
     minerApiController.underlyingActor.connections.length is 2
   }
 
-  it should "broadcast new template" in new Fixture {
+  it should "broadcast new template" in new SyncedFixture {
     val probe0 = TestProbe()
     val probe1 = TestProbe()
     connectToServer(probe0)
@@ -85,7 +102,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
     }
   }
 
-  it should "handle submission" in new Fixture with Eventually {
+  it should "handle submission" in new SyncedFixture with Eventually {
     val probe0      = TestProbe()
     val connection0 = connectToServer(probe0)
 
@@ -107,5 +124,19 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
     probe0.expectMsgPF() { case Tcp.Received(data) =>
       ServerMessage.deserialize(data).rightValue.value is SubmitResult(0, 0, succeeded)
     }
+  }
+
+  it should "close the connection if the clique is not synced" in new Fixture with Eventually {
+    val probe = TestProbe()
+    watch(probe.ref)
+
+    probe.send(IO(Tcp), Tcp.Connect(bindAddress))
+    probe.expectMsgType[Tcp.Connected]
+    eventually(minerApiController.underlyingActor.pendings.length is 1)
+    probe.reply(Tcp.Register(probe.ref))
+
+    minerApiController ! InterCliqueManager.SyncedResult(false)
+    eventually(minerApiController.underlyingActor.pendings.length is 0)
+    probe.expectMsgType[Tcp.ErrorClosed]
   }
 }

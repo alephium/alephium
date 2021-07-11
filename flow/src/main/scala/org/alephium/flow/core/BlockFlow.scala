@@ -150,6 +150,7 @@ object BlockFlow extends StrictLogging {
       BlockChain.fromStorageUnsafe(storages),
       BlockHeaderChain.fromStorageUnsafe(storages)
     )
+    blockflow.sanityCheckUnsafe()
     logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers")
     blockflow.updateBestDepsAfterLoadingUnsafe()
     blockflow

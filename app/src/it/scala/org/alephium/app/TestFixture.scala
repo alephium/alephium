@@ -41,11 +41,13 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
+import org.alephium.flow.mining.Miner
+import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.{Address, Block, ChainIndex, NetworkType}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
@@ -174,6 +176,25 @@ trait TestFixtureLike
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[TxResult](submitTx, restPort)
     res
+  }
+
+  def mineAndAndOneBlock(server: Server, index: ChainIndex): Block = {
+    val blockFlow = server.node.blockFlow
+    val blockTemplate =
+      blockFlow.prepareBlockFlowUnsafe(index, LockupScript.p2pkh(genesisKeys(index.to.value)._2))
+    val miningBlob = MiningBlob.from(blockTemplate)
+
+    @tailrec
+    def mine(): Block = {
+      Miner.mine(index, miningBlob)(server.config.broker, server.config.mining) match {
+        case Some((block, _)) => block
+        case None             => mine()
+      }
+    }
+
+    val block = mine()
+    server.node.blockFlow.addAndUpdateView(block) isE ()
+    block
   }
 
   def confirmTx(tx: TxResult, restPort: Int): Assertion = eventually {

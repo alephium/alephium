@@ -84,7 +84,11 @@ trait Server extends Service {
 
   override protected def startSelfOnce(): Future[Unit] = Future.successful {
     val props =
-      MinerApiController.props(node.allHandlers)(config.broker, config.network, config.mining)
+      MinerApiController.props(node.cliqueManager, node.allHandlers)(
+        config.broker,
+        config.network,
+        config.mining
+      )
     ActorRefT.build(flowSystem, props, s"MinerApi")
     ()
   }
@@ -113,7 +117,11 @@ object Server {
       val executionContext: ExecutionContext
   ) extends Server {
     val storages: Storages = {
-      Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
+      if (config.node.dbSyncWrite) {
+        Storages.createUnsafe(rootPath, storageFolder, Settings.syncWrite)(config.broker)
+      } else {
+        Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
+      }
     }
 
     val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)

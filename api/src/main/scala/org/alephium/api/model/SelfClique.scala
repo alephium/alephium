@@ -17,13 +17,14 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.model.{CliqueId, GroupIndex, NetworkType}
-import org.alephium.util.{AVector}
+import org.alephium.util.AVector
 
 final case class SelfClique(
     cliqueId: CliqueId,
     networkType: NetworkType,
     numZerosAtLeastInHash: Int,
     nodes: AVector[PeerAddress],
+    selfReady: Boolean,
     synced: Boolean,
     groupNumPerBroker: Int,
     groups: Int

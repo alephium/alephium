@@ -33,10 +33,8 @@ object IOUtils {
   }
 
   def clearUnsafe(path: Path): Unit = {
-    if (Files.exists(path)) {
-      if (Files.isDirectory(path)) {
-        Files.list(path).forEach(removeUnsafe)
-      }
+    if (Files.exists(path) && Files.isDirectory(path)) {
+      Files.list(path).forEach(removeUnsafe)
     }
   }
 

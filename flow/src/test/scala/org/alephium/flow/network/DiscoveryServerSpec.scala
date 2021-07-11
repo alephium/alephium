@@ -25,7 +25,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
-import org.alephium.flow.network.broker.{MisbehaviorManager, OutboundBrokerHandler}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
@@ -214,7 +214,7 @@ class DiscoveryServerSpec
 
   it should "mark address as unreachable" in new UnreachableFixture {
     val remote = Generators.socketAddressGen.sample.get
-    server0 ! OutboundBrokerHandler.Unreachable(remote)
+    server0 ! InterCliqueManager.Unreachable(remote)
     eventually {
       server0.underlyingActor.mightReachable(remote) is false
     }
