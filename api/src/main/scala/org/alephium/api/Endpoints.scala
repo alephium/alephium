@@ -49,15 +49,6 @@ trait Endpoints
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
       .and(query[TimeStamp]("toTs"))
-      .validate(
-        Validator.custom({ case (from, to) =>
-          if (from > to) {
-            List(ValidationError.Custom((from, to), "`fromTs` must be before `toTs`"))
-          } else {
-            List.empty
-          }
-        })
-      )
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to)
       )

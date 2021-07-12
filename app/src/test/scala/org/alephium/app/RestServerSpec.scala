@@ -57,10 +57,10 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         response.as[FetchResponse] is dummyFetchResponse
       }
 
-      Get(s"/blockflow?fromTs=10&toTs=0}") check { response =>
+      Get(s"/blockflow?fromTs=10&toTs=0") check { response =>
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
-          """Invalid value for: query parameter toTs (For input string: "0}": 0})"""
+          """`fromTs` must be before `toTs`"""
         )
       }
     }

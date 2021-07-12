@@ -156,9 +156,17 @@ class RestServer(
   }
 
   private val getBlockflowRoute = toRoute(getBlockflow) { timeInterval =>
-    Future.successful(
-      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
-    )
+    //TODO Validation can be moved to the `EndpointInput[TimeInterval]` once
+    //we update tapir to 0.18.0
+    if (timeInterval.from > timeInterval.to) {
+      Future.successful(
+        Left(ApiError.BadRequest(s"`fromTs` must be before `toTs`"))
+      )
+    } else {
+      Future.successful(
+        serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
+      )
+    }
   }
 
   private val getBlockRoute = toRoute(getBlock) { hash =>
