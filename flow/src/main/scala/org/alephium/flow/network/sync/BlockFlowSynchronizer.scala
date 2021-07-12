@@ -21,12 +21,13 @@ import java.net.InetSocketAddress
 import akka.actor.{Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, FlowHandler}
-import org.alephium.flow.network.{syncCleanupFrequency, syncExpiryPeriod, syncFrequency}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, IOBaseActor}
+import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BrokerInfo
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.EventStream.Subscriber
 
 object BlockFlowSynchronizer {
   def props(blockflow: BlockFlow, allHandlers: AllHandlers): Props =
@@ -41,16 +42,19 @@ object BlockFlowSynchronizer {
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
-    extends BaseActor
+    extends IOBaseActor
+    with Subscriber
     with DownloadTracker
     with BrokerStatusTracker {
   import BlockFlowSynchronizer._
 
+  var nodeSynced: Boolean = false
+
   override def preStart(): Unit = {
     super.preStart()
-    scheduleCancellable(self, Sync, syncFrequency)
+    scheduleSync()
     scheduleCancellable(self, CleanDownloading, syncCleanupFrequency)
-    ()
+    subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
   }
 
   override def receive: Receive = {
@@ -63,6 +67,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
         log.debug(s"Send sync requests to the network")
         allHandlers.flowHandler ! FlowHandler.GetSyncLocators
       }
+      scheduleSync()
     case flowLocators: FlowHandler.SyncLocators =>
       samplePeers.foreach { case (actor, brokerInfo) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filerFor(brokerInfo))
@@ -73,9 +78,16 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
+    case InterCliqueManager.SyncedResult(isSynced) => nodeSynced = isSynced
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {
     brokerInfos(broker).address
+  }
+
+  def scheduleSync(): Unit = {
+    val frequency = if (nodeSynced) stableSyncFrequency else syncFrequency
+    scheduleCancellableOnce(self, Sync, frequency)
+    ()
   }
 }

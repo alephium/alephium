@@ -22,8 +22,10 @@ import org.alephium.util.Duration
 package object network {
   val fastScanPeriod: Duration = Duration.ofMinutesUnsafe(1)
 
-  val syncFrequency: Duration        = Duration.ofSecondsUnsafe(2)
-  val syncCleanupFrequency: Duration = Duration.ofSecondsUnsafe(10)
-  val syncExpiryPeriod: Duration     = Duration.ofSecondsUnsafe(10)
+  val syncFrequency: Duration         = Duration.ofSecondsUnsafe(2)
+  val stableSyncFrequency: Duration   = Duration.ofSecondsUnsafe(20)
+  val syncCleanupFrequency: Duration  = Duration.ofSecondsUnsafe(10)
+  val syncExpiryPeriod: Duration      = Duration.ofSecondsUnsafe(10)
+  val updateSyncedFrequency: Duration = Duration.ofSecondsUnsafe(5)
 }
 // scalastyle:on magic.number

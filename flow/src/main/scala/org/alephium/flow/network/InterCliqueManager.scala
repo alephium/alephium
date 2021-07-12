@@ -55,12 +55,13 @@ object InterCliqueManager {
     )
   //scalastyle:on
 
-  sealed trait Command              extends CliqueManager.Command
-  final case object GetSyncStatuses extends Command
-  final case object IsSynced        extends Command
+  sealed trait Command                    extends CliqueManager.Command
+  final case object GetSyncStatuses       extends Command
+  final case object IsSynced              extends Command
+  final case object UpdateNodeSyncedOrNot extends Command
 
   sealed trait Event
-  final case class SyncedResult(isSynced: Boolean) extends Event
+  final case class SyncedResult(isSynced: Boolean) extends Event with EventStream.Event
   final case class SyncStatus(
       peerId: PeerId,
       address: InetSocketAddress,
@@ -107,6 +108,7 @@ class InterCliqueManager(
 
   override def preStart(): Unit = {
     super.preStart()
+    scheduleCancellable(self, UpdateNodeSyncedOrNot, updateSyncedFrequency)
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
   }
@@ -178,10 +180,10 @@ class InterCliqueManager(
       sender() ! syncStatuses
 
     case IsSynced =>
-      val syncedCount = brokers.count(_._2.isSynced)
-      val isSynced =
-        syncedCount >= (brokers.size + 1) / 2 && syncedCount >= (numBootstrapNodes + 1) / 2
-      sender() ! SyncedResult(isSynced)
+      sender() ! SyncedResult(isSynced())
+
+    case UpdateNodeSyncedOrNot =>
+      publishEvent(SyncedResult(isSynced()))
 
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
@@ -194,6 +196,11 @@ class InterCliqueManager(
     case DiscoveryServer.NeighborPeers(sortedPeers) =>
       extractPeersToConnect(sortedPeers, networkSetting.maxOutboundConnectionsPerGroup)
         .foreach(connectUnsafe)
+  }
+
+  def isSynced(): Boolean = {
+    val syncedCount = brokers.count(_._2.isSynced)
+    syncedCount >= (brokers.size + 1) / 2 && syncedCount >= (numBootstrapNodes + 1) / 2
   }
 
   def connect(broker: BrokerInfo): Unit = {
