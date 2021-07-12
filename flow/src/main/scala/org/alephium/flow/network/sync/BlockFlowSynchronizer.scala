@@ -45,19 +45,19 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     extends IOBaseActor
     with Subscriber
     with DownloadTracker
-    with BrokerStatusTracker {
+    with BrokerStatusTracker
+    with InterCliqueManager.NodeSyncStatus {
   import BlockFlowSynchronizer._
-
-  var nodeSynced: Boolean = false
 
   override def preStart(): Unit = {
     super.preStart()
-    scheduleSync()
     scheduleCancellable(self, CleanDownloading, syncCleanupFrequency)
-    subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
+    scheduleSync()
   }
 
-  override def receive: Receive = {
+  override def receive: Receive = handle orElse updateNodeSyncStatus
+
+  def handle: Receive = {
     case HandShaked(remoteBrokerInfo) =>
       log.debug(s"HandShaked with ${remoteBrokerInfo.address}")
       context.watch(sender())
@@ -78,7 +78,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
-    case InterCliqueManager.SyncedResult(isSynced) => nodeSynced = isSynced
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {
@@ -86,7 +85,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
   }
 
   def scheduleSync(): Unit = {
-    val frequency = if (nodeSynced) stableSyncFrequency else syncFrequency
+    val frequency = if (isNodeSynced) stableSyncFrequency else syncFrequency
     scheduleCancellableOnce(self, Sync, frequency)
     ()
   }

@@ -91,22 +91,22 @@ class BlockChainHandler(
       chainIndex,
       BlockValidation.build
     )
-    with EventStream.Publisher {
+    with EventStream.Publisher
+    with InterCliqueManager.NodeSyncStatus {
   import BlockChainHandler._
-
-  var nodeSynced: Boolean = false
 
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
 
-  override def receive: Receive = {
-    case Validate(block, broker, origin)           => handleData(block, broker, origin)
-    case InterCliqueManager.SyncedResult(isSynced) => nodeSynced = isSynced
+  override def receive: Receive = validate orElse updateNodeSyncStatus
+
+  def validate: Receive = { case Validate(block, broker, origin) =>
+    handleData(block, broker, origin)
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
     if (brokerConfig.contains(block.chainIndex.from)) {
       val broadcastIntraClique = brokerConfig.brokerNum != 1
-      if (nodeSynced || broadcastIntraClique) {
+      if (isNodeSynced || broadcastIntraClique) {
         val blockMessage =
           Message.serialize(SendBlocks(AVector(block)), networkSetting.networkType)
         val headerMessage =
@@ -117,7 +117,7 @@ class BlockChainHandler(
             blockMessage,
             headerMessage,
             origin,
-            nodeSynced
+            isNodeSynced
           )
         publishEvent(event)
       }

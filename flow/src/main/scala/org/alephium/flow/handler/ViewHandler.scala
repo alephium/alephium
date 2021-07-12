@@ -82,13 +82,15 @@ class ViewHandler(
     val miningSetting: MiningSetting
 ) extends ViewHandlerState
     with Subscriber
-    with Publisher {
-  var nodeSynced: Boolean    = false
+    with Publisher
+    with InterCliqueManager.NodeSyncStatus {
   var lastUpdated: TimeStamp = TimeStamp.zero
 
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
-  override def receive: Receive = {
+  override def receive: Receive = handle orElse updateNodeSyncStatus
+
+  def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, addedAt) =>
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
@@ -100,7 +102,7 @@ class ViewHandler(
           broadcastReadyTxs(newReadyTxs)
         }
       }
-      if (nodeSynced) { updateSubscribers() }
+      if (isNodeSynced) { updateSubscribers() }
 
     case ViewHandler.Subscribe         => subscribe()
     case ViewHandler.Unsubscribe       => unsubscribe()
@@ -112,8 +114,6 @@ class ViewHandler(
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
-
-    case InterCliqueManager.SyncedResult(isSynced) => nodeSynced = isSynced
   }
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {

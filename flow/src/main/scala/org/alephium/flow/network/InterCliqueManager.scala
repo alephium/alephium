@@ -89,6 +89,18 @@ object InterCliqueManager {
   val peersTotal: Gauge = Gauge
     .build("alephium_peers_total", "Number of connected peers")
     .register()
+
+  trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
+    private var nodeSynced: Boolean = false
+
+    subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
+
+    def updateNodeSyncStatus: Receive = { case InterCliqueManager.SyncedResult(isSynced) =>
+      nodeSynced = isSynced
+    }
+
+    def isNodeSynced: Boolean = nodeSynced
+  }
 }
 
 class InterCliqueManager(
