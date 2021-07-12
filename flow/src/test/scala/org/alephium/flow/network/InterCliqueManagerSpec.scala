@@ -29,8 +29,8 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
-import org.alephium.flow.network.broker.{InboundConnection, OutboundConnection}
 import org.alephium.flow.network.InterCliqueManager.SyncedResult
+import org.alephium.flow.network.broker.{InboundConnection, OutboundConnection}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
