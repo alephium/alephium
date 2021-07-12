@@ -30,6 +30,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.broker.{InboundConnection, OutboundConnection}
+import org.alephium.flow.network.InterCliqueManager.SyncedResult
 import org.alephium.protocol.Generators
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
@@ -238,7 +239,7 @@ class InterCliqueManagerSpec
       interCliqueManager ! CliqueManager.Synced(broker)
 
       interCliqueManager ! InterCliqueManager.IsSynced
-      expectMsg(InterCliqueManager.SyncedResult(expected))
+      eventually(expectMsg(InterCliqueManager.SyncedResult(expected)))
     }
   }
 
@@ -263,6 +264,28 @@ class InterCliqueManagerSpec
     override lazy val numBootstrapNodes: Int = 3
     addAndCheckSynced(false)
     addAndCheckSynced(true)
+  }
+
+  it should "publish node synced status" in new SyncFixture {
+    override lazy val numBootstrapNodes: Int = 1
+    checkSynced(false)
+
+    system.eventStream.subscribe(testActor, classOf[SyncedResult])
+    interCliqueManagerActor.lastNodeSyncedStatus is None
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
+    expectMsg(SyncedResult(false))
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
+    expectNoMessage()
+
+    addAndCheckSynced(true)
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
+    expectMsg(SyncedResult(true))
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
+    expectNoMessage()
   }
 
   trait Fixture extends FlowFixture with Generators {

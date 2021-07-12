@@ -55,10 +55,10 @@ object InterCliqueManager {
     )
   //scalastyle:on
 
-  sealed trait Command                    extends CliqueManager.Command
-  final case object GetSyncStatuses       extends Command
-  final case object IsSynced              extends Command
-  final case object UpdateNodeSyncedOrNot extends Command
+  sealed trait Command                     extends CliqueManager.Command
+  final case object GetSyncStatuses        extends Command
+  final case object IsSynced               extends Command
+  final case object UpdateNodeSyncedStatus extends Command
 
   sealed trait Event
   final case class SyncedResult(isSynced: Boolean) extends Event with EventStream.Event
@@ -120,7 +120,7 @@ class InterCliqueManager(
 
   override def preStart(): Unit = {
     super.preStart()
-    scheduleCancellable(self, UpdateNodeSyncedOrNot, updateSyncedFrequency)
+    scheduleCancellable(self, UpdateNodeSyncedStatus, updateSyncedFrequency)
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
   }
@@ -194,8 +194,8 @@ class InterCliqueManager(
     case IsSynced =>
       sender() ! SyncedResult(isSynced())
 
-    case UpdateNodeSyncedOrNot =>
-      publishEvent(SyncedResult(isSynced()))
+    case UpdateNodeSyncedStatus =>
+      updateNodeSyncedStatus()
 
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
@@ -213,6 +213,20 @@ class InterCliqueManager(
   def isSynced(): Boolean = {
     val syncedCount = brokers.count(_._2.isSynced)
     syncedCount >= (brokers.size + 1) / 2 && syncedCount >= (numBootstrapNodes + 1) / 2
+  }
+
+  var lastNodeSyncedStatus: Option[Boolean] = None
+  def updateNodeSyncedStatus(): Unit = {
+    val nodeSyncStatus = isSynced()
+    lastNodeSyncedStatus match {
+      case None =>
+        publishEvent(SyncedResult(nodeSyncStatus))
+      case Some(lastStatus) =>
+        if (nodeSyncStatus != lastStatus) {
+          publishEvent(SyncedResult(nodeSyncStatus))
+        } // else we don't do anything
+    }
+    lastNodeSyncedStatus = Some(nodeSyncStatus)
   }
 
   def connect(broker: BrokerInfo): Unit = {
