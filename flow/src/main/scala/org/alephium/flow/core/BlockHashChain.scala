@@ -315,11 +315,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def isRecent(hash: BlockHash): IOResult[Boolean] = {
-    getHeight(hash).flatMap(isRecent)
-  }
-
-  def isRecent(height: Int): IOResult[Boolean] = {
+  def isRecentHeight(height: Int): IOResult[Boolean] = {
     maxHeight.map(height >= _ - consensusConfig.recentBlockHeightDiff)
   }
 }

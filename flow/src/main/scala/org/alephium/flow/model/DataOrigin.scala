@@ -28,23 +28,23 @@ sealed trait DataOrigin {
 
 object DataOrigin {
   case object Local extends DataOrigin {
-    override def isLocal: Boolean = true
+    def isLocal: Boolean = true
 
-    override def isFrom(another: CliqueId): Boolean = false
+    def isFrom(another: CliqueId): Boolean = false
 
-    override def isFrom(brokerInfo: BrokerInfo): Boolean = false
+    def isFrom(brokerInfo: BrokerInfo): Boolean = false
   }
 
   sealed trait FromClique extends DataOrigin {
-    override def isLocal: Boolean = false
+    def isLocal: Boolean = false
 
     def brokerInfo: BrokerInfo
 
     def cliqueId: CliqueId = brokerInfo.cliqueId
 
-    override def isFrom(another: CliqueId): Boolean = cliqueId == another
+    def isFrom(another: CliqueId): Boolean = cliqueId == another
 
-    override def isFrom(_brokerInfo: BrokerInfo): Boolean = _brokerInfo == brokerInfo
+    def isFrom(_brokerInfo: BrokerInfo): Boolean = _brokerInfo == brokerInfo
   }
   final case class InterClique(brokerInfo: BrokerInfo) extends FromClique
   final case class IntraClique(brokerInfo: BrokerInfo) extends FromClique

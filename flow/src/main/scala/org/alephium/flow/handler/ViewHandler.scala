@@ -24,6 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.ViewHandler.SubscribeFailed
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
@@ -82,6 +83,7 @@ class ViewHandler(
 ) extends ViewHandlerState
     with Subscriber
     with Publisher {
+  var nodeSynced: Boolean    = false
   var lastUpdated: TimeStamp = TimeStamp.zero
 
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
@@ -98,9 +100,7 @@ class ViewHandler(
           broadcastReadyTxs(newReadyTxs)
         }
       }
-      if (blockFlow.isRecent(data)) {
-        updateSubscribers()
-      }
+      if (nodeSynced) { updateSubscribers() }
 
     case ViewHandler.Subscribe         => subscribe()
     case ViewHandler.Unsubscribe       => unsubscribe()
@@ -112,6 +112,8 @@ class ViewHandler(
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
+
+    case InterCliqueManager.SyncedResult(isSynced) => nodeSynced = isSynced
   }
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {

@@ -22,7 +22,7 @@ import io.prometheus.client.{Counter, Gauge, Histogram}
 import org.alephium.flow.core.{BlockFlow, BlockHashChain}
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
@@ -94,22 +94,31 @@ class BlockChainHandler(
     with EventStream.Publisher {
   import BlockChainHandler._
 
+  var nodeSynced: Boolean = false
+
   val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
 
-  override def receive: Receive = { case Validate(block, broker, origin) =>
-    handleData(block, broker, origin)
+  override def receive: Receive = {
+    case Validate(block, broker, origin)           => handleData(block, broker, origin)
+    case InterCliqueManager.SyncedResult(isSynced) => nodeSynced = isSynced
   }
 
   override def broadcast(block: Block, origin: DataOrigin): Unit = {
     if (brokerConfig.contains(block.chainIndex.from)) {
-      val isRecent = blockFlow.isRecent(block)
-      if (isRecent || brokerConfig.brokerNum != 1) {
+      val broadcastIntraClique = brokerConfig.brokerNum != 1
+      if (nodeSynced || broadcastIntraClique) {
         val blockMessage =
           Message.serialize(SendBlocks(AVector(block)), networkSetting.networkType)
         val headerMessage =
           Message.serialize(SendHeaders(AVector(block.header)), networkSetting.networkType)
         val event =
-          CliqueManager.BroadCastBlock(block, blockMessage, headerMessage, origin, isRecent)
+          CliqueManager.BroadCastBlock(
+            block,
+            blockMessage,
+            headerMessage,
+            origin,
+            nodeSynced
+          )
         publishEvent(event)
       }
     }
