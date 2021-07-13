@@ -24,6 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.ViewHandler.SubscribeFailed
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
@@ -81,12 +82,15 @@ class ViewHandler(
     val miningSetting: MiningSetting
 ) extends ViewHandlerState
     with Subscriber
-    with Publisher {
+    with Publisher
+    with InterCliqueManager.NodeSyncStatus {
   var lastUpdated: TimeStamp = TimeStamp.zero
 
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
-  override def receive: Receive = {
+  override def receive: Receive = handle orElse updateNodeSyncStatus
+
+  def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, addedAt) =>
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
@@ -98,9 +102,7 @@ class ViewHandler(
           broadcastReadyTxs(newReadyTxs)
         }
       }
-      if (blockFlow.isRecent(data)) {
-        updateSubscribers()
-      }
+      if (isNodeSynced) { updateSubscribers() }
 
     case ViewHandler.Subscribe         => subscribe()
     case ViewHandler.Unsubscribe       => unsubscribe()

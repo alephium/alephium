@@ -29,18 +29,13 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
+import org.alephium.flow.network.InterCliqueManager.SyncedResult
 import org.alephium.flow.network.broker.{InboundConnection, OutboundConnection}
-import org.alephium.protocol.Generators
+import org.alephium.protocol.{Generators, Hash}
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
-class InterCliqueManagerSpec
-    extends AlephiumActorSpec("InterCliqueManagerSpec")
-    with Generators
-    with ScalaFutures {
-  implicit override lazy val system: ActorSystem =
-    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
-
+class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutures {
   implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
   it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
@@ -238,7 +233,7 @@ class InterCliqueManagerSpec
       interCliqueManager ! CliqueManager.Synced(broker)
 
       interCliqueManager ! InterCliqueManager.IsSynced
-      expectMsg(InterCliqueManager.SyncedResult(expected))
+      eventually(expectMsg(InterCliqueManager.SyncedResult(expected)))
     }
   }
 
@@ -265,7 +260,36 @@ class InterCliqueManagerSpec
     addAndCheckSynced(true)
   }
 
-  trait Fixture extends FlowFixture with Generators {
+  it should "publish node synced status" in new SyncFixture {
+    override val configValues = Map(("alephium.network.update-synced-frequency", "1 minute"))
+
+    override lazy val numBootstrapNodes: Int = 1
+    checkSynced(false)
+
+    system.eventStream.subscribe(testActor, classOf[SyncedResult])
+    interCliqueManagerActor.lastNodeSyncedStatus is None
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
+    expectMsg(SyncedResult(false))
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
+    expectNoMessage()
+
+    addAndCheckSynced(true)
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
+    expectMsg(SyncedResult(true))
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
+    expectNoMessage()
+  }
+
+  trait Fixture extends FlowFixture with Generators with AlephiumActorSpecLike {
+    val name: String = s"InterCliqueManger-${Hash.random.shortHex}"
+
+    implicit override lazy val system: ActorSystem =
+      ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
+
     lazy val maxOutboundConnectionsPerGroup: Int = config.network.maxOutboundConnectionsPerGroup
     lazy val maxInboundConnectionsPerGroup: Int  = config.network.maxInboundConnectionsPerGroup
 

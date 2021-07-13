@@ -38,11 +38,7 @@ object BrokerStatusTracker {
 }
 
 trait BrokerStatusTracker {
-  import BrokerStatusTracker._
-
   val brokerInfos: mutable.HashMap[ActorRefT[BrokerHandler.Command], BrokerInfo] =
-    mutable.HashMap.empty
-  val brokerStatus: mutable.HashMap[ActorRefT[BrokerHandler.Command], Status] =
     mutable.HashMap.empty
 
   def samplePeers: AVector[(ActorRefT[BrokerHandler.Command], BrokerInfo)] =

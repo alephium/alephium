@@ -80,6 +80,7 @@ class DiscoveryServerSpec
 
           val scanFrequency: Duration     = Duration.ofMillisUnsafe(2000)
           val scanFastFrequency: Duration = Duration.ofMillisUnsafe(2000)
+          val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
           val neighborsPerGroup: Int      = 20
         }
         (brokerInfo, config)
@@ -270,6 +271,7 @@ object DiscoveryServerSpec {
 
       val scanFrequency: Duration     = _scanFrequency
       val scanFastFrequency: Duration = _scanFrequency
+      val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
       val neighborsPerGroup: Int      = _peersPerGroup
 
       override lazy val expireDuration: Duration = _expireDuration

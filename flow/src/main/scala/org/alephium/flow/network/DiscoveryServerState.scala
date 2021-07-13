@@ -182,7 +182,7 @@ trait DiscoveryServerState extends SessionManager {
       .foreach(ping(_, None))
   }
 
-  private val fastScanThreshold = TimeStamp.now() + fastScanPeriod
+  private val fastScanThreshold = TimeStamp.now() + discoveryConfig.fastScanPeriod
   def shouldScanFast(): Boolean = {
     (TimeStamp.now() < fastScanThreshold) || (!atLeastOnePeerPerGroup())
   }

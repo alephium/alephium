@@ -55,7 +55,7 @@ object CliqueManager {
       blockMsg: ByteString,
       headerMsg: ByteString,
       origin: DataOrigin,
-      isRecent: Boolean
+      broadcastInterClique: Boolean
   ) extends Command
       with EventStream.Event
   final case class BroadCastTx(
@@ -131,7 +131,7 @@ class CliqueManager(
   def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
     case message: CliqueManager.BroadCastBlock =>
       intraCliqueManager ! message
-      if (message.isRecent) {
+      if (message.broadcastInterClique) {
         interCliqueManager ! message
       }
     case message: CliqueManager.BroadCastTx =>

@@ -53,7 +53,9 @@ import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
-class TestFixture(val name: String) extends TestFixtureLike
+class TestFixture(val name: String) extends TestFixtureLike {
+  implicit lazy val system: ActorSystem = createSystem(name)
+}
 
 // scalastyle:off method.length
 // scalastyle:off number.of.methods
@@ -101,10 +103,11 @@ trait TestFixtureLike
     if (usedPort.contains(tcpPort)) {
       generatePort
     } else {
-      val tcp: ServerSocket   = ServerSocketChannel.open().socket()
-      val udp: DatagramSocket = DatagramChannel.open().socket()
-      val rest: ServerSocket  = ServerSocketChannel.open().socket()
-      val ws: ServerSocket    = ServerSocketChannel.open().socket()
+      val tcp: ServerSocket      = ServerSocketChannel.open().socket()
+      val udp: DatagramSocket    = DatagramChannel.open().socket()
+      val rest: ServerSocket     = ServerSocketChannel.open().socket()
+      val ws: ServerSocket       = ServerSocketChannel.open().socket()
+      val minerApi: ServerSocket = ServerSocketChannel.open().socket()
       try {
         tcp.setReuseAddress(true)
         tcp.bind(new InetSocketAddress("127.0.0.1", tcpPort))
@@ -114,6 +117,8 @@ trait TestFixtureLike
         rest.bind(new InetSocketAddress("127.0.0.1", restPort(tcpPort)))
         ws.setReuseAddress(true)
         ws.bind(new InetSocketAddress("127.0.0.1", wsPort(tcpPort)))
+        minerApi.setReuseAddress(true)
+        minerApi.bind(new InetSocketAddress("127.0.0.1", minerPort(tcpPort)))
         usedPort.add(tcpPort)
         tcpPort
       } catch {
@@ -123,6 +128,7 @@ trait TestFixtureLike
         udp.close()
         rest.close()
         ws.close()
+        minerApi.close()
       }
     }
   }

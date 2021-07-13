@@ -139,7 +139,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       val lastCanonicalHash = reversed(lastCanonicalIndex)
       val heightFrom        = getHeightUnsafe(lastCanonicalHash) + 1
       val heightTo          = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
-      if (Utils.unsafe(isRecent(heightFrom))) {
+      if (Utils.unsafe(isRecentHeight(heightFrom))) {
         getRecentDataUnsafe(heightFrom, heightTo)
       } else {
         getSyncDataUnsafe(heightFrom, heightTo)

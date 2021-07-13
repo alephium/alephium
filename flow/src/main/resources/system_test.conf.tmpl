@@ -30,6 +30,12 @@ alephium {
     penalty-frequency = 10 second
     connection-buffer-capacity-in-byte = 100000000
 
+    fast-sync-frequency = 2 second
+    stable-sync-frequency = 20 second
+    sync-cleanup-frequency = 10 second
+    sync-expiry-period = 10 second
+    update-synced-frequency = 5 second
+
     upnp {
       enabled = false
     }
@@ -51,6 +57,7 @@ alephium {
 
     scan-frequency = 90.seconds
     scan-fast-frequency = 5.seconds
+    fast-scan-period = 1 minute
     neighbors-per-group = 20
   }
 

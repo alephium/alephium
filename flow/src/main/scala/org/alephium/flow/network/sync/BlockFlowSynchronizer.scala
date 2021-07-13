@@ -21,15 +21,19 @@ import java.net.InetSocketAddress
 import akka.actor.{Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, FlowHandler}
-import org.alephium.flow.network.{syncCleanupFrequency, syncExpiryPeriod, syncFrequency}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, IOBaseActor}
+import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BrokerInfo
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.EventStream.Subscriber
 
 object BlockFlowSynchronizer {
-  def props(blockflow: BlockFlow, allHandlers: AllHandlers): Props =
+  def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
+      networkSetting: NetworkSetting
+  ): Props =
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
@@ -40,20 +44,24 @@ object BlockFlowSynchronizer {
   case object CleanDownloading                                          extends Command
 }
 
-class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
-    extends BaseActor
+class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
+    networkSetting: NetworkSetting
+) extends IOBaseActor
+    with Subscriber
     with DownloadTracker
-    with BrokerStatusTracker {
+    with BrokerStatusTracker
+    with InterCliqueManager.NodeSyncStatus {
   import BlockFlowSynchronizer._
 
   override def preStart(): Unit = {
     super.preStart()
-    scheduleCancellable(self, Sync, syncFrequency)
-    scheduleCancellable(self, CleanDownloading, syncCleanupFrequency)
-    ()
+    schedule(self, CleanDownloading, networkSetting.syncCleanupFrequency)
+    scheduleSync()
   }
 
-  override def receive: Receive = {
+  override def receive: Receive = handle orElse updateNodeSyncStatus
+
+  def handle: Receive = {
     case HandShaked(remoteBrokerInfo) =>
       log.debug(s"HandShaked with ${remoteBrokerInfo.address}")
       context.watch(sender())
@@ -63,13 +71,14 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
         log.debug(s"Send sync requests to the network")
         allHandlers.flowHandler ! FlowHandler.GetSyncLocators
       }
+      scheduleSync()
     case flowLocators: FlowHandler.SyncLocators =>
       samplePeers.foreach { case (actor, brokerInfo) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filerFor(brokerInfo))
       }
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)
-    case CleanDownloading        => cleanupDownloading(syncExpiryPeriod)
+    case CleanDownloading        => cleanupDownloading(networkSetting.syncExpiryPeriod)
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
@@ -77,5 +86,11 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {
     brokerInfos(broker).address
+  }
+
+  def scheduleSync(): Unit = {
+    val frequency =
+      if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
+    scheduleOnce(self, Sync, frequency)
   }
 }

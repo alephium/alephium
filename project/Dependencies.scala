@@ -18,7 +18,6 @@ import sbt._
 
 object Version {
   lazy val akka       = "2.6.13"
-  lazy val metrics    = "4.0.6"
   lazy val tapir      = "0.17.19"
   lazy val sttp       = "3.2.3"
   lazy val prometheus = "0.10.0"
@@ -37,8 +36,6 @@ object Dependencies {
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk15on"  % "1.68"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.1"
   lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.2.3"
-  lazy val metrics         = "io.dropwizard.metrics"       % "metrics-core"    % Version.metrics
-  lazy val `metrics-jmx`   = "io.dropwizard.metrics"       % "metrics-jmx"     % Version.metrics
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "5.18.4"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.2"
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.15.3"  % Test

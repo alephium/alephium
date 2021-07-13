@@ -21,19 +21,19 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorSystem}
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, SocketUtil, TestProbe}
-import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.util.{ActorRefT, AlephiumActorSpec}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AlephiumActorSpecLike, AlephiumSpec}
 
-class TcpControllerSpec extends AlephiumActorSpec("TcpController") with AlephiumConfigFixture {
-  implicit override lazy val system: ActorSystem =
-    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
+class TcpControllerSpec extends AlephiumSpec with AlephiumConfigFixture {
 
-  trait Fixture extends Eventually {
+  trait Fixture extends Eventually with AlephiumActorSpecLike {
+    implicit override lazy val system: ActorSystem =
+      createSystem("TcpControllerSpec", AlephiumActorSpec.debugConfig)
+
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()
     val bootstrapper       = TestProbe()
@@ -123,7 +123,7 @@ class TcpControllerSpec extends AlephiumActorSpec("TcpController") with Alephium
     eventually {
       fixture2.controller ! TcpController.ConnectTo(
         fixture1.bindAddress,
-        ActorRefT(TestProbe().ref)
+        ActorRefT(TestProbe()(fixture2.system).ref)
       )
       fixture2.controllerActor.confirmedConnections.contains(fixture1.bindAddress) is true
     }
