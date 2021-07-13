@@ -25,7 +25,9 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatest.concurrent.ScalaFutures
 
-class AlephiumActorSpec(val name: String) extends AlephiumActorSpecLike
+class AlephiumActorSpec(val name: String) extends AlephiumActorSpecLike {
+  implicit lazy val system: ActorSystem = createSystem(name)
+}
 
 trait AlephiumActorSpecLike
     extends TestKitBase
@@ -43,10 +45,12 @@ trait AlephiumActorSpecLike
     akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
   }
 
-  def name: String
-
-  implicit lazy val system: ActorSystem =
-    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
+  def createSystem(name: String, config: String = AlephiumActorSpec.warningConfig): ActorSystem = {
+    ActorSystem(
+      s"$name-${SecureAndSlowRandom.nextU256().toString}",
+      ConfigFactory.parseString(config)
+    )
+  }
 
   override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)

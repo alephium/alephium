@@ -53,7 +53,9 @@ import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
-class TestFixture(val name: String) extends TestFixtureLike
+class TestFixture(val name: String) extends TestFixtureLike {
+  implicit lazy val system: ActorSystem = createSystem(name)
+}
 
 // scalastyle:off method.length
 // scalastyle:off number.of.methods
