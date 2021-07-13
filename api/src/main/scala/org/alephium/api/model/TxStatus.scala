@@ -23,7 +23,7 @@ sealed trait TxStatus
 @upickle.implicits.key("confirmed")
 final case class Confirmed(
     blockHash: BlockHash,
-    blockIndex: Int,
+    txIndex: Int,
     chainConfirmations: Int,
     fromGroupConfirmations: Int,
     toGroupConfirmations: Int

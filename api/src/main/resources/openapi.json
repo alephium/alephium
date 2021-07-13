@@ -3583,7 +3583,7 @@
                     "value": {
                       "type": "confirmed",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "blockIndex": 0,
+                      "txIndex": 0,
                       "chainConfirmations": 1,
                       "fromGroupConfirmations": 2,
                       "toGroupConfirmations": 3
@@ -5255,7 +5255,7 @@
       "Confirmed": {
         "required": [
           "blockHash",
-          "blockIndex",
+          "txIndex",
           "chainConfirmations",
           "fromGroupConfirmations",
           "toGroupConfirmations"
@@ -5265,7 +5265,7 @@
           "blockHash": {
             "type": "string"
           },
-          "blockIndex": {
+          "txIndex": {
             "type": "integer"
           },
           "chainConfirmations": {

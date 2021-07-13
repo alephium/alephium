@@ -326,7 +326,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val blockHash         = BlockHash.generate
     val status0: TxStatus = Confirmed(blockHash, 0, 1, 2, 3)
     val jsonRaw0 =
-      s"""{"type":"confirmed","blockHash":"${blockHash.toHexString}","blockIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}"""
+      s"""{"type":"confirmed","blockHash":"${blockHash.toHexString}","txIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}"""
     checkData(status0, jsonRaw0)
 
     checkData[PeerStatus](PeerStatus.Penalty(10), s"""{"type":"penalty","value":10}""")
