@@ -18,12 +18,16 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
+import sttp.model.StatusCode
+
 import org.alephium.api.model._
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
 class BroadcastTxTest extends AlephiumSpec {
-  it should "broadcast tx between intra clique node" in new TestFixture("broadcast-tx-2-nodes") {
+  it should "not broadcast tx between intra clique node" in new TestFixture(
+    "broadcast-tx-2-nodes"
+  ) {
     val port2   = generatePort
     val server1 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     val server2 = bootNode(publicPort = port2, brokerId = 1)
@@ -31,20 +35,11 @@ class BroadcastTxTest extends AlephiumSpec {
 
     eventually(request[SelfClique](getSelfClique).selfReady is true)
 
-    val selfClique1 = request[SelfClique](getSelfClique)
-    val group1      = request[Group](getGroup(address))
-    val index1      = group1.group / selfClique1.groupNumPerBroker
-    val restPort1   = selfClique1.nodes(index1).restPort
-
-    val selfClique2 = request[SelfClique](getSelfClique, restPort(port2))
-    val group2      = request[Group](getGroup(address), restPort(port2))
-    val index2      = group2.group / selfClique2.groupNumPerBroker
-    val restPort2   = selfClique2.nodes(index2).restPort
-
-    val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort1)
-
+    val restPort1 = restPort(defaultMasterPort)
+    val restPort2 = restPort(port2)
+    val tx        = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort1)
     eventually(request[TxStatus](getTransactionStatus(tx), restPort1) is MemPooled)
-    eventually(request[TxStatus](getTransactionStatus(tx), restPort2) is MemPooled)
+    eventually(requestFailed(getTransactionStatus(tx), restPort2, StatusCode.BadRequest))
 
     server1.stop().futureValue is ()
     server2.stop().futureValue is ()

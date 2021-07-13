@@ -165,9 +165,13 @@ class ServerUtils(networkType: NetworkType) {
       txId: Hash,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
-    blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
-      case Some(status) => convert(status)
-      case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
+    if (blockFlow.brokerConfig.contains(chainIndex.from)) {
+      blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
+        case Some(status) => convert(status)
+        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
+      }
+    } else {
+      Left(ApiError.BadRequest(s"Invalid chain index $chainIndex, txId: ${txId.toHexString}"))
     }
   }
 
