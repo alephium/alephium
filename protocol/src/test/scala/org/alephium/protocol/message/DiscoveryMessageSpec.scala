@@ -56,6 +56,7 @@ class DiscoveryMessageSpec extends AlephiumSpec {
     implicit val discoveryConfig: DiscoveryConfig = new DiscoveryConfig {
       val scanFrequency: Duration     = Duration.ofSecondsUnsafe(1)
       val scanFastFrequency: Duration = Duration.ofSecondsUnsafe(1)
+      val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
       val neighborsPerGroup: Int      = 1
     }
   }

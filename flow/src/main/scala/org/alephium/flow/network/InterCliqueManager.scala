@@ -120,7 +120,7 @@ class InterCliqueManager(
 
   override def preStart(): Unit = {
     super.preStart()
-    scheduleCancellable(self, UpdateNodeSyncedStatus, updateSyncedFrequency)
+    schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
   }

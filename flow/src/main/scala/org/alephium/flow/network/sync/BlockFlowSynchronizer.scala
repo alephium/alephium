@@ -24,13 +24,16 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, IOBaseActor}
 import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
 
 object BlockFlowSynchronizer {
-  def props(blockflow: BlockFlow, allHandlers: AllHandlers): Props =
+  def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
+      networkSetting: NetworkSetting
+  ): Props =
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
@@ -41,8 +44,9 @@ object BlockFlowSynchronizer {
   case object CleanDownloading                                          extends Command
 }
 
-class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)
-    extends IOBaseActor
+class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
+    networkSetting: NetworkSetting
+) extends IOBaseActor
     with Subscriber
     with DownloadTracker
     with BrokerStatusTracker
@@ -51,7 +55,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
 
   override def preStart(): Unit = {
     super.preStart()
-    scheduleCancellable(self, CleanDownloading, syncCleanupFrequency)
+    schedule(self, CleanDownloading, networkSetting.syncCleanupFrequency)
     scheduleSync()
   }
 
@@ -74,7 +78,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)
-    case CleanDownloading        => cleanupDownloading(syncExpiryPeriod)
+    case CleanDownloading        => cleanupDownloading(networkSetting.syncExpiryPeriod)
     case Terminated(broker) =>
       log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
       brokerInfos -= ActorRefT(broker)
@@ -85,8 +89,8 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
   }
 
   def scheduleSync(): Unit = {
-    val frequency = if (isNodeSynced) stableSyncFrequency else syncFrequency
-    scheduleCancellableOnce(self, Sync, frequency)
-    ()
+    val frequency =
+      if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
+    scheduleOnce(self, Sync, frequency)
   }
 }
