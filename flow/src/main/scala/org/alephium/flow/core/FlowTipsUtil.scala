@@ -62,8 +62,8 @@ trait FlowTipsUtil {
   }
 
   def getOutTips(header: BlockHeader): AVector[BlockHash] = {
-    val index = header.chainIndex
     if (header.isGenesis) {
+      val index = header.chainIndex
       genesisHashes(index.from.value)
     } else {
       header.outTips
