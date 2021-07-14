@@ -60,10 +60,17 @@ class SwaggerVertx(
         ()
       }
 
+    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+    val contentType        = s"application/${openapiFileName.split("\\.").last}"
+    val contentDisposition = s"""inline; filename="$openapiFileName""""
     router
       .route(HttpMethod.GET, s"/$contextPath/$openapiFileName")
       .handler { ctx =>
-        ctx.response().putHeader("Content-Type", "application/yaml").end(openapiContent)
+        ctx
+          .response()
+          .putHeader("Content-Type", contentType)
+          .putHeader("Content-Disposition", contentDisposition)
+          .end(openapiContent)
         ()
       }
 

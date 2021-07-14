@@ -73,8 +73,8 @@ class BootUp extends StrictLogging {
       .onComplete {
         case Success(_) => ()
         case Failure(e) =>
-          logger.error("Fatal error during initialization.", e)
-          stop()
+          logger.error(s"Fatal error during initialization: $e")
+          sys.exit(1)
       }
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
