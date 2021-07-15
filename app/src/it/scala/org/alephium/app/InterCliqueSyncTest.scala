@@ -94,25 +94,15 @@ class InterCliqueSyncTest extends AlephiumSpec {
     ) = {
       val fromTs            = TimeStamp.now()
       val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
-      val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
+      val masterPortClique1 = clique1.masterTcpPort
 
-      clique1.map(_.start()).foreach(_.futureValue is ())
-      startWS(wsPort(masterPortClique1))
+      clique1.start()
+      clique1.startWs()
+      val selfClique1 = clique1.selfClique()
 
-      clique1.foreach { server =>
-        eventually(
-          request[SelfClique](getSelfClique, server.config.network.restPort).synced is true
-        )
-        request[Boolean](startMining, restPort(server.config.network.bindAddress.getPort)) is true
-      }
-
+      clique1.startMining()
       blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
-
-      clique1.foreach { server =>
-        request[Boolean](stopMining, restPort(server.config.network.bindAddress.getPort)) is true
-      }
-
-      val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
+      clique1.stopMining()
 
       val clique2 =
         bootClique(
@@ -120,19 +110,12 @@ class InterCliqueSyncTest extends AlephiumSpec {
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
           connectionBuild = connectionBuild
         )
-      val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
+      val masterPortClique2 = clique2.masterTcpPort
 
-      clique2.map(_.start()).foreach(_.futureValue is ())
+      clique2.start()
+      val selfClique2 = clique2.selfClique()
 
-      clique2.foreach { server =>
-        eventually(
-          request[SelfClique](getSelfClique, server.config.network.restPort).synced is true
-        )
-      }
-
-      val selfClique2 = request[SelfClique](getSelfClique, restPort(masterPortClique2))
-
-      clique2.foreach { server =>
+      clique2.servers.foreach { server =>
         eventually {
           val interCliquePeers =
             request[Seq[InterCliquePeerInfo]](
@@ -173,14 +156,14 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
       eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
 
-      clique1.foreach(_.stop().futureValue is ())
-      clique2.foreach(_.stop().futureValue is ())
+      clique1.stop()
+      clique2.stop()
     }
     // scalastyle:on method.length
   }
 
   it should "ban node if not same network type" in new TestFixture("2-nodes") {
-    val server0 = bootClique(1).head
+    val server0 = bootClique(1).servers.head
     server0.start().futureValue is ()
 
     val currentNetworkType = config.network.networkType
@@ -196,7 +179,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
           new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)
         ),
         connectionBuild = Injected.apply(modifier, _)
-      ).head
+      ).servers.head
     server1.start().futureValue is ()
 
     eventually {
@@ -226,7 +209,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
         ("alephium.network.ping-frequency", "1 seconds"),
         ("alephium.network.penalty-frequency", "1 seconds")
       )
-    ).head
+    ).servers.head
     server0.start().futureValue is ()
 
     val server1 = bootClique(
@@ -234,7 +217,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       bootstrap =
         Some(new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)),
       connectionBuild = Injected.payload(injection, _)
-    ).head
+    ).servers.head
 
     server1.start().futureValue is ()
 
@@ -260,7 +243,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       ByteString.fromArray(Array.fill[Byte](51)(-1))
     }
 
-    val server0 = bootClique(1).head
+    val server0 = bootClique(1).servers.head
     server0.start().futureValue is ()
 
     val server1 = bootClique(
@@ -268,7 +251,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
       bootstrap =
         Some(new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)),
       connectionBuild = Injected(injectionData, _)
-    ).head
+    ).servers.head
 
     server1.start().futureValue is ()
 

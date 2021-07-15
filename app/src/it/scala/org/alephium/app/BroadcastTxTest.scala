@@ -28,43 +28,36 @@ class BroadcastTxTest extends AlephiumSpec {
   it should "not broadcast tx between intra clique node" in new TestFixture(
     "broadcast-tx-2-nodes"
   ) {
-    val port2   = generatePort
-    val server1 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server2 = bootNode(publicPort = port2, brokerId = 1)
-    Seq(server1.start(), server2.start()).foreach(_.futureValue is (()))
+    val clique = bootClique(nbOfNodes = 2)
+    clique.start()
 
-    eventually(request[SelfClique](getSelfClique).synced is true)
-
-    val restPort1 = restPort(defaultMasterPort)
-    val restPort2 = restPort(port2)
+    val restPort1 = clique.servers(0).config.network.restPort
+    val restPort2 = clique.servers(1).config.network.restPort
     val tx        = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort1)
     eventually(request[TxStatus](getTransactionStatus(tx), restPort1) is MemPooled)
     eventually(requestFailed(getTransactionStatus(tx), restPort2, StatusCode.BadRequest))
 
-    server1.stop().futureValue is ()
-    server2.stop().futureValue is ()
+    clique.stop()
   }
 
   it should "broadcast sequential txs between inter clique node" in new TestFixture(
     "broadcast-tx-inter-clique"
   ) {
-
     val clique1           = bootClique(nbOfNodes = 1)
-    val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
+    val masterPortClique1 = clique1.masterTcpPort
 
-    clique1.map(_.start()).foreach(_.futureValue is (()))
-    eventually(request[SelfClique](getSelfClique, restPort(masterPortClique1)).synced is true)
-    val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
+    clique1.start()
+    val selfClique1 = clique1.selfClique()
 
     val clique2 =
       bootClique(
         nbOfNodes = 1,
         bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1))
       )
-    val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
+    clique2.start()
+    val masterPortClique2 = clique2.masterTcpPort
 
-    clique2.map(_.start()).foreach(_.futureValue is ())
-    clique2.foreach { server =>
+    clique2.servers.foreach { server =>
       eventually(request[SelfClique](getSelfClique, server.config.network.restPort).synced is true)
       eventually {
         val interCliquePeers =
@@ -86,34 +79,20 @@ class BroadcastTxTest extends AlephiumSpec {
 
     val tx0 =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-    eventually(
-      request[TxStatus](getTransactionStatus(tx0), restPort(masterPortClique1)) is MemPooled
-    )
-    eventually(
-      request[TxStatus](getTransactionStatus(tx0), restPort(masterPortClique2)) is MemPooled
-    )
+    checkTx(tx0, restPort(masterPortClique1), MemPooled)
+    checkTx(tx0, restPort(masterPortClique2), MemPooled)
 
     val tx1 =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-    eventually(
-      request[TxStatus](getTransactionStatus(tx1), restPort(masterPortClique1)) is MemPooled
-    )
-    eventually(
-      request[TxStatus](getTransactionStatus(tx1), restPort(masterPortClique2)) is NotFound
-    )
+    checkTx(tx1, restPort(masterPortClique1), MemPooled)
+    checkTx(tx1, restPort(masterPortClique2), NotFound)
 
-    clique2.foreach { server =>
-      request[Boolean](startMining, restPort(server.config.network.bindAddress.getPort)) is true
-    }
+    clique2.startMining()
 
-    eventually(
-      request[TxStatus](getTransactionStatus(tx0), restPort(masterPortClique1)) is a[Confirmed]
-    )
-    eventually(
-      request[TxStatus](getTransactionStatus(tx1), restPort(masterPortClique1)) is a[Confirmed]
-    )
+    confirmTx(tx0, restPort(masterPortClique1))
+    confirmTx(tx1, restPort(masterPortClique1))
 
-    clique1.foreach(_.stop().futureValue is ())
-    clique2.foreach(_.stop().futureValue is ())
+    clique1.stop()
+    clique2.stop()
   }
 }

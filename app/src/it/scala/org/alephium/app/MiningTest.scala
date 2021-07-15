@@ -21,24 +21,22 @@ import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 
 class MiningTest extends AlephiumSpec {
-  it should "work with 2 nodes" in new TestFixture("2-nodes") {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
-    Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
+  class Fixture(name: String, numNodes: Int) extends TestFixture(name) {
+    val clique = bootClique(nbOfNodes = numNodes)
+    clique.start()
+    clique.startWs()
 
-    eventually(request[SelfClique](getSelfClique).synced is true)
-
-    val selfClique = request[SelfClique](getSelfClique)
-    val group      = request[Group](getGroup(address))
+    val selfClique = clique.selfClique()
+    val group      = request[Group](getGroup(address), clique.masterRestPort)
     val index      = group.group / selfClique.groupNumPerBroker
     val restPort   = selfClique.nodes(index).restPort
 
     request[Balance](getBalance(address), restPort) is initialBalance
+  }
 
-    startWS(defaultWsMasterPort)
-
+  it should "work with 2 nodes" in new Fixture("2-nodes", 2) {
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
-    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
+    clique.startMining()
     confirmTx(tx, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
@@ -52,34 +50,20 @@ class MiningTest extends AlephiumSpec {
         Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 0, 1)
     }
 
-    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
-    server0.stop().futureValue is ()
-    server1.stop().futureValue is ()
+    clique.stopMining()
+    clique.stop()
   }
 
-  it should "work with external miner" in new TestFixture("2-nodes-external-miner") {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
-    Seq(server0.start(), server1.start()).foreach(_.futureValue is ())
-
-    eventually(request[SelfClique](getSelfClique).synced is true)
-
-    val selfClique = request[SelfClique](getSelfClique)
-    val group      = request[Group](getGroup(address))
-    val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.nodes(index).restPort
-
-    request[Balance](getBalance(address), restPort) is initialBalance
-
-    startWS(server0.config.network.wsPort)
-    startWS(server1.config.network.wsPort)
-
+  it should "work with external miner" in new Fixture("2-nodes-external-miner", 2) {
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
+    val server0 = clique.servers(0)
+    val server1 = clique.servers(1)
     val apiAddresses =
       s"127.0.0.1:${server0.config.network.minerApiPort},127.0.0.1:${server1.config.network.minerApiPort}"
     new CpuSoloMiner(server0.config, server0.flowSystem, Some(apiAddresses))
 
+    confirmTx(tx, restPort)
     eventually {
       val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
       txStatus is a[Confirmed]
@@ -87,27 +71,13 @@ class MiningTest extends AlephiumSpec {
 
     awaitNBlocksPerChain(1)
 
-    server0.stop().futureValue is ()
-    server1.stop().futureValue is ()
+    clique.stop()
   }
 
-  it should "mine all the txs" in new TestFixture("many-txs") {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
-    Seq(server0.start()).foreach(_.futureValue is ())
-
-    val selfClique = request[SelfClique](getSelfClique)
-    val group      = request[Group](getGroup(address))
-    val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.nodes(index).restPort
-
-    request[Balance](getBalance(address), restPort) is initialBalance
-
-    startWS(defaultWsMasterPort)
-
-    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
+  it should "mine all the txs" in new Fixture("many-txs", 1) {
+    clique.startMining()
 
     val n = 10
-
     val txs = (0 until n).map { _ =>
       val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
       Thread.sleep(100)
@@ -120,7 +90,7 @@ class MiningTest extends AlephiumSpec {
         Balance(initialBalance.balance - (transferAmount + defaultGasFee) * n, 0, 1)
     }
 
-    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
-    server0.stop().futureValue is ()
+    clique.stopMining()
+    clique.stop()
   }
 }

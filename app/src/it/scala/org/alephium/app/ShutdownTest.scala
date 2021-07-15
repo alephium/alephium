@@ -22,7 +22,6 @@ import akka.actor.Terminated
 import akka.io.{IO, Tcp}
 import akka.testkit.TestProbe
 
-import org.alephium.api.model.SelfClique
 import org.alephium.util._
 
 class ShutdownTest extends AlephiumSpec {
@@ -43,13 +42,10 @@ class ShutdownTest extends AlephiumSpec {
   it should "shutdown the clique when one node of the clique is down" in new TestFixture(
     "2-nodes"
   ) {
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
-    Seq(server0.start(), server1.start()).foreach(_.futureValue is ())
+    val clique = bootClique(nbOfNodes = 2)
+    clique.start()
 
-    eventually(request[SelfClique](getSelfClique).selfReady is true)
-
-    server0.stop().futureValue is ()
-    server1.flowSystem.whenTerminated.futureValue is a[Terminated]
+    clique.servers(0).stop().futureValue is ()
+    clique.servers(1).flowSystem.whenTerminated.futureValue is a[Terminated]
   }
 }
