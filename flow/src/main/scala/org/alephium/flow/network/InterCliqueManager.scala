@@ -93,8 +93,6 @@ object InterCliqueManager {
   trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
     private var nodeSynced: Boolean = false
 
-    subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
-
     def updateNodeSyncStatus: Receive = {
       case InterCliqueManager.SyncedResult(isSynced) =>
         nodeSynced = isSynced
@@ -224,13 +222,19 @@ class InterCliqueManager(
     val nodeSyncStatus = isSynced()
     lastNodeSyncedStatus match {
       case None =>
-        publishEvent(SyncedResult(nodeSyncStatus))
+        publishNodeStatus(SyncedResult(nodeSyncStatus))
       case Some(lastStatus) =>
         if (nodeSyncStatus != lastStatus) {
-          publishEvent(SyncedResult(nodeSyncStatus))
+          publishNodeStatus(SyncedResult(nodeSyncStatus))
         } // else we don't do anything
     }
     lastNodeSyncedStatus = Some(nodeSyncStatus)
+  }
+
+  def publishNodeStatus(result: SyncedResult): Unit = {
+    blockFlowSynchronizer.ref ! result
+    allHandlers.viewHandler.ref ! result
+    allHandlers.blockHandlers.foreach(_._2.ref ! result)
   }
 
   def connect(broker: BrokerInfo): Unit = {

@@ -354,9 +354,7 @@ trait TestFixtureLike
     val server: Server = new Server {
       val flowSystem: ActorSystem =
         ActorSystem(s"flow-${Random.nextInt()}", platformEnv.newConfig)
-      val httpSystem: ActorSystem =
-        ActorSystem(s"http-${Random.nextInt()}", platformEnv.newConfig)
-      implicit val executionContext = ExecutionContext.Implicits.global
+      implicit val executionContext: ExecutionContext = flowSystem.dispatcher
 
       val defaultNetwork = platformEnv.config.network
       val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
@@ -374,7 +372,6 @@ trait TestFixtureLike
       ) { () =>
         for {
           _ <- this.stopSubServices()
-          _ <- httpSystem.terminate()
         } yield Done
       }
 
@@ -385,12 +382,14 @@ trait TestFixtureLike
   }
 
   def startWS(port: Int): Future[WebSocketBase] = {
-    implicit val executionContext = ExecutionContext.Implicits.global
-    httpClient.webSocket(port, "127.0.0.1", "/events").asScala.map { ws =>
-      ws.textMessageHandler { blockNotify =>
-        blockNotifyProbe.ref ! blockNotify
-      }
-    }
+    httpClient
+      .webSocket(port, "127.0.0.1", "/events")
+      .asScala
+      .map { ws =>
+        ws.textMessageHandler { blockNotify =>
+          blockNotifyProbe.ref ! blockNotify
+        }
+      }(system.dispatcher)
   }
 
   def jsonRpc(method: String, params: String): String =
