@@ -67,7 +67,7 @@ trait MinerState {
     }
   }
 
-  var tasksReady: Boolean = false
+  @volatile var tasksReady: Boolean = false
   protected def startNewTasks(): Unit = {
     if (!tasksReady) {
       tasksReady = pendingTasks.forall(_.forall(_ != null))

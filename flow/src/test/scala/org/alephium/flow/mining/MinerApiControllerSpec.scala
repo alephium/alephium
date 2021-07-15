@@ -74,9 +74,9 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
 
   it should "accept new connections" in new SyncedFixture {
     connectToServer(TestProbe())
-    minerApiController.underlyingActor.connections.length is 1
+    eventually(minerApiController.underlyingActor.connections.length is 1)
     connectToServer(TestProbe())
-    minerApiController.underlyingActor.connections.length is 2
+    eventually(minerApiController.underlyingActor.connections.length is 2)
   }
 
   it should "broadcast new template" in new SyncedFixture {

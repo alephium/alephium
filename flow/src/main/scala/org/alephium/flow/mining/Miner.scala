@@ -102,7 +102,7 @@ object Miner extends LazyLogging {
 trait Miner extends BaseActor with MinerState {
   def networkType: NetworkType
 
-  var miningStarted: Boolean = false
+  @volatile var miningStarted: Boolean = false
 
   // scalastyle:off method.length
   def handleMining: Receive = {

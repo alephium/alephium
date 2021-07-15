@@ -27,9 +27,9 @@ class BlocksExportImportTest extends AlephiumSpec {
     val blockMinedNum = 10
     server.start().futureValue is ()
 
-    request[Boolean](startMining, defaultRestMasterPort) is true
-
     startWS(defaultWsMasterPort)
+
+    request[Boolean](startMining, defaultRestMasterPort) is true
 
     awaitNBlocks(blockMinedNum)
 

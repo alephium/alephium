@@ -264,20 +264,30 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     override val configValues = Map(("alephium.network.update-synced-frequency", "1 minute"))
     interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
 
+    def checkPublish(synced: Boolean) = {
+      allHandlerProbes.blockHandlers.foreach(_._2.expectMsg(SyncedResult(synced)))
+      allHandlerProbes.viewHandler.expectMsg(SyncedResult(synced))
+    }
+
+    def noPublish() = {
+      allHandlerProbes.blockHandlers.foreach(_._2.expectNoMessage())
+      allHandlerProbes.viewHandler.expectNoMessage()
+    }
+
     override lazy val numBootstrapNodes: Int = 1
     checkSynced(false)
-    syncProbe.expectMsg(SyncedResult(false))
+    checkPublish(false)
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
-    syncProbe.expectNoMessage()
+    noPublish()
 
     addAndCheckSynced(true)
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
-    syncProbe.expectMsg(SyncedResult(true))
+    checkPublish(true)
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
-    syncProbe.expectNoMessage()
+    noPublish()
   }
 
   trait Fixture extends FlowFixture with Generators with AlephiumActorSpecLike {
@@ -291,9 +301,9 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
 
     lazy val cliqueInfo = cliqueInfoGen.sample.get
 
-    lazy val discoveryServer       = TestProbe()
-    lazy val blockFlowSynchronizer = TestProbe()
-    lazy val (allHandlers, _)      = TestUtils.createAllHandlersProbe
+    lazy val discoveryServer                 = TestProbe()
+    lazy val blockFlowSynchronizer           = TestProbe()
+    lazy val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
 
     lazy val parentName        = s"InterCliqueManager-${Random.nextInt()}"
     lazy val numBootstrapNodes = 1
