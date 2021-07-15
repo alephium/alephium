@@ -19,6 +19,7 @@ package org.alephium.flow.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorRef.noSender
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, SocketUtil, TestProbe}
 import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
@@ -51,20 +52,28 @@ class TcpControllerSpec extends AlephiumSpec with AlephiumConfigFixture {
       connectToController(10)
     }
 
-    private def connectToController(n: Int): (InetSocketAddress, ActorRef) = {
+    def connectToController(
+        n: Int,
+        confirmed: Boolean = true
+    ): (InetSocketAddress, ActorRef) = {
       IO(Tcp) ! Tcp.Connect(bindAddress)
       expectMsgPF() {
         case _: Tcp.Connected =>
           val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
-          controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
 
-          bootstrapper.expectMsgType[Tcp.Connected]
-          val connection = bootstrapper.lastSender
-          (confirm.connected.remoteAddress, connection)
+          if (confirmed) {
+            controller ! TcpController.ConnectionConfirmed(confirm.connected, confirm.connection)
+            bootstrapper.expectMsgType[Tcp.Connected]
+            val connection = bootstrapper.lastSender
+            (confirm.connected.remoteAddress, connection)
+          } else {
+            controller ! TcpController.ConnectionDenied(confirm.connected, confirm.connection)
+            (confirm.connected.remoteAddress, noSender)
+          }
         case _: Tcp.CommandFailed =>
           Thread.sleep(100)
           assert(n > 0)
-          connectToController(n - 1)
+          connectToController(n - 1, confirmed)
       }
     }
   }
@@ -81,12 +90,9 @@ class TcpControllerSpec extends AlephiumSpec with AlephiumConfigFixture {
   }
 
   it should "not accept denied connections" in new Fixture {
-    IO(Tcp) ! Tcp.Connect(bindAddress)
-    val confirm = misbehaviorManager.expectMsgType[MisbehaviorManager.ConfirmConnection]
-    controller ! TcpController.ConnectionDenied(confirm.connected, confirm.connection)
+    connectToController(10, confirmed = false)
 
-    val address = confirm.connected.remoteAddress
-    controllerActor.confirmedConnections.contains(address) is false
+    controllerActor.confirmedConnections.isEmpty is true
   }
 
   it should "monitor the termination of connections" in new Fixture {
