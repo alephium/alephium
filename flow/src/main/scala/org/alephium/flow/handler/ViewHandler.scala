@@ -21,7 +21,6 @@ import scala.collection.mutable.ArrayBuffer
 import akka.actor.{ActorRef, Cancellable, Props}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.ViewHandler.SubscribeFailed
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.InterCliqueManager
@@ -53,7 +52,7 @@ object ViewHandler {
       templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
   ) extends Event
       with EventStream.Event
-  case object SubscribeFailed extends Event
+  final case class SubscribeResult(succeeded: Boolean) extends Event
 
   def needUpdate(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from) || chainIndex.isIntraGroup
@@ -84,20 +83,16 @@ class ViewHandler(
     with Subscriber
     with Publisher
     with InterCliqueManager.NodeSyncStatus {
-  var lastUpdated: TimeStamp = TimeStamp.zero
-
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
   override def receive: Receive = handle orElse updateNodeSyncStatus
 
   def handle: Receive = {
-    case ChainHandler.FlowDataAdded(data, _, addedAt) =>
+    case ChainHandler.FlowDataAdded(data, _, _) =>
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
-      val chainIndex = data.chainIndex
-      if (addedAt >= lastUpdated && ViewHandler.needUpdate(chainIndex)) {
-        lastUpdated = TimeStamp.now()
+      if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
         escapeIOError(blockFlow.updateBestDeps()) { newReadyTxs =>
           broadcastReadyTxs(newReadyTxs)
         }
@@ -134,23 +129,33 @@ trait ViewHandlerState extends IOBaseActor {
 
   def blockFlow: BlockFlow
   def minerAddressesOpt: Option[AVector[LockupScript]]
+  def isNodeSynced: Boolean
 
   var updateScheduled: Option[Cancellable] = None
   val subscribers: ArrayBuffer[ActorRef]   = ArrayBuffer.empty
 
   def subscribe(): Unit = {
-    if (!subscribers.contains(sender())) {
+    if (subscribers.contains(sender())) {
+      log.info(s"The actor is already subscribed")
+      sender() ! ViewHandler.SubscribeResult(true)
+    } else if (!isNodeSynced) {
+      failedInSubscribe(s"The node is not synced yet")
+    } else {
       minerAddressesOpt match {
         case Some(_) =>
           subscribers.addOne(sender())
+          updateSubscribers()
           scheduleUpdate()
+          sender() ! ViewHandler.SubscribeResult(true)
         case None =>
-          log.warning(s"Unable to subscribe the miner, as miner addresses are not set")
-          sender() ! SubscribeFailed
+          failedInSubscribe(s"Unable to subscribe the miner, as miner addresses are not set")
       }
-    } else {
-      log.debug(s"The miner is already subscribed")
     }
+  }
+
+  def failedInSubscribe(message: String): Unit = {
+    log.warning(message)
+    sender() ! ViewHandler.SubscribeResult(false)
   }
 
   def scheduleUpdate(): Unit = {
@@ -173,13 +178,18 @@ trait ViewHandlerState extends IOBaseActor {
   }
 
   def updateSubscribers(): Unit = {
-    minerAddressesOpt.foreach { minerAddresses =>
-      if (subscribers.nonEmpty) {
-        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+    if (isNodeSynced) {
+      minerAddressesOpt.foreach { minerAddresses =>
+        if (subscribers.nonEmpty) {
+          escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+            subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+          }
+          scheduleUpdate()
         }
-        scheduleUpdate()
       }
+    } else {
+      log.warning(s"The node is not synced, unsubscribe all actors")
+      subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
     }
   }
 }

@@ -262,26 +262,22 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
 
   it should "publish node synced status" in new SyncFixture {
     override val configValues = Map(("alephium.network.update-synced-frequency", "1 minute"))
+    interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
 
     override lazy val numBootstrapNodes: Int = 1
     checkSynced(false)
-
-    system.eventStream.subscribe(testActor, classOf[SyncedResult])
-    interCliqueManagerActor.lastNodeSyncedStatus is None
+    syncProbe.expectMsg(SyncedResult(false))
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
-    expectMsg(SyncedResult(false))
-    interCliqueManagerActor.updateNodeSyncedStatus()
-    interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
-    expectNoMessage()
+    syncProbe.expectNoMessage()
 
     addAndCheckSynced(true)
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
-    expectMsg(SyncedResult(true))
+    syncProbe.expectMsg(SyncedResult(true))
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
-    expectNoMessage()
+    syncProbe.expectNoMessage()
   }
 
   trait Fixture extends FlowFixture with Generators with AlephiumActorSpecLike {
@@ -301,6 +297,8 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
 
     lazy val parentName        = s"InterCliqueManager-${Random.nextInt()}"
     lazy val numBootstrapNodes = 1
+    val syncProbe              = TestProbe()
+    system.eventStream.subscribe(syncProbe.ref, classOf[SyncedResult])
     lazy val interCliqueManager = TestActorRef[InterCliqueManager](
       InterCliqueManager.props(
         cliqueInfo,

@@ -320,6 +320,9 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
           case ViewHandler.GetMinerAddresses =>
             sender ! None
             TestActor.KeepRunning
+          case InterCliqueManager.IsSynced =>
+            sender ! InterCliqueManager.SyncedResult(true)
+            TestActor.KeepRunning
         }
       )
 
@@ -334,6 +337,9 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         msg match {
           case ViewHandler.GetMinerAddresses =>
             sender ! Some(AVector(lockupScript))
+            TestActor.KeepRunning
+          case InterCliqueManager.IsSynced =>
+            sender ! InterCliqueManager.SyncedResult(interCliqueSynced)
             TestActor.KeepRunning
         }
       )
@@ -397,6 +403,8 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
   it should "call PUT /miners/addresses" in new RestServerFixture {
     withServer {
+      allHandlersProbe.viewHandler.setAutoPilot(TestActor.NoAutoPilot)
+
       val newAddresses = AVector.tabulate(config.broker.groups)(i =>
         addressStringGen(GroupIndex.unsafe(i)).sample.get._1
       )
@@ -538,15 +546,19 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
     var selfCliqueSynced  = true
     var interCliqueSynced = true
+    allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+      msg match {
+        case InterCliqueManager.IsSynced =>
+          sender ! InterCliqueManager.SyncedResult(interCliqueSynced)
+          TestActor.KeepRunning
+      }
+    )
     lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(
         system,
         Props(new BaseActor {
-          override def receive: Receive = {
-            case CliqueManager.IsSelfCliqueReady =>
-              sender() ! selfCliqueSynced
-            case InterCliqueManager.IsSynced =>
-              sender() ! InterCliqueManager.SyncedResult(interCliqueSynced)
+          override def receive: Receive = { case CliqueManager.IsSelfCliqueReady =>
+            sender() ! selfCliqueSynced
           }
         }),
         s"clique-manager-${Random.nextInt()}"

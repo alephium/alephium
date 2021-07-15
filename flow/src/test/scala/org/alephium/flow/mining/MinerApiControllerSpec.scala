@@ -26,7 +26,6 @@ import org.scalatest.concurrent.Eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
-import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumActorSpec, AVector, SocketUtil}
@@ -37,11 +36,10 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
 
   trait Fixture extends Eventually {
     val apiPort                         = generatePort()
-    val cliqueManager                   = TestProbe()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     val minerApiController = EventFilter.info(start = "Miner API server bound").intercept {
       TestActorRef[MinerApiController](
-        MinerApiController.props(cliqueManager.ref, allHandlers)(
+        MinerApiController.props(allHandlers)(
           brokerConfig,
           networkSetting.copy(minerApiPort = apiPort),
           miningSetting
@@ -62,20 +60,16 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
 
     val minerAddresses =
       AVector.tabulate(groups0)(g => getGenesisLockupScript(ChainIndex.unsafe(g, 0)))
-
-    def setSynced(isSynced: Boolean): Unit = {
-      cliqueManager.setAutoPilot((sender: ActorRef, msg: Any) =>
-        msg match {
-          case InterCliqueManager.IsSynced =>
-            sender ! InterCliqueManager.SyncedResult(isSynced)
-            TestActor.KeepRunning
-        }
-      )
-    }
   }
 
   trait SyncedFixture extends Fixture {
-    setSynced(true)
+    allHandlerProbes.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+      msg match {
+        case ViewHandler.Subscribe =>
+          sender ! ViewHandler.SubscribeResult(succeeded = true)
+          TestActor.KeepRunning
+      }
+    )
   }
 
   it should "accept new connections" in new SyncedFixture {
@@ -126,7 +120,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
     }
   }
 
-  it should "close the connection if the clique is not synced" in new Fixture with Eventually {
+  trait ConnectionFixture extends Fixture with Eventually {
     val probe = TestProbe()
     watch(probe.ref)
 
@@ -134,9 +128,21 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
     probe.expectMsgType[Tcp.Connected]
     eventually(minerApiController.underlyingActor.pendings.length is 1)
     probe.reply(Tcp.Register(probe.ref))
+  }
 
-    minerApiController ! InterCliqueManager.SyncedResult(false)
+  it should "close the connection if view handler is not ready" in new ConnectionFixture {
+    minerApiController ! ViewHandler.SubscribeResult(false)
     eventually(minerApiController.underlyingActor.pendings.length is 0)
     probe.expectMsgType[Tcp.ErrorClosed]
+  }
+
+  it should "close the connection if view handler is not ready after a while" in new ConnectionFixture {
+    minerApiController ! ViewHandler.SubscribeResult(true)
+    eventually(minerApiController.underlyingActor.pendings.length is 0)
+    eventually(minerApiController.underlyingActor.connections.length is 1)
+
+    minerApiController ! ViewHandler.SubscribeResult(false)
+    probe.expectMsgType[Tcp.ErrorClosed]
+    eventually(minerApiController.underlyingActor.connections.length is 0)
   }
 }

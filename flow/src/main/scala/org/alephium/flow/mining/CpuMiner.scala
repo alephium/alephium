@@ -70,6 +70,13 @@ class CpuMiner(val networkType: NetworkType, val allHandlers: AllHandlers)(impli
     case BlockChainHandler.InvalidBlock(hash) =>
       log.error(s"Mined an invalid block ${hash.shortHex}")
       setIdle(ChainIndex.from(hash))
+    case ViewHandler.SubscribeResult(succeeded) =>
+      if (succeeded) {
+        log.info(s"Subscribed for mining tasks")
+      } else {
+        log.warning(s"Unable to subscribe for new mining tasks")
+        self ! Miner.Stop
+      }
   }
 
   def updateAndStartTasks(templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
