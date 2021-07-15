@@ -95,8 +95,11 @@ object InterCliqueManager {
 
     subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
 
-    def updateNodeSyncStatus: Receive = { case InterCliqueManager.SyncedResult(isSynced) =>
-      nodeSynced = isSynced
+    def updateNodeSyncStatus: Receive = {
+      case InterCliqueManager.SyncedResult(isSynced) =>
+        nodeSynced = isSynced
+      case InterCliqueManager.IsSynced =>
+        sender() ! InterCliqueManager.SyncedResult(isNodeSynced)
     }
 
     def isNodeSynced: Boolean = nodeSynced
@@ -120,6 +123,7 @@ class InterCliqueManager(
 
   override def preStart(): Unit = {
     super.preStart()
+    updateNodeSyncedStatus()
     schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])

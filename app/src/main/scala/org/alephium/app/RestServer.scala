@@ -21,6 +21,7 @@ import java.io.{StringWriter, Writer}
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
+import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.prometheus.client.CollectorRegistry
@@ -83,7 +84,7 @@ class RestServer(
 
   //TODO Do we want to cache the result once it's synced?
   private def withSyncedClique[A](f: => FutureTry[A]): FutureTry[A] = {
-    node.cliqueManager
+    viewHandler.ref
       .ask(InterCliqueManager.IsSynced)
       .mapTo[InterCliqueManager.SyncedResult]
       .flatMap { result =>
@@ -119,7 +120,7 @@ class RestServer(
       selfReady <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
       synced <-
         if (selfReady) {
-          node.cliqueManager
+          viewHandler.ref
             .ask(InterCliqueManager.IsSynced)
             .mapTo[InterCliqueManager.SyncedResult]
             .map(_.isSynced)

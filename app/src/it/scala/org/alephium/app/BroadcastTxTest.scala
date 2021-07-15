@@ -33,7 +33,7 @@ class BroadcastTxTest extends AlephiumSpec {
     val server2 = bootNode(publicPort = port2, brokerId = 1)
     Seq(server1.start(), server2.start()).foreach(_.futureValue is (()))
 
-    eventually(request[SelfClique](getSelfClique).selfReady is true)
+    eventually(request[SelfClique](getSelfClique).synced is true)
 
     val restPort1 = restPort(defaultMasterPort)
     val restPort2 = restPort(port2)
@@ -53,6 +53,7 @@ class BroadcastTxTest extends AlephiumSpec {
     val masterPortClique1 = clique1.head.config.network.coordinatorAddress.getPort
 
     clique1.map(_.start()).foreach(_.futureValue is (()))
+    eventually(request[SelfClique](getSelfClique, restPort(masterPortClique1)).synced is true)
     val selfClique1 = request[SelfClique](getSelfClique, restPort(masterPortClique1))
 
     val clique2 =
@@ -62,8 +63,9 @@ class BroadcastTxTest extends AlephiumSpec {
       )
     val masterPortClique2 = clique2.head.config.network.coordinatorAddress.getPort
 
-    clique2.map(_.start()).foreach(_.futureValue is (()))
+    clique2.map(_.start()).foreach(_.futureValue is ())
     clique2.foreach { server =>
+      eventually(request[SelfClique](getSelfClique, server.config.network.restPort).synced is true)
       eventually {
         val interCliquePeers =
           request[Seq[InterCliquePeerInfo]](

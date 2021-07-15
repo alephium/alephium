@@ -84,7 +84,7 @@ trait Server extends Service {
 
   override protected def startSelfOnce(): Future[Unit] = Future.successful {
     val props =
-      MinerApiController.props(node.cliqueManager, node.allHandlers)(
+      MinerApiController.props(node.allHandlers)(
         config.broker,
         config.network,
         config.mining
