@@ -26,7 +26,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
   it should "boot and sync single node clique" in new TestFixture("1-node") {
     val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
     server.start().futureValue is (())
-    eventually(request[SelfClique](getSelfClique).selfReady is true)
+    eventually(request[SelfClique](getSelfClique, defaultRestMasterPort).selfReady is true)
 
     server.stop().futureValue is ()
   }
@@ -43,7 +43,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     eventually(server1.node.blockFlow.containsUnsafe(block.hash) is false)
     server1.start().futureValue is ()
 
-    eventually(request[SelfClique](getSelfClique).selfReady is true)
+    eventually(request[SelfClique](getSelfClique, defaultRestMasterPort).selfReady is true)
     eventually(server1.node.blockFlow.containsUnsafe(block.hash) is true)
 
     server0.stop().futureValue is ()

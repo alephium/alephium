@@ -55,6 +55,7 @@ import org.alephium.wallet.api.model._
 
 class TestFixture(val name: String) extends TestFixtureLike {
   implicit lazy val system: ActorSystem = createSystem(name)
+  implicit lazy val executionContext    = system.dispatcher
 }
 
 // scalastyle:off method.length
@@ -66,7 +67,7 @@ trait TestFixtureLike
     with ApiModelCodec
     with HttpFixture
     with ScalaFutures
-    with Eventually {
+    with Eventually { Fixture =>
 
   private val vertx      = Vertx.vertx()
   private val httpClient = vertx.createHttpClient()
@@ -149,7 +150,7 @@ trait TestFixtureLike
     response.code is StatusCode.Ok
   }
 
-  def request[T: Reader](request: Int => HttpRequest, port: Int = defaultRestMasterPort): T = {
+  def request[T: Reader](request: Int => HttpRequest, port: Int): T = {
     eventually {
       val response = request(port).send(backend)
 
@@ -317,7 +318,7 @@ trait TestFixtureLike
       bootstrap: Option[InetSocketAddress] = None,
       connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply,
       configOverrides: Map[String, Any] = Map.empty
-  ): Seq[Server] = {
+  ): Clique = {
     val masterPort = generatePort
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
@@ -334,7 +335,7 @@ trait TestFixtureLike
       )
     }
 
-    servers
+    Clique(AVector.from(servers))
   }
 
   def bootNode(
@@ -487,5 +488,55 @@ trait TestFixtureLike
 
   def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
     httpGet(s"/blockflow?fromTs=${fromTs.millis}&toTs=${toTs.millis}")
+
+  case class Clique(servers: AVector[Server]) {
+    def coordinator    = servers.head
+    def masterTcpPort  = servers.head.config.network.coordinatorAddress.getPort
+    def masterRestPort = servers.head.config.network.restPort
+
+    def start(): Unit = {
+      servers.map(_.start()).foreach(_.futureValue is ())
+      servers.foreach { server =>
+        eventually(
+          request[SelfClique](getSelfClique, server.config.network.restPort).synced is true
+        )
+      }
+    }
+
+    def stop(): Unit = {
+      servers.map(_.start()).foreach(_.futureValue is ())
+    }
+
+    def startWs(): Unit = {
+      servers.foreach { server =>
+        startWS(server.config.network.wsPort)
+      }
+    }
+
+    def startMining(): Unit = {
+      servers.foreach { server =>
+        request[Boolean](Fixture.startMining, server.config.network.restPort) is true
+      }
+    }
+
+    def stopMining(): Unit = {
+      servers.foreach { server =>
+        request[Boolean](
+          Fixture.stopMining,
+          restPort(server.config.network.bindAddress.getPort)
+        ) is true
+      }
+    }
+
+    def selfClique(): SelfClique = {
+      request[SelfClique](Fixture.getSelfClique, servers.sample().config.network.restPort)
+    }
+  }
+
+  def checkTx(tx: TxResult, port: Int, status: TxStatus): Assertion = {
+    eventually(
+      request[TxStatus](getTransactionStatus(tx), port) is status
+    )
+  }
 }
 // scalastyle:on method.length

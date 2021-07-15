@@ -26,12 +26,11 @@ class SmartContractTest extends AlephiumSpec {
 
   it should "compile/execute smart contracts" in new TestFixture("swap") {
 
-    val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
-    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
-    Seq(server0.start(), server1.start()).foreach(_.futureValue is (()))
+    val clique = bootClique(nbOfNodes = 2)
+    clique.start()
 
-    val selfClique = request[SelfClique](getSelfClique)
-    val group      = request[Group](getGroup(address))
+    val selfClique = clique.selfClique()
+    val group      = request[Group](getGroup(address), clique.masterRestPort)
     val index      = group.group / selfClique.groupNumPerBroker
     val restPort   = selfClique.nodes(index).restPort
 
@@ -210,7 +209,6 @@ class SmartContractTest extends AlephiumSpec {
       request[Balance](getBalance(address), restPort) isnot initialBalance
     }
 
-    server1.stop().futureValue is ()
-    server0.stop().futureValue is ()
+    clique.stop()
   }
 }
