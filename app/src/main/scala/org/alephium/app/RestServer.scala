@@ -91,6 +91,8 @@ class RestServer(
 
   private val backend = AsyncHttpClientFutureBackend()
 
+  private var nodesOpt: Option[AVector[PeerAddress]] = None
+
   //TODO Do we want to cache the result once it's synced?
   private def withSyncedClique[A](f: => FutureTry[A]): FutureTry[A] = {
     viewHandler.ref
@@ -517,13 +519,17 @@ class RestServer(
         }
       cliqueInfo <- node.bootstrapper.ask(Bootstrapper.GetIntraCliqueInfo).mapTo[IntraCliqueInfo]
     } yield {
+      val selfClique = RestServer.selfCliqueFrom(
+        cliqueInfo,
+        node.config.consensus,
+        selfReady = selfReady,
+        synced = synced
+      )
+      if (selfReady) {
+        nodesOpt = Some(selfClique.nodes)
+      }
       Right(
-        RestServer.selfCliqueFrom(
-          cliqueInfo,
-          node.config.consensus,
-          selfReady = selfReady,
-          synced = synced
-        )
+        selfClique
       )
     }
   }
@@ -562,14 +568,21 @@ class RestServer(
   private def uriFromGroup(
       fromGroup: GroupIndex
   ): Future[Either[ApiError[_ <: StatusCode], Uri]] =
-    fetchSelfClique().map { selfCliqueEither =>
-      for {
-        selfClique <- selfCliqueEither
-      } yield {
-        val peer = selfClique.peer(fromGroup)
-        Uri(peer.address.getHostAddress, peer.restPort)
-      }
+    nodesOpt match {
+      case Some(nodes) =>
+        val peer = nodes((fromGroup.value / brokerConfig.groupNumPerBroker) % nodes.length)
+        Future.successful(Right(Uri(peer.address.getHostAddress, peer.restPort)))
+      case None =>
+        fetchSelfClique().map { selfCliqueEither =>
+          for {
+            selfClique <- selfCliqueEither
+          } yield {
+            val peer = selfClique.peer(fromGroup)
+            Uri(peer.address.getHostAddress, peer.restPort)
+          }
+        }
     }
+
 }
 
 object RestServer {
