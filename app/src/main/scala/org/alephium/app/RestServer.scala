@@ -212,19 +212,21 @@ class RestServer(
       Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
   }
 
-  private val buildTransactionRoute = toRouteRedirect(buildTransaction) { case buildTransaction =>
-    withSyncedClique {
-      Future.successful(
-        serverUtils.buildTransaction(
-          blockFlow,
-          buildTransaction
+  private val buildTransactionRoute = toRouteRedirect(buildTransaction)(
+    buildTransaction =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils.buildTransaction(
+            blockFlow,
+            buildTransaction
+          )
         )
-      )
-    }
-  } { bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig) }
+      },
+    bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)
+  )
 
-  private val buildSweepAllTransactionRoute = toRouteRedirect(buildSweepAllTransaction) {
-    case buildSweepAllTransaction =>
+  private val buildSweepAllTransactionRoute = toRouteRedirect(buildSweepAllTransaction)(
+    buildSweepAllTransaction =>
       withSyncedClique {
         Future.successful(
           serverUtils.buildSweepAllTransaction(
@@ -232,8 +234,9 @@ class RestServer(
             buildSweepAllTransaction
           )
         )
-      }
-  } { bst => LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig) }
+      },
+    bst => LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)
+  )
 
   private val submitTransactionRoute = toRoute(submitTransaction) { transaction =>
     withSyncedClique {
@@ -527,11 +530,11 @@ class RestServer(
 
   private def toRouteRedirect[P, A](
       endpoint: BaseEndpoint[P, A]
-  )(f: P => Future[Either[ApiError[_ <: StatusCode], A]])(p: P => GroupIndex) = {
+  )(localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]], getIndex: P => GroupIndex) = {
     toRoute(endpoint) { params =>
       requestFromGroupIndex(
-        p(params),
-        f(params),
+        getIndex(params),
+        localLogic(params),
         endpoint,
         params
       )
@@ -548,13 +551,11 @@ class RestServer(
       case Right(_) => f
       case Left(_) =>
         uriFromGroup(groupIndex).flatMap {
-          _.fold(
-            e => Future.successful(Left(e)),
-            uri =>
-              backend
-                .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
-                .map(_.body)
-          )
+          case Left(error) => Future.successful(Left(error))
+          case Right(uri) =>
+            backend
+              .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
+              .map(_.body)
         }
     }
 
