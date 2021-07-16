@@ -18,6 +18,7 @@ package org.alephium.app
 
 import java.io.{StringWriter, Writer}
 
+import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
@@ -51,6 +52,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.http.{ServerOptions, SwaggerVertx}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -239,8 +241,92 @@ class RestServer(
     }
   }
 
-  private val getTransactionStatusRoute = toRoute(getTransactionStatus) { case (txId, chainIndex) =>
-    Future.successful(serverUtils.getTransactionStatus(blockFlow, txId, chainIndex))
+  private val getTransactionStatusRoute = toRoute(getTransactionStatus) {
+    case (txId, fromGroup, toGroup) =>
+      searchTransactionStatus(txId, fromGroup, toGroup)
+  }
+
+  private def searchTransactionStatus(
+      txId: Hash,
+      chainFrom: Option[GroupIndex],
+      chainTo: Option[GroupIndex]
+  ): Future[ServerUtils.Try[TxStatus]] = {
+    (chainFrom, chainTo) match {
+      case (Some(from), Some(to)) =>
+        Future.successful(
+          serverUtils.getTransactionStatus(blockFlow, txId, ChainIndex(from, to))
+        )
+      case (Some(from), None) =>
+        Future.successful(
+          searchLocalTransactionStatus(txId, brokerConfig.chainIndexes.filter(_.from == from))
+        )
+      case (None, Some(to)) =>
+        Future.successful(
+          searchLocalTransactionStatus(txId, brokerConfig.chainIndexes.filter(_.to == to))
+        )
+      case (None, None) =>
+        searchLocalTransactionStatus(txId, brokerConfig.chainIndexes) match {
+          case Right(NotFound) =>
+            searchTransactionStatusInOtherNodes(txId)
+          case other => Future.successful(other)
+        }
+    }
+
+  }
+
+  private def searchLocalTransactionStatus(
+      txId: Hash,
+      chainIndexes: AVector[ChainIndex]
+  ): ServerUtils.Try[TxStatus] = {
+    @tailrec
+    def rec(
+        indexes: AVector[ChainIndex],
+        currentRes: ServerUtils.Try[TxStatus]
+    ): ServerUtils.Try[TxStatus] = {
+      if (indexes.isEmpty) {
+        currentRes
+      } else {
+        val index = indexes.head
+        val res   = serverUtils.getTransactionStatus(blockFlow, txId, index)
+        res match {
+          case Right(NotFound) => rec(indexes.tail, res)
+          case Right(_)        => res
+          case Left(_)         => res
+        }
+      }
+    }
+    rec(chainIndexes, Right(NotFound))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  private def searchTransactionStatusInOtherNodes(txId: Hash): Future[ServerUtils.Try[TxStatus]] = {
+    val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
+    if (otherGroupFrom.isEmpty) {
+      Future.successful(Right(NotFound))
+    } else {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def rec(
+          from: GroupIndex,
+          remaining: AVector[GroupIndex]
+      ): Future[ServerUtils.Try[TxStatus]] = {
+        requestFromGroupIndex(
+          from,
+          Future.successful(Right(NotFound)),
+          getTransactionStatus,
+          (txId, Some(from), None)
+        ).flatMap {
+          case Right(NotFound) =>
+            if (remaining.isEmpty) {
+              Future.successful(Right(NotFound))
+            } else {
+              rec(remaining.head, remaining.tail)
+            }
+          case other => Future.successful(other)
+
+        }
+      }
+      rec(otherGroupFrom.head, otherGroupFrom.tail)
+    }
   }
 
   private val decodeUnsignedTransactionRoute = toRoute(decodeUnsignedTransaction) { tx =>

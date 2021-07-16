@@ -157,28 +157,15 @@ class ServerUtils(networkType: NetworkType)(implicit
   def getTransactionStatus(
       blockFlow: BlockFlow,
       txId: Hash,
-      fromGroup: Int,
-      toGroup: Int
-  ): Try[TxStatus] = {
-    for {
-      chainIndex <- checkTxChainIndex(fromGroup, toGroup)
-      status     <- getTransactionStatus(blockFlow, txId, chainIndex)
-    } yield status
-  }
-
-  def getTransactionStatus(
-      blockFlow: BlockFlow,
-      txId: Hash,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
-    if (blockFlow.brokerConfig.contains(chainIndex.from)) {
-      blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
+    for {
+      _ <- checkTxChainIndex(chainIndex, txId)
+      status <- blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
         case Some(status) => convert(status)
         case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
       }
-    } else {
-      Left(ApiError.BadRequest(s"Invalid chain index $chainIndex, txId: ${txId.toHexString}"))
-    }
+    } yield status
   }
 
   def decodeUnsignedTransaction(
@@ -312,9 +299,12 @@ class ServerUtils(networkType: NetworkType)(implicit
     checkChainIndex(chainIndex, hash.toHexString)
   }
 
-  def checkTxChainIndex(fromGroup: Int, toGroup: Int): Try[ChainIndex] = {
-    val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-    checkChainIndex(chainIndex, chainIndex.toString)
+  def checkTxChainIndex(chainIndex: ChainIndex, tx: Hash): Try[Unit] = {
+    if (brokerConfig.contains(chainIndex.from)) {
+      Right(())
+    } else {
+      Left(badRequest(s"${tx.toHexString} belongs to other groups"))
+    }
   }
 
   def execute(f: => Unit): FutureTry[Boolean] =

@@ -29,6 +29,7 @@ import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.network._
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -93,7 +94,7 @@ trait ServerFixture
     tx.unsigned.fromGroup.value,
     tx.unsigned.toGroup.value
   )
-  lazy val dummyTxStatus: TxStatus = Confirmed(BlockHash.zero, 0, 1, 2, 3)
+  lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 
 object ServerFixture {
@@ -231,11 +232,28 @@ object ServerFixture {
       Right(Right(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned))
     }
 
+    // scalastyle:off no.equal
+    val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
     override def getTxStatus(
         txId: Hash,
         chainIndex: ChainIndex
-    ): IOResult[Option[BlockFlowState.TxStatus]] =
-      Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
+    ): IOResult[Option[BlockFlowState.TxStatus]] = {
+      assume(brokerConfig.contains(chainIndex.from))
+      if (chainIndex == blockChainIndex) {
+        Right(Some(BlockFlowState.TxStatus(TxIndex(block.hash, 0), 1, 2, 3)))
+      } else {
+        Right(None)
+      }
+    }
+    // scalastyle:on no.equal
+
+    override def getMemPool(mainGroup: GroupIndex): MemPool = {
+      MemPool.empty(mainGroup)(config.broker, config.mempool)
+    }
+
+    override def getMemPool(chainIndex: ChainIndex): MemPool = {
+      MemPool.empty(chainIndex.from)(config.broker, config.mempool)
+    }
 
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)

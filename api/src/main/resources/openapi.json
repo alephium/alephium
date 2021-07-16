@@ -3556,7 +3556,7 @@
           {
             "name": "fromGroup",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer"
             }
@@ -3564,7 +3564,7 @@
           {
             "name": "toGroup",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer"
             }

@@ -206,11 +206,13 @@ trait Endpoints
       .out(jsonBody[TxResult])
       .summary("Submit a signed transaction")
 
-  lazy val getTransactionStatus: BaseEndpoint[(Hash, ChainIndex), TxStatus] =
+  lazy val getTransactionStatus
+      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
     transactionsEndpoint.get
       .in("status")
       .in(query[Hash]("txId"))
-      .in(chainIndexQuery)
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 

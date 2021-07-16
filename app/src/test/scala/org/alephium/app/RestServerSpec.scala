@@ -39,7 +39,6 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -301,13 +300,69 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call GET /transactions/status" in new RestServerFixture {
-    withServer {
-      Get(
-        s"/transactions/status?txId=${Hash.zero.toHexString}&fromGroup=0&toGroup=1"
-      ) check { response =>
-        response.code is StatusCode.Ok
-        response.as[TxStatus] is dummyTxStatus
+  it should "call GET /transactions/status" in new MultiRestServerFixture {
+    var txChainIndex: ChainIndex = _
+    withServers {
+      forAll(hashGen) { txId =>
+        servers.foreachWithIndex { case (server, index) =>
+          Get(
+            s"/transactions/status?txId=${txId.toHexString}",
+            server.port
+          ) check { response =>
+            val status = response.as[TxStatus]
+            response.code is StatusCode.Ok
+            txChainIndex = ChainIndex.from(status.asInstanceOf[Confirmed].blockHash)
+            status is dummyTxStatus
+          }
+
+          // scalastyle:off no.equal
+          val rightNode = txChainIndex.from.value == index
+          // scalastyle:on no.equal
+
+          Get(
+            s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}&toGroup=${txChainIndex.to.value}",
+            server.port
+          ) check { response =>
+            if (rightNode) {
+              val status = response.as[TxStatus]
+              response.code is StatusCode.Ok
+              status is dummyTxStatus
+            } else {
+              response.code is StatusCode.BadRequest
+              response.as[ApiError.BadRequest] is ApiError.BadRequest(
+                s"${txId.toHexString} belongs to other groups"
+              )
+            }
+          }
+
+          Get(
+            s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}",
+            server.port
+          ) check { response =>
+            if (rightNode) {
+              val status = response.as[TxStatus]
+              response.code is StatusCode.Ok
+              status is dummyTxStatus
+            } else {
+              response.code is StatusCode.Ok
+              response.as[TxStatus] is NotFound
+            }
+          }
+
+          Get(
+            s"/transactions/status?txId=${txId.toHexString}&toGroup=${txChainIndex.to.value}",
+            server.port
+          ) check { response =>
+            if (rightNode) {
+              val status = response.as[TxStatus]
+              response.code is StatusCode.Ok
+              status is dummyTxStatus
+            } else {
+              response.code is StatusCode.Ok
+              response.as[TxStatus] is NotFound
+            }
+          }
+        }
       }
     }
   }
