@@ -188,11 +188,8 @@ lazy val app = mainProject("app")
       val baseImageName = "alephium/dev-alephium"
       val versionTag    = version.value.replace('+', '_')
       Seq(
-        Some(ImageName(baseImageName + ":" + versionTag)),
-        git.gitHeadCommit.value.map { commitId =>
-          ImageName(baseImageName + ":" + commitId)
-        }
-      ).flatten
+        ImageName(baseImageName + ":" + versionTag)
+      )
     },
     buildInfoKeys := Seq[BuildInfoKey](
       name,
