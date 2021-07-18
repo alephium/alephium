@@ -185,7 +185,7 @@ lazy val app = mainProject("app")
       }
     },
     docker / imageNames := {
-      val baseImageName = "alephium/alephium"
+      val baseImageName = "alephium/dev-alephium"
       val versionTag    = version.value.replace('+', '_')
       Seq(
         Some(ImageName(baseImageName + ":" + versionTag)),
