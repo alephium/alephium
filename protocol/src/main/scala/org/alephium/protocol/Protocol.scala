@@ -21,5 +21,5 @@ import akka.util.ByteString
 import org.alephium.util.Bytes
 
 object Protocol {
-  val version: Int = Bytes.toIntUnsafe(ByteString(0, 0, 8, 3))
+  val version: Int = Bytes.toIntUnsafe(ByteString(0, 0, 8, 7))
 }
