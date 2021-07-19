@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
-import org.alephium.protocol.SafeSerdeImpl
+import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
@@ -114,12 +114,15 @@ final case class InterBrokerInfo private (
     cliqueId: CliqueId,
     brokerId: Int,
     groupNumPerBroker: Int
-) extends BrokerGroupInfo {
-  def peerId: PeerId = PeerId(cliqueId, brokerId)
+) extends HashSerde[InterBrokerInfo]
+    with BrokerGroupInfo {
+  def peerId: PeerId                   = PeerId(cliqueId, brokerId)
+  def hash: Hash                       = _getHash
+  def sign(key: PrivateKey): Signature = SignatureSchema.sign(hash.bytes, key)
 }
 
 object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {
-  val _serde: Serde[InterBrokerInfo] =
+  implicit val _serde: Serde[InterBrokerInfo] =
     Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker))
 
   def unsafe(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int): InterBrokerInfo =
