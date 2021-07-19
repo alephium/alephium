@@ -164,18 +164,30 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
   ): T
 
   def unsafe(brokerInfo: InterBrokerInfo, privateKey: PrivateKey): T = {
-    unsafe(Protocol.version, TimeStamp.now(), brokerInfo, brokerInfo.sign(privateKey))
+    val signature = SignatureSchema.sign(brokerInfo.hash.bytes, privateKey)
+    unsafe(Protocol.version, TimeStamp.now(), brokerInfo, signature)
   }
 
   val serde: Serde[T] =
     Serde.forProduct4(unsafe, t => (t.version, t.timestamp, t.brokerInfo, t.signature))
 
-  def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] =
-    if (message.version == Protocol.version && message.timestamp > TimeStamp.zero) {
+  def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] = {
+    val correctSignature = SignatureSchema.verify(
+      message.brokerInfo.hash.bytes,
+      message.signature,
+      message.brokerInfo.cliqueId.publicKey
+    )
+
+    if (
+      correctSignature &&
+      message.version == Protocol.version &&
+      message.timestamp > TimeStamp.zero
+    ) {
       Right(())
     } else {
       Left(s"invalid HandShake: $message")
     }
+  }
 }
 
 final case class Hello private (

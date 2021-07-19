@@ -116,9 +116,8 @@ final case class InterBrokerInfo private (
     groupNumPerBroker: Int
 ) extends HashSerde[InterBrokerInfo]
     with BrokerGroupInfo {
-  def peerId: PeerId                   = PeerId(cliqueId, brokerId)
-  def hash: Hash                       = _getHash
-  def sign(key: PrivateKey): Signature = SignatureSchema.sign(hash.bytes, key)
+  def peerId: PeerId = PeerId(cliqueId, brokerId)
+  def hash: Hash     = _getHash
 }
 
 object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {

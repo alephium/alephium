@@ -16,15 +16,46 @@
 
 package org.alephium.protocol.message
 
+import java.net.InetSocketAddress
+
 import org.alephium.macros.EnumerationMacros
+import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.Payload.Code
+import org.alephium.protocol.model.{BrokerInfo, CliqueId}
+import org.alephium.serde.SerdeError
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class PayloadSpec extends AlephiumSpec {
   implicit val ordering: Ordering[Code] = Ordering.by(Code.toInt(_))
+  implicit val groupConfig = new GroupConfig {
+    override def groups: Int = 4
+  }
 
   it should "index all payload types" in {
     val codes = EnumerationMacros.sealedInstancesOf[Code]
     Code.values is AVector.from(codes)
+  }
+
+  it should "validate Hello message" in {
+    val address          = new InetSocketAddress("127.0.0.1", 0)
+    val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
+    val brokerInfo       = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, address)
+
+    val input  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+    val output = Hello._deserialize(Hello.serde.serialize(input))
+    output.map(_.value) isE input
+  }
+
+  it should "not validate Hello message with wrong signature" in {
+    val address      = new InetSocketAddress("127.0.0.1", 0)
+    val (_, pubKey1) = SignatureSchema.secureGeneratePriPub()
+    val (priKey2, _) = SignatureSchema.secureGeneratePriPub()
+    val brokerInfo   = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
+
+    val input  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey2)
+    val output = Hello._deserialize(Hello.serde.serialize(input))
+
+    output.leftValue is a[SerdeError]
   }
 }
