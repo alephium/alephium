@@ -22,7 +22,7 @@ import org.alephium.serde
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{OutOfGas => _, _}
@@ -523,6 +523,8 @@ object TxValidation {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
           checkP2pkh(tx, gasRemaining, lock, unlock, signatures)
+        case (lock: LockupScript.P2MPKH, unlock: UnlockScript.P2MPKH) =>
+          checkP2mpkh(tx, gasRemaining, lock, unlock, signatures)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
           checkP2SH(tx, gasRemaining, lock, unlock, signatures)
         case _ =>
@@ -540,15 +542,45 @@ object TxValidation {
       if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        signatures.pop() match {
-          case Right(signature) =>
-            if (!SignatureSchema.verify(tx.id.bytes, signature, unlock.publicKey)) {
-              invalidTx(InvalidSignature)
+        checkSignature(tx, gasRemaining, unlock.publicKey, signatures)
+      }
+    }
+
+    private def checkSignature(
+        tx: Transaction,
+        gasRemaining: GasBox,
+        publicKey: PublicKey,
+        signatures: Stack[Signature]
+    ): TxValidationResult[GasBox] = {
+      signatures.pop() match {
+        case Right(signature) =>
+          if (!SignatureSchema.verify(tx.id.bytes, signature, publicKey)) {
+            invalidTx(InvalidSignature)
+          } else {
+            gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
+          }
+        case Left(_) => invalidTx(NotEnoughSignature)
+      }
+    }
+
+    protected[validation] def checkP2mpkh(
+        tx: Transaction,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2MPKH,
+        unlock: UnlockScript.P2MPKH,
+        signatures: Stack[Signature]
+    ): TxValidationResult[GasBox] = {
+      if (unlock.indexedPublicKeys.length != lock.m) {
+        invalidTx(InvalidNumberOfPublicKey)
+      } else {
+        unlock.indexedPublicKeys
+          .foldE(gasRemaining) { case (gasBox, (publicKey, index)) =>
+            if (!lock.pkHashes.get(index).contains(Hash.hash(publicKey.bytes))) {
+              invalidTx(InvalidPublicKeyHash)
             } else {
-              gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
+              checkSignature(tx, gasBox, publicKey, signatures)
             }
-          case Left(_) => invalidTx(NotEnoughSignature)
-        }
+          }
       }
     }
 

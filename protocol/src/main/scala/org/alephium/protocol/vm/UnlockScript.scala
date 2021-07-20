@@ -28,8 +28,16 @@ object UnlockScript {
   implicit val serde: Serde[UnlockScript] = {
     implicit val tuple: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
 
-    val p2mpkhSerde: Serde[P2MPKH] = Serde.forProduct1(P2MPKH.apply, t => t.indexedPublicKeys)
-    val p2shSerde: Serde[P2SH]     = Serde.forProduct2(P2SH, t => (t.script, t.params))
+    val p2mpkhSerde: Serde[P2MPKH] =
+      Serde
+        .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
+        .validate { lock =>
+          val ok = (0 until (lock.indexedPublicKeys.length - 1)).forall { i =>
+            lock.indexedPublicKeys.apply(i + 1)._2 > lock.indexedPublicKeys.apply(i)._2
+          }
+          if (ok) Right(()) else Left(s"Invalid order of public keys")
+        }
+    val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH, t => (t.script, t.params))
 
     new Serde[UnlockScript] {
       override def serialize(input: UnlockScript): ByteString = {
