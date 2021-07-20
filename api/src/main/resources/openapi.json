@@ -1186,7 +1186,7 @@
           "Miners"
         ],
         "summary": "List all miner addresses per group",
-        "description": "This endpoint can only be called if the wallet was created with the `miner = true` flag",
+        "description": "This endpoint can only be called if the wallet was created with the `isMiner = true` flag",
         "operationId": "getWalletsWallet_nameMiner-addresses",
         "parameters": [
           {
