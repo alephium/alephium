@@ -28,8 +28,6 @@ sealed trait LockupScript {
   def scriptHint: ScriptHint
 
   def hintBytes: ByteString
-
-  def groupIndex(implicit config: GroupConfig): GroupIndex = scriptHint.groupIndex
 }
 
 object LockupScript {
@@ -86,6 +84,8 @@ object LockupScript {
 
   sealed trait Asset extends LockupScript {
     def hintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
+
+    def groupIndex(implicit config: GroupConfig): GroupIndex = scriptHint.groupIndex
   }
   object Asset {
     implicit val serde: Serde[Asset] = LockupScript.serde.xfmap[Asset](

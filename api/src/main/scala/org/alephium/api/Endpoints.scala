@@ -152,9 +152,9 @@ trait Endpoints
       .out(jsonBody[Balance])
       .summary("Get the balance of a address")
 
-  val getGroup: BaseEndpoint[Address, Group] =
+  val getGroup: BaseEndpoint[Address.Asset, Group] =
     addressesEndpoint.get
-      .in(path[Address]("address"))
+      .in(path[Address.Asset]("address"))
       .in("group")
       .out(jsonBody[Group])
       .summary("Get the group of a address")

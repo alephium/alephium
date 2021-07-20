@@ -29,13 +29,14 @@ sealed trait Address {
 
   def toBase58: String = networkType.prefix ++ Base58.encode(serialize(lockupScript))
 
-  def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
-
   override def toString: String = toBase58
 }
 
 object Address {
-  final case class Asset(networkType: NetworkType, lockupScript: LockupScript.Asset) extends Address
+  final case class Asset(networkType: NetworkType, lockupScript: LockupScript.Asset)
+      extends Address {
+    def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+  }
   final case class Contract(networkType: NetworkType, lockupScript: LockupScript.P2C)
       extends Address
 

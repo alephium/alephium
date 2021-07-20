@@ -270,7 +270,7 @@ class ServerUtils(networkType: NetworkType)(implicit
     }
   }
 
-  def checkGroup(lockupScript: LockupScript): Try[Unit] = {
+  def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
       Some(s"Address ${Address.from(networkType, lockupScript)}")
