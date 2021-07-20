@@ -425,7 +425,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
   it should "call GET /miners/addresses" in new RestServerFixture {
     withServer {
-      val address      = Address.fromBase58(dummyKeyAddress, networkType).get
+      val address      = Address.asset(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
 
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -467,7 +467,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
       Put(s"/miners/addresses", body) check { response =>
-        val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
+        val addresses = newAddresses.map(Address.asset(_, networkType).get)
         allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateMinerAddresses(addresses))
         response.code is StatusCode.Ok
       }

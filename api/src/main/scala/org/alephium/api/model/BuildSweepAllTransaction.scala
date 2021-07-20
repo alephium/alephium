@@ -24,7 +24,7 @@ import org.alephium.util.TimeStamp
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildSweepAllTransaction(
     fromPublicKey: PublicKey,
-    toAddress: Address,
+    toAddress: Address.Asset,
     lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None

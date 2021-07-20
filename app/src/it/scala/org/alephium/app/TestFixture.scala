@@ -298,7 +298,7 @@ trait TestFixtureLike
       ) ++ configOverrides
       implicit override lazy val config = {
         val minerAddresses =
-          genesisKeys.map(p => Address(NetworkType.Testnet, LockupScript.p2pkh(p._2)))
+          genesisKeys.map(p => Address.Asset(NetworkType.Testnet, LockupScript.p2pkh(p._2)))
 
         val tmp0 = AlephiumConfig.load(newConfig)
         val tmp1 = tmp0.copy(mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses)))

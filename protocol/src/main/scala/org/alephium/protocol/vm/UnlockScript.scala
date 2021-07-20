@@ -25,33 +25,37 @@ import org.alephium.util.AVector
 sealed trait UnlockScript
 
 object UnlockScript {
-  val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH(_, _), t => (t.script, t.params))
-  val p2sSerde: Serde[P2S]   = Serde.forProduct1(P2S(_), t => t.params)
-  implicit val serde: Serde[UnlockScript] = new Serde[UnlockScript] {
-    override def serialize(input: UnlockScript): ByteString = {
-      input match {
-        case ppkh: P2PKH => ByteString(0) ++ serdeImpl[PublicKey].serialize(ppkh.publicKey)
-        case psh: P2SH   => ByteString(1) ++ p2shSerde.serialize(psh)
-        case ps: P2S     => ByteString(2) ++ p2sSerde.serialize(ps)
-      }
-    }
+  implicit val serde: Serde[UnlockScript] = {
+    implicit val tuple: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
 
-    override def _deserialize(input: ByteString): SerdeResult[Staging[UnlockScript]] = {
-      byteSerde._deserialize(input).flatMap {
-        case Staging(0, content) =>
-          serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH(_)))
-        case Staging(1, content) => p2shSerde._deserialize(content)
-        case Staging(2, content) => p2sSerde._deserialize(content)
-        case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
+    val p2mpkhSerde: Serde[P2MPKH] = Serde.forProduct1(P2MPKH.apply, t => t.indexedPublicKeys)
+    val p2shSerde: Serde[P2SH]     = Serde.forProduct2(P2SH, t => (t.script, t.params))
+
+    new Serde[UnlockScript] {
+      override def serialize(input: UnlockScript): ByteString = {
+        input match {
+          case p2pkh: P2PKH   => ByteString(0) ++ serdeImpl[PublicKey].serialize(p2pkh.publicKey)
+          case p2mpkh: P2MPKH => ByteString(1) ++ p2mpkhSerde.serialize(p2mpkh)
+          case p2sh: P2SH     => ByteString(2) ++ p2shSerde.serialize(p2sh)
+        }
+      }
+
+      override def _deserialize(input: ByteString): SerdeResult[Staging[UnlockScript]] = {
+        byteSerde._deserialize(input).flatMap {
+          case Staging(0, content) =>
+            serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH))
+          case Staging(1, content) => p2mpkhSerde._deserialize(content)
+          case Staging(2, content) => p2shSerde._deserialize(content)
+          case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
+        }
       }
     }
   }
 
   def p2pkh(publicKey: PublicKey): P2PKH                        = P2PKH(publicKey)
   def p2sh(script: StatelessScript, params: AVector[Val]): P2SH = P2SH(script, params)
-  def p2s(params: AVector[Val]): P2S                            = P2S(params)
 
-  final case class P2PKH(publicKey: PublicKey)                             extends UnlockScript
-  final case class P2SH(script: StatelessScript, val params: AVector[Val]) extends UnlockScript
-  final case class P2S(params: AVector[Val])                               extends UnlockScript
+  final case class P2PKH(publicKey: PublicKey)                          extends UnlockScript
+  final case class P2MPKH(indexedPublicKeys: AVector[(PublicKey, Int)]) extends UnlockScript
+  final case class P2SH(script: StatelessScript, params: AVector[Val])  extends UnlockScript
 }

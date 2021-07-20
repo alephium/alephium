@@ -32,7 +32,7 @@ trait TxUtils { Self: FlowUtils =>
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
   // In this way, we can guarantee that no concurrent utxos operations are making trouble
   def getUsableUtxos(
-      lockupScript: LockupScript
+      lockupScript: LockupScript.Asset
   ): IOResult[AVector[AssetOutputInfo]] = {
     @tailrec
     def iter(lastTryOpt: Option[AVector[AssetOutputInfo]]): IOResult[AVector[AssetOutputInfo]] = {
@@ -49,7 +49,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getUsableUtxosOnce(
-      lockupScript: LockupScript
+      lockupScript: LockupScript.Asset
   ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
@@ -63,7 +63,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   // return the total balance, the locked balance, and the number of all utxos
-  def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] = {
+  def getBalance(lockupScript: LockupScript.Asset): IOResult[(U256, U256, Int)] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
@@ -82,7 +82,7 @@ trait TxUtils { Self: FlowUtils =>
 
   def transfer(
       fromPublicKey: PublicKey,
-      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
@@ -122,7 +122,7 @@ trait TxUtils { Self: FlowUtils =>
 
   def transfer(
       fromPublicKey: PublicKey,
-      toLockupScript: LockupScript,
+      toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       amount: U256,
       gasOpt: Option[GasBox],
@@ -133,7 +133,7 @@ trait TxUtils { Self: FlowUtils =>
 
   def sweepAll(
       fromPublicKey: PublicKey,
-      toLockupScript: LockupScript,
+      toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -276,7 +276,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkOutputInfos(
-      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])]
   ): Either[String, Unit] = {
     if (outputInfos.isEmpty) {
       Left("Zero transaction outputs")

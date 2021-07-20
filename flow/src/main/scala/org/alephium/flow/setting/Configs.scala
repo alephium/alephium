@@ -155,7 +155,7 @@ object Configs extends StrictLogging {
     }
   }
 
-  def loadBlockFlow(balances: AVector[(LockupScript, U256)])(implicit
+  def loadBlockFlow(balances: AVector[(LockupScript.Asset, U256)])(implicit
       groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig
   ): AVector[AVector[Block]] = {

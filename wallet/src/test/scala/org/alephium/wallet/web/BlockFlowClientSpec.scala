@@ -45,7 +45,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val networkType                       = NetworkType.Devnet
     val groupIndex                        = GroupIndex.unsafe(0)
     val (script, publicKey, _)            = addressGen(groupIndex).sample.get
-    val toAddress                         = Address(networkType, script)
+    val toAddress                         = Address.Asset(networkType, script)
     val value                             = U256.from(1000).get
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
   }

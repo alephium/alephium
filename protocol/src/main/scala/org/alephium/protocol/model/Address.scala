@@ -22,7 +22,11 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.Base58
 
-final case class Address(networkType: NetworkType, lockupScript: LockupScript) {
+sealed trait Address {
+  def networkType: NetworkType
+
+  def lockupScript: LockupScript
+
   def toBase58: String = networkType.prefix ++ Base58.encode(serialize(lockupScript))
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
@@ -31,13 +35,31 @@ final case class Address(networkType: NetworkType, lockupScript: LockupScript) {
 }
 
 object Address {
+  final case class Asset(networkType: NetworkType, lockupScript: LockupScript.Asset) extends Address
+  final case class Contract(networkType: NetworkType, lockupScript: LockupScript.P2C)
+      extends Address
+
+  def from(networkType: NetworkType, lockupScript: LockupScript): Address = {
+    lockupScript match {
+      case e: LockupScript.Asset => Asset(networkType, e)
+      case e: LockupScript.P2C   => Contract(networkType, e)
+    }
+  }
+
   def fromBase58(input: String, expected: NetworkType): Option[Address] = {
     for {
       (networkType, lockupScriptBase58) <- NetworkType.decode(input)
       if networkType == expected
       lockupScriptRaw <- Base58.decode(lockupScriptBase58)
       lockupScript    <- deserialize[LockupScript](lockupScriptRaw).toOption
-    } yield Address(networkType, lockupScript)
+    } yield from(networkType, lockupScript)
+  }
+
+  def asset(input: String, expected: NetworkType): Option[Address.Asset] = {
+    fromBase58(input, expected) match {
+      case Some(address: Asset) => Some(address)
+      case _                    => None
+    }
   }
 
   def extractLockupScript(address: String): Option[LockupScript] = {
@@ -48,6 +70,6 @@ object Address {
     } yield lockupScript
   }
 
-  def p2pkh(networkType: NetworkType, publicKey: PublicKey): Address =
-    Address(networkType, LockupScript.p2pkh(publicKey))
+  def p2pkh(networkType: NetworkType, publicKey: PublicKey): Address.Asset =
+    Asset(networkType, LockupScript.p2pkh(publicKey))
 }

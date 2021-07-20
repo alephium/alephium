@@ -145,9 +145,9 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
-  val getBalance: BaseEndpoint[Address, Balance] =
+  val getBalance: BaseEndpoint[Address.Asset, Balance] =
     addressesEndpoint.get
-      .in(path[Address]("address"))
+      .in(path[Address.Asset]("address"))
       .in("balance")
       .out(jsonBody[Balance])
       .summary("Get the balance of a address")

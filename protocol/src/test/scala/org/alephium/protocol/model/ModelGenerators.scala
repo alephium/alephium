@@ -37,17 +37,22 @@ trait LockupScriptGenerators extends Generators {
 
   implicit def groupConfig: GroupConfig
 
-  def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript] =
+  def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
     for {
       publicKey <- publicKeyGen(groupIndex)
     } yield LockupScript.p2pkh(publicKey)
+
+  def contractLockupGen(): Gen[LockupScript.P2C] =
+    for {
+      contractId <- hashGen
+    } yield LockupScript.P2C(contractId)
 
   def p2pkScriptGen(groupIndex: GroupIndex): Gen[ScriptPair] =
     for {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield ScriptPair(LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey), privateKey)
 
-  def addressGen(groupIndex: GroupIndex): Gen[(LockupScript, PublicKey, PrivateKey)] =
+  def addressGen(groupIndex: GroupIndex): Gen[(LockupScript.Asset, PublicKey, PrivateKey)] =
     for {
       (privateKey, publicKey) <- keypairGen(groupIndex)
     } yield (LockupScript.p2pkh(publicKey), publicKey, privateKey)
@@ -55,7 +60,7 @@ trait LockupScriptGenerators extends Generators {
   def addressStringGen(groupIndex: GroupIndex): Gen[(String, PublicKey, PrivateKey)] =
     addressGen(groupIndex).map { case (script, publicKey, privateKey) =>
       (
-        Address(NetworkType.Devnet, script).toBase58,
+        Address.from(NetworkType.Devnet, script).toBase58,
         publicKey,
         privateKey
       )
@@ -67,7 +72,7 @@ trait LockupScriptGenerators extends Generators {
       (script, publicKey, privateKey) <- addressGen(groupIndex)
     } yield {
       (
-        Address(NetworkType.Devnet, script).toBase58,
+        Address.from(NetworkType.Devnet, script).toBase58,
         publicKey.toHexString,
         privateKey.toHexString
       )
@@ -169,7 +174,7 @@ trait TxGenerators
   def assetOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256] = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
-      scriptGen: Gen[LockupScript] = p2pkhLockupGen(groupIndex),
+      scriptGen: Gen[LockupScript.Asset] = p2pkhLockupGen(groupIndex),
       dataGen: Gen[ByteString] = dataGen
   ): Gen[AssetOutput] = {
     for {
@@ -180,10 +185,10 @@ trait TxGenerators
     } yield AssetOutput(amount, lockupScript, TimeStamp.zero, AVector.from(tokens), additionalData)
   }
 
-  def contractOutputGen(groupIndex: GroupIndex)(
+  def contractOutputGen(
       _amountGen: Gen[U256] = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
-      scriptGen: Gen[LockupScript] = p2pkhLockupGen(groupIndex)
+      scriptGen: Gen[LockupScript.P2C] = contractLockupGen()
   ): Gen[ContractOutput] = {
     for {
       amount       <- _amountGen
@@ -227,7 +232,7 @@ trait TxGenerators
     }
 
   type IndexScriptPairGen   = GroupIndex => Gen[ScriptPair]
-  type IndexLockupScriptGen = GroupIndex => Gen[LockupScript]
+  type IndexLockupScriptGen = GroupIndex => Gen[LockupScript.Asset]
 
   def unsignedTxGen(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]],
@@ -441,10 +446,18 @@ trait NoIndexModelGenerators
     with ConsensusConfigFixture.Default
 
 object ModelGenerators {
-  final case class ScriptPair(lockup: LockupScript, unlock: UnlockScript, privateKey: PrivateKey)
+  final case class ScriptPair(
+      lockup: LockupScript.Asset,
+      unlock: UnlockScript,
+      privateKey: PrivateKey
+  )
 
   final case class Balances(alfAmount: U256, tokens: Map[TokenId, U256]) {
-    def toOutput(lockupScript: LockupScript, lockTime: TimeStamp, data: ByteString): AssetOutput = {
+    def toOutput(
+        lockupScript: LockupScript.Asset,
+        lockTime: TimeStamp,
+        data: ByteString
+    ): AssetOutput = {
       val tokensVec = AVector.from(tokens)
       AssetOutput(alfAmount, lockupScript, lockTime, tokensVec, data)
     }

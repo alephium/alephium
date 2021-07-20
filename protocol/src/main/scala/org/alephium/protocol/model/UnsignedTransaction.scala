@@ -96,9 +96,9 @@ object UnsignedTransaction {
 
   def transferAlf(
       inputs: AVector[(AssetOutputRef, AssetOutput)],
-      fromLockupScript: LockupScript,
+      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
       gas: GasBox,
       gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {

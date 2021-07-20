@@ -18,6 +18,8 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
+import org.alephium.serde
+
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
@@ -521,8 +523,8 @@ object TxValidation {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
           checkP2pkh(tx, gasRemaining, lock, unlock, signatures)
-        case (lock: LockupScript.P2S, unlock: UnlockScript.P2S) =>
-          checkP2S(tx, gasRemaining, lock, unlock, signatures)
+        case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
+          checkP2SH(tx, gasRemaining, lock, unlock, signatures)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -550,27 +552,32 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkP2S(
+    protected[validation] def checkP2SH(
         tx: Transaction,
         gasRemaining: GasBox,
-        lock: LockupScript.P2S,
-        unlock: UnlockScript.P2S,
+        lock: LockupScript.P2SH,
+        unlock: UnlockScript.P2SH,
         signatures: Stack[Signature]
     ): TxValidationResult[GasBox] = {
-      checkScript(tx, gasRemaining, lock.script, unlock.params, signatures)
+      checkScript(tx, gasRemaining, lock.scriptHash, unlock.script, unlock.params, signatures)
     }
 
     protected[validation] def checkScript(
         tx: Transaction,
         gasRemaining: GasBox,
+        scriptHash: Hash,
         script: StatelessScript,
         params: AVector[Val],
         signatures: Stack[Signature]
     ): TxValidationResult[GasBox] = {
-      StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {
-        case Right(result)  => validTx(result.gasRemaining)
-        case Left(Right(e)) => invalidTx(InvalidUnlockScript(e))
-        case Left(Left(e))  => Left(Left(e.error))
+      if (Hash.hash(serde.serialize(script)) != scriptHash) {
+        invalidTx(InvalidScriptHash)
+      } else {
+        StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {
+          case Right(result)  => validTx(result.gasRemaining)
+          case Left(Right(e)) => invalidTx(InvalidUnlockScript(e))
+          case Left(Left(e))  => Left(Left(e.error))
+        }
       }
     }
 

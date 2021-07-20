@@ -25,7 +25,7 @@ import org.alephium.util.{AlephiumSpec, Hex}
 class AddressSpec extends AlephiumSpec {
   def succes(address: String, publicKey: String, networkType: NetworkType): Assertion = {
     val script = LockupScript.p2pkh(PublicKey.unsafe(Hex.from(publicKey).get))
-    Address(networkType, script).toBase58 is address
+    Address.from(networkType, script).toBase58 is address
     Address.fromBase58(address, networkType).get.lockupScript is script
   }
 

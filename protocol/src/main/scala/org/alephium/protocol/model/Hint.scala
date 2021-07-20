@@ -21,7 +21,7 @@ import org.alephium.serde.Serde
 import org.alephium.util.Bytes
 
 // No substypes for the sake of performance
-final case class Hint private (val value: Int) extends AnyVal {
+final case class Hint private (value: Int) extends AnyVal {
   def isAssetType: Boolean = (value & 1) == 1
 
   def isContractType: Boolean = (value & 1) == 0

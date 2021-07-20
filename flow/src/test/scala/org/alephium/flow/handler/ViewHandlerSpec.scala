@@ -63,7 +63,7 @@ class ViewHandlerSpec extends AlephiumSpec {
     val txProbe = TestProbe()
     lazy val minderAddresses =
       AVector.tabulate(groupConfig.groups)(i =>
-        Address(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
+        Address.Asset(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
       )
     lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow, txProbe.ref))
   }
@@ -173,7 +173,7 @@ class ViewHandlerSpec extends AlephiumSpec {
 
     viewHandler
       .ask(ViewHandler.GetMinerAddresses)
-      .mapTo[Option[AVector[LockupScript]]]
+      .mapTo[Option[AVector[LockupScript.Asset]]]
       .futureValue is Some(minderAddresses.map(_.lockupScript))
 
     EventFilter.error(start = "Updating invalid miner addresses").intercept {
