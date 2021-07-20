@@ -438,7 +438,9 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
       Get(s"/miners/addresses") check { response =>
         response.code is StatusCode.Ok
-        response.as[MinerAddresses] is MinerAddresses(AVector(address))
+        response.as[MinerAddresses] is MinerAddresses(
+          AVector(AddressInfo(address, address.groupIndex.value))
+        )
       }
 
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -462,17 +464,18 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       allHandlersProbe.viewHandler.setAutoPilot(TestActor.NoAutoPilot)
 
       val newAddresses = AVector.tabulate(config.broker.groups)(i =>
-        addressStringGen(GroupIndex.unsafe(i)).sample.get._1
+        AddressInfo(Address(networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1), i)
       )
       val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
       Put(s"/miners/addresses", body) check { response =>
-        val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
+        val addresses = newAddresses.map(_.address)
         allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateMinerAddresses(addresses))
         response.code is StatusCode.Ok
       }
 
-      val notEnoughAddressesBody = s"""{"addresses":["${dummyKeyAddress}"]}"""
+      val notEnoughAddressesBody =
+        s"""{"addresses":[{"address":"${dummyKeyAddress}", "group":1}]}"""
       Put(s"/miners/addresses", notEnoughAddressesBody) check { response =>
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
@@ -480,7 +483,9 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         )
       }
 
-      val wrongGroup     = AVector.tabulate(config.broker.groups)(_ => dummyKeyAddress)
+      val wrongGroup = AVector.tabulate(config.broker.groups)(i =>
+        AddressInfo(Address.fromBase58(dummyKeyAddress, networkType).get, i)
+      )
       val wrongGroupBody = s"""{"addresses":${writeJs(wrongGroup)}}"""
       Put(s"/miners/addresses", wrongGroupBody) check { response =>
         response.code is StatusCode.BadRequest

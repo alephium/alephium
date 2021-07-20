@@ -16,7 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
-final case class MinerAddresses(addresses: AVector[Address])
+final case class MinerAddresses(addresses: AVector[AddressInfo])

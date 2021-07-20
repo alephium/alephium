@@ -22,6 +22,7 @@ import sttp.tapir.generic.auto._
 import org.alephium.api.{BaseEndpoint, TapirCodecs, TapirSchemasLike}
 import org.alephium.api.Endpoints.jsonBody
 import org.alephium.api.UtilJson._
+import org.alephium.api.model.AddressInfo
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.json

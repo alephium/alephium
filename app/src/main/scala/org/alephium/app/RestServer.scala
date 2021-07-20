@@ -361,16 +361,20 @@ class RestServer(
       .mapTo[Option[AVector[LockupScript]]]
       .map {
         case Some(addresses) =>
-          Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
+          Right(MinerAddresses(addresses.map { lockupScript =>
+            val address = Address(networkType, lockupScript)
+            AddressInfo(address, address.groupIndex.value)
+          }))
         case None => Left(ApiError.InternalServerError(s"Miner addresses are not set up"))
       }
   }
 
   private val minerUpdateAddressesRoute = toRoute(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
+      val addresses = minerAddresses.addresses.sortBy(_.group).map(_.address)
       Miner
-        .validateAddresses(minerAddresses.addresses)
-        .map(_ => viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses))
+        .validateAddresses(addresses)
+        .map(_ => viewHandler ! ViewHandler.UpdateMinerAddresses(addresses))
         .left
         .map(ApiError.BadRequest(_))
     }

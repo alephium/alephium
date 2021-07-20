@@ -259,7 +259,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(ExportFile("exported-blocks-file"))
 
   implicit val minerAddressesExamples: List[Example[MinerAddresses]] =
-    simpleExample(MinerAddresses(AVector(address)))
+    simpleExample(MinerAddresses(AVector(AddressInfo(address, 0))))
 
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)

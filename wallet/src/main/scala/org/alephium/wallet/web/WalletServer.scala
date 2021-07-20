@@ -25,6 +25,7 @@ import sttp.tapir.swagger.vertx.SwaggerVertx
 
 import org.alephium.api.ApiError
 import org.alephium.api.OpenAPIWriters.openApiJson
+import org.alephium.api.model.AddressInfo
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.http.ServerOptions
 import org.alephium.protocol.config.GroupConfig
@@ -132,7 +133,7 @@ class WalletServer(
             addresses.map { p =>
               model.MinerAddressesInfo(
                 p.map { case (group, ad) =>
-                  model.AddressInfo(ad, group.value)
+                  AddressInfo(ad, group.value)
                 }
               )
             }
@@ -168,7 +169,7 @@ class WalletServer(
       Future.successful(
         walletService
           .deriveNextMinerAddresses(wallet)
-          .map(_.map(address => model.AddressInfo(address, address.groupIndex.value)))
+          .map(_.map(address => AddressInfo(address, address.groupIndex.value)))
           .left
           .map(toApiError)
       )

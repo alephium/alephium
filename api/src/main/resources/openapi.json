@@ -132,9 +132,24 @@
               "schema": {
                 "$ref": "#/components/schemas/WalletRestore"
               },
-              "example": {
-                "password": "my-secret-password",
-                "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
+                    "isMiner": true,
+                    "walletName": "wallet-super-name",
+                    "mnemonicPassphrase": "optional-mnemonic-passphrase"
+                  }
+                }
               }
             }
           },
@@ -4118,7 +4133,10 @@
                 },
                 "example": {
                   "addresses": [
-                    "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    {
+                      "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "group": 0
+                    }
                   ]
                 }
               }
@@ -4206,7 +4224,10 @@
               },
               "example": {
                 "addresses": [
-                  "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  {
+                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "group": 0
+                  }
                 ]
               }
             }
@@ -5385,8 +5406,23 @@
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/AddressInfo1"
             }
+          }
+        }
+      },
+      "AddressInfo1": {
+        "required": [
+          "address",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "group": {
+            "type": "integer"
           }
         }
       }

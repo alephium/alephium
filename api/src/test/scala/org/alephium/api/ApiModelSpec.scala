@@ -373,4 +373,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       s"""{"blockBlob":"bbbbbbbbbb","miningCount":"1234"}"""
     checkData(blockSolution, jsonRaw)
   }
+
+  it should "encode/decode AddressInfo" in {
+    val address     = generateAddress()
+    val group       = 0
+    val json        = s"""{"address":"$address","group":$group}"""
+    val addressInfo = AddressInfo(address, group)
+    checkData(addressInfo, json)
+  }
+
 }

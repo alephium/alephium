@@ -29,8 +29,6 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val addressesRW: RW[Addresses] = macroRW
 
-  implicit val addresseInfoRW: RW[AddressInfo] = macroRW
-
   implicit val minerAddressesInfoRW: RW[MinerAddressesInfo] = macroRW
 
   implicit val addressBalanceRW: RW[Balances.AddressBalance] = macroRW

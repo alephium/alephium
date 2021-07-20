@@ -99,6 +99,8 @@ trait ApiModelCodec {
       )
   }
 
+  implicit val addressInfoRW: RW[AddressInfo] = macroRW
+
   implicit val cliqueIdWriter: Writer[CliqueId] = StringWriter.comap[CliqueId](_.toHexString)
   implicit val cliqueIdReader: Reader[CliqueId] = StringReader.map { s =>
     Hex.from(s).flatMap(CliqueId.from).getOrElse(throw new Abort("invalid clique id"))

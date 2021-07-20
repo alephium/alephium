@@ -19,7 +19,7 @@ package org.alephium.wallet.api
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.ErrorExamples
-import org.alephium.api.model.Destination
+import org.alephium.api.model.{AddressInfo, Destination}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, NetworkType}
