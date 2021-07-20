@@ -46,7 +46,7 @@ trait WalletEndpoints
     .in(path[String]("wallet_name"))
     .tag("Miners")
     .description(
-      "This endpoint can only be called if the wallet was created with the `miner = true` flag"
+      "This endpoint can only be called if the wallet was created with the `isMiner = true` flag"
     )
 
   val createWallet: BaseEndpoint[WalletCreation, WalletCreation.Result] =

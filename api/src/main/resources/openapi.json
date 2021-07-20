@@ -131,9 +131,24 @@
               "schema": {
                 "$ref": "#/components/schemas/WalletRestore"
               },
-              "example": {
-                "password": "my-secret-password",
-                "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
+                    "isMiner": true,
+                    "walletName": "wallet-super-name",
+                    "mnemonicPassphrase": "optional-mnemonic-passphrase"
+                  }
+                }
               }
             }
           },
@@ -1178,7 +1193,7 @@
           "Miners"
         ],
         "summary": "List all miner addresses per group",
-        "description": "This endpoint can only be called if the wallet was created with the `miner = true` flag",
+        "description": "This endpoint can only be called if the wallet was created with the `isMiner = true` flag",
         "operationId": "getWalletsWallet_nameMiner-addresses",
         "parameters": [
           {
