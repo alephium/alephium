@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.serialize
 import org.alephium.util.Base58
 
 sealed trait Address {
@@ -51,8 +51,7 @@ object Address {
     for {
       (networkType, lockupScriptBase58) <- NetworkType.decode(input)
       if networkType == expected
-      lockupScriptRaw <- Base58.decode(lockupScriptBase58)
-      lockupScript    <- deserialize[LockupScript](lockupScriptRaw).toOption
+      lockupScript <- LockupScript.fromBase58(lockupScriptBase58)
     } yield from(networkType, lockupScript)
   }
 
@@ -66,8 +65,7 @@ object Address {
   def extractLockupScript(address: String): Option[LockupScript] = {
     for {
       (_, lockupScriptBase58) <- NetworkType.decode(address)
-      lockupScriptRaw         <- Base58.decode(lockupScriptBase58)
-      lockupScript            <- deserialize[LockupScript](lockupScriptRaw).toOption
+      lockupScript            <- LockupScript.fromBase58(lockupScriptBase58)
     } yield lockupScript
   }
 
