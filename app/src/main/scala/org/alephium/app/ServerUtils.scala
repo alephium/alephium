@@ -126,17 +126,17 @@ class ServerUtils(networkType: NetworkType)(implicit
     }
   }
 
-  def submitTransaction(txHandler: ActorRefT[TxHandler.Command], query: SubmitTransaction)(implicit
+  def submitTransaction(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[TxResult] = {
-    createTxTemplate(query) match {
-      case Right(tx)   => publishTx(txHandler, tx)
-      case Left(error) => Future.successful(Left(error))
-    }
+    publishTx(txHandler, tx)
   }
 
   def createTxTemplate(query: SubmitTransaction): Try[TransactionTemplate] = {
-    decodeUnsignedTransaction(query.unsignedTx).map { unsignedTx =>
+    for {
+      unsignedTx <- decodeUnsignedTransaction(query.unsignedTx)
+      _          <- validateUnsignedTransaction(unsignedTx)
+    } yield {
       TransactionTemplate(
         unsignedTx,
         AVector.fill(unsignedTx.inputs.length)(query.signature),
@@ -175,6 +175,17 @@ class ServerUtils(networkType: NetworkType)(implicit
       deserialize[UnsignedTransaction](txByteString).left
         .map(serdeError => badRequest(serdeError.getMessage))
     }
+  }
+
+  def validateUnsignedTransaction(
+      unsignedTx: UnsignedTransaction
+  ): Try[Unit] = {
+    if (unsignedTx.inputs.nonEmpty) {
+      Right(())
+    } else {
+      Left(ApiError.BadRequest("Invalid transaction: empty inputs"))
+    }
+
   }
 
   def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {

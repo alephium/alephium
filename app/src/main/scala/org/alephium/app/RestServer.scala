@@ -240,11 +240,15 @@ class RestServer(
     bst => LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)
   )
 
-  private val submitTransactionRoute = toRoute(submitTransaction) { transaction =>
-    withSyncedClique {
-      serverUtils.submitTransaction(txHandler, transaction)
-    }
-  }
+  private val submitTransactionRoute =
+    toRouteRedirectWith[SubmitTransaction, TransactionTemplate, TxResult](submitTransaction)(
+      tx => serverUtils.createTxTemplate(tx),
+      tx =>
+        withSyncedClique {
+          serverUtils.submitTransaction(txHandler, tx)
+        },
+      _.fromGroup
+    )
 
   private val getTransactionStatusRoute = toRoute(getTransactionStatus) {
     case (txId, fromGroup, toGroup) =>
@@ -544,6 +548,27 @@ class RestServer(
         endpoint,
         params
       )
+    }
+  }
+
+  private def toRouteRedirectWith[R, P, A](
+      endpoint: BaseEndpoint[R, A]
+  )(
+      paramsConvert: R => ServerUtils.Try[P],
+      localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]],
+      getIndex: P => GroupIndex
+  ) = {
+    toRoute(endpoint) { params =>
+      paramsConvert(params) match {
+        case Left(error) => Future.successful(Left(error))
+        case Right(converted) =>
+          requestFromGroupIndex(
+            getIndex(converted),
+            localLogic(converted),
+            endpoint,
+            params
+          )
+      }
     }
   }
 

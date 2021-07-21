@@ -227,8 +227,8 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call POST /transactions/submit" in new RestServerFixture {
-    withServer {
+  it should "call POST /transactions/submit" in new MultiRestServerFixture {
+    withServers {
       val tx =
         s"""{"unsignedTx":"${Hex.toHexString(
           serialize(dummyTx.unsigned)
