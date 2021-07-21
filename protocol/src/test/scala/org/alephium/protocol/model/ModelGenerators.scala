@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Sorting
+import scala.util.{Random, Sorting}
 
 import akka.util.ByteString
 import org.scalacheck.Arbitrary._
@@ -41,6 +41,12 @@ trait LockupScriptGenerators extends Generators {
     for {
       publicKey <- publicKeyGen(groupIndex)
     } yield LockupScript.p2pkh(publicKey)
+
+  def multiSigLockGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
+    for {
+      publicKey0 <- publicKeyGen(groupIndex)
+      moreKeys   <- Gen.nonEmptyListOf(Gen.const(PublicKey.generate)).map(AVector.from)
+    } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, Random.nextInt(moreKeys.length) + 1).get
 
   def contractLockupGen(): Gen[LockupScript.P2C] =
     for {

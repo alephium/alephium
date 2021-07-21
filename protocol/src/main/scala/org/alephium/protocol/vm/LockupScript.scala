@@ -78,9 +78,10 @@ object LockupScript {
   def p2mpkhUnsafe(keys: AVector[PublicKey], m: Int): P2MPKH = {
     P2MPKH.unsafe(keys.map(key => Hash.hash(key.bytes)), m)
   }
-  def p2s(script: StatelessScript): P2SH =
+  def p2sh(script: StatelessScript): P2SH =
     P2SH(Hash.hash(serdeImpl[StatelessScript].serialize(script)))
-  def p2c(contractId: Hash): P2C = P2C(contractId)
+  def p2sh(scriptHash: Hash): P2SH = P2SH(scriptHash)
+  def p2c(contractId: Hash): P2C   = P2C(contractId)
 
   sealed trait Asset extends LockupScript {
     def hintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
@@ -109,7 +110,8 @@ object LockupScript {
   object P2MPKH {
     implicit val serde: Serde[P2MPKH] = Serde.forProduct2(P2MPKH.apply, t => (t.pkHashes, t.m))
 
-    def unsafe(pkHashes: AVector[Hash], m: Int): P2MPKH = new P2MPKH(pkHashes, m)
+    def unsafe(pkHashes: AVector[Hash], m: Int): P2MPKH =
+      new P2MPKH(pkHashes, m)
   }
   // pay to script hash
   final case class P2SH(scriptHash: Hash) extends Asset {
