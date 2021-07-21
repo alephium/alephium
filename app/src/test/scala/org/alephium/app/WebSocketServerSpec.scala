@@ -47,7 +47,7 @@ class WebSocketServerSpec
 
   behavior of "http"
 
-  it should "encode BlockNotify" in new ServerFixture {
+  it should "encode BlockNotify" in new Fixture {
     val dep  = BlockHash.hash("foo")
     val deps = AVector.fill(groupConfig.depsNum)(dep)
     val header =
@@ -81,7 +81,13 @@ class WebSocketServerSpec
     }
   }
 
-  trait WebSocketServerFixture extends ServerFixture {
+  trait Fixture extends ServerFixture {
+    implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig)
+    implicit lazy val networkType: NetworkType = config.network.networkType
+    lazy val blockflowFetchMaxAge              = apiConfig.blockflowFetchMaxAge
+  }
+
+  trait WebSocketServerFixture extends Fixture {
 
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val system: ActorSystem                = ActorSystem("websocket-server-spec")

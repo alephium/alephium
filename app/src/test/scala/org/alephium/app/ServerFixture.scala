@@ -29,6 +29,7 @@ import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.network._
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -47,12 +48,7 @@ trait ServerFixture
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NoIndexModelGeneratorsLike {
-  implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig)
-  implicit lazy val networkType: NetworkType = config.network.networkType
-
   val now = TimeStamp.now()
-
-  lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
@@ -81,25 +77,7 @@ trait ServerFixture
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
     .get
-  def dummySweepAllTx(
-      tx: Transaction,
-      toLockupScript: LockupScript,
-      lockTimeOpt: Option[TimeStamp]
-  ): Transaction = {
-    val output = TxOutput.asset(U256.Ten, toLockupScript, lockTimeOpt)
-    tx.copy(
-      unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
-    )
-  }
-  def dummyTransferTx(
-      tx: Transaction,
-      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
-  ): Transaction = {
-    val newOutputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
-      TxOutput.asset(amount, toLockupScript, lockTimeOpt)
-    }
-    tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
-  }
+
   lazy val dummySignature =
     SignatureSchema.sign(
       dummyTx.unsigned.hash.bytes,
@@ -116,12 +94,33 @@ trait ServerFixture
     tx.unsigned.fromGroup.value,
     tx.unsigned.toGroup.value
   )
-  lazy val dummyTxStatus: TxStatus = Confirmed(BlockHash.zero, 0, 1, 2, 3)
+  lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 
-object ServerFixture extends ServerFixture {
+object ServerFixture {
   def show[T: Writer](t: T): String = {
     write(t)
+  }
+
+  def dummyTransferTx(
+      tx: Transaction,
+      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
+  ): Transaction = {
+    val newOutputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
+      TxOutput.asset(amount, toLockupScript, lockTimeOpt)
+    }
+    tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
+  }
+
+  def dummySweepAllTx(
+      tx: Transaction,
+      toLockupScript: LockupScript,
+      lockTimeOpt: Option[TimeStamp]
+  ): Transaction = {
+    val output = TxOutput.asset(U256.Ten, toLockupScript, lockTimeOpt)
+    tx.copy(
+      unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
+    )
   }
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
@@ -233,11 +232,28 @@ object ServerFixture extends ServerFixture {
       Right(Right(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned))
     }
 
+    // scalastyle:off no.equal
+    val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
     override def getTxStatus(
         txId: Hash,
         chainIndex: ChainIndex
-    ): IOResult[Option[BlockFlowState.TxStatus]] =
-      Right(Some(BlockFlowState.TxStatus(TxIndex(BlockHash.zero, 0), 1, 2, 3)))
+    ): IOResult[Option[BlockFlowState.TxStatus]] = {
+      assume(brokerConfig.contains(chainIndex.from))
+      if (chainIndex == blockChainIndex) {
+        Right(Some(BlockFlowState.TxStatus(TxIndex(block.hash, 0), 1, 2, 3)))
+      } else {
+        Right(None)
+      }
+    }
+    // scalastyle:on no.equal
+
+    override def getMemPool(mainGroup: GroupIndex): MemPool = {
+      MemPool.empty(mainGroup)(config.broker, config.mempool)
+    }
+
+    override def getMemPool(chainIndex: ChainIndex): MemPool = {
+      MemPool.empty(chainIndex.from)(config.broker, config.mempool)
+    }
 
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)

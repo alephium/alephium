@@ -16,8 +16,17 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.model.BrokerGroupInfo
+import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex}
+import org.alephium.util.AVector
 
 trait BrokerConfig extends GroupConfig with CliqueConfig with BrokerGroupInfo {
   def brokerId: Int
+
+  lazy val chainIndexes: AVector[ChainIndex] =
+    AVector.from(
+      for {
+        from <- groupRange
+        to   <- 0 until groups
+      } yield ChainIndex.unsafe(from, to)(this)
+    )
 }

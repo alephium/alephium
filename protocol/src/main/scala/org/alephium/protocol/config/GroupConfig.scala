@@ -16,10 +16,15 @@
 
 package org.alephium.protocol.config
 
+import org.alephium.protocol.model.GroupIndex
+import org.alephium.util.AVector
+
 trait GroupConfig {
   def groups: Int
 
   lazy val chainNum: Int = groups * groups
 
   lazy val depsNum: Int = 2 * groups - 1
+
+  lazy val allGroups: AVector[GroupIndex] = AVector.tabulate(groups)(GroupIndex.unsafe(_)(this))
 }

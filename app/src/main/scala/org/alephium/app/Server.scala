@@ -63,6 +63,7 @@ trait Server extends Service {
 
   lazy val restServer: RestServer =
     RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))(
+      config.broker,
       apiConfig,
       executionContext
     )
