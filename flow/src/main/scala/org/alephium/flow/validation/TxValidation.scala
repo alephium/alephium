@@ -18,14 +18,13 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
-import org.alephium.serde
-
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{OutOfGas => _, _}
+import org.alephium.serde.serialize
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 trait TxValidation {
@@ -602,7 +601,7 @@ object TxValidation {
         params: AVector[Val],
         signatures: Stack[Signature]
     ): TxValidationResult[GasBox] = {
-      if (Hash.hash(serde.serialize(script)) != scriptHash) {
+      if (Hash.hash(serialize(script)) != scriptHash) {
         invalidTx(InvalidScriptHash)
       } else {
         StatelessVM.runAssetScript(tx.id, gasRemaining, script, params, signatures) match {

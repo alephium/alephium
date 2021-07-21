@@ -88,6 +88,16 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice)
+  }
+
+  def transfer(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UnsignedTransaction]] = {
     getUsableUtxos(fromLockupScript).map { utxos =>
       for {
         totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>

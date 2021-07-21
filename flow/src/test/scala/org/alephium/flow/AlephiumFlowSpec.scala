@@ -113,8 +113,17 @@ trait FlowFixture
   }
 
   def transfer(blockFlow: BlockFlow, from: PrivateKey, to: PublicKey, amount: U256): Block = {
+    transfer(blockFlow, from, LockupScript.p2pkh(to), amount)
+  }
+
+  def transfer(
+      blockFlow: BlockFlow,
+      from: PrivateKey,
+      to: LockupScript.Asset,
+      amount: U256
+  ): Block = {
     val unsigned = blockFlow
-      .transfer(from.publicKey, LockupScript.p2pkh(to), None, amount, None, defaultGasPrice)
+      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice)
       .rightValue
       .rightValue
     val tx         = Transaction.from(unsigned, from)
