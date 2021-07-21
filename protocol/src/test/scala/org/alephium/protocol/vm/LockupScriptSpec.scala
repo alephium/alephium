@@ -58,4 +58,23 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val lock3 = LockupScript.p2c(hash0)
     serialize[LockupScript](lock3) is Hex.unsafe(s"03${hash0.toHexString}")
   }
+
+  it should "validate multisig" in {
+    val hash0 = Hash.random
+    val hash1 = Hash.random
+
+    val lock0 = Hex.unsafe(s"0102${hash0.toHexString}${hash1.toHexString}00")
+    deserialize[LockupScript](lock0).leftValue.getMessage
+      .startsWith(s"Invalid m-of-n multisig") is true
+
+    val lock1 = Hex.unsafe(s"0102${hash0.toHexString}${hash1.toHexString}03")
+    deserialize[LockupScript](lock1).leftValue.getMessage
+      .startsWith(s"Invalid m-of-n multisig") is true
+
+    val lock2 = Hex.unsafe(s"0102${hash0.toHexString}${hash1.toHexString}01")
+    deserialize[LockupScript](lock2).isRight is true
+
+    val lock3 = Hex.unsafe(s"0102${hash0.toHexString}${hash1.toHexString}02")
+    deserialize[LockupScript](lock3).isRight is true
+  }
 }

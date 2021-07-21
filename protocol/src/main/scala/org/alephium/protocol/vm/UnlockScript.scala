@@ -33,9 +33,10 @@ object UnlockScript {
         .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
         .validate { lock =>
           val ok = (0 until (lock.indexedPublicKeys.length - 1)).forall { i =>
-            lock.indexedPublicKeys.apply(i + 1)._2 > lock.indexedPublicKeys.apply(i)._2
+            val index = lock.indexedPublicKeys(i)._2
+            index >= 0 && lock.indexedPublicKeys(i + 1)._2 > index
           }
-          if (ok) Right(()) else Left(s"Invalid order of public keys")
+          if (ok) Right(()) else Left(s"Invalid public keys indexes: ${lock.indexedPublicKeys}")
         }
     val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH, t => (t.script, t.params))
 

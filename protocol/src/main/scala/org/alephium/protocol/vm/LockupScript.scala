@@ -73,7 +73,7 @@ object LockupScript {
   def p2pkh(key: PublicKey): P2PKH = p2pkh(Hash.hash(key.bytes))
   def p2pkh(pkHash: Hash): P2PKH   = P2PKH(pkHash)
   def p2mpkh(keys: AVector[PublicKey], m: Int): Option[P2MPKH] = {
-    Option.when(keys.length > m && m > 0)(p2mpkhUnsafe(keys, m))
+    Option.when(P2MPKH.validate(keys.length, m))(p2mpkhUnsafe(keys, m))
   }
   def p2mpkhUnsafe(keys: AVector[PublicKey], m: Int): P2MPKH = {
     P2MPKH.unsafe(keys.map(key => Hash.hash(key.bytes)), m)
@@ -108,7 +108,18 @@ object LockupScript {
     lazy val scriptHint: ScriptHint = ScriptHint.fromHash(pkHashes.head)
   }
   object P2MPKH {
-    implicit val serde: Serde[P2MPKH] = Serde.forProduct2(P2MPKH.apply, t => (t.pkHashes, t.m))
+    def validate(pkLength: Int, m: Int): Boolean = m > 0 && m <= pkLength
+
+    implicit val serde: Serde[P2MPKH] = {
+      val underlying: Serde[P2MPKH] = Serde.forProduct2(P2MPKH.apply, t => (t.pkHashes, t.m))
+      underlying.validate(lock =>
+        if (validate(lock.pkHashes.length, lock.m)) {
+          Right(())
+        } else {
+          Left(s"Invalid m-of-n multisig: ${lock.pkHashes}, m: ${lock.m}")
+        }
+      )
+    }
 
     def unsafe(pkHashes: AVector[Hash], m: Int): P2MPKH =
       new P2MPKH(pkHashes, m)

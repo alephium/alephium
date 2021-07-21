@@ -56,4 +56,24 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val unlock2 = UnlockScript.p2sh(StatelessScript(AVector.empty), AVector.empty)
     serialize[UnlockScript](unlock2) is Hex.unsafe(s"020000")
   }
+
+  it should "validate multisig" in {
+    val publicKey0 = PublicKey.generate
+    val publicKey1 = PublicKey.generate
+
+    val unlock0 = Hex.unsafe(s"0102${publicKey0.toHexString}01${publicKey1.toHexString}01")
+    deserialize[UnlockScript](unlock0).leftValue.getMessage
+      .startsWith("Invalid public keys indexes") is true
+
+    val unlock1 = Hex.unsafe(s"0102${publicKey0.toHexString}01${publicKey1.toHexString}00")
+    deserialize[UnlockScript](unlock1).leftValue.getMessage
+      .startsWith("Invalid public keys indexes") is true
+
+    val unlock2 = Hex.unsafe(s"0102${publicKey0.toHexString}3f${publicKey1.toHexString}00")
+    deserialize[UnlockScript](unlock2).leftValue.getMessage
+      .startsWith("Invalid public keys indexes") is true
+
+    val unlock3 = Hex.unsafe(s"0102${publicKey0.toHexString}00${publicKey1.toHexString}01")
+    deserialize[UnlockScript](unlock3).isRight is true
+  }
 }
