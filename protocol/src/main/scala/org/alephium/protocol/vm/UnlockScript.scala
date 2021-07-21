@@ -60,8 +60,9 @@ object UnlockScript {
     }
   }
 
-  def p2pkh(publicKey: PublicKey): P2PKH                        = P2PKH(publicKey)
-  def p2sh(script: StatelessScript, params: AVector[Val]): P2SH = P2SH(script, params)
+  def p2pkh(publicKey: PublicKey): P2PKH                           = P2PKH(publicKey)
+  def p2mpkh(indexedPublicKeys: AVector[(PublicKey, Int)]): P2MPKH = P2MPKH(indexedPublicKeys)
+  def p2sh(script: StatelessScript, params: AVector[Val]): P2SH    = P2SH(script, params)
 
   final case class P2PKH(publicKey: PublicKey)                          extends UnlockScript
   final case class P2MPKH(indexedPublicKeys: AVector[(PublicKey, Int)]) extends UnlockScript
