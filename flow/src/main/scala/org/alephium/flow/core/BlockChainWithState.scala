@@ -101,6 +101,7 @@ object BlockChainWithState {
       override val chainStateStorage =
         storages.nodeStateStorage.chainStateStorage(rootBlock.chainIndex)
       override val genesisHash = rootBlock.hash
+      override val chainIndex  = rootBlock.chainIndex
 
       override def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit] =
         _updateState(worldState, block)
