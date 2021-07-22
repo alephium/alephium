@@ -84,12 +84,11 @@ trait TestFixtureLike
     (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  // the address needs to be in group 0 or 1 for node with broker-id 0
-  val address    = "T1Bz5Lri6ensLeYQaPujQKBnRSuxjwCRDsToHyavDxP6Jh"
-  val publicKey  = "0238c96456729ada4f0b0fce8d3fb7ba4bd5ae18e716853c43fb113341bfa83a1d"
-  val privateKey = "b6f46c5c285ce53caf1c292a4f8aac7ce1670996a3dc37c2ae96217a2141d8f9"
+  val address    = "T1DJa7LiwyNJosMWeDX6MejZQhwHHyh5yF4VYghMVoC2q"
+  val publicKey  = "03499a66a8a131a8cec4e7f51e919cff7385c34731a156482bdb7e6cdac7d39a3d"
+  val privateKey = "b14ce75cf22b0d678f3168d0ac5b2afea070e476c7bc60410245086b369fb17f"
   val mnemonic =
-    "woman trophy alarm surface decade reward robust such such inside swallow kit denial mistake marble curtain vehicle kiss auto couch call knee drama pool"
+    "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
   val (transferAddress, _, _) = generateAccount
 
   val password = "password"
@@ -492,6 +491,15 @@ trait TestFixtureLike
     def coordinator    = servers.head
     def masterTcpPort  = servers.head.config.network.coordinatorAddress.getPort
     def masterRestPort = servers.head.config.network.restPort
+
+    def brokers: Int         = servers.head.config.broker.brokerNum
+    def groupsPerBroker: Int = servers.head.config.broker.groupNumPerBroker
+
+    def getGroup(address: String) =
+      request[Group](Fixture.getGroup(address), masterRestPort)
+
+    def getServer(fromGroup: Int): Server = servers((fromGroup % groups0) / groupsPerBroker)
+    def getRestPort(fromGroup: Int): Int  = getServer(fromGroup).config.network.restPort
 
     def start(): Unit = {
       servers.map(_.start()).foreach(_.futureValue is ())

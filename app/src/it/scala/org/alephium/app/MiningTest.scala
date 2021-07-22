@@ -27,9 +27,7 @@ class MiningTest extends AlephiumSpec {
     clique.startWs()
 
     val selfClique = clique.selfClique()
-    val group      = request[Group](getGroup(address), clique.masterRestPort)
-    val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.nodes(index).restPort
+    val restPort   = clique.getRestPort(clique.getGroup(address).group)
 
     request[Balance](getBalance(address), restPort) is initialBalance
   }
@@ -43,7 +41,7 @@ class MiningTest extends AlephiumSpec {
         Balance(initialBalance.balance - transferAmount - defaultGasFee, 0, 1)
     }
 
-    val tx2 = transferFromWallet(transferAddress, transferAmount, restPort)
+    val tx2 = transferFromWallet(transferAddress, transferAmount, clique.masterRestPort)
     confirmTx(tx2, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is

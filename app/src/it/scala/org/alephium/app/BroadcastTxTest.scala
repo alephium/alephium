@@ -31,9 +31,9 @@ class BroadcastTxTest extends AlephiumSpec {
     val clique = bootClique(nbOfNodes = 2)
     clique.start()
 
-    val restPort1 = clique.servers(0).config.network.restPort
-    val restPort2 = clique.servers(1).config.network.restPort
-    val tx        = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort1)
+    val tx        = transfer(publicKey, transferAddress, transferAmount, privateKey, clique.masterRestPort)
+    val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
+    val restPort2 = clique.getServer(tx.fromGroup + clique.groupsPerBroker).config.network.restPort
     eventually(request[TxStatus](getTransactionStatus(tx), restPort1) is MemPooled)
     eventually(requestFailed(getTransactionStatus(tx), restPort2, StatusCode.BadRequest))
 
