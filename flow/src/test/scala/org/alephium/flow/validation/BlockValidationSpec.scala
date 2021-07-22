@@ -63,7 +63,11 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
   }
 
-  def coinbase(chainIndex: ChainIndex, gasFee: U256, lockupScript: LockupScript): Transaction = {
+  def coinbase(
+      chainIndex: ChainIndex,
+      gasFee: U256,
+      lockupScript: LockupScript.Asset
+  ): Transaction = {
     Transaction.coinbase(chainIndex, gasFee, lockupScript, Target.Max, TimeStamp.now())
   }
 

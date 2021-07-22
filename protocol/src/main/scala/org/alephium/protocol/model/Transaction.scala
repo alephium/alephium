@@ -208,7 +208,7 @@ object Transaction {
   def coinbase(
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig): Transaction = {
@@ -218,7 +218,7 @@ object Transaction {
   def coinbase(
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp
@@ -230,7 +230,7 @@ object Transaction {
   def coinbase(
       chainIndex: ChainIndex,
       gasFee: U256,
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig): Transaction = {
@@ -240,7 +240,7 @@ object Transaction {
   def coinbase(
       chainIndex: ChainIndex,
       gasFee: U256,
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp
@@ -268,7 +268,7 @@ object Transaction {
     )
   }
 
-  def genesis(balances: AVector[(LockupScript, U256)]): Transaction = {
+  def genesis(balances: AVector[(LockupScript.Asset, U256)]): Transaction = {
     val outputs = balances.map[AssetOutput] { case (lockupScript, value) =>
       TxOutput.genesis(value, lockupScript)
     }

@@ -21,7 +21,7 @@ import org.alephium.util.{TimeStamp, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Destination(
-    address: Address,
+    address: Address.Asset,
     amount: U256,
     lockTime: Option[TimeStamp] = None
 )

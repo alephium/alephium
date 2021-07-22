@@ -51,7 +51,7 @@ object Output {
       case o: model.AssetOutput =>
         Asset(
           o.amount,
-          Address(networkType, o.lockupScript),
+          Address.Asset(networkType, o.lockupScript),
           o.tokens.map((Token.apply).tupled),
           o.lockTime,
           o.additionalData
@@ -59,7 +59,7 @@ object Output {
       case o: model.ContractOutput =>
         Contract(
           o.amount,
-          Address(networkType, o.lockupScript),
+          Address.Contract(networkType, o.lockupScript),
           o.tokens.map((Token.apply).tupled)
         )
     }

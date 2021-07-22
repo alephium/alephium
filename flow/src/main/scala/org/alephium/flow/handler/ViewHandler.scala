@@ -41,11 +41,11 @@ object ViewHandler {
   )
 
   sealed trait Command
-  case object Subscribe                                              extends Command
-  case object Unsubscribe                                            extends Command
-  case object UpdateSubscribers                                      extends Command
-  case object GetMinerAddresses                                      extends Command
-  final case class UpdateMinerAddresses(addresses: AVector[Address]) extends Command
+  case object Subscribe                                                    extends Command
+  case object Unsubscribe                                                  extends Command
+  case object UpdateSubscribers                                            extends Command
+  case object GetMinerAddresses                                            extends Command
+  final case class UpdateMinerAddresses(addresses: AVector[Address.Asset]) extends Command
 
   sealed trait Event
   final case class NewTemplates(
@@ -60,7 +60,7 @@ object ViewHandler {
 
   def prepareTemplates(
       blockFlow: BlockFlow,
-      minerAddresses: AVector[LockupScript]
+      minerAddresses: AVector[LockupScript.Asset]
   )(implicit brokerConfig: BrokerConfig): IOResult[IndexedSeq[IndexedSeq[BlockFlowTemplate]]] =
     IOUtils.tryExecute {
       brokerConfig.groupRange.map { fromGroup =>
@@ -75,7 +75,7 @@ object ViewHandler {
 class ViewHandler(
     val blockFlow: BlockFlow,
     txHandler: ActorRefT[TxHandler.Command],
-    var minerAddressesOpt: Option[AVector[LockupScript]]
+    var minerAddressesOpt: Option[AVector[LockupScript.Asset]]
 )(implicit
     val brokerConfig: BrokerConfig,
     val miningSetting: MiningSetting
@@ -128,7 +128,7 @@ trait ViewHandlerState extends IOBaseActor {
   implicit def miningSetting: MiningSetting
 
   def blockFlow: BlockFlow
-  def minerAddressesOpt: Option[AVector[LockupScript]]
+  def minerAddressesOpt: Option[AVector[LockupScript.Asset]]
   def isNodeSynced: Boolean
 
   var updateScheduled: Option[Cancellable] = None

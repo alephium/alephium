@@ -85,7 +85,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
   trait Fixture extends AlephiumConfigFixture {
 
-    def buildOutput(lockupScript: LockupScript, amount: U256): AssetOutputInfo = {
+    def buildOutput(lockupScript: LockupScript.Asset, amount: U256): AssetOutputInfo = {
       val output =
         AssetOutput(amount, lockupScript, TimeStamp.now(), AVector.empty, ByteString.empty)
       val ref = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)

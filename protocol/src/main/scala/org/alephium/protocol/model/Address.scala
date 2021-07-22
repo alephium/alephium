@@ -19,35 +19,56 @@ package org.alephium.protocol.model
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.serialize
 import org.alephium.util.Base58
 
-final case class Address(networkType: NetworkType, lockupScript: LockupScript) {
-  def toBase58: String = networkType.prefix ++ Base58.encode(serialize(lockupScript))
+sealed trait Address {
+  def networkType: NetworkType
 
-  def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+  def lockupScript: LockupScript
+
+  def toBase58: String = networkType.prefix ++ Base58.encode(serialize(lockupScript))
 
   override def toString: String = toBase58
 }
 
 object Address {
+  final case class Asset(networkType: NetworkType, lockupScript: LockupScript.Asset)
+      extends Address {
+    def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+  }
+  final case class Contract(networkType: NetworkType, lockupScript: LockupScript.P2C)
+      extends Address
+
+  def from(networkType: NetworkType, lockupScript: LockupScript): Address = {
+    lockupScript match {
+      case e: LockupScript.Asset => Asset(networkType, e)
+      case e: LockupScript.P2C   => Contract(networkType, e)
+    }
+  }
+
   def fromBase58(input: String, expected: NetworkType): Option[Address] = {
     for {
       (networkType, lockupScriptBase58) <- NetworkType.decode(input)
       if networkType == expected
-      lockupScriptRaw <- Base58.decode(lockupScriptBase58)
-      lockupScript    <- deserialize[LockupScript](lockupScriptRaw).toOption
-    } yield Address(networkType, lockupScript)
+      lockupScript <- LockupScript.fromBase58(lockupScriptBase58)
+    } yield from(networkType, lockupScript)
+  }
+
+  def asset(input: String, expected: NetworkType): Option[Address.Asset] = {
+    fromBase58(input, expected) match {
+      case Some(address: Asset) => Some(address)
+      case _                    => None
+    }
   }
 
   def extractLockupScript(address: String): Option[LockupScript] = {
     for {
       (_, lockupScriptBase58) <- NetworkType.decode(address)
-      lockupScriptRaw         <- Base58.decode(lockupScriptBase58)
-      lockupScript            <- deserialize[LockupScript](lockupScriptRaw).toOption
+      lockupScript            <- LockupScript.fromBase58(lockupScriptBase58)
     } yield lockupScript
   }
 
-  def p2pkh(networkType: NetworkType, publicKey: PublicKey): Address =
-    Address(networkType, LockupScript.p2pkh(publicKey))
+  def p2pkh(networkType: NetworkType, publicKey: PublicKey): Address.Asset =
+    Asset(networkType, LockupScript.p2pkh(publicKey))
 }

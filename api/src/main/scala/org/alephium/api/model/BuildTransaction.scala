@@ -28,6 +28,6 @@ final case class BuildTransaction(
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 ) {
-  def fromAddress(networkType: NetworkType): Address =
-    Address(networkType, LockupScript.p2pkh(fromPublicKey))
+  def fromAddress(networkType: NetworkType): Address.Asset =
+    Address.Asset(networkType, LockupScript.p2pkh(fromPublicKey))
 }

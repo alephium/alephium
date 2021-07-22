@@ -77,7 +77,6 @@ trait ServerFixture
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
     .get
-
   lazy val dummySignature =
     SignatureSchema.sign(
       dummyTx.unsigned.hash.bytes,
@@ -104,7 +103,7 @@ object ServerFixture {
 
   def dummyTransferTx(
       tx: Transaction,
-      outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])]
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])]
   ): Transaction = {
     val newOutputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
       TxOutput.asset(amount, toLockupScript, lockTimeOpt)
@@ -114,7 +113,7 @@ object ServerFixture {
 
   def dummySweepAllTx(
       tx: Transaction,
-      toLockupScript: LockupScript,
+      toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp]
   ): Transaction = {
     val output = TxOutput.asset(U256.Ten, toLockupScript, lockTimeOpt)
@@ -210,12 +209,12 @@ object ServerFixture {
       Right(AVector(AVector((block, 1))))
     }
 
-    override def getBalance(lockupScript: LockupScript): IOResult[(U256, U256, Int)] =
+    override def getBalance(lockupScript: LockupScript.Asset): IOResult[(U256, U256, Int)] =
       Right((U256.Zero, U256.Zero, 0))
 
     override def transfer(
         fromPublicKey: PublicKey,
-        outputInfos: AVector[(LockupScript, U256, Option[TimeStamp])],
+        outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice
     ): IOResult[Either[String, UnsignedTransaction]] = {
@@ -224,7 +223,7 @@ object ServerFixture {
 
     override def sweepAll(
         fromPublicKey: PublicKey,
-        toLockupScript: LockupScript,
+        toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice

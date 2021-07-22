@@ -19,5 +19,5 @@ package org.alephium.wallet.api.model
 import org.alephium.protocol.model.Address
 
 object DeriveNextAddress {
-  final case class Result(address: Address)
+  final case class Result(address: Address.Asset)
 }

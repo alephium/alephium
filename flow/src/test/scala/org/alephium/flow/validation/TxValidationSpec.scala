@@ -24,10 +24,11 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.{ALF, Hash, Signature}
+import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, VMFactory}
+import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -456,5 +457,103 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         failCheck(checkBlockTx(txNew, preparedWorldState), InvalidSignature)
       }
     }
+  }
+
+  behavior of "lockup script"
+
+  trait LockupFixture extends StatefulFixture {
+    def prepareOutput(lockup: LockupScript.Asset, unlock: UnlockScript) = {
+      val group                 = lockup.groupIndex
+      val (genesisPriKey, _, _) = genesisKeys(group.value)
+      val block                 = transfer(blockFlow, genesisPriKey, lockup, ALF.alf(2))
+      addAndCheck(blockFlow, block)
+      blockFlow
+        .transfer(lockup, unlock, AVector((lockup, ALF.alf(1), None)), None, defaultGasPrice)
+        .rightValue
+        .rightValue
+    }
+
+    def replaceUnlock(tx: Transaction, unlock: UnlockScript, priKeys: PrivateKey*) = {
+      val unsigned  = tx.unsigned
+      val inputs    = unsigned.inputs
+      val theInput  = inputs.head
+      val newInputs = inputs.replace(0, theInput.copy(unlockScript = unlock))
+      val newTx     = tx.copy(unsigned = unsigned.copy(inputs = newInputs))
+      if (priKeys.isEmpty) {
+        newTx
+      } else {
+        sign(newTx.unsigned, priKeys: _*)
+      }
+    }
+
+    def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*) = {
+      val signatures = privateKeys.map(SignatureSchema.sign(unsigned.hash.bytes, _))
+      Transaction.from(unsigned, AVector.from(signatures))
+    }
+  }
+
+  it should "validate p2pkh" in new LockupFixture {
+    val (priKey, pubKey) = keypairGen.sample.get
+    val lockup           = LockupScript.p2pkh(pubKey)
+    val unlock           = UnlockScript.p2pkh(pubKey)
+
+    val unsigned = prepareOutput(lockup, unlock)
+    val tx0      = Transaction.from(unsigned, priKey)
+    passValidation(validateTx(tx0, blockFlow))
+    val tx1 = replaceUnlock(tx0, UnlockScript.p2pkh(PublicKey.generate))
+    failValidation(validateTx(tx1, blockFlow), InvalidPublicKeyHash)
+    val tx2 = tx0.copy(inputSignatures = AVector(Signature.generate))
+    failValidation(validateTx(tx2, blockFlow), InvalidSignature)
+  }
+
+  it should "validate p2mpkh" in new LockupFixture {
+    val (priKey0, pubKey0) = keypairGen.sample.get
+    val (priKey1, pubKey1) = keypairGen.sample.get
+    val (priKey2, pubKey2) = keypairGen.sample.get
+
+    val lockup   = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
+    val unlock   = UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey1 -> 1))
+    val unsigned = prepareOutput(lockup, unlock)
+    val tx0      = sign(unsigned, priKey0, priKey1)
+    passValidation(validateTx(tx0, blockFlow))
+    val tx1 = sign(unsigned, priKey0)
+    failValidation(validateTx(tx1, blockFlow), NotEnoughSignature)
+    val tx2 = sign(unsigned, priKey0, priKey2)
+    failValidation(validateTx(tx2, blockFlow), InvalidSignature)
+    val tx3 = sign(unsigned, priKey1, priKey1)
+    failValidation(validateTx(tx3, blockFlow), InvalidSignature)
+
+    val tx4 = replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0)))
+    failValidation(validateTx(tx4, blockFlow), InvalidNumberOfPublicKey)
+    val tx5 =
+      replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey1 -> 3)), priKey0, priKey1)
+    failValidation(validateTx(tx5, blockFlow), InvalidPublicKeyHash)
+    val tx6 =
+      replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey0 -> 1)), priKey0, priKey1)
+    failValidation(validateTx(tx6, blockFlow), InvalidPublicKeyHash)
+  }
+
+  it should "validate p2sh" in new LockupFixture {
+    def rawScript(n: Int) =
+      s"""
+         |AssetScript P2sh {
+         |  pub fn main(a: U256) -> () {
+         |    checkEq!(a, $n)
+         |  }
+         |}
+         |""".stripMargin
+
+    val script   = Compiler.compileAssetScript(rawScript(51)).rightValue
+    val lockup   = LockupScript.p2sh(script)
+    val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
+    val unsigned = prepareOutput(lockup, unlock)
+
+    val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
+    passValidation(validateTx(tx0, blockFlow))
+    val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
+    failValidation(validateTx(tx1, blockFlow), InvalidUnlockScript(EqualityFailed))
+    val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
+    val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
+    failValidation(validateTx(tx2, blockFlow), InvalidScriptHash)
   }
 }

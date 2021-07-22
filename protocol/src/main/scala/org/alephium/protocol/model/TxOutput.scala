@@ -52,39 +52,39 @@ object TxOutput {
 
   def from(amount: U256, tokens: AVector[(TokenId, U256)], lockupScript: LockupScript): TxOutput = {
     lockupScript match {
-      case _: LockupScript.P2C => ContractOutput(amount, lockupScript, tokens)
-      case _                   => AssetOutput(amount, lockupScript, TimeStamp.zero, tokens, ByteString.empty)
+      case e: LockupScript.P2C   => ContractOutput(amount, e, tokens)
+      case e: LockupScript.Asset => AssetOutput(amount, e, TimeStamp.zero, tokens, ByteString.empty)
     }
   }
 
-  def asset(amount: U256, lockupScript: LockupScript): AssetOutput = {
+  def asset(amount: U256, lockupScript: LockupScript.Asset): AssetOutput = {
     asset(amount, lockupScript, TimeStamp.zero)
   }
 
-  def asset(amount: U256, lockupScript: LockupScript, lockTime: TimeStamp): AssetOutput = {
+  def asset(amount: U256, lockupScript: LockupScript.Asset, lockTime: TimeStamp): AssetOutput = {
     AssetOutput(amount, lockupScript, lockTime, AVector.empty, ByteString.empty)
   }
 
   def asset(
       amount: U256,
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp]
   ): AssetOutput = {
     val lockTime = lockTimeOpt.getOrElse(TimeStamp.zero)
     asset(amount, lockupScript, lockTime)
   }
 
-  def contract(amount: U256, lockupScript: LockupScript): ContractOutput = {
+  def contract(amount: U256, lockupScript: LockupScript.P2C): ContractOutput = {
     ContractOutput(amount, lockupScript, AVector.empty)
   }
 
-  def genesis(amount: U256, lockupScript: LockupScript): AssetOutput = {
+  def genesis(amount: U256, lockupScript: LockupScript.Asset): AssetOutput = {
     asset(amount, lockupScript)
   }
 
   // TODO: improve this when vm is mature
   def forSMT: TxOutput =
-    ContractOutput(U256.One, LockupScript.p2pkh(Hash.zero), AVector.empty)
+    ContractOutput(U256.One, LockupScript.p2c(Hash.zero), AVector.empty)
 }
 
 /** @param amount the number of ALF in the output
@@ -94,7 +94,7 @@ object TxOutput {
   */
 final case class AssetOutput(
     amount: U256,
-    lockupScript: LockupScript, // TODO: exclude p2c script
+    lockupScript: LockupScript.Asset,
     lockTime: TimeStamp,
     tokens: AVector[(TokenId, U256)],
     additionalData: ByteString
@@ -120,7 +120,7 @@ object AssetOutput {
 
 final case class ContractOutput(
     amount: U256,
-    lockupScript: LockupScript,
+    lockupScript: LockupScript.P2C,
     tokens: AVector[(TokenId, U256)]
 ) extends TxOutput {
   def isAsset: Boolean = false

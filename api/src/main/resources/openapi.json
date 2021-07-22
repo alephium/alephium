@@ -4484,11 +4484,100 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "balance": {
             "type": "integer",
             "format": "uint256"
+          }
+        }
+      },
+      "Asset": {
+        "required": [
+          "networkType",
+          "lockupScript"
+        ],
+        "type": "object",
+        "properties": {
+          "networkType": {
+            "$ref": "#/components/schemas/NetworkType"
+          },
+          "lockupScript": {
+            "$ref": "#/components/schemas/Asset1"
+          }
+        }
+      },
+      "NetworkType": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Devnet"
+          },
+          {
+            "$ref": "#/components/schemas/Mainnet"
+          },
+          {
+            "$ref": "#/components/schemas/Testnet"
+          }
+        ]
+      },
+      "Devnet": {
+        "type": "object"
+      },
+      "Mainnet": {
+        "type": "object"
+      },
+      "Testnet": {
+        "type": "object"
+      },
+      "Asset1": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/P2MPKH"
+          },
+          {
+            "$ref": "#/components/schemas/P2PKH"
+          },
+          {
+            "$ref": "#/components/schemas/P2SH"
+          }
+        ]
+      },
+      "P2MPKH": {
+        "required": [
+          "m"
+        ],
+        "type": "object",
+        "properties": {
+          "pkHashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "m": {
+            "type": "integer"
+          }
+        }
+      },
+      "P2PKH": {
+        "required": [
+          "pkHash"
+        ],
+        "type": "object",
+        "properties": {
+          "pkHash": {
+            "type": "string"
+          }
+        }
+      },
+      "P2SH": {
+        "required": [
+          "scriptHash"
+        ],
+        "type": "object",
+        "properties": {
+          "scriptHash": {
+            "type": "string"
           }
         }
       },
@@ -4517,7 +4606,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "amount": {
             "type": "integer",
@@ -4566,7 +4655,7 @@
         "type": "object",
         "properties": {
           "toAddress": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "lockTime": {
             "type": "integer"
@@ -4586,12 +4675,12 @@
         "type": "object",
         "properties": {
           "activeAddress": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Asset"
             }
           }
         }
@@ -4615,7 +4704,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "group": {
             "type": "integer"
@@ -4629,7 +4718,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           }
         }
       },
@@ -4640,7 +4729,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           }
         }
       },
@@ -4695,28 +4784,6 @@
             "type": "integer"
           }
         }
-      },
-      "NetworkType": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Devnet"
-          },
-          {
-            "$ref": "#/components/schemas/Mainnet"
-          },
-          {
-            "$ref": "#/components/schemas/Testnet"
-          }
-        ]
-      },
-      "Devnet": {
-        "type": "object"
-      },
-      "Mainnet": {
-        "type": "object"
-      },
-      "Testnet": {
-        "type": "object"
       },
       "PeerAddress": {
         "required": [
@@ -4944,14 +5011,14 @@
       "Input": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset"
+            "$ref": "#/components/schemas/Asset2"
           },
           {
             "$ref": "#/components/schemas/Contract"
           }
         ]
       },
-      "Asset": {
+      "Asset2": {
         "required": [
           "outputRef",
           "unlockScript"
@@ -4995,14 +5062,14 @@
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/Asset3"
           },
           {
             "$ref": "#/components/schemas/Contract1"
           }
         ]
       },
-      "Asset1": {
+      "Asset3": {
         "required": [
           "amount",
           "address",
@@ -5181,7 +5248,7 @@
             "type": "string"
           },
           "toAddress": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "lockTime": {
             "type": "integer"
@@ -5385,7 +5452,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Asset"
             }
           }
         }

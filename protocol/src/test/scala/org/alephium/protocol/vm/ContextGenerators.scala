@@ -29,7 +29,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   ): (StatefulContractObject, StatefulContext) = {
     val groupIndex        = GroupIndex.unsafe(0)
     val contractOutputRef = contractOutputRefGen(groupIndex).sample.get
-    val contractOutput    = contractOutputGen(groupIndex)().sample.get
+    val contractOutput    = contractOutputGen().sample.get
 
     cachedWorldState.createContract(contract, fields, contractOutputRef, contractOutput) isE ()
 

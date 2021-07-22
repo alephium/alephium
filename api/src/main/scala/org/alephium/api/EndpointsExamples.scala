@@ -36,12 +36,12 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
-    LockupScript.fromBase58("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
-  private val address                    = Address(networkType, lockupScript)
+  private val address                    = Address.Asset(networkType, lockupScript)
   private val cliqueId                   = CliqueId(publicKey)
   private val port                       = 12344
   private val minerApiPort               = 12355

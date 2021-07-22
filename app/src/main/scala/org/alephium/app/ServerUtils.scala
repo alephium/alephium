@@ -258,7 +258,7 @@ class ServerUtils(networkType: NetworkType)(implicit
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
-      toAddress: Address,
+      toAddress: Address.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -270,19 +270,16 @@ class ServerUtils(networkType: NetworkType)(implicit
     }
   }
 
-  def checkGroup(lockupScript: LockupScript): Try[Unit] = {
+  def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
-      Some(s"Address ${Address(networkType, lockupScript)}")
+      Some(s"Address ${Address.from(networkType, lockupScript)}")
     )
   }
 
   def checkGroup(publicKey: PublicKey): Try[Unit] = {
     val lockupScript = LockupScript.p2pkh(publicKey)
-    checkGroup(
-      lockupScript.groupIndex(brokerConfig),
-      Some(s"Address ${Address(networkType, lockupScript)}")
-    )
+    checkGroup(lockupScript)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -358,7 +355,7 @@ class ServerUtils(networkType: NetworkType)(implicit
   private def unignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       publicKey: PublicKey
   ): ExeResult[UnsignedTransaction] = {
     val unlockScript = UnlockScript.p2pkh(publicKey)

@@ -32,8 +32,8 @@ trait WalletExamples extends ErrorExamples {
 
   private val networkType = NetworkType.Mainnet
   private val lockupScript =
-    LockupScript.fromBase58("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
-  private val address  = Address(networkType, lockupScript)
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+  private val address  = Address.Asset(networkType, lockupScript)
   private val password = "my-secret-password"
   private val mnemonic =
     Mnemonic

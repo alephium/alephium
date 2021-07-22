@@ -82,7 +82,7 @@ object Miner extends LazyLogging {
   }
 
   def validateAddresses(
-      addresses: AVector[Address]
+      addresses: AVector[Address.Asset]
   )(implicit groupConfig: GroupConfig): Either[String, Unit] = {
     if (addresses.length != groupConfig.groups) {
       Left(s"Wrong number of addresses, expected ${groupConfig.groups}, got ${addresses.length}")
@@ -153,7 +153,7 @@ trait Miner extends BaseActor with MinerState {
     val txCount    = block.transactions.length
     log.debug(s"MiningCounts: $countsToString")
     val minerAddress =
-      Address(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
+      Address.Asset(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
     log.info(
       s"A new block ${block.hash.toHexString} got mined for $chainIndex, tx: $txCount, " +
         s"miningCount: $totalCount, target: ${block.header.target}, miner: $minerAddress"

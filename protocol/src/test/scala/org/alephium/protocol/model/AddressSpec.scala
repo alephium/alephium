@@ -18,14 +18,14 @@ package org.alephium.protocol.model
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol.PublicKey
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, Hex}
 
 class AddressSpec extends AlephiumSpec {
   def succes(address: String, publicKey: String, networkType: NetworkType): Assertion = {
     val script = LockupScript.p2pkh(PublicKey.unsafe(Hex.from(publicKey).get))
-    Address(networkType, script).toBase58 is address
+    Address.from(networkType, script).toBase58 is address
     Address.fromBase58(address, networkType).get.lockupScript is script
   }
 
@@ -108,5 +108,12 @@ class AddressSpec extends AlephiumSpec {
         )
       )
     )
+  }
+
+  it should "parse asset address only" in {
+    val lock    = LockupScript.P2C(Hash.random)
+    val address = Address.from(NetworkType.Mainnet, lock).toBase58
+    Address.asset(address, NetworkType.Mainnet) is None
+    Address.fromBase58(address, NetworkType.Mainnet).get.lockupScript is lock
   }
 }

@@ -397,7 +397,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   private def generateAddress(chainIndex: ChainIndex, networkType: NetworkType)(implicit
       groupConfig: GroupConfig
-  ): Address = {
+  ): Address.Asset = {
     val (_, toPublicKey) = chainIndex.to.generateKey
     Address.p2pkh(networkType, toPublicKey)
   }
@@ -425,7 +425,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     txTemplate
   }
 
-  private def checkAddressBalance(address: Address, amount: U256, utxoNum: Int = 1)(implicit
+  private def checkAddressBalance(address: Address.Asset, amount: U256, utxoNum: Int = 1)(implicit
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {

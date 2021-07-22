@@ -36,10 +36,10 @@ class VMSpec extends AlephiumSpec {
   def contractCreation(
       code: StatefulContract,
       initialState: AVector[Val],
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       alfAmount: U256
   ): StatefulScript = {
-    val address  = Address(NetworkType.Testnet, lockupScript)
+    val address  = Address.Asset(NetworkType.Testnet, lockupScript)
     val codeRaw  = Hex.toHexString(serialize(code))
     val stateRaw = Hex.toHexString(serialize(initialState))
     val scriptRaw =
@@ -180,7 +180,7 @@ class VMSpec extends AlephiumSpec {
   trait ContractFixture extends FlowFixture {
     val chainIndex     = ChainIndex.unsafe(0, 0)
     val genesisLockup  = getGenesisLockupScript(chainIndex)
-    val genesisAddress = Address(NetworkType.Testnet, genesisLockup)
+    val genesisAddress = Address.Asset(NetworkType.Testnet, genesisLockup)
 
     def addAndValidate(blockFlow: BlockFlow, block: Block): Assertion = {
       val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
