@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet
+package org.alephium.tools
 
 import scala.annotation.tailrec
 
@@ -22,6 +22,7 @@ import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
+import org.alephium.wallet.Constants
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object WalletGen extends App {
