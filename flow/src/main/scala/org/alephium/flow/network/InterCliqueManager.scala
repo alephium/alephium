@@ -213,8 +213,17 @@ class InterCliqueManager(
   }
 
   def isSynced(): Boolean = {
-    val syncedCount = brokers.count(_._2.isSynced)
-    syncedCount >= (brokers.size + 1) / 2 && syncedCount >= (numBootstrapNodes + 1) / 2
+    brokerConfig.groupRange.forall { group =>
+      var relavantBrokers = 0
+      var syncedCount     = 0
+      brokers.foreach { broker =>
+        if (broker._2.info.containsRaw(group)) {
+          relavantBrokers += 1
+          if (broker._2.isSynced) syncedCount += 1
+        }
+      }
+      syncedCount >= (relavantBrokers + 1) / 2 && syncedCount >= (numBootstrapNodes + 1) / 2
+    }
   }
 
   var lastNodeSyncedStatus: Option[Boolean] = None
