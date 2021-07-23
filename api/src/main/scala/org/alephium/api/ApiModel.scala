@@ -90,6 +90,18 @@ trait ApiModelCodec {
   implicit val blockHashReader: Reader[BlockHash] =
     byteStringReader.map(BlockHash.from(_).getOrElse(throw new Abort("cannot decode block hash")))
 
+  implicit lazy val assetAddressWriter: Writer[Address.Asset] =
+    StringWriter.comap[Address.Asset](_.toBase58)
+  implicit lazy val assetAddressReader: Reader[Address.Asset] = StringReader.map { input =>
+    Address.fromBase58(input, networkType) match {
+      case Some(address: Address.Asset) => address
+      case Some(_: Address.Contract) =>
+        throw Abort(s"Expect asset address, but got contract address: $input")
+      case None =>
+        throw Abort(s"Unable to decode address from $input")
+    }
+  }
+
   implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
   implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
     Address

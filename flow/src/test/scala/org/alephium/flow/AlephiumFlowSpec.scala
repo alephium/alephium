@@ -54,7 +54,7 @@ trait FlowFixture
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
-  def getGenesisLockupScript(chainIndex: ChainIndex): LockupScript = {
+  def getGenesisLockupScript(chainIndex: ChainIndex): LockupScript.Asset = {
     val mainGroup         = chainIndex.from
     val (_, publicKey, _) = genesisKeys(mainGroup.value)
     LockupScript.p2pkh(publicKey)
@@ -88,7 +88,7 @@ trait FlowFixture
   def simpleScriptMulti(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      invokers: AVector[LockupScript],
+      invokers: AVector[LockupScript.Asset],
       txScripts: AVector[StatefulScript]
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
@@ -113,8 +113,17 @@ trait FlowFixture
   }
 
   def transfer(blockFlow: BlockFlow, from: PrivateKey, to: PublicKey, amount: U256): Block = {
+    transfer(blockFlow, from, LockupScript.p2pkh(to), amount)
+  }
+
+  def transfer(
+      blockFlow: BlockFlow,
+      from: PrivateKey,
+      to: LockupScript.Asset,
+      amount: U256
+  ): Block = {
     val unsigned = blockFlow
-      .transfer(from.publicKey, LockupScript.p2pkh(to), None, amount, None, defaultGasPrice)
+      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice)
       .rightValue
       .rightValue
     val tx         = Transaction.from(unsigned, from)
@@ -136,8 +145,8 @@ trait FlowFixture
     val outputAmount =
       if (gasFeeInTheAmount) amount - defaultGasFee.divUnsafe(numReceivers) else amount
     val outputInfos = AVector.fill(numReceivers) {
-      val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
-      val lockupScript: LockupScript  = LockupScript.p2pkh(toPublicKey)
+      val (toPrivateKey, toPublicKey)      = chainIndex.to.generateKey
+      val lockupScript: LockupScript.Asset = LockupScript.p2pkh(toPublicKey)
       keyManager += lockupScript -> toPrivateKey
       (lockupScript, outputAmount, lockTimeOpt)
     }
@@ -149,7 +158,7 @@ trait FlowFixture
   def transferTxsMulti(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      scripts: AVector[(LockupScript, StatefulScript)],
+      scripts: AVector[(LockupScript.Asset, StatefulScript)],
       amount: U256
   ): AVector[Transaction] = {
     scripts.map { case (lockupScript, txScript) =>
@@ -385,7 +394,11 @@ trait FlowFixture
       .sumBy(_.output.amount.v: BigInt) is expected.toBigInt
   }
 
-  def checkBalance(blockFlow: BlockFlow, pubScript: LockupScript, expected: U256): Assertion = {
+  def checkBalance(
+      blockFlow: BlockFlow,
+      pubScript: LockupScript.Asset,
+      expected: U256
+  ): Assertion = {
     blockFlow.getUsableUtxos(pubScript).toOption.get.sumBy(_.output.amount.v: BigInt) is expected.v
   }
 
