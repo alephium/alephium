@@ -26,7 +26,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{GetBlocks, GetHeaders, SyncResponse}
 import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Duration}
 
 trait BrokerHandler extends BaseBrokerHandler {
   def selfCliqueInfo: CliqueInfo
@@ -46,7 +46,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
 
   def syncing: Receive = {
-    allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories
+    schedule(self, BrokerHandler.IntraSync, Duration.zero, Duration.ofMinutesUnsafe(1))
 
     val receive: Receive = {
       case FlowHandler.SyncInventories(inventories) =>
@@ -58,6 +58,8 @@ trait BrokerHandler extends BaseBrokerHandler {
           BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)
         send(GetHeaders(headersToSync))
         send(GetBlocks(blocksToSync))
+      case BrokerHandler.IntraSync =>
+        allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories
     }
     receive
   }
@@ -86,4 +88,6 @@ object BrokerHandler {
     }
     headersToSync -> blocksToSync
   }
+
+  case object IntraSync
 }
