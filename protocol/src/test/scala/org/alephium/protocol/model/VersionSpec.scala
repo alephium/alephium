@@ -14,12 +14,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol
+package org.alephium.protocol.model
 
-import akka.util.ByteString
+import org.scalacheck.Gen
 
-import org.alephium.util.Bytes
+import org.alephium.util.AlephiumSpec
 
-object Protocol {
-  val version: Int = Bytes.toIntUnsafe(ByteString(0, 0, 8, 9))
+class VersionSpec extends AlephiumSpec {
+  it should "get version from release string" in {
+    val positiveInt = Gen.choose(0, Int.MaxValue)
+    val versionStrGen: Gen[(String, Version)] = for {
+      major    <- positiveInt
+      minor    <- positiveInt
+      patch    <- positiveInt
+      commitId <- Gen.option(Gen.hexStr)
+    } yield (
+      s"$major.$minor.$patch${commitId.map(id => s"+$id").getOrElse("")}",
+      Version(major, minor, patch)
+    )
+
+    forAll(versionStrGen) { case (versionStr, version) =>
+      Version.fromReleaseVersion(versionStr) contains version
+    }
+  }
 }
