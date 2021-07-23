@@ -31,9 +31,17 @@ trait BaseActor extends Actor with ActorLogging {
   }
 
   def scheduleCancellable(receiver: ActorRef, message: Any, delay: Duration): Cancellable = {
-    val delayScala = delay.asScala
+    scheduleCancellable(receiver, message, delay, delay)
+  }
+
+  def scheduleCancellable(
+      receiver: ActorRef,
+      message: Any,
+      initialDelay: Duration,
+      delay: Duration
+  ): Cancellable = {
     context.system.scheduler
-      .scheduleWithFixedDelay(delayScala, delayScala, receiver, message)(
+      .scheduleWithFixedDelay(initialDelay.asScala, delay.asScala, receiver, message)(
         context.dispatcher,
         context.self
       )
@@ -41,6 +49,11 @@ trait BaseActor extends Actor with ActorLogging {
 
   def schedule(receiver: ActorRef, message: Any, delay: Duration): Unit = {
     scheduleCancellable(receiver, message, delay)
+    ()
+  }
+
+  def schedule(receiver: ActorRef, message: Any, initialDelay: Duration, delay: Duration): Unit = {
+    scheduleCancellable(receiver, message, initialDelay, delay)
     ()
   }
 
