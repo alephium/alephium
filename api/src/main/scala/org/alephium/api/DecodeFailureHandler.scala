@@ -16,42 +16,42 @@
 
 package org.alephium.api
 
+import sttp.model.{Header, StatusCode}
 import sttp.tapir._
-import sttp.tapir.server._
+import sttp.tapir.server.interceptor._
+import sttp.tapir.server.interceptor.decodefailure.DefaultDecodeFailureHandler._
 
 import org.alephium.api.{alfJsonBody, ApiError}
 
 trait DecodeFailureHandler {
 
-  private def myFailureResponse(
-      response: DefaultDecodeFailureResponse,
-      message: String
-  ): DecodeFailureHandling =
-    DecodeFailureHandling.response(ServerDefaults.failureOutput(alfJsonBody[ApiError.BadRequest]))(
-      (response, ApiError.BadRequest(message))
+  def failureResponse(c: StatusCode, hs: List[Header], m: String): ValuedEndpointOutput[_] = {
+    ValuedEndpointOutput(
+      statusCode.and(headers).and(alfJsonBody[ApiError.BadRequest]),
+      (c, hs, ApiError.BadRequest(m))
     )
+  }
 
-  private def myFailureMessage(ctx: DecodeFailureContext): String = {
-    val base = ServerDefaults.FailureMessages.failureSourceMessage(ctx.input)
+  def failureMessage(ctx: DecodeFailureContext): String = {
+    val base = FailureMessages.failureSourceMessage(ctx.failingInput)
 
     val detail = ctx.failure match {
       case DecodeResult.InvalidValue(errors) if errors.nonEmpty =>
-        Some(ServerDefaults.ValidationMessages.validationErrorsMessage(errors))
+        Some(ValidationMessages.validationErrorsMessage(errors))
       case DecodeResult.Error(original, error) => Some(s"${error.getMessage}: $original")
       case _                                   => None
     }
 
-    ServerDefaults.FailureMessages.combineSourceAndDetail(base, detail)
+    FailureMessages.combineSourceAndDetail(base, detail)
   }
-  val myDecodeFailureHandler = ServerDefaults.decodeFailureHandler.copy(
-    response = myFailureResponse,
-    respond = ServerDefaults.FailureHandling
-      .respond(
-        _,
-        badRequestOnPathErrorIfPathShapeMatches = true,
-        badRequestOnPathInvalidIfPathShapeMatches = true
-      ),
-    failureMessage = myFailureMessage
-  )
 
+  val myDecodeFailureHandler = handler.copy(
+    response = failureResponse,
+    respond = respond(
+      _,
+      badRequestOnPathErrorIfPathShapeMatches = true,
+      badRequestOnPathInvalidIfPathShapeMatches = true
+    ),
+    failureMessage = failureMessage
+  )
 }

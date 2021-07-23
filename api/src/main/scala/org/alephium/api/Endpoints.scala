@@ -16,13 +16,11 @@
 
 package org.alephium.api
 
-import scala.reflect.ClassTag
-
 import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
-import sttp.tapir.EndpointOutput.StatusMapping
+import sttp.tapir.EndpointOutput.OneOfMapping
 import sttp.tapir.generic.auto._
 
 import org.alephium.api.TapirCodecs
@@ -278,15 +276,13 @@ trait Endpoints
 object Endpoints {
   // scalastyle:off regex
   def error[S <: StatusCode, T <: ApiError[S]: ReadWriter: Schema](
-      apiError: ApiError.Companion[S, T]
+      apiError: ApiError.Companion[S, T],
+      matcher: PartialFunction[Any, Boolean]
   )(implicit
-      examples: List[Example[T]],
-      ct: ClassTag[T]
-  ): StatusMapping[T] = {
-    statusMappingClassMatcher(
-      apiError.statusCode,
-      jsonBody[T].description(apiError.description),
-      ct.runtimeClass
+      examples: List[Example[T]]
+  ): OneOfMapping[T] = {
+    oneOfMappingValueMatcher(apiError.statusCode, jsonBody[T].description(apiError.description))(
+      matcher
     )
   }
   // scalastyle:on regex

@@ -34,7 +34,6 @@
         "operationId": "getWallets",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -142,7 +141,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -259,7 +257,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -360,7 +357,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -472,7 +468,7 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            
           },
           "400": {
             "description": "BadRequest",
@@ -562,7 +558,7 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            
           },
           "400": {
             "description": "BadRequest",
@@ -665,7 +661,7 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            
           },
           "400": {
             "description": "BadRequest",
@@ -755,7 +751,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -879,7 +874,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -994,7 +988,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1096,7 +1089,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1200,7 +1192,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1311,7 +1302,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1412,7 +1402,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1531,7 +1520,7 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            
           },
           "400": {
             "description": "BadRequest",
@@ -1611,7 +1600,6 @@
         "operationId": "getInfosNode",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1701,7 +1689,6 @@
         "operationId": "getInfosSelf-clique",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1805,7 +1792,6 @@
         "operationId": "getInfosInter-clique-peer-info",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1907,7 +1893,6 @@
         "operationId": "getInfosDiscovered-neighbors",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2008,7 +1993,6 @@
         "operationId": "getInfosMisbehaviors",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2121,7 +2105,7 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            
           },
           "400": {
             "description": "BadRequest",
@@ -2223,7 +2207,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2373,7 +2356,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2517,7 +2499,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2619,7 +2600,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2735,7 +2715,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2847,7 +2826,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -2955,7 +2933,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3103,7 +3080,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3213,7 +3189,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3320,7 +3295,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3425,7 +3399,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3572,7 +3545,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3699,7 +3671,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3807,7 +3778,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -3911,7 +3881,6 @@
         },
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -4022,7 +3991,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -4110,7 +4078,6 @@
         "operationId": "getMinersAddresses",
         "responses": {
           "200": {
-            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -4215,7 +4182,7 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            
           },
           "400": {
             "description": "BadRequest",
@@ -4289,26 +4256,97 @@
   },
   "components": {
     "schemas": {
-      "WalletCreation": {
+      "AddressBalance": {
         "required": [
-          "password"
+          "address",
+          "balance"
         ],
         "type": "object",
         "properties": {
-          "password": {
+          "address": {
             "type": "string"
           },
-          "walletName": {
+          "balance": {
+            "type": "integer",
+            "format": "uint256"
+          }
+        }
+      },
+      "AddressInfo": {
+        "required": [
+          "address",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
             "type": "string"
           },
-          "isMiner": {
-            "type": "boolean"
-          },
-          "mnemonicPassphrase": {
-            "type": "string"
-          },
-          "mnemonicSize": {
+          "group": {
             "type": "integer"
+          }
+        }
+      },
+      "Addresses": {
+        "required": [
+          "activeAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "activeAddress": {
+            "type": "string"
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Asset": {
+        "required": [
+          "outputRef",
+          "unlockScript"
+        ],
+        "type": "object",
+        "properties": {
+          "outputRef": {
+            "$ref": "#/components/schemas/OutputRef"
+          },
+          "unlockScript": {
+            "type": "string"
+          }
+        }
+      },
+      "Asset1": {
+        "required": [
+          "amount",
+          "address",
+          "lockTime",
+          "additionalData"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "additionalData": {
+            "type": "string"
           }
         }
       },
@@ -4323,138 +4361,24 @@
           }
         }
       },
-      "InternalServerError": {
+      "Balance": {
         "required": [
-          "detail"
+          "balance",
+          "lockedBalance",
+          "utxoNum"
         ],
         "type": "object",
         "properties": {
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "NotFound": {
-        "required": [
-          "detail",
-          "resource"
-        ],
-        "type": "object",
-        "properties": {
-          "detail": {
-            "type": "string"
+          "balance": {
+            "type": "integer",
+            "format": "uint256"
           },
-          "resource": {
+          "lockedBalance": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "utxoNum": {
             "type": "integer"
-          }
-        }
-      },
-      "ServiceUnavailable": {
-        "required": [
-          "detail"
-        ],
-        "type": "object",
-        "properties": {
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "Unauthorized": {
-        "required": [
-          "detail"
-        ],
-        "type": "object",
-        "properties": {
-          "detail": {
-            "type": "string"
-          }
-        }
-      },
-      "Result": {
-        "required": [
-          "walletName",
-          "mnemonic"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          },
-          "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "WalletRestore": {
-        "required": [
-          "password",
-          "mnemonic"
-        ],
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string"
-          },
-          "mnemonic": {
-            "type": "string"
-          },
-          "isMiner": {
-            "type": "boolean"
-          },
-          "walletName": {
-            "type": "string"
-          },
-          "mnemonicPassphrase": {
-            "type": "string"
-          }
-        }
-      },
-      "Result1": {
-        "required": [
-          "walletName"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          }
-        }
-      },
-      "WalletStatus": {
-        "required": [
-          "walletName",
-          "locked"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          },
-          "locked": {
-            "type": "boolean"
-          }
-        }
-      },
-      "WalletUnlock": {
-        "required": [
-          "password"
-        ],
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string"
-          }
-        }
-      },
-      "WalletDeletion": {
-        "required": [
-          "password"
-        ],
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string"
           }
         }
       },
@@ -4476,295 +4400,55 @@
           }
         }
       },
-      "AddressBalance": {
+      "Banned": {
         "required": [
-          "address",
-          "balance"
+          "until"
         ],
         "type": "object",
         "properties": {
-          "address": {
-            "type": "string"
-          },
-          "balance": {
+          "until": {
             "type": "integer",
-            "format": "uint256"
+            "format": "int64"
           }
         }
       },
-      "Transfer": {
-        "type": "object",
-        "properties": {
-          "destinations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Destination"
-            }
-          },
-          "gas": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
-          }
-        }
-      },
-      "Destination": {
+      "BlockEntry": {
         "required": [
-          "address",
-          "amount"
+          "hash",
+          "timestamp",
+          "chainFrom",
+          "chainTo",
+          "height"
         ],
         "type": "object",
         "properties": {
-          "address": {
+          "hash": {
             "type": "string"
           },
-          "amount": {
+          "timestamp": {
             "type": "integer",
-            "format": "uint256"
+            "format": "int64"
           },
-          "lockTime": {
-            "type": "integer"
-          }
-        }
-      },
-      "GasPrice": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "integer",
-            "format": "uint256"
-          }
-        }
-      },
-      "Result2": {
-        "required": [
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "txId": {
-            "type": "string"
-          },
-          "fromGroup": {
+          "chainFrom": {
             "type": "integer"
           },
-          "toGroup": {
-            "type": "integer"
-          }
-        }
-      },
-      "SweepAll": {
-        "required": [
-          "toAddress"
-        ],
-        "type": "object",
-        "properties": {
-          "toAddress": {
-            "type": "string"
-          },
-          "lockTime": {
+          "chainTo": {
             "type": "integer"
           },
-          "gas": {
+          "height": {
             "type": "integer"
           },
-          "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
-          }
-        }
-      },
-      "Addresses": {
-        "required": [
-          "activeAddress"
-        ],
-        "type": "object",
-        "properties": {
-          "activeAddress": {
-            "type": "string"
-          },
-          "addresses": {
+          "deps": {
             "type": "array",
             "items": {
               "type": "string"
             }
-          }
-        }
-      },
-      "MinerAddressesInfo": {
-        "type": "object",
-        "properties": {
-          "addresses": {
+          },
+          "transactions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AddressInfo"
+              "$ref": "#/components/schemas/Tx"
             }
-          }
-        }
-      },
-      "AddressInfo": {
-        "required": [
-          "address",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "group": {
-            "type": "integer"
-          }
-        }
-      },
-      "Result3": {
-        "required": [
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "ChangeActiveAddress": {
-        "required": [
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "NodeInfo": {
-        "required": [
-          "isMining"
-        ],
-        "type": "object",
-        "properties": {
-          "isMining": {
-            "type": "boolean"
-          }
-        }
-      },
-      "SelfClique": {
-        "required": [
-          "cliqueId",
-          "networkType",
-          "numZerosAtLeastInHash",
-          "selfReady",
-          "synced",
-          "groupNumPerBroker",
-          "groups"
-        ],
-        "type": "object",
-        "properties": {
-          "cliqueId": {
-            "type": "string"
-          },
-          "networkType": {
-            "$ref": "#/components/schemas/NetworkType"
-          },
-          "numZerosAtLeastInHash": {
-            "type": "integer"
-          },
-          "nodes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PeerAddress"
-            }
-          },
-          "selfReady": {
-            "type": "boolean"
-          },
-          "synced": {
-            "type": "boolean"
-          },
-          "groupNumPerBroker": {
-            "type": "integer"
-          },
-          "groups": {
-            "type": "integer"
-          }
-        }
-      },
-      "NetworkType": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Devnet"
-          },
-          {
-            "$ref": "#/components/schemas/Mainnet"
-          },
-          {
-            "$ref": "#/components/schemas/Testnet"
-          }
-        ]
-      },
-      "Devnet": {
-        "type": "object"
-      },
-      "Mainnet": {
-        "type": "object"
-      },
-      "Testnet": {
-        "type": "object"
-      },
-      "PeerAddress": {
-        "required": [
-          "address",
-          "restPort",
-          "wsPort",
-          "minerApiPort"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "restPort": {
-            "type": "integer"
-          },
-          "wsPort": {
-            "type": "integer"
-          },
-          "minerApiPort": {
-            "type": "integer"
-          }
-        }
-      },
-      "InterCliquePeerInfo": {
-        "required": [
-          "cliqueId",
-          "brokerId",
-          "groupNumPerBroker",
-          "address",
-          "isSynced"
-        ],
-        "type": "object",
-        "properties": {
-          "cliqueId": {
-            "type": "string"
-          },
-          "brokerId": {
-            "type": "integer"
-          },
-          "groupNumPerBroker": {
-            "type": "integer"
-          },
-          "address": {
-            "type": "string"
-          },
-          "isSynced": {
-            "type": "boolean"
           }
         }
       },
@@ -4791,336 +4475,66 @@
           }
         }
       },
-      "PeerMisbehavior": {
+      "BuildContract": {
         "required": [
-          "peer",
-          "status"
+          "fromPublicKey",
+          "code"
         ],
         "type": "object",
         "properties": {
-          "peer": {
+          "fromPublicKey": {
             "type": "string"
           },
-          "status": {
-            "$ref": "#/components/schemas/PeerStatus"
+          "code": {
+            "type": "string"
           }
         }
       },
-      "PeerStatus": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Banned"
-          },
-          {
-            "$ref": "#/components/schemas/Penalty"
-          }
-        ]
-      },
-      "Banned": {
+      "BuildContractResult": {
         "required": [
-          "until"
-        ],
-        "type": "object",
-        "properties": {
-          "until": {
-            "type": "integer"
-          }
-        }
-      },
-      "Penalty": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "integer"
-          }
-        }
-      },
-      "MisbehaviorAction": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Unban"
-          }
-        ]
-      },
-      "Unban": {
-        "type": "object",
-        "properties": {
-          "peers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "FetchResponse": {
-        "type": "object",
-        "properties": {
-          "blocks": {
-            "type": "array",
-            "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/BlockEntry"
-              }
-            }
-          }
-        }
-      },
-      "BlockEntry": {
-        "required": [
+          "unsignedTx",
           "hash",
-          "timestamp",
-          "chainFrom",
-          "chainTo",
-          "height"
+          "fromGroup",
+          "toGroup"
         ],
         "type": "object",
         "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
           "hash": {
             "type": "string"
           },
-          "timestamp": {
+          "fromGroup": {
             "type": "integer"
           },
-          "chainFrom": {
+          "toGroup": {
             "type": "integer"
-          },
-          "chainTo": {
-            "type": "integer"
-          },
-          "height": {
-            "type": "integer"
-          },
-          "deps": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "transactions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Tx"
-            }
           }
         }
       },
-      "Tx": {
+      "BuildSweepAllTransaction": {
         "required": [
-          "id",
-          "startGas",
-          "gasPrice"
+          "fromPublicKey",
+          "toAddress"
         ],
         "type": "object",
         "properties": {
-          "id": {
+          "fromPublicKey": {
             "type": "string"
           },
-          "inputs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Input"
-            }
+          "toAddress": {
+            "type": "string"
           },
-          "outputs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Output"
-            }
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
           },
-          "startGas": {
+          "gas": {
             "type": "integer"
           },
           "gasPrice": {
-            "type": "integer",
-            "format": "uint256"
-          }
-        }
-      },
-      "Input": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Asset"
-          },
-          {
-            "$ref": "#/components/schemas/Contract"
-          }
-        ]
-      },
-      "Asset": {
-        "required": [
-          "outputRef",
-          "unlockScript"
-        ],
-        "type": "object",
-        "properties": {
-          "outputRef": {
-            "$ref": "#/components/schemas/OutputRef"
-          },
-          "unlockScript": {
-            "type": "string"
-          }
-        }
-      },
-      "OutputRef": {
-        "required": [
-          "scriptHint",
-          "key"
-        ],
-        "type": "object",
-        "properties": {
-          "scriptHint": {
-            "type": "integer"
-          },
-          "key": {
-            "type": "string"
-          }
-        }
-      },
-      "Contract": {
-        "required": [
-          "outputRef"
-        ],
-        "type": "object",
-        "properties": {
-          "outputRef": {
-            "$ref": "#/components/schemas/OutputRef"
-          }
-        }
-      },
-      "Output": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Asset1"
-          },
-          {
-            "$ref": "#/components/schemas/Contract1"
-          }
-        ]
-      },
-      "Asset1": {
-        "required": [
-          "amount",
-          "address",
-          "lockTime",
-          "additionalData"
-        ],
-        "type": "object",
-        "properties": {
-          "amount": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "address": {
-            "type": "string"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "lockTime": {
-            "type": "integer"
-          },
-          "additionalData": {
-            "type": "string"
-          }
-        }
-      },
-      "Token": {
-        "required": [
-          "id",
-          "amount"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "integer",
-            "format": "uint256"
-          }
-        }
-      },
-      "Contract1": {
-        "required": [
-          "amount",
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "amount": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "address": {
-            "type": "string"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          }
-        }
-      },
-      "Balance": {
-        "required": [
-          "balance",
-          "lockedBalance",
-          "utxoNum"
-        ],
-        "type": "object",
-        "properties": {
-          "balance": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "lockedBalance": {
-            "type": "integer",
-            "format": "uint256"
-          },
-          "utxoNum": {
-            "type": "integer"
-          }
-        }
-      },
-      "Group": {
-        "required": [
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "group": {
-            "type": "integer"
-          }
-        }
-      },
-      "HashesAtHeight": {
-        "type": "object",
-        "properties": {
-          "headers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "ChainInfo": {
-        "required": [
-          "currentHeight"
-        ],
-        "type": "object",
-        "properties": {
-          "currentHeight": {
-            "type": "integer"
+            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },
@@ -5170,141 +4584,25 @@
           }
         }
       },
-      "BuildSweepAllTransaction": {
+      "ChainInfo": {
         "required": [
-          "fromPublicKey",
-          "toAddress"
+          "currentHeight"
         ],
         "type": "object",
         "properties": {
-          "fromPublicKey": {
-            "type": "string"
-          },
-          "toAddress": {
-            "type": "string"
-          },
-          "lockTime": {
-            "type": "integer"
-          },
-          "gas": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
-          }
-        }
-      },
-      "SubmitTransaction": {
-        "required": [
-          "unsignedTx",
-          "signature"
-        ],
-        "type": "object",
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "signature": {
-            "type": "string"
-          }
-        }
-      },
-      "TxResult": {
-        "required": [
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "txId": {
-            "type": "string"
-          },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
+          "currentHeight": {
             "type": "integer"
           }
         }
       },
-      "DecodeTransaction": {
+      "ChangeActiveAddress": {
         "required": [
-          "unsignedTx"
+          "address"
         ],
         "type": "object",
         "properties": {
-          "unsignedTx": {
+          "address": {
             "type": "string"
-          }
-        }
-      },
-      "TxStatus": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Confirmed"
-          },
-          {
-            "$ref": "#/components/schemas/MemPooled"
-          },
-          {
-            "$ref": "#/components/schemas/NotFound1"
-          }
-        ]
-      },
-      "Confirmed": {
-        "required": [
-          "blockHash",
-          "txIndex",
-          "chainConfirmations",
-          "fromGroupConfirmations",
-          "toGroupConfirmations"
-        ],
-        "type": "object",
-        "properties": {
-          "blockHash": {
-            "type": "string"
-          },
-          "txIndex": {
-            "type": "integer"
-          },
-          "chainConfirmations": {
-            "type": "integer"
-          },
-          "fromGroupConfirmations": {
-            "type": "integer"
-          },
-          "toGroupConfirmations": {
-            "type": "integer"
-          }
-        }
-      },
-      "MemPooled": {
-        "type": "object"
-      },
-      "NotFound1": {
-        "type": "object"
-      },
-      "SubmitContract": {
-        "required": [
-          "code",
-          "tx",
-          "signature",
-          "fromGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "tx": {
-            "type": "string"
-          },
-          "signature": {
-            "type": "string"
-          },
-          "fromGroup": {
-            "type": "integer"
           }
         }
       },
@@ -5341,34 +4639,392 @@
           }
         }
       },
-      "BuildContract": {
+      "Confirmed": {
         "required": [
-          "fromPublicKey",
-          "code"
+          "blockHash",
+          "txIndex",
+          "chainConfirmations",
+          "fromGroupConfirmations",
+          "toGroupConfirmations"
         ],
         "type": "object",
         "properties": {
-          "fromPublicKey": {
+          "blockHash": {
             "type": "string"
           },
-          "code": {
-            "type": "string"
+          "txIndex": {
+            "type": "integer"
+          },
+          "chainConfirmations": {
+            "type": "integer"
+          },
+          "fromGroupConfirmations": {
+            "type": "integer"
+          },
+          "toGroupConfirmations": {
+            "type": "integer"
           }
         }
       },
-      "BuildContractResult": {
+      "Contract": {
         "required": [
-          "unsignedTx",
-          "hash",
-          "fromGroup",
-          "toGroup"
+          "outputRef"
+        ],
+        "type": "object",
+        "properties": {
+          "outputRef": {
+            "$ref": "#/components/schemas/OutputRef"
+          }
+        }
+      },
+      "Contract1": {
+        "required": [
+          "amount",
+          "address"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          }
+        }
+      },
+      "DecodeTransaction": {
+        "required": [
+          "unsignedTx"
         ],
         "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
+          }
+        }
+      },
+      "Destination": {
+        "required": [
+          "address",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
           },
-          "hash": {
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Devnet": {
+        "type": "object"
+      },
+      "FetchResponse": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/BlockEntry"
+              }
+            }
+          }
+        }
+      },
+      "GasPrice": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "uint256"
+          }
+        }
+      },
+      "Group": {
+        "required": [
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "integer"
+          }
+        }
+      },
+      "HashesAtHeight": {
+        "type": "object",
+        "properties": {
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Input": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Asset"
+          },
+          {
+            "$ref": "#/components/schemas/Contract"
+          }
+        ]
+      },
+      "InterCliquePeerInfo": {
+        "required": [
+          "cliqueId",
+          "brokerId",
+          "groupNumPerBroker",
+          "address",
+          "isSynced"
+        ],
+        "type": "object",
+        "properties": {
+          "cliqueId": {
+            "type": "string"
+          },
+          "brokerId": {
+            "type": "integer"
+          },
+          "groupNumPerBroker": {
+            "type": "integer"
+          },
+          "address": {
+            "type": "string"
+          },
+          "isSynced": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InternalServerError": {
+        "required": [
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "Mainnet": {
+        "type": "object"
+      },
+      "MemPooled": {
+        "type": "object"
+      },
+      "MinerAddresses": {
+        "type": "object",
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MinerAddressesInfo": {
+        "type": "object",
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressInfo"
+            }
+          }
+        }
+      },
+      "MisbehaviorAction": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Unban"
+          }
+        ]
+      },
+      "NetworkType": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Devnet"
+          },
+          {
+            "$ref": "#/components/schemas/Mainnet"
+          },
+          {
+            "$ref": "#/components/schemas/Testnet"
+          }
+        ]
+      },
+      "NodeInfo": {
+        "required": [
+          "isMining"
+        ],
+        "type": "object",
+        "properties": {
+          "isMining": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotFound": {
+        "required": [
+          "detail",
+          "resource"
+        ],
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          }
+        }
+      },
+      "NotFound1": {
+        "type": "object"
+      },
+      "Output": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Asset1"
+          },
+          {
+            "$ref": "#/components/schemas/Contract1"
+          }
+        ]
+      },
+      "OutputRef": {
+        "required": [
+          "scriptHint",
+          "key"
+        ],
+        "type": "object",
+        "properties": {
+          "scriptHint": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "PeerAddress": {
+        "required": [
+          "address",
+          "restPort",
+          "wsPort",
+          "minerApiPort"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "restPort": {
+            "type": "integer"
+          },
+          "wsPort": {
+            "type": "integer"
+          },
+          "minerApiPort": {
+            "type": "integer"
+          }
+        }
+      },
+      "PeerMisbehavior": {
+        "required": [
+          "peer",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "peer": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PeerStatus"
+          }
+        }
+      },
+      "PeerStatus": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Banned"
+          },
+          {
+            "$ref": "#/components/schemas/Penalty"
+          }
+        ]
+      },
+      "Penalty": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer"
+          }
+        }
+      },
+      "Result": {
+        "required": [
+          "walletName",
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
+            "type": "string"
+          },
+          "mnemonic": {
+            "type": "string"
+          }
+        }
+      },
+      "Result1": {
+        "required": [
+          "walletName"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
+            "type": "string"
+          }
+        }
+      },
+      "Result2": {
+        "required": [
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
             "type": "string"
           },
           "fromGroup": {
@@ -5379,14 +5035,331 @@
           }
         }
       },
-      "MinerAddresses": {
+      "Result3": {
+        "required": [
+          "address"
+        ],
         "type": "object",
         "properties": {
-          "addresses": {
+          "address": {
+            "type": "string"
+          }
+        }
+      },
+      "SelfClique": {
+        "required": [
+          "cliqueId",
+          "networkType",
+          "numZerosAtLeastInHash",
+          "selfReady",
+          "synced",
+          "groupNumPerBroker",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "cliqueId": {
+            "type": "string"
+          },
+          "networkType": {
+            "$ref": "#/components/schemas/NetworkType"
+          },
+          "numZerosAtLeastInHash": {
+            "type": "integer"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeerAddress"
+            }
+          },
+          "selfReady": {
+            "type": "boolean"
+          },
+          "synced": {
+            "type": "boolean"
+          },
+          "groupNumPerBroker": {
+            "type": "integer"
+          },
+          "groups": {
+            "type": "integer"
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "required": [
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "SubmitContract": {
+        "required": [
+          "code",
+          "tx",
+          "signature",
+          "fromGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "tx": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "fromGroup": {
+            "type": "integer"
+          }
+        }
+      },
+      "SubmitTransaction": {
+        "required": [
+          "unsignedTx",
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      },
+      "SweepAll": {
+        "required": [
+          "toAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "toAddress": {
+            "type": "string"
+          },
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "Testnet": {
+        "type": "object"
+      },
+      "Token": {
+        "required": [
+          "id",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
+          }
+        }
+      },
+      "Transfer": {
+        "type": "object",
+        "properties": {
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "Tx": {
+        "required": [
+          "id",
+          "startGas",
+          "gasPrice"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Input"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Output"
+            }
+          },
+          "startGas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "type": "integer",
+            "format": "uint256"
+          }
+        }
+      },
+      "TxResult": {
+        "required": [
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string"
+          },
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
+            "type": "integer"
+          }
+        }
+      },
+      "TxStatus": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Confirmed"
+          },
+          {
+            "$ref": "#/components/schemas/MemPooled"
+          },
+          {
+            "$ref": "#/components/schemas/NotFound1"
+          }
+        ]
+      },
+      "Unauthorized": {
+        "required": [
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "Unban": {
+        "type": "object",
+        "properties": {
+          "peers": {
             "type": "array",
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "WalletCreation": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "walletName": {
+            "type": "string"
+          },
+          "isMiner": {
+            "type": "boolean"
+          },
+          "mnemonicPassphrase": {
+            "type": "string"
+          },
+          "mnemonicSize": {
+            "type": "integer"
+          }
+        }
+      },
+      "WalletDeletion": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletRestore": {
+        "required": [
+          "password",
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "mnemonic": {
+            "type": "string"
+          },
+          "isMiner": {
+            "type": "boolean"
+          },
+          "walletName": {
+            "type": "string"
+          },
+          "mnemonicPassphrase": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletStatus": {
+        "required": [
+          "walletName",
+          "locked"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "WalletUnlock": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
           }
         }
       }

@@ -20,7 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import io.vertx.ext.web._
 import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter
 import sttp.tapir.swagger.vertx.SwaggerVertx
 
 import org.alephium.api.ApiError
@@ -44,8 +44,10 @@ class WalletServer(
 )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
     extends WalletEndpoints
     with WalletDocumentation
-    with ServerOptions {
+    with VertxFutureServerInterpreter {
   import WalletServer.toApiError
+
+  override val vertxFutureServerOptions = ServerOptions.serverOptions
 
   lazy val docsRoute: Router => Route = new SwaggerVertx(
     openApiJson(walletOpenAPI),
@@ -54,7 +56,7 @@ class WalletServer(
 
   // scalastyle:off method.length
   lazy val routes: AVector[Router => Route] = AVector(
-    toRoute(createWallet) { walletCreation =>
+    route(createWallet) { walletCreation =>
       Future.successful(
         walletService
           .createWallet(
@@ -71,7 +73,7 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(restoreWallet) { walletRestore =>
+    route(restoreWallet) { walletRestore =>
       Future.successful(
         walletService
           .restoreWallet(
@@ -86,20 +88,20 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(lockWallet) { wallet =>
+    route(lockWallet) { wallet =>
       Future.successful(walletService.lockWallet(wallet).left.map(toApiError))
     },
-    toRoute(unlockWallet) { case (wallet, walletUnlock) =>
+    route(unlockWallet) { case (wallet, walletUnlock) =>
       Future.successful(
         walletService.unlockWallet(wallet, walletUnlock.password).left.map(toApiError)
       )
     },
-    toRoute(deleteWallet) { case (wallet, walletDeletion) =>
+    route(deleteWallet) { case (wallet, walletDeletion) =>
       Future.successful(
         walletService.deleteWallet(wallet, walletDeletion.password).left.map(toApiError)
       )
     },
-    toRoute(getBalances) { wallet =>
+    route(getBalances) { wallet =>
       walletService
         .getBalances(wallet)
         .map(_.map { balances =>
@@ -113,7 +115,7 @@ class WalletServer(
           model.Balances(totalBalance, balancesPerAddress)
         }.left.map(toApiError))
     },
-    toRoute(getAddresses) { wallet =>
+    route(getAddresses) { wallet =>
       Future.successful(
         walletService
           .getAddresses(wallet)
@@ -124,7 +126,7 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(getMinerAddresses) { wallet =>
+    route(getMinerAddresses) { wallet =>
       Future.successful(
         walletService
           .getMinerAddresses(wallet)
@@ -141,21 +143,21 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(transfer) { case (wallet, tr) =>
+    route(transfer) { case (wallet, tr) =>
       walletService
         .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice)
         .map(_.map { case (txId, fromGroup, toGroup) =>
           model.Transfer.Result(txId, fromGroup, toGroup)
         }.left.map(toApiError))
     },
-    toRoute(sweepAll) { case (wallet, sa) =>
+    route(sweepAll) { case (wallet, sa) =>
       walletService
         .sweepAll(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice)
         .map(_.map { case (txId, fromGroup, toGroup) =>
           model.Transfer.Result(txId, fromGroup, toGroup)
         }.left.map(toApiError))
     },
-    toRoute(deriveNextAddress) { wallet =>
+    route(deriveNextAddress) { wallet =>
       Future.successful(
         walletService
           .deriveNextAddress(wallet)
@@ -164,7 +166,7 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(deriveNextMinerAddresses) { wallet =>
+    route(deriveNextMinerAddresses) { wallet =>
       Future.successful(
         walletService
           .deriveNextMinerAddresses(wallet)
@@ -173,7 +175,7 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(changeActiveAddress) { case (wallet, change) =>
+    route(changeActiveAddress) { case (wallet, change) =>
       Future.successful(
         walletService
           .changeActiveAddress(wallet, change.address)
@@ -181,7 +183,7 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(listWallets) { _ =>
+    route(listWallets) { _ =>
       Future.successful(
         walletService
           .listWallets()
@@ -190,7 +192,7 @@ class WalletServer(
           .map(toApiError)
       )
     },
-    toRoute(getWallet) { wallet =>
+    route(getWallet) { wallet =>
       Future.successful(
         walletService
           .getWallet(wallet)

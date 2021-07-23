@@ -26,6 +26,7 @@ import org.alephium.api.TapirSchemasLike
 
 trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike with StrictLogging {
   import Endpoints._
+  import ApiError._
 
   type BaseEndpoint[A, B] = Endpoint[A, ApiError[_ <: StatusCode], B, Any]
 
@@ -33,11 +34,11 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
     endpoint
       .errorOut(
         oneOf[ApiError[_ <: StatusCode]](
-          error(ApiError.BadRequest),
-          error(ApiError.InternalServerError),
-          error(ApiError.NotFound),
-          error(ApiError.ServiceUnavailable),
-          error(ApiError.Unauthorized)
+          error(BadRequest, { case BadRequest(_) => true }),
+          error(InternalServerError, { case InternalServerError(_) => true }),
+          error(NotFound, { case NotFound(_) => true }),
+          error(ServiceUnavailable, { case ServiceUnavailable(_) => true }),
+          error(Unauthorized, { case Unauthorized(_) => true })
         )
       )
 }
