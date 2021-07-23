@@ -29,7 +29,7 @@ import io.prometheus.client.Gauge
 import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, Version}
 import org.alephium.util.{AVector, Duration, Files => AFiles}
 
 object Boot extends App with StrictLogging {
@@ -63,6 +63,8 @@ class BootUp extends StrictLogging {
   val server: Server = Server(rootPath, flowSystem)
 
   def init(): Unit = {
+    checkDatabaseCompatibility()
+
     // Register the default Hotspot (JVM) collectors for Prometheus
     DefaultExports.initialize()
     collectBuildInfo()
@@ -95,6 +97,15 @@ class BootUp extends StrictLogging {
   def stop(): Unit = {
     Await.result(flowSystem.terminate(), shutdownTimeout.asScala)
     ()
+  }
+
+  def checkDatabaseCompatibility(): Unit = {
+    server.storages.nodeStateStorage.checkDatabaseCompatibility(Version.release) match {
+      case Left(error) =>
+        logger.error(s"Database compatibility check error: $error")
+        sys.exit(1)
+      case Right(_) =>
+    }
   }
 
   def logConfig(): Unit = {
