@@ -35,16 +35,22 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server0.start().futureValue is ()
 
-    val block = mineAndAndOneBlock(server0, ChainIndex.unsafe(0, 2))
+    val blocks = AVector.tabulate(groups0) { toGroup =>
+      mineAndAndOneBlock(server0, ChainIndex.unsafe(0, toGroup))
+    }
 
     eventually(requestFailed(getSelfClique, statusCode = StatusCode.InternalServerError))
 
     val server1 = bootNode(publicPort = generatePort, brokerId = 1)
-    eventually(server1.node.blockFlow.containsUnsafe(block.hash) is false)
+    blocks.foreach { block =>
+      eventually(server1.node.blockFlow.containsUnsafe(block.hash) is false)
+    }
     server1.start().futureValue is ()
 
     eventually(request[SelfClique](getSelfClique, defaultRestMasterPort).selfReady is true)
-    eventually(server1.node.blockFlow.containsUnsafe(block.hash) is true)
+    blocks.foreach { block =>
+      eventually(server1.node.blockFlow.containsUnsafe(block.hash) is true)
+    }
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
