@@ -87,14 +87,10 @@ trait BlockFlow
     }
   }
 
-  override protected def getIntraSyncInventoriesUnsafe(
-      remoteBroker: BrokerGroupInfo
-  ): AVector[AVector[BlockHash]] = {
-    AVector.tabulate(brokerConfig.groupNumPerBroker * remoteBroker.groupNumPerBroker) { index =>
-      val k         = index / remoteBroker.groupNumPerBroker
-      val l         = index % remoteBroker.groupNumPerBroker
-      val fromGroup = brokerConfig.groupFrom + k
-      val toGroup   = remoteBroker.groupFrom + l
+  override protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]] = {
+    AVector.tabulate(brokerConfig.groupNumPerBroker * brokerConfig.groups) { index =>
+      val fromGroup = brokerConfig.groupFrom + index / brokerConfig.groups
+      val toGroup   = index % brokerConfig.groups
       val chain     = getBlockChain(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
       chain.getLatestHashesUnsafe()
     }
