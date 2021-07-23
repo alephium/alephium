@@ -48,7 +48,7 @@ class MessageSpec extends AlephiumSpec {
   it should "serde message" in {
 
     payload.length is 2
-    header.length is 1
+    header.length is 3
 
     serialized.length is (payload.length + header.length + additionalLength)
 

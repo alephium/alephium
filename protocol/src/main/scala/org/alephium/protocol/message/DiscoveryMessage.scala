@@ -28,13 +28,11 @@ import org.alephium.serde._
 import org.alephium.util.AVector
 
 final case class DiscoveryMessage(
-    header: DiscoveryMessage.Header,
+    header: Header,
     payload: DiscoveryMessage.Payload
 )
 
 object DiscoveryMessage {
-  val version: Version = Version.release
-
   final case class Id(value: Hash) extends AnyVal
   object Id {
     implicit val serde: Serde[Id] = Serde.forProduct1(Id.apply, _.value)
@@ -43,21 +41,8 @@ object DiscoveryMessage {
   }
 
   def from(payload: Payload): DiscoveryMessage = {
-    val header = Header(version)
+    val header = Header(Version.release)
     DiscoveryMessage(header, payload)
-  }
-
-  final case class Header(version: Version)
-  object Header {
-    implicit val serde: Serde[Header] = Version.serde
-      .validate(_version =>
-        if (_version.compatible(version)) {
-          Right(())
-        } else {
-          Left(s"Invalid version: got ${_version}, expect: $version")
-        }
-      )
-      .xmap(Header.apply, _.version)
   }
 
   trait Payload {

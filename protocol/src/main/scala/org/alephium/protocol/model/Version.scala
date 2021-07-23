@@ -21,7 +21,7 @@ import org.alephium.serde.Serde
 
 final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Version] {
   def backwardCompatible(version: Version): Boolean = major >= version.major
-  def compatible(version: Version): Boolean = major == version.major
+  def compatible(version: Version): Boolean         = major == version.major
 
   override def compare(that: Version): Int = {
     major.compare(that.major) match {

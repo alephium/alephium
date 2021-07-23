@@ -17,6 +17,7 @@
 package org.alephium.protocol.message
 
 import akka.util.ByteString
+
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{NetworkType, Version}
 import org.alephium.serde
