@@ -301,7 +301,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
   behavior of "Sync"
 
-  it should "compute sync locators and inventories" in new FlowFixture {
+  it should "compute sync locators and inventories for inter cliques" in new FlowFixture {
     brokerConfig.groupNumPerBroker is 1 // the test only works in this case
 
     (0 until brokerConfig.groups).foreach { testToGroup =>
@@ -347,32 +347,18 @@ class BlockFlowSpec extends AlephiumSpec {
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
       blockFlow1.getSyncInventories(locators1) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
-
-      (0 until brokerConfig.brokerNum).foreach { id =>
-        val remoteBrokerInfo = new BrokerGroupInfo {
-          override def brokerId: Int          = id
-          override def groupNumPerBroker: Int = brokerConfig.groupNumPerBroker
-        }
-        blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
-          (if (remoteBrokerInfo.groupFrom equals testToGroup) {
-             AVector(hashes0)
-           } else {
-             AVector(AVector.empty[BlockHash])
-           })
-        blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE AVector(AVector.empty[BlockHash])
-      }
-
-      val remoteBrokerInfo = new BrokerGroupInfo {
-        override def brokerId: Int          = 0
-        override def groupNumPerBroker: Int = brokerConfig.groups
-      }
-      blockFlow0.getIntraSyncInventories(remoteBrokerInfo) isE
-        AVector.tabulate(brokerConfig.groups) { k =>
-          if (k equals testToGroup) hashes0 else AVector.empty[BlockHash]
-        }
-      blockFlow1.getIntraSyncInventories(remoteBrokerInfo) isE
-        AVector.fill(brokerConfig.groups)(AVector.empty[BlockHash])
     }
+  }
+
+  it should "compute sync locators and inventories for intra cliques" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-id", 1))
+    val blocks = AVector.tabulate(groups0) { toGroup =>
+      val chainIndex = ChainIndex.unsafe(1, toGroup)
+      val block      = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block
+    }
+    blockFlow.getIntraSyncInventories() isE blocks.map(_.hash).map(AVector(_))
   }
 
   behavior of "Mining"

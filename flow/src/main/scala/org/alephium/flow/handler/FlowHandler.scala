@@ -34,7 +34,7 @@ object FlowHandler {
   final case class GetHeaders(locators: AVector[BlockHash])                  extends Command
   case object GetSyncLocators                                                extends Command
   final case class GetSyncInventories(locators: AVector[AVector[BlockHash]]) extends Command
-  final case class GetIntraSyncInventories(brokerInfo: BrokerInfo)           extends Command
+  case object GetIntraSyncInventories                                        extends Command
 
   sealed trait Event
   final case class BlocksLocated(blocks: AVector[Block])                extends Event
@@ -91,8 +91,8 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
       escapeIOError(blockFlow.getSyncInventories(locators)) { inventories =>
         sender() ! SyncInventories(inventories)
       }
-    case GetIntraSyncInventories(brokerInfo) =>
-      escapeIOError(blockFlow.getIntraSyncInventories(brokerInfo)) { inventories =>
+    case GetIntraSyncInventories =>
+      escapeIOError(blockFlow.getIntraSyncInventories()) { inventories =>
         sender() ! SyncInventories(inventories)
       }
   }
