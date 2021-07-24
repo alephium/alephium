@@ -61,8 +61,10 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
       channel.socket().setReuseAddress(true)
       channel.socket().bind(bindAddress)
 
-      selectionKey = channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
-      sharedSelectionHandler.selector.wakeup()
+      sharedSelectionHandler.execute {
+        sharedSelectionHandler.selector.wakeup()
+        selectionKey = channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
+      }
 
       discoveryServer ! Bound(bindAddress)
       context.become(listening)
