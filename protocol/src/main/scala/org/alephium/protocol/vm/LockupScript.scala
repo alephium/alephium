@@ -116,7 +116,7 @@ object LockupScript {
         if (validate(lock.pkHashes.length, lock.m)) {
           Right(())
         } else {
-          Left(s"Invalid m-of-n multisig: ${lock.pkHashes}, m: ${lock.m}")
+          Left(s"Invalid m in m-of-n multisig: ${lock.pkHashes}, m: ${lock.m}")
         }
       )
     }

@@ -29,6 +29,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -531,6 +532,39 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx6 =
       replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey0 -> 1)), priKey0, priKey1)
     failValidation(validateTx(tx6, blockFlow), InvalidPublicKeyHash)
+  }
+
+  it should "invalidate p2mpkh in deserialization" in new LockupFixture {
+    val (priKey0, pubKey0) = keypairGen.sample.get
+    val (priKey1, pubKey1) = keypairGen.sample.get
+
+    def wrongMultiSig(m: Int): Transaction = {
+      val lockup                = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1), m)
+      val group                 = groupIndexGen.sample.get
+      val (genesisPriKey, _, _) = genesisKeys(group.value)
+      val block                 = transfer(blockFlow, genesisPriKey, lockup, ALF.alf(2))
+      block.nonCoinbase.head
+    }
+
+    // m = 0 in m-of-n multisig
+    val tx0 = wrongMultiSig(0)
+    deserialize[Transaction](serialize(tx0)).leftValue.getMessage
+      .startsWith("Invalid m in m-of-n multisig") is true
+
+    // m = n + 1 in m-of-n multisig
+    val tx1 = wrongMultiSig(3)
+    deserialize[Transaction](serialize(tx1)).leftValue.getMessage
+      .startsWith("Invalid m in m-of-n multisig") is true
+
+    // unlock indexes are not monotonically increasing in m-of-n multisig
+    val tx2 = {
+      val lockup   = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1), 2)
+      val unlock   = UnlockScript.p2mpkh(AVector(pubKey1 -> 1, pubKey0 -> 0))
+      val unsigned = prepareOutput(lockup, unlock)
+      sign(unsigned, priKey1, priKey0)
+    }
+    deserialize[Transaction](serialize(tx2)).leftValue.getMessage
+      .startsWith("Invalid public keys indexes") is true
   }
 
   it should "validate p2sh" in new LockupFixture {
