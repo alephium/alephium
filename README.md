@@ -8,11 +8,11 @@ blockchain that makes programmable money scalable and secure.
 The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bitcoin.org/bitcoin.pdf) and [Ethereum](https://ethereum.org/en/whitepaper/):
 
 * BlockFlow algorithm based on UTXO model enables sharding and scalability for today (code + [algorithm paper](https://github.com/alephium/research/blob/master/alephium.pdf))
-  * First sharding algorithm that supports `single-step cross-shard transactions`, offering the same user experience as single chain
+  * The first sharding algorithm that supports `single-step cross-shard transactions`, offering the same user experience as single chain
   * Simple and elegant `PoW based sharding`, does not rely on beacon chain
 * `Stateful UTXO model` combines the advantages of both eUTXO model and account model (see code, wiki to come)
   * Tokens are first-class citizens and UTXO-based, which are `owned by users` directly instead of contracts
-  * Offers the same expressiveness as `account model`. DApps can be easily built on top of it with better security
+  * Offer the same expressiveness as `account model`. DApps can be easily built on top of it with better security
   * Support `multiple participants` in a single smart contract transaction. Multiple calls can be packed into a single transaction too.
 * Novel VM design resolves many critical challenges of dApp platforms (see code, wiki to come)
   * Less IO intensive

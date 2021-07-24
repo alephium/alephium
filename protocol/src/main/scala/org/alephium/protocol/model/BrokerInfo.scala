@@ -114,14 +114,15 @@ final case class InterBrokerInfo private (
     cliqueId: CliqueId,
     brokerId: Int,
     groupNumPerBroker: Int
-) extends HashSerde[InterBrokerInfo]
-    with BrokerGroupInfo {
+) extends BrokerGroupInfo {
   def peerId: PeerId = PeerId(cliqueId, brokerId)
-  def hash: Hash     = _getHash
+  def hash(implicit serializer: Serializer[InterBrokerInfo]): Hash = {
+    Hash.hash(serialize(this))
+  }
 }
 
 object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {
-  implicit val _serde: Serde[InterBrokerInfo] =
+  val _serde: Serde[InterBrokerInfo] =
     Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker))
 
   def unsafe(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int): InterBrokerInfo =
