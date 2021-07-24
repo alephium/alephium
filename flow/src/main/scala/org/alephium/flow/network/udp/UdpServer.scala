@@ -49,7 +49,7 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
 
   var discoveryServer: ActorRefT[UdpServer.Event] = _
   var channel: DatagramChannel                    = _
-  var selectionKey: SelectionKey                  = _
+  @volatile var selectionKey: SelectionKey        = _
 
   val sharedSelectionHandler: SelectionHandler = SelectionHandler(context.system)
 
@@ -61,9 +61,10 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
       channel.socket().setReuseAddress(true)
       channel.socket().bind(bindAddress)
 
-      sharedSelectionHandler.execute {
-        sharedSelectionHandler.selector.wakeup()
+      sharedSelectionHandler.registerTask { () =>
         selectionKey = channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
+        sharedSelectionHandler.selector.wakeup()
+        ()
       }
 
       discoveryServer ! Bound(bindAddress)
@@ -93,7 +94,7 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
       }
     case Read =>
       read(16)
-      sharedSelectionHandler.execute {
+      sharedSelectionHandler.registerTask { () =>
         selectionKey.interestOps(SelectionKey.OP_READ)
         ()
       }
@@ -114,7 +115,7 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
 
   override def postStop(): Unit = {
     if (selectionKey != null) {
-      sharedSelectionHandler.execute(selectionKey.cancel())
+      sharedSelectionHandler.registerTask(() => selectionKey.cancel())
     }
     if (channel != null) {
       try channel.close()
