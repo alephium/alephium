@@ -60,7 +60,10 @@ object ConfigUtils {
         )
       case None =>
         Left(
-          new ConfigException.BadValue("address", s"Invalid base58 or network-type: $rawAddress")
+          new ConfigException.BadValue(
+            "address",
+            s"Invalid base58 encoding or network-type: $rawAddress"
+          )
         )
     }
   }

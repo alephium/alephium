@@ -95,7 +95,7 @@ object LockupScript {
         case _ =>
           Left(SerdeError.validation(s"Expect LockupScript.Asset, but got LockupScript.P2C"))
       },
-      x => x
+      identity
     )
   }
 

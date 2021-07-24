@@ -117,13 +117,7 @@ object BlockFlowGroupView {
             (_, output) => output.lockupScript == lockupScript
           )
           .map(
-            _.map(p =>
-              AssetOutputInfo(
-                p._1.asInstanceOf[AssetOutputRef],
-                p._2.asInstanceOf[AssetOutput],
-                PersistedOutput
-              )
-            )
+            _.map(p => AssetOutputInfo(p._1, p._2, PersistedOutput))
           )
       } yield persistedUtxos
     }
