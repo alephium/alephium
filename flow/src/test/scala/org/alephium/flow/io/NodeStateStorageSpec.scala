@@ -17,59 +17,44 @@
 package org.alephium.flow.io
 
 import org.scalacheck.Gen
-import org.scalatest.Assertion
 
 import org.alephium.io.RocksDBSource
-import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.Version
-import org.alephium.util.{AlephiumSpec, Files}
+import org.alephium.util.AlephiumSpec
 
-class NodeStateStorageSpec extends AlephiumSpec {
-  trait Fixture extends ConsensusConfigFixture.Default {
-    val tmpdir    = Files.tmpDir
-    val dbname    = "node-state-storage-spec"
-    val dbPath    = tmpdir.resolve(dbname)
-    val dbVersion = Version(10, 20, 30)
+class NodeStateStorageSpec extends AlephiumSpec with StorageTestFixture[NodeStateRockDBStorage] {
 
-    val source  = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-    val storage = NodeStateRockDBStorage(source, RocksDBSource.ColumnFamily.All)
+  override val dbname: String = "node-state-storage-spec"
+  override val builder: RocksDBSource => NodeStateRockDBStorage =
+    source => NodeStateRockDBStorage(source, RocksDBSource.ColumnFamily.All)
 
-    def setup(): Assertion = {
-      storage.setDatabaseVersion(dbVersion).isRight is true
-      storage.getDatabaseVersion isE Some(dbVersion)
-    }
+  val versionGen: Gen[Version] = for {
+    major <- Gen.choose(0, Int.MaxValue)
+    minor <- Gen.choose(0, Int.MaxValue)
+    patch <- Gen.choose(0, Int.MaxValue)
+  } yield Version(major, minor, patch)
 
-    def postTest(): Assertion = {
-      source.dESTROY().isRight is true
-    }
+  it should "check database compatibility" in {
+    val initNodeVersion = versionGen.sample.get
+    storage.setDatabaseVersion(initNodeVersion).isRight is true
+    storage.getDatabaseVersion isE Some(initNodeVersion)
 
-    val versionGen: Gen[Version] = for {
-      major <- Gen.choose(0, Int.MaxValue)
-      minor <- Gen.choose(0, Int.MaxValue)
-      patch <- Gen.choose(0, Int.MaxValue)
-    } yield Version(major, minor, patch)
-  }
-
-  it should "check database compatibility" in new Fixture {
-    setup()
     forAll(versionGen) { version =>
-      val dbVersion = storage.getDatabaseVersion.rightValue.get
-      if (!version.backwardCompatible(dbVersion)) {
+      val nodeVersion = storage.getDatabaseVersion.rightValue.get
+      if (!version.backwardCompatible(nodeVersion)) {
         storage.checkDatabaseCompatibility(version).isLeft is true
-      } else if (dbVersion < version) {
+      } else if (nodeVersion < version) {
         storage.checkDatabaseCompatibility(version).isRight is true
         storage.getDatabaseVersion isE Some(version)
       }
     }
-    postTest()
   }
 
-  it should "update database version when init" in new Fixture {
+  it should "update database version when init" in {
     storage.getDatabaseVersion isE None
 
     val version: Version = versionGen.sample.get
     storage.checkDatabaseCompatibility(version).isRight is true
     storage.getDatabaseVersion isE Some(version)
-    postTest()
   }
 }
