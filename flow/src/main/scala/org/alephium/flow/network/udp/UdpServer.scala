@@ -63,8 +63,6 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
 
       sharedSelectionHandler.registerTask { () =>
         selectionKey = channel.register(sharedSelectionHandler.selector, SelectionKey.OP_READ, self)
-        sharedSelectionHandler.selector.wakeup()
-        ()
       }
 
       discoveryServer ! Bound(bindAddress)
