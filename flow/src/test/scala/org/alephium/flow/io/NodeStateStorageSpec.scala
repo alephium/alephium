@@ -22,7 +22,7 @@ import org.alephium.io.RocksDBSource
 import org.alephium.protocol.model.Version
 import org.alephium.util.AlephiumSpec
 
-class NodeStateStorageSpec extends AlephiumSpec with StorageTestFixture[NodeStateRockDBStorage] {
+class NodeStateStorageSpec extends AlephiumSpec with StorageSpec[NodeStateRockDBStorage] {
 
   override val dbname: String = "node-state-storage-spec"
   override val builder: RocksDBSource => NodeStateRockDBStorage =
@@ -36,25 +36,25 @@ class NodeStateStorageSpec extends AlephiumSpec with StorageTestFixture[NodeStat
 
   it should "check database compatibility" in {
     val initNodeVersion = versionGen.sample.get
-    storage.setDatabaseVersion(initNodeVersion).isRight is true
-    storage.getDatabaseVersion isE Some(initNodeVersion)
+    storage.setNodeVersion(initNodeVersion).isRight is true
+    storage.getNodeVersion isE Some(initNodeVersion)
 
     forAll(versionGen) { version =>
-      val nodeVersion = storage.getDatabaseVersion.rightValue.get
+      val nodeVersion = storage.getNodeVersion.rightValue.get
       if (!version.backwardCompatible(nodeVersion)) {
-        storage.checkDatabaseCompatibility(version).isLeft is true
+        storage.checkNodeCompatibility(version).isLeft is true
       } else if (nodeVersion < version) {
-        storage.checkDatabaseCompatibility(version).isRight is true
-        storage.getDatabaseVersion isE Some(version)
+        storage.checkNodeCompatibility(version).isRight is true
+        storage.getNodeVersion isE Some(version)
       }
     }
   }
 
   it should "update database version when init" in {
-    storage.getDatabaseVersion isE None
+    storage.getNodeVersion isE None
 
     val version: Version = versionGen.sample.get
-    storage.checkDatabaseCompatibility(version).isRight is true
-    storage.getDatabaseVersion isE Some(version)
+    storage.checkNodeCompatibility(version).isRight is true
+    storage.getNodeVersion isE Some(version)
   }
 }

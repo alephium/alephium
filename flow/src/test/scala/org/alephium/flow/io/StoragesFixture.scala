@@ -52,7 +52,7 @@ object StoragesFixture {
   }
 }
 
-trait StorageTestFixture[S]
+trait StorageSpec[S]
     extends ConsensusConfigFixture.Default
     with AlephiumSpec
     with BeforeAndAfterEach { self: Suite =>

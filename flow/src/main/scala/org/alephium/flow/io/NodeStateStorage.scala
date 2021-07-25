@@ -52,34 +52,34 @@ trait NodeStateStorage extends RawKeyValueStorage {
       putRawUnsafe(isInitializedKey, ByteString(1))
     }
 
-  private val dbVersionKey =
-    Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
+  private val nodeVersionKey =
+    Hash.hash("databaseVersion").bytes ++ ByteString(Storages.nodeVersionPostfix)
 
-  def setDatabaseVersion(version: Version): IOResult[Unit] =
+  def setNodeVersion(version: Version): IOResult[Unit] =
     IOUtils.tryExecute {
-      putRawUnsafe(dbVersionKey, serialize(version))
+      putRawUnsafe(nodeVersionKey, serialize(version))
     }
 
-  def getDatabaseVersion: IOResult[Option[Version]] =
+  def getNodeVersion: IOResult[Option[Version]] =
     IOUtils.tryExecute {
-      getOptRawUnsafe(dbVersionKey).map(deserialize[Version](_) match {
+      getOptRawUnsafe(nodeVersionKey).map(deserialize[Version](_) match {
         case Left(e)  => throw e
         case Right(v) => v
       })
     }
 
-  def checkDatabaseCompatibility(version: Version): IOResult[Unit] = {
-    getDatabaseVersion.flatMap {
-      case Some(dbVersion) if !version.backwardCompatible(dbVersion) =>
+  def checkNodeCompatibility(version: Version): IOResult[Unit] = {
+    getNodeVersion.flatMap {
+      case Some(nodeVersion) if !version.backwardCompatible(nodeVersion) =>
         Left(
           IOError.Other(
-            new RuntimeException(s"Database version is $dbVersion, client version is $version")
+            new RuntimeException(s"Database version is $nodeVersion, client version is $version")
           )
         )
-      case Some(dbVersion) if dbVersion < version =>
-        setDatabaseVersion(version)
+      case Some(nodeVersion) if nodeVersion < version =>
+        setNodeVersion(version)
       case None =>
-        setDatabaseVersion(version)
+        setNodeVersion(version)
       case _ => Right(())
     }
   }
