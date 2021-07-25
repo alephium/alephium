@@ -23,7 +23,7 @@ import org.alephium.util.AlephiumSpec
 class BlockStorageSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
-    with StorageTestFixture[BlockRockDBStorage] {
+    with StorageSpec[BlockRockDBStorage] {
   import RocksDBSource.ColumnFamily
 
   override val dbname: String = "block-storage-spec"

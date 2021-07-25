@@ -63,7 +63,7 @@ class BootUp extends StrictLogging {
   val server: Server = Server(rootPath, flowSystem)
 
   def init(): Unit = {
-    checkDatabaseCompatibility()
+    checkNodeCompatibility()
 
     // Register the default Hotspot (JVM) collectors for Prometheus
     DefaultExports.initialize()
@@ -99,10 +99,10 @@ class BootUp extends StrictLogging {
     ()
   }
 
-  def checkDatabaseCompatibility(): Unit = {
-    server.storages.nodeStateStorage.checkDatabaseCompatibility(Version.release) match {
+  def checkNodeCompatibility(): Unit = {
+    server.storages.nodeStateStorage.checkNodeCompatibility(Version.release) match {
       case Left(error) =>
-        logger.error(s"Database compatibility check error: $error")
+        logger.error(s"Node compatibility check error: $error")
         sys.exit(1)
       case Right(_) =>
     }
