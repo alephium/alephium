@@ -16,67 +16,55 @@
 
 package org.alephium.flow.io
 
-import org.scalatest.Assertion
-
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
-import org.alephium.util.{AlephiumSpec, Files}
+import org.alephium.util.AlephiumSpec
 
-class BlockHeaderStorageSpec extends AlephiumSpec with NoIndexModelGenerators {
+class BlockHeaderStorageSpec
+    extends AlephiumSpec
+    with NoIndexModelGenerators
+    with StorageTestFixture[BlockHeaderRockDBStorage] {
   import RocksDBSource.ColumnFamily
 
-  trait Fixture extends ConsensusConfigFixture.Default {
-    val tmpdir = Files.tmpDir
-    val dbname = "foo"
-    val dbPath = tmpdir.resolve(dbname)
+  override val dbname: String = "block-header-storage-spec"
+  override val builder: RocksDBSource => BlockHeaderRockDBStorage =
+    source => BlockHeaderRockDBStorage(source, ColumnFamily.All)
 
-    val source        = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-    val headerStorage = BlockHeaderRockDBStorage(source, ColumnFamily.All)
-
-    def generate(): BlockHeader = {
-      val block = blockGen.sample.get
-      block.header
-    }
-
-    def postTest(): Assertion = {
-      source.dESTROY().isRight is true
-    }
+  def generate(): BlockHeader = {
+    val block = blockGen.sample.get
+    block.header
   }
 
-  it should "create database" in new Fixture {
+  it should "create database" in {
     RocksDBSource.open(dbPath, RocksDBSource.Compaction.HDD).isLeft is true
-    postTest()
   }
 
-  it should "check existence" in new Fixture {
+  it should "check existence" in {
     val blockHeader = generate()
-    headerStorage.exists(blockHeader) isE false
-    headerStorage.put(blockHeader).isRight is true
-    headerStorage.exists(blockHeader) isE true
-    postTest()
+    storage.exists(blockHeader) isE false
+    storage.put(blockHeader).isRight is true
+    storage.exists(blockHeader) isE true
   }
 
-  it should "delete entities" in new Fixture {
+  it should "delete entities" in {
     val blockHeader = generate()
-    headerStorage.put(blockHeader).isRight is true
-    headerStorage.exists(blockHeader) isE true
-    headerStorage.delete(blockHeader).isRight is true
-    headerStorage.exists(blockHeader) isE false
-    postTest()
+    storage.put(blockHeader).isRight is true
+    storage.exists(blockHeader) isE true
+    storage.delete(blockHeader).isRight is true
+    storage.exists(blockHeader) isE false
   }
 
-  it should "work for transactions" in new Fixture with ConsensusConfigFixture {
+  it should "work for transactions" in new ConsensusConfigFixture.Default {
     forAll(blockGen) { block =>
       val header = block.header
       val hash   = block.hash
-      headerStorage.put(header).isRight is true
-      headerStorage.get(hash) isE header
-      headerStorage.getOpt(hash) isE Some(header)
-      headerStorage.delete(hash).isRight is true
-      headerStorage.get(hash).isLeft is true
-      headerStorage.getOpt(hash) isE None
+      storage.put(header).isRight is true
+      storage.get(hash) isE header
+      storage.getOpt(hash) isE Some(header)
+      storage.delete(hash).isRight is true
+      storage.get(hash).isLeft is true
+      storage.getOpt(hash) isE None
     }
-    postTest()
   }
 }

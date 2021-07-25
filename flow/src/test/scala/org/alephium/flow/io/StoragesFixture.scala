@@ -16,11 +16,14 @@
 
 package org.alephium.flow.io
 
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files => JFiles, Path}
+
+import org.scalatest.{BeforeAndAfterEach, Suite}
 
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfig}
+import org.alephium.util.{AlephiumSpec, Files}
 
 trait StoragesFixture {
   def storages: Storages
@@ -32,7 +35,7 @@ trait StoragesFixture {
 
 object StoragesFixture {
   def buildStorages(rootPath: Path)(implicit groupConfig: GroupConfig): Storages = {
-    if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
+    if (!JFiles.exists(rootPath)) rootPath.toFile.mkdir()
 
     val postFix   = Hash.random.toHexString
     val dbFolders = s"db-$postFix"
@@ -46,5 +49,28 @@ object StoragesFixture {
     implicit def groupConfig: GroupConfig
 
     lazy val storages = StoragesFixture.buildStorages(rootPath)
+  }
+}
+
+trait StorageTestFixture[S]
+    extends ConsensusConfigFixture.Default
+    with AlephiumSpec
+    with BeforeAndAfterEach { self: Suite =>
+  val dbname: String
+  val builder: RocksDBSource => S
+  lazy val dbPath           = Files.tmpDir.resolve(dbname)
+  var source: RocksDBSource = _
+  var storage: S            = _
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    source = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    storage = builder(source)
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    source.dESTROY().rightValue
+    ()
   }
 }
