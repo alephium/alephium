@@ -38,24 +38,17 @@ class PayloadSpec extends AlephiumSpec {
   }
 
   it should "validate Hello message" in {
-    val address          = new InetSocketAddress("127.0.0.1", 0)
-    val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
-    val brokerInfo       = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, address)
+    val address            = new InetSocketAddress("127.0.0.1", 0)
+    val (priKey1, pubKey1) = SignatureSchema.secureGeneratePriPub()
+    val (priKey2, _)       = SignatureSchema.secureGeneratePriPub()
+    val brokerInfo         = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
 
-    val input  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
-    val output = Hello._deserialize(Hello.serde.serialize(input))
-    output.map(_.value) isE input
-  }
+    val validInput  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey1)
+    val validOutput = Hello._deserialize(Hello.serde.serialize(validInput))
+    validOutput.map(_.value) isE validInput
 
-  it should "not validate Hello message with wrong signature" in {
-    val address      = new InetSocketAddress("127.0.0.1", 0)
-    val (_, pubKey1) = SignatureSchema.secureGeneratePriPub()
-    val (priKey2, _) = SignatureSchema.secureGeneratePriPub()
-    val brokerInfo   = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
-
-    val input  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey2)
-    val output = Hello._deserialize(Hello.serde.serialize(input))
-
-    output.leftValue is a[SerdeError]
+    val invalidInput  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey2)
+    val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
+    invalidOutput.leftValue is a[SerdeError]
   }
 }
