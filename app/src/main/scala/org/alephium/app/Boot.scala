@@ -100,7 +100,7 @@ class BootUp extends StrictLogging {
   }
 
   def checkNodeCompatibility(): Unit = {
-    server.storages.nodeStateStorage.checkNodeCompatibility(Version.release) match {
+    server.storages.nodeStateStorage.checkDatabaseCompatibility(Version.release) match {
       case Left(error) =>
         logger.error(s"Node compatibility check error: $error")
         sys.exit(1)

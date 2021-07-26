@@ -147,6 +147,19 @@ trait Generators extends NumericHelpers {
       ip3  <- Gen.choose(0, 255)
       port <- portGen
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
+
+  lazy val versionGen: Gen[(String, Version)] = {
+    val positiveInt = Gen.choose(0, Int.MaxValue)
+    for {
+      major    <- positiveInt
+      minor    <- positiveInt
+      patch    <- positiveInt
+      commitId <- Gen.option(Gen.hexStr)
+    } yield (
+      s"$major.$minor.$patch${commitId.map(id => s"+$id").getOrElse("")}",
+      Version(major, minor, patch)
+    )
+  }
 }
 
 trait DefaultGenerators extends Generators {

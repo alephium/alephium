@@ -20,14 +20,7 @@ import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.core.BlockHashChain
-import org.alephium.io.{
-  IOError,
-  IOResult,
-  IOUtils,
-  RawKeyValueStorage,
-  RocksDBColumn,
-  RocksDBSource
-}
+import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -52,34 +45,34 @@ trait NodeStateStorage extends RawKeyValueStorage {
       putRawUnsafe(isInitializedKey, ByteString(1))
     }
 
-  private val nodeVersionKey =
-    Hash.hash("databaseVersion").bytes ++ ByteString(Storages.nodeVersionPostfix)
+  private val dbVersionKey =
+    Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
 
-  def setNodeVersion(version: Version): IOResult[Unit] =
+  def setDatabaseVersion(version: Version): IOResult[Unit] =
     IOUtils.tryExecute {
-      putRawUnsafe(nodeVersionKey, serialize(version))
+      putRawUnsafe(dbVersionKey, serialize(version))
     }
 
-  def getNodeVersion: IOResult[Option[Version]] =
+  def getDatabaseVersion: IOResult[Option[Version]] =
     IOUtils.tryExecute {
-      getOptRawUnsafe(nodeVersionKey).map(deserialize[Version](_) match {
+      getOptRawUnsafe(dbVersionKey).map(deserialize[Version](_) match {
         case Left(e)  => throw e
         case Right(v) => v
       })
     }
 
-  def checkNodeCompatibility(version: Version): IOResult[Unit] = {
-    getNodeVersion.flatMap {
-      case Some(nodeVersion) if !version.backwardCompatible(nodeVersion) =>
+  def checkDatabaseCompatibility(version: Version): IOResult[Unit] = {
+    getDatabaseVersion.flatMap {
+      case Some(dbVersion) if !version.compatible(dbVersion) =>
         Left(
           IOError.Other(
-            new RuntimeException(s"Database version is $nodeVersion, client version is $version")
+            new RuntimeException(s"Database version is $dbVersion, client version is $version")
           )
         )
-      case Some(nodeVersion) if nodeVersion < version =>
-        setNodeVersion(version)
+      case Some(dbVersion) if dbVersion < version =>
+        setDatabaseVersion(version)
       case None =>
-        setNodeVersion(version)
+        setDatabaseVersion(version)
       case _ => Right(())
     }
   }

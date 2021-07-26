@@ -16,24 +16,12 @@
 
 package org.alephium.protocol.model
 
-import org.scalacheck.Gen
-
+import org.alephium.protocol.Generators
 import org.alephium.util.AlephiumSpec
 
 class VersionSpec extends AlephiumSpec {
   it should "get version from release string" in {
-    val positiveInt = Gen.choose(0, Int.MaxValue)
-    val versionStrGen: Gen[(String, Version)] = for {
-      major    <- positiveInt
-      minor    <- positiveInt
-      patch    <- positiveInt
-      commitId <- Gen.option(Gen.hexStr)
-    } yield (
-      s"$major.$minor.$patch${commitId.map(id => s"+$id").getOrElse("")}",
-      Version(major, minor, patch)
-    )
-
-    forAll(versionStrGen) { case (versionStr, version) =>
+    forAll(Generators.versionGen) { case (versionStr, version) =>
       Version.fromReleaseVersion(versionStr) contains version
     }
   }
