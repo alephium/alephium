@@ -20,8 +20,7 @@ import org.alephium.protocol.BuildInfo
 import org.alephium.serde.Serde
 
 final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Version] {
-  def backwardCompatible(version: Version): Boolean = major >= version.major
-  def compatible(version: Version): Boolean         = major == version.major
+  def compatible(version: Version): Boolean = major == version.major
 
   override def compare(that: Version): Int = {
     major.compare(that.major) match {
@@ -38,8 +37,8 @@ final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Ver
 }
 
 object Version {
-  private val dummy: Version = Version(-1, 0, 0)
-  val release: Version       = fromReleaseVersion(BuildInfo.version).getOrElse(dummy)
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  val release: Version = fromReleaseVersion(BuildInfo.version).get
 
   def fromReleaseVersion(release: String): Option[Version] = {
     val regex = """^(\d+)\.(\d+)\.(\d+)(\+.+)?""".r

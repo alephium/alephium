@@ -27,7 +27,7 @@ object Header {
       if (version.compatible(Version.release)) {
         Right(())
       } else {
-        Left(s"Invalid version: got ${version}, expect: ${Version.release}")
+        Left(s"Invalid version: expect: $version, self: ${Version.release}")
       }
     )
     .xmap(Header.apply, _.version)

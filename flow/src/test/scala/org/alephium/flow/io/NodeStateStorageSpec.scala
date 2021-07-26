@@ -16,45 +16,42 @@
 
 package org.alephium.flow.io
 
-import org.scalacheck.Gen
-
 import org.alephium.io.RocksDBSource
+import org.alephium.protocol.Generators
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.Version
 import org.alephium.util.AlephiumSpec
 
-class NodeStateStorageSpec extends AlephiumSpec with StorageSpec[NodeStateRockDBStorage] {
+class NodeStateStorageSpec
+    extends AlephiumSpec
+    with GroupConfigFixture.Default
+    with StorageSpec[NodeStateRockDBStorage] {
 
   override val dbname: String = "node-state-storage-spec"
   override val builder: RocksDBSource => NodeStateRockDBStorage =
     source => NodeStateRockDBStorage(source, RocksDBSource.ColumnFamily.All)
 
-  val versionGen: Gen[Version] = for {
-    major <- Gen.choose(0, Int.MaxValue)
-    minor <- Gen.choose(0, Int.MaxValue)
-    patch <- Gen.choose(0, Int.MaxValue)
-  } yield Version(major, minor, patch)
-
   it should "check database compatibility" in {
-    val initNodeVersion = versionGen.sample.get
-    storage.setNodeVersion(initNodeVersion).isRight is true
-    storage.getNodeVersion isE Some(initNodeVersion)
+    val initDbVersion = Generators.versionGen.sample.get._2
+    storage.setDatabaseVersion(initDbVersion).isRight is true
+    storage.getDatabaseVersion isE Some(initDbVersion)
 
-    forAll(versionGen) { version =>
-      val nodeVersion = storage.getNodeVersion.rightValue.get
-      if (!version.backwardCompatible(nodeVersion)) {
-        storage.checkNodeCompatibility(version).isLeft is true
-      } else if (nodeVersion < version) {
-        storage.checkNodeCompatibility(version).isRight is true
-        storage.getNodeVersion isE Some(version)
+    forAll(Generators.versionGen) { case (_, version) =>
+      val dbVersion = storage.getDatabaseVersion.rightValue.get
+      if (!version.compatible(dbVersion)) {
+        storage.checkDatabaseCompatibility(version).isLeft is true
+      } else if (dbVersion < version) {
+        storage.checkDatabaseCompatibility(version).isRight is true
+        storage.getDatabaseVersion isE Some(version)
       }
     }
   }
 
   it should "update database version when init" in {
-    storage.getNodeVersion isE None
+    storage.getDatabaseVersion isE None
 
-    val version: Version = versionGen.sample.get
-    storage.checkNodeCompatibility(version).isRight is true
-    storage.getNodeVersion isE Some(version)
+    val version: Version = Generators.versionGen.sample.get._2
+    storage.checkDatabaseCompatibility(version).isRight is true
+    storage.getDatabaseVersion isE Some(version)
   }
 }

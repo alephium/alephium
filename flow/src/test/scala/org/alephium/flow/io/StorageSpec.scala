@@ -16,16 +16,12 @@
 
 package org.alephium.flow.io
 
-import org.scalatest.{BeforeAndAfterEach, Suite}
+import org.scalatest.BeforeAndAfterEach
 
 import org.alephium.io.RocksDBSource
-import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.util.{AlephiumSpec, Files}
 
-trait StorageSpec[S]
-    extends ConsensusConfigFixture.Default
-    with AlephiumSpec
-    with BeforeAndAfterEach { self: Suite =>
+trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {
   val dbname: String
   val builder: RocksDBSource => S
   lazy val dbPath           = Files.tmpDir.resolve(dbname)
