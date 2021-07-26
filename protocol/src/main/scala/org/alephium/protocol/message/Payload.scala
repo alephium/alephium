@@ -19,8 +19,7 @@ package org.alephium.protocol.message
 import akka.util.ByteString
 import io.prometheus.client.Counter
 
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.Protocol
+import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -153,37 +152,63 @@ sealed trait HandShake extends Payload {
   def version: Int
   def timestamp: TimeStamp
   def brokerInfo: InterBrokerInfo
+  def signature: Signature
 }
 
 sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T] {
-  def unsafe(version: Int, timestamp: TimeStamp, brokerInfo: InterBrokerInfo): T
+  def unsafe(
+      version: Int,
+      timestamp: TimeStamp,
+      brokerInfo: InterBrokerInfo,
+      signature: Signature
+  ): T
 
-  def unsafe(brokerInfo: InterBrokerInfo): T =
-    unsafe(Protocol.version, TimeStamp.now(), brokerInfo)
+  def unsafe(brokerInfo: InterBrokerInfo, privateKey: PrivateKey): T = {
+    val signature = SignatureSchema.sign(brokerInfo.hash.bytes, privateKey)
+    unsafe(Protocol.version, TimeStamp.now(), brokerInfo, signature)
+  }
 
   implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
   val serde: Serde[T] =
-    Serde.forProduct3(unsafe, t => (t.version, t.timestamp, t.brokerInfo))
+    Serde.forProduct4(unsafe, t => (t.version, t.timestamp, t.brokerInfo, t.signature))
 
-  def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] =
-    if (message.version == Protocol.version && message.timestamp > TimeStamp.zero) {
+  def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] = {
+    val validSignature = SignatureSchema.verify(
+      message.brokerInfo.hash.bytes,
+      message.signature,
+      message.brokerInfo.cliqueId.publicKey
+    )
+
+    if (
+      validSignature &&
+      message.version == Protocol.version &&
+      message.timestamp > TimeStamp.zero
+    ) {
       Right(())
     } else {
       Left(s"invalid HandShake: $message")
     }
+  }
 }
 
 final case class Hello private (
     version: Int,
     timestamp: TimeStamp,
-    brokerInfo: InterBrokerInfo
+    brokerInfo: InterBrokerInfo,
+    signature: Signature
 ) extends HandShake {
   override def measure(): Unit = Hello.payloadLabeled.inc()
 }
 
 object Hello extends HandShakeSerding[Hello] with Payload.Code {
-  def unsafe(version: Int, timestamp: TimeStamp, brokerInfo: InterBrokerInfo): Hello =
-    new Hello(version, timestamp, brokerInfo)
+  def unsafe(
+      version: Int,
+      timestamp: TimeStamp,
+      brokerInfo: InterBrokerInfo,
+      signature: Signature
+  ): Hello = {
+    new Hello(version, timestamp, brokerInfo, signature)
+  }
 }
 
 final case class Ping(nonce: Int, timestamp: TimeStamp) extends Payload {

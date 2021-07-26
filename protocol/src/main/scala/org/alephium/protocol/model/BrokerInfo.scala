@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
-import org.alephium.protocol.SafeSerdeImpl
+import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
 
@@ -116,6 +116,9 @@ final case class InterBrokerInfo private (
     groupNumPerBroker: Int
 ) extends BrokerGroupInfo {
   def peerId: PeerId = PeerId(cliqueId, brokerId)
+  def hash(implicit serializer: Serializer[InterBrokerInfo]): Hash = {
+    Hash.hash(serialize(this))
+  }
 }
 
 object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {

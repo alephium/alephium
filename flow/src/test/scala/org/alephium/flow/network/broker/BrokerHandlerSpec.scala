@@ -27,6 +27,7 @@ import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{Hello, Payload, Pong}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
@@ -34,9 +35,10 @@ import org.alephium.util.{ActorRefT, Duration}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
   it should "handshake with new connection" in new Fixture {
+    val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
     val brokerInfo =
-      BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("127.0.0.1", 0))
-    val hello = Hello.unsafe(brokerInfo.interBrokerInfo)
+      BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
+    val hello = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
     brokerHandler ! BrokerHandler.Received(hello)
     brokerHandler.underlyingActor.pingPongTickOpt is a[Some[_]]
   }
@@ -84,15 +86,17 @@ class TestBrokerHandler(
     extends BrokerHandler {
   val connectionType: ConnectionType = OutboundConnection
 
+  val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
+
   override val remoteAddress: InetSocketAddress = SocketUtil.temporaryServerAddress()
 
   override def handShakeDuration: Duration = Duration.ofSecondsUnsafe(2)
 
   override def allHandlers: AllHandlers = ???
 
-  val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 0, 1, new InetSocketAddress("127.0.0.1", 0))
+  val brokerInfo = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
 
-  override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo)
+  override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
 
   override def exchanging: Receive = exchangingCommon
 
