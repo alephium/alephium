@@ -16,19 +16,25 @@
 
 package org.alephium.api
 
+import scala.concurrent.Future
+
 import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.generic.auto._
+import sttp.tapir.server._
 
-import org.alephium.api.TapirCodecs
-import org.alephium.api.TapirSchemasLike
+import org.alephium.api.{TapirCodecs, TapirSchemasLike}
+import org.alephium.api.model.ApiKey
 
 trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike with StrictLogging {
   import Endpoints._
   import ApiError._
 
-  type BaseEndpoint[A, B] = Endpoint[A, ApiError[_ <: StatusCode], B, Any]
+  def maybeApiKey: Option[ApiKey]
+
+  type BaseEndpoint[I, O] =
+    PartialServerEndpoint[Option[ApiKey], Unit, I, ApiError[_ <: StatusCode], O, Any, Future]
 
   val baseEndpoint: BaseEndpoint[Unit, Unit] =
     endpoint
@@ -41,4 +47,29 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
           error(Unauthorized, { case Unauthorized(_) => true })
         )
       )
+      .in(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
+      .serverLogicForCurrent { apiKey => Future.successful(checkApiKey(apiKey)) }
+
+  private def checkApiKey(
+      maybeToCheck: Option[ApiKey]
+  ): Either[ApiError[_ <: StatusCode], Unit] =
+    (maybeApiKey, maybeToCheck) match {
+      case (None, None)    => Right(())
+      case (None, Some(_)) => Left(ApiError.Unauthorized("Api key not configured in server"))
+      case (Some(_), None) => Left(ApiError.Unauthorized("Missing api key"))
+      case (Some(apiKey), Some(toCheck)) =>
+        if (apiKey.value == toCheck.value) {
+          Right(())
+        } else {
+          Left(ApiError.Unauthorized("Wrong api key"))
+        }
+    }
+
+  def serverLogic[I, O](endpoint: BaseEndpoint[I, O])(
+      logic: I => Future[Either[ApiError[_ <: StatusCode], O]]
+  ): ServerEndpoint[(Option[ApiKey], I), ApiError[_ <: StatusCode], O, Any, Future] = {
+    endpoint.serverLogic { case (_, input) =>
+      logic(input)
+    }
+  }
 }
