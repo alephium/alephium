@@ -21,7 +21,6 @@ import akka.actor.{Props, Stash}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{Message, SendHeaders}
 import org.alephium.protocol.model._
 import org.alephium.util._
 
@@ -30,8 +29,6 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  final case class GetBlocks(locators: AVector[BlockHash])                   extends Command
-  final case class GetHeaders(locators: AVector[BlockHash])                  extends Command
   case object GetSyncLocators                                                extends Command
   final case class GetSyncInventories(locators: AVector[AVector[BlockHash]]) extends Command
   case object GetIntraSyncInventories                                        extends Command
@@ -63,24 +60,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
     with Stash {
   import FlowHandler._
 
-  override def receive: Receive = handleRelay orElse handleSync
-
-  def handleRelay: Receive = {
-    case GetHeaders(locators) =>
-      locators.flatMapE(blockFlow.getHeadersAfter) match {
-        case Left(error) =>
-          log.warning(s"Failure while getting block headers: $error")
-        case Right(headers) =>
-          sender() ! Message(SendHeaders(headers))
-      }
-    case GetBlocks(locators: AVector[BlockHash]) =>
-      locators.flatMapE(blockFlow.getBlocksAfter) match {
-        case Left(error) =>
-          log.warning(s"IO Failure while getting blocks: $error")
-        case Right(blocks) =>
-          sender() ! BlocksLocated(blocks)
-      }
-  }
+  override def receive: Receive = handleSync
 
   def handleSync: Receive = {
     case GetSyncLocators =>
