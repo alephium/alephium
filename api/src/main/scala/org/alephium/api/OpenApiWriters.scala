@@ -27,10 +27,40 @@ import org.alephium.json.Json._
 
 object OpenAPIWriters {
 
-  def openApiJson(openAPI: OpenAPI): String = write(
-    dropNullValues(writeJs(openAPI)),
-    indent = 2
-  )
+  def openApiJson(openAPI: OpenAPI, dropAuth: Boolean): String = {
+    val newOpenAPI = if (dropAuth) {
+      dropSecurityFields(openAPI)
+    } else {
+      openAPI
+    }
+    write(
+      dropNullValues(writeJs(newOpenAPI)),
+      indent = 2
+    )
+  }
+
+  def dropSecurityFields(openAPI: OpenAPI): OpenAPI = {
+    val components: Option[Components] =
+      openAPI.components.map(_.copy(securitySchemes = ListMap.empty))
+    val paths: Paths = openAPI.paths.copy(pathItems = openAPI.paths.pathItems.map {
+      case (key, pathItem) =>
+        (key, mapOperation(pathItem)(_.copy(security = List.empty)))
+    })
+    openAPI.copy(components = components, paths = paths)
+  }
+
+  private def mapOperation(pathItem: PathItem)(f: Operation => Operation): PathItem = {
+    pathItem.copy(
+      get = pathItem.get.map(f),
+      put = pathItem.put.map(f),
+      post = pathItem.post.map(f),
+      delete = pathItem.delete.map(f),
+      options = pathItem.options.map(f),
+      head = pathItem.head.map(f),
+      patch = pathItem.patch.map(f),
+      trace = pathItem.trace.map(f)
+    )
+  }
 
   //needed because `OpenAPI.openapi` got a default value in tapir and upickle doesnt serialize it for weird reason
   final case class MyOpenAPI(
