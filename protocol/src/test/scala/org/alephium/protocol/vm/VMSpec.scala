@@ -40,7 +40,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val (obj, context) =
       prepareContract(contract, AVector[Val]())
     StatefulVM.execute(context, obj, AVector(Val.U256(U256.Two))) is
-      failed(PrivateExternalMethodCall)
+      failed(ExternalPrivateMethodCall)
   }
 
   it should "overflow oprand stack" in {

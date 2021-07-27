@@ -193,7 +193,7 @@ sealed trait ContractObj[Ctx <: Context] {
   ): ExeResult[Frame[Ctx]] = {
     for {
       method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
-      _      <- if (method.isPublic) okay else failed(PrivateExternalMethodCall)
+      _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
         val returnTo: AVector[Val] => ExeResult[Unit] = returns =>
           if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
@@ -245,7 +245,7 @@ sealed trait ContractObj[Ctx <: Context] {
   ): ExeResult[Frame[Ctx]] = {
     for {
       method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
-      _      <- if (method.isPublic) Right(()) else failed(PrivateExternalMethodCall)
+      _      <- if (method.isPublic) Right(()) else failed(ExternalPrivateMethodCall)
       frame <-
         if (method.isPayable) {
           startPayableFrame(ctx, method, args, operandStack, returnTo)

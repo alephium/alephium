@@ -216,7 +216,7 @@ final class StatefulFrame(
     for {
       contractObj        <- ctx.loadContract(contractKey)
       method             <- contractObj.getMethod(index).toRight(Right(InvalidMethodIndex(index)))
-      _                  <- if (method.isPublic) okay else failed(PrivateExternalMethodCall)
+      _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       args               <- opStack.pop(method.argsType.length)
       _                  <- method.check(args)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
