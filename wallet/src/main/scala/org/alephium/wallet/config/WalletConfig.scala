@@ -24,6 +24,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
 import sttp.model.Uri
 
+import org.alephium.api.model.ApiKey
 import org.alephium.conf._
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.Duration
@@ -33,11 +34,18 @@ final case class WalletConfig(
     secretDir: Path,
     networkType: NetworkType,
     lockingTimeout: Duration,
+    apiKey: Option[ApiKey],
     blockflow: WalletConfig.BlockFlow
 )
 
 object WalletConfig {
-  final case class BlockFlow(host: String, port: Int, groups: Int, blockflowFetchMaxAge: Duration) {
+  final case class BlockFlow(
+      host: String,
+      port: Int,
+      groups: Int,
+      blockflowFetchMaxAge: Duration,
+      apiKey: Option[ApiKey]
+  ) {
     val uri: Uri = Uri(host, port)
   }
 
@@ -47,6 +55,14 @@ object WalletConfig {
       .getOrElse(throw new ConfigException.BadValue("", s"invalid network type: $name"))
   }
 
+  implicit private val apiValueReader: ValueReader[ApiKey] =
+    ValueReader[String].map { input =>
+      ApiKey.from(input) match {
+        case Right(apiKey) => apiKey
+        case Left(error)   => throw new ConfigException.BadValue("ApiKey", error)
+      }
+    }
+
   implicit val walletConfigReader: ValueReader[WalletConfig] =
     valueReader { implicit cfg =>
       WalletConfig(
@@ -54,6 +70,7 @@ object WalletConfig {
         as[Path]("secretDir"),
         as[NetworkType]("networkType"),
         as[Duration]("lockingTimeout"),
+        as[Option[ApiKey]]("apiKey"),
         as[WalletConfig.BlockFlow]("blockflow")
       )
     }

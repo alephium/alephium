@@ -45,11 +45,20 @@ trait WalletConfigFixture extends SocketUtil {
     override def groups: Int = config.blockflow.groups
   }
 
+  val apiKey = None
+
   lazy val config = WalletConfig(
     Some(walletPort),
     tempSecretDir,
     networkType,
     lockingTimeout,
-    WalletConfig.BlockFlow(host.getHostAddress, blockFlowPort, groupNum, blockflowFetchMaxAge)
+    apiKey,
+    WalletConfig.BlockFlow(
+      host.getHostAddress,
+      blockFlowPort,
+      groupNum,
+      blockflowFetchMaxAge,
+      apiKey
+    )
   )
 }
