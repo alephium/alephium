@@ -102,10 +102,10 @@ trait BrokerHandler extends BaseBrokerHandler {
       setSelfSynced()
     } else {
       if (validate(hashes)) {
-        log.debug(s"Received sync response ${Utils.showFlow(hashes)} from $remoteAddress")
+        log.debug(s"Received inv response ${Utils.showFlow(hashes)} from $remoteAddress")
         blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
       } else {
-        log.warning(s"Invalid sync response from $remoteAddress: ${Utils.showFlow(hashes)}")
+        log.warning(s"Invalid inv response from $remoteAddress: ${Utils.showFlow(hashes)}")
         handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
       }
     }

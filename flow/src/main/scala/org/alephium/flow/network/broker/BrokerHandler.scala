@@ -190,7 +190,7 @@ trait BrokerHandler extends FlowDataHandler {
   def pingFrequency: Duration
 
   def sendPing(): Unit = {
-    if (pingRequestId.value != U64.Zero) {
+    if (pingRequestId.value != U32.Zero) {
       log.info(s"No Pong message received in time from $remoteAddress")
       handleMisbehavior(MisbehaviorManager.RequestTimeout(remoteAddress))
     }
@@ -200,7 +200,7 @@ trait BrokerHandler extends FlowDataHandler {
   }
 
   def handlePing(requestId: RequestId, timestamp: TimeStamp): Unit = {
-    if (requestId.value == U64.Zero) {
+    if (requestId.value == U32.Zero) {
       handleMisbehavior(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp.millis
@@ -212,7 +212,7 @@ trait BrokerHandler extends FlowDataHandler {
   def handlePong(requestId: RequestId): Unit = {
     if (requestId == pingRequestId) {
       log.debug(s"Pong received from broker $brokerAlias")
-      pingRequestId = RequestId(U64.Zero)
+      pingRequestId = RequestId(U32.Zero)
     } else {
       log.debug(
         s"Pong received from broker $brokerAlias wrong requestId: expect $pingRequestId, got $requestId"

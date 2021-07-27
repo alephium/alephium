@@ -23,7 +23,7 @@ import scala.reflect.ClassTag
 import akka.util.ByteString
 
 import org.alephium.util.{AVector, Bytes, I256, TimeStamp, U256}
-import org.alephium.util.U64
+import org.alephium.util.U32
 
 trait Serde[T] extends Serializer[T] with Deserializer[T] { self =>
   // Note: make sure that T and S are isomorphic
@@ -184,14 +184,12 @@ object Serde extends ProductSerde {
       CompactInteger.Unsigned.decodeU256(input)
   }
 
-  private[serde] object U64Serde extends Serde[U64] {
-    override def serialize(input: U64): ByteString =
-      CompactInteger.Unsigned.encode(U256.fromU64(input))
+  private[serde] object U32Serde extends Serde[U32] {
+    override def serialize(input: U32): ByteString =
+      CompactInteger.Unsigned.encode(input)
 
-    override def _deserialize(input: ByteString): SerdeResult[Staging[U64]] =
-      CompactInteger.Unsigned.decodeU256(input).map { x =>
-        x.mapValue(y => U64.unsafe(y.v.longValue()))
-      }
+    override def _deserialize(input: ByteString): SerdeResult[Staging[U32]] =
+      CompactInteger.Unsigned.decodeU32(input)
   }
 
   private[serde] object ByteStringSerde extends Serde[ByteString] {

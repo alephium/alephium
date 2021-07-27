@@ -200,10 +200,10 @@ class InterCliqueSyncTest extends AlephiumSpec {
 
   it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
     val injection: PartialFunction[Payload, Payload] = { case Pong(requestId) =>
-      val updatedRequestId = if (requestId.value.addUnsafe(U64.One) != U64.Zero) {
-        RequestId(requestId.value.addUnsafe(U64.One))
+      val updatedRequestId = if (requestId.value.addUnsafe(U32.One) != U32.Zero) {
+        RequestId(requestId.value.addUnsafe(U32.One))
       } else {
-        RequestId(requestId.value.addUnsafe(U64.Two))
+        RequestId(requestId.value.addUnsafe(U32.Two))
       }
 
       Pong(updatedRequestId)

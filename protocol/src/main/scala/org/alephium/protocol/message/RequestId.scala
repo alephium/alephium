@@ -18,9 +18,9 @@ package org.alephium.protocol.message
 
 import org.alephium.serde.Serde
 import org.alephium.util.SecureAndSlowRandom
-import org.alephium.util.U64
+import org.alephium.util.U32
 
-final case class RequestId(value: U64) {
+final case class RequestId(value: U32) {
   override def toString(): String = {
     s"RequestId: ${value.v}"
   }
@@ -29,11 +29,11 @@ final case class RequestId(value: U64) {
 object RequestId {
   implicit val serde: Serde[RequestId] = Serde.forProduct1(RequestId(_), _.value)
 
-  def unsafe(value: Long): RequestId = {
-    RequestId(U64.unsafe(value))
+  def unsafe(value: Int): RequestId = {
+    RequestId(U32.unsafe(value))
   }
 
   def random(): RequestId = {
-    RequestId(SecureAndSlowRandom.nextNonZeroU64())
+    RequestId(SecureAndSlowRandom.nextNonZeroU32())
   }
 }

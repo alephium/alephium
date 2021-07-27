@@ -32,12 +32,7 @@ sealed trait Payload extends Product with Serializable {
 }
 
 object Payload {
-  @SuppressWarnings(
-    Array(
-      "org.wartremover.warts.Product",
-      "org.wartremover.warts.Serializable"
-    )
-  )
+
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
       case x: Hello           => (Hello, Hello.serialize(x))

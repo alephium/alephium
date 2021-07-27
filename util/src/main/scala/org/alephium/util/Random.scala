@@ -51,9 +51,9 @@ trait AbstractRandom {
   }
 
   @tailrec
-  final def nextNonZeroU64(): U64 = {
-    val random = source.nextLong()
-    if (random != 0) U64.unsafe(math.abs(random)) else nextNonZeroU64()
+  final def nextNonZeroU32(): U32 = {
+    val random = nextNonZeroInt()
+    if (random != 0) U32.unsafe(math.abs(random)) else nextNonZeroU32()
   }
 }
 
