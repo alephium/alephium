@@ -264,8 +264,6 @@ final class StatefulFrame(
     } yield None
 }
 
-object StatefulFrame {}
-
 object Frame {
   def stateless(
       ctx: StatelessContext,
