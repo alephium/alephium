@@ -35,13 +35,13 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
     val obj = contract.toObject(contractOutputRef.key, fields)
     val context = new StatefulContext {
-      override val worldState: WorldState.Staging                = cachedWorldState.staging()
-      override def outputBalances: Frame.Balances                = ???
-      override def nextOutputIndex: Int                          = ???
-      override def txId: Hash                                    = Hash.zero
-      override def signatures: Stack[protocol.Signature]         = Stack.ofCapacity(0)
-      override def getInitialBalances: ExeResult[Frame.Balances] = failed(NonPayableFrame)
-      override var gasRemaining: GasBox                          = gasLimit
+      override val worldState: WorldState.Staging          = cachedWorldState.staging()
+      override def outputBalances: Balances                = ???
+      override def nextOutputIndex: Int                    = ???
+      override def txId: Hash                              = Hash.zero
+      override def signatures: Stack[protocol.Signature]   = Stack.ofCapacity(0)
+      override def getInitialBalances: ExeResult[Balances] = failed(NonPayableFrame)
+      override var gasRemaining: GasBox                    = gasLimit
     }
     obj -> context
   }
