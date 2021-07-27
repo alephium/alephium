@@ -19,6 +19,8 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import org.scalatest.Assertion
+
 import org.alephium.protocol
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.minimalGas
@@ -26,24 +28,58 @@ import org.alephium.serde._
 import org.alephium.util._
 
 class VMSpec extends AlephiumSpec with ContextGenerators {
-  it should "not call from private function" in {
-    val method =
-      Method[StatefulContext](
-        isPublic = false,
-        isPayable = false,
-        argsType = AVector.empty,
-        localsLength = 0,
-        returnType = AVector.empty,
-        instrs = AVector.empty
-      )
-    val contract = StatefulContract(AVector.empty, methods = AVector(method))
-    val (obj, context) =
-      prepareContract(contract, AVector[Val]())
-    StatefulVM.execute(context, obj, AVector(Val.U256(U256.Two))) is
-      failed(ExternalPrivateMethodCall)
+
+  trait Fixture {
+    val baseMethod = Method[StatefulContext](
+      isPublic = true,
+      isPayable = false,
+      argsType = AVector.empty,
+      localsLength = 0,
+      returnType = AVector.empty,
+      instrs = AVector.empty
+    )
+
+    def failMainMethod(
+        method: Method[StatefulContext],
+        args: AVector[Val] = AVector.empty,
+        gasLimit: GasBox = minimalGas,
+        failure: ExeFailure
+    ): Assertion = {
+      val contract = StatefulContract(AVector.empty, methods = AVector(method))
+      failContract(contract, args, gasLimit, failure)
+    }
+
+    def failContract(
+        contract: StatefulContract,
+        args: AVector[Val] = AVector.empty,
+        gasLimit: GasBox = minimalGas,
+        failure: ExeFailure
+    ): Assertion = {
+      val (obj, context) =
+        prepareContract(contract, AVector[Val](), gasLimit)
+      StatefulVM.execute(context, obj, args).leftValue.rightValue is failure
+    }
   }
 
-  it should "overflow oprand stack" in {
+  it should "not call from private function" in new Fixture {
+    failMainMethod(baseMethod.copy(isPublic = false), failure = ExternalPrivateMethodCall)
+  }
+
+  it should "not fail when there is no main method" in new Fixture {
+    failContract(
+      StatefulContract(AVector.empty, AVector.empty),
+      failure = InvalidMethodIndex(0)
+    )
+  }
+
+  it should "not return values for main function" in new Fixture {
+    failMainMethod(
+      baseMethod.copy(returnType = AVector(Val.U256), instrs = AVector(U256Const0, Return)),
+      failure = NonEmptyReturnForMainFunction
+    )
+  }
+
+  it should "overflow oprand stack" in new Fixture {
     val method =
       Method[StatefulContext](
         isPublic = true,
@@ -65,14 +101,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         )
       )
 
-    val contract = StatefulContract(AVector.empty, methods = AVector(method))
-    val (obj, context) =
-      prepareContract(contract, AVector[Val](), 1000000)
-    StatefulVM.execute(
-      context,
-      obj,
-      AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1)))
-    ) is failed(StackOverflow)
+    failMainMethod(
+      method,
+      AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1))),
+      1000000,
+      StackOverflow
+    )
   }
 
   it should "execute the following script" in {
