@@ -46,21 +46,21 @@ trait BrokerHandler extends BaseBrokerHandler {
       case BaseBrokerHandler.SyncLocators(locators) =>
         log.debug(s"Send sync locators to $remoteAddress: ${Utils.showFlow(locators)}")
         send(SyncRequest(locators))
-      case BaseBrokerHandler.Received(SyncRequest(locators)) =>
+      case BaseBrokerHandler.Received(SyncRequest(requestId, locators)) =>
         if (validate(locators)) {
           log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
-          allHandlers.flowHandler ! FlowHandler.GetSyncInventories(locators)
+          allHandlers.flowHandler ! FlowHandler.GetSyncInventories(requestId, locators)
         } else {
           log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
           handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
         }
-      case FlowHandler.SyncInventories(inventories) =>
+      case FlowHandler.SyncInventories(requestId, inventories) =>
         log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
         if (inventories.forall(_.isEmpty)) {
           setRemoteSynced()
         }
-        send(SyncResponse(inventories))
-      case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
+        send(SyncResponse(requestId, inventories))
+      case BaseBrokerHandler.Received(SyncResponse(_, hashes)) =>
         if (hashes.forall(_.isEmpty)) {
           setSelfSynced()
         } else {

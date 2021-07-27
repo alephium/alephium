@@ -49,10 +49,12 @@ trait BrokerHandler extends BaseBrokerHandler {
     schedule(self, BrokerHandler.IntraSync, Duration.zero, Duration.ofMinutesUnsafe(1))
 
     val receive: Receive = {
-      case FlowHandler.SyncInventories(inventories) =>
-        send(SyncResponse(inventories))
-      case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
-        log.debug(s"Received sync response ${Utils.showFlow(hashes)} from intra clique broker")
+      case FlowHandler.SyncInventories(requestId, inventories) =>
+        send(SyncResponse(requestId, inventories))
+      case BaseBrokerHandler.Received(SyncResponse(requestId, hashes)) =>
+        log.debug(
+          s"Received sync response ${Utils.showFlow(hashes)} from intra clique broker, $requestId"
+        )
         assume(hashes.length == remoteBrokerInfo.groupNumPerBroker * brokerConfig.groups)
         val (headersToSync, blocksToSync) =
           BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)

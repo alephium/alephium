@@ -211,52 +211,60 @@ object Hello extends HandShakeSerding[Hello] with Payload.Code {
   }
 }
 
-final case class Ping(nonce: Int, timestamp: TimeStamp) extends Payload {
+final case class Ping(id: RequestId, timestamp: TimeStamp) extends Payload {
   override def measure(): Unit = Ping.payloadLabeled.inc()
 }
 
 object Ping extends Payload.Serding[Ping] with Payload.Code {
-  val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.nonce, p.timestamp))
+  val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.id, p.timestamp))
 }
 
-final case class Pong(nonce: Int) extends Payload {
+final case class Pong(id: RequestId) extends Payload {
   override def measure(): Unit = Pong.payloadLabeled.inc()
 }
 
 object Pong extends Payload.Serding[Pong] with Payload.Code {
-  val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.nonce)
+  val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.id)
 }
 
-final case class SendBlocks(blocks: AVector[Block]) extends Payload {
+final case class SendBlocks(id: Option[RequestId], blocks: AVector[Block]) extends Payload {
   override def measure(): Unit = SendBlocks.payloadLabeled.inc()
 }
 
 object SendBlocks extends Payload.Serding[SendBlocks] with Payload.Code {
-  implicit val serde: Serde[SendBlocks] = Serde.forProduct1(apply, p => p.blocks)
+  implicit val serde: Serde[SendBlocks] = Serde.forProduct2(apply, p => (p.id, p.blocks))
 }
 
-final case class GetBlocks(locators: AVector[BlockHash]) extends Payload {
+final case class GetBlocks(id: RequestId, locators: AVector[BlockHash]) extends Payload {
   override def measure(): Unit = GetBlocks.payloadLabeled.inc()
 }
 
 object GetBlocks extends Payload.Serding[GetBlocks] with Payload.Code {
-  implicit val serde: Serde[GetBlocks] = Serde.forProduct1(apply, p => p.locators)
+  implicit val serde: Serde[GetBlocks] = Serde.forProduct2(apply, p => (p.id, p.locators))
+
+  def apply(locators: AVector[BlockHash]): GetBlocks = {
+    GetBlocks(RequestId.random(), locators)
+  }
 }
 
-final case class SendHeaders(headers: AVector[BlockHeader]) extends Payload {
+final case class SendHeaders(id: Option[RequestId], headers: AVector[BlockHeader]) extends Payload {
   override def measure(): Unit = SendHeaders.payloadLabeled.inc()
 }
 
 object SendHeaders extends Payload.Serding[SendHeaders] with Payload.Code {
-  implicit val serde: Serde[SendHeaders] = Serde.forProduct1(apply, p => p.headers)
+  implicit val serde: Serde[SendHeaders] = Serde.forProduct2(apply, p => (p.id, p.headers))
 }
 
-final case class GetHeaders(locators: AVector[BlockHash]) extends Payload {
+final case class GetHeaders(id: RequestId, locators: AVector[BlockHash]) extends Payload {
   override def measure(): Unit = GetHeaders.payloadLabeled.inc()
 }
 
 object GetHeaders extends Payload.Serding[GetHeaders] with Payload.Code {
-  implicit val serde: Serde[GetHeaders] = Serde.forProduct1(apply, p => p.locators)
+  implicit val serde: Serde[GetHeaders] = Serde.forProduct2(apply, p => (p.id, p.locators))
+
+  def apply(locators: AVector[BlockHash]): GetHeaders = {
+    GetHeaders(RequestId.random(), locators)
+  }
 }
 
 final case class SendTxs(txs: AVector[TransactionTemplate]) extends Payload {
@@ -267,18 +275,23 @@ object SendTxs extends Payload.Serding[SendTxs] with Payload.Code {
   implicit val serde: Serde[SendTxs] = Serde.forProduct1(apply, p => p.txs)
 }
 
-final case class SyncRequest(locators: AVector[AVector[BlockHash]]) extends Payload {
+final case class SyncRequest(id: RequestId, locators: AVector[AVector[BlockHash]]) extends Payload {
   override def measure(): Unit = SyncRequest.payloadLabeled.inc()
 }
 
 object SyncRequest extends Payload.Serding[SyncRequest] with Payload.Code {
-  implicit val serde: Serde[SyncRequest] = Serde.forProduct1(apply, p => p.locators)
+  implicit val serde: Serde[SyncRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
+
+  def apply(locators: AVector[AVector[BlockHash]]): SyncRequest = {
+    SyncRequest(RequestId.random(), locators)
+  }
 }
 
-final case class SyncResponse(hashes: AVector[AVector[BlockHash]]) extends Payload {
+final case class SyncResponse(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
+    extends Payload {
   override def measure(): Unit = SyncResponse.payloadLabeled.inc()
 }
 
 object SyncResponse extends Payload.Serding[SyncResponse] with Payload.Code {
-  implicit val serde: Serde[SyncResponse] = Serde.forProduct1(apply, p => p.hashes)
+  implicit val serde: Serde[SyncResponse] = Serde.forProduct2(apply, p => (p.id, p.hashes))
 }

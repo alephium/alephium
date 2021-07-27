@@ -120,23 +120,23 @@ trait BrokerHandler extends FlowDataHandler {
         s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
       send(GetBlocks(hashes))
-    case Received(SendBlocks(blocks)) =>
+    case Received(SendBlocks(_, blocks)) =>
       log.debug(
         s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress"
       )
       handleFlowData(blocks, dataOrigin, isBlock = true)
-    case Received(GetBlocks(hashes)) =>
+    case Received(GetBlocks(requestId, hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
-        send(SendBlocks(blocks))
+        send(SendBlocks(Some(requestId), blocks))
       }
-    case Received(SendHeaders(headers)) =>
+    case Received(SendHeaders(_, headers)) =>
       log.debug(
         s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress"
       )
       handleFlowData(headers, dataOrigin, isBlock = false)
-    case Received(GetHeaders(hashes)) =>
+    case Received(GetHeaders(requestId, hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
-        send(SendHeaders(headers))
+        send(SendHeaders(Some(requestId), headers))
       }
     case Received(SendTxs(txs)) =>
       log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.id))}")
@@ -170,42 +170,42 @@ trait BrokerHandler extends FlowDataHandler {
 
   def pingPong: Receive = {
     case SendPing             => sendPing()
-    case Received(ping: Ping) => handlePing(ping.nonce, ping.timestamp)
-    case Received(pong: Pong) => handlePong(pong.nonce)
+    case Received(ping: Ping) => handlePing(ping.id, ping.timestamp)
+    case Received(pong: Pong) => handlePong(pong.id)
   }
 
   final var pingPongTickOpt: Option[Cancellable] = None
-  final var pingNonce: Int                       = 0
+  final var pingRequestId: RequestId             = RequestId.unsafe(0)
 
   def pingFrequency: Duration
 
   def sendPing(): Unit = {
-    if (pingNonce != 0) {
+    if (pingRequestId.value != U64.Zero) {
       log.info(s"No Pong message received in time from $remoteAddress")
       handleMisbehavior(MisbehaviorManager.RequestTimeout(remoteAddress))
     }
 
-    pingNonce = UnsecureRandom.nextNonZeroInt()
-    send(Ping(pingNonce, TimeStamp.now()))
+    pingRequestId = RequestId.random()
+    send(Ping(pingRequestId, TimeStamp.now()))
   }
 
-  def handlePing(nonce: Int, timestamp: TimeStamp): Unit = {
-    if (nonce == 0) {
+  def handlePing(requestId: RequestId, timestamp: TimeStamp): Unit = {
+    if (requestId.value == U64.Zero) {
       handleMisbehavior(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
     } else {
       val delay = System.currentTimeMillis() - timestamp.millis
       log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")
-      send(Pong(nonce))
+      send(Pong(requestId))
     }
   }
 
-  def handlePong(nonce: Int): Unit = {
-    if (nonce == pingNonce) {
+  def handlePong(requestId: RequestId): Unit = {
+    if (requestId == pingRequestId) {
       log.debug(s"Pong received from broker $brokerAlias")
-      pingNonce = 0
+      pingRequestId = RequestId(U64.Zero)
     } else {
       log.debug(
-        s"Pong received from broker $brokerAlias wrong nonce: expect $pingNonce, got $nonce"
+        s"Pong received from broker $brokerAlias wrong requestId: expect $pingRequestId, got $requestId"
       )
       handleMisbehavior(MisbehaviorManager.InvalidPingPong(remoteAddress))
     }

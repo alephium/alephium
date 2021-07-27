@@ -33,7 +33,7 @@ object CompactInteger {
    * - 0b11: multi-byte mode: [0, 2**536)
    */
   object Unsigned {
-    private val oneByteBound  = 0x40 // 0b00100000
+    private val oneByteBound  = 0x40 // 0b01000000
     private val twoByteBound  = oneByteBound << 8
     private val fourByteBound = oneByteBound << (8 * 3)
 

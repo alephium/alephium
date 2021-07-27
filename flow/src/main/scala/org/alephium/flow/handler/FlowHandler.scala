@@ -21,6 +21,7 @@ import akka.actor.{Props, Stash}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.RequestId
 import org.alephium.protocol.model._
 import org.alephium.util._
 
@@ -29,13 +30,15 @@ object FlowHandler {
     Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case object GetSyncLocators                                                extends Command
-  final case class GetSyncInventories(locators: AVector[AVector[BlockHash]]) extends Command
-  case object GetIntraSyncInventories                                        extends Command
+  case object GetSyncLocators extends Command
+  final case class GetSyncInventories(id: RequestId, locators: AVector[AVector[BlockHash]])
+      extends Command
+  case object GetIntraSyncInventories extends Command
 
   sealed trait Event
-  final case class BlocksLocated(blocks: AVector[Block])                extends Event
-  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Event
+  final case class BlocksLocated(blocks: AVector[Block]) extends Event
+  final case class SyncInventories(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
+      extends Event
   final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[BlockHash]])
       extends Command {
     def filerFor(another: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
@@ -67,13 +70,13 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
       escapeIOError(blockFlow.getSyncLocators()) { locators =>
         sender() ! SyncLocators(brokerConfig, locators)
       }
-    case GetSyncInventories(locators) =>
+    case GetSyncInventories(requestId, locators) =>
       escapeIOError(blockFlow.getSyncInventories(locators)) { inventories =>
-        sender() ! SyncInventories(inventories)
+        sender() ! SyncInventories(Some(requestId), inventories)
       }
     case GetIntraSyncInventories =>
       escapeIOError(blockFlow.getIntraSyncInventories()) { inventories =>
-        sender() ! SyncInventories(inventories)
+        sender() ! SyncInventories(None, inventories)
       }
   }
 }

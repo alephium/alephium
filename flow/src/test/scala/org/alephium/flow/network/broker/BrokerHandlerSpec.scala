@@ -29,7 +29,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{Hello, Payload, Pong}
+import org.alephium.protocol.message.{Hello, Payload, Pong, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{ActorRefT, Duration}
 
@@ -51,7 +51,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
 
   it should "stop when received other message than handshake message" in new Fixture {
     watch(brokerHandler)
-    brokerHandler ! BrokerHandler.Received(Pong(100))
+    brokerHandler ! BrokerHandler.Received(Pong(RequestId.unsafe(100)))
     expectTerminated(brokerHandler)
   }
 
