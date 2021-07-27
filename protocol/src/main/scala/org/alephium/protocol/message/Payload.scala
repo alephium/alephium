@@ -41,17 +41,18 @@ object Payload {
   )
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
-      case x: Hello          => (Hello, Hello.serialize(x))
-      case x: Ping           => (Ping, Ping.serialize(x))
-      case x: Pong           => (Pong, Pong.serialize(x))
-      case x: BlocksResponse => (BlocksResponse, BlocksResponse.serialize(x))
-      case x: BlocksRequest  => (BlocksRequest, BlocksRequest.serialize(x))
-      case x: NewBlocks      => (NewBlocks, NewBlocks.serialize(x))
-      case x: SendHeaders    => (SendHeaders, SendHeaders.serialize(x))
-      case x: GetHeaders     => (GetHeaders, GetHeaders.serialize(x))
-      case x: SendTxs        => (SendTxs, SendTxs.serialize(x))
-      case x: SyncRequest    => (SyncRequest, SyncRequest.serialize(x))
-      case x: SyncResponse   => (SyncResponse, SyncResponse.serialize(x))
+      case x: Hello           => (Hello, Hello.serialize(x))
+      case x: Ping            => (Ping, Ping.serialize(x))
+      case x: Pong            => (Pong, Pong.serialize(x))
+      case x: BlocksResponse  => (BlocksResponse, BlocksResponse.serialize(x))
+      case x: BlocksRequest   => (BlocksRequest, BlocksRequest.serialize(x))
+      case x: NewBlocks       => (NewBlocks, NewBlocks.serialize(x))
+      case x: HeadersResponse => (HeadersResponse, HeadersResponse.serialize(x))
+      case x: HeadersRequest  => (HeadersRequest, HeadersRequest.serialize(x))
+      case x: NewHeaders      => (NewHeaders, NewHeaders.serialize(x))
+      case x: SendTxs         => (SendTxs, SendTxs.serialize(x))
+      case x: SyncRequest     => (SyncRequest, SyncRequest.serialize(x))
+      case x: SyncResponse    => (SyncResponse, SyncResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -64,17 +65,18 @@ object Payload {
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
     deserializerCode._deserialize(input).flatMap { case Staging(code, rest) =>
       code match {
-        case Hello          => Hello._deserialize(rest)
-        case Ping           => Ping._deserialize(rest)
-        case Pong           => Pong._deserialize(rest)
-        case BlocksResponse => BlocksResponse._deserialize(rest)
-        case BlocksRequest  => BlocksRequest._deserialize(rest)
-        case NewBlocks      => NewBlocks._deserialize(rest)
-        case SendHeaders    => SendHeaders._deserialize(rest)
-        case GetHeaders     => GetHeaders._deserialize(rest)
-        case SendTxs        => SendTxs._deserialize(rest)
-        case SyncRequest    => SyncRequest._deserialize(rest)
-        case SyncResponse   => SyncResponse._deserialize(rest)
+        case Hello           => Hello._deserialize(rest)
+        case Ping            => Ping._deserialize(rest)
+        case Pong            => Pong._deserialize(rest)
+        case BlocksResponse  => BlocksResponse._deserialize(rest)
+        case BlocksRequest   => BlocksRequest._deserialize(rest)
+        case NewBlocks       => NewBlocks._deserialize(rest)
+        case HeadersResponse => HeadersResponse._deserialize(rest)
+        case HeadersRequest  => HeadersRequest._deserialize(rest)
+        case NewHeaders      => NewHeaders._deserialize(rest)
+        case SendTxs         => SendTxs._deserialize(rest)
+        case SyncRequest     => SyncRequest._deserialize(rest)
+        case SyncResponse    => SyncResponse._deserialize(rest)
       }
     }
   }
@@ -130,8 +132,9 @@ object Payload {
         BlocksResponse,
         BlocksRequest,
         NewBlocks,
-        SendHeaders,
-        GetHeaders,
+        HeadersResponse,
+        HeadersRequest,
+        NewHeaders,
         SendTxs,
         SyncRequest,
         SyncResponse
@@ -243,7 +246,7 @@ final case class NewBlocks(blocks: AVector[Block]) extends Payload {
 }
 
 object NewBlocks extends Payload.Serding[NewBlocks] with Payload.Code {
-  implicit val serde: Serde[NewBlocks] = Serde.forProduct1(apply, p => p.blocks)
+  implicit val serde: Serde[NewBlocks] = Serde.forProduct1(apply, _.blocks)
 }
 
 final case class BlocksRequest(id: RequestId, locators: AVector[BlockHash]) extends Payload {
@@ -258,23 +261,33 @@ object BlocksRequest extends Payload.Serding[BlocksRequest] with Payload.Code {
   }
 }
 
-final case class SendHeaders(id: Option[RequestId], headers: AVector[BlockHeader]) extends Payload {
-  override def measure(): Unit = SendHeaders.payloadLabeled.inc()
+final case class HeadersResponse(id: RequestId, headers: AVector[BlockHeader])
+    extends Payload {
+  override def measure(): Unit = HeadersResponse.payloadLabeled.inc()
 }
 
-object SendHeaders extends Payload.Serding[SendHeaders] with Payload.Code {
-  implicit val serde: Serde[SendHeaders] = Serde.forProduct2(apply, p => (p.id, p.headers))
+object HeadersResponse extends Payload.Serding[HeadersResponse] with Payload.Code {
+  implicit val serde: Serde[HeadersResponse] = Serde.forProduct2(apply, p => (p.id, p.headers))
 }
 
-final case class GetHeaders(id: RequestId, locators: AVector[BlockHash]) extends Payload {
-  override def measure(): Unit = GetHeaders.payloadLabeled.inc()
+final case class NewHeaders(headers: AVector[BlockHeader])
+    extends Payload {
+  override def measure(): Unit = NewHeaders.payloadLabeled.inc()
 }
 
-object GetHeaders extends Payload.Serding[GetHeaders] with Payload.Code {
-  implicit val serde: Serde[GetHeaders] = Serde.forProduct2(apply, p => (p.id, p.locators))
+object NewHeaders extends Payload.Serding[NewHeaders] with Payload.Code {
+  implicit val serde: Serde[NewHeaders] = Serde.forProduct1(apply, _.headers)
+}
 
-  def apply(locators: AVector[BlockHash]): GetHeaders = {
-    GetHeaders(RequestId.random(), locators)
+final case class HeadersRequest(id: RequestId, locators: AVector[BlockHash]) extends Payload {
+  override def measure(): Unit = HeadersRequest.payloadLabeled.inc()
+}
+
+object HeadersRequest extends Payload.Serding[HeadersRequest] with Payload.Code {
+  implicit val serde: Serde[HeadersRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
+
+  def apply(locators: AVector[BlockHash]): HeadersRequest = {
+    HeadersRequest(RequestId.random(), locators)
   }
 }
 
