@@ -43,16 +43,16 @@ object Payload {
       case x: Hello           => (Hello, Hello.serialize(x))
       case x: Ping            => (Ping, Ping.serialize(x))
       case x: Pong            => (Pong, Pong.serialize(x))
-      case x: BlocksResponse  => (BlocksResponse, BlocksResponse.serialize(x))
       case x: BlocksRequest   => (BlocksRequest, BlocksRequest.serialize(x))
-      case x: NewBlocks       => (NewBlocks, NewBlocks.serialize(x))
-      case x: HeadersResponse => (HeadersResponse, HeadersResponse.serialize(x))
+      case x: BlocksResponse  => (BlocksResponse, BlocksResponse.serialize(x))
       case x: HeadersRequest  => (HeadersRequest, HeadersRequest.serialize(x))
-      case x: NewHeaders      => (NewHeaders, NewHeaders.serialize(x))
-      case x: NewTxs          => (NewTxs, NewTxs.serialize(x))
+      case x: HeadersResponse => (HeadersResponse, HeadersResponse.serialize(x))
       case x: InvRequest      => (InvRequest, InvRequest.serialize(x))
       case x: InvResponse     => (InvResponse, InvResponse.serialize(x))
+      case x: NewBlocks       => (NewBlocks, NewBlocks.serialize(x))
+      case x: NewHeaders      => (NewHeaders, NewHeaders.serialize(x))
       case x: NewInv          => (NewInv, NewInv.serialize(x))
+      case x: NewTxs          => (NewTxs, NewTxs.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -68,16 +68,16 @@ object Payload {
         case Hello           => Hello._deserialize(rest)
         case Ping            => Ping._deserialize(rest)
         case Pong            => Pong._deserialize(rest)
-        case BlocksResponse  => BlocksResponse._deserialize(rest)
         case BlocksRequest   => BlocksRequest._deserialize(rest)
-        case NewBlocks       => NewBlocks._deserialize(rest)
-        case HeadersResponse => HeadersResponse._deserialize(rest)
+        case BlocksResponse  => BlocksResponse._deserialize(rest)
         case HeadersRequest  => HeadersRequest._deserialize(rest)
-        case NewHeaders      => NewHeaders._deserialize(rest)
-        case NewTxs          => NewTxs._deserialize(rest)
+        case HeadersResponse => HeadersResponse._deserialize(rest)
         case InvRequest      => InvRequest._deserialize(rest)
         case InvResponse     => InvResponse._deserialize(rest)
+        case NewBlocks       => NewBlocks._deserialize(rest)
+        case NewHeaders      => NewHeaders._deserialize(rest)
         case NewInv          => NewInv._deserialize(rest)
+        case NewTxs          => NewTxs._deserialize(rest)
       }
     }
   }
@@ -154,9 +154,15 @@ object Payload {
     )
     .labelNames("payload_type")
     .register()
+
+  sealed trait Solicited extends Payload {
+    val id: RequestId
+  }
+
+  sealed trait UnSolicited extends Payload
 }
 
-sealed trait HandShake extends Payload {
+sealed trait HandShake extends Payload.UnSolicited {
   def version: Int
   def timestamp: TimeStamp
   def brokerInfo: InterBrokerInfo
@@ -219,7 +225,7 @@ object Hello extends HandShakeSerding[Hello] with Payload.Code {
   }
 }
 
-final case class Ping(id: RequestId, timestamp: TimeStamp) extends Payload {
+final case class Ping(id: RequestId, timestamp: TimeStamp) extends Payload.Solicited {
   override def measure(): Unit = Ping.payloadLabeled.inc()
 }
 
@@ -227,7 +233,7 @@ object Ping extends Payload.Serding[Ping] with Payload.Code {
   val serde: Serde[Ping] = Serde.forProduct2(apply, p => (p.id, p.timestamp))
 }
 
-final case class Pong(id: RequestId) extends Payload {
+final case class Pong(id: RequestId) extends Payload.Solicited {
   override def measure(): Unit = Pong.payloadLabeled.inc()
 }
 
@@ -235,7 +241,7 @@ object Pong extends Payload.Serding[Pong] with Payload.Code {
   val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.id)
 }
 
-final case class BlocksResponse(id: RequestId, blocks: AVector[Block]) extends Payload {
+final case class BlocksResponse(id: RequestId, blocks: AVector[Block]) extends Payload.Solicited {
   override def measure(): Unit = BlocksResponse.payloadLabeled.inc()
 }
 
@@ -243,15 +249,8 @@ object BlocksResponse extends Payload.Serding[BlocksResponse] with Payload.Code 
   implicit val serde: Serde[BlocksResponse] = Serde.forProduct2(apply, p => (p.id, p.blocks))
 }
 
-final case class NewBlocks(blocks: AVector[Block]) extends Payload {
-  override def measure(): Unit = NewBlocks.payloadLabeled.inc()
-}
-
-object NewBlocks extends Payload.Serding[NewBlocks] with Payload.Code {
-  implicit val serde: Serde[NewBlocks] = Serde.forProduct1(apply, _.blocks)
-}
-
-final case class BlocksRequest(id: RequestId, locators: AVector[BlockHash]) extends Payload {
+final case class BlocksRequest(id: RequestId, locators: AVector[BlockHash])
+    extends Payload.Solicited {
   override def measure(): Unit = BlocksRequest.payloadLabeled.inc()
 }
 
@@ -263,7 +262,8 @@ object BlocksRequest extends Payload.Serding[BlocksRequest] with Payload.Code {
   }
 }
 
-final case class HeadersResponse(id: RequestId, headers: AVector[BlockHeader]) extends Payload {
+final case class HeadersResponse(id: RequestId, headers: AVector[BlockHeader])
+    extends Payload.Solicited {
   override def measure(): Unit = HeadersResponse.payloadLabeled.inc()
 }
 
@@ -271,15 +271,8 @@ object HeadersResponse extends Payload.Serding[HeadersResponse] with Payload.Cod
   implicit val serde: Serde[HeadersResponse] = Serde.forProduct2(apply, p => (p.id, p.headers))
 }
 
-final case class NewHeaders(headers: AVector[BlockHeader]) extends Payload {
-  override def measure(): Unit = NewHeaders.payloadLabeled.inc()
-}
-
-object NewHeaders extends Payload.Serding[NewHeaders] with Payload.Code {
-  implicit val serde: Serde[NewHeaders] = Serde.forProduct1(apply, _.headers)
-}
-
-final case class HeadersRequest(id: RequestId, locators: AVector[BlockHash]) extends Payload {
+final case class HeadersRequest(id: RequestId, locators: AVector[BlockHash])
+    extends Payload.Solicited {
   override def measure(): Unit = HeadersRequest.payloadLabeled.inc()
 }
 
@@ -291,15 +284,8 @@ object HeadersRequest extends Payload.Serding[HeadersRequest] with Payload.Code 
   }
 }
 
-final case class NewTxs(txs: AVector[TransactionTemplate]) extends Payload {
-  override def measure(): Unit = NewTxs.payloadLabeled.inc()
-}
-
-object NewTxs extends Payload.Serding[NewTxs] with Payload.Code {
-  implicit val serde: Serde[NewTxs] = Serde.forProduct1(apply, p => p.txs)
-}
-
-final case class InvRequest(id: RequestId, locators: AVector[AVector[BlockHash]]) extends Payload {
+final case class InvRequest(id: RequestId, locators: AVector[AVector[BlockHash]])
+    extends Payload.Solicited {
   override def measure(): Unit = InvRequest.payloadLabeled.inc()
 }
 
@@ -311,7 +297,8 @@ object InvRequest extends Payload.Serding[InvRequest] with Payload.Code {
   }
 }
 
-final case class InvResponse(id: RequestId, hashes: AVector[AVector[BlockHash]]) extends Payload {
+final case class InvResponse(id: RequestId, hashes: AVector[AVector[BlockHash]])
+    extends Payload.Solicited {
   override def measure(): Unit = InvResponse.payloadLabeled.inc()
 }
 
@@ -319,10 +306,34 @@ object InvResponse extends Payload.Serding[InvResponse] with Payload.Code {
   implicit val serde: Serde[InvResponse] = Serde.forProduct2(apply, p => (p.id, p.hashes))
 }
 
-final case class NewInv(hashes: AVector[AVector[BlockHash]]) extends Payload {
+final case class NewBlocks(blocks: AVector[Block]) extends Payload.UnSolicited {
+  override def measure(): Unit = NewBlocks.payloadLabeled.inc()
+}
+
+object NewBlocks extends Payload.Serding[NewBlocks] with Payload.Code {
+  implicit val serde: Serde[NewBlocks] = Serde.forProduct1(apply, _.blocks)
+}
+
+final case class NewHeaders(headers: AVector[BlockHeader]) extends Payload.UnSolicited {
+  override def measure(): Unit = NewHeaders.payloadLabeled.inc()
+}
+
+object NewHeaders extends Payload.Serding[NewHeaders] with Payload.Code {
+  implicit val serde: Serde[NewHeaders] = Serde.forProduct1(apply, _.headers)
+}
+
+final case class NewInv(hashes: AVector[AVector[BlockHash]]) extends Payload.UnSolicited {
   override def measure(): Unit = NewInv.payloadLabeled.inc()
 }
 
 object NewInv extends Payload.Serding[NewInv] with Payload.Code {
   implicit val serde: Serde[NewInv] = Serde.forProduct1(apply, _.hashes)
+}
+
+final case class NewTxs(txs: AVector[TransactionTemplate]) extends Payload.UnSolicited {
+  override def measure(): Unit = NewTxs.payloadLabeled.inc()
+}
+
+object NewTxs extends Payload.Serding[NewTxs] with Payload.Code {
+  implicit val serde: Serde[NewTxs] = Serde.forProduct1(apply, p => p.txs)
 }
