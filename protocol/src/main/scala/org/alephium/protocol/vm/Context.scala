@@ -111,15 +111,32 @@ object StatefulContext {
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
-      preOutputsOpt: Option[AVector[TxOutput]]
+      preOutputs: AVector[TxOutput]
   ): StatefulContext = {
-    new Impl(tx, worldState, preOutputsOpt, gasRemaining)
+    new Impl(tx, worldState, preOutputs, gasRemaining)
+  }
+
+  def build(
+      tx: TransactionAbstract,
+      gasRemaining: GasBox,
+      worldState: WorldState.Cached,
+      preOutputsOpt: Option[AVector[TxOutput]]
+  ): ExeResult[StatefulContext] = {
+    preOutputsOpt match {
+      case Some(outputs) => Right(apply(tx, gasRemaining, worldState, outputs))
+      case None =>
+        worldState.getPreOutputsForVM(tx) match {
+          case Right(Some(outputs)) => Right(apply(tx, gasRemaining, worldState, outputs))
+          case Right(None)          => failed(NonExistTxInput)
+          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
+        }
+    }
   }
 
   final class Impl(
       val tx: TransactionAbstract,
       val initWorldState: WorldState.Cached,
-      val preOutputsOpt: Option[AVector[TxOutput]],
+      val preOutputs: AVector[TxOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
     override val worldState: WorldState.Staging = initWorldState.staging()
@@ -145,7 +162,6 @@ object StatefulContext {
     override def getInitialBalances: ExeResult[Frame.Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
-          preOutputs <- getPreOutputs()
           balances <- Frame.Balances
             .from(preOutputs, tx.unsigned.fixedOutputs)
             .toRight(Right(InvalidBalances))
@@ -156,16 +172,6 @@ object StatefulContext {
       } else {
         failed(NonPayableFrame)
       }
-
-    private def getPreOutputs(): ExeResult[AVector[TxOutput]] = preOutputsOpt match {
-      case Some(outputs) => Right(outputs)
-      case None =>
-        initWorldState.getPreOutputsForVM(tx) match {
-          case Right(Some(outputs)) => Right(outputs)
-          case Right(None)          => failed(NonExistTxInput)
-          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
-        }
-    }
 
     override val outputBalances: Frame.Balances = Frame.Balances.empty
   }

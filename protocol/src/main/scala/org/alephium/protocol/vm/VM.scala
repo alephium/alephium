@@ -279,9 +279,10 @@ object StatefulVM {
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(tx, gasRemaining, worldState, preOutputsOpt)
-    val obj     = script.toObject
-    execute(context, obj, AVector.empty).map { _ =>
+    for {
+      context <- StatefulContext.build(tx, gasRemaining, worldState, preOutputsOpt)
+      _       <- execute(context, script.toObject, AVector.empty)
+    } yield {
       context.worldState.commit()
       TxScriptExecution(
         context.gasRemaining,
