@@ -40,18 +40,23 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 
-class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
+//scalastyle:off file.size.limit
+abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
+    extends AlephiumFutureSpec
+    with EitherValues
+    with NumericHelpers {
 
   implicit val system: ActorSystem  = ActorSystem("rest-server-spec")
   implicit val ec: ExecutionContext = system.dispatcher
 
   it should "call GET /blockflow" in new RestServerFixture {
-    withServer {
+    withServers {
       Get(s"/blockflow?fromTs=0&toTs=0") check { response =>
         response.code is StatusCode.Ok
         response.as[FetchResponse] is dummyFetchResponse
@@ -67,22 +72,29 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /blockflow/blocks/<hash>" in new RestServerFixture {
-    withServer {
-      Get(s"/blockflow/blocks/${dummyBlockHeader.hash.toHexString}") check { response =>
-        val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
-        if (brokerConfig.contains(chainIndex.from) || brokerConfig.contains(chainIndex.to)) {
-          response.code is StatusCode.Ok
-          response.as[BlockEntry] is dummyBlockEntry
-        } else {
-          response.code is StatusCode.BadRequest
+    withServers {
+      servers.foreach { server =>
+        Get(s"/blockflow/blocks/${dummyBlockHeader.hash.toHexString}", server.port) check {
+          response =>
+            val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
+            if (
+              server.brokerConfig
+                .contains(chainIndex.from) || server.brokerConfig.contains(chainIndex.to)
+            ) {
+              response.code is StatusCode.Ok
+              response.as[BlockEntry] is dummyBlockEntry
+            } else {
+              response.code is StatusCode.BadRequest
+            }
         }
       }
     }
   }
 
   it should "call GET /addresses/<address>/balance" in new RestServerFixture {
-    withServer {
-      Get(s"/addresses/$dummyKeyAddress/balance") check { response =>
+    withServers {
+      val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
+      Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
         response.code is StatusCode.Ok
         response.as[Balance] is dummyBalance
       }
@@ -90,7 +102,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /addresses/<address>/group" in new RestServerFixture {
-    withServer {
+    withServers {
       Get(s"/addresses/$dummyKeyAddress/group") check { response =>
         response.code is StatusCode.Ok
         response.as[Group] is dummyGroup
@@ -99,7 +111,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /blockflow/hashes" in new RestServerFixture {
-    withServer {
+    withServers {
       Get(s"/blockflow/hashes?fromGroup=1&toGroup=1&height=1") check { response =>
         response.code is StatusCode.Ok
         response.as[HashesAtHeight] is dummyHashesAtHeight
@@ -126,7 +138,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /blockflow/chains" in new RestServerFixture {
-    withServer {
+    withServers {
       Get(s"/blockflow/chains?fromGroup=1&toGroup=1") check { response =>
         response.code is StatusCode.Ok
         response.as[ChainInfo] is dummyChainInfo
@@ -150,7 +162,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /transactions/unconfirmed" in new RestServerFixture {
-    withServer {
+    withServers {
       Get(s"/transactions/unconfirmed?fromGroup=0&toGroup=0") check { response =>
         response.code is StatusCode.Ok
         response.as[AVector[Tx]] is AVector.empty[Tx]
@@ -158,7 +170,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call POST /transactions/build" in new MultiRestServerFixture {
+  it should "call POST /transactions/build" in new RestServerFixture {
     withServers {
       Post(
         s"/transactions/build",
@@ -227,7 +239,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call POST /transactions/submit" in new MultiRestServerFixture {
+  it should "call POST /transactions/submit" in new RestServerFixture {
     withServers {
       val tx =
         s"""{"unsignedTx":"${Hex.toHexString(
@@ -250,7 +262,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call POST /transactions/sweep-all/build" in new RestServerFixture {
-    withServer {
+    withServers {
       Post(
         s"/transactions/sweep-all/build",
         body = s"""
@@ -300,11 +312,11 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
-  it should "call GET /transactions/status" in new MultiRestServerFixture {
+  it should "call GET /transactions/status" in new RestServerFixture {
     var txChainIndex: ChainIndex = _
     withServers {
       forAll(hashGen) { txId =>
-        servers.foreachWithIndex { case (server, index) =>
+        servers.foreach { server =>
           Get(
             s"/transactions/status?txId=${txId.toHexString}",
             server.port
@@ -316,7 +328,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
           }
 
           // scalastyle:off no.equal
-          val rightNode = txChainIndex.from.value == index
+          val rightNode = server.node.config.broker.contains(txChainIndex.from)
           // scalastyle:on no.equal
 
           Get(
@@ -368,7 +380,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call POST /miners" in new RestServerFixture {
-    withServer {
+    withServers {
       val address      = Address.fromBase58(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -424,7 +436,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /miners/addresses" in new RestServerFixture {
-    withServer {
+    withServers {
       val address      = Address.fromBase58(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
 
@@ -458,7 +470,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call PUT /miners/addresses" in new RestServerFixture {
-    withServer {
+    withServers {
       allHandlersProbe.viewHandler.setAutoPilot(TestActor.NoAutoPilot)
 
       val newAddresses = AVector.tabulate(config.broker.groups)(i =>
@@ -492,7 +504,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /infos/node" in new RestServerFixture {
-    withServer {
+    withServers {
       minerProbe.setAutoPilot(new TestActor.AutoPilot {
         var miningStarted: Boolean = false
         def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
@@ -531,7 +543,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
 
   it should "call GET /infos/misbehaviors" in new RestServerFixture {
     import MisbehaviorManager._
-    withServer {
+    withServers {
 
       val inetAddress = InetAddress.getByName("127.0.0.1")
       val ts          = TimeStamp.now()
@@ -555,7 +567,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call POST /infos/misbehaviors" in new RestServerFixture {
-    withServer {
+    withServers {
       val body = """{"type":"unban","peers":["123.123.123.123"]}"""
       Post(s"/infos/misbehaviors", body) check { response =>
         response.code is StatusCode.Ok
@@ -564,7 +576,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
   }
 
   it should "call GET /docs" in new RestServerFixture {
-    withServer {
+    withServers {
       Get(s"/docs") check { response =>
         response.code is StatusCode.Ok
       }
@@ -584,7 +596,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
           )
 
         val openapi =
-          response.as[ujson.Value]
+          removeField("security", removeField("securitySchemes", response.as[ujson.Value]))
 
         Get(s"/docs") check { response =>
           response.code is StatusCode.Ok
@@ -595,7 +607,47 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     }
   }
 
+  it should "correctly use the api-key" in new RestServerFixture {
+    override lazy val maybeApiKey = apiKey match {
+      case Some(_) => None
+      case None    => Some(Random.nextString(32))
+    }
+
+    withServers {
+      Get(s"/blockflow?fromTs=0&toTs=0") check { response =>
+        response.code is StatusCode.Unauthorized
+        if (maybeApiKey.isDefined) {
+          response.as[ApiError.Unauthorized] is ApiError.Unauthorized(
+            "Api key not configured in server"
+          )
+        } else {
+          response.as[ApiError.Unauthorized] is ApiError.Unauthorized("Missing api key")
+        }
+      }
+    }
+  }
+
+  it should "validate the api-key" in new RestServerFixture {
+    override lazy val maybeApiKey = apiKey.map(_ => Random.nextString(32))
+
+    withServers {
+      Get(s"/blockflow?fromTs=0&toTs=0") check { response =>
+        if (apiKey.isDefined) {
+          response.code is StatusCode.Unauthorized
+          response.as[ApiError.Unauthorized] is ApiError.Unauthorized("Wrong api key")
+        } else {
+          response.code is StatusCode.Ok
+        }
+      }
+    }
+  }
+
   trait Fixture extends ServerFixture with HttpRouteFixture {
+
+    override val configValues = Map(("alephium.broker.broker-num", nbOfNodes)) ++ apiKey
+      .map(key => Map(("alephium.api.api-key", key.value)))
+      .getOrElse(Map.empty)
+
     lazy val minerProbe                      = TestProbe()
     lazy val miner                           = ActorRefT[Miner.Command](minerProbe.ref)
     lazy val (allHandlers, allHandlersProbe) = TestUtils.createAllHandlersProbe
@@ -625,6 +677,8 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
     lazy val misbehaviorManagerProbe = TestProbe()
     lazy val misbehaviorManager      = ActorRefT[MisbehaviorManager.Command](misbehaviorManagerProbe.ref)
 
+    implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
+
     lazy val node = new NodeDummy(
       dummyIntraCliqueInfo,
       dummyNeighborPeers,
@@ -642,37 +696,17 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       (new java.io.File("")).toPath,
       NetworkType.Devnet,
       Duration.ofMinutesUnsafe(0),
-      WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0))
+      apiConfig.apiKey,
+      WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey)
     )
 
     lazy val walletApp = new WalletApp(walletConfig)
   }
 
-  trait RestServerFixture extends Fixture {
-    lazy val port = config.network.restPort
-    lazy val server: RestServer =
-      RestServer(node, miner, blocksExporter, Some(walletApp.walletServer))
-
-    implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig)
-    implicit lazy val networkType: NetworkType = config.network.networkType
-
-    lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
-
-    def withServer(f: => Any) = {
-      try {
-        server.start().futureValue
-        f
-      } finally {
-        server.stop().futureValue
-      }
-    }
-  }
-
-  trait MultiRestServerFixture extends Fixture with SocketUtil {
+  trait RestServerFixture extends Fixture with SocketUtil {
 
     implicit lazy val networkType: NetworkType = config.network.networkType
     implicit lazy val blockflowFetchMaxAge     = Duration.zero
-    lazy val groupNumPerBroker                 = config.broker.groupNumPerBroker
 
     private def buildPeer(id: Int): (PeerInfo, ApiConfig) = {
       val peerPort = generatePort()
@@ -681,7 +715,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       //all same port as only `restPort` is used
       val peer = PeerInfo.unsafe(
         id,
-        groupNumPerBroker = groupNumPerBroker,
+        groupNumPerBroker = config.broker.groupNumPerBroker,
         publicAddress = None,
         privateAddress = address,
         restPort = peerPort,
@@ -692,7 +726,8 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       val peerConf = ApiConfig(
         networkInterface = address.getAddress,
         blockflowFetchMaxAge = blockflowFetchMaxAge,
-        askTimeout = Duration.ofMinutesUnsafe(1)
+        askTimeout = Duration.ofMinutesUnsafe(1),
+        apiConfig.apiKey
       )
 
       (peer, peerConf)
@@ -704,12 +739,12 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
       val intraCliqueInfo = IntraCliqueInfo.unsafe(
         dummyIntraCliqueInfo.id,
         AVector.from(peers.map(_._1)),
-        groupNumPerBroker = groupNumPerBroker,
+        groupNumPerBroker = config.broker.groupNumPerBroker,
         dummyIntraCliqueInfo.priKey
       )
 
       AVector.from(peers.zipWithIndex.map { case ((peer, peerConf), id) =>
-        val newConfig = config.copy(broker = config.broker.copy(brokerId = id))
+        val serverConfig = config.copy(broker = config.broker.copy(brokerId = id))
         val nodeDummy = new NodeDummy(
           intraCliqueInfo,
           dummyNeighborPeers,
@@ -720,7 +755,7 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
           storages,
           cliqueManagerOpt = Some(cliqueManager),
           misbehaviorManagerOpt = Some(misbehaviorManager)
-        )(newConfig)
+        )(serverConfig)
 
         new RestServer(
           nodeDummy,
@@ -729,16 +764,20 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
           blocksExporter,
           Some(walletApp.walletServer)
         )(
-          newConfig.broker,
+          serverConfig.broker,
           peerConf,
           scala.concurrent.ExecutionContext.Implicits.global
         )
       })
     }
 
-    lazy val servers = buildServers(config.broker.groups)
+    lazy val servers = buildServers(nbOfNodes)
 
-    lazy val port = servers.sample().port
+    override lazy val port        = servers.sample().port
+    override lazy val maybeApiKey = apiKey.map(_.value)
+
+    def getPort(group: GroupIndex): Int =
+      servers.find(_.node.config.broker.contains(group)).get.port
 
     def withServers(f: => Any) = {
       try {
@@ -748,5 +787,40 @@ class RestServerSpec extends AlephiumFutureSpec with EitherValues with NumericHe
         servers.foreach(_.stop().futureValue)
       }
     }
+
+    // scalastyle:off no.equal
+    def removeField(name: String, json: ujson.Value): ujson.Value = {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def rec(json: ujson.Value): ujson.Value = {
+        json match {
+          case obj: ujson.Obj =>
+            ujson.Obj.from(
+              obj.value.filterNot { case (key, _) => key == name }.map { case (key, value) =>
+                key -> rec(value)
+              }
+            )
+
+          case arr: ujson.Arr =>
+            val newValues = arr.value.map { value =>
+              rec(value)
+            }
+            ujson.Arr.from(newValues)
+
+          case x => x
+        }
+      }
+      json match {
+        case ujson.Null => ujson.Null
+        case other      => rec(other)
+      }
+    }
   }
 }
+
+class RestServerSpec1Node  extends RestServerSpec(1)
+class RestServerSpec3Nodes extends RestServerSpec(3)
+class RestServerSpecApiKey
+    extends RestServerSpec(
+      3,
+      Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"))
+    )

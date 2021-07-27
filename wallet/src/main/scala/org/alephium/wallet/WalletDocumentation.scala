@@ -40,7 +40,7 @@ trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
     deriveNextAddress,
     deriveNextMinerAddresses,
     changeActiveAddress
-  )
+  ).map(_.endpoint)
 
   lazy val walletOpenAPI: OpenAPI =
     toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
