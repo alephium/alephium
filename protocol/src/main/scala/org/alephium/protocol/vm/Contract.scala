@@ -177,7 +177,7 @@ sealed trait ContractObj[Ctx <: Context] {
 
   def buildPayableFrame(
       ctx: Ctx,
-      balanceState: Frame.BalanceState,
+      balanceState: BalanceState,
       obj: ContractObj[Ctx],
       method: Method[Ctx],
       args: AVector[Val],
@@ -216,7 +216,7 @@ sealed trait ContractObj[Ctx <: Context] {
     ctx.getInitialBalances.map { balances =>
       buildPayableFrame(
         ctx,
-        Frame.BalanceState.from(balances),
+        BalanceState.from(balances),
         this,
         method,
         args,
@@ -274,7 +274,7 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
 
   def buildPayableFrame(
       ctx: StatelessContext,
-      balanceState: Frame.BalanceState,
+      balanceState: BalanceState,
       obj: ContractObj[StatelessContext],
       method: Method[StatelessContext],
       args: AVector[Val],
@@ -297,7 +297,7 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
 
   def buildPayableFrame(
       ctx: StatefulContext,
-      balanceState: Frame.BalanceState,
+      balanceState: BalanceState,
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],
@@ -329,7 +329,7 @@ final case class StatefulContractObject(
 
   def buildPayableFrame(
       ctx: StatefulContext,
-      balanceState: Frame.BalanceState,
+      balanceState: BalanceState,
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],

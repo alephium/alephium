@@ -124,7 +124,7 @@ final class StatefulVM(
     }
   }
 
-  protected def merge(next: Frame.Balances, current: Frame.Balances): Option[Unit] = {
+  protected def merge(next: Balances, current: Balances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= current.all.length) {
@@ -172,7 +172,7 @@ final class StatefulVM(
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def outputGeneratedBalances(outputBalances: Frame.Balances): ExeResult[Unit] = {
+  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
     @tailrec
     def iter(index: Int): ExeResult[Unit] = {
       if (index >= outputBalances.all.length) {

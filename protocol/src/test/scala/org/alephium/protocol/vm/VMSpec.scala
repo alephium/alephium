@@ -119,11 +119,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   trait BalancesFixture {
     val (_, pubKey0) = SignatureSchema.generatePriPub()
     val address0     = Val.Address(LockupScript.p2pkh(pubKey0))
-    val balances0    = Frame.BalancesPerLockup(100, mutable.Map.empty, 0)
+    val balances0    = BalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = Frame.BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
+    val balances1    = BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
       new StatefulContext {
@@ -133,15 +133,15 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
         def nextOutputIndex: Int                  = 0
 
-        def getInitialBalances: ExeResult[Frame.Balances] = {
+        def getInitialBalances: ExeResult[Balances] = {
           Right(
-            Frame.Balances(
+            Balances(
               ArrayBuffer(address0.lockupScript -> balances0, address1.lockupScript -> balances1)
             )
           )
         }
 
-        override val outputBalances: Frame.Balances = Frame.Balances.empty
+        override val outputBalances: Balances = Balances.empty
       }
 
     def testInstrs(instrs: AVector[Instr[StatefulContext]], expected: ExeResult[AVector[Val]]) = {
