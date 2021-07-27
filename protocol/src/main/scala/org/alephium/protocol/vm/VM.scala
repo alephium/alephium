@@ -51,13 +51,13 @@ sealed abstract class VM[Ctx <: Context](
 
   @tailrec
   private def executeFrames(): ExeResult[Unit] = {
-    if (frameStack.nonEmpty) {
-      executeCurrentFrame(frameStack.topUnsafe) match {
-        case Right(_)    => executeFrames()
-        case Left(error) => Left(error)
-      }
-    } else {
-      Right(())
+    frameStack.top match {
+      case Some(topFrame) =>
+        executeCurrentFrame(topFrame) match {
+          case Right(_)    => executeFrames()
+          case Left(error) => Left(error)
+        }
+      case None => Right(())
     }
   }
 
