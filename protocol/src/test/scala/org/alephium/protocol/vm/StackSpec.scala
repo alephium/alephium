@@ -96,18 +96,18 @@ class StackSpec extends AlephiumSpec {
 
     (0 until n) foreach { k =>
       stack.push(k) isE ()
-      val subStack = stack.subStack()
-      subStack.capacity is (n - k - 1)
+      val remainingStack = stack.remainingStack()
+      remainingStack.capacity is (n - k - 1)
     }
     stack.size is n
     stack.remove(n) isE ()
     stack.size is 0
 
-    (0 until n).foldLeft(stack.subStack()) { case (subStack, k) =>
-      subStack.currentIndex is k
-      subStack.push(k) isE ()
-      subStack.size is 1
-      subStack.subStack()
+    (0 until n).foldLeft(stack.remainingStack()) { case (remainingStack, k) =>
+      remainingStack.currentIndex is k
+      remainingStack.push(k) isE ()
+      remainingStack.size is 1
+      remainingStack.remainingStack()
     }
     stack.size is 0
   }
