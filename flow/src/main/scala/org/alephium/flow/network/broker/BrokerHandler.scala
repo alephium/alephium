@@ -119,15 +119,20 @@ trait BrokerHandler extends FlowDataHandler {
       log.debug(
         s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
-      send(GetBlocks(hashes))
-    case Received(SendBlocks(_, blocks)) =>
+      send(BlocksRequest(hashes))
+    case Received(NewBlocks(blocks)) =>
       log.debug(
         s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress"
       )
       handleFlowData(blocks, dataOrigin, isBlock = true)
-    case Received(GetBlocks(requestId, hashes)) =>
+    case Received(BlocksResponse(requestId, blocks)) =>
+      log.debug(
+        s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress, with $requestId"
+      )
+      handleFlowData(blocks, dataOrigin, isBlock = true)
+    case Received(BlocksRequest(requestId, hashes)) =>
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
-        send(SendBlocks(Some(requestId), blocks))
+        send(BlocksResponse(requestId, blocks))
       }
     case Received(SendHeaders(_, headers)) =>
       log.debug(

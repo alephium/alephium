@@ -41,16 +41,17 @@ object Payload {
   )
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
-      case x: Hello        => (Hello, Hello.serialize(x))
-      case x: Ping         => (Ping, Ping.serialize(x))
-      case x: Pong         => (Pong, Pong.serialize(x))
-      case x: SendBlocks   => (SendBlocks, SendBlocks.serialize(x))
-      case x: GetBlocks    => (GetBlocks, GetBlocks.serialize(x))
-      case x: SendHeaders  => (SendHeaders, SendHeaders.serialize(x))
-      case x: GetHeaders   => (GetHeaders, GetHeaders.serialize(x))
-      case x: SendTxs      => (SendTxs, SendTxs.serialize(x))
-      case x: SyncRequest  => (SyncRequest, SyncRequest.serialize(x))
-      case x: SyncResponse => (SyncResponse, SyncResponse.serialize(x))
+      case x: Hello          => (Hello, Hello.serialize(x))
+      case x: Ping           => (Ping, Ping.serialize(x))
+      case x: Pong           => (Pong, Pong.serialize(x))
+      case x: BlocksResponse => (BlocksResponse, BlocksResponse.serialize(x))
+      case x: BlocksRequest  => (BlocksRequest, BlocksRequest.serialize(x))
+      case x: NewBlocks      => (NewBlocks, NewBlocks.serialize(x))
+      case x: SendHeaders    => (SendHeaders, SendHeaders.serialize(x))
+      case x: GetHeaders     => (GetHeaders, GetHeaders.serialize(x))
+      case x: SendTxs        => (SendTxs, SendTxs.serialize(x))
+      case x: SyncRequest    => (SyncRequest, SyncRequest.serialize(x))
+      case x: SyncResponse   => (SyncResponse, SyncResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -63,16 +64,17 @@ object Payload {
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
     deserializerCode._deserialize(input).flatMap { case Staging(code, rest) =>
       code match {
-        case Hello        => Hello._deserialize(rest)
-        case Ping         => Ping._deserialize(rest)
-        case Pong         => Pong._deserialize(rest)
-        case SendBlocks   => SendBlocks._deserialize(rest)
-        case GetBlocks    => GetBlocks._deserialize(rest)
-        case SendHeaders  => SendHeaders._deserialize(rest)
-        case GetHeaders   => GetHeaders._deserialize(rest)
-        case SendTxs      => SendTxs._deserialize(rest)
-        case SyncRequest  => SyncRequest._deserialize(rest)
-        case SyncResponse => SyncResponse._deserialize(rest)
+        case Hello          => Hello._deserialize(rest)
+        case Ping           => Ping._deserialize(rest)
+        case Pong           => Pong._deserialize(rest)
+        case BlocksResponse => BlocksResponse._deserialize(rest)
+        case BlocksRequest  => BlocksRequest._deserialize(rest)
+        case NewBlocks      => NewBlocks._deserialize(rest)
+        case SendHeaders    => SendHeaders._deserialize(rest)
+        case GetHeaders     => GetHeaders._deserialize(rest)
+        case SendTxs        => SendTxs._deserialize(rest)
+        case SyncRequest    => SyncRequest._deserialize(rest)
+        case SyncResponse   => SyncResponse._deserialize(rest)
       }
     }
   }
@@ -125,8 +127,9 @@ object Payload {
         Hello,
         Ping,
         Pong,
-        SendBlocks,
-        GetBlocks,
+        BlocksResponse,
+        BlocksRequest,
+        NewBlocks,
         SendHeaders,
         GetHeaders,
         SendTxs,
@@ -227,23 +230,31 @@ object Pong extends Payload.Serding[Pong] with Payload.Code {
   val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.id)
 }
 
-final case class SendBlocks(id: Option[RequestId], blocks: AVector[Block]) extends Payload {
-  override def measure(): Unit = SendBlocks.payloadLabeled.inc()
+final case class BlocksResponse(id: RequestId, blocks: AVector[Block]) extends Payload {
+  override def measure(): Unit = BlocksResponse.payloadLabeled.inc()
 }
 
-object SendBlocks extends Payload.Serding[SendBlocks] with Payload.Code {
-  implicit val serde: Serde[SendBlocks] = Serde.forProduct2(apply, p => (p.id, p.blocks))
+object BlocksResponse extends Payload.Serding[BlocksResponse] with Payload.Code {
+  implicit val serde: Serde[BlocksResponse] = Serde.forProduct2(apply, p => (p.id, p.blocks))
 }
 
-final case class GetBlocks(id: RequestId, locators: AVector[BlockHash]) extends Payload {
-  override def measure(): Unit = GetBlocks.payloadLabeled.inc()
+final case class NewBlocks(blocks: AVector[Block]) extends Payload {
+  override def measure(): Unit = NewBlocks.payloadLabeled.inc()
 }
 
-object GetBlocks extends Payload.Serding[GetBlocks] with Payload.Code {
-  implicit val serde: Serde[GetBlocks] = Serde.forProduct2(apply, p => (p.id, p.locators))
+object NewBlocks extends Payload.Serding[NewBlocks] with Payload.Code {
+  implicit val serde: Serde[NewBlocks] = Serde.forProduct1(apply, p => p.blocks)
+}
 
-  def apply(locators: AVector[BlockHash]): GetBlocks = {
-    GetBlocks(RequestId.random(), locators)
+final case class BlocksRequest(id: RequestId, locators: AVector[BlockHash]) extends Payload {
+  override def measure(): Unit = BlocksRequest.payloadLabeled.inc()
+}
+
+object BlocksRequest extends Payload.Serding[BlocksRequest] with Payload.Code {
+  implicit val serde: Serde[BlocksRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
+
+  def apply(locators: AVector[BlockHash]): BlocksRequest = {
+    BlocksRequest(RequestId.random(), locators)
   }
 }
 

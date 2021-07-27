@@ -24,7 +24,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{GetBlocks, GetHeaders, SyncResponse}
+import org.alephium.protocol.message.{BlocksRequest, GetHeaders, SyncResponse}
 import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, Duration}
 
@@ -59,7 +59,7 @@ trait BrokerHandler extends BaseBrokerHandler {
         val (headersToSync, blocksToSync) =
           BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)
         send(GetHeaders(headersToSync))
-        send(GetBlocks(blocksToSync))
+        send(BlocksRequest(blocksToSync))
       case BrokerHandler.IntraSync =>
         allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories
     }
