@@ -61,10 +61,6 @@ class Stack[@sp T: ClassTag](
 
   def top: Option[T] = Option.when(currentIndex >= 1)(underlying(currentIndex - 1))
 
-  def topUnsafe: T = {
-    underlying(currentIndex - 1)
-  }
-
   def push(elem: T): ExeResult[Unit] = {
     if (currentIndex < maxIndex) {
       underlying(currentIndex) = elem
