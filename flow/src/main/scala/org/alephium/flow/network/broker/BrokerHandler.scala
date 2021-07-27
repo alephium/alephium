@@ -143,7 +143,7 @@ trait BrokerHandler extends FlowDataHandler {
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
         send(HeadersResponse(requestId, headers))
       }
-    case Received(SendTxs(txs)) =>
+    case Received(NewTxs(txs)) =>
       log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.id))}")
       allHandlers.txHandler ! TxHandler.AddToSharedPool(txs, dataOrigin)
     case Send(data) =>
