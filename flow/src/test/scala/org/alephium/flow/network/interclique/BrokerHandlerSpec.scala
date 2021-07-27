@@ -33,7 +33,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.SyncResponse
+import org.alephium.protocol.message.{InvResponse, RequestId}
 import org.alephium.protocol.model.CliqueInfo
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -59,14 +59,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     brokerHandler.underlyingActor.remoteSynced is false
 
     EventFilter.info(start = "Self synced").intercept {
-      brokerHandler ! BaseBrokerHandler.Received(SyncResponse(None, AVector.empty))
+      brokerHandler ! BaseBrokerHandler.Received(InvResponse(RequestId.random(), AVector.empty))
     }
     brokerHandler.underlyingActor.selfSynced is true
     brokerHandler.underlyingActor.remoteSynced is false
     cliqueManager.expectNoMessage()
 
     EventFilter.info(start = "Self synced", occurrences = 0).intercept {
-      brokerHandler ! BaseBrokerHandler.Received(SyncResponse(None, AVector.empty))
+      brokerHandler ! BaseBrokerHandler.Received(InvResponse(RequestId.random(), AVector.empty))
     }
   }
 
@@ -75,7 +75,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     brokerHandler.underlyingActor.remoteSynced is false
 
     brokerHandler ! FlowHandler.SyncInventories(None, AVector(AVector.empty))
-    brokerHandler ! BaseBrokerHandler.Received(SyncResponse(None, AVector.empty))
+    brokerHandler ! BaseBrokerHandler.Received(InvResponse(RequestId.random(), AVector.empty))
     eventually {
       brokerHandler.underlyingActor.selfSynced is true
       brokerHandler.underlyingActor.remoteSynced is true

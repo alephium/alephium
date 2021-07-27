@@ -23,7 +23,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.message.{SyncRequest, SyncResponse}
+import org.alephium.protocol.message.{InvRequest, InvResponse, NewInv}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -45,8 +45,8 @@ trait BrokerHandler extends BaseBrokerHandler {
     val receive: Receive = {
       case BaseBrokerHandler.SyncLocators(locators) =>
         log.debug(s"Send sync locators to $remoteAddress: ${Utils.showFlow(locators)}")
-        send(SyncRequest(locators))
-      case BaseBrokerHandler.Received(SyncRequest(requestId, locators)) =>
+        send(InvRequest(locators))
+      case BaseBrokerHandler.Received(InvRequest(requestId, locators)) =>
         if (validate(locators)) {
           log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
           allHandlers.flowHandler ! FlowHandler.GetSyncInventories(requestId, locators)
@@ -59,20 +59,13 @@ trait BrokerHandler extends BaseBrokerHandler {
         if (inventories.forall(_.isEmpty)) {
           setRemoteSynced()
         }
-        send(SyncResponse(requestId, inventories))
-      case BaseBrokerHandler.Received(SyncResponse(_, hashes)) =>
-        if (hashes.forall(_.isEmpty)) {
-          setSelfSynced()
-        } else {
-          if (validate(hashes)) {
-            log.debug(s"Received sync response ${Utils.showFlow(hashes)} from $remoteAddress")
-            blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
-          } else {
-            log.warning(s"Invalid sync response from $remoteAddress: ${Utils.showFlow(hashes)}")
-            handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
-          }
-        }
+        send(requestId.map(InvResponse(_, inventories)).getOrElse(NewInv(inventories)))
+      case BaseBrokerHandler.Received(InvResponse(_, hashes)) =>
+        handleInv(hashes)
+      case BaseBrokerHandler.Received(NewInv(hashes)) =>
+        handleInv(hashes)
     }
+
     receive
   }
 
@@ -102,5 +95,19 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   def validate(locators: AVector[AVector[BlockHash]]): Boolean = {
     locators.forall(_.forall(hash => brokerConfig.contains(ChainIndex.from(hash).from)))
+  }
+
+  private def handleInv(hashes: AVector[AVector[BlockHash]]): Unit = {
+    if (hashes.forall(_.isEmpty)) {
+      setSelfSynced()
+    } else {
+      if (validate(hashes)) {
+        log.debug(s"Received sync response ${Utils.showFlow(hashes)} from $remoteAddress")
+        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
+      } else {
+        log.warning(s"Invalid sync response from $remoteAddress: ${Utils.showFlow(hashes)}")
+        handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+      }
+    }
   }
 }

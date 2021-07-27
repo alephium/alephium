@@ -25,7 +25,7 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
 
-sealed trait Payload extends Product {
+sealed trait Payload extends Product with Serializable {
   val name = productPrefix
 
   def measure(): Unit
@@ -35,8 +35,7 @@ object Payload {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.Product",
-      "org.wartremover.warts.Serializable",
-      "org.wartremover.warts.JavaSerializable"
+      "org.wartremover.warts.Serializable"
     )
   )
   def serialize(payload: Payload): ByteString = {
@@ -51,8 +50,9 @@ object Payload {
       case x: HeadersRequest  => (HeadersRequest, HeadersRequest.serialize(x))
       case x: NewHeaders      => (NewHeaders, NewHeaders.serialize(x))
       case x: NewTxs          => (NewTxs, NewTxs.serialize(x))
-      case x: SyncRequest     => (SyncRequest, SyncRequest.serialize(x))
-      case x: SyncResponse    => (SyncResponse, SyncResponse.serialize(x))
+      case x: InvRequest      => (InvRequest, InvRequest.serialize(x))
+      case x: InvResponse     => (InvResponse, InvResponse.serialize(x))
+      case x: NewInv          => (NewInv, NewInv.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -75,8 +75,9 @@ object Payload {
         case HeadersRequest  => HeadersRequest._deserialize(rest)
         case NewHeaders      => NewHeaders._deserialize(rest)
         case NewTxs          => NewTxs._deserialize(rest)
-        case SyncRequest     => SyncRequest._deserialize(rest)
-        case SyncResponse    => SyncResponse._deserialize(rest)
+        case InvRequest      => InvRequest._deserialize(rest)
+        case InvResponse     => InvResponse._deserialize(rest)
+        case NewInv          => NewInv._deserialize(rest)
       }
     }
   }
@@ -136,8 +137,9 @@ object Payload {
         HeadersRequest,
         NewHeaders,
         NewTxs,
-        SyncRequest,
-        SyncResponse
+        InvRequest,
+        InvResponse,
+        NewInv
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -297,23 +299,30 @@ object NewTxs extends Payload.Serding[NewTxs] with Payload.Code {
   implicit val serde: Serde[NewTxs] = Serde.forProduct1(apply, p => p.txs)
 }
 
-final case class SyncRequest(id: RequestId, locators: AVector[AVector[BlockHash]]) extends Payload {
-  override def measure(): Unit = SyncRequest.payloadLabeled.inc()
+final case class InvRequest(id: RequestId, locators: AVector[AVector[BlockHash]]) extends Payload {
+  override def measure(): Unit = InvRequest.payloadLabeled.inc()
 }
 
-object SyncRequest extends Payload.Serding[SyncRequest] with Payload.Code {
-  implicit val serde: Serde[SyncRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
+object InvRequest extends Payload.Serding[InvRequest] with Payload.Code {
+  implicit val serde: Serde[InvRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
 
-  def apply(locators: AVector[AVector[BlockHash]]): SyncRequest = {
-    SyncRequest(RequestId.random(), locators)
+  def apply(locators: AVector[AVector[BlockHash]]): InvRequest = {
+    InvRequest(RequestId.random(), locators)
   }
 }
 
-final case class SyncResponse(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
-    extends Payload {
-  override def measure(): Unit = SyncResponse.payloadLabeled.inc()
+final case class InvResponse(id: RequestId, hashes: AVector[AVector[BlockHash]]) extends Payload {
+  override def measure(): Unit = InvResponse.payloadLabeled.inc()
 }
 
-object SyncResponse extends Payload.Serding[SyncResponse] with Payload.Code {
-  implicit val serde: Serde[SyncResponse] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+object InvResponse extends Payload.Serding[InvResponse] with Payload.Code {
+  implicit val serde: Serde[InvResponse] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+}
+
+final case class NewInv(hashes: AVector[AVector[BlockHash]]) extends Payload {
+  override def measure(): Unit = NewInv.payloadLabeled.inc()
+}
+
+object NewInv extends Payload.Serding[NewInv] with Payload.Code {
+  implicit val serde: Serde[NewInv] = Serde.forProduct1(apply, _.hashes)
 }
