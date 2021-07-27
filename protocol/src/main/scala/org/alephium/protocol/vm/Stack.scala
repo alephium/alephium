@@ -151,6 +151,6 @@ class Stack[@sp T: ClassTag](
     }
   }
 
-  def subStack(): Stack[T] =
+  def remainingStack(): Stack[T] =
     new Stack[T](underlying, currentIndex, maxIndex - currentIndex, currentIndex)
 }

@@ -278,7 +278,7 @@ object Frame {
       locals(index) = tpe.default
     }
     args.foreachWithIndex((v, index) => locals(index) = v)
-    new StatelessFrame(0, obj, operandStack.subStack(), method, locals, returnTo, ctx)
+    new StatelessFrame(0, obj, operandStack.remainingStack(), method, locals, returnTo, ctx)
   }
 
   def stateful(
@@ -295,7 +295,7 @@ object Frame {
     new StatefulFrame(
       0,
       obj,
-      operandStack.subStack(),
+      operandStack.remainingStack(),
       method,
       locals,
       returnTo,
