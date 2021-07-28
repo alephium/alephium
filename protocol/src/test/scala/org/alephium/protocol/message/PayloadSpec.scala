@@ -22,11 +22,12 @@ import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{Protocol, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.message.Payload.Code
-import org.alephium.protocol.model.{BrokerInfo, CliqueId}
+import org.alephium.protocol.model.{BrokerInfo, CliqueId, NoIndexModelGenerators}
 import org.alephium.serde.SerdeError
+import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
-class PayloadSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   implicit val ordering: Ordering[Code] = Ordering.by(Code.toInt(_))
   implicit val groupConfig = new GroupConfig {
     override def groups: Int = 4
@@ -103,5 +104,44 @@ class PayloadSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
     Payload.serialize(pong) is pongBlob
     Payload.deserialize(pongBlob) isE pong
+  }
+
+  it should "serialize/deserialize the BlocksRequest/BlocksResponse payload" in {
+    import Hex._
+
+    val block1       = blockGen.sample.get
+    val block2       = blockGen.sample.get
+    val requestId    = RequestId.unsafe(1)
+    val blockRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
+
+    val blockRequestBlob =
+      // code id
+      hex"03" ++
+        // request id
+        hex"01" ++
+        // locator number
+        hex"02" ++
+        // locator 1
+        block1.hash.bytes ++
+        // locator 2
+        block2.hash.bytes
+
+    Payload.serialize(blockRequest) is blockRequestBlob
+    Payload.deserialize(blockRequestBlob) isE blockRequest
+
+    val blockResponse = BlocksResponse(requestId, AVector(block1))
+
+    val blockResponseBlob =
+      // code id
+      hex"04" ++
+        // request id
+        hex"01" ++
+        // locator number
+        hex"01" ++
+        // locator 1
+        serialize(block1)
+
+    Payload.serialize(blockResponse) is blockResponseBlob
+    Payload.deserialize(blockResponseBlob) isE blockResponse
   }
 }
