@@ -185,4 +185,49 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     Payload.serialize(headersResponse) is headersResponseBlob
     Payload.deserialize(headersResponseBlob) isE headersResponse
   }
+
+  it should "serialize/deserialize the InvRequest/InvResponse payload" in {
+    import Hex._
+
+    val block1     = blockGen.sample.get
+    val block2     = blockGen.sample.get
+    val requestId  = RequestId.unsafe(1)
+    val invRequest = InvRequest(requestId, AVector(AVector(block1.hash, block2.hash)))
+
+    val invRequestBlob =
+      // code id
+      hex"07" ++
+        // request id
+        hex"01" ++
+        // locator array number
+        hex"01" ++
+        // locator number of the first locator array
+        hex"02" ++
+        // locator 1
+        block1.hash.bytes ++
+        // locator 2
+        block2.hash.bytes
+
+    Payload.serialize(invRequest) is invRequestBlob
+    Payload.deserialize(invRequestBlob) isE invRequest
+
+    val invResponse = InvResponse(requestId, AVector(AVector(block1.hash, block2.hash)))
+
+    val invResponseBlob =
+      // code id
+      hex"08" ++
+        // request id
+        hex"01" ++
+        // hash array number
+        hex"01" ++
+        // hash number of the first hash array
+        hex"02" ++
+        // hash 1
+        serialize(block1.hash) ++
+        // hash 2
+        serialize(block2.hash)
+
+    Payload.serialize(invResponse) is invResponseBlob
+    Payload.deserialize(invResponseBlob) isE invResponse
+  }
 }
