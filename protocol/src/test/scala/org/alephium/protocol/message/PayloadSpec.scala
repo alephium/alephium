@@ -18,9 +18,12 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
+import akka.util.ByteString
+import org.scalatest.compatible.Assertion
+
 import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{Protocol, PublicKey, SignatureSchema}
-import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, NoIndexModelGenerators}
 import org.alephium.serde.SerdeError
@@ -61,7 +64,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val brokerInfo   = BrokerInfo.unsafe(cliqueId, 0, 1, new InetSocketAddress("127.0.0.1", 0))
     val version: Int = Protocol.version
     val hello        = Hello.unsafe(version, TimeStamp.unsafe(100), brokerInfo.interBrokerInfo)
-    val helloBlob    =
+    verifySerde(hello) {
       // code id
       hex"00" ++
         // version
@@ -74,9 +77,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         hex"00" ++
         // groupNumPerBroker
         hex"01"
-
-    Payload.serialize(hello) is helloBlob
-    Payload.deserialize(helloBlob) isE hello
+    }
   }
 
   it should "serialize/deserialize the Ping/Pong payload" in {
@@ -84,65 +85,55 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val requestId = RequestId.unsafe(1)
     val ping      = Ping(requestId, TimeStamp.unsafe(100))
-    val pingBlob  =
+    verifySerde(ping) {
       // code id
       hex"01" ++
         // request id
         hex"01" ++
         // timestamp
         hex"0000000000000064"
+    }
 
-    Payload.serialize(ping) is pingBlob
-    Payload.deserialize(pingBlob) isE ping
-
-    val pong     = Pong(requestId)
-    val pongBlob =
+    val pong = Pong(requestId)
+    verifySerde(pong) {
       // code id
       hex"02" ++
         // request id
         hex"01"
-
-    Payload.serialize(pong) is pongBlob
-    Payload.deserialize(pongBlob) isE pong
+    }
   }
 
   it should "serialize/deserialize the BlocksRequest/BlocksResponse payload" in {
     import Hex._
 
-    val block1       = blockGen.sample.get
-    val block2       = blockGen.sample.get
-    val requestId    = RequestId.unsafe(1)
-    val blockRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
-
-    val blockRequestBlob =
+    val block1        = blockGen.sample.get
+    val block2        = blockGen.sample.get
+    val requestId     = RequestId.unsafe(1)
+    val blocksRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
+    verifySerde(blocksRequest) {
       // code id
       hex"03" ++
         // request id
         hex"01" ++
-        // locator number
+        // number of locators
         hex"02" ++
         // locator 1
         block1.hash.bytes ++
         // locator 2
         block2.hash.bytes
+    }
 
-    Payload.serialize(blockRequest) is blockRequestBlob
-    Payload.deserialize(blockRequestBlob) isE blockRequest
-
-    val blockResponse = BlocksResponse(requestId, AVector(block1))
-
-    val blockResponseBlob =
+    val blocksResponse = BlocksResponse(requestId, AVector(block1))
+    verifySerde(blocksResponse) {
       // code id
       hex"04" ++
         // request id
         hex"01" ++
-        // blocks number
+        // number of blocks
         hex"01" ++
         // block 1
         serialize(block1)
-
-    Payload.serialize(blockResponse) is blockResponseBlob
-    Payload.deserialize(blockResponseBlob) isE blockResponse
+    }
   }
 
   it should "serialize/deserialize the HeadersRequest/HeadersResponse payload" in {
@@ -152,38 +143,32 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val block2         = blockGen.sample.get
     val requestId      = RequestId.unsafe(1)
     val headersRequest = HeadersRequest(requestId, AVector(block1.hash, block2.hash))
-
-    val headersRequestBlob =
+    verifySerde(headersRequest) {
       // code id
       hex"05" ++
         // request id
         hex"01" ++
-        // locator number
+        // number of locators
         hex"02" ++
         // locator 1
         block1.hash.bytes ++
         // locator 2
         block2.hash.bytes
-
-    Payload.serialize(headersRequest) is headersRequestBlob
-    Payload.deserialize(headersRequestBlob) isE headersRequest
+    }
 
     val headersResponse = HeadersResponse(requestId, AVector(block1.header, block2.header))
-
-    val headersResponseBlob =
+    verifySerde(headersResponse) {
       // code id
       hex"06" ++
         // request id
         hex"01" ++
-        // header number
+        // number of headers
         hex"02" ++
         // header 1
         serialize(block1.header) ++
         // header 2
         serialize(block2.header)
-
-    Payload.serialize(headersResponse) is headersResponseBlob
-    Payload.deserialize(headersResponseBlob) isE headersResponse
+    }
   }
 
   it should "serialize/deserialize the InvRequest/InvResponse payload" in {
@@ -193,41 +178,97 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val block2     = blockGen.sample.get
     val requestId  = RequestId.unsafe(1)
     val invRequest = InvRequest(requestId, AVector(AVector(block1.hash, block2.hash)))
-
-    val invRequestBlob =
+    verifySerde(invRequest) {
       // code id
       hex"07" ++
         // request id
         hex"01" ++
-        // locator array number
+        // number of locator array
         hex"01" ++
-        // locator number of the first locator array
+        // number of locators in the first locator array
         hex"02" ++
         // locator 1
         block1.hash.bytes ++
         // locator 2
         block2.hash.bytes
-
-    Payload.serialize(invRequest) is invRequestBlob
-    Payload.deserialize(invRequestBlob) isE invRequest
+    }
 
     val invResponse = InvResponse(requestId, AVector(AVector(block1.hash, block2.hash)))
-
-    val invResponseBlob =
+    verifySerde(invResponse) {
       // code id
       hex"08" ++
         // request id
         hex"01" ++
-        // hash array number
+        // number of hash arrays
         hex"01" ++
-        // hash number of the first hash array
+        // number of hashes in the first hash array
         hex"02" ++
         // hash 1
         serialize(block1.hash) ++
         // hash 2
         serialize(block2.hash)
+    }
+  }
 
-    Payload.serialize(invResponse) is invResponseBlob
-    Payload.deserialize(invResponseBlob) isE invResponse
+  it should "serialize/deserialize the NewBlocks/NewHeaders/NewInv/NewTxs payload" in {
+    import Hex._
+
+    val block1    = blockGen.sample.get
+    val block2    = blockGen.sample.get
+    val newBlocks = NewBlocks(AVector(block1, block2))
+    verifySerde(newBlocks) {
+      // code id
+      hex"09" ++
+        // number of blocks
+        hex"02" ++
+        // block 1
+        serialize(block1) ++
+        // block 2
+        serialize(block2)
+    }
+
+    val newHeaders = NewHeaders(AVector(block1.header, block2.header))
+    verifySerde(newHeaders) {
+      // code id
+      hex"0a" ++
+        // number of headers
+        hex"02" ++
+        // header 1
+        serialize(block1.header) ++
+        // header 2
+        serialize(block2.header)
+    }
+
+    val newInv = NewInv(AVector(AVector(block1.hash, block2.hash)))
+    verifySerde(newInv) {
+      // code id
+      hex"0b" ++
+        // number of hash arrays
+        hex"01" ++
+        // number of hashes in the first hash array
+        hex"02" ++
+        // hash 1
+        serialize(block1.hash) ++
+        // hash 2
+        serialize(block2.hash)
+    }
+
+    val txTemplate1 = transactionGen().sample.get.toTemplate
+    val txTemplate2 = transactionGen().sample.get.toTemplate
+    val newTxs      = NewTxs(AVector(txTemplate1, txTemplate2))
+    verifySerde(newTxs) {
+      hex"0c" ++
+        // number of tx templates
+        hex"02" ++
+        // tx template 1
+        serialize(txTemplate1) ++
+        // tx template 2
+        serialize(txTemplate2)
+    }
+  }
+
+  private def verifySerde(payload: Payload)(blob: ByteString): Assertion = {
+    Payload.serialize(payload) is blob
+    Payload.deserialize(blob) isE payload
   }
 }
