@@ -21,9 +21,9 @@ import java.net.InetSocketAddress
 import akka.util.ByteString
 import org.scalatest.compatible.Assertion
 
+import org.alephium.crypto.SecP256K1Signature
 import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{Protocol, PublicKey, SignatureSchema}
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, NoIndexModelGenerators}
 import org.alephium.serde.SerdeError
@@ -32,9 +32,6 @@ import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   implicit val ordering: Ordering[Code] = Ordering.by(Code.toInt(_))
-  implicit val groupConfig = new GroupConfig {
-    override def groups: Int = 4
-  }
 
   it should "index all payload types" in {
     val codes = EnumerationMacros.sealedInstancesOf[Code]
@@ -59,24 +56,31 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serialize/deserialize the Hello payload" in {
     import Hex._
 
-    val publicKeyHex = hex"4b8abc82e1423c4aa234549a3ada5dbc04ce1bc8db1b990c4af3b73fdfd7b301f4"
-    val cliqueId     = CliqueId(new PublicKey(publicKeyHex))
-    val brokerInfo   = BrokerInfo.unsafe(cliqueId, 0, 1, new InetSocketAddress("127.0.0.1", 0))
-    val version: Int = Protocol.version
-    val hello        = Hello.unsafe(version, TimeStamp.unsafe(100), brokerInfo.interBrokerInfo)
+    val publicKeyHex = hex"02a6df864a42ff65b12a46d09284213993a562a052059caa1d2fed594c369ee495"
+    val signatureHex =
+      hex"c2a56d568c070ed39aaac48891df094b9aaff196c2c48e57b20253a78c3c89083177fa42021855badcde3242085da559f74c7d81f250872af17eac7366374526"
+    val cliqueId   = CliqueId(new PublicKey(publicKeyHex))
+    val brokerInfo = BrokerInfo.unsafe(cliqueId, 0, 1, new InetSocketAddress("127.0.0.1", 0))
+    val version    = Protocol.version
+    val signature  = new SecP256K1Signature(signatureHex)
+    val hello =
+      Hello.unsafe(version, TimeStamp.unsafe(1627484789657L), brokerInfo.interBrokerInfo, signature)
+
     verifySerde(hello) {
       // code id
       hex"00" ++
         // version
         hex"4809" ++
         // timestamp
-        hex"0000000000000064" ++
+        hex"0000017aeda71b99" ++
         // clique id
         publicKeyHex ++
         // borker id
         hex"00" ++
         // groupNumPerBroker
-        hex"01"
+        hex"01" ++
+        // signature
+        signatureHex
     }
   }
 
