@@ -68,7 +68,3 @@ trait ContractPool extends CostStrategy {
     worldState.updateContract(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
   }
 }
-
-object ContractPool {
-  final case class State(state: mutable.ArraySeq[Val]) extends AnyVal
-}
