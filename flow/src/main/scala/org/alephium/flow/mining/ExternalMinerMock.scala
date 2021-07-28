@@ -120,11 +120,11 @@ class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketA
         apiConnections(addressIndex) = Some(connectionHandler)
       }
     case Tcp.CommandFailed(c: Tcp.Connect) =>
-      log.error(s"Cannot connect to miner API ${c.remoteAddress}, stopping self ...")
-      context.stop(self)
+      log.error(s"Cannot connect to miner API ${c.remoteAddress}, Shutdown the system ...")
+      terminateSystem()
     case Terminated(_) =>
       log.info(
-        s"Connection to miner API is closed, please check the nodes for more information. Shutdown the system now ..."
+        s"Connection to miner API is closed, please check the nodes for more information. Shutdown the system ..."
       )
       terminateSystem()
   }

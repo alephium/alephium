@@ -21,7 +21,7 @@ import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.message.{Message, Ping}
+import org.alephium.protocol.message.{Message, Ping, RequestId}
 import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
 class ConnectionHandlerSpec
@@ -38,7 +38,7 @@ class ConnectionHandlerSpec
     connection.expectMsgType[Tcp.Register]
     connection.expectMsg(Tcp.ResumeReading)
 
-    val message      = Ping(1, TimeStamp.now())
+    val message      = Ping(RequestId.unsafe(1), TimeStamp.now())
     val messageBytes = Message.serialize(message, config.network.networkType)
   }
 

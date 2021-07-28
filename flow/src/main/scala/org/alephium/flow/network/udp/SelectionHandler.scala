@@ -17,8 +17,8 @@
 package org.alephium.flow.network.udp
 
 import java.nio.channels.{CancelledKeyException, SelectionKey, Selector}
-import java.util.concurrent.atomic.AtomicBoolean
 
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
@@ -27,7 +27,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.util.Duration
 
-// This is modified from akk.io.SelectionHandler
+// This is modified from akka.io.SelectionHandler
 object SelectionHandler extends ExtensionId[SelectionHandler] with ExtensionIdProvider {
   override def lookup: ExtensionId[_ <: Extension] = SelectionHandler
 
@@ -46,11 +46,21 @@ class SelectionHandler(
     executionContext: ExecutionContext
 ) extends Extension
     with LazyLogging {
-  private val timeout = Duration.ofSecondsUnsafe(5)
-  private val wakeUp  = new AtomicBoolean(false)
+  private val timeout      = Duration.ofSecondsUnsafe(5)
+  private val pendingTasks = ArrayBuffer.empty[Runnable]
+
+  def registerTask(runnable: Runnable): Unit = {
+    pendingTasks.synchronized(pendingTasks.addOne(runnable))
+    selector.wakeup()
+    ()
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def select(): Unit = {
+    pendingTasks.synchronized {
+      pendingTasks.foreach(runnable => runnable.run())
+      pendingTasks.clear()
+    }
     if (selector.select(timeout.millis) > 0) {
       val selectedKeys = selector.selectedKeys()
       val iterator     = selectedKeys.iterator()
@@ -68,7 +78,6 @@ class SelectionHandler(
       }
       selectedKeys.clear()
     }
-    wakeUp.set(false)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -79,21 +88,6 @@ class SelectionHandler(
         case _: CancelledKeyException => // ok, can be triggered while setting interest ops
         case NonFatal(e)              => logger.error(s"Udp selection non-fatal error: $e")
       } finally executionContext.execute(loop)
-    }
-  }
-
-  def execute(f: => Unit): Unit = {
-    executionContext.execute { () =>
-      try f
-      catch {
-        case _: CancelledKeyException => // ok, can be triggered while setting interest ops
-        case NonFatal(e)              => logger.error(s"Error during selector management task: $e")
-      }
-    }
-    // if possible avoid syscall and trade off with LOCK CMPXCHG
-    if (wakeUp.compareAndSet(false, true)) {
-      selector.wakeup()
-      ()
     }
   }
 

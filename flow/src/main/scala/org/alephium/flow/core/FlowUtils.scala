@@ -395,10 +395,8 @@ object FlowUtils {
 }
 
 trait SyncUtils {
-  def getIntraSyncInventories(
-      remoteBroker: BrokerGroupInfo
-  ): IOResult[AVector[AVector[BlockHash]]] =
-    IOUtils.tryExecute(getIntraSyncInventoriesUnsafe(remoteBroker))
+  def getIntraSyncInventories(): IOResult[AVector[AVector[BlockHash]]] =
+    IOUtils.tryExecute(getIntraSyncInventoriesUnsafe())
 
   def getSyncLocators(): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncLocatorsUnsafe())
@@ -408,9 +406,7 @@ trait SyncUtils {
   ): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators))
 
-  protected def getIntraSyncInventoriesUnsafe(
-      remoteBroker: BrokerGroupInfo
-  ): AVector[AVector[BlockHash]]
+  protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]]
 
   protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]]
 

@@ -34,7 +34,7 @@ class MessageSpec extends AlephiumSpec {
   val lengthField    = 4
   val checksumLength = 4
   val magic          = networkType.magicBytes
-  val pong           = Pong(1)
+  val pong           = Pong(RequestId.unsafe(1))
   val message        = Message(pong)
   val serialized     = Message.serialize(message, networkType)
   val header         = serdeImpl[Header].serialize(message.header)

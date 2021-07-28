@@ -89,8 +89,8 @@ class WebSocketServerSpec
 
   trait WebSocketServerFixture extends Fixture {
 
-    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val system: ActorSystem                = ActorSystem("websocket-server-spec")
+    implicit val executionContext: ExecutionContext = system.dispatcher
     lazy val blockFlowProbe                         = TestProbe()
     val (allHandlers, _)                            = TestUtils.createAllHandlersProbe
     lazy val node = new NodeDummy(

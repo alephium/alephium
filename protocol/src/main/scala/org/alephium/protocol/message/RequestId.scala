@@ -14,12 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol
+package org.alephium.protocol.message
 
-import akka.util.ByteString
+import org.alephium.serde.Serde
+import org.alephium.util.SecureAndSlowRandom
+import org.alephium.util.U32
 
-import org.alephium.util.Bytes
+final case class RequestId(value: U32) {
+  override def toString(): String = {
+    s"RequestId: ${value.v}"
+  }
+}
 
-object Protocol {
-  val version: Int = Bytes.toIntUnsafe(ByteString(0, 0, 8, 9))
+object RequestId {
+  implicit val serde: Serde[RequestId] = Serde.forProduct1(RequestId(_), _.value)
+
+  def unsafe(value: Int): RequestId = {
+    RequestId(U32.unsafe(value))
+  }
+
+  def random(): RequestId = {
+    RequestId(SecureAndSlowRandom.nextNonZeroU32())
+  }
 }

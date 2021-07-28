@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.message.{Message, Payload, Pong}
+import org.alephium.protocol.message.{Message, Payload, Pong, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, NetworkType}
 import org.alephium.util._
 
@@ -199,8 +199,14 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
-    val injection: PartialFunction[Payload, Payload] = { case Pong(x) =>
-      Pong(if (x + 1 != 0) x + 1 else x + 2)
+    val injection: PartialFunction[Payload, Payload] = { case Pong(requestId) =>
+      val updatedRequestId = if (requestId.value.addUnsafe(U32.One) != U32.Zero) {
+        RequestId(requestId.value.addUnsafe(U32.One))
+      } else {
+        RequestId(requestId.value.addUnsafe(U32.Two))
+      }
+
+      Pong(updatedRequestId)
     }
 
     val server0 = bootClique(

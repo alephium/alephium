@@ -47,6 +47,7 @@ package object serde {
   implicit val boolSerde: Serde[Boolean] = BoolSerde
   implicit val byteSerde: Serde[Byte]    = ByteSerde
   implicit val intSerde: Serde[Int]      = IntSerde
+  implicit val u32Serde: Serde[U32]      = U32Serde
   implicit val i256Serde: Serde[I256]    = I256Serde
   implicit val u256Serde: Serde[U256]    = U256Serde
 
