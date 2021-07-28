@@ -92,6 +92,7 @@ class BroadcastTxTest extends AlephiumSpec {
     confirmTx(tx0, restPort(masterPortClique1))
     confirmTx(tx1, restPort(masterPortClique1))
 
+    clique2.stopMining()
     clique1.stop()
     clique2.stop()
   }
