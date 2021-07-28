@@ -19,14 +19,14 @@ package org.alephium.protocol.message
 import java.net.InetSocketAddress
 
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.{Protocol, PublicKey, SignatureSchema}
+import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.serde.SerdeError
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
-class PayloadSpec extends AlephiumSpec {
+class PayloadSpec extends AlephiumSpec with GroupConfigFixture.Default {
   implicit val ordering: Ordering[Code] = Ordering.by(Code.toInt(_))
   implicit val groupConfig = new GroupConfig {
     override def groups: Int = 4
@@ -50,5 +50,29 @@ class PayloadSpec extends AlephiumSpec {
     val invalidInput  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey2)
     val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
     invalidOutput.leftValue is a[SerdeError]
+  }
+
+  it should "serialize/deserialize the Hello payload" in {
+    import Hex._
+
+    val publicKeyHex = hex"4b8abc82e1423c4aa234549a3ada5dbc04ce1bc8db1b990c4af3b73fdfd7b301f4"
+    val cliqueId     = CliqueId(new PublicKey(publicKeyHex))
+    val brokerInfo   = BrokerInfo.unsafe(cliqueId, 0, 1, new InetSocketAddress("127.0.0.1", 0))
+    val version: Int = Protocol.version
+    val hello        = Hello.unsafe(version, TimeStamp.unsafe(100), brokerInfo.interBrokerInfo)
+    val helloBlob    =
+      // version
+      hex"004809" ++
+        // timestamp
+        hex"0000000000000064" ++
+        // clique id
+        publicKeyHex ++
+        // borker id
+        hex"00" ++
+        // groupNumPerBroker
+        hex"01"
+
+    Payload.serialize(hello) is helloBlob
+    Payload.deserialize(helloBlob) isE hello
   }
 }

@@ -125,16 +125,16 @@ object Payload {
         Hello,
         Ping,
         Pong,
-        BlocksResponse,
         BlocksRequest,
-        NewBlocks,
-        HeadersResponse,
+        BlocksResponse,
         HeadersRequest,
-        NewHeaders,
-        NewTxs,
+        HeadersResponse,
         InvRequest,
         InvResponse,
-        NewInv
+        NewBlocks,
+        NewHeaders,
+        NewInv,
+        NewTxs
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
