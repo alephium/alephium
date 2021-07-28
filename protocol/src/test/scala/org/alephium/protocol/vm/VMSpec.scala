@@ -178,17 +178,22 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         override val outputBalances: Balances = Balances.empty
       }
 
-    def testInstrs(instrs: AVector[Instr[StatefulContext]], expected: ExeResult[AVector[Val]]) = {
-      val method = Method[StatefulContext](
-        isPublic = true,
-        isPayable = true,
-        argsType = AVector.empty,
-        localsLength = 0,
-        returnType = expected.fold(_ => AVector.empty[Val.Type], _.map(_.tpe)),
-        instrs
-      )
+    def testInstrs(
+        instrs: AVector[AVector[Instr[StatefulContext]]],
+        expected: ExeResult[AVector[Val]]
+    ) = {
+      val methods = instrs.mapWithIndex { case (instrs, index) =>
+        Method[StatefulContext](
+          isPublic = index equals 0,
+          isPayable = true,
+          argsType = AVector.empty,
+          localsLength = 0,
+          returnType = expected.fold(_ => AVector.empty[Val.Type], _.map(_.tpe)),
+          instrs
+        )
+      }
       val context = mockContext()
-      val obj     = StatefulScript.from(AVector(method)).get.toObject
+      val obj     = StatefulScript.from(methods).get.toObject
 
       StatefulVM.executeWithOutputs(context, obj, AVector.empty) is expected
 
@@ -196,11 +201,18 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     }
 
     def pass(instrs: AVector[Instr[StatefulContext]], expected: AVector[Val]) = {
-      testInstrs(instrs, Right(expected))
+      testInstrs(AVector(instrs), Right(expected))
+    }
+
+    def passMulti(
+        instrss: AVector[AVector[Instr[StatefulContext]]],
+        expected: AVector[Val]
+    ) = {
+      testInstrs(instrss, Right(expected))
     }
 
     def fail(instrs: AVector[Instr[StatefulContext]], expected: ExeFailure) = {
-      testInstrs(instrs, failed(expected))
+      testInstrs(AVector(instrs), failed(expected))
     }
   }
 
@@ -244,6 +256,32 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
+  }
+
+  it should "pass approved tokens to function call" in new BalancesFixture {
+    val instrs0 = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      U256Const(Val.U256(10)),
+      ApproveAlf,
+      CallLocal(1),
+      AddressConst(address0),
+      U256Const(Val.U256(20)),
+      ApproveAlf,
+      CallLocal(2)
+    )
+    val instrs1 = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      AlfRemaining,
+      U256Const(Val.U256(10)),
+      CheckEqU256
+    )
+    val instrs2 = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      AlfRemaining,
+      U256Const(Val.U256(20)),
+      CheckEqU256
+    )
+    passMulti(AVector(instrs0, instrs1, instrs2), AVector.empty[Val])
   }
 
   it should "fail when no enough balance for approval" in new BalancesFixture {

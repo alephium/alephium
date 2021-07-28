@@ -75,13 +75,13 @@ sealed abstract class VM[Ctx <: Context](
     for {
       _ <- frameStack.pop()
       _ <- frameStack.top match {
-        case Some(nextFrame) => switchFrame(currentFrame, nextFrame)
-        case None            => completeLastFrame(currentFrame)
+        case Some(previousFrame) => switchBackFrame(currentFrame, previousFrame)
+        case None                => completeLastFrame(currentFrame)
       }
     } yield ()
   }
 
-  protected def switchFrame(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
+  protected def switchBackFrame(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
 
   protected def completeLastFrame(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
@@ -91,7 +91,7 @@ final class StatelessVM(
     frameStack: Stack[Frame[StatelessContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
-  protected def switchFrame(
+  protected def switchBackFrame(
       currentFrame: Frame[StatelessContext],
       nextFrame: Frame[StatelessContext]
   ): ExeResult[Unit] = Right(())
@@ -104,16 +104,16 @@ final class StatefulVM(
     frameStack: Stack[Frame[StatefulContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
-  protected def switchFrame(
+  protected def switchBackFrame(
       currentFrame: Frame[StatefulContext],
-      nextFrame: Frame[StatefulContext]
+      previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
     if (currentFrame.method.isPayable) {
       val resultOpt = for {
-        currentBalances <- currentFrame.balanceStateOpt
-        nextBalances    <- nextFrame.balanceStateOpt
-        _               <- merge(nextBalances.remaining, currentBalances.remaining)
-        _               <- merge(nextBalances.remaining, currentBalances.approved)
+        currentBalances  <- currentFrame.balanceStateOpt
+        previousBalances <- previousFrame.balanceStateOpt
+        _                <- mergeBack(previousBalances.remaining, currentBalances.remaining)
+        _                <- mergeBack(previousBalances.remaining, currentBalances.approved)
       } yield ()
       resultOpt match {
         case Some(_) => okay
@@ -124,7 +124,7 @@ final class StatefulVM(
     }
   }
 
-  protected def merge(next: Balances, current: Balances): Option[Unit] = {
+  protected def mergeBack(previous: Balances, current: Balances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= current.all.length) {
@@ -134,7 +134,7 @@ final class StatefulVM(
         if (balancesPerLockup.scopeDepth <= 0) {
           ctx.outputBalances.add(lockupScript, balancesPerLockup)
         } else {
-          next.add(lockupScript, balancesPerLockup) match {
+          previous.add(lockupScript, balancesPerLockup) match {
             case Some(_) => iter(index + 1)
             case None    => None
           }
