@@ -61,8 +61,10 @@ class PayloadSpec extends AlephiumSpec with GroupConfigFixture.Default {
     val version: Int = Protocol.version
     val hello        = Hello.unsafe(version, TimeStamp.unsafe(100), brokerInfo.interBrokerInfo)
     val helloBlob    =
-      // version
-      hex"004809" ++
+      // code id
+      hex"00" ++
+        // version
+        hex"4809" ++
         // timestamp
         hex"0000000000000064" ++
         // clique id
@@ -74,5 +76,32 @@ class PayloadSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
     Payload.serialize(hello) is helloBlob
     Payload.deserialize(helloBlob) isE hello
+  }
+
+  it should "serialize/deserialize the Ping/Pong payload" in {
+    import Hex._
+
+    val requestId = RequestId.unsafe(1)
+    val ping      = Ping(requestId, TimeStamp.unsafe(100))
+    val pingBlob  =
+      // code id
+      hex"01" ++
+        // request id
+        hex"01" ++
+        // timestamp
+        hex"0000000000000064"
+
+    Payload.serialize(ping) is pingBlob
+    Payload.deserialize(pingBlob) isE ping
+
+    val pong     = Pong(requestId)
+    val pongBlob =
+      // code id
+      hex"02" ++
+        // request id
+        hex"01"
+
+    Payload.serialize(pong) is pongBlob
+    Payload.deserialize(pongBlob) isE pong
   }
 }
