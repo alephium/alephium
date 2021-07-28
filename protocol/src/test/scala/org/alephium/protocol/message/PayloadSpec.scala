@@ -136,12 +136,53 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
       hex"04" ++
         // request id
         hex"01" ++
-        // locator number
+        // blocks number
         hex"01" ++
-        // locator 1
+        // block 1
         serialize(block1)
 
     Payload.serialize(blockResponse) is blockResponseBlob
     Payload.deserialize(blockResponseBlob) isE blockResponse
+  }
+
+  it should "serialize/deserialize the HeadersRequest/HeadersResponse payload" in {
+    import Hex._
+
+    val block1         = blockGen.sample.get
+    val block2         = blockGen.sample.get
+    val requestId      = RequestId.unsafe(1)
+    val headersRequest = HeadersRequest(requestId, AVector(block1.hash, block2.hash))
+
+    val headersRequestBlob =
+      // code id
+      hex"05" ++
+        // request id
+        hex"01" ++
+        // locator number
+        hex"02" ++
+        // locator 1
+        block1.hash.bytes ++
+        // locator 2
+        block2.hash.bytes
+
+    Payload.serialize(headersRequest) is headersRequestBlob
+    Payload.deserialize(headersRequestBlob) isE headersRequest
+
+    val headersResponse = HeadersResponse(requestId, AVector(block1.header, block2.header))
+
+    val headersResponseBlob =
+      // code id
+      hex"06" ++
+        // request id
+        hex"01" ++
+        // header number
+        hex"02" ++
+        // header 1
+        serialize(block1.header) ++
+        // header 2
+        serialize(block2.header)
+
+    Payload.serialize(headersResponse) is headersResponseBlob
+    Payload.deserialize(headersResponseBlob) isE headersResponse
   }
 }
