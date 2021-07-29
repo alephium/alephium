@@ -61,19 +61,27 @@ trait NodeStateStorage extends RawKeyValueStorage {
       })
     }
 
-  def checkDatabaseCompatibility(version: Version): IOResult[Unit] = {
+  def checkDatabaseCompatibility(
+      dbMinimalVersion: Version,
+      nodeVersion: Version
+  ): IOResult[Unit] = {
     getDatabaseVersion.flatMap {
-      case Some(dbVersion) if !version.compatible(dbVersion) =>
-        Left(
-          IOError.Other(
-            new RuntimeException(s"Database version is $dbVersion, client version is $version")
+      case Some(dbVersion) =>
+        if (dbVersion < dbMinimalVersion || dbVersion > nodeVersion) {
+          Left(
+            IOError.Other(
+              new RuntimeException(
+                s"Database version is $dbVersion, node supported minimal version is $dbMinimalVersion, node version is $nodeVersion"
+              )
+            )
           )
-        )
-      case Some(dbVersion) if dbVersion < version =>
-        setDatabaseVersion(version)
+        } else if (dbMinimalVersion <= dbVersion && dbVersion < nodeVersion) {
+          setDatabaseVersion(nodeVersion)
+        } else {
+          Right(())
+        }
       case None =>
-        setDatabaseVersion(version)
-      case _ => Right(())
+        setDatabaseVersion(nodeVersion)
     }
   }
 

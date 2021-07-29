@@ -36,14 +36,16 @@ class NodeStateStorageSpec
     storage.setDatabaseVersion(initDbVersion).isRight is true
     storage.getDatabaseVersion isE Some(initDbVersion)
 
-    forAll(Generators.versionGen) { case (_, version) =>
-      val dbVersion = storage.getDatabaseVersion.rightValue.get
-      if (!version.compatible(dbVersion)) {
-        storage.checkDatabaseCompatibility(version).isLeft is true
-      } else if (dbVersion < version) {
-        storage.checkDatabaseCompatibility(version).isRight is true
-        storage.getDatabaseVersion isE Some(version)
-      }
+    forAll(Generators.versionGen, Generators.versionGen) {
+      case ((_, minimalVersion), (_, nodeVersion)) if minimalVersion <= nodeVersion =>
+        val dbVersion = storage.getDatabaseVersion.rightValue.get
+        if (dbVersion < minimalVersion || dbVersion > nodeVersion) {
+          storage.checkDatabaseCompatibility(minimalVersion, nodeVersion).isLeft is true
+        } else {
+          storage.checkDatabaseCompatibility(minimalVersion, nodeVersion).isRight is true
+          storage.getDatabaseVersion isE Some(nodeVersion)
+        }
+      case _ => true
     }
   }
 
@@ -51,7 +53,7 @@ class NodeStateStorageSpec
     storage.getDatabaseVersion isE None
 
     val version: Version = Generators.versionGen.sample.get._2
-    storage.checkDatabaseCompatibility(version).isRight is true
+    storage.checkDatabaseCompatibility(version, version).isRight is true
     storage.getDatabaseVersion isE Some(version)
   }
 }
