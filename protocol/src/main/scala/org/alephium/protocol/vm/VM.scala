@@ -154,7 +154,7 @@ final class StatefulVM(
 
   protected def completeLastFrame(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     for {
-      _ <- ctx.commitContractStates()
+      _ <- ctx.updateContractStates()
       _ <- cleanBalances(lastFrame)
     } yield ()
   }
@@ -258,7 +258,8 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
-  def runTxScript(
+  // dryrun will not commit worldstate changes, which is efficient for tx validation
+  def dryrunTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
       preOutputs: AVector[TxOutput],
@@ -268,6 +269,7 @@ object StatefulVM {
     runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
   }
 
+  // run will commit worldstate changes
   def runTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
@@ -279,7 +281,7 @@ object StatefulVM {
       context <- StatefulContext.build(tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
     } yield {
-      context.worldState.commit()
+      context.commitStates()
       TxScriptExecution(
         context.gasRemaining,
         AVector.from(context.contractInputs),

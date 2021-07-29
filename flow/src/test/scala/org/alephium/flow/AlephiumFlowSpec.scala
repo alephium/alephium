@@ -358,7 +358,7 @@ trait FlowFixture
     val groupView  = blockFlow.getMutableGroupView(mainGroup).rightValue
     val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
-      .runTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
+      .dryrunTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
       .rightValue
     result.contractInputs -> result.generatedOutputs
   }
