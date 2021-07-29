@@ -16,7 +16,7 @@
 
 package org.alephium.flow.io
 
-import org.alephium.io.RocksDBSource
+import org.alephium.io.{IOError, RocksDBSource}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.Version
@@ -33,16 +33,18 @@ class NodeStateStorageSpec
 
   it should "check database compatibility" in {
     val initDbVersion = Generators.versionGen.sample.get._2
-    storage.setDatabaseVersion(initDbVersion).isRight is true
+    storage.setDatabaseVersion(initDbVersion) isE ()
     storage.getDatabaseVersion isE Some(initDbVersion)
 
     forAll(Generators.versionGen, Generators.versionGen) {
       case ((_, minimalVersion), (_, nodeVersion)) if minimalVersion <= nodeVersion =>
         val dbVersion = storage.getDatabaseVersion.rightValue.get
         if (dbVersion < minimalVersion || dbVersion > nodeVersion) {
-          storage.checkDatabaseCompatibility(minimalVersion, nodeVersion).isLeft is true
+          storage
+            .checkDatabaseCompatibility(minimalVersion, nodeVersion)
+            .leftValue is a[IOError.Other]
         } else {
-          storage.checkDatabaseCompatibility(minimalVersion, nodeVersion).isRight is true
+          storage.checkDatabaseCompatibility(minimalVersion, nodeVersion) isE ()
           storage.getDatabaseVersion isE Some(nodeVersion)
         }
       case _ => true
@@ -53,7 +55,7 @@ class NodeStateStorageSpec
     storage.getDatabaseVersion isE None
 
     val version: Version = Generators.versionGen.sample.get._2
-    storage.checkDatabaseCompatibility(version, version).isRight is true
+    storage.checkDatabaseCompatibility(version, version) isE ()
     storage.getDatabaseVersion isE Some(version)
   }
 }

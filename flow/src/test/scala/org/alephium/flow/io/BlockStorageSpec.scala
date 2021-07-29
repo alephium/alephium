@@ -34,7 +34,7 @@ class BlockStorageSpec
     forAll(blockGen) { block =>
       storage.exists(block.hash) isE false
       storage.existsUnsafe(block.hash) is false
-      storage.put(block).isRight is true
+      storage.put(block) isE ()
       storage.existsUnsafe(block.hash) is true
       storage.exists(block.hash) isE true
       storage.getUnsafe(block.hash) is block
@@ -44,7 +44,7 @@ class BlockStorageSpec
 
   it should "fail to delete" in {
     forAll(blockGen) { block =>
-      storage.put(block).isRight is true
+      storage.put(block) isE ()
       assertThrows[NotImplementedError] {
         storage.delete(block.hash)
       }

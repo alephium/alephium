@@ -23,7 +23,7 @@ import org.scalatest.compatible.Assertion
 
 import org.alephium.crypto.SecP256K1Signature
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.{Protocol, PublicKey, SignatureSchema}
+import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, NoIndexModelGenerators}
 import org.alephium.serde.SerdeError
@@ -61,16 +61,21 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
       hex"c2a56d568c070ed39aaac48891df094b9aaff196c2c48e57b20253a78c3c89083177fa42021855badcde3242085da559f74c7d81f250872af17eac7366374526"
     val cliqueId   = CliqueId(new PublicKey(publicKeyHex))
     val brokerInfo = BrokerInfo.unsafe(cliqueId, 0, 1, new InetSocketAddress("127.0.0.1", 0))
-    val version    = Protocol.version
+    val clientId   = "scala-alephium/v1.0.0/Linux"
     val signature  = new SecP256K1Signature(signatureHex)
     val hello =
-      Hello.unsafe(version, TimeStamp.unsafe(1627484789657L), brokerInfo.interBrokerInfo, signature)
+      Hello.unsafe(
+        clientId,
+        TimeStamp.unsafe(1627484789657L),
+        brokerInfo.interBrokerInfo,
+        signature
+      )
 
     verifySerde(hello) {
       // code id
       hex"00" ++
-        // version
-        hex"4809" ++
+        // client id
+        hex"1b7363616c612d616c65706869756d2f76312e302e302f4c696e7578" ++
         // timestamp
         hex"0000017aeda71b99" ++
         // clique id

@@ -39,7 +39,7 @@ final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Ver
 object Version {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   val release: Version          = fromReleaseVersion(BuildInfo.version).get
-  val dbMinimalVersion: Version = release // FIXME
+  val dbMinimalVersion: Version = release
 
   val clientId: String = s"scala-alephium/$release/${System.getProperty("os.name")}"
 
