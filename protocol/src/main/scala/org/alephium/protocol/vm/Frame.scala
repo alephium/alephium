@@ -32,6 +32,9 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def balanceStateOpt: Option[BalanceState]
 
+  def getBalanceState(): ExeResult[BalanceState] =
+    balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
+
   def pcMax: Int = method.instrs.length
 
   def advancePC(): Unit = pc += 1
@@ -160,9 +163,9 @@ final class StatefulFrame(
   ): ExeResult[Option[BalanceState]] = {
     if (method.isPayable) {
       for {
-        state <- balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
+        currentBalances <- getBalanceState()
         balanceStateOpt <- {
-          val newFrameBalances = state.useApproved()
+          val newFrameBalances = currentBalances.useApproved()
           contractObj.addressOpt match {
             case Some(contractId) =>
               ctx

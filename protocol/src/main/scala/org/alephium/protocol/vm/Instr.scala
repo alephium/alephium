@@ -875,7 +875,7 @@ object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
     for {
       amount       <- frame.popOpStackT[Val.U256]()
       address      <- frame.popOpStackT[Val.Address]()
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       _ <- balanceState
         .approveALF(address.lockupScript, amount.v)
         .toRight(Right(NotEnoughBalance))
@@ -897,7 +897,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackT[Val.Address]()
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       _ <- balanceState
         .approveToken(address.lockupScript, tokenId, amount.v)
         .toRight(Right(NotEnoughBalance))
@@ -909,7 +909,7 @@ object AlfRemaining extends AssetInstr with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address      <- frame.popOpStackT[Val.Address]()
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       amount <- balanceState
         .alfRemaining(address.lockupScript)
         .toRight(Right(NoAlfBalanceForTheAddress))
@@ -924,7 +924,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
       address      <- frame.popOpStackT[Val.Address]()
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       amount <- balanceState
         .tokenRemaining(address.lockupScript, tokenId)
         .toRight(Right(NoTokenBalanceForTheAddress))
@@ -947,7 +947,7 @@ sealed trait Transfer extends AssetInstr {
       amount       <- frame.popOpStackT[Val.U256]()
       to           <- toThunk
       from         <- fromThunk
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       _            <- balanceState.useAlf(from, amount.v).toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.outputBalances
         .addAlf(to, amount.v)
@@ -966,7 +966,7 @@ sealed trait Transfer extends AssetInstr {
       tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
       to           <- toThunk
       from         <- fromThunk
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       _ <- balanceState
         .useToken(from, tokenId, amount.v)
         .toRight(Right(NotEnoughBalance))
@@ -1053,7 +1053,7 @@ object CreateContract extends ContractInstr with GasCreate {
       contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
-      balanceState <- frame.balanceStateOpt.toRight(Right(NonPayableFrame))
+      balanceState <- frame.getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       _            <- frame.ctx.createContract(contractCode, balances, fields)
     } yield ()
