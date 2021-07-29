@@ -18,7 +18,7 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorRef
 import akka.actor.ActorRef.noSender
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, SocketUtil, TestProbe}
@@ -27,13 +27,14 @@ import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AlephiumActorSpecLike, AlephiumSpec}
+import org.alephium.util._
 
-class TcpControllerSpec extends AlephiumSpec with AlephiumConfigFixture {
+class TcpControllerSpec
+    extends AlephiumSpec
+    with AlephiumConfigFixture
+    with RefinedAlephiumActorSpec {
 
-  trait Fixture extends Eventually with AlephiumActorSpecLike {
-    implicit override lazy val system: ActorSystem =
-      createSystem("TcpControllerSpec", AlephiumActorSpec.debugConfig)
+  trait Fixture extends Eventually with ActorFixture {
 
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()

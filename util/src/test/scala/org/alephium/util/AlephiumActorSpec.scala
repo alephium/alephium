@@ -33,18 +33,8 @@ trait AlephiumActorSpecLike
     extends TestKitBase
     with ImplicitSender
     with AlephiumSpec
-    with BeforeAndAfterAll {
-  implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
-
-  // TestActorRef can't be used together with Stash sometimes, ref: internet
-  def newTestActorRef[T <: Actor](props: Props): TestActorRef[T] = {
-    newTestActorRef(props, SecureAndSlowRandom.nextU256().toString)
-  }
-
-  def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
-    akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
-  }
-
+    with BeforeAndAfterAll
+    with AlephiumActorSpec.Utils {
   def createSystem(name: String, config: String = AlephiumActorSpec.warningConfig): ActorSystem = {
     ActorSystem(
       s"$name-${SecureAndSlowRandom.nextU256().toString}",
@@ -57,8 +47,12 @@ trait AlephiumActorSpecLike
   }
 }
 
-trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with ScalaFutures {
-  var _system: ActorSystem = _
+trait RefinedAlephiumActorSpec
+    extends AlephiumSpec
+    with BeforeAndAfterEach
+    with ScalaFutures
+    with AlephiumActorSpec.Utils {
+  @volatile var _system: ActorSystem = _
 
   override def afterEach(): Unit = {
     super.afterEach()
@@ -68,19 +62,32 @@ trait RefinedAlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with
     }
   }
 
-  trait ActorCreation {
+  trait SystemFixture {
     implicit val system: ActorSystem =
       ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
     _system = system
+
+    // TestActorRef can't be used together with Stash sometimes, ref: internet
+    def newTestActorRef[T <: Actor](props: Props): TestActorRef[T] = {
+      newTestActorRef(props, SecureAndSlowRandom.nextU256().toString)
+    }
+
+    def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
+      akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
+    }
   }
 
-  trait ActorFixture extends ActorCreation with TestKitBase with ImplicitSender
+  trait ActorFixture extends SystemFixture with TestKitBase with ImplicitSender
 }
 
 object AlephiumActorSpec {
   lazy val warningConfig = config("WARNING")
   lazy val infoConfig    = config("INFO")
   lazy val debugConfig   = config("DEBUG")
+
+  trait Utils {
+    implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
+  }
 
   def config(logLevel: String): String =
     s"""
