@@ -126,17 +126,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getBlockflowLogic = serverLogic(getBlockflow) { timeInterval =>
-    //TODO Validation can be moved to the `EndpointInput[TimeInterval]` once
-    //we update tapir to 0.18.0
-    if (timeInterval.from > timeInterval.to) {
-      Future.successful(
-        Left(ApiError.BadRequest(s"`fromTs` must be before `toTs`"))
-      )
-    } else {
-      Future.successful(
-        serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
-      )
-    }
+    Future.successful(
+      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
+    )
   }
 
   val getBlockLogic = serverLogic(getBlock) { hash =>

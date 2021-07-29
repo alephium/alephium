@@ -65,7 +65,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       Get(s"/blockflow?fromTs=10&toTs=0") check { response =>
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
-          """`fromTs` must be before `toTs`"""
+          """Invalid value (`fromTs` must be before `toTs`)"""
         )
       }
     }
