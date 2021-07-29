@@ -28,11 +28,7 @@ sealed abstract class VM[Ctx <: Context](
     operandStack: Stack[Val]
 ) {
   def execute(obj: ContractObj[Ctx], methodIndex: Int, args: AVector[Val]): ExeResult[Unit] = {
-    for {
-      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack)
-      _          <- frameStack.push(startFrame)
-      _          <- executeFrames()
-    } yield ()
+    execute(obj, methodIndex, args, None)
   }
 
   def executeWithOutputs(
@@ -42,11 +38,21 @@ sealed abstract class VM[Ctx <: Context](
   ): ExeResult[AVector[Val]] = {
     var outputs: AVector[Val]                     = AVector.ofSize(0)
     val returnTo: AVector[Val] => ExeResult[Unit] = returns => { outputs = returns; Right(()) }
+    execute(obj, methodIndex, args, Some(returnTo)).map(_ => outputs)
+  }
+
+  @inline
+  private def execute(
+      obj: ContractObj[Ctx],
+      methodIndex: Int,
+      args: AVector[Val],
+      returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
+  ): ExeResult[Unit] = {
     for {
-      startFrame <- obj.startFrameWithOutputs(ctx, methodIndex, args, operandStack, returnTo)
+      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
-    } yield outputs
+    } yield ()
   }
 
   @tailrec

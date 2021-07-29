@@ -185,18 +185,21 @@ sealed trait ContractObj[Ctx <: Context] {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): Frame[Ctx]
 
+  private val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
+    if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
+
   def startFrame(
       ctx: Ctx,
       methodIndex: Int,
       args: AVector[Val],
-      operandStack: Stack[Val]
+      operandStack: Stack[Val],
+      returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Frame[Ctx]] = {
     for {
       method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
       _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
-        val returnTo: AVector[Val] => ExeResult[Unit] = returns =>
-          if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
+        val returnTo = returnToOpt.getOrElse(noReturnTo)
         if (method.isPayable) {
           startPayableFrame(ctx, method, args, operandStack, returnTo)
         } else {
@@ -234,25 +237,6 @@ sealed trait ContractObj[Ctx <: Context] {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     Right(buildNonPayableFrame(ctx, this, method, args, operandStack, returnTo))
-  }
-
-  def startFrameWithOutputs(
-      ctx: Ctx,
-      methodIndex: Int,
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[Ctx]] = {
-    for {
-      method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
-      _      <- if (method.isPublic) Right(()) else failed(ExternalPrivateMethodCall)
-      frame <-
-        if (method.isPayable) {
-          startPayableFrame(ctx, method, args, operandStack, returnTo)
-        } else {
-          startNonPayableFrame(ctx, method, args, operandStack, returnTo)
-        }
-    } yield frame
   }
 }
 
