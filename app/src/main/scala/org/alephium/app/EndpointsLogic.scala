@@ -72,7 +72,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   private var nodesOpt: Option[AVector[PeerAddress]] = None
 
-  //TODO Do we want to cache the result once it's synced?
   private def withSyncedClique[A](f: => FutureTry[A]): FutureTry[A] = {
     viewHandler.ref
       .ask(InterCliqueManager.IsSynced)
