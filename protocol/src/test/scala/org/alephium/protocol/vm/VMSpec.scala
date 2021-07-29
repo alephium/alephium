@@ -72,6 +72,20 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
+  it should "check the number of args for entry method" in new Fixture {
+    failMainMethod(baseMethod.copy(argsLength = 1), failure = InvalidMethodArgLength(0, 1))
+  }
+
+  it should "check the number of args for called method" in new Fixture {
+    failContract(
+      StatefulContract(
+        AVector.empty,
+        AVector(baseMethod.copy(instrs = AVector(CallLocal(1))), baseMethod.copy(argsLength = 1))
+      ),
+      failure = InsufficientArgs
+    )
+  }
+
   it should "not return values for main function" in new Fixture {
     failMainMethod(
       baseMethod.copy(returnLength = 1, instrs = AVector(U256Const0, Return)),
@@ -167,7 +181,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
         def nextOutputIndex: Int                  = 0
 
-        def getInitialBalances: ExeResult[Balances] = {
+        def getInitialBalances(): ExeResult[Balances] = {
           Right(
             Balances(
               ArrayBuffer(address0.lockupScript -> balances0, address1.lockupScript -> balances1)

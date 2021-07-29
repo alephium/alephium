@@ -43,6 +43,7 @@ case object NoReturnVal                                        extends ExeFailur
 final case class InvalidType(v: Val)                           extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
+case object InsufficientArgs                                   extends ExeFailure
 case object InvalidMethodParamsType                            extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
 case object EqualityFailed                                     extends ExeFailure

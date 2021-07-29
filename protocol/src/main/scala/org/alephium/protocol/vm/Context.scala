@@ -31,7 +31,7 @@ trait ContractEnv
 trait StatelessContext extends CostStrategy {
   def txId: Hash
   def signatures: Stack[Signature]
-  def getInitialBalances: ExeResult[Balances]
+  def getInitialBalances(): ExeResult[Balances]
 }
 
 object StatelessContext {
@@ -45,7 +45,7 @@ object StatelessContext {
 
   final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
       extends StatelessContext {
-    override def getInitialBalances: ExeResult[Balances] = failed(NonPayableFrame)
+    override def getInitialBalances(): ExeResult[Balances] = failed(NonPayableFrame)
   }
 }
 
@@ -157,7 +157,7 @@ object StatefulContext {
         "org.wartremover.warts.Serializable"
       )
     )
-    override def getInitialBalances: ExeResult[Balances] =
+    override def getInitialBalances(): ExeResult[Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
           balances <- Balances
