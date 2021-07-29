@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import org.alephium.protocol.Hash
 import org.alephium.util.{AVector, Bytes}
 
-abstract class Frame[Ctx <: Context] {
+abstract class Frame[Ctx <: StatelessContext] {
   var pc: Int
   def obj: ContractObj[Ctx]
   def opStack: Stack[Val]

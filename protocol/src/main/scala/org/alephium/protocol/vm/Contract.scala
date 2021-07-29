@@ -23,7 +23,7 @@ import org.alephium.protocol.model.ContractId
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-final case class Method[Ctx <: Context](
+final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
     isPayable: Boolean,
     argsType: AVector[Val.Type],
@@ -65,7 +65,7 @@ object Method {
     )
 }
 
-sealed trait Contract[Ctx <: Context] {
+sealed trait Contract[Ctx <: StatelessContext] {
   def fields: AVector[Val.Type]
   def methods: AVector[Method[Ctx]]
 }
@@ -74,7 +74,7 @@ object Contract {
   val emptyFields: AVector[Val.Type] = AVector.ofSize(0)
 }
 
-sealed abstract class Script[Ctx <: Context] extends Contract[Ctx] {
+sealed abstract class Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   val fields: AVector[Val.Type] = Contract.emptyFields
 
   def toObject: ScriptObj[Ctx]
@@ -157,7 +157,7 @@ object StatefulContract {
   val forSMT: StatefulContract = StatefulContract(AVector.empty, AVector(Method.forSMT))
 }
 
-sealed trait ContractObj[Ctx <: Context] {
+sealed trait ContractObj[Ctx <: StatelessContext] {
   def addressOpt: Option[Hash]
   def code: Contract[Ctx]
   def fields: mutable.ArraySeq[Val]
@@ -254,7 +254,7 @@ sealed trait ContractObj[Ctx <: Context] {
   }
 }
 
-sealed trait ScriptObj[Ctx <: Context] extends ContractObj[Ctx] {
+sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
   val addressOpt: Option[Hash]      = None
   val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
 }
