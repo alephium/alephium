@@ -17,6 +17,7 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
@@ -207,9 +208,8 @@ object StatelessVM {
       args: AVector[Val],
       signature: Signature
   ): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(txId, initialGas, signature)
-    val obj     = script.toObject
-    execute(context, obj, args)
+    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
+    runAssetScript(txId, initialGas, script, args, stack)
   }
 
   def runAssetScript(
