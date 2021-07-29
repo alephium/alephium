@@ -96,6 +96,9 @@ abstract class Frame[Ctx <: StatelessContext] {
   }
 
   def execute(): ExeResult[Option[Frame[Ctx]]]
+
+  protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
+    Return.runWith(this).map(_ => None)
 }
 
 final class StatelessFrame(
@@ -139,9 +142,6 @@ final class StatelessFrame(
       failed(PcOverflow)
     }
   }
-
-  private def runReturn(): ExeResult[Option[Frame[StatelessContext]]] =
-    Return.runWith(this).map(_ => None)
 }
 
 final class StatefulFrame(
@@ -240,11 +240,6 @@ final class StatefulFrame(
       failed(PcOverflow)
     }
   }
-
-  private def runReturn(): ExeResult[Option[Frame[StatefulContext]]] =
-    for {
-      _ <- Return.runWith(this)
-    } yield None
 }
 
 object Frame {
