@@ -170,19 +170,17 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
     }
   }
 
-  def buildNonPayableFrame(
+  def startNonPayableFrame(
       ctx: Ctx,
-      obj: ContractObj[Ctx],
       method: Method[Ctx],
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]]
 
-  def buildPayableFrame(
+  def startPayableFrame(
       ctx: Ctx,
       balanceState: BalanceState,
-      obj: ContractObj[Ctx],
       method: Method[Ctx],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -221,26 +219,15 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     ctx.getInitialBalances().flatMap { balances =>
-      buildPayableFrame(
+      startPayableFrame(
         ctx,
         BalanceState.from(balances),
-        this,
         method,
         args,
         operandStack,
         returnTo
       )
     }
-  }
-
-  protected def startNonPayableFrame(
-      ctx: Ctx,
-      method: Method[Ctx],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[Ctx]] = {
-    buildNonPayableFrame(ctx, this, method, args, operandStack, returnTo)
   }
 }
 
@@ -250,20 +237,18 @@ sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
 }
 
 final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext] {
-  def buildNonPayableFrame(
+  def startNonPayableFrame(
       ctx: StatelessContext,
-      obj: ContractObj[StatelessContext],
       method: Method[StatelessContext],
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatelessContext]] =
-    Frame.stateless(ctx, obj, method, args, operandStack, returnTo)
+    Frame.stateless(ctx, this, method, args, operandStack, returnTo)
 
-  def buildPayableFrame(
+  def startPayableFrame(
       ctx: StatelessContext,
       balanceState: BalanceState,
-      obj: ContractObj[StatelessContext],
       method: Method[StatelessContext],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -272,26 +257,24 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
 }
 
 final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext] {
-  def buildNonPayableFrame(
+  def startNonPayableFrame(
       ctx: StatefulContext,
-      obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, None, obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, None, this, method, args, operandStack, returnTo)
 
-  def buildPayableFrame(
+  def startPayableFrame(
       ctx: StatefulContext,
       balanceState: BalanceState,
-      obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, Some(balanceState), obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, Some(balanceState), this, method, args, operandStack, returnTo)
 }
 
 final case class StatefulContractObject(
@@ -304,24 +287,22 @@ final case class StatefulContractObject(
 
   def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
 
-  def buildNonPayableFrame(
+  def startNonPayableFrame(
       ctx: StatefulContext,
-      obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, None, obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, None, this, method, args, operandStack, returnTo)
 
-  def buildPayableFrame(
+  def startPayableFrame(
       ctx: StatefulContext,
       balanceState: BalanceState,
-      obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, Some(balanceState), obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, Some(balanceState), this, method, args, operandStack, returnTo)
 }
