@@ -224,16 +224,20 @@ object StatelessVM {
     execute(context, obj, args)
   }
 
+  private def default(ctx: StatelessContext): StatelessVM = {
+    new StatelessVM(
+      ctx,
+      Stack.ofCapacity(frameStackMaxSize),
+      Stack.ofCapacity(opStackMaxSize)
+    )
+  }
+
   private def execute(
       context: StatelessContext,
       obj: ContractObj[StatelessContext],
       args: AVector[Val]
   ): ExeResult[AssetScriptExecution] = {
-    val vm = new StatelessVM(
-      context,
-      Stack.ofCapacity(frameStackMaxSize),
-      Stack.ofCapacity(opStackMaxSize)
-    )
+    val vm = default(context)
     vm.execute(obj, 0, args).map(_ => AssetScriptExecution(context.gasRemaining))
   }
 
@@ -242,11 +246,7 @@ object StatelessVM {
       obj: ContractObj[StatelessContext],
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    val vm = new StatelessVM(
-      context,
-      Stack.ofCapacity(frameStackMaxSize),
-      Stack.ofCapacity(opStackMaxSize)
-    )
+    val vm = default(context)
     vm.executeWithOutputs(obj, 0, args)
   }
 }
@@ -288,13 +288,16 @@ object StatefulVM {
     }
   }
 
+  private def default(ctx: StatefulContext): StatefulVM = {
+    new StatefulVM(ctx, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+  }
+
   def execute(
       context: StatefulContext,
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[Unit] = {
-    val vm =
-      new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+    val vm = default(context)
     vm.execute(obj, 0, args)
   }
 
@@ -303,8 +306,7 @@ object StatefulVM {
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    val vm =
-      new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+    val vm = default(context)
     vm.executeWithOutputs(obj, 0, args)
   }
 }
