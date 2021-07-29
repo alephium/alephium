@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, EitherF}
 
 sealed abstract class VM[Ctx <: Context](
     ctx: Ctx,
@@ -179,31 +179,21 @@ final class StatefulVM(
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
-    @tailrec
-    def iter(index: Int): ExeResult[Unit] = {
-      if (index >= outputBalances.all.length) {
-        okay
-      } else {
-        val (lockupScript, balances) = outputBalances.all(index)
-        balances.toTxOutput(lockupScript) match {
-          case Right(outputOpt) =>
-            outputOpt.foreach { output =>
-              lockupScript match {
-                case LockupScript.P2C(contractId) =>
-                  val contractOutput = output.asInstanceOf[ContractOutput]
-                  val outputRef      = ctx.nextContractOutputRef(contractOutput)
-                  ctx.updateContractAsset(contractId, outputRef, contractOutput)
-                case _ => ()
-              }
-              ctx.generatedOutputs.addOne(output)
-            }
-            iter(index + 1)
-          case Left(error) => Left(error)
+    EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
+      balances.toTxOutput(lockupScript).map { outputOpt =>
+        outputOpt.foreach { output =>
+          lockupScript match {
+            case LockupScript.P2C(contractId) =>
+              val contractOutput = output.asInstanceOf[ContractOutput]
+              val outputRef      = ctx.nextContractOutputRef(contractOutput)
+              ctx.updateContractAsset(contractId, outputRef, contractOutput)
+            case _ => ()
+          }
+          ctx.generatedOutputs.addOne(output)
+          ()
         }
       }
     }
-
-    iter(0)
   }
 }
 
