@@ -26,16 +26,14 @@ import org.alephium.util.AVector
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
     isPayable: Boolean,
-    argsType: AVector[Val.Type],
+    argsLength: Int,
     localsLength: Int,
-    returnType: AVector[Val.Type],
+    returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
   def check(args: AVector[Val]): ExeResult[Unit] = {
-    if (args.length != argsType.length) {
-      failed(InvalidMethodArgLength(args.length, argsType.length))
-    } else if (!args.forallWithIndex((v, index) => v.tpe == argsType(index))) {
-      failed(InvalidMethodParamsType)
+    if (args.length != argsLength) {
+      failed(InvalidMethodArgLength(args.length, argsLength))
     } else {
       okay
     }
@@ -46,21 +44,21 @@ object Method {
   implicit val statelessSerde: Serde[Method[StatelessContext]] =
     Serde.forProduct6(
       Method[StatelessContext],
-      t => (t.isPublic, t.isPayable, t.argsType, t.localsLength, t.returnType, t.instrs)
+      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
     )
   implicit val statefulSerde: Serde[Method[StatefulContext]] =
     Serde.forProduct6(
       Method[StatefulContext],
-      t => (t.isPublic, t.isPayable, t.argsType, t.localsLength, t.returnType, t.instrs)
+      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
     )
 
   def forSMT: Method[StatefulContext] =
     Method[StatefulContext](
       isPublic = false,
       isPayable = false,
-      AVector.empty,
-      0,
-      AVector.empty,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
       AVector(Pop)
     )
 }
@@ -125,9 +123,9 @@ object StatefulScript {
         Method[StatefulContext](
           isPublic = true,
           isPayable = false,
-          argsType = AVector.empty,
+          argsLength = 0,
           localsLength = 0,
-          returnType = AVector.empty,
+          returnLength = 0,
           instrs = AVector(ConstFalse, ConstTrue, CheckEqBool)
         )
       )

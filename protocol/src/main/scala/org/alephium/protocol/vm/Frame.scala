@@ -116,7 +116,7 @@ final class StatelessFrame(
   def methodFrame(index: Int): ExeResult[Frame[StatelessContext]] = {
     for {
       method <- getMethod(index)
-      args   <- opStack.pop(method.argsType.length)
+      args   <- opStack.pop(method.argsLength)
       _      <- method.check(args)
     } yield Frame.stateless(ctx, obj, method, args, opStack, opStack.push)
   }
@@ -187,7 +187,7 @@ final class StatefulFrame(
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
       method             <- getMethod(index)
-      args               <- opStack.pop(method.argsType.length)
+      args               <- opStack.pop(method.argsLength)
       _                  <- method.check(args)
       newBalanceStateOpt <- getNewFrameBalancesState(obj, method)
     } yield {
@@ -203,7 +203,7 @@ final class StatefulFrame(
       contractObj        <- ctx.loadContract(contractKey)
       method             <- contractObj.getMethod(index)
       _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
-      args               <- opStack.pop(method.argsType.length)
+      args               <- opStack.pop(method.argsLength)
       _                  <- method.check(args)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
     } yield {
@@ -255,9 +255,6 @@ object Frame {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): Frame[StatelessContext] = {
     val locals = Array.fill[Val](method.localsLength)(Val.False)
-    method.argsType.foreachWithIndex { case (tpe, index) =>
-      locals(index) = tpe.default
-    }
     args.foreachWithIndex((v, index) => locals(index) = v)
     new StatelessFrame(0, obj, operandStack.remainingStack(), method, locals, returnTo, ctx)
   }

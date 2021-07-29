@@ -208,16 +208,14 @@ object Ast {
       state.setFuncScope(id)
       check(state)
 
-      val localVars  = state.getLocalVars(id)
-      val argsType   = localVars.take(args.length).map(_.tpe.toVal)
-      val returnType = AVector.from(rtypes.view.map(_.toVal))
-      val instrs     = body.flatMap(_.genCode(state))
+      val localVars = state.getLocalVars(id)
+      val instrs    = body.flatMap(_.genCode(state))
       Method[Ctx](
         isPublic,
         isPayable,
-        AVector.from(argsType),
-        localVars.length,
-        returnType,
+        argsLength = args.length,
+        localsLength = localVars.length,
+        returnLength = rtypes.length,
         AVector.from(instrs)
       )
     }

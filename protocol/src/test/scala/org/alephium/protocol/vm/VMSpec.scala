@@ -33,9 +33,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val baseMethod = Method[StatefulContext](
       isPublic = true,
       isPayable = false,
-      argsType = AVector.empty,
+      argsLength = 0,
       localsLength = 0,
-      returnType = AVector.empty,
+      returnLength = 0,
       instrs = AVector.empty
     )
 
@@ -74,7 +74,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "not return values for main function" in new Fixture {
     failMainMethod(
-      baseMethod.copy(returnType = AVector(Val.U256), instrs = AVector(U256Const0, Return)),
+      baseMethod.copy(returnLength = 1, instrs = AVector(U256Const0, Return)),
       failure = NonEmptyReturnForMainFunction
     )
   }
@@ -84,9 +84,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector.empty,
+        returnLength = 0,
         instrs = AVector(
           U256Const0,
           U256Const0,
@@ -114,9 +114,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector(Val.U256),
+        returnLength = 1,
         instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const5, U256Add, Return)
       )
     val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
@@ -130,18 +130,18 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val method0 = Method[StatelessContext](
       isPublic = true,
       isPayable = false,
-      argsType = AVector(Val.U256),
+      argsLength = 1,
       localsLength = 1,
-      returnType = AVector(Val.U256),
+      returnLength = 1,
       instrs = AVector(LoadLocal(0), CallLocal(1), Return)
     )
     val method1 =
       Method[StatelessContext](
         isPublic = false,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector(Val.U256),
+        returnLength = 1,
         instrs = AVector(LoadLocal(0), U256Const1, U256Add, Return)
       )
     val script = StatelessScript(methods = AVector(method0, method1))
@@ -186,9 +186,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         Method[StatefulContext](
           isPublic = index equals 0,
           isPayable = true,
-          argsType = AVector.empty,
+          argsLength = 0,
           localsLength = 0,
-          returnType = expected.fold(_ => AVector.empty[Val.Type], _.map(_.tpe)),
+          returnLength = expected.fold(_ => 0, _.length),
           instrs
         )
       }
@@ -336,9 +336,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector.empty,
+        returnLength = 0,
         instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const1, U256Add, StoreField(1))
       )
     val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))

@@ -759,10 +759,8 @@ object CallExternal extends StatefulInstrCompanion1[Byte]
 
 case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasZero {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    val returnType = frame.method.returnType
     for {
-      value <- frame.opStack.pop(returnType.length)
-      _     <- if (value.map(_.tpe) == returnType) okay else failed(InvalidReturnType)
+      value <- frame.opStack.pop(frame.method.returnLength)
       _     <- frame.returnTo(value)
     } yield frame.complete()
   }
