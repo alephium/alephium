@@ -204,6 +204,7 @@ lazy val app = mainProject("app")
   )
 
 lazy val json = project("json")
+  .dependsOn(util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
       upickle
@@ -223,6 +224,7 @@ lazy val http = project("http")
   .settings(
     libraryDependencies ++= Seq(
       `tapir-vertx`,
+      `tapir-client`,
       `sttp-backend`
     )
   )
@@ -277,13 +279,10 @@ lazy val wallet = project("wallet")
   .settings(
     libraryDependencies ++= Seq(
       vertx,
-      `tapir-vertx`,
       `scala-logging`,
       `tapir-core`,
       `tapir-openapi`,
       `tapir-swagger-ui`,
-      `tapir-client`,
-      `sttp-backend`,
       `scala-logging`,
       logback
     ),

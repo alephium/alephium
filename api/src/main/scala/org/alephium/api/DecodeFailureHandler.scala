@@ -37,7 +37,7 @@ trait DecodeFailureHandler {
 
     val detail = ctx.failure match {
       case DecodeResult.InvalidValue(errors) if errors.nonEmpty =>
-        Some(ValidationMessages.validationErrorsMessage(errors))
+        Some(validationErrorsMessage(errors))
       case DecodeResult.Error(original, error) => Some(s"${error.getMessage}: $original")
       case _                                   => None
     }
@@ -54,4 +54,16 @@ trait DecodeFailureHandler {
     ),
     failureMessage = failureMessage
   )
+
+  private def invalidValueMessage[T](ve: ValidationError[T], valueName: String): String =
+    ve match {
+      case c: ValidationError.Custom[T] => c.message
+      case _                            => ValidationMessages.invalidValueMessage(ve, valueName)
+    }
+
+  private def validationErrorMessage(ve: ValidationError[_]): String =
+    invalidValueMessage(ve, ValidationMessages.pathMessage(ve).getOrElse("value"))
+
+  private def validationErrorsMessage(ve: List[ValidationError[_]]): String =
+    ve.map(validationErrorMessage).mkString(", ")
 }

@@ -49,7 +49,8 @@ trait HttpFixture {
   def httpRequest[T,R](
       method: Method,
       endpoint: String,
-      maybeBody: Option[String] = None
+      maybeBody: Option[String] = None,
+      maybeHeader: Option[(String, String)] = None
   ): Int =>  HttpRequest = { port =>
 
     val request = basicRequest
@@ -60,15 +61,20 @@ trait HttpFixture {
       case None         => request
     }
 
-    requestWithBody
+    val requestWithHeaders = maybeHeader match {
+      case Some((key, value)) => requestWithBody.header(key, value)
+      case None         => requestWithBody
+    }
+
+    requestWithHeaders
   }
 
-  def httpGet(endpoint: String, maybeBody: Option[String] = None) =
-    httpRequest(Method.GET, endpoint, maybeBody)
-  def httpPost(endpoint: String, maybeBody: Option[String] = None) =
-    httpRequest(Method.POST, endpoint, maybeBody)
-  def httpPut(endpoint: String, maybeBody: Option[String] = None) =
-    httpRequest(Method.PUT, endpoint, maybeBody)
+  def httpGet(endpoint: String, maybeBody: Option[String] = None, maybeHeader: Option[(String, String)] = None) =
+    httpRequest(Method.GET, endpoint, maybeBody, maybeHeader)
+  def httpPost(endpoint: String, maybeBody: Option[String] = None, maybeHeader: Option[(String, String)] = None) =
+    httpRequest(Method.POST, endpoint, maybeBody, maybeHeader)
+  def httpPut(endpoint: String, maybeBody: Option[String] = None, maybeHeader: Option[(String, String)] = None) =
+    httpRequest(Method.PUT, endpoint, maybeBody, maybeHeader)
 
 // scalastyle:off no.equal
   def parsePath(str: String): (Seq[String], Map[String, String]) = {
@@ -114,9 +120,14 @@ trait HttpFixture {
 
 trait HttpRouteFixture extends HttpFixture {
   def port: Int
+  def maybeApiKey: Option[String]
+
+  private lazy val maybeHeader:Option[(String,String)] ={
+    maybeApiKey.map(apiKey=> ("X-API-KEY", apiKey))
+  }
 
   def Post(endpoint: String, maybeBody: Option[String]): Response[Either[String, String]] = {
-    httpPost(endpoint,maybeBody)(port).send(backend)
+    httpPost(endpoint,maybeBody, maybeHeader)(port).send(backend)
   }
 
   def Post(endpoint: String): Response[Either[String, String]]               =
@@ -126,18 +137,18 @@ trait HttpRouteFixture extends HttpFixture {
     Post(endpoint, Some(body))
 
   def Put(endpoint: String, body: String) = {
-    httpPut(endpoint, Some(body))(port).send(backend)
+    httpPut(endpoint, Some(body),maybeHeader)(port).send(backend)
   }
 
   def Delete(endpoint: String, body: String) = {
-    httpRequest(Method.DELETE, endpoint, Some(body))(port).send(backend)
+    httpRequest(Method.DELETE, endpoint, Some(body),maybeHeader)(port).send(backend)
   }
 
   def Get(endpoint: String, otherPort: Int = port): Response[Either[String, String]] = {
-    httpGet(endpoint)(otherPort).send(backend)
+    httpGet(endpoint,maybeHeader = maybeHeader)(otherPort).send(backend)
   }
 
   def Get(endpoint: String, body: String): Response[Either[String, String]] = {
-    httpGet(endpoint, Some(body))(port).send(backend)
+    httpGet(endpoint, Some(body),maybeHeader)(port).send(backend)
   }
 }

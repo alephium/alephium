@@ -17,36 +17,41 @@
 package org.alephium.tools
 
 import org.alephium.api.OpenAPIWriters.openApiJson
+import org.alephium.api.model.ApiKey
 import org.alephium.app.Documentation
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.NetworkType
 import org.alephium.util.Duration
 import org.alephium.wallet.WalletDocumentation
 
+@SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
 object OpenApiUpdate extends App {
 
   val wallet: WalletDocumentation = new WalletDocumentation {
 
-    val blockflowFetchMaxAge: Duration    = Duration.zero
-    implicit def networkType: NetworkType = NetworkType.Testnet
+    override val maybeApiKey: Option[ApiKey]       = None
+    override val blockflowFetchMaxAge: Duration    = Duration.zero
+    implicit override def networkType: NetworkType = NetworkType.Testnet
+    scala.concurrent.ExecutionContext.Implicits.global
 
   }
 
   new Documentation {
-    val port = 12973
 
-    val blockflowFetchMaxAge: Duration = Duration.zero
-    implicit def groupConfig: GroupConfig =
+    override val port                              = 12973
+    override val blockflowFetchMaxAge: Duration    = Duration.zero
+    override val maybeApiKey: Option[ApiKey]       = None
+    override val walletEndpoints                   = wallet.walletEndpoints
+    implicit override val networkType: NetworkType = NetworkType.Testnet
+    implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3
       }
-    implicit def networkType: NetworkType = NetworkType.Testnet
 
-    override val walletEndpoints = wallet.walletEndpoints
-
-    private val json = openApiJson(openAPI)
+    private val json = openApiJson(openAPI, dropAuth = maybeApiKey.isEmpty)
 
     import java.io.PrintWriter
     new PrintWriter("../api/src/main/resources/openapi.json") { write(json); close }
+
   }
 }

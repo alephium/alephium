@@ -88,6 +88,5 @@ object Json extends upickle.AttributeTagged {
           case None      => ujson.Null
         }
     }
-
   }
 }

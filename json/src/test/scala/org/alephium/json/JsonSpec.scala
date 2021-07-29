@@ -14,34 +14,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet
+package org.alephium.json
 
-import sttp.tapir.Endpoint
-import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
-import sttp.tapir.openapi.OpenAPI
+import org.alephium.json.Json._
+import org.alephium.util.AlephiumSpec
 
-import org.alephium.wallet.api.WalletEndpoints
+class JsonSpec extends AlephiumSpec {
+  it should "dropNullValues" in {
+    val json =
+      read[ujson.Value]("""{"foo":null,"bar":{"yop":null,"baz":[{"test":"test","arst":null}]}}""")
+    val cleaned = dropNullValues(json)
 
-trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
-
-  val walletEndpoints: List[Endpoint[_, _, _, _]] = List(
-    createWallet,
-    restoreWallet,
-    listWallets,
-    getWallet,
-    lockWallet,
-    unlockWallet,
-    deleteWallet,
-    getBalances,
-    transfer,
-    sweepAll,
-    getAddresses,
-    getMinerAddresses,
-    deriveNextAddress,
-    deriveNextMinerAddresses,
-    changeActiveAddress
-  ).map(_.endpoint)
-
-  lazy val walletOpenAPI: OpenAPI =
-    toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
+    cleaned is read[ujson.Value]("""{"bar":{"baz":[{"test":"test"}]}}""")
+  }
 }

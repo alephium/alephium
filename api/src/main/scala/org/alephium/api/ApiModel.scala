@@ -251,6 +251,14 @@ trait ApiModelCodec {
     }
   )
 
+  implicit val apiKeyEncoder: Writer[ApiKey] = StringWriter.comap(_.value)
+  implicit val apiKeyDecoder: Reader[ApiKey] = StringReader.map { raw =>
+    ApiKey.from(raw) match {
+      case Right(apiKey) => apiKey
+      case Left(error)   => throw Abort(error)
+    }
+  }
+
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)
 
