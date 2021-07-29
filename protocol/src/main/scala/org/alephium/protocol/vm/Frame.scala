@@ -48,26 +48,24 @@ abstract class Frame[Ctx <: Context] {
 
   def complete(): Unit = pc = method.instrs.length
 
-  def isComplete: Boolean = pc == method.instrs.length
+  def pushOpStack(v: Val): ExeResult[Unit] = opStack.push(v)
 
-  def push(v: Val): ExeResult[Unit] = opStack.push(v)
-
-  def pop(): ExeResult[Val] = opStack.pop()
+  def popOpStack(): ExeResult[Val] = opStack.pop()
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def popT[T <: Val](): ExeResult[T] =
-    pop().flatMap { elem =>
+  def popOpStackT[T <: Val](): ExeResult[T] =
+    popOpStack().flatMap { elem =>
       try Right(elem.asInstanceOf[T])
       catch {
         case _: ClassCastException => failed(InvalidType(elem))
       }
     }
 
-  def getLocal(index: Int): ExeResult[Val] = {
+  def getLocalVal(index: Int): ExeResult[Val] = {
     if (locals.isDefinedAt(index)) Right(locals(index)) else failed(InvalidLocalIndex)
   }
 
-  def setLocal(index: Int, v: Val): ExeResult[Unit] = {
+  def setLocalVal(index: Int, v: Val): ExeResult[Unit] = {
     if (!locals.isDefinedAt(index)) {
       failed(InvalidLocalIndex)
     } else {
@@ -225,7 +223,7 @@ final class StatefulFrame(
     advancePC()
     for {
       _           <- ctx.chargeGas(GasSchedule.callGas)
-      byteVec     <- popT[Val.ByteVec]()
+      byteVec     <- popOpStackT[Val.ByteVec]()
       contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
       newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
     } yield Some(newFrame)
