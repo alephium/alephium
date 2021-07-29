@@ -51,7 +51,7 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  def commitContractStates(): ExeResult[Unit] = {
+  def updateContractStates(): ExeResult[Unit] = {
     EitherF.foreachTry(pool) { case (contractKey, contractObj) =>
       if (contractObj.isUpdated) {
         for {
@@ -66,5 +66,10 @@ trait ContractPool extends CostStrategy {
 
   private def updateState(contractKey: ContractId, state: AVector[Val]): ExeResult[Unit] = {
     worldState.updateContract(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
+  }
+
+  def commitStates(): Unit = {
+    worldState.commit()
+    ()
   }
 }

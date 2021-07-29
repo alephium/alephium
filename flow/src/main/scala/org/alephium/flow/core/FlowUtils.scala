@@ -272,7 +272,7 @@ trait FlowUtils
           case Some(outputs) => Right(outputs)
         }
     } yield {
-      StatefulVM.runTxScript(
+      StatefulVM.dryrunTxScript(
         groupView.worldState,
         tx,
         preOutputs,
