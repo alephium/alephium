@@ -30,13 +30,13 @@ import org.alephium.util.{AVector, Bytes, Collection}
 
 // scalastyle:off file.size.limit number.of.types
 
-sealed trait Instr[-Ctx <: Context] extends GasSchedule {
+sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
   def serialize(): ByteString
 
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait InstrWithSimpleGas[-Ctx <: Context] extends GasSimple {
+sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _ <- frame.ctx.chargeGas(this)
@@ -132,11 +132,12 @@ sealed trait StatelessInstrSimpleGas
     with InstrWithSimpleGas[StatelessContext]
     with GasSimple {}
 
-sealed trait InstrCompanion[-Ctx <: Context] {
+sealed trait InstrCompanion[-Ctx <: StatelessContext] {
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[Staging[Instr[C]]]
 }
 
-sealed abstract class InstrCompanion1[Ctx <: Context, T: Serde] extends InstrCompanion[Ctx] {
+sealed abstract class InstrCompanion1[Ctx <: StatelessContext, T: Serde]
+    extends InstrCompanion[Ctx] {
   lazy val code: Byte = Instr.toCode(this).toByte
 
   def apply(t: T): Instr[Ctx]

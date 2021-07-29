@@ -28,13 +28,11 @@ trait BlockEnv
 trait TxEnv
 trait ContractEnv
 
-trait Context extends CostStrategy {
+trait StatelessContext extends CostStrategy {
   def txId: Hash
   def signatures: Stack[Signature]
   def getInitialBalances: ExeResult[Balances]
 }
-
-trait StatelessContext extends Context
 
 object StatelessContext {
   def apply(txId: Hash, txGas: GasBox, signature: Signature): StatelessContext = {

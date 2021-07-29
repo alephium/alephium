@@ -23,7 +23,7 @@ import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
 
-sealed abstract class VM[Ctx <: Context](
+sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
     frameStack: Stack[Frame[Ctx]],
     operandStack: Stack[Val]
