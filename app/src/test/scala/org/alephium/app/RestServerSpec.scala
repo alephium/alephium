@@ -57,12 +57,12 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
 
   it should "call GET /blockflow" in new RestServerFixture {
     withServers {
-      Get(s"/blockflow?fromTs=0&toTs=0") check { response =>
+      Get(blockflowFromTo(0, 0)) check { response =>
         response.code is StatusCode.Ok
         response.as[FetchResponse] is dummyFetchResponse
       }
 
-      Get(s"/blockflow?fromTs=10&toTs=0") check { response =>
+      Get(blockflowFromTo(10, 0)) check { response =>
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
           """Invalid value (`fromTs` must be before `toTs`)"""
@@ -614,7 +614,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
     }
 
     withServers {
-      Get(s"/blockflow?fromTs=0&toTs=0") check { response =>
+      Get(blockflowFromTo(0, 0)) check { response =>
         response.code is StatusCode.Unauthorized
         if (maybeApiKey.isDefined) {
           response.as[ApiError.Unauthorized] is ApiError.Unauthorized(
@@ -631,7 +631,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
     override lazy val maybeApiKey = apiKey.map(_ => Random.nextString(32))
 
     withServers {
-      Get(s"/blockflow?fromTs=0&toTs=0") check { response =>
+      Get(blockflowFromTo(0, 0)) check { response =>
         if (apiKey.isDefined) {
           response.code is StatusCode.Unauthorized
           response.as[ApiError.Unauthorized] is ApiError.Unauthorized("Wrong api key")
@@ -731,6 +731,10 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       )
 
       (peer, peerConf)
+    }
+
+    def blockflowFromTo(from: Long, to: Long): String = {
+      s"/blockflow?fromTs=$from&toTs=$to"
     }
 
     private def buildServers(nb: Int) = {
