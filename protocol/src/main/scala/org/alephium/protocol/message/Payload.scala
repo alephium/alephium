@@ -158,6 +158,7 @@ object Payload {
 }
 
 sealed trait HandShake extends Payload.UnSolicited {
+  def clientId: String
   def timestamp: TimeStamp
   def brokerInfo: InterBrokerInfo
   def signature: Signature
@@ -165,6 +166,7 @@ sealed trait HandShake extends Payload.UnSolicited {
 
 sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T] {
   def unsafe(
+      clientId: String,
       timestamp: TimeStamp,
       brokerInfo: InterBrokerInfo,
       signature: Signature
@@ -172,12 +174,12 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
 
   def unsafe(brokerInfo: InterBrokerInfo, privateKey: PrivateKey): T = {
     val signature = SignatureSchema.sign(brokerInfo.hash.bytes, privateKey)
-    unsafe(TimeStamp.now(), brokerInfo, signature)
+    unsafe(Version.clientId, TimeStamp.now(), brokerInfo, signature)
   }
 
   implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo._serde
   val serde: Serde[T] =
-    Serde.forProduct3(unsafe, t => (t.timestamp, t.brokerInfo, t.signature))
+    Serde.forProduct4(unsafe, t => (t.clientId, t.timestamp, t.brokerInfo, t.signature))
 
   def validate(message: T)(implicit config: GroupConfig): Either[String, Unit] = {
     val validSignature = SignatureSchema.verify(
@@ -198,6 +200,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
 }
 
 final case class Hello private (
+    clientId: String,
     timestamp: TimeStamp,
     brokerInfo: InterBrokerInfo,
     signature: Signature
@@ -207,11 +210,12 @@ final case class Hello private (
 
 object Hello extends HandShakeSerding[Hello] with Payload.Code {
   def unsafe(
+      clientId: String,
       timestamp: TimeStamp,
       brokerInfo: InterBrokerInfo,
       signature: Signature
   ): Hello = {
-    new Hello(timestamp, brokerInfo, signature)
+    new Hello(clientId, timestamp, brokerInfo, signature)
   }
 }
 
