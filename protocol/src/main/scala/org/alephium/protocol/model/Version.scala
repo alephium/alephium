@@ -38,7 +38,15 @@ final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Ver
 
 object Version {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  val release: Version = fromReleaseVersion(BuildInfo.version).get
+  val release: Version          = fromReleaseVersion(BuildInfo.version).get
+  val dbMinimalVersion: Version = release // FIXME
+
+  val clientId: String = {
+    val osName    = System.getProperty("os.name")
+    val osArch    = System.getProperty("os.arch")
+    val osVersion = System.getProperty("os.version")
+    s"scala-alephium/$release/$osName-$osArch-$osVersion"
+  }
 
   def fromReleaseVersion(release: String): Option[Version] = {
     val regex = """^(\d+)\.(\d+)\.(\d+)(\+.+)?""".r
