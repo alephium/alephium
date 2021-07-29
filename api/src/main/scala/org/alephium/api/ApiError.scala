@@ -20,7 +20,8 @@ import scala.annotation.nowarn
 
 import sttp.model.StatusCode
 import sttp.tapir.{FieldName, Schema}
-import sttp.tapir.SchemaType.{SObjectInfo, SProduct}
+import sttp.tapir.Schema.SName
+import sttp.tapir.SchemaType.{SProduct, SProductField}
 
 import org.alephium.json.Json._
 
@@ -58,15 +59,19 @@ object ApiError {
     }
 
     def apiErrorSchema(
-        fields: List[(FieldName, Schema[_])]
+        fields: List[SProductField[E]]
     ): Schema[E] = {
       Schema(
         SProduct(
-          SObjectInfo(description),
           List(
-            FieldName("detail") -> Schema.schemaForString
+            SProductField[E, String](
+              FieldName("detail"),
+              Schema.schemaForString,
+              error => Some(error.detail)
+            )
           ) ++ fields
-        )
+        ),
+        Some(SName(description))
       )
     }
 
@@ -125,7 +130,13 @@ object ApiError {
     )
 
     implicit override lazy val schema: Schema[NotFound] = apiErrorSchema(
-      List(FieldName("resource") -> Schema.schemaForInt)
+      List(
+        SProductField[NotFound, String](
+          FieldName("resource"),
+          Schema.schemaForString,
+          notFound => Some(notFound.resource)
+        )
+      )
     )
   }
 

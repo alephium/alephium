@@ -16,18 +16,13 @@
 
 package org.alephium.http
 
-import scala.concurrent.ExecutionContext
-
-import sttp.tapir.server.vertx.VertxFutureEndpointOptions
+import sttp.tapir.server.vertx.VertxFutureServerOptions
 
 import org.alephium.api.DecodeFailureHandler
 
-trait ServerOptions extends DecodeFailureHandler {
-  implicit def executionContext:ExecutionContext
-
-  implicit lazy val serverOptions: VertxFutureEndpointOptions =
-    VertxFutureEndpointOptions(
-      decodeFailureHandler = myDecodeFailureHandler,
-      specificExecutionContext = Some(executionContext)
+object ServerOptions extends DecodeFailureHandler {
+   val serverOptions: VertxFutureServerOptions=
+    VertxFutureServerOptions.customInterceptors(
+      decodeFailureHandler = myDecodeFailureHandler
     )
 }

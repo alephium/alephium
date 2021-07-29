@@ -11,7 +11,7 @@ services:
     build:
       context: .
       args:
-        RELEASE: "0.8.2"
+        RELEASE: "0.8.9"
 
     restart: unless-stopped
     ports:

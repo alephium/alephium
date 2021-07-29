@@ -17,6 +17,7 @@
 package org.alephium.api
 
 import scala.collection.immutable.ListMap
+import scala.collection.mutable.LinkedHashMap
 import scala.util.Try
 
 import sttp.tapir.apispec._
@@ -32,14 +33,15 @@ object OpenAPIWriters {
   )
 
   //needed because `OpenAPI.openapi` got a default value in tapir and upickle doesnt serialize it for weird reason
-  final private case class MyOpenAPI(
+  final case class MyOpenAPI(
       openapi: String,
       info: Info,
       tags: List[Tag],
       servers: List[Server],
-      paths: ListMap[String, PathItem],
+      paths: Paths,
       components: Option[Components],
-      security: List[SecurityRequirement]
+      security: List[SecurityRequirement],
+      extensions: ListMap[String, ExtensionValue]
   )
 
   implicit def writerReferenceOr[T: Writer]: Writer[ReferenceOr[T]] = writer[ujson.Value].comap {
@@ -47,29 +49,50 @@ object OpenAPIWriters {
     case Right(t)             => writeJs(t)
   }
 
-  implicit val writerOAuthFlow: Writer[OAuthFlow]           = macroW[OAuthFlow]
-  implicit val writerOAuthFlows: Writer[OAuthFlows]         = macroW[OAuthFlows]
-  implicit val writerSecurityScheme: Writer[SecurityScheme] = macroW[SecurityScheme]
-  implicit val writerExampleValue: Writer[ExampleValue] = writer[ujson.Value].comap {
-    case ExampleSingleValue(value) =>
+  implicit val extensionValue: Writer[ExtensionValue] = writer[ujson.Value].comap {
+    case ExtensionValue(value) =>
       Try(read[ujson.Value](value)).toEither.toOption.getOrElse(ujson.Str(value))
+  }
+  implicit val writerOAuthFlow: Writer[OAuthFlow]   = expandExtensions(macroW[OAuthFlow])
+  implicit val writerOAuthFlows: Writer[OAuthFlows] = expandExtensions(macroW[OAuthFlows])
+  implicit val writerSecurityScheme: Writer[SecurityScheme] = expandExtensions(
+    macroW[SecurityScheme]
+  )
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  implicit val writerExampleValue: Writer[ExampleSingleValue] = writer[ujson.Value].comap {
+    case ExampleSingleValue(value: String) =>
+      Try(read[ujson.Value](value)).toEither.toOption.getOrElse(ujson.Str(value))
+    case ExampleSingleValue(value: Int)        => writeJs(value)
+    case ExampleSingleValue(value: Long)       => writeJs(value)
+    case ExampleSingleValue(value: Float)      => writeJs(value)
+    case ExampleSingleValue(value: Double)     => writeJs(value)
+    case ExampleSingleValue(value: Boolean)    => writeJs(value)
+    case ExampleSingleValue(value: BigDecimal) => writeJs(value)
+    case ExampleSingleValue(value: BigInt)     => writeJs(value)
+    // scalastyle:off null
+    case ExampleSingleValue(null) => ujson.Null
+    // scalastyle:on null
+    case ExampleSingleValue(value) => ujson.Str(value.toString)
+  }
+  implicit val encoderExampleValue: Writer[ExampleValue] = writer[ujson.Value].comap {
+    case e: ExampleSingleValue => writeJs[ExampleSingleValue](e)
     case ExampleMultipleValue(values) =>
       ujson.Arr(
-        values.map(v => Try(read[ujson.Value](v)).toEither.toOption.getOrElse(ujson.Str(v)))
+        values.map(e => writeJs[ExampleSingleValue](ExampleSingleValue(e)))
       )
   }
-  implicit val writerSchemaType: Writer[SchemaType.SchemaType]             = writeEnumeration
-  implicit val writerSchema: Writer[Schema]                                = macroW[Schema]
-  implicit val writerReference: Writer[Reference]                          = macroW[Reference]
-  implicit val writerHeader: Writer[Header]                                = macroW[Header]
-  implicit val writerExample: Writer[Example]                              = macroW[Example]
-  implicit val writerResponse: Writer[Response]                            = macroW[Response]
-  implicit val writerEncoding: Writer[Encoding]                            = macroW[Encoding]
-  implicit val writerMediaType: Writer[MediaType]                          = macroW[MediaType]
-  implicit val writerRequestBody: Writer[RequestBody]                      = macroW[RequestBody]
-  implicit val writerParameterStyle: Writer[ParameterStyle.ParameterStyle] = writeEnumeration
-  implicit val writerParameterIn: Writer[ParameterIn.ParameterIn]          = writeEnumeration
-  implicit val writerParameter: Writer[Parameter]                          = macroW[Parameter]
+  implicit val writerSchemaType: Writer[SchemaType]         = StringWriter.comap(_.value)
+  implicit val writerSchema: Writer[Schema]                 = expandExtensions(macroW[Schema])
+  implicit val writerReference: Writer[Reference]           = macroW[Reference]
+  implicit val writerHeader: Writer[Header]                 = macroW[Header]
+  implicit val writerExample: Writer[Example]               = expandExtensions(macroW[Example])
+  implicit val writerResponse: Writer[Response]             = expandExtensions(macroW[Response])
+  implicit val writerEncoding: Writer[Encoding]             = expandExtensions(macroW[Encoding])
+  implicit val writerMediaType: Writer[MediaType]           = expandExtensions(macroW[MediaType])
+  implicit val writerRequestBody: Writer[RequestBody]       = expandExtensions(macroW[RequestBody])
+  implicit val writerParameterStyle: Writer[ParameterStyle] = StringWriter.comap(_.value)
+  implicit val writerParameterIn: Writer[ParameterIn]       = StringWriter.comap(_.value)
+  implicit val writerParameter: Writer[Parameter]           = expandExtensions(macroW[Parameter])
   implicit val writerResponseMap: Writer[ListMap[ResponsesKey, ReferenceOr[Response]]] =
     writer[ujson.Value].comap { (responses: ListMap[ResponsesKey, ReferenceOr[Response]]) =>
       {
@@ -80,20 +103,31 @@ object OpenAPIWriters {
         ujson.Obj.from(fields.toSeq)
       }
     }
-  implicit val writerOperation: Writer[Operation]           = macroW[Operation]
-  implicit val writerPathItem: Writer[PathItem]             = macroW[PathItem]
-  implicit val writerComponents: Writer[Components]         = macroW[Components]
-  implicit val writerServerVariable: Writer[ServerVariable] = macroW[ServerVariable]
-  implicit val writerServer: Writer[Server]                 = macroW[Server]
+  implicit val writerResponses: Writer[Responses] = writer[ujson.Value].comap { resp =>
+    val extensions = writeJs(resp.extensions).objOpt.getOrElse(LinkedHashMap.empty)
+    val respJson   = writeJs(resp.responses)
+    respJson.objOpt.map(p => ujson.Obj(p ++ extensions)).getOrElse(respJson)
+  }
+  implicit val writerOperation: Writer[Operation] = expandExtensions(macroW[Operation])
+  implicit val writerPathItem: Writer[PathItem]   = macroW[PathItem]
+  implicit val writerPaths: Writer[Paths] = writer[ujson.Value].comap { paths =>
+    val extensions = writeJs(paths.extensions).objOpt.getOrElse(LinkedHashMap.empty)
+    val pathItems  = writeJs(paths.pathItems)
+    pathItems.objOpt.map(p => ujson.Obj(p ++ extensions)).getOrElse(pathItems)
+  }
+  implicit val writerComponents: Writer[Components] = expandExtensions(macroW[Components])
+  implicit val writerServerVariable: Writer[ServerVariable] = expandExtensions(
+    macroW[ServerVariable]
+  )
+  implicit val writerServer: Writer[Server] = expandExtensions(macroW[Server])
   implicit val writerExternalDocumentation: Writer[ExternalDocumentation] =
-    macroW[ExternalDocumentation]
-  implicit val writerTag: Writer[Tag]                     = macroW[Tag]
-  implicit val writerInfo: Writer[Info]                   = macroW[Info]
-  implicit val writerContact: Writer[Contact]             = macroW[Contact]
-  implicit val writerLicense: Writer[License]             = macroW[License]
+    expandExtensions(macroW[ExternalDocumentation])
+  implicit val writerTag: Writer[Tag]                     = expandExtensions(macroW[Tag])
+  implicit val writerInfo: Writer[Info]                   = expandExtensions(macroW[Info])
+  implicit val writerContact: Writer[Contact]             = expandExtensions(macroW[Contact])
+  implicit val writerLicense: Writer[License]             = expandExtensions(macroW[License])
+  implicit private val writerMyOpenAPI: Writer[MyOpenAPI] = expandExtensions(macroW[MyOpenAPI])
   implicit val writerDiscriminator: Writer[Discriminator] = macroW[Discriminator]
-
-  implicit private val writerMyOpenAPI: Writer[MyOpenAPI] = macroW[MyOpenAPI]
 
   implicit def writerList[T: Writer]: Writer[List[T]] = writer[ujson.Value].comap {
     case Nil        => ujson.Null
@@ -113,6 +147,20 @@ object OpenAPIWriters {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   final def writeEnumeration[E <: Enumeration]: Writer[E#Value] = StringWriter.comap(_.toString)
 
+  private def expandExtensions[T](writerT: Writer[T]): Writer[T] = {
+    writer[ujson.Value].comap { c =>
+      val v = writeJs(c)(writerT)
+      v.objOpt.map(obj => expandObjExtensions(ujson.Obj(obj))).getOrElse(v)
+    }
+
+  }
+
+  private def expandObjExtensions(jsonObject: ujson.Obj): ujson.Obj = {
+    val extensions     = ujson.Obj.from(jsonObject.value.find { case (key, _) => key == "extensions" })
+    val jsonWithoutExt = jsonObject.value.filter { case (key, _) => key != "extensions" }
+    ujson.Obj(extensions.objOpt.map(ext => ext ++ jsonWithoutExt).getOrElse(jsonWithoutExt))
+  }
+
   implicit private val openapiWriter: Writer[OpenAPI] = writerMyOpenAPI.comap[OpenAPI] { openapi =>
     MyOpenAPI(
       openapi.openapi,
@@ -121,7 +169,8 @@ object OpenAPIWriters {
       openapi.servers,
       openapi.paths,
       openapi.components,
-      openapi.security
+      openapi.security,
+      openapi.extensions
     )
   }
 

@@ -22,7 +22,7 @@ import sttp.tapir.openapi.OpenAPI
 
 import org.alephium.wallet.api.WalletEndpoints
 
-trait WalletDocumentation extends WalletEndpoints {
+trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
 
   val walletEndpoints: List[Endpoint[_, _, _, _]] = List(
     createWallet,
@@ -43,5 +43,5 @@ trait WalletDocumentation extends WalletEndpoints {
   )
 
   lazy val walletOpenAPI: OpenAPI =
-    OpenAPIDocsInterpreter.toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
+    toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
 }

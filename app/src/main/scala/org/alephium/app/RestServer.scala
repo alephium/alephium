@@ -34,8 +34,8 @@ import io.vertx.ext.web.handler.CorsHandler
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.client.sttp.SttpClientInterpreter
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter.{route => toRoute}
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.OpenAPIWriters.openApiJson
@@ -74,10 +74,11 @@ class RestServer(
 ) extends Endpoints
     with Documentation
     with Service
-    with ServerOptions
+    with VertxFutureServerInterpreter
     with SttpClientInterpreter
     with StrictLogging {
 
+  override val vertxFutureServerOptions                   = ServerOptions.serverOptions
   private val blockFlow: BlockFlow                        = node.blockFlow
   private val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
   private val viewHandler: ActorRefT[ViewHandler.Command] = node.allHandlers.viewHandler
@@ -118,7 +119,7 @@ class RestServer(
       }
   }
 
-  private val getNodeInfoRoute = toRoute(getNodeInfo) { _ =>
+  private val getNodeInfoRoute = route(getNodeInfo) { _ =>
     for {
       isMining <- miner.ask(Miner.IsMining).mapTo[Boolean]
     } yield {
@@ -126,11 +127,11 @@ class RestServer(
     }
   }
 
-  private val getSelfCliqueRoute = toRoute(getSelfClique) { _ =>
+  private val getSelfCliqueRoute = route(getSelfClique) { _ =>
     fetchSelfClique()
   }
 
-  private val getInterCliquePeerInfoRoute = toRoute(getInterCliquePeerInfo) { _ =>
+  private val getInterCliquePeerInfoRoute = route(getInterCliquePeerInfo) { _ =>
     node.cliqueManager
       .ask(InterCliqueManager.GetSyncStatuses)
       .mapTo[Seq[InterCliqueManager.SyncStatus]]
@@ -139,14 +140,14 @@ class RestServer(
       }
   }
 
-  private val getDiscoveredNeighborsRoute = toRoute(getDiscoveredNeighbors) { _ =>
+  private val getDiscoveredNeighborsRoute = route(getDiscoveredNeighbors) { _ =>
     node.discoveryServer
       .ask(DiscoveryServer.GetNeighborPeers(None))
       .mapTo[DiscoveryServer.NeighborPeers]
       .map(response => Right(response.peers))
   }
 
-  private val getBlockflowRoute = toRoute(getBlockflow) { timeInterval =>
+  private val getBlockflowRoute = route(getBlockflow) { timeInterval =>
     //TODO Validation can be moved to the `EndpointInput[TimeInterval]` once
     //we update tapir to 0.18.0
     if (timeInterval.from > timeInterval.to) {
@@ -160,19 +161,19 @@ class RestServer(
     }
   }
 
-  private val getBlockRoute = toRoute(getBlock) { hash =>
+  private val getBlockRoute = route(getBlock) { hash =>
     Future.successful(serverUtils.getBlock(blockFlow, GetBlock(hash)))
   }
 
-  private val getBalanceRoute = toRoute(getBalance) { address =>
+  private val getBalanceRoute = route(getBalance) { address =>
     Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address)))
   }
 
-  private val getGroupRoute = toRoute(getGroup) { address =>
+  private val getGroupRoute = route(getGroup) { address =>
     Future.successful(serverUtils.getGroup(GetGroup(address)))
   }
 
-  private val getMisbehaviorsRoute = toRoute(getMisbehaviors) { _ =>
+  private val getMisbehaviorsRoute = route(getMisbehaviors) { _ =>
     for {
       brokerPeers <- node.misbehaviorManager.ask(MisbehaviorManager.GetPeers).mapTo[Peers]
     } yield {
@@ -188,14 +189,14 @@ class RestServer(
     }
   }
 
-  private val misbehaviorActionRoute = toRoute(misbehaviorAction) {
+  private val misbehaviorActionRoute = route(misbehaviorAction) {
     case MisbehaviorAction.Unban(peers) =>
       node.misbehaviorManager ! MisbehaviorManager.Unban(peers)
       node.discoveryServer ! DiscoveryServer.Unban(peers)
       Future.successful(Right(()))
   }
 
-  private val getHashesAtHeightRoute = toRoute(getHashesAtHeight) { case (chainIndex, height) =>
+  private val getHashesAtHeightRoute = route(getHashesAtHeight) { case (chainIndex, height) =>
     Future.successful(
       serverUtils.getHashesAtHeight(
         blockFlow,
@@ -205,16 +206,15 @@ class RestServer(
     )
   }
 
-  private val getChainInfoRoute = toRoute(getChainInfo) { chainIndex =>
+  private val getChainInfoRoute = route(getChainInfo) { chainIndex =>
     Future.successful(serverUtils.getChainInfo(blockFlow, chainIndex))
   }
 
-  private val listUnconfirmedTransactionsRoute = toRoute(listUnconfirmedTransactions) {
-    chainIndex =>
-      Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
+  private val listUnconfirmedTransactionsRoute = route(listUnconfirmedTransactions) { chainIndex =>
+    Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
   }
 
-  private val buildTransactionRoute = toRouteRedirect(buildTransaction)(
+  private val buildTransactionRoute = routeRedirect(buildTransaction)(
     buildTransaction =>
       withSyncedClique {
         Future.successful(
@@ -227,7 +227,7 @@ class RestServer(
     bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)
   )
 
-  private val buildSweepAllTransactionRoute = toRouteRedirect(buildSweepAllTransaction)(
+  private val buildSweepAllTransactionRoute = routeRedirect(buildSweepAllTransaction)(
     buildSweepAllTransaction =>
       withSyncedClique {
         Future.successful(
@@ -241,7 +241,7 @@ class RestServer(
   )
 
   private val submitTransactionRoute =
-    toRouteRedirectWith[SubmitTransaction, TransactionTemplate, TxResult](submitTransaction)(
+    routeRedirectWith[SubmitTransaction, TransactionTemplate, TxResult](submitTransaction)(
       tx => serverUtils.createTxTemplate(tx),
       tx =>
         withSyncedClique {
@@ -250,7 +250,7 @@ class RestServer(
       _.fromGroup
     )
 
-  private val getTransactionStatusRoute = toRoute(getTransactionStatus) {
+  private val getTransactionStatusRoute = route(getTransactionStatus) {
     case (txId, fromGroup, toGroup) =>
       searchTransactionStatus(txId, fromGroup, toGroup)
   }
@@ -338,13 +338,13 @@ class RestServer(
     }
   }
 
-  private val decodeUnsignedTransactionRoute = toRoute(decodeUnsignedTransaction) { tx =>
+  private val decodeUnsignedTransactionRoute = route(decodeUnsignedTransaction) { tx =>
     Future.successful(
       serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(Tx.from(_, networkType))
     )
   }
 
-  private val minerActionRoute = toRoute(minerAction) { action =>
+  private val minerActionRoute = route(minerAction) { action =>
     withSyncedClique {
       withMinerAddressSet {
         action match {
@@ -355,7 +355,7 @@ class RestServer(
     }
   }
 
-  private val minerListAddressesRoute = toRoute(minerListAddresses) { _ =>
+  private val minerListAddressesRoute = route(minerListAddresses) { _ =>
     viewHandler
       .ask(ViewHandler.GetMinerAddresses)
       .mapTo[Option[AVector[LockupScript.Asset]]]
@@ -370,7 +370,7 @@ class RestServer(
       }
   }
 
-  private val minerUpdateAddressesRoute = toRoute(minerUpdateAddresses) { minerAddresses =>
+  private val minerUpdateAddressesRoute = route(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
       Miner
         .validateAddresses(minerAddresses.addresses)
@@ -380,19 +380,19 @@ class RestServer(
     }
   }
 
-  private val submitContractRoute = toRoute(submitContract) { query =>
+  private val submitContractRoute = route(submitContract) { query =>
     withSyncedClique {
       serverUtils.submitContract(txHandler, query)
     }
   }
 
-  private val buildContractRoute = toRoute(buildContract) { query =>
+  private val buildContractRoute = route(buildContract) { query =>
     serverUtils.buildContract(blockFlow, query)
   }
 
-  private val compileRoute = toRoute(compile) { query => serverUtils.compile(query) }
+  private val compileRoute = route(compile) { query => serverUtils.compile(query) }
 
-  private val exportBlocksRoute = toRoute(exportBlocks) { exportFile =>
+  private val exportBlocksRoute = route(exportBlocks) { exportFile =>
     //Run the export in background
     Future.successful(
       blocksExporter
@@ -411,7 +411,7 @@ class RestServer(
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  private val metricsRoute = toRoute(metrics) { _ =>
+  private val metricsRoute = route(metrics) { _ =>
     Future.successful {
       val writer: Writer = new StringWriter()
       try {
@@ -542,10 +542,10 @@ class RestServer(
     }
   }
 
-  private def toRouteRedirect[P, A](
+  private def routeRedirect[P, A](
       endpoint: BaseEndpoint[P, A]
   )(localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]], getIndex: P => GroupIndex) = {
-    toRoute(endpoint) { params =>
+    route(endpoint) { params =>
       requestFromGroupIndex(
         getIndex(params),
         localLogic(params),
@@ -555,14 +555,14 @@ class RestServer(
     }
   }
 
-  private def toRouteRedirectWith[R, P, A](
+  private def routeRedirectWith[R, P, A](
       endpoint: BaseEndpoint[R, A]
   )(
       paramsConvert: R => ServerUtils.Try[P],
       localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]],
       getIndex: P => GroupIndex
   ) = {
-    toRoute(endpoint) { params =>
+    route(endpoint) { params =>
       paramsConvert(params) match {
         case Left(error) => Future.successful(Left(error))
         case Right(converted) =>

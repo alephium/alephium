@@ -23,7 +23,7 @@ import scala.reflect.ClassTag
 
 import akka.util.ByteString
 import sttp.tapir.Schema
-import sttp.tapir.SchemaType.SInteger
+import sttp.tapir.SchemaType.{SInteger, SString}
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
@@ -34,24 +34,22 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 trait TapirSchemasLike {
   implicit def avectorSchema[T: Schema: ClassTag]: Schema[AVector[T]] =
     implicitly[Schema[T]].asArray.map(array => Some(AVector.from(array)))(_.toArray)
-  implicit val addressSchema: Schema[Address]         = Schema(Schema.schemaForString.schemaType)
-  implicit val byteStringSchema: Schema[ByteString]   = Schema(Schema.schemaForString.schemaType)
-  implicit val pulblicKeySchema: Schema[PublicKey]    = Schema(Schema.schemaForString.schemaType)
-  implicit val groupIndexSchema: Schema[GroupIndex]   = Schema(Schema.schemaForInt.schemaType)
-  implicit val hashSchema: Schema[Hash]               = Schema(Schema.schemaForString.schemaType)
-  implicit val blockHashSchema: Schema[BlockHash]     = Schema(Schema.schemaForString.schemaType)
-  implicit val pubScriptSchema: Schema[LockupScript]  = Schema(Schema.schemaForString.schemaType)
-  implicit val signatureSchema: Schema[Signature]     = Schema(Schema.schemaForString.schemaType)
-  implicit val timestampSchema: Schema[TimeStamp]     = Schema(Schema.schemaForLong.schemaType)
-  implicit val u256Schema: Schema[U256]               = Schema(SInteger).format("uint256")
-  implicit val bigIntegerSchema: Schema[BigInteger]   = Schema(SInteger).format("bigint")
-  implicit val inetAddressSchema: Schema[InetAddress] = Schema(Schema.schemaForString.schemaType)
-  implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(
-    Schema.schemaForString.schemaType
-  )
-  implicit val cliqueIdSchema: Schema[CliqueId]          = Schema(Schema.schemaForString.schemaType)
-  implicit val mnemonicSchema: Schema[Mnemonic]          = Schema(Schema.schemaForString.schemaType)
-  implicit val mnemonicSizeSchema: Schema[Mnemonic.Size] = Schema(Schema.schemaForInt.schemaType)
+  implicit val addressSchema: Schema[Address]                     = Schema(SString())
+  implicit val byteStringSchema: Schema[ByteString]               = Schema(SString())
+  implicit val pulblicKeySchema: Schema[PublicKey]                = Schema(SString())
+  implicit val groupIndexSchema: Schema[GroupIndex]               = Schema(SInteger())
+  implicit val hashSchema: Schema[Hash]                           = Schema(SString())
+  implicit val blockHashSchema: Schema[BlockHash]                 = Schema(SString())
+  implicit val pubScriptSchema: Schema[LockupScript]              = Schema(SString())
+  implicit val signatureSchema: Schema[Signature]                 = Schema(SString())
+  implicit val timestampSchema: Schema[TimeStamp]                 = Schema(SInteger()).format("int64")
+  implicit val u256Schema: Schema[U256]                           = Schema(SInteger()).format("uint256")
+  implicit val bigIntegerSchema: Schema[BigInteger]               = Schema(SInteger()).format("bigint")
+  implicit val inetAddressSchema: Schema[InetAddress]             = Schema(SString())
+  implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(SString())
+  implicit val cliqueIdSchema: Schema[CliqueId]                   = Schema(SString())
+  implicit val mnemonicSchema: Schema[Mnemonic]                   = Schema(SString())
+  implicit val mnemonicSizeSchema: Schema[Mnemonic.Size]          = Schema(SInteger())
 }
 
 object TapirSchemas extends TapirSchemasLike

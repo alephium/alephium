@@ -22,7 +22,7 @@ import sttp.tapir.openapi.{OpenAPI, Server, ServerVariable}
 
 import org.alephium.api.Endpoints
 
-trait Documentation extends Endpoints {
+trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
 
   def walletEndpoints: List[Endpoint[_, _, _, _]]
   def port: Int
@@ -64,7 +64,6 @@ trait Documentation extends Endpoints {
   )
 
   lazy val openAPI: OpenAPI =
-    OpenAPIDocsInterpreter
-      .toOpenAPI(walletEndpoints ++ blockflowEndpoints, "Alephium API", "1.0")
+    toOpenAPI(walletEndpoints ++ blockflowEndpoints, "Alephium API", "1.0")
       .servers(servers)
 }

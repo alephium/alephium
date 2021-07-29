@@ -209,6 +209,7 @@ class SmartContractTest extends AlephiumSpec {
       request[Balance](getBalance(address), restPort) isnot initialBalance
     }
 
+    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     clique.stop()
   }
 }
