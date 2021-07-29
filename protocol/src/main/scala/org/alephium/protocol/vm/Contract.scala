@@ -162,8 +162,22 @@ sealed trait ContractObj[Ctx <: Context] {
   def code: Contract[Ctx]
   def fields: mutable.ArraySeq[Val]
 
-  def getMethod(index: Int): Option[Method[Ctx]] = {
-    code.methods.get(index)
+  def getMethod(index: Int): ExeResult[Method[Ctx]] = {
+    code.methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+  }
+
+  def getField(index: Int): ExeResult[Val] = {
+    if (fields.isDefinedAt(index)) Right(fields(index)) else failed(InvalidFieldIndex)
+  }
+
+  def setField(index: Int, v: Val): ExeResult[Unit] = {
+    if (!fields.isDefinedAt(index)) {
+      failed(InvalidFieldIndex)
+    } else if (fields(index).tpe != v.tpe) {
+      failed(InvalidFieldType)
+    } else {
+      Right(fields.update(index, v))
+    }
   }
 
   def buildNonPayableFrame(
@@ -196,7 +210,7 @@ sealed trait ContractObj[Ctx <: Context] {
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Frame[Ctx]] = {
     for {
-      method <- getMethod(methodIndex).toRight(Right(InvalidMethodIndex(methodIndex)))
+      method <- getMethod(methodIndex)
       _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
         val returnTo = returnToOpt.getOrElse(noReturnTo)
