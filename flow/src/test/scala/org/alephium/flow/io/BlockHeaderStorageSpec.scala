@@ -16,7 +16,8 @@
 
 package org.alephium.flow.io
 
-import org.alephium.io.RocksDBSource
+import org.alephium.io.{IOError, RocksDBSource}
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
 import org.alephium.util.AlephiumSpec
@@ -43,15 +44,15 @@ class BlockHeaderStorageSpec
   it should "check existence" in {
     val blockHeader = generate()
     storage.exists(blockHeader) isE false
-    storage.put(blockHeader).isRight is true
+    storage.put(blockHeader) isE ()
     storage.exists(blockHeader) isE true
   }
 
   it should "delete entities" in {
     val blockHeader = generate()
-    storage.put(blockHeader).isRight is true
+    storage.put(blockHeader) isE ()
     storage.exists(blockHeader) isE true
-    storage.delete(blockHeader).isRight is true
+    storage.delete(blockHeader) isE ()
     storage.exists(blockHeader) isE false
   }
 
@@ -59,11 +60,11 @@ class BlockHeaderStorageSpec
     forAll(blockGen) { block =>
       val header = block.header
       val hash   = block.hash
-      storage.put(header).isRight is true
+      storage.put(header) isE ()
       storage.get(hash) isE header
       storage.getOpt(hash) isE Some(header)
-      storage.delete(hash).isRight is true
-      storage.get(hash).isLeft is true
+      storage.delete(hash) isE ()
+      storage.get(hash).leftValue is a[IOError.KeyNotFound[BlockHash]]
       storage.getOpt(hash) isE None
     }
   }
