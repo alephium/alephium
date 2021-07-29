@@ -74,23 +74,15 @@ abstract class Frame[Ctx <: Context] {
   }
 
   def getField(index: Int): ExeResult[Val] = {
-    val fields = obj.fields
-    if (fields.isDefinedAt(index)) Right(fields(index)) else failed(InvalidFieldIndex)
+    obj.getField(index)
   }
 
   def setField(index: Int, v: Val): ExeResult[Unit] = {
-    val fields = obj.fields
-    if (!fields.isDefinedAt(index)) {
-      failed(InvalidFieldIndex)
-    } else if (fields(index).tpe != v.tpe) {
-      failed(InvalidFieldType)
-    } else {
-      Right(fields.update(index, v))
-    }
+    obj.setField(index, v)
   }
 
   protected def getMethod(index: Int): ExeResult[Method[Ctx]] = {
-    obj.getMethod(index).toRight(Right(InvalidMethodIndex(index)))
+    obj.getMethod(index)
   }
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
@@ -102,8 +94,6 @@ abstract class Frame[Ctx <: Context] {
       frame <- methodFrame(Bytes.toPosInt(index))
     } yield Some(frame)
   }
-
-  def externalMethodFrame(contractKey: Hash, index: Int): ExeResult[Frame[StatefulContext]]
 
   def execute(): ExeResult[Option[Frame[Ctx]]]
 }
@@ -126,8 +116,7 @@ final class StatelessFrame(
   }
 
   // Should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState]                                                 = ???
-  def externalMethodFrame(contractKey: Hash, index: Int): ExeResult[Frame[StatefulContext]] = ???
+  def balanceStateOpt: Option[BalanceState] = ???
 
   @tailrec
   override def execute(): ExeResult[Option[Frame[StatelessContext]]] = {
@@ -203,13 +192,13 @@ final class StatefulFrame(
     }
   }
 
-  override def externalMethodFrame(
+  def externalMethodFrame(
       contractKey: Hash,
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {
       contractObj        <- ctx.loadContract(contractKey)
-      method             <- contractObj.getMethod(index).toRight(Right(InvalidMethodIndex(index)))
+      method             <- contractObj.getMethod(index)
       _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       args               <- opStack.pop(method.argsType.length)
       _                  <- method.check(args)
