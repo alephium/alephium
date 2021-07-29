@@ -41,12 +41,7 @@ object Version {
   val release: Version          = fromReleaseVersion(BuildInfo.version).get
   val dbMinimalVersion: Version = release // FIXME
 
-  val clientId: String = {
-    val osName    = System.getProperty("os.name")
-    val osArch    = System.getProperty("os.arch")
-    val osVersion = System.getProperty("os.version")
-    s"scala-alephium/$release/$osName-$osArch-$osVersion"
-  }
+  val clientId: String = s"scala-alephium/$release/${System.getProperty("os.name")}"
 
   def fromReleaseVersion(release: String): Option[Version] = {
     val regex = """^(\d+)\.(\d+)\.(\d+)(\+.+)?""".r
