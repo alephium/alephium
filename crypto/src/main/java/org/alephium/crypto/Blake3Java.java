@@ -82,6 +82,12 @@ public class Blake3Java {
         return permuted;
     }
 
+    private static void show(String prefix, int[] state, int[] blockWords) {
+        System.out.println(prefix + " state: " + Arrays.toString(state));
+        System.out.println(prefix + " blockWords " + Arrays.toString(blockWords));
+        System.out.println();
+    }
+
     private static int[] compress(int[] chainingValue, int[] blockWords, long counter, int blockLen, int flags){
         int counterInt = (int) (counter & 0xffffffffL);
         int counterShift = (int) ((counter >> 32) & 0xffffffffL);
@@ -103,24 +109,33 @@ public class Blake3Java {
                 blockLen,
                 flags
         };
+        show("== initial", state, blockWords);
         roundFn(state, blockWords);         // Round 1
         blockWords = permute(blockWords);
+        show("== round1", state, blockWords);
         roundFn(state, blockWords);         // Round 2
         blockWords = permute(blockWords);
+        show("== round2", state, blockWords);
         roundFn(state, blockWords);         // Round 3
         blockWords = permute(blockWords);
+        show("== round3", state, blockWords);
         roundFn(state, blockWords);         // Round 4
         blockWords = permute(blockWords);
+        show("== round4", state, blockWords);
         roundFn(state, blockWords);         // Round 5
         blockWords = permute(blockWords);
+        show("== round5", state, blockWords);
         roundFn(state, blockWords);         // Round 6
         blockWords = permute(blockWords);
+        show("== round6", state, blockWords);
         roundFn(state, blockWords);         // Round 7
+        show("== round7", state, blockWords);
 
         for(int i = 0; i<8; i++){
             state[i] ^= state[i+8];
             state[i+8] ^= chainingValue[i];
         }
+        show("== final", state, blockWords);
         return state;
     }
 
@@ -144,6 +159,17 @@ public class Blake3Java {
         int blockLen;
         int flags;
 
+        @Override
+        public String toString() {
+            return "Node{" +
+                    "inputChainingValue=" + Arrays.toString(inputChainingValue) +
+                    ", blockWords=" + Arrays.toString(blockWords) +
+                    ", counter=" + counter +
+                    ", blockLen=" + blockLen +
+                    ", flags=" + flags +
+                    '}';
+        }
+
         private Node(int[] inputChainingValue, int[] blockWords, long counter, int blockLen, int flags) {
             this.inputChainingValue = inputChainingValue;
             this.blockWords = blockWords;
@@ -160,12 +186,18 @@ public class Blake3Java {
         }
 
         private byte[] rootOutputBytes(int outLen){
+            System.out.println("========== initial node state ============");
+            System.out.println(this);
+            System.out.println();
             int outputCounter = 0;
             int outputsNeeded = Math.floorDiv(outLen,(2*OUT_LEN)) + 1;
             byte[] hash = new byte[outLen];
             int i = 0;
             while(outputCounter < outputsNeeded){
                 int[] words = compress(inputChainingValue, blockWords, outputCounter, blockLen,flags | ROOT );
+                System.out.println("========== node state " + outputCounter + " ============");
+                System.out.println(this);
+                System.out.println();
 
                 for(int word: words){
                     for(byte b: ByteBuffer.allocate(4)
@@ -193,6 +225,18 @@ public class Blake3Java {
         byte blockLen = 0;
         byte blocksCompressed = 0;
         int flags;
+
+        @Override
+        public String toString() {
+            return "ChunkState{" +
+                    "chainingValue=" + Arrays.toString(chainingValue) +
+                    ", chunkCounter=" + chunkCounter +
+                    ", block=" + Arrays.toString(block) +
+                    ", blockLen=" + blockLen +
+                    ", blocksCompressed=" + blocksCompressed +
+                    ", flags=" + flags +
+                    '}';
+        }
 
         public ChunkState(int[] key, long chunkCounter, int flags){
             this.chainingValue = key;
@@ -293,6 +337,10 @@ public class Blake3Java {
      * @param input Data to be added
      */
     public void update(byte[] input){
+        System.out.println("========== initial chunk state ============");
+        System.out.println(this.chunkState.toString());
+        System.out.println();
+
         int currPos = 0;
         while(currPos < input.length) {
 
@@ -308,6 +356,10 @@ public class Blake3Java {
             int take = Math.min(want, input.length - currPos);
             chunkState.update(Arrays.copyOfRange(input, currPos, currPos + take));
             currPos+=take;
+
+            System.out.println("========== chunk state " + currPos + " ============");
+            System.out.println(this.chunkState.toString());
+            System.out.println();
         }
     }
 

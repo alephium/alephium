@@ -50,6 +50,12 @@ class Blake3JavaSpec extends AlephiumSpec {
       test(Blake3Java.newKeyDerivationHasher(testVectors.context_string), _.derive_key)
     )
   }
+
+  it should "hash empty input" in {
+    val hasher = Blake3Java.newInstance()
+    hasher.update(Array.ofDim[Byte](0))
+    hasher.digest().nonEmpty is true
+  }
 }
 
 object Blake3Spec {
