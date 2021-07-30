@@ -53,7 +53,7 @@ trait NodeStateStorage extends RawKeyValueStorage {
       putRawUnsafe(dbVersionKey, serialize(version))
     }
 
-  def getDatabaseVersion: IOResult[Option[Version]] =
+  def getDatabaseVersion(): IOResult[Option[Version]] =
     IOUtils.tryExecute {
       getOptRawUnsafe(dbVersionKey).map(deserialize[Version](_) match {
         case Left(e)  => throw e
@@ -65,7 +65,7 @@ trait NodeStateStorage extends RawKeyValueStorage {
       dbMinimalVersion: Version,
       nodeVersion: Version
   ): IOResult[Unit] = {
-    getDatabaseVersion.flatMap {
+    getDatabaseVersion().flatMap {
       case Some(dbVersion) =>
         if (dbVersion < dbMinimalVersion || dbVersion > nodeVersion) {
           Left(
