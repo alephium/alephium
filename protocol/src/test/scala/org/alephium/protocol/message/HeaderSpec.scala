@@ -16,19 +16,27 @@
 
 package org.alephium.protocol.message
 
+import org.alephium.protocol.Generators
 import org.alephium.protocol.model.Version
-import org.alephium.serde.Serde
+import org.alephium.serde._
+import org.alephium.util.AlephiumSpec
 
-final case class Header(version: Version) extends AnyVal
+class HeaderSpec extends AlephiumSpec {
+  it should "serialize/deserialize the Header when version compatible" in {
+    val header = Header(Version.release)
+    val bytes  = serialize(header)
+    deserialize[Header](bytes) isE header
+  }
 
-object Header {
-  implicit val serde: Serde[Header] = Version.serde
-    .validate(version =>
+  it should "deserialize failed when version not compatible" in {
+    forAll(Generators.versionGen) { case (_, version) =>
+      val header = Header(version)
+      val bytes  = serialize(header)
       if (version.compatible(Version.release)) {
-        Right(())
+        deserialize[Header](bytes) isE header
       } else {
-        Left(s"Invalid version: expect: $version, self: ${Version.release}")
+        deserialize[Header](bytes).leftValue is a[SerdeError]
       }
-    )
-    .xmap(Header.apply, _.version)
+    }
+  }
 }
