@@ -14,21 +14,29 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.flow.io
 
-import org.alephium.protocol.model.Version
-import org.alephium.serde.Serde
+import org.scalatest.BeforeAndAfterEach
 
-final case class Header(version: Version) extends AnyVal
+import org.alephium.io.RocksDBSource
+import org.alephium.util.{AlephiumSpec, Files}
 
-object Header {
-  implicit val serde: Serde[Header] = Version.serde
-    .validate(version =>
-      if (version.compatible(Version.release)) {
-        Right(())
-      } else {
-        Left(s"Invalid version: expect: $version, self: ${Version.release}")
-      }
-    )
-    .xmap(Header.apply, _.version)
+trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {
+  val dbname: String
+  val builder: RocksDBSource => S
+  lazy val dbPath           = Files.tmpDir.resolve(dbname)
+  var source: RocksDBSource = _
+  var storage: S            = _
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    source = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    storage = builder(source)
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    source.dESTROY().rightValue
+    ()
+  }
 }
