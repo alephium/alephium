@@ -289,6 +289,16 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
+  it should "boot and sync two cliques of 2 nodes when version is compatible" in new Fixture(
+    "2-cliques-of-2-nodes"
+  ) {
+    val version = Version.release.copy(minor = Version.release.minor + 1)
+    val injection: PartialFunction[Message, Message] = { case Message(_, payload) =>
+      Message(Header(version), payload)
+    }
+    test(2, 2, Injected.message(injection, _))
+  }
+
   it should "ban node if version is not compatible" in new TestFixture("2-nodes") {
     val dummyVersion = Version.release.copy(major = Version.release.major + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload: Hello) =>
@@ -308,7 +318,6 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.start().futureValue is ()
 
     eventually {
-      server0.flowSystem
       val misbehaviors =
         request[AVector[PeerMisbehavior]](
           getMisbehaviors,
