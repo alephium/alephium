@@ -93,7 +93,12 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "support injection" in new Fixture("clique-2-node-clique-1-node-injection") {
-    test(2, 1, connectionBuild = Injected.noModification)
+    test(
+      2,
+      1,
+      clique1ConnectionBuild = Injected.noModification,
+      clique2ConnectionBuild = Injected.noModification
+    )
   }
 
   class Fixture(name: String) extends TestFixture(name) {
@@ -102,10 +107,12 @@ class InterCliqueSyncTest extends AlephiumSpec {
     def test(
         nbOfNodesClique1: Int,
         nbOfNodesClique2: Int,
-        connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+        clique1ConnectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply,
+        clique2ConnectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
     ) = {
-      val fromTs            = TimeStamp.now()
-      val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
+      val fromTs = TimeStamp.now()
+      val clique1 =
+        bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = clique1ConnectionBuild)
       val masterPortClique1 = clique1.masterTcpPort
 
       clique1.start()
@@ -120,7 +127,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
         bootClique(
           nbOfNodes = nbOfNodesClique2,
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
-          connectionBuild = connectionBuild
+          connectionBuild = clique2ConnectionBuild
         )
       val masterPortClique2 = clique2.masterTcpPort
 
@@ -292,11 +299,16 @@ class InterCliqueSyncTest extends AlephiumSpec {
   it should "boot and sync two cliques of 2 nodes when version is compatible" in new Fixture(
     "2-cliques-of-2-nodes"
   ) {
-    val version = Version.release.copy(minor = Version.release.minor + 1)
+    val clique2Version = Version.release.copy(minor = Version.release.minor + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload) =>
-      Message(Header(version), payload)
+      Message(Header(clique2Version), payload)
     }
-    test(2, 2, Injected.message(injection, _))
+    test(
+      2,
+      2,
+      clique1ConnectionBuild = Injected.noModification,
+      clique2ConnectionBuild = Injected.message(injection, _)
+    )
   }
 
   it should "ban node if version is not compatible" in new TestFixture("2-nodes") {
