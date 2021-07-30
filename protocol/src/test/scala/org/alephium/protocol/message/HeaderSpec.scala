@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.message
 
-import org.alephium.protocol.Generators
 import org.alephium.protocol.model.Version
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
@@ -29,14 +28,8 @@ class HeaderSpec extends AlephiumSpec {
   }
 
   it should "deserialize failed when version not compatible" in {
-    forAll(Generators.versionGen) { case (_, version) =>
-      val header = Header(version)
-      val bytes  = serialize(header)
-      if (version.compatible(Version.release)) {
-        deserialize[Header](bytes) isE header
-      } else {
-        deserialize[Header](bytes).leftValue is a[SerdeError]
-      }
-    }
+    val version = Version(Int.MaxValue, Int.MaxValue, Int.MaxValue)
+    val bytes   = serialize(Header(version))
+    deserialize[Header](bytes).leftValue is a[SerdeError]
   }
 }
