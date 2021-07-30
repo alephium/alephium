@@ -65,7 +65,7 @@ trait ContractPool extends CostStrategy {
   }
 
   private def updateState(contractKey: ContractId, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.updateContract(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
+    worldState.updateContractUnsafe(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
   }
 
   def commitStates(): Unit = {

@@ -20,11 +20,19 @@ import org.alephium.protocol.model.ContractOutputRef
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-final case class ContractState(
+final case class ContractState private (
     code: StatefulContract,
     fields: AVector[Val],
     contractOutputRef: ContractOutputRef
-)
+) {
+  def updateFieldsUnsafe(newFields: AVector[Val]): ContractState = {
+    this.copy(fields = newFields)
+  }
+
+  def updateOutputRef(ref: ContractOutputRef): ContractState = {
+    this.copy(contractOutputRef = ref)
+  }
+}
 
 object ContractState {
   implicit val serde: Serde[ContractState] =
@@ -32,4 +40,13 @@ object ContractState {
 
   val forMPt: ContractState =
     ContractState(StatefulContract.forSMT, AVector.empty, ContractOutputRef.forSMT)
+
+  def unsafe(
+      code: StatefulContract,
+      fields: AVector[Val],
+      contractOutputRef: ContractOutputRef
+  ): ContractState = {
+    assume(code.validate(fields))
+    new ContractState(code, fields, contractOutputRef)
+  }
 }

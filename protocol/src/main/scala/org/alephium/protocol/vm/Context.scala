@@ -74,11 +74,15 @@ trait StatefulContext extends StatelessContext with ContractPool {
       initialBalances.tokenVector
     )
     val outputRef = nextContractOutputRef(contractOutput)
-    worldState
-      .createContract(code, initialFields, outputRef, contractOutput)
-      .map(_ => discard(generatedOutputs.addOne(contractOutput)))
-      .left
-      .map(e => Left(IOErrorUpdateState(e)))
+    for {
+      _ <- code.check(initialFields)
+      _ <-
+        worldState
+          .createContractUnsafe(code, initialFields, outputRef, contractOutput)
+          .map(_ => discard(generatedOutputs.addOne(contractOutput)))
+          .left
+          .map(e => Left(IOErrorUpdateState(e)))
+    } yield ()
   }
 
   def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {

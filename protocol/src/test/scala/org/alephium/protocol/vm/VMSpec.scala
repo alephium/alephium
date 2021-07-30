@@ -45,7 +45,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         gasLimit: GasBox = minimalGas,
         failure: ExeFailure
     ): Assertion = {
-      val contract = StatefulContract(AVector.empty, methods = AVector(method))
+      val contract = StatefulContract(0, methods = AVector(method))
       failContract(contract, args, gasLimit, failure)
     }
 
@@ -67,7 +67,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "not fail when there is no main method" in new Fixture {
     failContract(
-      StatefulContract(AVector.empty, AVector.empty),
+      StatefulContract(0, AVector.empty),
       failure = InvalidMethodIndex(0)
     )
   }
@@ -79,7 +79,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "check the number of args for called method" in new Fixture {
     failContract(
       StatefulContract(
-        AVector.empty,
+        0,
         AVector(baseMethod.copy(instrs = AVector(CallLocal(1))), baseMethod.copy(argsLength = 1))
       ),
       failure = InsufficientArgs
@@ -133,7 +133,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         returnLength = 1,
         instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const5, U256Add, Return)
       )
-    val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
+    val contract = StatefulContract(2, methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val](Val.U256(U256.Zero), Val.U256(U256.One)))
     StatefulVM.executeWithOutputs(context, obj, AVector(Val.U256(U256.Two))) isE
@@ -355,7 +355,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         returnLength = 0,
         instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const1, U256Add, StoreField(1))
       )
-    val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
+    val contract = StatefulContract(2, methods = AVector(method))
     serialize(contract)(StatefulContract.serde).nonEmpty is true
   }
 }

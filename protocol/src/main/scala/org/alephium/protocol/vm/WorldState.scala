@@ -39,14 +39,14 @@ trait WorldState[T] {
 
   def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
 
-  def createContract(
+  def createContractUnsafe(
       code: StatefulContract,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): IOResult[T]
 
-  def updateContract(key: Hash, fields: AVector[Val]): IOResult[T]
+  def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[T]
 
   def updateContract(key: Hash, outputRef: ContractOutputRef, output: ContractOutput): IOResult[T]
 
@@ -125,17 +125,17 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
     } yield state.code.toObject(key, state)
   }
 
-  def createContract(
+  def createContractUnsafe(
       code: StatefulContract,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): IOResult[Unit]
 
-  def updateContract(key: Hash, fields: AVector[Val]): IOResult[Unit] = {
+  def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[Unit] = {
     for {
       oldState <- getContractState(key)
-      newState <- updateContract(key, oldState.copy(fields = fields))
+      newState <- updateContract(key, oldState.updateFieldsUnsafe(fields))
     } yield newState
   }
 
@@ -185,17 +185,17 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
     } yield state.code.toObject(key, state)
   }
 
-  def createContract(
+  def createContractUnsafe(
       code: StatefulContract,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): IOResult[ImmutableWorldState]
 
-  def updateContract(key: Hash, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
+  def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
     for {
       oldState <- getContractState(key)
-      newState <- updateContract(key, oldState.copy(fields = fields))
+      newState <- updateContract(key, oldState.updateFieldsUnsafe(fields))
     } yield newState
   }
 }
@@ -264,13 +264,13 @@ object WorldState {
       outputState.put(outputRef, output).map(Persisted(_, contractState))
     }
 
-    def createContract(
+    def createContractUnsafe(
         code: StatefulContract,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Persisted] = {
-      val state = ContractState(code, fields, outputRef)
+      val state = ContractState.unsafe(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
         newContractState <- contractState.put(outputRef.key, state)
@@ -289,7 +289,7 @@ object WorldState {
       for {
         state            <- getContractState(key)
         newOutputState   <- outputState.put(outputRef, output)
-        newContractState <- contractState.put(key, state.copy(contractOutputRef = outputRef))
+        newContractState <- contractState.put(key, state.updateOutputRef(outputRef))
       } yield Persisted(newOutputState, newContractState)
     }
 
@@ -341,13 +341,13 @@ object WorldState {
       outputState.put(outputRef, output)
     }
 
-    def createContract(
+    def createContractUnsafe(
         code: StatefulContract,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Unit] = {
-      val state = ContractState(code, fields, outputRef)
+      val state = ContractState.unsafe(code, fields, outputRef)
       for {
         _ <- outputState.put(outputRef, output)
         _ <- contractState.put(outputRef.key, state)
@@ -366,7 +366,7 @@ object WorldState {
       for {
         state <- getContractState(key)
         _     <- outputState.put(outputRef, output)
-        _     <- contractState.put(key, state.copy(contractOutputRef = outputRef))
+        _     <- contractState.put(key, state.updateOutputRef(outputRef))
       } yield ()
     }
 
@@ -420,7 +420,7 @@ object WorldState {
     val emptyOutput = TxOutput.forSMT
     val emptyOutputTrie =
       SparseMerkleTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
-    val emptyState        = ContractState(StatefulContract.forSMT, AVector.empty, genesisRef)
+    val emptyState        = ContractState.unsafe(StatefulContract.forSMT, AVector.empty, genesisRef)
     val emptyContractTrie = SparseMerkleTrie.build(storage, Hash.zero, emptyState)
     Persisted(emptyOutputTrie, emptyContractTrie)
   }

@@ -56,16 +56,12 @@ object Method {
 }
 
 sealed trait Contract[Ctx <: StatelessContext] {
-  def fields: AVector[Val.Type]
+  def fieldLength: Int
   def methods: AVector[Method[Ctx]]
 }
 
-object Contract {
-  val emptyFields: AVector[Val.Type] = AVector.ofSize(0)
-}
-
 sealed abstract class Script[Ctx <: StatelessContext] extends Contract[Ctx] {
-  val fields: AVector[Val.Type] = Contract.emptyFields
+  def fieldLength: Int = 0
 
   def toObject: ScriptObj[Ctx]
 }
@@ -125,26 +121,38 @@ object StatefulScript {
 }
 
 final case class StatefulContract(
-    fields: AVector[Val.Type],
+    fieldLength: Int,
     methods: AVector[Method[StatefulContext]]
 ) extends HashSerde[StatefulContract]
     with Contract[StatefulContext] {
   override lazy val hash: Hash = _getHash
 
+  def check(initialFields: AVector[Val]): ExeResult[Unit] = {
+    if (validate(initialFields)) {
+      okay
+    } else {
+      failed(InvalidFieldType)
+    }
+  }
+
+  def validate(initialFields: AVector[Val]): Boolean = {
+    initialFields.length == fieldLength
+  }
+
   def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
-    StatefulContractObject(this, contractState.fields, contractState.fields.toArray, address)
+    StatefulContractObject(this, contractState.fields, address)
   }
 
   def toObject(address: Hash, fields: AVector[Val]): StatefulContractObject = {
-    StatefulContractObject(this, fields, fields.toArray, address)
+    StatefulContractObject(this, fields, address)
   }
 }
 
 object StatefulContract {
   implicit val serde: Serde[StatefulContract] =
-    Serde.forProduct2(StatefulContract.apply, t => (t.fields, t.methods))
+    Serde.forProduct2(StatefulContract.apply, t => (t.fieldLength, t.methods))
 
-  val forSMT: StatefulContract = StatefulContract(AVector.empty, AVector(Method.forSMT))
+  val forSMT: StatefulContract = StatefulContract(0, AVector(Method.forSMT))
 }
 
 sealed trait ContractObj[Ctx <: StatelessContext] {
@@ -277,7 +285,7 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
     Frame.stateful(ctx, Some(balanceState), this, method, args, operandStack, returnTo)
 }
 
-final case class StatefulContractObject(
+final case class StatefulContractObject private (
     code: StatefulContract,
     initialFields: AVector[Val],
     fields: mutable.ArraySeq[Val],
@@ -305,4 +313,14 @@ final case class StatefulContractObject(
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
     Frame.stateful(ctx, Some(balanceState), this, method, args, operandStack, returnTo)
+}
+
+object StatefulContractObject {
+  def apply(
+      code: StatefulContract,
+      initialFields: AVector[Val],
+      address: ContractId
+  ): StatefulContractObject = {
+    new StatefulContractObject(code, initialFields, initialFields.toArray, address)
+  }
 }
