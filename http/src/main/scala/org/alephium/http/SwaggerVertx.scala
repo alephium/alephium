@@ -43,6 +43,7 @@ class SwaggerVertx(
     StaticHandler
       .create(s"META-INF/resources/webjars/swagger-ui/$swaggerVersion/")
       .setCachingEnabled(false)
+      .setDefaultContentEncoding("UTF-8")
   }
 
   private val redirectUrl = {
