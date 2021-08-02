@@ -168,7 +168,10 @@ trait FlowUtils
     }
   }
 
-  def prepareBlockFlow(chainIndex: ChainIndex, miner: LockupScript): IOResult[BlockFlowTemplate] = {
+  def prepareBlockFlow(
+      chainIndex: ChainIndex,
+      miner: LockupScript.Asset
+  ): IOResult[BlockFlowTemplate] = {
     assume(brokerConfig.contains(chainIndex.from))
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
@@ -198,7 +201,7 @@ trait FlowUtils
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
-      miner: LockupScript
+      miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     for {
       fullTxs      <- executeTxTemplates(chainIndex, loosenDeps, groupView, candidates)
@@ -248,7 +251,10 @@ trait FlowUtils
     }
   }
 
-  def prepareBlockFlowUnsafe(chainIndex: ChainIndex, miner: LockupScript): BlockFlowTemplate = {
+  def prepareBlockFlowUnsafe(
+      chainIndex: ChainIndex,
+      miner: LockupScript.Asset
+  ): BlockFlowTemplate = {
     Utils.unsafe(prepareBlockFlow(chainIndex, miner))
   }
 

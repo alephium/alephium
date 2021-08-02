@@ -63,7 +63,7 @@ class WalletAppSpec
   val password                   = Hash.generate.toHexString
   var mnemonic: Mnemonic         = _
   var addresses: model.Addresses = _
-  var address: Address           = _
+  var address: Address.Asset     = _
   var wallet: String             = "wallet-name"
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58

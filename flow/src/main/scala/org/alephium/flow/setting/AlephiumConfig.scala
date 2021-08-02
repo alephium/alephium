@@ -75,7 +75,7 @@ final case class ConsensusSetting(
 //scalastyle:on
 
 final case class MiningSetting(
-    minerAddresses: Option[AVector[Address]],
+    minerAddresses: Option[AVector[Address.Asset]],
     nonceStep: U256,
     batchDelay: Duration,
     apiInterface: InetAddress,
@@ -162,7 +162,7 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     node: NodeSetting,
-    genesisBalances: AVector[(LockupScript, U256)]
+    genesisBalances: AVector[(LockupScript.Asset, U256)]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesisBalances)(broker, consensus)
@@ -250,7 +250,7 @@ object AlephiumConfig {
       apiInterface: InetAddress,
       pollingInterval: Duration
   ) {
-    def toMiningSetting(addresses: Option[AVector[Address]]): MiningSetting = {
+    def toMiningSetting(addresses: Option[AVector[Address.Asset]]): MiningSetting = {
       MiningSetting(
         addresses,
         nonceStep,

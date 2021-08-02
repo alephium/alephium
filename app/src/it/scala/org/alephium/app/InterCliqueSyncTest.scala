@@ -25,8 +25,8 @@ import akka.util.ByteString
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.message.{Message, Payload, Pong}
-import org.alephium.protocol.model.{BrokerInfo, NetworkType}
+import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
+import org.alephium.protocol.model.{BrokerInfo, NetworkType, Version}
 import org.alephium.util._
 
 class Injected[T](injection: ByteString => ByteString, ref: ActorRef) extends ActorRefT[T](ref) {
@@ -44,14 +44,14 @@ object Injected {
 
   def noModification[T](ref: ActorRef): Injected[T] = apply[T](identity, ref)
 
-  def payload[T](
-      injection: PartialFunction[Payload, Payload],
+  def message[T](
+      injection: PartialFunction[Message, Message],
       ref: ActorRef
   )(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
     val injectionData: ByteString => ByteString = data => {
-      val payload = Message.deserialize(data, networkConfig.networkType).toOption.get.payload
-      if (injection.isDefinedAt(payload)) {
-        val injected     = injection.apply(payload)
+      val message = Message.deserialize(data, networkConfig.networkType).toOption.get
+      if (injection.isDefinedAt(message)) {
+        val injected     = injection.apply(message)
         val injectedData = Message.serialize(injected, networkConfig.networkType)
         injectedData
       } else {
@@ -61,6 +61,18 @@ object Injected {
 
     new Injected(injectionData, ref)
   }
+
+  def payload[T](
+      injection: PartialFunction[Payload, Payload],
+      ref: ActorRef
+  )(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
+    val newInjection: PartialFunction[Message, Message] = {
+      case Message(header, payload) if injection.isDefinedAt(payload) =>
+        Message(header, injection(payload))
+    }
+    message(newInjection, ref)
+  }
+
 }
 
 class InterCliqueSyncTest extends AlephiumSpec {
@@ -81,7 +93,12 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "support injection" in new Fixture("clique-2-node-clique-1-node-injection") {
-    test(2, 1, connectionBuild = Injected.noModification)
+    test(
+      2,
+      1,
+      clique1ConnectionBuild = Injected.noModification,
+      clique2ConnectionBuild = Injected.noModification
+    )
   }
 
   class Fixture(name: String) extends TestFixture(name) {
@@ -90,10 +107,12 @@ class InterCliqueSyncTest extends AlephiumSpec {
     def test(
         nbOfNodesClique1: Int,
         nbOfNodesClique2: Int,
-        connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
+        clique1ConnectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply,
+        clique2ConnectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply
     ) = {
-      val fromTs            = TimeStamp.now()
-      val clique1           = bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = connectionBuild)
+      val fromTs = TimeStamp.now()
+      val clique1 =
+        bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = clique1ConnectionBuild)
       val masterPortClique1 = clique1.masterTcpPort
 
       clique1.start()
@@ -108,7 +127,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
         bootClique(
           nbOfNodes = nbOfNodesClique2,
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
-          connectionBuild = connectionBuild
+          connectionBuild = clique2ConnectionBuild
         )
       val masterPortClique2 = clique2.masterTcpPort
 
@@ -199,8 +218,14 @@ class InterCliqueSyncTest extends AlephiumSpec {
   }
 
   it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
-    val injection: PartialFunction[Payload, Payload] = { case Pong(x) =>
-      Pong(if (x + 1 != 0) x + 1 else x + 2)
+    val injection: PartialFunction[Payload, Payload] = { case Pong(requestId) =>
+      val updatedRequestId = if (requestId.value.addUnsafe(U32.One) != U32.Zero) {
+        RequestId(requestId.value.addUnsafe(U32.One))
+      } else {
+        RequestId(requestId.value.addUnsafe(U32.Two))
+      }
+
+      Pong(updatedRequestId)
     }
 
     val server0 = bootClique(
@@ -265,6 +290,55 @@ class InterCliqueSyncTest extends AlephiumSpec {
         case PeerStatus.Banned(_) => true
         case _                    => false
       } is true
+    }
+
+    server0.stop().futureValue is ()
+    server1.stop().futureValue is ()
+  }
+
+  it should "boot and sync two cliques of 2 nodes when version is compatible" in new Fixture(
+    "2-cliques-of-2-nodes"
+  ) {
+    val clique2Version = Version.release.copy(minor = Version.release.minor + 1)
+    val injection: PartialFunction[Message, Message] = { case Message(_, payload) =>
+      Message(Header(clique2Version), payload)
+    }
+    test(
+      2,
+      2,
+      clique1ConnectionBuild = Injected.noModification,
+      clique2ConnectionBuild = Injected.message(injection, _)
+    )
+  }
+
+  it should "ban node if version is not compatible" in new TestFixture("2-nodes") {
+    val dummyVersion = Version.release.copy(major = Version.release.major + 1)
+    val injection: PartialFunction[Message, Message] = { case Message(_, payload: Hello) =>
+      Message(Header(dummyVersion), payload)
+    }
+
+    val server0 = bootClique(1).servers.head
+    server0.start().futureValue is ()
+
+    val server1 = bootClique(
+      1,
+      bootstrap =
+        Some(new InetSocketAddress("127.0.0.1", server0.config.network.coordinatorAddress.getPort)),
+      connectionBuild = Injected.message(injection, _)
+    ).servers.head
+
+    server1.start().futureValue is ()
+
+    eventually {
+      val misbehaviors =
+        request[AVector[PeerMisbehavior]](
+          getMisbehaviors,
+          restPort(server0.config.network.bindAddress.getPort)
+        )
+
+      val server1Address = server1.config.network.bindAddress.getAddress
+      misbehaviors.head.peer is server1Address
+      misbehaviors.head.status is a[PeerStatus.Banned]
     }
 
     server0.stop().futureValue is ()

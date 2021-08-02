@@ -24,7 +24,7 @@ import org.alephium.util.{AVector, Number, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Genesis {
-  def apply(networkType: NetworkType): AVector[(LockupScript, U256)] =
+  def apply(networkType: NetworkType): AVector[(LockupScript.Asset, U256)] =
     networkType match {
       case Mainnet => mainnet
       case Devnet  => devnet
@@ -32,25 +32,24 @@ object Genesis {
     }
 
   // scalastyle:off magic.number
-  private val mainnet: AVector[(LockupScript, U256)] = AVector(
-    build("M17CgKt3PfMx16RqQmgs4na8vJnrsiCQPxnoGg9k3wQe2V", ALF.alf(Number.million), Mainnet),
-    build("M1EKok85mnVphzXF6RoFfg29xjaaBvaUoL4zU8s8JZHuj3", ALF.alf(Number.million), Mainnet),
-    build("M1Jt9rGcqqpC1HBoXYgDcefY6y7dPQdDtKXWJEd375U8H", ALF.alf(Number.million), Mainnet),
-    build("M1HJLSRbyEJhvVNxgiAanCH36PZDfbgpDkL9MSoPT9uZp9", ALF.alf(Number.million), Mainnet)
+  private val mainnet: AVector[(LockupScript.Asset, U256)] = AVector(
+    build("M1532GfKdSQjmMN57o4Xt9v2ZnzVrphcjRpNu6ajknmY7B", ALF.alf(Number.million), Mainnet),
+    build("M1CAmPx4Wm5zJmCp9oMYy4HTEhqB8Vez2epF9FJxQN6YQz", ALF.alf(Number.million), Mainnet),
+    build("M1DxgAn21D1vk4mGA9uF3cY5qj3LK22PeA8WhJ4TaPkzqP", ALF.alf(Number.million), Mainnet),
+    build("M19GCch12jtsnXCSEapK8yUaC7keJa4eYpDoLNVmKpr78k", ALF.alf(Number.million), Mainnet)
   )
 
-  private val testnet: AVector[(LockupScript, U256)] = AVector(
-    build("T1DSVCXhFC8sFjXzuXWKcRfDfBuet6MPSoknijfKghqrq8", ALF.alf(Number.million), Testnet),
-    build("T1Bz5Lri6ensLeYQaPujQKBnRSuxjwCRDsToHyavDxP6Jh", ALF.alf(Number.million), Testnet),
-    build("T14RX14eXnNhE8XoB18msvzbTxVjEgpoAEPWGW1MzMseyk", ALF.alf(Number.million), Testnet),
-    build("T1CVKEQ33CKfBoVx9S8RQALW3tGD4YN1J6n6428oqNkYzJ", ALF.alf(Number.million), Testnet),
-    build("T1EEFFBGYac9ZbXKscqTdfbCd4siW1Yn8YYTo9CPGT811c", ALF.alf(Number.million), Testnet)
+  private val testnet: AVector[(LockupScript.Asset, U256)] = AVector(
+    build("T13CCnCmV1zgDj43FtDVGT7eCxtMuUeYU5T8moewy8c2bg", ALF.alf(Number.million), Testnet),
+    build("T1C1wgFWXfHt5LzVRdXG962rSqahjR821VYewVp7jbDvzc", ALF.alf(Number.million), Testnet),
+    build("T1DJa7LiwyNJosMWeDX6MejZQhwHHyh5yF4VYghMVoC2q", ALF.alf(Number.million), Testnet),
+    build("T1GJRkJkhhfb1mnJaKZ2MVHRVqzrDdfk4wegCTQj5fDR9T", ALF.alf(Number.million), Testnet)
   )
 
-  private val devnet: AVector[(LockupScript, U256)] = AVector(
-    build("D17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z", ALF.alf(Number.million), Devnet),
-    build("D15f8wM4hVa9SCfzZGUTKCDF4jY29EsrCipjVkjJ35A54J", ALF.alf(Number.million), Devnet),
-    build("D12EHAuV329gDw5Lu8bBXGj6CqKUTFZR52qNnnpGt5CiA6", ALF.alf(Number.million), Devnet)
+  private val devnet: AVector[(LockupScript.Asset, U256)] = AVector(
+    build("D12Ffj2pjqghfzyoH6WPL6QEcjVD42g8DoE1JJu8TwLmzR", ALF.alf(Number.million), Devnet),
+    build("D14AUQziA5Rsg9LZCcWzy6bLQdiEWojYG9y3GA93Jeavke", ALF.alf(Number.million), Devnet),
+    build("D1BXVZ7TFvo6DUkoRdLirh5Zgfw6KkqM8b8KypfEacrQ6p", ALF.alf(Number.million), Devnet)
   )
   // scalastyle:on magic.number
 
@@ -58,9 +57,9 @@ object Genesis {
       addressRaw: String,
       amount: U256,
       networkType: NetworkType
-  ): (LockupScript, U256) = {
+  ): (LockupScript.Asset, U256) = {
     val address = Address
-      .fromBase58(addressRaw, networkType)
+      .asset(addressRaw, networkType)
       .getOrElse(throw new RuntimeException(s"Invalid address $addressRaw for $networkType"))
     (address.lockupScript, amount)
   }

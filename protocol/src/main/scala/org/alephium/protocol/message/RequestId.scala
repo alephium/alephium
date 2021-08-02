@@ -14,20 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.message
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.AVector
+import org.alephium.serde.Serde
+import org.alephium.util.SecureAndSlowRandom
+import org.alephium.util.U32
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromPublicKey: PublicKey,
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-) {
-  def fromAddress(networkType: NetworkType): Address.Asset =
-    Address.Asset(networkType, LockupScript.p2pkh(fromPublicKey))
+final case class RequestId(value: U32) {
+  override def toString(): String = {
+    s"RequestId: ${value.v}"
+  }
+}
+
+object RequestId {
+  implicit val serde: Serde[RequestId] = Serde.forProduct1(RequestId(_), _.value)
+
+  def unsafe(value: Int): RequestId = {
+    RequestId(U32.unsafe(value))
+  }
+
+  def random(): RequestId = {
+    RequestId(SecureAndSlowRandom.nextNonZeroU32())
+  }
 }

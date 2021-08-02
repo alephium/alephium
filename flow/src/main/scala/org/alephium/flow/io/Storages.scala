@@ -34,6 +34,7 @@ object Storages {
   val trieHashPostfix: Byte      = 2
   val heightPostfix: Byte        = 3
   val chainStatePostfix: Byte    = 4
+  val dbVersionPostfix: Byte     = 5
 
   def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(implicit
       config: GroupConfig

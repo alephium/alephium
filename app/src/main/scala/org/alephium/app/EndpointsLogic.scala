@@ -362,10 +362,14 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   val minerListAddressesLogic = serverLogic(minerListAddresses) { _ =>
     viewHandler
       .ask(ViewHandler.GetMinerAddresses)
-      .mapTo[Option[AVector[LockupScript]]]
+      .mapTo[Option[AVector[LockupScript.Asset]]]
       .map {
-        case Some(addresses) =>
-          Right(MinerAddresses(addresses.map(address => Address(networkType, address))))
+        case Some(lockupScripts) =>
+          Right(
+            MinerAddresses(
+              lockupScripts.map(lockupScript => Address.Asset(networkType, lockupScript))
+            )
+          )
         case None => Left(ApiError.InternalServerError(s"Miner addresses are not set up"))
       }
   }
@@ -421,7 +425,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         case error: Throwable =>
           Left(ApiError.InternalServerError(error.getMessage))
       } finally {
-        writer.close
+        writer.close()
       }
     }
   }

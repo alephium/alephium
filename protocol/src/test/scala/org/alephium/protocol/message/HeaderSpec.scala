@@ -14,20 +14,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.message
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.AVector
+import org.alephium.protocol.model.Version
+import org.alephium.serde._
+import org.alephium.util.AlephiumSpec
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromPublicKey: PublicKey,
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-) {
-  def fromAddress(networkType: NetworkType): Address.Asset =
-    Address.Asset(networkType, LockupScript.p2pkh(fromPublicKey))
+class HeaderSpec extends AlephiumSpec {
+  it should "serialize/deserialize the Header when version compatible" in {
+    val header = Header(Version.release)
+    val bytes  = serialize(header)
+    deserialize[Header](bytes) isE header
+  }
+
+  it should "deserialize failed when version not compatible" in {
+    val version = Version(Int.MaxValue, Int.MaxValue, Int.MaxValue)
+    val bytes   = serialize(Header(version))
+    deserialize[Header](bytes).leftValue is a[SerdeError]
+  }
 }

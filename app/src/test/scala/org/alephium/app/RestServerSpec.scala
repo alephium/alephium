@@ -381,7 +381,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
 
   it should "call POST /miners" in new RestServerFixture {
     withServers {
-      val address      = Address.fromBase58(dummyKeyAddress, networkType).get
+      val address      = Address.asset(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
         msg match {
@@ -437,7 +437,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
 
   it should "call GET /miners/addresses" in new RestServerFixture {
     withServers {
-      val address      = Address.fromBase58(dummyKeyAddress, networkType).get
+      val address      = Address.asset(dummyKeyAddress, networkType).get
       val lockupScript = address.lockupScript
 
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -479,7 +479,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
       Put(s"/miners/addresses", body) check { response =>
-        val addresses = newAddresses.map(Address.fromBase58(_, networkType).get)
+        val addresses = newAddresses.map(Address.asset(_, networkType).get)
         allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateMinerAddresses(addresses))
         response.code is StatusCode.Ok
       }

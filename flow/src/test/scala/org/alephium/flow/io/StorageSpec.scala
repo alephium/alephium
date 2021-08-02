@@ -14,20 +14,29 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.flow.io
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.AVector
+import org.scalatest.BeforeAndAfterEach
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromPublicKey: PublicKey,
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-) {
-  def fromAddress(networkType: NetworkType): Address.Asset =
-    Address.Asset(networkType, LockupScript.p2pkh(fromPublicKey))
+import org.alephium.io.RocksDBSource
+import org.alephium.util.{AlephiumSpec, Files}
+
+trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {
+  val dbname: String
+  val builder: RocksDBSource => S
+  lazy val dbPath           = Files.tmpDir.resolve(dbname)
+  var source: RocksDBSource = _
+  var storage: S            = _
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    source = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    storage = builder(source)
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    source.dESTROY().rightValue
+    ()
+  }
 }

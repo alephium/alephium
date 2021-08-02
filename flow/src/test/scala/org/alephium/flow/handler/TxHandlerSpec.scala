@@ -26,7 +26,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.protocol.ALF
-import org.alephium.protocol.message.{Message, SendTxs}
+import org.alephium.protocol.message.{Message, NewTxs}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumActorSpec, AVector}
 
@@ -93,7 +93,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
     val dataOrigin = DataOrigin.Local
 
     def txMessage(tx: Transaction) =
-      Message.serialize(SendTxs(AVector(tx.toTemplate)), networkSetting.networkType)
+      Message.serialize(NewTxs(AVector(tx.toTemplate)), networkSetting.networkType)
     def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate), dataOrigin)
 
     val txHandler = system.actorOf(TxHandler.props(blockFlow))

@@ -31,7 +31,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, Duration, Hex, TimeStamp, U256}
 
 trait BlockFlowClient {
-  def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]]
+  def fetchBalance(address: Address.Asset): Future[Either[ApiError[_ <: StatusCode], U256]]
   def prepareTransaction(
       fromPublicKey: String,
       destinations: AVector[Destination],
@@ -40,7 +40,7 @@ trait BlockFlowClient {
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def prepareSweepAllTransaction(
       fromPublicKey: String,
-      address: Address,
+      address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
@@ -103,7 +103,7 @@ object BlockFlowClient {
       }
     }
 
-    def fetchBalance(address: Address): Future[Either[ApiError[_ <: StatusCode], U256]] =
+    def fetchBalance(address: Address.Asset): Future[Either[ApiError[_ <: StatusCode], U256]] =
       requestFromGroup(address.groupIndex, getBalance, address).map(_.map(_.balance))
 
     def prepareTransaction(
@@ -132,7 +132,7 @@ object BlockFlowClient {
 
     def prepareSweepAllTransaction(
         fromPublicKey: String,
-        address: Address,
+        address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]

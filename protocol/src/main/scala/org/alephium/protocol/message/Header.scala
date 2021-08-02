@@ -16,24 +16,19 @@
 
 package org.alephium.protocol.message
 
-import org.alephium.protocol.Protocol
-import org.alephium.serde.{Serde, SerdeError}
+import org.alephium.protocol.model.Version
+import org.alephium.serde.Serde
 
-final case class Header(version: Int)
+final case class Header(version: Version) extends AnyVal
 
 object Header {
-  implicit val serde: Serde[Header] =
-    Serde
-      .tuple1[Int]
-      .xfmap(
-        version =>
-          if (version == Protocol.version) {
-            Right(Header(version))
-          } else {
-            Left(
-              SerdeError.wrongFormat(s"Invalid version, got $version, expect ${Protocol.version}")
-            )
-          },
-        header => header.version
-      )
+  implicit val serde: Serde[Header] = Version.serde
+    .validate(version =>
+      if (version.compatible(Version.release)) {
+        Right(())
+      } else {
+        Left(s"Invalid version: expect: $version, self: ${Version.release}")
+      }
+    )
+    .xmap(Header.apply, _.version)
 }

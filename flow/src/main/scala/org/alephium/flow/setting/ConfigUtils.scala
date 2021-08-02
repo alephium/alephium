@@ -37,7 +37,7 @@ object ConfigUtils {
   def parseMiners(
       minerAddressesOpt: Option[Seq[String]],
       networkType: NetworkType
-  ): Either[ConfigException, Option[AVector[Address]]] = {
+  ): Either[ConfigException, Option[AVector[Address.Asset]]] = {
     minerAddressesOpt match {
       case Some(minerAddresses) =>
         AVector.from(minerAddresses).mapE(parseAddresses(_, networkType)).map(Option.apply)
@@ -48,9 +48,23 @@ object ConfigUtils {
   private def parseAddresses(
       rawAddress: String,
       networkType: NetworkType
-  ): Either[ConfigException, Address] = {
-    Address.fromBase58(rawAddress, networkType).toRight {
-      new ConfigException.BadValue("address", "Invalid base58 or network-type")
+  ): Either[ConfigException, Address.Asset] = {
+    Address.fromBase58(rawAddress, networkType) match {
+      case Some(address: Address.Asset) => Right(address)
+      case Some(_: Address.Contract) =>
+        Left(
+          new ConfigException.BadValue(
+            "address",
+            s"Unexpected contract address for miner: $rawAddress"
+          )
+        )
+      case None =>
+        Left(
+          new ConfigException.BadValue(
+            "address",
+            s"Invalid base58 encoding or network-type: $rawAddress"
+          )
+        )
     }
   }
 

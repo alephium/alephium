@@ -64,7 +64,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   val inetAddress = InetAddress.getByName("127.0.0.1")
 
-  def generateAddress(): Address = Address.p2pkh(networkType, PublicKey.generate)
+  def generateAddress(): Address.Asset = Address.p2pkh(networkType, PublicKey.generate)
 
   def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
     write(data) is jsonRaw.filterNot(_.isWhitespace)

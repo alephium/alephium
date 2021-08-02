@@ -258,6 +258,12 @@ lazy val flow = project("flow")
   .dependsOn(protocol % "test->test;compile->compile")
 
 lazy val protocol = project("protocol")
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](version),
+    buildInfoPackage := "org.alephium.protocol",
+    buildInfoUsePackageAsPath := true
+  )
   .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(

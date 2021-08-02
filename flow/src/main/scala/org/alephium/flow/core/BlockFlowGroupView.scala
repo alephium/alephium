@@ -57,9 +57,13 @@ trait BlockFlowGroupView[WS <: WorldState[_]] {
   }
 
   def getRelevantUtxos(
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]]
+
+  def getContractUtxos(lockupScript: LockupScript.P2C): IOResult[ContractOutput] = {
+    worldState.getContractAsset(lockupScript.contractId)
+  }
 }
 
 object BlockFlowGroupView {
@@ -102,13 +106,13 @@ object BlockFlowGroupView {
     }
 
     private def getPersistedUtxos(
-        lockupScript: LockupScript,
+        lockupScript: LockupScript.Asset,
         maxUtxosToRead: Int
     ): IOResult[AVector[AssetOutputInfo]] = {
       for {
         persistedUtxos <- worldState
           .getAssetOutputs(
-            lockupScript.assetHintBytes,
+            lockupScript.hintBytes,
             maxUtxosToRead,
             (_, output) => output.lockupScript == lockupScript
           )
@@ -166,7 +170,7 @@ object BlockFlowGroupView {
     }
 
     def getRelevantUtxos(
-        lockupScript: LockupScript,
+        lockupScript: LockupScript.Asset,
         maxUtxosToRead: Int
     ): IOResult[AVector[AssetOutputInfo]] = {
       getPersistedUtxos(lockupScript, maxUtxosToRead).map { persistedUtxos =>
@@ -193,7 +197,7 @@ object BlockFlowGroupView {
     }
 
     override def getRelevantUtxos(
-        lockupScript: LockupScript,
+        lockupScript: LockupScript.Asset,
         maxUtxosToRead: Int
     ): IOResult[AVector[AssetOutputInfo]] = {
       super.getRelevantUtxos(lockupScript, maxUtxosToRead).map { utxosInBlocks =>

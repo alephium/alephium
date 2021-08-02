@@ -24,7 +24,7 @@ import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{GetBlocks, GetHeaders, SyncResponse}
+import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, InvResponse, NewInv}
 import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, Duration}
 
@@ -49,15 +49,16 @@ trait BrokerHandler extends BaseBrokerHandler {
     schedule(self, BrokerHandler.IntraSync, Duration.zero, Duration.ofMinutesUnsafe(1))
 
     val receive: Receive = {
-      case FlowHandler.SyncInventories(inventories) =>
-        send(SyncResponse(inventories))
-      case BaseBrokerHandler.Received(SyncResponse(hashes)) =>
-        log.debug(s"Received sync response ${Utils.showFlow(hashes)} from intra clique broker")
-        assume(hashes.length == remoteBrokerInfo.groupNumPerBroker * brokerConfig.groups)
-        val (headersToSync, blocksToSync) =
-          BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)
-        send(GetHeaders(headersToSync))
-        send(GetBlocks(blocksToSync))
+      case FlowHandler.SyncInventories(requestId, inventories) =>
+        send(requestId.map(InvResponse(_, inventories)).getOrElse(NewInv(inventories)))
+      case BaseBrokerHandler.Received(NewInv(hashes)) =>
+        log.debug(s"Received new inv ${Utils.showFlow(hashes)} from intra clique broker")
+        handleInv(hashes)
+      case BaseBrokerHandler.Received(InvResponse(requestId, hashes)) =>
+        log.debug(
+          s"Received inv response ${Utils.showFlow(hashes)} from intra clique broker with $requestId"
+        )
+        handleInv(hashes)
       case BrokerHandler.IntraSync =>
         allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories
     }
@@ -65,6 +66,14 @@ trait BrokerHandler extends BaseBrokerHandler {
   }
 
   override def dataOrigin: DataOrigin = DataOrigin.IntraClique(remoteBrokerInfo)
+
+  private def handleInv(hashes: AVector[AVector[BlockHash]]): Unit = {
+    assume(hashes.length == remoteBrokerInfo.groupNumPerBroker * brokerConfig.groups)
+    val (headersToSync, blocksToSync) =
+      BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)
+    send(HeadersRequest(headersToSync))
+    send(BlocksRequest(blocksToSync))
+  }
 }
 
 object BrokerHandler {

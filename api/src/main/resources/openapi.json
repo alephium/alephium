@@ -4264,7 +4264,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "balance": {
             "type": "integer",
@@ -4280,7 +4280,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "group": {
             "type": "integer"
@@ -4294,17 +4294,45 @@
         "type": "object",
         "properties": {
           "activeAddress": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Asset"
             }
           }
         }
       },
       "Asset": {
+        "required": [
+          "networkType",
+          "lockupScript"
+        ],
+        "type": "object",
+        "properties": {
+          "networkType": {
+            "$ref": "#/components/schemas/NetworkType"
+          },
+          "lockupScript": {
+            "$ref": "#/components/schemas/Asset1"
+          }
+        }
+      },
+      "Asset1": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/P2MPKH"
+          },
+          {
+            "$ref": "#/components/schemas/P2PKH"
+          },
+          {
+            "$ref": "#/components/schemas/P2SH"
+          }
+        ]
+      },
+      "Asset2": {
         "required": [
           "outputRef",
           "unlockScript"
@@ -4319,7 +4347,7 @@
           }
         }
       },
-      "Asset1": {
+      "Asset3": {
         "required": [
           "amount",
           "address",
@@ -4524,7 +4552,7 @@
             "type": "string"
           },
           "toAddress": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "lockTime": {
             "type": "integer",
@@ -4602,7 +4630,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           }
         }
       },
@@ -4718,7 +4746,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "amount": {
             "type": "integer",
@@ -4784,7 +4812,7 @@
       "Input": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset"
+            "$ref": "#/components/schemas/Asset2"
           },
           {
             "$ref": "#/components/schemas/Contract"
@@ -4841,7 +4869,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Asset"
             }
           }
         }
@@ -4909,7 +4937,7 @@
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/Asset3"
           },
           {
             "$ref": "#/components/schemas/Contract1"
@@ -4927,6 +4955,45 @@
             "type": "integer"
           },
           "key": {
+            "type": "string"
+          }
+        }
+      },
+      "P2MPKH": {
+        "required": [
+          "m"
+        ],
+        "type": "object",
+        "properties": {
+          "pkHashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "m": {
+            "type": "integer"
+          }
+        }
+      },
+      "P2PKH": {
+        "required": [
+          "pkHash"
+        ],
+        "type": "object",
+        "properties": {
+          "pkHash": {
+            "type": "string"
+          }
+        }
+      },
+      "P2SH": {
+        "required": [
+          "scriptHash"
+        ],
+        "type": "object",
+        "properties": {
+          "scriptHash": {
             "type": "string"
           }
         }
@@ -5042,7 +5109,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           }
         }
       },
@@ -5143,7 +5210,7 @@
         "type": "object",
         "properties": {
           "toAddress": {
-            "type": "string"
+            "$ref": "#/components/schemas/Asset"
           },
           "lockTime": {
             "type": "integer",

@@ -20,11 +20,11 @@ import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.core.BlockHashChain
-import org.alephium.io.{IOResult, IOUtils, RawKeyValueStorage, RocksDBColumn, RocksDBSource}
+import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{ChainIndex, Version}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -44,6 +44,46 @@ trait NodeStateStorage extends RawKeyValueStorage {
     IOUtils.tryExecute {
       putRawUnsafe(isInitializedKey, ByteString(1))
     }
+
+  private val dbVersionKey =
+    Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
+
+  def setDatabaseVersion(version: Version): IOResult[Unit] =
+    IOUtils.tryExecute {
+      putRawUnsafe(dbVersionKey, serialize(version))
+    }
+
+  def getDatabaseVersion(): IOResult[Option[Version]] =
+    IOUtils.tryExecute {
+      getOptRawUnsafe(dbVersionKey).map(deserialize[Version](_) match {
+        case Left(e)  => throw e
+        case Right(v) => v
+      })
+    }
+
+  def checkDatabaseCompatibility(
+      dbMinimalVersion: Version,
+      nodeVersion: Version
+  ): IOResult[Unit] = {
+    getDatabaseVersion().flatMap {
+      case Some(dbVersion) =>
+        if (dbVersion < dbMinimalVersion || dbVersion > nodeVersion) {
+          Left(
+            IOError.Other(
+              new RuntimeException(
+                s"Database version is $dbVersion, node supported minimal version is $dbMinimalVersion, node version is $nodeVersion"
+              )
+            )
+          )
+        } else if (dbMinimalVersion <= dbVersion && dbVersion < nodeVersion) {
+          setDatabaseVersion(nodeVersion)
+        } else {
+          Right(())
+        }
+      case None =>
+        setDatabaseVersion(nodeVersion)
+    }
+  }
 
   private val chainStateKeys = AVector.tabulate(config.groups, config.groups) { (from, to) =>
     ByteString(from.toByte, to.toByte, Storages.chainStatePostfix)

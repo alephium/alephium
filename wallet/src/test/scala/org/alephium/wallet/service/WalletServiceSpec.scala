@@ -105,9 +105,9 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val walletName = "wallet"
     val notFound   = WalletNotFound(new File(tempSecretDir.toString, walletName))
     val address =
-      Address(
+      Address.Asset(
         NetworkType.Devnet,
-        LockupScript.fromBase58("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
+        LockupScript.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
       )
 
     walletService.unlockWallet(walletName, "").leftValue is notFound

@@ -49,6 +49,12 @@ trait AbstractRandom {
   def nextU256NonUniform(bound: U256): U256 = {
     nextU256().modUnsafe(bound)
   }
+
+  @tailrec
+  final def nextNonZeroU32(): U32 = {
+    val random = nextNonZeroInt()
+    if (random != 0) U32.unsafe(math.abs(random)) else nextNonZeroU32()
+  }
 }
 
 object UnsecureRandom extends AbstractRandom {
