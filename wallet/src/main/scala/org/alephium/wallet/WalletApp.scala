@@ -47,7 +47,8 @@ class WalletApp(config: WalletConfig)(implicit
     BlockFlowClient.apply(
       config.blockflow.uri,
       config.networkType,
-      config.blockflow.blockflowFetchMaxAge
+      config.blockflow.blockflowFetchMaxAge,
+      config.blockflow.apiKey
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -56,7 +57,12 @@ class WalletApp(config: WalletConfig)(implicit
     WalletService.apply(blockFlowClient, secretDir, config.networkType, config.lockingTimeout)
 
   val walletServer: WalletServer =
-    new WalletServer(walletService, config.networkType, config.blockflow.blockflowFetchMaxAge)
+    new WalletServer(
+      walletService,
+      config.networkType,
+      config.blockflow.blockflowFetchMaxAge,
+      config.apiKey
+    )
 
   val routes: AVector[Router => Route] = walletServer.routes :+ walletServer.docsRoute
 

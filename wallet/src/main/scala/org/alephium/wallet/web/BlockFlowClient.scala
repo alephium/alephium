@@ -18,12 +18,12 @@ package org.alephium.wallet.web
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.client.sttp._
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.model._
+import org.alephium.http.EndpointSender
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
@@ -53,24 +53,29 @@ trait BlockFlowClient {
 }
 
 object BlockFlowClient {
-  def apply(defaultUri: Uri, networkType: NetworkType, blockflowFetchMaxAge: Duration)(implicit
+  def apply(
+      defaultUri: Uri,
+      networkType: NetworkType,
+      blockflowFetchMaxAge: Duration,
+      maybeApiKey: Option[ApiKey]
+  )(implicit
       groupConfig: GroupConfig,
       executionContext: ExecutionContext
   ): BlockFlowClient =
-    new Impl(defaultUri, networkType, blockflowFetchMaxAge)
+    new Impl(defaultUri, networkType, blockflowFetchMaxAge, maybeApiKey)
 
   private class Impl(
       defaultUri: Uri,
       val networkType: NetworkType,
-      val blockflowFetchMaxAge: Duration
+      val blockflowFetchMaxAge: Duration,
+      val maybeApiKey: Option[ApiKey]
   )(implicit
       val groupConfig: GroupConfig,
       executionContext: ExecutionContext
   ) extends BlockFlowClient
       with Endpoints
+      with EndpointSender
       with SttpClientInterpreter {
-
-    private val backend = AsyncHttpClientFutureBackend()
 
     private def uriFromGroup(
         fromGroup: GroupIndex
@@ -84,20 +89,19 @@ object BlockFlowClient {
         }
       }
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     private def requestFromGroup[P, A](
         fromGroup: GroupIndex,
         endpoint: BaseEndpoint[P, A],
         params: P
-    ): Future[Either[ApiError[_ <: StatusCode], A]] =
+    ): Future[Either[ApiError[_ <: StatusCode], A]] = {
       uriFromGroup(fromGroup).flatMap {
         _.fold(
           e => Future.successful(Left(e)),
-          uri =>
-            backend
-              .send(toRequestThrowDecodeFailures(endpoint, Some(uri)).apply(params))
-              .map(_.body)
+          uri => send(endpoint, params, uri)
         )
       }
+    }
 
     def fetchBalance(address: Address.Asset): Future[Either[ApiError[_ <: StatusCode], U256]] =
       requestFromGroup(address.groupIndex, getBalance, address).map(_.map(_.balance))
@@ -164,12 +168,9 @@ object BlockFlowClient {
       )
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     private def fetchSelfClique(): Future[Either[ApiError[_ <: StatusCode], SelfClique]] = {
-      val x = backend
-        .send(
-          toRequestThrowDecodeFailures(getSelfClique, Some(defaultUri)).apply(())
-        )
-      x.map(_.body)
+      send(getSelfClique, (), defaultUri)
     }
   }
 }

@@ -64,6 +64,6 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
   )
 
   lazy val openAPI: OpenAPI =
-    toOpenAPI(walletEndpoints ++ blockflowEndpoints, "Alephium API", "1.0")
+    toOpenAPI(walletEndpoints ++ blockflowEndpoints.map(_.endpoint), "Alephium API", "1.0")
       .servers(servers)
 }

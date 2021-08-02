@@ -14,34 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet
+package org.alephium.api.model
 
-import sttp.tapir.Endpoint
-import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
-import sttp.tapir.openapi.OpenAPI
+final case class ApiKey private (val value: String)
 
-import org.alephium.wallet.api.WalletEndpoints
+object ApiKey {
+  def unsafe(raw: String): ApiKey = new ApiKey(raw)
 
-trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
-
-  val walletEndpoints: List[Endpoint[_, _, _, _]] = List(
-    createWallet,
-    restoreWallet,
-    listWallets,
-    getWallet,
-    lockWallet,
-    unlockWallet,
-    deleteWallet,
-    getBalances,
-    transfer,
-    sweepAll,
-    getAddresses,
-    getMinerAddresses,
-    deriveNextAddress,
-    deriveNextMinerAddresses,
-    changeActiveAddress
-  ).map(_.endpoint)
-
-  lazy val walletOpenAPI: OpenAPI =
-    toOpenAPI(walletEndpoints, "Alephium Wallet", "1.0")
+  def from(raw: String): Either[String, ApiKey] = {
+    if (raw.length < 32) {
+      Left("Api key must have at least 32 characters")
+    } else {
+      Right(new ApiKey(raw))
+    }
+  }
 }

@@ -50,6 +50,13 @@ trait Endpoints
       .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
         (timeInterval.from, timeInterval.to)
       )
+      .validate(Validator.custom { timeInterval =>
+        if (timeInterval.from > timeInterval.to) {
+          List(ValidationError.Custom(timeInterval, s"`fromTs` must be before `toTs`"))
+        } else {
+          List.empty
+        }
+      })
 
   private lazy val chainIndexQuery: EndpointInput[ChainIndex] =
     query[GroupIndex]("fromGroup")

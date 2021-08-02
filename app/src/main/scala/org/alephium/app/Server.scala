@@ -48,11 +48,13 @@ trait Server extends Service {
       config.wallet.secretDir,
       config.network.networkType,
       config.wallet.lockingTimeout,
+      apiConfig.apiKey,
       WalletConfig.BlockFlow(
         apiConfig.networkInterface.getHostAddress,
         config.network.restPort,
         config.broker.groups,
-        apiConfig.blockflowFetchMaxAge
+        apiConfig.blockflowFetchMaxAge,
+        apiConfig.apiKey
       )
     )
 

@@ -18,10 +18,10 @@ package org.alephium.wallet.web
 
 import org.scalatest.Inside
 import sttp.client3._
-import sttp.tapir.client.sttp._
 
 import org.alephium.api.Endpoints
 import org.alephium.api.model.{BuildTransaction, Destination}
+import org.alephium.http.EndpointSender
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -31,8 +31,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
     val destinations       = AVector(Destination(toAddress, value, None))
     val buildTransactionIn = BuildTransaction(publicKey, destinations, None, None)
-    val request = toRequestThrowDecodeFailures(buildTransaction, Some(uri"http://127.0.0.1:1234"))
-      .apply(buildTransactionIn)
+    val request            = createRequest(buildTransaction, buildTransactionIn, uri"http://127.0.0.1:1234")
     request.uri is uri"http://127.0.0.1:1234/transactions/build"
 
     inside(request.body) { case body: StringBody =>
@@ -40,7 +39,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     }
   }
 
-  trait Fixture extends Endpoints with LockupScriptGenerators with SttpClientInterpreter {
+  trait Fixture extends Endpoints with LockupScriptGenerators with EndpointSender {
     implicit val groupConfig: GroupConfig = new GroupConfig { val groups = 4 }
     val networkType                       = NetworkType.Devnet
     val groupIndex                        = GroupIndex.unsafe(0)
@@ -48,5 +47,6 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val toAddress                         = Address.Asset(networkType, script)
     val value                             = U256.from(1000).get
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
+    val maybeApiKey                       = None
   }
 }

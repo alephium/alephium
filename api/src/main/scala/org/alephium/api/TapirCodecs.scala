@@ -46,6 +46,9 @@ trait TapirCodecs extends ApiModelCodec {
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromJson[Address]
 
+  implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
+    fromJson[ApiKey]
+
   implicit val publicKeyTapirCodec: Codec[String, PublicKey, TextPlain] =
     fromJson[PublicKey]
 

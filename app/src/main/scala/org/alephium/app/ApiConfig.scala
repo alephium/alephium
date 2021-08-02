@@ -18,27 +18,38 @@ package org.alephium.app
 
 import java.net.InetAddress
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigException}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
+import org.alephium.api.model.ApiKey
 import org.alephium.conf._
 import org.alephium.util.Duration
 
 final case class ApiConfig(
     networkInterface: InetAddress,
     blockflowFetchMaxAge: Duration,
-    askTimeout: Duration
+    askTimeout: Duration,
+    apiKey: Option[ApiKey]
 )
 
 object ApiConfig {
+
+  implicit private val apiValueReader: ValueReader[ApiKey] =
+    ValueReader[String].map { input =>
+      ApiKey.from(input) match {
+        case Right(apiKey) => apiKey
+        case Left(error)   => throw new ConfigException.BadValue("ApiKey", error)
+      }
+    }
 
   implicit private val apiConfigValueReader: ValueReader[ApiConfig] =
     valueReader { implicit cfg =>
       ApiConfig(
         as[InetAddress]("networkInterface"),
         as[Duration]("blockflowFetchMaxAge"),
-        as[Duration]("askTimeout")
+        as[Duration]("askTimeout"),
+        as[Option[ApiKey]]("apiKey")
       )
     }
 

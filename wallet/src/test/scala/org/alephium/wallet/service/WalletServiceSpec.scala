@@ -171,7 +171,8 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       BlockFlowClient.apply(
         config.blockflow.uri,
         config.networkType,
-        config.blockflow.blockflowFetchMaxAge
+        config.blockflow.blockflowFetchMaxAge,
+        config.blockflow.apiKey
       )
 
     lazy val walletService: WalletService =
