@@ -77,7 +77,7 @@ class WalletAppSpec
   val unlockJson = s"""{"password":"$password"}"""
   val deleteJson = s"""{"password":"$password"}"""
   def transferJson(amount: Int) =
-    s"""{"destinations":[{"address":"$transferAddress","amount":"$amount"}]}"""
+    s"""{"destinations":[{"address":"$transferAddress","amount":"$amount","tokens":[]}]}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""

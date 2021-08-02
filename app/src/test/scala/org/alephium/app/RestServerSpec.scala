@@ -193,7 +193,8 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "tokens": []
         |    }
         |  ]
         |}
@@ -213,6 +214,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |    {
         |      "address": "$dummyToAddress",
         |      "amount": "1",
+        |      "tokens": [],
         |      "lockTime": "1234"
         |    }
         |  ]
@@ -238,7 +240,8 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "tokens": []
         |    }
         |  ]
         |}

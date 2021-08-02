@@ -268,14 +268,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val toAddress     = Address.p2pkh(toKey)
 
     {
-      val transfer = BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1)))
-      val jsonRaw  = s"""
+      val transfer =
+        BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1, AVector.empty)))
+      val jsonRaw = s"""
         |{
         |  "fromPublicKey": "${fromPublicKey.toHexString}",
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "tokens": []
         |    }
         |  ]
         |}
@@ -286,7 +288,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     {
       val transfer = BuildTransaction(
         fromPublicKey,
-        AVector(Destination(toAddress, 1, Some(TimeStamp.unsafe(1234)))),
+        AVector(Destination(toAddress, 1, AVector.empty, Some(TimeStamp.unsafe(1234)))),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )
@@ -297,6 +299,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |    {
         |      "address": "${toAddress.toBase58}",
         |      "amount": "1",
+        |      "tokens": [],
         |      "lockTime": 1234
         |    }
         |  ],

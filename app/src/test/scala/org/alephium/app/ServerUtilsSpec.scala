@@ -163,7 +163,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(fromPublicKey)
-      val selfDestination                    = Destination(fromAddress, ALF.oneAlf)
+      val selfDestination                    = Destination(fromAddress, ALF.oneAlf, AVector.empty)
 
       info("Sending some coins to itself twice, creating 3 UTXOs in total for the same public key")
       val destinations = AVector(selfDestination, selfDestination)
@@ -241,7 +241,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toGroup                            = chainIndex.to
       val (toPrivateKey, toPublicKey, _)     = genesisKeys(toGroup.value)
       val toAddress                          = Address.p2pkh(toPublicKey)
-      val destination                        = Destination(toAddress, ALF.oneAlf)
+      val destination                        = Destination(toAddress, ALF.oneAlf, AVector.empty)
 
       info("Sending some coins to an address, resulting 3 UTXOs for its corresponding public key")
       val destinations = AVector(destination, destination)
@@ -385,7 +385,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = ALF.oneAlf
-    Destination(address, amount)
+    Destination(address, amount, AVector.empty)
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit

@@ -17,11 +17,12 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.model.Address
-import org.alephium.util.{TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Destination(
     address: Address.Asset,
     amount: U256,
+    tokens: AVector[Token],
     lockTime: Option[TimeStamp] = None
 )
