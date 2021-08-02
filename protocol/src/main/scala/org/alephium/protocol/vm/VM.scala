@@ -172,27 +172,18 @@ final class StatefulVM(
           case None    => failed(InvalidBalances)
         }
         _ <- outputGeneratedBalances(ctx.outputBalances)
+        _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       Right(())
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-      balances.toTxOutput(lockupScript).map { outputOpt =>
-        outputOpt.foreach { output =>
-          lockupScript match {
-            case LockupScript.P2C(contractId) =>
-              val contractOutput = output.asInstanceOf[ContractOutput]
-              val outputRef      = ctx.nextContractOutputRef(contractOutput)
-              ctx.updateContractAsset(contractId, outputRef, contractOutput)
-            case _ => ()
-          }
-          ctx.generatedOutputs.addOne(output)
-          ()
-        }
+      balances.toTxOutput(lockupScript).flatMap {
+        case Some(output) => ctx.generateOutput(output)
+        case None         => Right(())
       }
     }
   }

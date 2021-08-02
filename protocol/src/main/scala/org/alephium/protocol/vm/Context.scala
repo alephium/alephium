@@ -62,6 +62,20 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
     ContractOutputRef.unsafe(txId, output, nextOutputIndex)
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def generateOutput(output: TxOutput): ExeResult[Unit] = {
+    output.lockupScript match {
+      case LockupScript.P2C(contractId) =>
+        val contractOutput = output.asInstanceOf[ContractOutput]
+        val outputRef      = nextContractOutputRef(contractOutput)
+        generatedOutputs.addOne(output)
+        updateContractAsset(contractId, outputRef, contractOutput)
+      case _ =>
+        generatedOutputs.addOne(output)
+        Right(())
+    }
+  }
+
   def createContract(
       code: StatefulContract,
       initialBalances: BalancesPerLockup,
@@ -86,14 +100,17 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {
-    worldState
-      .useContractAsset(contractId)
-      .map { case (contractOutputRef, contractAsset) =>
-        contractInputs.addOne(contractOutputRef)
-        BalancesPerLockup.from(contractAsset)
-      }
-      .left
-      .map(e => Left(IOErrorLoadContract(e)))
+    for {
+      balances <- worldState
+        .useContractAsset(contractId)
+        .map { case (contractOutputRef, contractAsset) =>
+          contractInputs.addOne(contractOutputRef)
+          BalancesPerLockup.from(contractAsset)
+        }
+        .left
+        .map(e => Left(IOErrorLoadContract(e)))
+      _ <- markAssetInUsing(contractId)
+    } yield balances
   }
 
   def updateContractAsset(
@@ -101,10 +118,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): ExeResult[Unit] = {
-    worldState
-      .updateContract(contractId, outputRef, output)
-      .left
-      .map(e => Left(IOErrorUpdateState(e)))
+    for {
+      _ <- worldState
+        .updateContract(contractId, outputRef, output)
+        .left
+        .map(e => Left(IOErrorUpdateState(e)))
+      _ <- markAssetFlushed(contractId)
+    } yield ()
   }
 }
 

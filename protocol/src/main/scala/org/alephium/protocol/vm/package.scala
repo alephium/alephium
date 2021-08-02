@@ -25,5 +25,5 @@ package object vm {
 
   val opStackMaxSize: Int      = 0x400
   val frameStackMaxSize: Int   = 0x400
-  val contractPoolMaxSize: Int = 0x400
+  val contractPoolMaxSize: Int = 16 // upto 16 contracts can be called in one tx
 }

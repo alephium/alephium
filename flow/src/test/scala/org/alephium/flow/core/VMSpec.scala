@@ -19,7 +19,6 @@ package org.alephium.flow.core
 import scala.language.implicitConversions
 
 import akka.util.ByteString
-import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.validation.BlockValidation
@@ -182,12 +181,6 @@ class VMSpec extends AlephiumSpec {
     val genesisLockup  = getGenesisLockupScript(chainIndex)
     val genesisAddress = Address.Asset(NetworkType.Testnet, genesisLockup)
 
-    def addAndValidate(blockFlow: BlockFlow, block: Block): Assertion = {
-      val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-      blockValidation.validate(block, blockFlow).isRight is true
-      blockFlow.addAndUpdateView(block).isRight is true
-    }
-
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
       val contract = Compiler.compileContract(input).toOption.get
       val txScript = contractCreation(contract, initialState, genesisLockup, dustUtxoAmount)
@@ -196,12 +189,16 @@ class VMSpec extends AlephiumSpec {
       val contractOutputRef =
         TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
 
-      addAndValidate(blockFlow, block)
+      addAndCheck(blockFlow, block)
       contractOutputRef
     }
 
-    def createContract(input: String, numAssets: Int, numContracts: Int): ContractOutputRef = {
-      val initialState      = AVector[Val](Val.U256(U256.Zero))
+    def createContract(
+        input: String,
+        numAssets: Int,
+        numContracts: Int,
+        initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero))
+    ): ContractOutputRef = {
       val contractOutputRef = createContract(input, initialState)
 
       val contractKey = contractOutputRef.key
@@ -218,7 +215,7 @@ class VMSpec extends AlephiumSpec {
       contractOutputRef
     }
 
-    def callTxScript(input: String): Assertion = {
+    def callTxScript(input: String): Unit = {
       val script = Compiler.compileTxScript(input).toOption.get
       val block =
         if (script.entryMethod.isPayable) {
@@ -226,20 +223,49 @@ class VMSpec extends AlephiumSpec {
         } else {
           simpleScript(blockFlow, chainIndex, script)
         }
-      addAndValidate(blockFlow, block)
+      addAndCheck(blockFlow, block)
     }
 
     def callTxScriptMulti(input: Int => String): Block = {
       val block0 = transfer(blockFlow, chainIndex, numReceivers = 10)
-      addAndValidate(blockFlow, block0)
+      addAndCheck(blockFlow, block0)
       val newAddresses = block0.nonCoinbase.head.unsigned.fixedOutputs.init.map(_.lockupScript)
       val scripts = AVector.tabulate(newAddresses.length) { index =>
         Compiler.compileTxScript(input(index)).fold(throw _, identity)
       }
       val block1 = simpleScriptMulti(blockFlow, chainIndex, newAddresses, scripts)
-      addAndValidate(blockFlow, block1)
+      addAndCheck(blockFlow, block1)
       block1
     }
+  }
+
+  it should "not use up contract assets" in new ContractFixture {
+    val input =
+      s"""
+         |TxContract Foo() {
+         |  pub payable fn foo(address: Address) -> () {
+         |    transferAlfFromSelf!(address, alfRemaining!(selfAddress!()))
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(input, 2, 2, AVector.empty).key
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    let foo = Foo(#${contractId.toHexString})
+         |    foo.foo(@${genesisAddress.toBase58})
+         |  }
+         |}
+         |
+         |$input
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(main).toOption.get
+    intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
+      s"Right(TxScriptExeFailed(${EmptyContractAsset.toString}))"
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -314,7 +340,7 @@ class VMSpec extends AlephiumSpec {
     val script   = Compiler.compileTxScript(main).toOption.get
     val newState = AVector[Val](Val.U256(U256.unsafe(110)))
     val block    = simpleScript(blockFlow, chainIndex, script)
-    addAndValidate(blockFlow, block)
+    addAndCheck(blockFlow, block)
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().toOption.get.length is 3
@@ -360,7 +386,7 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(main).toOption.get
 
     val block0 = payableCall(blockFlow, chainIndex, script)
-    addAndValidate(blockFlow, block0)
+    addAndCheck(blockFlow, block0)
 
     val worldState0 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState0.getContractStates().toOption.get.length is 2
@@ -372,7 +398,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     val block1 = payableCall(blockFlow, chainIndex, script)
-    addAndValidate(blockFlow, block1)
+    addAndCheck(blockFlow, block1)
 
     val worldState1 = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState1.getContractStates().toOption.get.length is 2
