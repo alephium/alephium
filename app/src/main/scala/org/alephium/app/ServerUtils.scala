@@ -205,6 +205,11 @@ class ServerUtils(networkType: NetworkType)(implicit
         .map(failedInIO)
     } yield BlockEntry.from(block, height, networkType)
 
+  def getBlockHeader(blockFlow: BlockFlow, query: GetBlockHeader): Try[BlockHeaderEntry] =
+    for {
+      blockEntry <- getBlock(blockFlow, GetBlock(query.hash))
+    } yield BlockHeaderEntry.from(blockEntry, blockEntry.height)
+
   def getHashesAtHeight(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,

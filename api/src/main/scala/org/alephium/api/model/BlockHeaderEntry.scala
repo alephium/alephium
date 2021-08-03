@@ -16,6 +16,7 @@
 
 package org.alephium.api.model
 
+import org.alephium.api.model.BlockEntry
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.{AVector, TimeStamp}
@@ -38,6 +39,17 @@ object BlockHeaderEntry {
       chainTo = header.chainIndex.to.value,
       height = height,
       deps = header.blockDeps.deps
+    )
+  }
+
+  def from(blockEntry: BlockEntry, height: Int): BlockHeaderEntry = {
+    BlockHeaderEntry(
+      hash = blockEntry.hash,
+      timestamp = blockEntry.timestamp,
+      chainFrom = blockEntry.chainFrom,
+      chainTo = blockEntry.chainTo,
+      height = height,
+      deps = blockEntry.deps
     )
   }
 }
