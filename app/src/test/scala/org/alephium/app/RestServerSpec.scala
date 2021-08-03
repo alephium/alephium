@@ -91,10 +91,10 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
     }
   }
 
-  it should "call GET /blockflow/header/<hash>" in new RestServerFixture {
+  it should "call GET /blockflow/headers/<hash>" in new RestServerFixture {
     withServers {
       servers.foreach { server =>
-        Get(s"/blockflow/header/${dummyBlockHeader.hash.toHexString}", server.port) check {
+        Get(s"/blockflow/headers/${dummyBlockHeader.hash.toHexString}", server.port) check {
           response =>
             val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
             if (

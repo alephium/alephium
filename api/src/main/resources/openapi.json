@@ -2906,13 +2906,13 @@
         }
       }
     },
-    "/blockflow/header/{block_hash}": {
+    "/blockflow/headers/{block_hash}": {
       "get": {
         "tags": [
           "Blockflow"
         ],
         "summary": "Get block header",
-        "operationId": "getBlockflowHeaderBlock_hash",
+        "operationId": "getBlockflowHeadersBlock_hash",
         "parameters": [
           {
             "name": "block_hash",

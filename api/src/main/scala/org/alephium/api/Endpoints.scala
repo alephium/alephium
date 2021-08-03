@@ -281,7 +281,7 @@ trait Endpoints
 
   val getBlockHeaderEntry: BaseEndpoint[BlockHash, BlockHeaderEntry] =
     blockflowEndpoint.get
-      .in("header")
+      .in("headers")
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockHeaderEntry])
       .summary("Get block header")
