@@ -93,7 +93,7 @@ object Instr {
     I256Const, U256Const,
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
-    Pop, Pop2, Dup, Dup2, Swap,
+    Pop,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
     NotBool, AndBool, OrBool,
@@ -315,26 +315,6 @@ sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompani
 case object Pop extends PureStackInstr {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.opStack.remove(1)
-  }
-}
-case object Pop2 extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.remove(2)
-  }
-}
-object Dup extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.dup(1)
-  }
-}
-object Dup2 extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.dup(2)
-  }
-}
-object Swap extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.swap(2)
   }
 }
 
