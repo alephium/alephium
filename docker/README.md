@@ -13,7 +13,7 @@ Make sure you installed both before proceeding further.
 From this `docker` folder, run:
 
 ```
-docker-compose build alephuim
+docker-compose build alephium
 ```
 
 A container called `alephium/alephium:latest` will be created from an official [Release](https://github.com/alephium/alephium/releases).
