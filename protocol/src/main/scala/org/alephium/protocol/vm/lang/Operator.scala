@@ -86,21 +86,12 @@ sealed trait TestOperator extends Operator {
       Seq(Type.Bool)
     }
   }
-
-  def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]]
 }
 case object Eq extends TestOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Type.I256 => Seq(EqI256)
       case Type.U256 => Seq(EqU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfNeI256(offset))
-      case Type.U256 => Seq(IfNeU256(offset))
       case _         => throw new RuntimeException("Dead branch")
     }
   }
@@ -113,26 +104,12 @@ case object Ne extends TestOperator {
       case _         => throw new RuntimeException("Dead branch")
     }
   }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfEqI256(offset))
-      case Type.U256 => Seq(IfEqU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
 }
 case object Lt extends TestOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Type.I256 => Seq(LtI256)
       case Type.U256 => Seq(LtU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfGeI256(offset))
-      case Type.U256 => Seq(IfGeU256(offset))
       case _         => throw new RuntimeException("Dead branch")
     }
   }
@@ -145,13 +122,6 @@ case object Le extends TestOperator {
       case _         => throw new RuntimeException("Dead branch")
     }
   }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfGtI256(offset))
-      case Type.U256 => Seq(IfGtU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
 }
 case object Gt extends TestOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
@@ -161,26 +131,12 @@ case object Gt extends TestOperator {
       case _         => throw new RuntimeException("Dead branch")
     }
   }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfLeI256(offset))
-      case Type.U256 => Seq(IfLeU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
 }
 case object Ge extends TestOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
       case Type.I256 => Seq(GeI256)
       case Type.U256 => Seq(GeU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfLtI256(offset))
-      case Type.U256 => Seq(IfLtU256(offset))
       case _         => throw new RuntimeException("Dead branch")
     }
   }
@@ -197,9 +153,6 @@ case object Not extends LogicalOperator {
   }
 
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
-
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] =
-    Seq(IfTrue(offset))
 }
 sealed trait BinaryLogicalOperator extends LogicalOperator {
   override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
@@ -212,13 +165,7 @@ sealed trait BinaryLogicalOperator extends LogicalOperator {
 }
 case object And extends BinaryLogicalOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(AndBool)
-
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] =
-    Seq(IfNotAnd(offset))
 }
 case object Or extends BinaryLogicalOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(OrBool)
-
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] =
-    Seq(IfNotOr(offset))
 }

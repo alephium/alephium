@@ -163,13 +163,11 @@ object Ast {
     @inline def getCondIR[Ctx <: StatelessContext](
         condition: Expr[Ctx],
         state: Compiler.State[Ctx],
-        offset: Byte
+        offset: Int
     ): Seq[Instr[Ctx]] = {
       condition match {
-        case Binop(op: TestOperator, left, right) =>
-          left.genCode(state) ++ right.genCode(state) ++ op.toBranchIR(left.getType(state), offset)
-        case UnaryOp(op: LogicalOperator, expr) =>
-          expr.genCode(state) ++ op.toBranchIR(expr.getType(state), offset)
+        case UnaryOp(Not, expr) =>
+          expr.genCode(state) :+ IfTrue(offset)
         case _ =>
           condition.genCode(state) :+ IfFalse(offset)
       }
@@ -280,13 +278,13 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val elseIRs  = elseBranch.flatMap(_.genCode(state))
-      val offsetIR = if (elseIRs.nonEmpty) Seq(Forward(elseIRs.length.toByte)) else Seq.empty
+      val offsetIR = if (elseIRs.nonEmpty) Seq(Jump(elseIRs.length)) else Seq.empty
       val ifIRs    = ifBranch.flatMap(_.genCode(state)) ++ offsetIR
       if (ifIRs.length > 0xff || elseIRs.length > 0xff) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
-      val condIR = Statement.getCondIR(condition, state, ifIRs.length.toByte)
+      val condIR = Statement.getCondIR(condition, state, ifIRs.length)
       condIR ++ ifIRs ++ elseIRs
     }
   }
@@ -302,13 +300,13 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val bodyIR   = body.flatMap(_.genCode(state))
-      val condIR   = Statement.getCondIR(condition, state, (bodyIR.length + 1).toByte)
+      val condIR   = Statement.getCondIR(condition, state, bodyIR.length + 1)
       val whileLen = condIR.length + bodyIR.length + 1
       if (whileLen > 0xff) {
         // TODO: support long branches
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
-      condIR ++ bodyIR :+ Backward(whileLen.toByte)
+      condIR ++ bodyIR :+ Jump(-whileLen)
     }
   }
   final case class ReturnStmt[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]])
