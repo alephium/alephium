@@ -74,10 +74,25 @@ trait FlowUtils
   def updateGrandPoolUnsafe(
       mainGroup: GroupIndex,
       newDeps: BlockDeps,
+      oldDeps: BlockDeps,
+      maxHeightGap: Int
+  ): AVector[TransactionTemplate] = {
+    val newHeight = getHeightUnsafe(newDeps.uncleHash(mainGroup))
+    val oldHeight = getHeightUnsafe(oldDeps.uncleHash(mainGroup))
+    if (newHeight <= oldHeight + maxHeightGap) {
+      updateMemPoolUnsafe(mainGroup, newDeps, oldDeps)
+      getMemPool(mainGroup).updatePendingPool()
+    } else { // we don't update tx pool when the node is syncing
+      AVector.empty
+    }
+  }
+
+  def updateGrandPoolUnsafe(
+      mainGroup: GroupIndex,
+      newDeps: BlockDeps,
       oldDeps: BlockDeps
   ): AVector[TransactionTemplate] = {
-    updateMemPoolUnsafe(mainGroup, newDeps, oldDeps)
-    getMemPool(mainGroup).updatePendingPool()
+    updateGrandPoolUnsafe(mainGroup, newDeps, oldDeps, maxSyncBlocksPerChain)
   }
 
   def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps, oldDeps: BlockDeps): Unit = {

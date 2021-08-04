@@ -26,7 +26,7 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Weight
-import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
+import org.alephium.util.{AVector, EitherF, LruCache, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
@@ -123,16 +123,20 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  def contains(hash: BlockHash): IOResult[Boolean]    = blockStateStorage.exists(hash)
-  def containsUnsafe(hash: BlockHash): Boolean        = blockStateStorage.existsUnsafe(hash)
-  def getState(hash: BlockHash): IOResult[BlockState] = blockStateStorage.get(hash)
-  def getStateUnsafe(hash: BlockHash): BlockState     = blockStateStorage.getUnsafe(hash)
-  def getHeight(hash: BlockHash): IOResult[Int]       = blockStateStorage.get(hash).map(_.height)
-  def getHeightUnsafe(hash: BlockHash): Int           = blockStateStorage.getUnsafe(hash).height
-  def getWeight(hash: BlockHash): IOResult[Weight] =
-    blockStateStorage.get(hash).map(_.weight)
-  def getWeightUnsafe(hash: BlockHash): Weight =
-    blockStateStorage.getUnsafe(hash).weight
+  private lazy val stateCache =
+    LruCache[BlockHash, BlockState, IOError](consensusConfig.blockCacheCapacityPerChain)
+  def contains(hash: BlockHash): IOResult[Boolean] =
+    stateCache.exists(hash)(blockStateStorage.exists(hash))
+  def containsUnsafe(hash: BlockHash): Boolean =
+    stateCache.existsUnsafe(hash)(blockStateStorage.existsUnsafe(hash))
+  def getState(hash: BlockHash): IOResult[BlockState] =
+    stateCache.get(hash)(blockStateStorage.get(hash))
+  def getStateUnsafe(hash: BlockHash): BlockState =
+    stateCache.getUnsafe(hash)(blockStateStorage.getUnsafe(hash))
+  def getHeight(hash: BlockHash): IOResult[Int]    = getState(hash).map(_.height)
+  def getHeightUnsafe(hash: BlockHash): Int        = getStateUnsafe(hash).height
+  def getWeight(hash: BlockHash): IOResult[Weight] = getState(hash).map(_.weight)
+  def getWeightUnsafe(hash: BlockHash): Weight     = getStateUnsafe(hash).weight
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 

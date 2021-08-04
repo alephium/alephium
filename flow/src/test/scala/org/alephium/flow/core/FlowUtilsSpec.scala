@@ -199,4 +199,30 @@ class FlowUtilsSpec extends AlephiumSpec {
           .replace(1, block2.nonCoinbase ++ block1.nonCoinbase)
       )
   }
+
+  it should "update mempool when needed" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = transfer(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, chainIndex)
+    val tx0    = block0.nonCoinbase.head.toTemplate
+    val tx1    = block1.nonCoinbase.head.toTemplate
+
+    def test(heightGap: Int, expected: AVector[TransactionTemplate]) = {
+      val blockFlow = isolatedBlockFlow()
+      val mempool   = blockFlow.getMemPool(chainIndex)
+      mempool.addNewTx(chainIndex, tx0)
+      mempool.addNewTx(chainIndex, tx1)
+      mempool.pendingPool.contains(tx0.id) is false
+      mempool.pendingPool.contains(tx1.id) is true
+
+      blockFlow.add(block0) isE ()
+      val oldDeps = blockFlow.getBestDeps(chainIndex.from)
+      val newDeps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+      blockFlow.updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps, heightGap) is expected
+    }
+
+    test(0, AVector.empty)
+    test(1, AVector(tx1))
+  }
 }

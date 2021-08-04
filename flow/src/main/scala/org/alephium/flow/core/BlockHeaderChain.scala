@@ -30,7 +30,7 @@ import org.alephium.util.{AVector, Duration, EitherF, LruCache, TimeStamp}
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
 
-  lazy val headerCache =
+  private lazy val headerCache =
     LruCache[BlockHash, BlockHeader, IOError](consensusConfig.blockCacheCapacityPerChain)
 
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = {
