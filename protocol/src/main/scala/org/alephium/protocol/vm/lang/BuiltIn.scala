@@ -74,13 +74,9 @@ object BuiltIn {
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
         case Type.Bool        => Seq(CheckEqBool)
-        case Type.Byte        => Seq(CheckEqByte)
         case Type.I256        => Seq(CheckEqI256)
         case Type.U256        => Seq(CheckEqU256)
-        case Type.BoolVec     => Seq(CheckEqBoolVec)
         case Type.ByteVec     => Seq(CheckEqByteVec)
-        case Type.I256Vec     => Seq(CheckEqI256Vec)
-        case Type.U256Vec     => Seq(CheckEqU256Vec)
         case Type.Address     => Seq(CheckEqAddress)
         case _: Type.Contract => Seq(CheckEqByteVec)
       }
@@ -110,26 +106,14 @@ object BuiltIn {
     }
   }
   object ConversionBuiltIn {
-    val validTypes: AVector[Type] = AVector(Type.Byte, Type.I256, Type.U256)
+    val validTypes: AVector[Type] = AVector(Type.I256, Type.U256)
   }
 
-  val toByte: ConversionBuiltIn = new ConversionBuiltIn("byte") {
-    override def toType: Type = Type.Byte
-
-    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-      inputType(0) match {
-        case Type.I256 => Seq(I256ToByte)
-        case Type.U256 => Seq(U256ToByte)
-        case _         => throw new RuntimeException("Dead branch")
-      }
-    }
-  }
   val toI256: ConversionBuiltIn = new ConversionBuiltIn("i256") {
     override def toType: Type = Type.I256
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
-        case Type.Byte => Seq(ByteToI256)
         case Type.U256 => Seq(U256ToI256)
         case _         => throw new RuntimeException("Dead branch")
       }
@@ -140,7 +124,6 @@ object BuiltIn {
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType(0) match {
-        case Type.Byte => Seq(ByteToU256)
         case Type.I256 => Seq(I256ToU256)
         case _         => throw new RuntimeException("Dead branch")
       }
@@ -152,7 +135,6 @@ object BuiltIn {
     keccak256,
     checkEq,
     checkSignature,
-    toByte,
     toI256,
     toU256
   ).map(f => f.name -> f).toMap

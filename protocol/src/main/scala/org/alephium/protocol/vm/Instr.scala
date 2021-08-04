@@ -97,16 +97,13 @@ object Instr {
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
     NotBool, AndBool, OrBool,
-                ByteToI256, ByteToU256,
-    I256ToByte,             I256ToU256,
-    U256ToByte, U256ToI256,
+    I256ToU256, U256ToI256,
     Forward, Backward,
     IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
     IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
     IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
     CallLocal, Return,
-    CheckEqBool, CheckEqByte, CheckEqI256, CheckEqU256, CheckEqByteVec,
-    CheckEqBoolVec, CheckEqByteVec, CheckEqI256Vec, CheckEqU256Vec,
+    CheckEqBool, CheckEqI256, CheckEqU256, CheckEqByteVec, CheckEqAddress,
     Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
@@ -543,31 +540,9 @@ sealed trait ConversionInstr[R <: Val, U <: Val]
   }
 }
 
-case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] with GasVeryLow {
-  override def converse(from: Val.Byte): ExeResult[Val.I256] = {
-    Right(Val.I256(util.I256.from(from.v & 0xffL)))
-  }
-}
-case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] with GasVeryLow {
-  override def converse(from: Val.Byte): ExeResult[Val.U256] = {
-    Right(Val.U256(util.U256.unsafe(from.v & 0xffL)))
-  }
-}
-
-case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] with GasVeryLow {
-  override def converse(from: Val.I256): ExeResult[Val.Byte] = {
-    from.v.toByte.map(Val.Byte.apply).toRight(Right(InvalidConversion(from, Val.Byte)))
-  }
-}
 case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] with GasVeryLow {
   override def converse(from: Val.I256): ExeResult[Val.U256] = {
     util.U256.fromI256(from.v).map(Val.U256.apply).toRight(Right(InvalidConversion(from, Val.U256)))
-  }
-}
-
-case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] with GasVeryLow {
-  override def converse(from: Val.U256): ExeResult[Val.Byte] = {
-    from.v.toByte.map(Val.Byte.apply).toRight(Right(InvalidConversion(from, Val.U256)))
   }
 }
 case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryLow {
@@ -787,13 +762,9 @@ sealed trait CheckEqT[T <: Val]
 }
 
 case object CheckEqBool    extends CheckEqT[Val.Bool]
-case object CheckEqByte    extends CheckEqT[Val.Byte]
 case object CheckEqI256    extends CheckEqT[Val.I256]
 case object CheckEqU256    extends CheckEqT[Val.U256]
-case object CheckEqBoolVec extends CheckEqT[Val.BoolVec]
 case object CheckEqByteVec extends CheckEqT[Val.ByteVec]
-case object CheckEqI256Vec extends CheckEqT[Val.I256Vec]
-case object CheckEqU256Vec extends CheckEqT[Val.U256Vec]
 case object CheckEqAddress extends CheckEqT[Val.Address]
 
 sealed abstract class HashAlg[T <: Val, H <: RandomBytes]

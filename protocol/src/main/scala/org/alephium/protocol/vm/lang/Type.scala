@@ -24,31 +24,22 @@ sealed trait Type {
 }
 
 object Type {
-  val primitives: AVector[Type] = AVector[Type](Bool, Byte, I256, U256) ++
-    AVector[Type](BoolVec, ByteVec, I256Vec, U256Vec, Address)
+  val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
   def fromVal(tpe: Val.Type): Type = {
     tpe match {
       case Val.Bool    => Bool
-      case Val.Byte    => Byte
       case Val.I256    => I256
       case Val.U256    => U256
-      case Val.BoolVec => BoolVec
       case Val.ByteVec => ByteVec
-      case Val.I256Vec => I256Vec
-      case Val.U256Vec => U256Vec
       case Val.Address => Address
     }
   }
 
   case object Bool    extends Type { def toVal: Val.Type = Val.Bool    }
-  case object Byte    extends Type { def toVal: Val.Type = Val.Byte    }
   case object I256    extends Type { def toVal: Val.Type = Val.I256    }
   case object U256    extends Type { def toVal: Val.Type = Val.U256    }
-  case object BoolVec extends Type { def toVal: Val.Type = Val.BoolVec }
   case object ByteVec extends Type { def toVal: Val.Type = Val.ByteVec }
-  case object I256Vec extends Type { def toVal: Val.Type = Val.I256Vec }
-  case object U256Vec extends Type { def toVal: Val.Type = Val.U256Vec }
   case object Address extends Type { def toVal: Val.Type = Val.Address }
 
   sealed trait Contract extends Type {
