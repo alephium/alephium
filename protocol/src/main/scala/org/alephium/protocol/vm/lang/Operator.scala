@@ -80,7 +80,7 @@ case object Mod extends ArithOperator {
 
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
-    if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
+    if (argsType.length != 2 || argsType(0) != argsType(1)) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
     } else {
       Seq(Type.Bool)
@@ -90,9 +90,11 @@ sealed trait TestOperator extends Operator {
 case object Eq extends TestOperator {
   override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
     argsType(0) match {
-      case Type.I256 => Seq(EqI256)
-      case Type.U256 => Seq(EqU256)
-      case _         => throw new RuntimeException("Dead branch")
+      case Type.I256    => Seq(EqI256)
+      case Type.U256    => Seq(EqU256)
+      case Type.ByteVec => Seq(EqByteVec)
+      case Type.Address => Seq(EqAddress)
+      case _            => throw new RuntimeException("Dead branch")
     }
   }
 }

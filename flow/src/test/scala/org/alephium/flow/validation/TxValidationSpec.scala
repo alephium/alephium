@@ -572,7 +572,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       s"""
          |AssetScript P2sh {
          |  pub fn main(a: U256) -> () {
-         |    checkEq!(a, $n)
+         |    require!(a == $n)
          |  }
          |}
          |""".stripMargin
@@ -585,7 +585,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     passValidation(validateTx(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
-    failValidation(validateTx(tx1, blockFlow), InvalidUnlockScript(EqualityFailed))
+    failValidation(validateTx(tx1, blockFlow), InvalidUnlockScript(AssertionFailed))
     val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
     val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
     failValidation(validateTx(tx2, blockFlow), InvalidScriptHash)

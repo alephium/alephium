@@ -46,7 +46,7 @@ final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailur
 case object InsufficientArgs                                   extends ExeFailure
 case object InvalidMethodParamsType                            extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
-case object EqualityFailed                                     extends ExeFailure
+case object AssertionFailed                                    extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
 case object PcOverflow                                         extends ExeFailure
 case object InvalidReturnType                                  extends ExeFailure

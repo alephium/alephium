@@ -63,30 +63,12 @@ object BuiltIn {
 
   sealed abstract class GenericStatelessBuiltIn(val name: String) extends BuiltIn[StatelessContext]
 
-  val checkEq: GenericStatelessBuiltIn = new GenericStatelessBuiltIn("checkEq") {
-    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-      if (!(inputType.length == 2) || inputType(0) != inputType(1)) {
-        throw Error(s"Invalid args type $inputType for builtin func $name")
-      } else {
-        Seq.empty
-      }
-    }
-    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-      inputType(0) match {
-        case Type.Bool        => Seq(CheckEqBool)
-        case Type.I256        => Seq(CheckEqI256)
-        case Type.U256        => Seq(CheckEqU256)
-        case Type.ByteVec     => Seq(CheckEqByteVec)
-        case Type.Address     => Seq(CheckEqAddress)
-        case _: Type.Contract => Seq(CheckEqByteVec)
-      }
-    }
-  }
-
   val blake2b: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2bByteVec)
   val keccak256: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256ByteVec)
+  val require: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("require", Seq(Type.Bool), Seq(), Assert)
   val checkSignature: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
 
@@ -133,7 +115,7 @@ object BuiltIn {
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
-    checkEq,
+    require,
     checkSignature,
     toI256,
     toU256

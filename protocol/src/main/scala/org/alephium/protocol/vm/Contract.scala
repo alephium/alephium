@@ -114,7 +114,7 @@ object StatefulScript {
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
-          instrs = AVector(ConstFalse, ConstTrue, CheckEqBool)
+          instrs = AVector(ConstFalse, Assert)
         )
       )
     )

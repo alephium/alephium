@@ -94,14 +94,14 @@ object Instr {
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop,
+    NotBool, AndBool, OrBool,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
-    NotBool, AndBool, OrBool,
     I256ToU256, U256ToI256,
-    Jump,
-    IfTrue, IfFalse,
+    EqByteVec, EqAddress,
+    Jump, IfTrue, IfFalse,
     CallLocal, Return,
-    CheckEqBool, CheckEqI256, CheckEqU256, CheckEqByteVec, CheckEqAddress,
+    Assert,
     Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
   val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
@@ -525,6 +525,21 @@ case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryL
   }
 }
 
+sealed trait EqT[T <: Val]
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasVeryLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      x <- frame.popOpStackT[T]()
+      y <- frame.popOpStackT[T]()
+      _ <- frame.pushOpStack(Val.Bool(x == y))
+    } yield ()
+  }
+}
+case object EqByteVec extends EqT[Val.ByteVec]
+case object EqAddress extends EqT[Val.Address]
+
 sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
 sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}
 sealed trait NewByteVec    extends ObjectInstr with GasSchedule    {}
@@ -614,28 +629,14 @@ case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0
 sealed trait CryptoInstr extends StatelessInstr with GasSchedule                         {}
 sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
 
-sealed trait CheckEqT[T <: Val]
-    extends StatelessInstrSimpleGas
-    with StatelessInstrCompanion0
-    with GasVeryLow {
-  def check(x: T, y: T): ExeResult[Unit] = {
-    if (x == y) okay else failed(EqualityFailed)
-  }
-
+case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasVeryLow {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      x <- frame.popOpStackT[T]()
-      y <- frame.popOpStackT[T]()
-      _ <- check(x, y)
+      predicate <- frame.popOpStackT[Val.Bool]()
+      _         <- if (predicate.v) okay else failed(AssertionFailed)
     } yield ()
   }
 }
-
-case object CheckEqBool    extends CheckEqT[Val.Bool]
-case object CheckEqI256    extends CheckEqT[Val.I256]
-case object CheckEqU256    extends CheckEqT[Val.U256]
-case object CheckEqByteVec extends CheckEqT[Val.ByteVec]
-case object CheckEqAddress extends CheckEqT[Val.Address]
 
 sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
     extends CryptoInstr
