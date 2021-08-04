@@ -135,7 +135,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getBlockHeaderEntryLogic = serverLogic(getBlockHeaderEntry) { hash =>
-    Future.successful(serverUtils.getBlockHeader(blockFlow, GetBlockHeader(hash)))
+    Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
 
   val getBalanceLogic = serverLogic(getBalance) { address =>

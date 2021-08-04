@@ -205,10 +205,17 @@ class ServerUtils(networkType: NetworkType)(implicit
         .map(failedInIO)
     } yield BlockEntry.from(block, height, networkType)
 
-  def getBlockHeader(blockFlow: BlockFlow, query: GetBlockHeader): Try[BlockHeaderEntry] =
+  def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =
     for {
-      blockEntry <- getBlock(blockFlow, GetBlock(query.hash))
-    } yield BlockHeaderEntry.from(blockEntry, blockEntry.height)
+      blockHeader <- blockFlow
+        .getBlockHeader(hash)
+        .left
+        .map(_ => failed(s"Fail fetching block header with hash ${hash}"))
+      height <- blockFlow
+        .getHeight(hash)
+        .left
+        .map(failedInIO)
+    } yield BlockHeaderEntry.from(blockHeader, height)
 
   def getHashesAtHeight(
       blockFlow: BlockFlow,

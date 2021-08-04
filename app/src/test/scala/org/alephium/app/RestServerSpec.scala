@@ -96,16 +96,11 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       servers.foreach { server =>
         Get(s"/blockflow/headers/${dummyBlockHeader.hash.toHexString}", server.port) check {
           response =>
-            val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
-            if (
-              server.brokerConfig
-                .contains(chainIndex.from) || server.brokerConfig.contains(chainIndex.to)
-            ) {
-              response.code is StatusCode.Ok
-              response.as[BlockHeaderEntry] is BlockHeaderEntry.from(dummyBlockEntry, 1)
-            } else {
-              response.code is StatusCode.BadRequest
-            }
+            response.code is StatusCode.Ok
+            response.as[BlockHeaderEntry] is BlockHeaderEntry.from(
+              dummyBlockHeader,
+              dummyBlockEntry.height
+            )
         }
       }
     }
