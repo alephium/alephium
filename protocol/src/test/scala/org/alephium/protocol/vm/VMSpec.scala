@@ -65,7 +65,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     failMainMethod(baseMethod.copy(isPublic = false), failure = ExternalPrivateMethodCall)
   }
 
-  it should "not fail when there is no main method" in new Fixture {
+  it should "fail when there is no main method" in new Fixture {
     failContract(
       StatefulContract(0, AVector.empty),
       failure = InvalidMethodIndex(0)
