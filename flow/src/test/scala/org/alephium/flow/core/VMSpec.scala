@@ -426,6 +426,7 @@ class VMSpec extends AlephiumSpec {
 
   // scalastyle:off method.length
   it should "test operators" in new ContractFixture {
+    // scalastyle:off no.equal
     def expect(out: Int) =
       s"""
          |TxScript Inverse {
@@ -485,6 +486,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
+    // scalastyle:on no.equal
 
     {
       val script = Compiler.compileTxScript(expect(1)).rightValue

@@ -568,6 +568,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "validate p2sh" in new LockupFixture {
+    // scalastyle:off no.equal
     def rawScript(n: Int) =
       s"""
          |AssetScript P2sh {
@@ -576,6 +577,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |  }
          |}
          |""".stripMargin
+    // scalastyle:on no.equal
 
     val script   = Compiler.compileAssetScript(rawScript(51)).rightValue
     val lockup   = LockupScript.p2sh(script)
