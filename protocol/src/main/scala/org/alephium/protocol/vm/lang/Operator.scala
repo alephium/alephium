@@ -77,6 +77,30 @@ case object Mod extends ArithOperator {
     }
   }
 }
+case object ModAdd extends ArithOperator {
+  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+    argsType(0) match {
+      case Type.U256 => Seq(U256ModAdd)
+      case _         => throw new RuntimeException("Expect U256 only")
+    }
+  }
+}
+case object ModSub extends ArithOperator {
+  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+    argsType(0) match {
+      case Type.U256 => Seq(U256ModSub)
+      case _         => throw new RuntimeException("Expect U256 only")
+    }
+  }
+}
+case object ModMul extends ArithOperator {
+  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+    argsType(0) match {
+      case Type.U256 => Seq(U256ModMul)
+      case _         => throw new RuntimeException("Expect U256 only")
+    }
+  }
+}
 
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {

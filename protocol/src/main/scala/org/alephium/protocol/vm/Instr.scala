@@ -97,6 +97,7 @@ object Instr {
     NotBool, AndBool, OrBool,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
+    U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
     I256ToU256, U256ToI256,
     EqByteVec, EqAddress,
     Jump, IfTrue, IfFalse,
@@ -340,6 +341,15 @@ object BinaryArithmeticInstr {
     ArithmeticError(s"Arithmetic error: $op($a, $b)")
   }
 
+  @inline def i256Op(
+      instr: ArithmeticInstr,
+      op: (util.I256, util.I256) => util.I256
+  )(x: Val, y: Val): ExeResult[Val.I256] =
+    (x, y) match {
+      case (a: Val.I256, b: Val.I256) => Right(Val.I256.apply(op(a.v, b.v)))
+      case _                          => failed(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
   @inline def i256SafeOp(
       instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Option[util.I256]
@@ -348,6 +358,15 @@ object BinaryArithmeticInstr {
       case (a: Val.I256, b: Val.I256) =>
         op(a.v, b.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(a, b, instr)))
       case _ => failed(BinaryArithmeticInstr.error(x, y, instr))
+    }
+
+  @inline def u256Op(
+      instr: ArithmeticInstr,
+      op: (util.U256, util.U256) => util.U256
+  )(x: Val, y: Val): ExeResult[Val.U256] =
+    (x, y) match {
+      case (a: Val.U256, b: Val.U256) => Right(Val.U256.apply(op(a.v, b.v)))
+      case _                          => failed(BinaryArithmeticInstr.error(x, y, instr))
     }
 
   @inline def u256SafeOp(
@@ -441,6 +460,38 @@ object U256Div extends BinaryArithmeticInstr with GasLow {
 object U256Mod extends BinaryArithmeticInstr with GasLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mod(_))(x, y)
+}
+object U256ModAdd extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, _.modAdd(_))(x, y)
+}
+object U256ModSub extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, _.modSub(_))(x, y)
+}
+object U256ModMul extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, _.modMul(_))(x, y)
+}
+object U256BitAnd extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, _.bitAnd(_))(x, y)
+}
+object U256BitOr extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, _.bitOr(_))(x, y)
+}
+object U256Xor extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, _.xor(_))(x, y)
+}
+object U256SHL extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, (x, y) => x.shl(y))(x, y)
+}
+object U256SHR extends BinaryArithmeticInstr with GasLow {
+  protected def op(x: Val, y: Val): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(this, (x, y) => x.shr(y))(x, y)
 }
 object EqU256 extends BinaryArithmeticInstr with GasVeryLow {
   protected def op(x: Val, y: Val): ExeResult[Val] =

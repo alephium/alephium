@@ -21,7 +21,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.validation.BlockValidation
+import org.alephium.flow.validation.{BlockValidation, ExistInvalidTx, TxScriptExeFailed}
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -422,6 +422,40 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     createContract(input, 2, 2)
+  }
+
+  it should "find modulo inverse" in new ContractFixture {
+    def expect(out: Int) =
+      s"""
+         |TxScript Inverse {
+         |  pub fn main() -> () {
+         |    let x = 10973
+         |    let mut y = 1
+         |    let mut i = 0
+         |    while (i <= 8) {
+         |      y = y ⊗ (2 ⊖ x ⊗ y)
+         |      i = i + 1
+         |    }
+         |    let r = x ⊗ y
+         |    require!(r == $out)
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      val script = Compiler.compileTxScript(expect(1)).rightValue
+      val block  = simpleScript(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+    }
+
+    {
+      val script = Compiler.compileTxScript(expect(2)).rightValue
+      val block  = simpleScript(blockFlow, chainIndex, script)
+      val blockValidation =
+        BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+      blockValidation.validate(block, blockFlow).leftValue.rightValue is
+        ExistInvalidTx(TxScriptExeFailed(AssertionFailed))
+    }
   }
 
   behavior of "constant product market"

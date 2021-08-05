@@ -21,7 +21,13 @@ import java.math.BigInteger
 class U256Spec extends AlephiumSpec {
   val numGen = (0 to 3).flatMap { i =>
     val n = BigInteger.valueOf(i.toLong)
-    List(n, U256.MaxValue.divUnsafe(U256.Two).toBigInt.add(n), U256.MaxValue.toBigInt.subtract(n))
+    List(
+      n,
+      U256.MaxValue.divUnsafe(U256.Two).toBigInt.add(n),
+      U256.MaxValue.toBigInt.subtract(n),
+      SecureAndSlowRandom.nextU256().toBigInt,
+      SecureAndSlowRandom.nextU256().toBigInt
+    )
   }
 
   it should "be bounded properly" in {
@@ -89,14 +95,58 @@ class U256Spec extends AlephiumSpec {
     test(_.mod(_), _.modUnsafe(_), _.remainder(_), _ > BigInteger.ZERO)
   }
 
-  it should "compare U256" in {
+  def test[R, S](
+      op: (U256, U256) => R,
+      opExpected: (BigInteger, BigInteger) => S,
+      r2s: R => S
+  ): Unit = {
     for {
       a <- numGen
       b <- numGen
     } {
       val aU256 = U256.unsafe(a)
       val bU256 = U256.unsafe(b)
-      aU256.compareTo(bU256) is a.compareTo(b)
+      r2s(op(aU256, bU256)) is opExpected(a, b)
+    }
+  }
+
+  it should "test mod_add" in {
+    test[U256, BigInteger](_.modAdd(_), _.add(_).mod(U256.upperBound), _.toBigInt)
+  }
+
+  it should "test mod_sub" in {
+    test[U256, BigInteger](_.modSub(_), _.subtract(_).mod(U256.upperBound), _.toBigInt)
+  }
+
+  it should "test mod_mul" in {
+    test[U256, BigInteger](_.modMul(_), _.multiply(_).mod(U256.upperBound), _.toBigInt)
+  }
+
+  it should "test bit_and" in {
+    test[U256, BigInteger](_.bitAnd(_), _.and(_), _.toBigInt)
+  }
+
+  it should "test bit_or" in {
+    test[U256, BigInteger](_.bitOr(_), _.or(_), _.toBigInt)
+  }
+
+  it should "test xor" in {
+    test[U256, BigInteger](_.xor(_), _.xor(_), _.toBigInt)
+  }
+
+  it should "compare U256" in {
+    test[Int, Int](_.compareTo(_), _.compareTo(_), identity)
+  }
+
+  it should "test shift" in {
+    for {
+      x <- numGen
+      n <- Seq(0, 1, 2, 8, 16, 64, 256, Int.MaxValue).map(U256.unsafe) ++ numGen.map(U256.unsafe)
+    } {
+      val xU256    = U256.unsafe(x)
+      val nBounded = if (n > U256.unsafe(256)) 256 else n.toBigInt.intValue()
+      xU256.shl(n).toBigInt is x.shiftLeft(nBounded).mod(U256.upperBound)
+      xU256.shr(n).toBigInt is x.shiftRight(nBounded).mod(U256.upperBound)
     }
   }
 
@@ -105,6 +155,16 @@ class U256Spec extends AlephiumSpec {
     for (u256 <- cases) {
       U256.unsafe(u256.toBytes) is u256
     }
+  }
+
+  it should "bound bigint" in {
+    for (n <- numGen) {
+      U256.boundNonNegative(U256.upperBound.add(n)) is U256.unsafe(n)
+    }
+    assertThrows[AssertionError](U256.boundNonNegative(BigInteger.valueOf(-1)))
+
+    U256.boundSub(U256.Zero.v.subtract(U256.MaxValue.v)) is U256.One
+    U256.boundSub(U256.MaxValue.v.subtract(U256.Zero.v)) is U256.MaxValue
   }
 
   it should "construct from Long" in {
