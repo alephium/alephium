@@ -105,6 +105,15 @@ trait EndpointsExamples extends ErrorExamples {
     miningCount = U256.unsafe(1000)
   )
 
+  private val blockHeaderEntry = BlockHeaderEntry(
+    hash = blockHash,
+    timestamp = ts,
+    chainFrom = 1,
+    chainTo = 2,
+    height = height,
+    deps = AVector(blockHash, blockHash)
+  )
+
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   val minerActionExamples: List[Example[MinerAction]] = List(
@@ -123,6 +132,9 @@ trait EndpointsExamples extends ErrorExamples {
         isMining = true
       )
     )
+
+  implicit val getBlockHeaderEntryExample: List[Example[BlockHeaderEntry]] =
+    simpleExample(blockHeaderEntry)
 
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(

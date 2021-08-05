@@ -40,6 +40,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getGroup,
     getHashesAtHeight,
     getChainInfo,
+    getBlockHeaderEntry,
     listUnconfirmedTransactions,
     buildTransaction,
     buildSweepAllTransaction,

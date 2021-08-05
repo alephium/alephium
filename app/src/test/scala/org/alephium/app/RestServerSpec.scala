@@ -91,6 +91,21 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
     }
   }
 
+  it should "call GET /blockflow/headers/<hash>" in new RestServerFixture {
+    withServers {
+      servers.foreach { server =>
+        Get(s"/blockflow/headers/${dummyBlockHeader.hash.toHexString}", server.port) check {
+          response =>
+            response.code is StatusCode.Ok
+            response.as[BlockHeaderEntry] is BlockHeaderEntry.from(
+              dummyBlockHeader,
+              dummyBlockEntry.height
+            )
+        }
+      }
+    }
+  }
+
   it should "call GET /addresses/<address>/balance" in new RestServerFixture {
     withServers {
       val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)

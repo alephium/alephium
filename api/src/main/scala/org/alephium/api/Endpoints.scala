@@ -278,6 +278,13 @@ trait Endpoints
       .in("metrics")
       .out(alfPlainTextBody)
       .summary("Exports all prometheus metrics")
+
+  val getBlockHeaderEntry: BaseEndpoint[BlockHash, BlockHeaderEntry] =
+    blockflowEndpoint.get
+      .in("headers")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[BlockHeaderEntry])
+      .summary("Get block header")
 }
 
 object Endpoints {

@@ -79,6 +79,7 @@ class RestServer(
       getGroupLogic,
       getHashesAtHeightLogic,
       getChainInfoLogic,
+      getBlockHeaderEntryLogic,
       listUnconfirmedTransactionsLogic,
       buildTransactionLogic,
       buildSweepAllTransactionLogic,
