@@ -187,7 +187,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |AssetScript P2PKH {
          |  pub fn verify(pk: ByteVec) -> () {
          |    let hash = #${hash.toHexString}
-         |    require!(hash == blake2b!(pk))
+         |    assert!(hash == blake2b!(pk))
          |    checkSignature!(pk)
          |    return
          |  }
@@ -198,7 +198,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val pubKeyHash       = Hash.hash(pubKey.bytes)
     val signature        = SignatureSchema.sign(Hash.zero.bytes, priKey)
 
-    val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
+    val script = Compiler.compileAssetScript(input(pubKeyHash)).rightValue
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args = AVector[Val](Val.ByteVec.from(pubKey))

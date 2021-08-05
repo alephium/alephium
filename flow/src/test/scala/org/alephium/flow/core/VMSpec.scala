@@ -437,7 +437,7 @@ class VMSpec extends AlephiumSpec {
          |      i = i + 1
          |    }
          |    let r = x ⊗ y
-         |    require!(r == $out)
+         |    assert!(r == $out)
          |  }
          |}
          |""".stripMargin

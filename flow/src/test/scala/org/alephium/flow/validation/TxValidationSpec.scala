@@ -572,7 +572,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       s"""
          |AssetScript P2sh {
          |  pub fn main(a: U256) -> () {
-         |    require!(a == $n)
+         |    assert!(a == $n)
          |  }
          |}
          |""".stripMargin

@@ -67,8 +67,8 @@ object BuiltIn {
     SimpleStatelessBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2bByteVec)
   val keccak256: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256ByteVec)
-  val require: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("require", Seq(Type.Bool), Seq(), Assert)
+  val assert: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
   val checkSignature: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
 
@@ -115,7 +115,7 @@ object BuiltIn {
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
-    require,
+    assert,
     checkSignature,
     toI256,
     toU256
