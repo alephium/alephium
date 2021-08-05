@@ -120,6 +120,8 @@ trait ApiModelCodec {
 
   implicit val fetchResponseRW: RW[FetchResponse] = macroRW
 
+  implicit val unconfirmedTransactionsRW: RW[UnconfirmedTransactions] = macroRW
+
   implicit val outputRefRW: RW[OutputRef] = macroRW
 
   implicit val tokenRW: RW[Token] = macroRW

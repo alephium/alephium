@@ -21,10 +21,12 @@ import scala.concurrent._
 import sttp.client3.Request
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.{StatusCode, Uri}
+import sttp.tapir.DecodeResult
 import sttp.tapir.client.sttp.SttpClientInterpreter
 
 import org.alephium.api.{ApiError, BaseEndpoint}
 import org.alephium.api.model.ApiKey
+import org.alephium.util.Utils.getStackTrace
 
 // scalastyle:off method.length
 trait EndpointSender extends BaseEndpoint with SttpClientInterpreter {
@@ -38,8 +40,21 @@ trait EndpointSender extends BaseEndpoint with SttpClientInterpreter {
       params: I,
       uri: Uri
   ): Request[Either[ApiError[_ <: StatusCode], O], Any] = {
-    toRequestThrowDecodeFailures(endpoint.endpoint, Some(uri)).apply((maybeApiKey, params))
+    toRequest(endpoint.endpoint, Some(uri))
+      .apply((maybeApiKey, params))
+      .mapResponse(handleDecodeFailures)
   }
+
+  private def handleDecodeFailures[O](
+      dr: DecodeResult[Either[ApiError[_ <: StatusCode], O]]
+  ): Either[ApiError[_ <: StatusCode], O] =
+    dr match {
+      case DecodeResult.Value(v) => v
+      case DecodeResult.Error(_, e) =>
+        logger.error(getStackTrace(e))
+        Left(ApiError.InternalServerError(e.getMessage))
+      case f => Left(ApiError.InternalServerError(s"Cannot decode: $f"))
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def send[A, B](endpoint: BaseEndpoint[A, B], params: A, uri: Uri)(implicit

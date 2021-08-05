@@ -186,8 +186,8 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.getChainInfo(blockFlow, chainIndex))
   }
 
-  val listUnconfirmedTransactionsLogic = serverLogic(listUnconfirmedTransactions) { chainIndex =>
-    Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow, chainIndex))
+  val listUnconfirmedTransactionsLogic = serverLogic(listUnconfirmedTransactions) { _ =>
+    Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow))
   }
 
   type BaseServerEndpoint[A, B] = ServerEndpoint[A, ApiError[_ <: StatusCode], B, Any, Future]

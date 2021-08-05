@@ -20,7 +20,7 @@ import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.UtxoUtils
-import org.alephium.protocol.{ALF, Hash, PrivateKey, SignatureSchema}
+import org.alephium.protocol.{ALF, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasBox
@@ -537,6 +537,46 @@ class ServerUtilsSpec extends AlephiumSpec {
       .leftValue
 
     buildTransaction.detail is "Different groups for transaction outputs"
+  }
+
+  it should "return mempool statuses" in new Fixture with Generators {
+
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils()
+
+    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow)
+
+    emptyMempool.rightValue is AVector.empty[UnconfirmedTransactions]
+
+    val chainIndex                         = chainIndexGen.sample.get
+    val fromGroup                          = chainIndex.from
+    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
+    val destination                        = generateDestination(chainIndex)
+
+    val buildTransaction = serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, AVector(destination))
+      )
+      .rightValue
+
+    val txTemplate = signAndAddToMemPool(
+      buildTransaction.txId,
+      buildTransaction.unsignedTx,
+      chainIndex,
+      fromPrivateKey
+    )
+
+    val txs = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+
+    txs is AVector(
+      UnconfirmedTransactions(
+        chainIndex.from.value,
+        chainIndex.to.value,
+        AVector(Tx.fromTemplate(txTemplate))
+      )
+    )
   }
 
   private def generateDestination(

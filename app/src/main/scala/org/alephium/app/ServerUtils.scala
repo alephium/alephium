@@ -82,14 +82,21 @@ class ServerUtils(implicit
   }
 
   def listUnconfirmedTransactions(
-      blockFlow: BlockFlow,
-      chainIndex: ChainIndex
-  ): Try[AVector[Tx]] = {
+      blockFlow: BlockFlow
+  ): Try[AVector[UnconfirmedTransactions]] = {
     Right(
-      blockFlow
-        .getMemPool(chainIndex)
-        .getAll(chainIndex)
-        .map(Tx.fromTemplate(_))
+      brokerConfig.chainIndexes
+        .map { chainIndex =>
+          UnconfirmedTransactions(
+            chainIndex.from.value,
+            chainIndex.to.value,
+            blockFlow
+              .getMemPool(chainIndex)
+              .getAll(chainIndex)
+              .map(Tx.fromTemplate(_))
+          )
+        }
+        .filter(_.unconfirmedTransactions.nonEmpty)
     )
   }
 

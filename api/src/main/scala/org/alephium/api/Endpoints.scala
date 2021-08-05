@@ -190,11 +190,10 @@ trait Endpoints
       .summary("Get infos about the chain from the given groups")
 
   //have to be lazy to let `groupConfig` being initialized
-  lazy val listUnconfirmedTransactions: BaseEndpoint[ChainIndex, AVector[Tx]] =
+  lazy val listUnconfirmedTransactions: BaseEndpoint[Unit, AVector[UnconfirmedTransactions]] =
     transactionsEndpoint.get
       .in("unconfirmed")
-      .in(chainIndexQuery)
-      .out(jsonBody[AVector[Tx]])
+      .out(jsonBody[AVector[UnconfirmedTransactions]])
       .summary("List unconfirmed transactions")
 
   val buildTransaction: BaseEndpoint[BuildTransaction, BuildTransactionResult] =

@@ -164,6 +164,13 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     }
   }
 
+  it should "call GET /transactions/unconfirmed" in {
+    Get(s"/transactions/unconfirmed?fromGroup=0&toGroup=0") check { response =>
+      response.code is StatusCode.Ok
+      response.as[AVector[UnconfirmedTransactions]] is AVector.empty[UnconfirmedTransactions]
+    }
+  }
+
   it should "call GET /blockflow/chains" in {
     Get(s"/blockflow/chains?fromGroup=1&toGroup=1") check { response =>
       response.code is StatusCode.Ok
@@ -183,13 +190,6 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     }
     Get(s"/blockflow/chains?fromGroup=1&toGroup=10") check { response =>
       response.code is StatusCode.BadRequest
-    }
-  }
-
-  it should "call GET /transactions/unconfirmed" in {
-    Get(s"/transactions/unconfirmed?fromGroup=0&toGroup=0") check { response =>
-      response.code is StatusCode.Ok
-      response.as[AVector[Tx]] is AVector.empty[Tx]
     }
   }
 

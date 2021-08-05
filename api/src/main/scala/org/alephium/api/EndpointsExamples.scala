@@ -177,17 +177,13 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val misbehaviorsExamples: List[Example[AVector[PeerMisbehavior]]] =
     simpleExample(AVector(PeerMisbehavior(inetAddress, PeerStatus.Penalty(42))))
 
-  implicit val txsExamples: List[Example[AVector[Tx]]] =
-    simpleExample(
-      AVector(
-        tx
-      )
-    )
-
   implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
 
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(AVector(AVector(blockEntry))))
+
+  implicit val unconfirmedTransactionsExamples: List[Example[AVector[UnconfirmedTransactions]]] =
+    simpleExample(AVector(UnconfirmedTransactions(0, 1, AVector(tx))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
