@@ -19,6 +19,9 @@ package org.alephium.protocol.vm.lang
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
+import org.alephium.protocol.vm.lang.ArithOperator._
+import org.alephium.protocol.vm.lang.LogicalOperator._
+import org.alephium.protocol.vm.lang.TestOperator._
 import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
 
 class ParserSpec extends AlephiumSpec {

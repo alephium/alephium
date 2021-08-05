@@ -24,6 +24,9 @@ import fastparse.NoWhitespace._
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.Val.ByteVec
+import org.alephium.protocol.vm.lang.ArithOperator._
+import org.alephium.protocol.vm.lang.LogicalOperator._
+import org.alephium.protocol.vm.lang.TestOperator._
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -111,6 +114,11 @@ object Lexer {
   def opModAdd[_: P]: P[Operator]     = P("⊕" | "`+`").map(_ => ModAdd)
   def opModSub[_: P]: P[Operator]     = P("⊖" | "`-`").map(_ => ModSub)
   def opModMul[_: P]: P[Operator]     = P("⊗" | "`*`").map(_ => ModMul)
+  def opSHL[_: P]: P[Operator]        = P("<<").map(_ => SHL)
+  def opSHR[_: P]: P[Operator]        = P(">>").map(_ => SHR)
+  def opBitAnd[_: P]: P[Operator]     = P("&").map(_ => BitAnd)
+  def opXor[_: P]: P[Operator]        = P("^").map(_ => Xor)
+  def opBitOr[_: P]: P[Operator]      = P("|").map(_ => BitOr)
   def opEq[_: P]: P[TestOperator]     = P("==").map(_ => Eq)
   def opNe[_: P]: P[TestOperator]     = P("!=").map(_ => Ne)
   def opLt[_: P]: P[TestOperator]     = P("<").map(_ => Lt)

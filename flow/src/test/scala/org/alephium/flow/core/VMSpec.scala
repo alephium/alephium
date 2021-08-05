@@ -424,7 +424,8 @@ class VMSpec extends AlephiumSpec {
     createContract(input, 2, 2)
   }
 
-  it should "find modulo inverse" in new ContractFixture {
+  // scalastyle:off method.length
+  it should "test operators" in new ContractFixture {
     def expect(out: Int) =
       s"""
          |TxScript Inverse {
@@ -438,6 +439,49 @@ class VMSpec extends AlephiumSpec {
          |    }
          |    let r = x ⊗ y
          |    assert!(r == $out)
+         |
+         |    test()
+         |  }
+         |
+         |  fn test() -> () {
+         |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0)
+         |
+         |    let x = 0
+         |    let y = 1
+         |    assert!(x << 1 == 0)
+         |    assert!(x >> 1 == 0)
+         |    assert!(y << 1 == 2)
+         |    assert!(y >> 1 == 0)
+         |    assert!(y << 255 != 0)
+         |    assert!(y << 256 == 0)
+         |    assert!(x & x == 0)
+         |    assert!(x & y == 0)
+         |    assert!(y & y == 1)
+         |    assert!(x | x == 0)
+         |    assert!(x | y == 1)
+         |    assert!(y | y == 1)
+         |    assert!(x ^ x == 0)
+         |    assert!(x ^ y == 1)
+         |    assert!(y ^ y == 0)
+         |
+         |    assert!((x < y) == true)
+         |    assert!((x <= y) == true)
+         |    assert!((x < x) == false)
+         |    assert!((x <= x) == true)
+         |    assert!((x > y) == false)
+         |    assert!((x >= y) == false)
+         |    assert!((x > x) == false)
+         |    assert!((x >= x) == true)
+         |
+         |    assert!((true && true) == true)
+         |    assert!((true && false) == false)
+         |    assert!((false && false) == false)
+         |    assert!((true || true) == true)
+         |    assert!((true || false) == true)
+         |    assert!((false || false) == false)
+         |    
+         |    assert!(!true == false)
+         |    assert!(!false == true)
          |  }
          |}
          |""".stripMargin
@@ -457,6 +501,7 @@ class VMSpec extends AlephiumSpec {
         ExistInvalidTx(TxScriptExeFailed(AssertionFailed))
     }
   }
+  // scalastyle:on method.length
 
   behavior of "constant product market"
 

@@ -17,6 +17,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.vm.{Contract => VmContract, _}
+import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods

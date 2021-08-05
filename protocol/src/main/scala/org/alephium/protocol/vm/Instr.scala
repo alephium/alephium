@@ -94,7 +94,7 @@ object Instr {
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop,
-    NotBool, AndBool, OrBool,
+    NotBool, AndBool, OrBool, EqBool,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
     U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
@@ -545,6 +545,15 @@ case object OrBool extends LogicInstr with GasVeryLow {
       bool2 <- frame.popOpStackT[Val.Bool]()
       bool1 <- frame.popOpStackT[Val.Bool]()
       _     <- frame.pushOpStack(bool1.or(bool2))
+    } yield ()
+  }
+}
+case object EqBool extends LogicInstr with GasVeryLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      bool2 <- frame.popOpStackT[Val.Bool]()
+      bool1 <- frame.popOpStackT[Val.Bool]()
+      _     <- frame.pushOpStack(Val.Bool(bool1 == bool2))
     } yield ()
   }
 }

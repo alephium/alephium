@@ -20,6 +20,7 @@ import org.alephium.crypto.Byte32
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
 class LexerSpec extends AlephiumSpec {
