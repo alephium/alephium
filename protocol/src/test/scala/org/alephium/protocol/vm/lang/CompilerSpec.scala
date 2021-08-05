@@ -394,7 +394,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract Operator() {
          |  pub fn main() -> (U256, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
-         |    let y = 1 < 2 <= 2 < 3
+         |    let y = (1 < 2) && (2 <= 2) && (2 < 3)
          |    let z = !false && false || false
          |
          |    return x, y, z

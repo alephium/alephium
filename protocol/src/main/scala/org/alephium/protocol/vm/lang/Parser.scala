@@ -19,7 +19,6 @@ package org.alephium.protocol.vm.lang
 import fastparse._
 
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
-import org.alephium.protocol.vm.lang.LogicalOperator.And
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
@@ -48,27 +47,14 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.Binop(op, acc, right)
       }
     }
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def chainBool[_: P](p: => P[Ast.Expr[Ctx]], op: => P[TestOperator]): P[Ast.Expr[Ctx]] =
-    P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
-      if (rhs.isEmpty) {
-        lhs
-      } else {
-        val (op, right) = rhs(0)
-        val acc         = Ast.Binop(op, lhs, right)
-        rhs.tail
-          .foldLeft((acc, right)) { case ((acc, last), (op, right)) =>
-            (Ast.Binop(And, acc, Ast.Binop(op, last, right)), right)
-          }
-          ._1
-      }
-    }
 
   // Optimize chained comparisons
-  def expr[_: P]: P[Ast.Expr[Ctx]]         = P(chainBool(andExpr, Lexer.opOr))
-  def andExpr[_: P]: P[Ast.Expr[Ctx]]      = P(chainBool(relationExpr, Lexer.opAnd))
-  def relationExpr[_: P]: P[Ast.Expr[Ctx]] = P(chainBool(arithExpr5, comparision))
-  def comparision[_: P]: P[TestOperator] =
+  def expr[_: P]: P[Ast.Expr[Ctx]]         = P(chain(andExpr, Lexer.opOr))
+  def andExpr[_: P]: P[Ast.Expr[Ctx]]      = P(chain(relationExpr, Lexer.opAnd))
+  def relationExpr[_: P]: P[Ast.Expr[Ctx]] = P(comp | arithExpr5)
+  def comp[_: P]: P[Ast.Expr[Ctx]] =
+    P(arithExpr5 ~ comparison ~ arithExpr5).map { case (lhs, op, rhs) => Ast.Binop(op, lhs, rhs) }
+  def comparison[_: P]: P[TestOperator] =
     P(Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)
   def arithExpr5[_: P]: P[Ast.Expr[Ctx]] =
     P(chain(arithExpr4, Lexer.opBitOr))

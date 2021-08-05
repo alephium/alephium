@@ -47,15 +47,7 @@ class ParserSpec extends AlephiumSpec {
         Variable(Ident("u"))
       )
     fastparse.parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
-      Binop[StatelessContext](
-        And,
-        Binop(
-          And,
-          Binop(Lt, Variable(Ident("x")), Variable(Ident("y"))),
-          Binop(Le, Variable(Ident("y")), Variable(Ident("y")))
-        ),
-        Binop(Lt, Variable(Ident("y")), Variable(Ident("z")))
-      )
+      Binop[StatelessContext](Lt, Variable(Ident("x")), Variable(Ident("y")))
     fastparse.parse("x && y || z", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Or,

@@ -479,7 +479,7 @@ class VMSpec extends AlephiumSpec {
          |    assert!((true || true) == true)
          |    assert!((true || false) == true)
          |    assert!((false || false) == false)
-         |    
+         |
          |    assert!(!true == false)
          |    assert!(!false == true)
          |  }
