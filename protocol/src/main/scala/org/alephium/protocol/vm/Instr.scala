@@ -657,7 +657,7 @@ object ControlCompanion {
   def validate(n: Int): Boolean = (n <= (1 << 16)) && (n >= -(1 << 16))
 
   val offsetSerde: Serde[Int] = serdeImpl[Int].validate(offset =>
-    if (validate(offset)) Right(()) else Left(s"Invalid off set $offset")
+    if (validate(offset)) Right(()) else Left(s"Invalid offset $offset")
   )
 }
 
