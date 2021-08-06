@@ -17,20 +17,22 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.switch
-import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 
 import akka.util.ByteString
 
 import org.alephium.crypto._
+import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.serde.{deserialize => decode, _}
 import org.alephium.util
-import org.alephium.util.{AVector, Bytes, Collection}
+import org.alephium.util.{AVector, Bytes}
 
 // scalastyle:off file.size.limit number.of.types
 
 sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
+  def code: Byte
+
   def serialize(): ByteString
 
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
@@ -78,15 +80,15 @@ object Instr {
   }
 
   def getStatelessCompanion(byte: Byte): Option[InstrCompanion[StatelessContext]] = {
-    Collection.get(statelessInstrs, Bytes.toPosInt(byte))
+    statelessInstrs(Bytes.toPosInt(byte))
   }
 
   def getStatefulCompanion(byte: Byte): Option[InstrCompanion[StatefulContext]] = {
-    Collection.get(statefulInstrs, Bytes.toPosInt(byte))
+    statefulInstrs(Bytes.toPosInt(byte))
   }
 
   // format: off
-  val statelessInstrs: ArraySeq[InstrCompanion[StatelessContext]] = ArraySeq(
+  val statelessInstrs0: AVector[InstrCompanion[StatelessContext]] = AVector(
     ConstTrue, ConstFalse,
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
@@ -105,16 +107,38 @@ object Instr {
     Assert,
     Blake2bByteVec, Keccak256ByteVec, CheckSignature
   )
-  val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
-    ArraySeq[InstrCompanion[StatefulContext]](
-      LoadField, StoreField, CallExternal,
-      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
-      TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-      CreateContract, SelfAddress, SelfTokenId, IssueToken
-    )
+  val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
+    LoadField, StoreField, CallExternal,
+    ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
+    TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
+    CreateContract, SelfAddress, SelfTokenId, IssueToken
+  )
   // format: on
 
-  val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
+  val toCode: Map[InstrCompanion[_ <: StatelessContext], Int] = {
+    val instrs0: AVector[InstrCompanion[_ <: StatelessContext]] =
+      AVector(CallLocal, CallExternal, Return)
+    val instrs1: AVector[InstrCompanion[_ <: StatelessContext]] =
+      statelessInstrs0.filter(!instrs0.contains(_)).as[InstrCompanion[_]]
+    val instrs2: AVector[InstrCompanion[_ <: StatelessContext]] =
+      statefulInstrs0.filter(!instrs0.contains(_)).as[InstrCompanion[_]]
+    (instrs0.mapWithIndex((instr, index) => (instr, index)) ++
+      instrs1.mapWithIndex((instr, index) => (instr, index + 3)) ++
+      instrs2.mapWithIndex((instr, index) => (instr, index + 160))).toIterable.toMap
+  }
+
+  val statelessInstrs: AVector[Option[InstrCompanion[StatelessContext]]] = {
+    val table = Array.fill[Option[InstrCompanion[StatelessContext]]](256)(None)
+    statelessInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
+    AVector.unsafe(table)
+  }
+
+  val statefulInstrs: AVector[Option[InstrCompanion[StatefulContext]]] = {
+    val table = Array.fill[Option[InstrCompanion[StatefulContext]]](256)(None)
+    statelessInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
+    statefulInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
+    AVector.unsafe(table)
+  }
 }
 
 sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
@@ -244,32 +268,37 @@ object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsa
 object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
+@ByteCode
 final case class I256Const(const: Val.I256) extends ConstInstr1[Val.I256] {
   override def serialize(): ByteString =
-    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(const.v)
+    ByteString(code) ++ serdeImpl[util.I256].serialize(const.v)
 }
 object I256Const extends StatelessInstrCompanion1[Val.I256]
+@ByteCode
 final case class U256Const(const: Val.U256) extends ConstInstr1[Val.U256] {
   override def serialize(): ByteString =
-    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(const.v)
+    ByteString(code) ++ serdeImpl[util.U256].serialize(const.v)
 }
 object U256Const extends StatelessInstrCompanion1[Val.U256]
 
+@ByteCode
 final case class BytesConst(const: Val.ByteVec) extends ConstInstr1[Val.ByteVec] {
   override def serialize(): ByteString =
-    ByteString(BytesConst.code) ++ serdeImpl[Val.ByteVec].serialize(const)
+    ByteString(code) ++ serdeImpl[Val.ByteVec].serialize(const)
 }
 object BytesConst extends StatelessInstrCompanion1[Val.ByteVec]
 
+@ByteCode
 final case class AddressConst(const: Val.Address) extends ConstInstr1[Val.Address] {
   override def serialize(): ByteString =
-    ByteString(AddressConst.code) ++ serdeImpl[Val.Address].serialize(const)
+    ByteString(code) ++ serdeImpl[Val.Address].serialize(const)
 }
 object AddressConst extends StatelessInstrCompanion1[Val.Address]
 
 // Note: 0 <= index <= 0xFF
+@ByteCode
 final case class LoadLocal(index: Byte) extends OperandStackInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(LoadLocal.code, index)
+  override def serialize(): ByteString = ByteString(code, index)
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.getLocalVal(Bytes.toPosInt(index))
@@ -278,8 +307,9 @@ final case class LoadLocal(index: Byte) extends OperandStackInstr with GasVeryLo
   }
 }
 object LoadLocal extends StatelessInstrCompanion1[Byte]
+@ByteCode
 final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(StoreLocal.code, index)
+  override def serialize(): ByteString = ByteString(code, index)
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.popOpStack()
@@ -290,8 +320,9 @@ final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryL
 object StoreLocal extends StatelessInstrCompanion1[Byte]
 
 sealed trait FieldInstr extends StatefulInstrSimpleGas with GasSimple {}
+@ByteCode
 final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(LoadField.code, index)
+  override def serialize(): ByteString = ByteString(code, index)
   override def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.getField(Bytes.toPosInt(index))
@@ -300,8 +331,9 @@ final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
   }
 }
 object LoadField extends StatefulInstrCompanion1[Byte]
+@ByteCode
 final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(StoreField.code, index)
+  override def serialize(): ByteString = ByteString(code, index)
   override def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.popOpStack()
@@ -614,7 +646,7 @@ sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh {
   override def serialize(): ByteString = ByteString(code) ++ serdeImpl[Int].serialize(offset)
 }
 
-trait ControlCompanion[T <: StatelessInstr] extends InstrCompanion[StatelessContext] {
+sealed trait ControlCompanion[T <: StatelessInstr] extends InstrCompanion[StatelessContext] {
   def apply(offset: Int): T
 
   override def deserialize[C <: StatelessContext](input: ByteString): SerdeResult[Staging[T]] = {
@@ -629,9 +661,8 @@ object ControlCompanion {
   )
 }
 
+@ByteCode
 final case class Jump(offset: Int) extends ControlInstr {
-  override def code: Byte = Jump.code
-
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.offsetPC(offset)
   }
@@ -648,29 +679,30 @@ sealed trait IfJumpInstr extends ControlInstr {
     } yield ()
   }
 }
+@ByteCode
 final case class IfTrue(offset: Int) extends IfJumpInstr {
-  override def code: Byte = IfTrue.code
-
   override def condition(value: Val.Bool): Boolean = value.v
 }
-case object IfTrue extends ControlCompanion[IfTrue]
-final case class IfFalse(offset: Int) extends IfJumpInstr {
-  override def code: Byte = IfFalse.code
+object IfTrue extends ControlCompanion[IfTrue]
 
+@ByteCode
+final case class IfFalse(offset: Int) extends IfJumpInstr {
   override def condition(value: Val.Bool): Boolean = !value.v
 }
-case object IfFalse extends ControlCompanion[IfFalse]
+object IfFalse extends ControlCompanion[IfFalse]
 
 sealed trait CallInstr
+@ByteCode
 final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr with GasCall {
-  override def serialize(): ByteString = ByteString(CallLocal.code, index)
+  override def serialize(): ByteString = ByteString(code, index)
 
   // Implemented in frame instead
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallLocal extends StatelessInstrCompanion1[Byte]
+@ByteCode
 final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr with GasCall {
-  override def serialize(): ByteString = ByteString(CallExternal.code, index)
+  override def serialize(): ByteString = ByteString(code, index)
 
   // Implemented in frame instead
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???

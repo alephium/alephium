@@ -59,20 +59,20 @@ object ArithOperator {
     }
   }
 
-  val Add = binary(I256Add, U256Add)
-  val Sub = binary(I256Sub, U256Sub)
-  val Mul = binary(I256Mul, U256Mul)
-  val Div = binary(I256Div, U256Div)
-  val Mod = binary(I256Mod, U256Mod)
+  val Add: ArithOperator = binary(I256Add, U256Add)
+  val Sub: ArithOperator = binary(I256Sub, U256Sub)
+  val Mul: ArithOperator = binary(I256Mul, U256Mul)
+  val Div: ArithOperator = binary(I256Div, U256Div)
+  val Mod: ArithOperator = binary(I256Mod, U256Mod)
 
-  val ModAdd = u256Binary("ModAdd", U256ModAdd)
-  val ModSub = u256Binary("ModSub", U256ModSub)
-  val ModMul = u256Binary("ModMul", U256ModMul)
-  val SHL    = u256Binary("SHL", U256SHL)
-  val SHR    = u256Binary("SHR", U256SHR)
-  val BitAnd = u256Binary("BitAnd", U256BitAnd)
-  val BitOr  = u256Binary("BitOr", U256BitOr)
-  val Xor    = u256Binary("Xor", U256Xor)
+  val ModAdd: ArithOperator = u256Binary("ModAdd", U256ModAdd)
+  val ModSub: ArithOperator = u256Binary("ModSub", U256ModSub)
+  val ModMul: ArithOperator = u256Binary("ModMul", U256ModMul)
+  val SHL: ArithOperator    = u256Binary("SHL", U256SHL)
+  val SHR: ArithOperator    = u256Binary("SHR", U256SHR)
+  val BitAnd: ArithOperator = u256Binary("BitAnd", U256BitAnd)
+  val BitOr: ArithOperator  = u256Binary("BitOr", U256BitOr)
+  val Xor: ArithOperator    = u256Binary("Xor", U256Xor)
 }
 
 sealed trait TestOperator extends Operator {
@@ -113,11 +113,11 @@ object TestOperator {
     }
   }
 
-  val Ne = inequality(NeI256, NeU256)
-  val Lt = inequality(LtI256, LtU256)
-  val Le = inequality(LeI256, LeU256)
-  val Gt = inequality(GtI256, GtU256)
-  val Ge = inequality(GeI256, GeU256)
+  val Ne: TestOperator = inequality(NeI256, NeU256)
+  val Lt: TestOperator = inequality(LtI256, LtU256)
+  val Le: TestOperator = inequality(LeI256, LeU256)
+  val Gt: TestOperator = inequality(GtI256, GtU256)
+  val Ge: TestOperator = inequality(GeI256, GeU256)
 }
 
 sealed trait LogicalOperator extends TestOperator

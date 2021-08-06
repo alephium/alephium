@@ -339,7 +339,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
   it should "serde instructions" in {
     Instr.statefulInstrs.foreach {
-      case instrCompanion: StatefulInstrCompanion0 =>
+      case Some(instrCompanion: StatefulInstrCompanion0) =>
         deserialize[Instr[StatefulContext]](
           instrCompanion.serialize()
         ).toOption.get is instrCompanion

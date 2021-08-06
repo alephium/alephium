@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import scala.annotation.tailrec
+import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
 import org.alephium.util.{AVector, Bytes}
@@ -98,7 +98,31 @@ abstract class Frame[Ctx <: StatelessContext] {
     } yield Some(frame)
   }
 
-  def execute(): ExeResult[Option[Frame[Ctx]]]
+  def callExternal(index: Byte): ExeResult[Option[Frame[Ctx]]]
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  @tailrec final def execute(): ExeResult[Option[Frame[Ctx]]] = {
+    if (pc < pcMax) {
+      val instr = method.instrs(pc)
+      (instr.code: @switch) match {
+        case 0 => callLocal(instr.asInstanceOf[CallLocal].index)
+        case 1 => callExternal(instr.asInstanceOf[CallExternal].index)
+        case 2 => runReturn()
+        case _ =>
+          // No flatMap for tailrec
+          instr.runWith(this) match {
+            case Right(_) =>
+              advancePC()
+              execute()
+            case Left(e) => Left(e)
+          }
+      }
+    } else if (pc == pcMax) {
+      runReturn()
+    } else {
+      failed(PcOverflow)
+    }
+  }
 
   protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
     Return.runWith(this).map(_ => None)
@@ -120,30 +144,9 @@ final class StatelessFrame(
     } yield frame
   }
 
-  // Should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState] = ???
-
-  @tailrec
-  override def execute(): ExeResult[Option[Frame[StatelessContext]]] = {
-    if (pc < pcMax) {
-      method.instrs(pc) match {
-        case CallLocal(index) => callLocal(index)
-        case Return           => runReturn()
-        case instr            =>
-          // No flatMap for tailrec
-          instr.runWith(this) match {
-            case Right(_) =>
-              advancePC()
-              execute()
-            case Left(e) => Left(e)
-          }
-      }
-    } else if (pc == pcMax) {
-      runReturn()
-    } else {
-      failed(PcOverflow)
-    }
-  }
+  // the following should not be used in stateless context
+  def balanceStateOpt: Option[BalanceState]                                 = ???
+  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
 }
 
 final class StatefulFrame(
@@ -214,29 +217,6 @@ final class StatefulFrame(
       contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
       newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
     } yield Some(newFrame)
-  }
-
-  @tailrec
-  override def execute(): ExeResult[Option[Frame[StatefulContext]]] = {
-    if (pc < pcMax) {
-      method.instrs(pc) match {
-        case CallLocal(index)    => callLocal(index)
-        case CallExternal(index) => callExternal(index)
-        case Return              => runReturn()
-        case instr               =>
-          // No flatMap for tailrec
-          instr.runWith(this) match {
-            case Right(_) =>
-              advancePC()
-              execute()
-            case Left(e) => Left(e)
-          }
-      }
-    } else if (pc == pcMax) {
-      runReturn()
-    } else {
-      failed(PcOverflow)
-    }
   }
 }
 
