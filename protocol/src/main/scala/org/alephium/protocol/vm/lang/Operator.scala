@@ -34,8 +34,8 @@ sealed trait ArithOperator extends Operator {
 }
 object ArithOperator {
   private def binary(
-      i256Instr: BinaryArithmeticInstr,
-      u256Instr: BinaryArithmeticInstr
+      i256Instr: BinaryArithmeticInstr[Val.I256],
+      u256Instr: BinaryArithmeticInstr[Val.U256]
   ): ArithOperator = {
     new ArithOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
@@ -48,7 +48,7 @@ object ArithOperator {
     }
   }
 
-  private def u256Binary(name: String, instr: BinaryArithmeticInstr): ArithOperator = {
+  private def u256Binary(name: String, instr: BinaryArithmeticInstr[Val.U256]): ArithOperator = {
     new ArithOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
         argsType(0) match {
@@ -99,8 +99,8 @@ object TestOperator {
   }
 
   private def inequality(
-      i256Instr: BinaryArithmeticInstr,
-      u256Instr: BinaryArithmeticInstr
+      i256Instr: BinaryArithmeticInstr[Val.I256],
+      u256Instr: BinaryArithmeticInstr[Val.U256]
   ): TestOperator = {
     new TestOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
