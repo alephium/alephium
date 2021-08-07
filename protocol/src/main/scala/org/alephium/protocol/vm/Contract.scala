@@ -58,16 +58,18 @@ object Method {
 sealed trait Contract[Ctx <: StatelessContext] {
   def fieldLength: Int
   def methods: AVector[Method[Ctx]]
+  def hash: Hash
 }
 
-sealed abstract class Script[Ctx <: StatelessContext] extends Contract[Ctx] {
+sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   def fieldLength: Int = 0
 
   def toObject: ScriptObj[Ctx]
 }
 
 final case class StatelessScript(methods: AVector[Method[StatelessContext]])
-    extends Script[StatelessContext] {
+    extends HashSerde[StatelessScript]
+    with Script[StatelessContext] {
   override def toObject: ScriptObj[StatelessContext] = {
     StatelessScriptObject(this)
   }
@@ -79,7 +81,8 @@ object StatelessScript {
 }
 
 final case class StatefulScript private (methods: AVector[Method[StatefulContext]])
-    extends Script[StatefulContext] {
+    extends HashSerde[StatefulScript]
+    with Script[StatefulContext] {
   def entryMethod: Method[StatefulContext] = methods.head
 
   override def toObject: ScriptObj[StatefulContext] = {
@@ -125,13 +128,12 @@ final case class StatefulContract(
     methods: AVector[Method[StatefulContext]]
 ) extends HashSerde[StatefulContract]
     with Contract[StatefulContext] {
-  override lazy val hash: Hash = _getHash
 
   def check(initialFields: AVector[Val]): ExeResult[Unit] = {
     if (validate(initialFields)) {
       okay
     } else {
-      failed(InvalidFieldType)
+      failed(InvalidFieldLength)
     }
   }
 
@@ -156,9 +158,16 @@ object StatefulContract {
 }
 
 sealed trait ContractObj[Ctx <: StatelessContext] {
-  def addressOpt: Option[Hash]
+  def contractIdOpt: Option[ContractId]
   def code: Contract[Ctx]
   def fields: mutable.ArraySeq[Val]
+
+  def getContractId(): ExeResult[ContractId] = contractIdOpt.toRight(Right(ExpectAContract))
+
+  def getAddress(): ExeResult[Val.Address] =
+    getContractId().map(id => Val.Address(LockupScript.p2c(id)))
+
+  def getCodeHash(): Val.ByteVec = Val.ByteVec(mutable.ArraySeq.make(code.hash.bytes.toArray))
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
     code.methods.get(index).toRight(Right(InvalidMethodIndex(index)))
@@ -180,7 +189,7 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 }
 
 sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
-  val addressOpt: Option[Hash]      = None
+  val contractIdOpt: Option[Hash]   = None
   val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
 }
 
@@ -192,9 +201,9 @@ final case class StatefulContractObject private (
     code: StatefulContract,
     initialFields: AVector[Val],
     fields: mutable.ArraySeq[Val],
-    address: ContractId
+    contractId: ContractId
 ) extends ContractObj[StatefulContext] {
-  override def addressOpt: Option[ContractId] = Some(address)
+  override def contractIdOpt: Option[ContractId] = Some(contractId)
 
   def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
 }
@@ -203,8 +212,8 @@ object StatefulContractObject {
   def apply(
       code: StatefulContract,
       initialFields: AVector[Val],
-      address: ContractId
+      contractId: ContractId
   ): StatefulContractObject = {
-    new StatefulContractObject(code, initialFields, initialFields.toArray, address)
+    new StatefulContractObject(code, initialFields, initialFields.toArray, contractId)
   }
 }

@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
+import org.alephium.protocol.model.ContractId
 import org.alephium.util.{AVector, Bytes}
 
 abstract class Frame[Ctx <: StatelessContext] {
@@ -29,6 +30,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def locals: Array[Val]
   def returnTo: AVector[Val] => ExeResult[Unit]
   def ctx: Ctx
+
+  def getCallerFrame(): ExeResult[Frame[Ctx]]
 
   def balanceStateOpt: Option[BalanceState]
 
@@ -63,6 +66,13 @@ abstract class Frame[Ctx <: StatelessContext] {
         case _: ClassCastException => failed(InvalidType(elem))
       }
     }
+
+  def popContractId(): ExeResult[ContractId] = {
+    for {
+      byteVec     <- popOpStackT[Val.ByteVec]()
+      contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
+    } yield contractKey
+  }
 
   def getLocalVal(index: Int): ExeResult[Val] = {
     if (locals.isDefinedAt(index)) Right(locals(index)) else failed(InvalidLocalIndex)
@@ -146,6 +156,7 @@ final class StatelessFrame(
 
   // the following should not be used in stateless context
   def balanceStateOpt: Option[BalanceState]                                 = ???
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                  = ???
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
 }
 
@@ -157,8 +168,13 @@ final class StatefulFrame(
     val locals: Array[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
+    val callerFrameOpt: Option[Frame[StatefulContext]],
     val balanceStateOpt: Option[BalanceState]
 ) extends Frame[StatefulContext] {
+  def getCallerFrame(): ExeResult[Frame[StatefulContext]] = {
+    callerFrameOpt.toRight(Right(NoCaller))
+  }
+
   private def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
@@ -168,7 +184,7 @@ final class StatefulFrame(
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
           val newFrameBalances = currentBalances.useApproved()
-          contractObj.addressOpt match {
+          contractObj.contractIdOpt match {
             case Some(contractId) =>
               ctx
                 .useContractAsset(contractId)
@@ -191,7 +207,7 @@ final class StatefulFrame(
       method             <- getMethod(index)
       newBalanceStateOpt <- getNewFrameBalancesState(obj, method)
       frame <-
-        Frame.stateful(ctx, newBalanceStateOpt, obj, method, opStack, opStack.push)
+        Frame.stateful(ctx, Some(this), newBalanceStateOpt, obj, method, opStack, opStack.push)
     } yield frame
   }
 
@@ -205,17 +221,24 @@ final class StatefulFrame(
       _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
       frame <-
-        Frame.stateful(ctx, newBalanceStateOpt, contractObj, method, opStack, opStack.push)
+        Frame.stateful(
+          ctx,
+          Some(this),
+          newBalanceStateOpt,
+          contractObj,
+          method,
+          opStack,
+          opStack.push
+        )
     } yield frame
   }
 
   def callExternal(index: Byte): ExeResult[Option[Frame[StatefulContext]]] = {
     advancePC()
     for {
-      _           <- ctx.chargeGas(GasSchedule.callGas)
-      byteVec     <- popOpStackT[Val.ByteVec]()
-      contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
-      newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
+      _          <- ctx.chargeGas(GasSchedule.callGas)
+      contractId <- popContractId()
+      newFrame   <- externalMethodFrame(contractId, Bytes.toPosInt(index))
     } yield Some(newFrame)
   }
 }
@@ -244,6 +267,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
+      callerFrame: Option[Frame[StatefulContext]],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
@@ -261,6 +285,7 @@ object Frame {
         _,
         returnTo,
         ctx,
+        callerFrame,
         balanceStateOpt
       )
     )
@@ -268,6 +293,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
+      callerFrame: Option[Frame[StatefulContext]],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
@@ -286,6 +312,7 @@ object Frame {
         _,
         returnTo,
         ctx,
+        callerFrame,
         balanceStateOpt
       )
     )

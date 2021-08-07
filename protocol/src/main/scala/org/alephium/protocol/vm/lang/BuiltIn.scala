@@ -202,11 +202,28 @@ object BuiltIn {
   val selfAddress: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)
 
+  val selfContractId: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("selfContractId", Seq.empty, Seq(Type.ByteVec), SelfContractId)
+
   val selfTokenId: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("selfTokenId", Seq.empty, Seq(Type.ByteVec), SelfTokenId)
+    SimpleStatefulBuiltIn("selfTokenId", Seq.empty, Seq(Type.ByteVec), SelfContractId)
 
   val issueToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("issueToken", Seq(Type.U256), Seq.empty, IssueToken)
+
+  val callerAddress: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("callerAddress", Seq.empty, Seq(Type.Address), CallerAddress)
+
+  val callerCodeHash: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("callerCodeHash", Seq.empty, Seq(Type.ByteVec), CallerCodeHash)
+
+  val contractCodeHash: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "contractCodeHash",
+      Seq(Type.ByteVec),
+      Seq(Type.ByteVec),
+      ContractCodeHash
+    )
 
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
     statelessFuncs ++ Seq(
@@ -222,7 +239,11 @@ object BuiltIn {
       transferTokenToSelf,
       createContract,
       selfAddress,
+      selfContractId,
       selfTokenId,
-      issueToken
+      issueToken,
+      callerAddress,
+      callerCodeHash,
+      contractCodeHash
     ).map(f => f.name -> f)
 }

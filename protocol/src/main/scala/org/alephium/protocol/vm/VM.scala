@@ -205,7 +205,7 @@ final class StatefulVM(
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, None, obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, None, None, obj, method, args, operandStack, returnTo)
 
   def startPayableFrame(
       obj: ContractObj[StatefulContext],
@@ -216,7 +216,7 @@ final class StatefulVM(
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, Some(balanceState), obj, method, args, operandStack, returnTo)
+    Frame.stateful(ctx, None, Some(balanceState), obj, method, args, operandStack, returnTo)
 
   protected def switchBackFrame(
       currentFrame: Frame[StatefulContext],

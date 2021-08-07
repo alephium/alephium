@@ -144,4 +144,16 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
     Compiler.compileState(stateRaw).rightValue is AVector.from(expected)
   }
+
+  it should "parse bytes and address" in {
+    val hash    = Hash.random
+    val address = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    fastparse
+      .parse(
+        s"foo.foo(#${hash.toHexString}, #${hash.toHexString}, @${address.toBase58})",
+        StatefulParser.contractCall(_)
+      )
+      .get
+      .value is a[ContractCall]
+  }
 }

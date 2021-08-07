@@ -50,7 +50,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileTxScript(scriptRaw).toOption.get
+    Compiler.compileTxScript(scriptRaw).rightValue
   }
 
   it should "not start with private function" in new FlowFixture {
@@ -182,7 +182,7 @@ class VMSpec extends AlephiumSpec {
     val genesisAddress = Address.Asset(NetworkType.Testnet, genesisLockup)
 
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
-      val contract = Compiler.compileContract(input).toOption.get
+      val contract = Compiler.compileContract(input).rightValue
       val txScript = contractCreation(contract, initialState, genesisLockup, dustUtxoAmount)
       val block    = payableCall(blockFlow, chainIndex, txScript)
 
@@ -377,11 +377,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Foo(mut x: U256) {
-         |  pub payable fn foo() -> () {
-         |    issueToken!(10000000)
-         |  }
-         |}
+         |$input
          |""".stripMargin
     val script = Compiler.compileTxScript(main).toOption.get
 
@@ -504,6 +500,61 @@ class VMSpec extends AlephiumSpec {
     }
   }
   // scalastyle:on method.length
+
+  it should "test contract instructions" in new ContractFixture {
+    def createContract(input: String): (String, String, String) = {
+      val contractId    = createContract(input, initialState = AVector.empty).key
+      val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+      val contractState = worldState.getContractState(contractId).rightValue
+      val address =
+        Address.Contract(networkSetting.networkType, LockupScript.p2c(contractId)).toBase58
+      (contractId.toHexString, address, contractState.code.hash.toHexString)
+    }
+
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo(fooId: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
+         |    assert!(selfContractId!() == fooId)
+         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
+         |    assert!(contractCodeHash!(barId) == barCodeHash)
+         |    assert!(callerAddress!() == barAddress)
+         |    assert!(callerCodeHash!() == barCodeHash)
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, _, fooHash) = createContract(foo)
+
+    val bar =
+      s"""
+         |TxContract Bar() {
+         |  pub fn bar(fooId: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
+         |    assert!(selfContractId!() == barId)
+         |    assert!(selfAddress!() == barAddress)
+         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
+         |    assert!(contractCodeHash!(barId) == barCodeHash)
+         |    Foo(#$fooId).foo(fooId, fooCodeHash, barId, barCodeHash, barAddress)
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val (barId, barAddress, barHash) = createContract(bar)
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    Bar(#$barId).bar(#$fooId, #$fooHash, #$barId, #$barHash, @$barAddress)
+         |  }
+         |}
+         |
+         |$bar
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val block  = simpleScript(blockFlow, chainIndex, script)
+    addAndCheck(blockFlow, block)
+  }
 
   behavior of "constant product market"
 

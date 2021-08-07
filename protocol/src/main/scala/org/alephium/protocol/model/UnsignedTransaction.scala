@@ -16,9 +16,9 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{ALF, Hash, HashSerde}
+import org.alephium.protocol.{ALF, HashSerde}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -37,8 +37,6 @@ final case class UnsignedTransaction(
     inputs: AVector[TxInput],
     fixedOutputs: AVector[AssetOutput]
 ) extends HashSerde[UnsignedTransaction] {
-  override lazy val hash: Hash = _getHash
-
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = {
     inputs.head.fromGroup

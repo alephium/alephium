@@ -38,6 +38,7 @@ case object InvalidParameters                                  extends ExeFailur
 case object InvalidLocalIndex                                  extends ExeFailure
 case object InvalidLocalType                                   extends ExeFailure
 case object InvalidFieldIndex                                  extends ExeFailure
+case object InvalidFieldLength                                 extends ExeFailure
 case object InvalidFieldType                                   extends ExeFailure
 case object NoReturnVal                                        extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
@@ -73,6 +74,7 @@ case object ContractAssetAlreadyInUsing                        extends ExeFailur
 case object ContractAssetAlreadyFlushed                        extends ExeFailure
 case object ContractAssetUnloaded                              extends ExeFailure
 case object EmptyContractAsset                                 extends ExeFailure
+case object NoCaller                                           extends ExeFailure
 
 sealed trait IOFailure {
   def error: IOError

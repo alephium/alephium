@@ -16,16 +16,13 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{Hash, HashSerde}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.UnlockScript
 import org.alephium.serde._
 import org.alephium.util.Bytes
 
-final case class TxInput(outputRef: AssetOutputRef, unlockScript: UnlockScript)
-    extends HashSerde[TxInput] {
-  def hash: Hash = _getHash
-
+final case class TxInput(outputRef: AssetOutputRef, unlockScript: UnlockScript) {
   def fromGroup(implicit config: GroupConfig): GroupIndex = outputRef.fromGroup
 }
 

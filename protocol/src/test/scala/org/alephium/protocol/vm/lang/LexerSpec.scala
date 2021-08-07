@@ -16,8 +16,10 @@
 
 package org.alephium.protocol.vm.lang
 
+import scala.collection.mutable
+
 import org.alephium.crypto.Byte32
-import org.alephium.protocol.PublicKey
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.{Address, NetworkType}
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.lang.ArithOperator._
@@ -53,5 +55,14 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("⊕", Lexer.opModAdd(_)).get.value is ModAdd
     fastparse.parse("⊖", Lexer.opModSub(_)).get.value is ModSub
     fastparse.parse("⊗", Lexer.opModMul(_)).get.value is ModMul
+  }
+
+  it should "parse bytes and address" in {
+    val hash    = Hash.random
+    val address = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    fastparse.parse(s"#${hash.toHexString}", Lexer.bytes(_)).get.value is
+      Val.ByteVec(mutable.ArraySeq.make(hash.bytes.toArray))
+    fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
+      Val.Address(address.lockupScript)
   }
 }

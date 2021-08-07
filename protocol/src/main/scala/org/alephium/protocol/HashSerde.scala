@@ -19,7 +19,7 @@ package org.alephium.protocol
 import org.alephium.serde.{serialize, Serde}
 
 abstract class HashSerde[T: Serde] { self: T =>
-  def hash: Hash
+  lazy val hash: Hash = _getHash
 
   protected def _getHash: Hash = Hash.hash(serialize[T](this))
 

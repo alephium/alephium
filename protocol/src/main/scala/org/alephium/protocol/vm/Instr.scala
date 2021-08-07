@@ -111,7 +111,8 @@ object Instr {
     LoadField, StoreField, CallExternal,
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-    CreateContract, SelfAddress, SelfTokenId, IssueToken
+    CreateContract, SelfAddress, SelfContractId, IssueToken,
+    CallerAddress, CallerCodeHash, ContractCodeHash
   )
   // format: on
 
@@ -844,7 +845,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
 
 sealed trait Transfer extends AssetInstr {
   def getContractLockupScript[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
-    frame.obj.addressOpt.toRight(Right(ExpectAContract)).map(LockupScript.p2c)
+    frame.obj.getContractId().map(LockupScript.p2c)
   }
 
   def transferAlf[C <: StatefulContext](
@@ -972,18 +973,17 @@ object CreateContract extends ContractInstr with GasCreate {
 object SelfAddress extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
-      _           <- frame.pushOpStack(Val.Address(LockupScript.p2c(addressHash)))
+      address <- frame.obj.getAddress()
+      _       <- frame.pushOpStack(address)
     } yield ()
   }
 }
 
-object SelfTokenId extends ContractInstr with GasVeryLow {
+object SelfContractId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
-      tokenId = addressHash // tokenId is addressHash
-      _ <- frame.pushOpStack(Val.ByteVec(mutable.ArraySeq.from(tokenId.bytes)))
+      contractId <- frame.obj.getContractId()
+      _          <- frame.pushOpStack(Val.ByteVec(mutable.ArraySeq.from(contractId.bytes)))
     } yield ()
   }
 }
@@ -991,13 +991,43 @@ object SelfTokenId extends ContractInstr with GasVeryLow {
 object IssueToken extends ContractInstr with GasBalance {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _           <- Either.cond(frame.method.isPayable, (), Right(NonPayableFrame))
-      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
-      amount      <- frame.popOpStackT[Val.U256]()
-      tokenId = addressHash // tokenId is addressHash
+      _          <- Either.cond(frame.method.isPayable, (), Right(NonPayableFrame))
+      contractId <- frame.obj.getContractId()
+      amount     <- frame.popOpStackT[Val.U256]()
+      tokenId = contractId // tokenId is addressHash
       _ <- frame.ctx.outputBalances
-        .addToken(LockupScript.p2c(addressHash), tokenId, amount.v)
+        .addToken(LockupScript.p2c(contractId), tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
+    } yield ()
+  }
+}
+
+// only return the address when the caller is a contract
+object CallerAddress extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      address     <- callerFrame.obj.getAddress()
+      _           <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
+
+object CallerCodeHash extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      _           <- frame.pushOpStack(callerFrame.obj.getCodeHash())
+    } yield ()
+  }
+}
+
+object ContractCodeHash extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractId <- frame.popContractId()
+      contract   <- frame.ctx.loadContract(contractId)
+      _          <- frame.pushOpStack(contract.getCodeHash())
     } yield ()
   }
 }
