@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import scala.collection.immutable
 import scala.collection.mutable
 
 import org.alephium.macros.HashSerde
@@ -168,7 +169,7 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
   def getAddress(): ExeResult[Val.Address] =
     getContractId().map(id => Val.Address(LockupScript.p2c(id)))
 
-  def getCodeHash(): Val.ByteVec = Val.ByteVec(mutable.ArraySeq.make(code.hash.bytes.toArray))
+  def getCodeHash(): Val.ByteVec = Val.ByteVec(immutable.ArraySeq.from(code.hash.bytes))
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
     code.methods.get(index).toRight(Right(InvalidMethodIndex(index)))

@@ -263,7 +263,7 @@ object Serde extends ProductSerde {
 
   private[serde] class BatchDeserializer[T: ClassTag](deserializer: Deserializer[T]) {
     @tailrec
-    private def __deserializeSeq[C <: mutable.IndexedSeq[T]](
+    private def __deserializeSeq[C <: IndexedSeq[T]](
         rest: ByteString,
         index: Int,
         length: Int,
@@ -281,7 +281,7 @@ object Serde extends ProductSerde {
       }
     }
 
-    final def _deserializeSeq[C <: mutable.IndexedSeq[T]](
+    final def _deserializeSeq[C <: IndexedSeq[T]](
         size: Int,
         input: ByteString,
         newBuilder: => mutable.Builder[T, C]
@@ -380,7 +380,7 @@ object Serde extends ProductSerde {
       }
     }
 
-  private[serde] def dynamicSizeSerde[C <: mutable.IndexedSeq[T], T: ClassTag](
+  private[serde] def dynamicSizeSerde[C <: IndexedSeq[T], T: ClassTag](
       serde: Serde[T],
       newBuilder: => mutable.Builder[T, C]
   ): Serde[C] =

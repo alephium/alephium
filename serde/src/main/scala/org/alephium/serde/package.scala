@@ -19,7 +19,7 @@ package org.alephium
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress, UnknownHostException}
 
-import scala.collection.mutable
+import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 import akka.util.ByteString
@@ -82,14 +82,14 @@ package object serde {
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
     Serde.avectorSerde[T](serde)
 
-  implicit val boolArraySeqSerde: Serde[mutable.ArraySeq[Boolean]] = arraySeqSerde[Boolean]
-  implicit val byteArraySeqSerde: Serde[mutable.ArraySeq[Byte]]    = arraySeqSerde[Byte]
-  implicit val intArraySeqSerde: Serde[mutable.ArraySeq[Int]]      = arraySeqSerde[Int]
-  implicit val i256ArraySeqSerde: Serde[mutable.ArraySeq[I256]]    = arraySeqSerde[I256]
-  implicit val u256ArraySeqSerde: Serde[mutable.ArraySeq[U256]]    = arraySeqSerde[U256]
+  implicit val boolArraySeqSerde: Serde[ArraySeq[Boolean]] = arraySeqSerde[Boolean]
+  implicit val byteArraySeqSerde: Serde[ArraySeq[Byte]]    = arraySeqSerde[Byte]
+  implicit val intArraySeqSerde: Serde[ArraySeq[Int]]      = arraySeqSerde[Int]
+  implicit val i256ArraySeqSerde: Serde[ArraySeq[I256]]    = arraySeqSerde[I256]
+  implicit val u256ArraySeqSerde: Serde[ArraySeq[U256]]    = arraySeqSerde[U256]
 
-  implicit def arraySeqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[mutable.ArraySeq[T]] =
-    dynamicSizeSerde(serde, mutable.ArraySeq.newBuilder)
+  implicit def arraySeqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[ArraySeq[T]] =
+    dynamicSizeSerde[ArraySeq[T], T](serde, ArraySeq.newBuilder)
 
   implicit val bigIntegerSerde: Serde[BigInteger] =
     avectorSerde[Byte].xmap(vc => new BigInteger(vc.toArray), bi => AVector.unsafe(bi.toByteArray))

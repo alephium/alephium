@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.mutable.ArraySeq
+import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 

@@ -16,13 +16,14 @@
 
 package org.alephium.protocol.vm
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol
 import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol
 import org.alephium.protocol.model.minimalGas
 import org.alephium.serde._
 import org.alephium.util._
@@ -237,7 +238,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(100), Val.U256(1), Val.U256(99)))
@@ -246,7 +247,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "fail when there is no token balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       TokenRemaining
     )
     fail(instrs, NoTokenBalanceForTheAddress)
@@ -260,13 +261,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address0),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       U256Const(Val.U256(10)),
       ApproveToken,
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
@@ -303,7 +304,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "fail when no enough balance for approval" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       U256Const(Val.U256(10)),
       ApproveToken
     )
@@ -318,7 +319,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       TransferAlf,
       AddressConst(address1),
       AddressConst(address0),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       U256Const(Val.U256(1)),
       TransferToken,
       AddressConst(address0),
@@ -326,7 +327,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
       TokenRemaining
     )
 

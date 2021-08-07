@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.switch
-import scala.collection.mutable
+import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
@@ -983,7 +983,7 @@ object SelfContractId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId <- frame.obj.getContractId()
-      _          <- frame.pushOpStack(Val.ByteVec(mutable.ArraySeq.from(contractId.bytes)))
+      _          <- frame.pushOpStack(Val.ByteVec(ArraySeq.from(contractId.bytes)))
     } yield ()
   }
 }
