@@ -82,6 +82,17 @@ trait TxUtils { Self: FlowUtils =>
 
   def transfer(
       fromPublicKey: PublicKey,
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      amount: U256,
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    transfer(fromPublicKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
+  }
+
+  def transfer(
+      fromPublicKey: PublicKey,
       outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -98,47 +109,53 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    getUsableUtxos(fromLockupScript).map { utxos =>
-      for {
-        totalAmount <- outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
-          acc.add(amount).toRight("Amount overflow")
+    checkBeforeTransfer(outputInfos, gasOpt) match {
+      case Right(totalAmount) =>
+        selectUTXOs(fromLockupScript, totalAmount, outputInfos.length, gasOpt, gasPrice).map {
+          _.flatMap { selected =>
+            for {
+              _ <- checkWithMaxTxInputNum(selected.assets)
+              unsignedTx <- UnsignedTransaction
+                .transferAlf(
+                  selected.assets.map(asset => (asset.ref, asset.output)),
+                  fromLockupScript,
+                  fromUnlockScript,
+                  outputInfos,
+                  selected.gas,
+                  gasPrice
+                )
+            } yield unsignedTx
+          }
         }
-        _ <- checkOutputInfos(outputInfos)
-        _ <- checkWithMinimalGas(gasOpt, minimalGas)
-        selected <- UtxoUtils.select(
-          utxos,
-          totalAmount,
-          gasOpt,
-          gasPrice,
-          defaultGasPerInput,
-          defaultGasPerOutput,
-          dustUtxoAmount,
-          outputInfos.length + 1,
-          minimalGas
-        )
-        _ <- checkWithMaxTxInputNum(selected.assets)
-        unsignedTx <- UnsignedTransaction
-          .transferAlf(
-            selected.assets.map(asset => (asset.ref, asset.output)),
-            fromLockupScript,
-            fromUnlockScript,
-            outputInfos,
-            selected.gas,
-            gasPrice
-          )
-      } yield unsignedTx
+
+      case Left(e) =>
+        Right(Left(e))
     }
   }
 
   def transfer(
       fromPublicKey: PublicKey,
-      toLockupScript: LockupScript.Asset,
-      lockTimeOpt: Option[TimeStamp],
-      amount: U256,
-      gasOpt: Option[GasBox],
+      utxos: AVector[Asset],
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      gas: GasBox,
       gasPrice: GasPrice
-  ): IOResult[Either[String, UnsignedTransaction]] = {
-    transfer(fromPublicKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
+  ): Either[String, UnsignedTransaction] = {
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+
+    for {
+      _ <- checkBeforeTransfer(outputInfos, Some(gas))
+      _ <- checkWithMaxTxInputNum(utxos)
+      unsignedTx <- UnsignedTransaction
+        .transferAlf(
+          utxos.map(asset => (asset.ref, asset.output)),
+          fromLockupScript,
+          fromUnlockScript,
+          outputInfos,
+          gas,
+          gasPrice
+        )
+    } yield unsignedTx
   }
 
   def sweepAll(
@@ -266,15 +283,29 @@ trait TxUtils { Self: FlowUtils =>
     } yield failedTxs
   }
 
+  private def checkTotalAmount(
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])]
+  ): Either[String, U256] = {
+    outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
+      acc.add(amount).toRight("Amount overflow")
+    }
+  }
+
   private def checkWithMinimalGas(
       gasOpt: Option[GasBox],
       minimalGas: GasBox
   ): Either[String, Unit] = {
     gasOpt match {
-      case None => Right(())
-      case Some(gas) =>
-        if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
+      case None      => Right(())
+      case Some(gas) => checkWithMinimalGas(gas, minimalGas)
     }
+  }
+
+  private def checkWithMinimalGas(
+      gas: GasBox,
+      minimalGas: GasBox
+  ): Either[String, Unit] = {
+    if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
   }
 
   private def checkWithMaxTxInputNum(assets: AVector[Asset]): Either[String, Unit] = {
@@ -298,6 +329,39 @@ trait TxUtils { Self: FlowUtils =>
       } else {
         Left("Different groups for transaction outputs")
       }
+    }
+  }
+
+  private def checkBeforeTransfer(
+      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      gasOpt: Option[GasBox]
+  ): Either[String, U256] = {
+    for {
+      totalAmount <- checkTotalAmount(outputInfos)
+      _           <- checkOutputInfos(outputInfos)
+      _           <- checkWithMinimalGas(gasOpt, minimalGas)
+    } yield totalAmount
+  }
+
+  private def selectUTXOs(
+      fromLockupScript: LockupScript.Asset,
+      outputsTotalAmount: U256,
+      outputsLength: Int,
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UtxoUtils.Selected]] = {
+    getUsableUtxos(fromLockupScript).map { utxos =>
+      UtxoUtils.select(
+        utxos,
+        outputsTotalAmount,
+        gasOpt,
+        gasPrice,
+        defaultGasPerInput,
+        defaultGasPerOutput,
+        dustUtxoAmount,
+        outputsLength + 1,
+        minimalGas
+      )
     }
   }
 }

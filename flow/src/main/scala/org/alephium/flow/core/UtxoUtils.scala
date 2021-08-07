@@ -24,8 +24,8 @@ import org.alephium.util._
 
 /*
  * We sort the utxos based on the amount and type
- *   - the utxos with smaller amounts are selected first
  *   - the utxos with higher persisted level are selected first (confirmed utxos are of high priority)
+ *   - the utxos with smaller amounts are selected first
  */
 // scalastyle:off parameter.number
 object UtxoUtils {
