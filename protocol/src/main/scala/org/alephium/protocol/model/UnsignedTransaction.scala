@@ -16,7 +16,8 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{ALF, HashSerde}
+import org.alephium.macros.HashSerde
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm._
 import org.alephium.serde._
@@ -30,13 +31,14 @@ import org.alephium.util.{AVector, TimeStamp, U256}
   * @param inputs a vector of TxInput
   * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
+@HashSerde
 final case class UnsignedTransaction(
     scriptOpt: Option[StatefulScript],
     startGas: GasBox,
     gasPrice: GasPrice,
     inputs: AVector[TxInput],
     fixedOutputs: AVector[AssetOutput]
-) extends HashSerde[UnsignedTransaction] {
+) extends AnyRef {
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = {
     inputs.head.fromGroup

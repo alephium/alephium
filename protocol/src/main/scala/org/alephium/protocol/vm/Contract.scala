@@ -18,7 +18,8 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
-import org.alephium.protocol.{Hash, HashSerde}
+import org.alephium.macros.HashSerde
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -67,9 +68,9 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   def toObject: ScriptObj[Ctx]
 }
 
+@HashSerde
 final case class StatelessScript(methods: AVector[Method[StatelessContext]])
-    extends HashSerde[StatelessScript]
-    with Script[StatelessContext] {
+    extends Script[StatelessContext] {
   override def toObject: ScriptObj[StatelessContext] = {
     StatelessScriptObject(this)
   }
@@ -80,9 +81,9 @@ object StatelessScript {
     Serde.forProduct1(StatelessScript.apply, _.methods)
 }
 
+@HashSerde
 final case class StatefulScript private (methods: AVector[Method[StatefulContext]])
-    extends HashSerde[StatefulScript]
-    with Script[StatefulContext] {
+    extends Script[StatefulContext] {
   def entryMethod: Method[StatefulContext] = methods.head
 
   override def toObject: ScriptObj[StatefulContext] = {
@@ -123,11 +124,11 @@ object StatefulScript {
     )
 }
 
+@HashSerde
 final case class StatefulContract(
     fieldLength: Int,
     methods: AVector[Method[StatefulContext]]
-) extends HashSerde[StatefulContract]
-    with Contract[StatefulContext] {
+) extends Contract[StatefulContext] {
 
   def check(initialFields: AVector[Val]): ExeResult[Unit] = {
     if (validate(initialFields)) {
