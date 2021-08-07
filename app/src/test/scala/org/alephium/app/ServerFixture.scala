@@ -27,6 +27,7 @@ import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
+import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
@@ -103,9 +104,9 @@ object ServerFixture {
 
   def dummyTransferTx(
       tx: Transaction,
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])]
+      outputInfos: AVector[TxOutputInfo]
   ): Transaction = {
-    val newOutputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
+    val newOutputs = outputInfos.map { case TxOutputInfo(toLockupScript, amount, _, lockTimeOpt) =>
       TxOutput.asset(amount, toLockupScript, lockTimeOpt)
     }
     tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
@@ -214,7 +215,7 @@ object ServerFixture {
 
     override def transfer(
         fromPublicKey: PublicKey,
-        outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+        outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice
     ): IOResult[Either[String, UnsignedTransaction]] = {

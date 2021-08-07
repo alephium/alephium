@@ -25,6 +25,7 @@ import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValidation}
@@ -149,7 +150,7 @@ trait FlowFixture
       val (toPrivateKey, toPublicKey)      = chainIndex.to.generateKey
       val lockupScript: LockupScript.Asset = LockupScript.p2pkh(toPublicKey)
       keyManager += lockupScript -> toPrivateKey
-      (lockupScript, outputAmount, lockTimeOpt)
+      TxOutputInfo(lockupScript, outputAmount, AVector.empty, lockTimeOpt)
     }
     val unsignedTx =
       blockFlow.transfer(publicKey, outputInfos, None, defaultGasPrice).rightValue.rightValue

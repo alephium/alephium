@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
+import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.core.UtxoUtils.Asset
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
@@ -88,12 +89,17 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    transfer(fromPublicKey, AVector((toLockupScript, amount, lockTimeOpt)), gasOpt, gasPrice)
+    transfer(
+      fromPublicKey,
+      AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
+      gasOpt,
+      gasPrice
+    )
   }
 
   def transfer(
       fromPublicKey: PublicKey,
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
@@ -105,7 +111,7 @@ trait TxUtils { Self: FlowUtils =>
   def transfer(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
@@ -120,7 +126,7 @@ trait TxUtils { Self: FlowUtils =>
                   selected.assets.map(asset => (asset.ref, asset.output)),
                   fromLockupScript,
                   fromUnlockScript,
-                  outputInfos,
+                  outputInfos.map(info => (info.lockupScript, info.alfAmount, info.lockTime)),
                   selected.gas,
                   gasPrice
                 )
@@ -136,7 +142,7 @@ trait TxUtils { Self: FlowUtils =>
   def transfer(
       fromPublicKey: PublicKey,
       utxos: AVector[Asset],
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      outputInfos: AVector[TxOutputInfo],
       gas: GasBox,
       gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {
@@ -151,7 +157,7 @@ trait TxUtils { Self: FlowUtils =>
           utxos.map(asset => (asset.ref, asset.output)),
           fromLockupScript,
           fromUnlockScript,
-          outputInfos,
+          outputInfos.map(info => (info.lockupScript, info.alfAmount, info.lockTime)),
           gas,
           gasPrice
         )
@@ -284,10 +290,10 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkTotalAmount(
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])]
+      outputInfos: AVector[TxOutputInfo]
   ): Either[String, U256] = {
-    outputInfos.foldE(U256.Zero) { case (acc, (_, amount, _)) =>
-      acc.add(amount).toRight("Amount overflow")
+    outputInfos.foldE(U256.Zero) { case (acc, outputInfo) =>
+      acc.add(outputInfo.alfAmount).toRight("Amount overflow")
     }
   }
 
@@ -317,12 +323,12 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkOutputInfos(
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])]
+      outputInfos: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
     if (outputInfos.isEmpty) {
       Left("Zero transaction outputs")
     } else {
-      val groupIndexes = outputInfos.map(_._1.groupIndex)
+      val groupIndexes = outputInfos.map(_.lockupScript.groupIndex)
 
       if (groupIndexes.forall(_ == groupIndexes.head)) {
         Right(())
@@ -333,7 +339,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkBeforeTransfer(
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox]
   ): Either[String, U256] = {
     for {
@@ -367,6 +373,14 @@ trait TxUtils { Self: FlowUtils =>
 }
 
 object TxUtils {
+  final case class TokenInfo(id: Hash, amount: U256)
+  final case class TxOutputInfo(
+      lockupScript: LockupScript.Asset,
+      alfAmount: U256,
+      tokens: AVector[TokenInfo],
+      lockTime: Option[TimeStamp]
+  )
+
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
   }

@@ -24,6 +24,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
+import org.alephium.flow.core.TxUtils.{TokenInfo, TxOutputInfo}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
@@ -258,7 +259,16 @@ class ServerUtils(implicit
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
-      (destination.address.lockupScript, destination.amount, destination.lockTime)
+      val tokensInfo = destination.tokens.map { token =>
+        TokenInfo(token.id, token.amount)
+      }
+
+      TxOutputInfo(
+        destination.address.lockupScript,
+        destination.amount,
+        tokensInfo,
+        destination.lockTime
+      )
     }
 
     blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice) match {

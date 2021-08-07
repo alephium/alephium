@@ -31,6 +31,7 @@ import org.alephium.api.{ApiError, ApiModel}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
+import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -199,15 +200,18 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  ]
         |}
         """.stripMargin
-    ) check { response =>
-      response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-        ServerFixture.dummyTransferTx(dummyTx, AVector((dummyToLockupScript, U256.One, None)))
-      )
-    }
-    Post(
-      s"/transactions/build",
-      body = s"""
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+          ServerFixture.dummyTransferTx(
+            dummyTx,
+            AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+          )
+        )
+      }
+      Post(
+        s"/transactions/build",
+        body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
         |  "destinations": [
@@ -220,12 +224,20 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  ]
         |}
         """.stripMargin
-    ) check { response =>
-      response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-        ServerFixture.dummyTransferTx(
-          dummyTx,
-          AVector((dummyToLockupScript, U256.One, Some(TimeStamp.unsafe(1234))))
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+          ServerFixture.dummyTransferTx(
+            dummyTx,
+            AVector(
+              TxOutputInfo(
+                dummyToLockupScript,
+                U256.One,
+                AVector.empty,
+                Some(TimeStamp.unsafe(1234))
+              )
+            )
+          )
         )
       )
     }
