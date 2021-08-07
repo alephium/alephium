@@ -42,6 +42,68 @@ sealed abstract class VM[Ctx <: StatelessContext](
     execute(obj, methodIndex, args, Some(returnTo)).map(_ => outputs)
   }
 
+  def startNonPayableFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[Ctx]]
+
+  def startPayableFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      balanceState: BalanceState,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[Ctx]]
+
+  protected def startPayableFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[Ctx]] = {
+    ctx.getInitialBalances().flatMap { balances =>
+      startPayableFrame(
+        obj,
+        ctx,
+        BalanceState.from(balances),
+        method,
+        args,
+        operandStack,
+        returnTo
+      )
+    }
+  }
+
+  def startFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      methodIndex: Int,
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
+  ): ExeResult[Frame[Ctx]] = {
+    for {
+      method <- obj.getMethod(methodIndex)
+      _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
+      frame <- {
+        val returnTo = returnToOpt.getOrElse(VM.noReturnTo)
+        if (method.isPayable) {
+          startPayableFrame(obj, ctx, method, args, operandStack, returnTo)
+        } else {
+          startNonPayableFrame(obj, ctx, method, args, operandStack, returnTo)
+        }
+      }
+    } yield frame
+  }
+
   @inline
   private def execute(
       obj: ContractObj[Ctx],
@@ -50,7 +112,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Unit] = {
     for {
-      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack, returnToOpt)
+      startFrame <- startFrame(obj, ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
     } yield ()
@@ -93,6 +155,11 @@ sealed abstract class VM[Ctx <: StatelessContext](
   protected def completeLastFrame(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
 
+object VM {
+  val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
+    if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
+}
+
 final class StatelessVM(
     ctx: StatelessContext,
     frameStack: Stack[Frame[StatelessContext]],
@@ -102,6 +169,25 @@ final class StatelessVM(
       currentFrame: Frame[StatelessContext],
       nextFrame: Frame[StatelessContext]
   ): ExeResult[Unit] = Right(())
+  def startNonPayableFrame(
+      obj: ContractObj[StatelessContext],
+      ctx: StatelessContext,
+      method: Method[StatelessContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatelessContext]] =
+    Frame.stateless(ctx, obj, method, args, operandStack, returnTo)
+
+  def startPayableFrame(
+      obj: ContractObj[StatelessContext],
+      ctx: StatelessContext,
+      balanceState: BalanceState,
+      method: Method[StatelessContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatelessContext]] = failed(NonPayableFrame)
 
   protected def completeLastFrame(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 }
@@ -111,6 +197,27 @@ final class StatefulVM(
     frameStack: Stack[Frame[StatefulContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
+  def startNonPayableFrame(
+      obj: ContractObj[StatefulContext],
+      ctx: StatefulContext,
+      method: Method[StatefulContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatefulContext]] =
+    Frame.stateful(ctx, None, obj, method, args, operandStack, returnTo)
+
+  def startPayableFrame(
+      obj: ContractObj[StatefulContext],
+      ctx: StatefulContext,
+      balanceState: BalanceState,
+      method: Method[StatefulContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatefulContext]] =
+    Frame.stateful(ctx, Some(balanceState), obj, method, args, operandStack, returnTo)
+
   protected def switchBackFrame(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]

@@ -177,66 +177,6 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
       Right(fields.update(index, v))
     }
   }
-
-  def startNonPayableFrame(
-      ctx: Ctx,
-      method: Method[Ctx],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[Ctx]]
-
-  def startPayableFrame(
-      ctx: Ctx,
-      balanceState: BalanceState,
-      method: Method[Ctx],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[Ctx]]
-
-  private val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
-    if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
-
-  def startFrame(
-      ctx: Ctx,
-      methodIndex: Int,
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
-  ): ExeResult[Frame[Ctx]] = {
-    for {
-      method <- getMethod(methodIndex)
-      _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
-      frame <- {
-        val returnTo = returnToOpt.getOrElse(noReturnTo)
-        if (method.isPayable) {
-          startPayableFrame(ctx, method, args, operandStack, returnTo)
-        } else {
-          startNonPayableFrame(ctx, method, args, operandStack, returnTo)
-        }
-      }
-    } yield frame
-  }
-
-  protected def startPayableFrame(
-      ctx: Ctx,
-      method: Method[Ctx],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[Ctx]] = {
-    ctx.getInitialBalances().flatMap { balances =>
-      startPayableFrame(
-        ctx,
-        BalanceState.from(balances),
-        method,
-        args,
-        operandStack,
-        returnTo
-      )
-    }
-  }
 }
 
 sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
@@ -244,46 +184,9 @@ sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
   val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
 }
 
-final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext] {
-  def startNonPayableFrame(
-      ctx: StatelessContext,
-      method: Method[StatelessContext],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatelessContext]] =
-    Frame.stateless(ctx, this, method, args, operandStack, returnTo)
+final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext]
 
-  def startPayableFrame(
-      ctx: StatelessContext,
-      balanceState: BalanceState,
-      method: Method[StatelessContext],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatelessContext]] = failed(NonPayableFrame)
-}
-
-final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext] {
-  def startNonPayableFrame(
-      ctx: StatefulContext,
-      method: Method[StatefulContext],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, None, this, method, args, operandStack, returnTo)
-
-  def startPayableFrame(
-      ctx: StatefulContext,
-      balanceState: BalanceState,
-      method: Method[StatefulContext],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, Some(balanceState), this, method, args, operandStack, returnTo)
-}
+final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext]
 
 final case class StatefulContractObject private (
     code: StatefulContract,
@@ -294,25 +197,6 @@ final case class StatefulContractObject private (
   override def addressOpt: Option[ContractId] = Some(address)
 
   def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
-
-  def startNonPayableFrame(
-      ctx: StatefulContext,
-      method: Method[StatefulContext],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, None, this, method, args, operandStack, returnTo)
-
-  def startPayableFrame(
-      ctx: StatefulContext,
-      balanceState: BalanceState,
-      method: Method[StatefulContext],
-      args: AVector[Val],
-      operandStack: Stack[Val],
-      returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatefulContext]] =
-    Frame.stateful(ctx, Some(balanceState), this, method, args, operandStack, returnTo)
 }
 
 object StatefulContractObject {
