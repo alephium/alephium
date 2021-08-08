@@ -541,19 +541,30 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val (barId, barAddress, barHash) = createContract(bar)
 
-    val main =
+    def main(state: String) =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
+         |  pub payable fn main() -> () {
          |    Bar(#$barId).bar(#$fooId, #$fooHash, #$barId, #$barHash, @$barAddress)
+         |    approveAlf!(@$genesisAddress, ${ALF.alf(1).v})
+         |    copyCreateContract!(#$fooId, #$state)
          |  }
          |}
          |
          |$bar
          |""".stripMargin
-    val script = Compiler.compileTxScript(main).rightValue
-    val block  = simpleScript(blockFlow, chainIndex, script)
-    addAndCheck(blockFlow, block)
+
+    {
+      val script = Compiler.compileTxScript(main("00")).rightValue
+      val block  = payableCall(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+    }
+
+    {
+      val script = Compiler.compileTxScript(main("010001")).rightValue
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
+        s"Right(TxScriptExeFailed($InvalidFieldLength))"
+    }
   }
 
   behavior of "constant product market"

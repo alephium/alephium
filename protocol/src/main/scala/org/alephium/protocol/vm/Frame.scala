@@ -18,8 +18,11 @@ package org.alephium.protocol.vm
 
 import scala.annotation.{switch, tailrec}
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
+import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
 
 abstract class Frame[Ctx <: StatelessContext] {
@@ -67,11 +70,22 @@ abstract class Frame[Ctx <: StatelessContext] {
       }
     }
 
+  @inline
   def popContractId(): ExeResult[ContractId] = {
     for {
       byteVec     <- popOpStackT[Val.ByteVec]()
       contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
     } yield contractKey
+  }
+
+  @inline
+  def popFields(): ExeResult[AVector[Val]] = {
+    for {
+      fieldsRaw <- popOpStackT[Val.ByteVec]()
+      fields <- deserialize[AVector[Val]](ByteString(fieldsRaw.a)).left.map(e =>
+        Right(SerdeErrorCreateContract(e))
+      )
+    } yield fields
   }
 
   def getLocalVal(index: Int): ExeResult[Val] = {
@@ -99,6 +113,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   }
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
+
+  def createContract(code: StatefulContract, fields: AVector[Val]): ExeResult[Unit]
 
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
     advancePC()
@@ -155,9 +171,10 @@ final class StatelessFrame(
   }
 
   // the following should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState]                                 = ???
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                  = ???
-  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
+  def balanceStateOpt: Option[BalanceState]                                         = ???
+  def createContract(code: StatefulContract, fields: AVector[Val]): ExeResult[Unit] = ???
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                          = ???
+  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]]         = ???
 }
 
 final class StatefulFrame(
@@ -200,6 +217,14 @@ final class StatefulFrame(
     } else {
       Right(None)
     }
+  }
+
+  def createContract(code: StatefulContract, fields: AVector[Val]): ExeResult[Unit] = {
+    for {
+      balanceState <- getBalanceState()
+      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      _            <- ctx.createContract(code, balances, fields)
+    } yield ()
   }
 
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {

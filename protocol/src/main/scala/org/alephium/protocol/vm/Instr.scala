@@ -111,7 +111,7 @@ object Instr {
     LoadField, StoreField, CallExternal,
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-    CreateContract, SelfAddress, SelfContractId, IssueToken,
+    CreateContract, CopyCreateContract, SelfAddress, SelfContractId, IssueToken,
     CallerAddress, CallerCodeHash, ContractCodeHash
   )
   // format: on
@@ -955,17 +955,23 @@ sealed trait ContractInstr
 object CreateContract extends ContractInstr with GasCreate {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      fieldsRaw <- frame.popOpStackT[Val.ByteVec]()
-      fields <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(e =>
-        Right(SerdeErrorCreateContract(e))
-      )
+      fields          <- frame.popFields()
       contractCodeRaw <- frame.popOpStackT[Val.ByteVec]()
       contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
-      balanceState <- frame.getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- frame.ctx.createContract(contractCode, balances, fields)
+      _ <- frame.createContract(contractCode, fields)
+    } yield ()
+  }
+}
+
+object CopyCreateContract extends ContractInstr with GasCreate {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      fields      <- frame.popFields()
+      contractId  <- frame.popContractId()
+      contractObj <- frame.ctx.loadContract(contractId)
+      _           <- frame.createContract(contractObj.code, fields)
     } yield ()
   }
 }
