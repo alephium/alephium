@@ -20,6 +20,7 @@ import scala.language.implicitConversions
 
 import akka.util.ByteString
 
+import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signature}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.validation.{BlockValidation, ExistInvalidTx, TxScriptExeFailed}
 import org.alephium.protocol.{ALF, Hash}
@@ -245,6 +246,12 @@ class VMSpec extends AlephiumSpec {
       val block1 = simpleScriptMulti(blockFlow, chainIndex, newAddresses, scripts)
       addAndCheck(blockFlow, block1)
       block1
+    }
+
+    def testSimpleScript(main: String) = {
+      val script = Compiler.compileTxScript(main).rightValue
+      val block  = simpleScript(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
     }
   }
 
@@ -635,7 +642,7 @@ class VMSpec extends AlephiumSpec {
     test()
   }
 
-  it should "test crypto built-ins" in new ContractFixture {
+  it should "test hash built-ins" in new ContractFixture {
     val input = Hex.toHexString(ByteString.fromString("Hello World1"))
     val main =
       s"""
@@ -652,10 +659,27 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
+    testSimpleScript(main)
+  }
 
-    val script = Compiler.compileTxScript(main).rightValue
-    val block  = simpleScript(blockFlow, chainIndex, script)
-    addAndCheck(blockFlow, block)
+  it should "test signature built-ins" in new ContractFixture {
+    val zero                     = Hash.zero.toHexString
+    val (p256Pri, p256Pub)       = SecP256K1.generatePriPub()
+    val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
+    val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
+    val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig) == true)
+         |    assert!(verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #${SecP256K1Signature.zero.toHexString}) == false)
+         |    assert!(verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig) == true)
+         |    assert!(verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #${ED25519Signature.zero.toHexString}) == false)
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(main)
   }
 
   behavior of "constant product market"

@@ -105,7 +105,7 @@ object Instr {
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
-    Blake2b, Keccak256, Sha256, Sha3, VerifySignature,
+    Blake2b, Keccak256, Sha256, Sha3, VerifySignature, VerifySecP256K1, VerifyED25519,
     BlockTimeStamp, BlockTarget
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -713,7 +713,6 @@ case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0
 }
 
 sealed trait CryptoInstr extends StatelessInstr with GasSchedule
-sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple
 
 sealed abstract class HashAlg[H <: RandomBytes]
     extends CryptoInstr
@@ -754,6 +753,8 @@ case object Keccak256 extends HashAlg[crypto.Keccak256] with HashAlg.Keccak256Ha
 case object Sha256    extends HashAlg[crypto.Sha256] with HashAlg.Sha256Hash
 case object Sha3      extends HashAlg[crypto.Sha3] with HashAlg.Sha3Hash
 
+sealed trait Signature extends CryptoInstr with StatelessInstrSimpleGas with GasSimple
+
 case object VerifySignature extends Signature with StatelessInstrCompanion0 with GasSignature {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val rawData    = frame.ctx.txId.bytes
@@ -766,11 +767,60 @@ case object VerifySignature extends Signature with StatelessInstrCompanion0 with
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
           okay
         } else {
-          failed(VerificationFailed)
+          failed(InvalidSignature)
         }
       }
     } yield ()
   }
+}
+
+trait GenericSignature[PubKey, Sig]
+    extends Signature
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def buildPubKey(value: Val.ByteVec): Option[PubKey]
+  def buildSignature(value: Val.ByteVec): Option[Sig]
+  def verify(data: ByteString, signature: Sig, pubKey: PubKey): Boolean
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      rawSignature <- frame.popOpStackT[Val.ByteVec]()
+      signature    <- buildSignature(rawSignature).toRight(Right(InvalidSignatureFormat))
+      rawPublicKey <- frame.popOpStackT[Val.ByteVec]()
+      publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey))
+      rawData      <- frame.popOpStackT[Val.ByteVec]()
+      _            <- if (rawData.bytes.length == 32) okay else failed(SignedDataIsNot32Bytes)
+      _            <- frame.pushOpStack(Val.Bool(verify(rawData.bytes, signature, publicKey)))
+    } yield ()
+  }
+}
+
+case object VerifySecP256K1
+    extends GenericSignature[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
+  def buildPubKey(value: Val.ByteVec): Option[crypto.SecP256K1PublicKey] =
+    crypto.SecP256K1PublicKey.from(value.a)
+  def buildSignature(value: Val.ByteVec): Option[crypto.SecP256K1Signature] =
+    crypto.SecP256K1Signature.from(value.a)
+  def verify(
+      data: ByteString,
+      signature: crypto.SecP256K1Signature,
+      pubKey: crypto.SecP256K1PublicKey
+  ): Boolean =
+    crypto.SecP256K1.verify(data, signature, pubKey)
+}
+
+case object VerifyED25519
+    extends GenericSignature[crypto.ED25519PublicKey, crypto.ED25519Signature] {
+  def buildPubKey(value: Val.ByteVec): Option[crypto.ED25519PublicKey] =
+    crypto.ED25519PublicKey.from(value.a)
+  def buildSignature(value: Val.ByteVec): Option[crypto.ED25519Signature] =
+    crypto.ED25519Signature.from(value.a)
+  def verify(
+      data: ByteString,
+      signature: crypto.ED25519Signature,
+      pubKey: crypto.ED25519PublicKey
+  ): Boolean =
+    crypto.ED25519.verify(data, signature, pubKey)
 }
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance

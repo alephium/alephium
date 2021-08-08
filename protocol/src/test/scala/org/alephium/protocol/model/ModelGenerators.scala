@@ -117,7 +117,7 @@ trait TxInputGenerators extends Generators {
       hash       <- hashGen
     } yield {
       val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
-      TxInput(outputRef, UnlockScript.p2pkh(PublicKey.zero))
+      TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
 }
 

@@ -374,8 +374,8 @@ trait FlowFixture
   def addAndCheck(blockFlow: BlockFlow, block: Block): Unit = {
     val blockValidation =
       BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-    blockValidation.validate(block, blockFlow).isRight is true
-    blockFlow.addAndUpdateView(block).isRight is true
+    blockValidation.validate(block, blockFlow).rightValue
+    blockFlow.addAndUpdateView(block).rightValue
     checkOutputs(blockFlow, block)
   }
 

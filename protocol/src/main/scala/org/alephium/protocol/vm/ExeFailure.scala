@@ -24,12 +24,14 @@ import org.alephium.serde.SerdeError
 // scalastyle:off number.of.types
 trait ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
-case object VerificationFailed                                 extends ExeFailure
 final case class NonCategorized(message: String)               extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
 case object StackUnderflow                                     extends ExeFailure
 case object InsufficientSignatures                             extends ExeFailure
 case object InvalidPublicKey                                   extends ExeFailure
+case object SignedDataIsNot32Bytes                             extends ExeFailure
+case object InvalidSignatureFormat                             extends ExeFailure
+case object InvalidSignature                                   extends ExeFailure
 case object InvalidBoolean                                     extends ExeFailure
 case object IntegerOverFlow                                    extends ExeFailure
 final case class ArithmeticError(message: String)              extends ExeFailure

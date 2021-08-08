@@ -23,7 +23,7 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{OutOfGas => _, _}
+import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => _, _}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 

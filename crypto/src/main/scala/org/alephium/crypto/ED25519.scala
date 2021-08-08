@@ -16,6 +16,8 @@
 
 package org.alephium.crypto
 
+import scala.util.control.NonFatal
+
 import akka.util.ByteString
 import org.bouncycastle.math.ec.rfc8032.{Ed25519 => bcEd25519}
 
@@ -91,6 +93,10 @@ object ED25519 extends SignatureSchema[ED25519PrivateKey, ED25519PublicKey, ED25
       signature: Array[Byte],
       publicKey: Array[Byte]
   ): Boolean = {
-    bcEd25519.verify(signature, 0, publicKey, 0, message, 0, message.length)
+    try {
+      bcEd25519.verify(signature, 0, publicKey, 0, message, 0, message.length)
+    } catch {
+      case NonFatal(_) => false
+    }
   }
 }

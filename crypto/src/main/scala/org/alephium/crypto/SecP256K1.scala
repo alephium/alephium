@@ -18,6 +18,8 @@ package org.alephium.crypto
 
 import java.math.BigInteger
 
+import scala.util.control.NonFatal
+
 import akka.util.ByteString
 import org.bouncycastle.asn1.x9.X9ECParameters
 import org.bouncycastle.crypto.digests.SHA256Digest
@@ -61,6 +63,7 @@ object SecP256K1PrivateKey
   override def length: Int = 32
 }
 
+// public key should be compressed, but the format is checked until signature verification
 class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
   lazy val unsafePoint: ECPoint = SecP256K1.point(bytes)
 }
@@ -151,10 +154,14 @@ object SecP256K1
   ): Boolean = {
     val (r, s) = SecP256K1Signature.decode(signature)
     isCanonical(s) && {
-      val signer         = new ECDSASigner
-      val publicKeyPoint = curve.decodePoint(publicKey)
-      signer.init(false, new ECPublicKeyParameters(publicKeyPoint, domain))
-      signer.verifySignature(message, r, s)
+      try {
+        val signer         = new ECDSASigner
+        val publicKeyPoint = curve.decodePoint(publicKey)
+        signer.init(false, new ECPublicKeyParameters(publicKeyPoint, domain))
+        signer.verifySignature(message, r, s)
+      } catch {
+        case NonFatal(_) => false
+      }
     }
   }
 }

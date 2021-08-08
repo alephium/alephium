@@ -91,6 +91,8 @@ object Val {
 
   final case class ByteVec(a: ArraySeq[scala.Byte]) extends AnyVal with Val {
     def tpe: Val.Type = ByteVec
+
+    def bytes: ByteString = ByteString(a)
   }
   final case class Address(lockupScript: LockupScript) extends AnyVal with Val {
     def tpe: Val.Type = Address
