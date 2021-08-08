@@ -59,7 +59,8 @@ class InstrSpec extends AlephiumSpec {
       CallLocal(byte), Return,
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifySignature, VerifySecP256K1, VerifyED25519,
-      BlockTimeStamp, BlockTarget
+      BlockTimeStamp, BlockTarget,
+      Log1, Log2, Log3, Log4, Log5
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),

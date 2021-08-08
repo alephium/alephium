@@ -106,7 +106,8 @@ object Instr {
     CallLocal, Return,
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifySignature, VerifySecP256K1, VerifyED25519,
-    BlockTimeStamp, BlockTarget
+    BlockTimeStamp, BlockTarget,
+    Log1, Log2, Log3, Log4, Log5
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1126,10 +1127,15 @@ object BlockTarget extends BlockInstr {
   }
 }
 
-//trait ContextInstr    extends StatelessInstr
-//trait BlockInfo       extends ContextInstr
-//trait TransactionInfo extends ContextInstr
-//trait InputInfo       extends ContextInstr
-//trait OutputInfo      extends ContextInstr
+trait Log extends StatelessInstr with StatelessInstrCompanion0 with GasHigh {
+  def n: Int
 
-//trait ContractInfo extends StatefulInstr
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.opStack.pop(n).map(_ => ()) // TODO: send the log to an event bus
+  }
+}
+object Log1 extends Log { val n: Int = 1 }
+object Log2 extends Log { val n: Int = 2 }
+object Log3 extends Log { val n: Int = 3 }
+object Log4 extends Log { val n: Int = 4 }
+object Log5 extends Log { val n: Int = 5 }
