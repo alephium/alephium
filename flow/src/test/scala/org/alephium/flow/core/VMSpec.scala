@@ -536,6 +536,7 @@ class VMSpec extends AlephiumSpec {
          |    assert!(contractCodeHash!(barId) == barCodeHash)
          |    assert!(callerAddress!() == barAddress)
          |    assert!(callerCodeHash!() == barCodeHash)
+         |    assert!(isCallerTheTx!() == false)
          |  }
          |}
          |""".stripMargin
@@ -544,12 +545,14 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  pub fn bar(fooId: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
+         |  pub payable fn bar(fooId: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
          |    assert!(contractCodeHash!(fooId) == fooCodeHash)
          |    assert!(contractCodeHash!(barId) == barCodeHash)
          |    Foo(#$fooId).foo(fooId, fooCodeHash, barId, barCodeHash, barAddress)
+         |    assert!(isCallerTheTx!() == true)
+         |    assert!(isPaying!(@$genesisAddress) == false)
          |  }
          |}
          |
@@ -564,6 +567,7 @@ class VMSpec extends AlephiumSpec {
          |    Bar(#$barId).bar(#$fooId, #$fooHash, #$barId, #$barHash, @$barAddress)
          |    approveAlf!(@$genesisAddress, ${ALF.alf(1).v})
          |    copyCreateContract!(#$fooId, #$state)
+         |    assert!(isPaying!(@$genesisAddress) == true)
          |  }
          |}
          |

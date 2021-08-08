@@ -64,10 +64,10 @@ class InstrSpec extends AlephiumSpec {
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
-      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
+      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
       TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CopyCreateContract, DestroyContract, SelfAddress, SelfContractId, IssueToken,
-      CallerAddress, CallerCodeHash, ContractCodeHash
+      CallerAddress, IsCallerTheTx, CallerCodeHash, ContractCodeHash
     )
     // format: on
 

@@ -111,10 +111,10 @@ object Instr {
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
-    ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
+    ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CopyCreateContract, DestroyContract, SelfAddress, SelfContractId, IssueToken,
-    CallerAddress, CallerCodeHash, ContractCodeHash
+    CallerAddress, IsCallerTheTx, CallerCodeHash, ContractCodeHash
   )
   // format: on
 
@@ -896,6 +896,17 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
   }
 }
 
+object IsPaying extends AssetInstr with StatefulInstrCompanion0 {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address      <- frame.popOpStackT[Val.Address]()
+      balanceState <- frame.getBalanceState()
+      isPaying = balanceState.isPaying(address.lockupScript)
+      _ <- frame.pushOpStack(Val.Bool(isPaying))
+    } yield ()
+  }
+}
+
 sealed trait Transfer extends AssetInstr {
   def getContractLockupScript[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
     frame.obj.getContractId().map(LockupScript.p2c)
@@ -1078,6 +1089,15 @@ object CallerAddress extends ContractInstr with GasLow {
       callerFrame <- frame.getCallerFrame()
       address     <- callerFrame.obj.getAddress()
       _           <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
+
+object IsCallerTheTx extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      _           <- frame.pushOpStack(Val.Bool(callerFrame.obj.isCallerTheTx()))
     } yield ()
   }
 }

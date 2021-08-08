@@ -53,6 +53,10 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
     remaining.getTokenAmount(lockupScript, tokenId)
   }
 
+  def isPaying(lockupScript: LockupScript): Boolean = {
+    remaining.all.exists(_._1 == lockupScript) || approved.all.exists(_._1 == lockupScript)
+  }
+
   def useApproved(): BalanceState = {
     val toUse = approved.use()
     BalanceState(toUse, Balances.empty)

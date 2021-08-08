@@ -169,6 +169,8 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
   def getAddress(): ExeResult[Val.Address] =
     getContractId().map(id => Val.Address(LockupScript.p2c(id)))
 
+  def isCallerTheTx(): Boolean = contractIdOpt.isEmpty
+
   def getCodeHash(): Val.ByteVec = Val.ByteVec(immutable.ArraySeq.from(code.hash.bytes))
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
