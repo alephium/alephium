@@ -105,7 +105,7 @@ object Instr {
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
-    Blake2b, Keccak256, Sha256, Sha3, CheckSignature,
+    Blake2b, Keccak256, Sha256, Sha3, VerifySignature,
     BlockTimeStamp, BlockTarget
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -754,7 +754,7 @@ case object Keccak256 extends HashAlg[crypto.Keccak256] with HashAlg.Keccak256Ha
 case object Sha256    extends HashAlg[crypto.Sha256] with HashAlg.Sha256Hash
 case object Sha3      extends HashAlg[crypto.Sha3] with HashAlg.Sha3Hash
 
-case object CheckSignature extends Signature with StatelessInstrCompanion0 with GasSignature {
+case object VerifySignature extends Signature with StatelessInstrCompanion0 with GasSignature {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val rawData    = frame.ctx.txId.bytes
     val signatures = frame.ctx.signatures

@@ -58,7 +58,7 @@ class InstrSpec extends AlephiumSpec {
       Jump(int), IfTrue(int), IfFalse(int),
       CallLocal(byte), Return,
       Assert,
-      Blake2b, Keccak256, Sha256, Sha3, CheckSignature,
+      Blake2b, Keccak256, Sha256, Sha3, VerifySignature,
       BlockTimeStamp, BlockTarget
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(

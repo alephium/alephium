@@ -73,8 +73,8 @@ object BuiltIn {
     SimpleStatelessBuiltIn("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
   val assert: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
-  val checkSignature: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
+  val verifySignature: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("verifySignature", Seq(Type.ByteVec), Seq(), VerifySignature)
   val blockTimeStamp: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("blockTimeStamp", Seq.empty, Seq(Type.U256), BlockTimeStamp)
   val blockTarget: SimpleStatelessBuiltIn =
@@ -126,7 +126,7 @@ object BuiltIn {
     sha256,
     sha3,
     assert,
-    checkSignature,
+    verifySignature,
     blockTimeStamp,
     blockTarget,
     toI256,
