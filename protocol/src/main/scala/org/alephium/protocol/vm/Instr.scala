@@ -542,7 +542,7 @@ case object BoolNot extends LogicInstr with GasVeryLow {
     } yield ()
   }
 }
-trait BinaryBool extends LogicInstr with GasVeryLow {
+sealed trait BinaryBool extends LogicInstr with GasVeryLow {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool
 
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -775,7 +775,7 @@ case object VerifySignature extends Signature with StatelessInstrCompanion0 with
   }
 }
 
-trait GenericSignature[PubKey, Sig]
+sealed trait GenericSignature[PubKey, Sig]
     extends Signature
     with StatelessInstrCompanion0
     with GasSignature {
@@ -1147,7 +1147,7 @@ object BlockTarget extends BlockInstr {
   }
 }
 
-trait Log extends StatelessInstr with StatelessInstrCompanion0 with GasHigh {
+sealed trait Log extends StatelessInstr with StatelessInstrCompanion0 with GasHigh {
   def n: Int
 
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

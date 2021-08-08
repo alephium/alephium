@@ -30,7 +30,7 @@ import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 
-// scalastyle:off no.equal
+// scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
@@ -517,6 +517,7 @@ class VMSpec extends AlephiumSpec {
   }
   // scalastyle:on method.length
 
+  // scalastyle:off no.equal
   it should "test contract instructions" in new ContractFixture {
     def createContract(input: String): (String, String, String) = {
       val contractId    = createContract(input, initialState = AVector.empty).key
@@ -646,6 +647,7 @@ class VMSpec extends AlephiumSpec {
     test()
   }
 
+  // scalastyle:off regex
   it should "test hash built-ins" in new ContractFixture {
     val input = Hex.toHexString(ByteString.fromString("Hello World1"))
     val main =
@@ -666,6 +668,7 @@ class VMSpec extends AlephiumSpec {
     testSimpleScript(main)
   }
 
+  // scalastyle:off no.equal
   it should "test signature built-ins" in new ContractFixture {
     val zero                     = Hash.zero.toHexString
     val (p256Pri, p256Pub)       = SecP256K1.generatePriPub()
@@ -854,3 +857,4 @@ class VMSpec extends AlephiumSpec {
     contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
   }
 }
+// scalastyle:on file.size.limit no.equal regex
