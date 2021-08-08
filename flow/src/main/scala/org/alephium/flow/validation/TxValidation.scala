@@ -247,7 +247,7 @@ trait TxValidation {
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputs: AVector[TxOutput],
-      blockEnv: BlockEnv): TxValidationResult[Unit] // TODO: optimize it with preOutputs
+      blockEnv: BlockEnv): TxValidationResult[Unit]
   // format: on
 }
 
