@@ -134,9 +134,9 @@ object UnsignedTransaction {
   }
 
   def transfer(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
       outputInfos: AVector[TxOutputInfo],
       gas: GasBox,
       gasPrice: GasPrice
@@ -145,20 +145,20 @@ object UnsignedTransaction {
     assume(gasPrice.value <= ALF.MaxALFValue)
     val gasFee = gasPrice * gas
     for {
-      inputSum <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight s"Input amount overflow")
+      inputSum <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
       outputAmount <- outputInfos.foldE(U256.Zero)(
-        _ add _.alfAmount toRight s"Output amount overflow"
+        _ add _.alfAmount toRight "Output amount overflow"
       )
-      remainder0 <- inputSum.sub(outputAmount).toRight(s"Not enough balance")
-      remainder  <- remainder0.sub(gasFee).toRight(s"Not enough balance for gas fee")
-      _          <- checkTokens(inputs, outputInfos)
+      remainder0      <- inputSum.sub(outputAmount).toRight("Not enough balance")
+      remainder       <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
+      remainingTokens <- checkTokens(inputs, outputInfos)
     } yield {
       var outputs = outputInfos.map {
         case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
           TxOutput.asset(amount, toLockupScript, tokens, lockTimeOpt)
       }
       if (remainder > U256.Zero) {
-        outputs = outputs :+ TxOutput.asset(remainder, fromLockupScript)
+        outputs = outputs :+ TxOutput.asset(remainder, remainingTokens, fromLockupScript)
       }
       UnsignedTransaction(
         networkConfig.chainId,

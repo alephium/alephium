@@ -170,9 +170,9 @@ trait TxUtils { Self: FlowUtils =>
       _ <- checkWithMaxTxInputNum(utxos)
       unsignedTx <- UnsignedTransaction
         .transfer(
-          utxos.map(asset => (asset.ref, asset.output)),
           fromLockupScript,
           fromUnlockScript,
+          utxos.map(asset => (asset.ref, asset.output)),
           outputInfos,
           gas,
           gasPrice
@@ -201,9 +201,9 @@ trait TxUtils { Self: FlowUtils =>
         amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
         unsignedTx <- UnsignedTransaction
           .transfer(
-            utxos.map(asset => (asset.ref, asset.output)),
             fromLockupScript,
             fromUnlockScript,
+            utxos.map(asset => (asset.ref, asset.output)),
             // FIXME! take care of tokens
             AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
             gas,
