@@ -113,6 +113,21 @@ trait StatefulContext extends StatelessContext with ContractPool {
     } yield balances
   }
 
+  def destroyContract(
+      contractId: ContractId,
+      address: LockupScript
+  ): ExeResult[Unit] = {
+    for {
+      contractAsset <- useContractAsset(contractId)
+      _ <- address match {
+        case _: LockupScript.Asset => okay
+        case _: LockupScript.P2C   => failed(InvalidAddressInContractDestroy)
+      }
+      _ <- outputBalances.add(address, contractAsset).toRight(Right(InvalidBalances))
+      _ <- markAssetFlushed(contractId)
+    } yield ()
+  }
+
   def updateContractAsset(
       contractId: ContractId,
       outputRef: ContractOutputRef,

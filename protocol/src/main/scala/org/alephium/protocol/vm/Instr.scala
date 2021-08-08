@@ -111,7 +111,7 @@ object Instr {
     LoadField, StoreField, CallExternal,
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-    CreateContract, CopyCreateContract, SelfAddress, SelfContractId, IssueToken,
+    CreateContract, CopyCreateContract, DestroyContract, SelfAddress, SelfContractId, IssueToken,
     CallerAddress, CallerCodeHash, ContractCodeHash
   )
   // format: on
@@ -972,6 +972,16 @@ object CopyCreateContract extends ContractInstr with GasCreate {
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContract(contractId)
       _           <- frame.createContract(contractObj.code, fields)
+    } yield ()
+  }
+}
+
+object DestroyContract extends ContractInstr with GasDestroy {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address    <- frame.popOpStackT[Val.Address]()
+      contractId <- frame.popContractId()
+      _          <- frame.ctx.destroyContract(contractId, address.lockupScript)
     } yield ()
   }
 }

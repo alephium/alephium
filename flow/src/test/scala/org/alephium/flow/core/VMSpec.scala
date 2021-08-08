@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.validation.{BlockValidation, ExistInvalidTx, TxScriptExeFailed}
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -564,6 +564,40 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main("010001")).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
         s"Right(TxScriptExeFailed($InvalidFieldLength))"
+    }
+  }
+
+  it should "destroy contract" in new ContractFixture {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, initialState = AVector.empty).key.toHexString
+
+    def main(targetAddress: String) =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    destroyContract!(#$fooId, @$targetAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      val address = Address.Contract(networkSetting.networkType, LockupScript.P2C(Hash.generate))
+      val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
+        s"Right(TxScriptExeFailed($InvalidAddressInContractDestroy))"
+    }
+
+    {
+      val script = Compiler.compileTxScript(main(genesisAddress.toBase58)).rightValue
+      val block  = payableCall(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
     }
   }
 

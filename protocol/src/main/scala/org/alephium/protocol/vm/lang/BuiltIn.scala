@@ -207,6 +207,14 @@ object BuiltIn {
       CopyCreateContract
     )
 
+  val destroyContract: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "destroyContract",
+      Seq[Type](Type.ByteVec, Type.Address),
+      Seq.empty,
+      DestroyContract
+    )
+
   val selfAddress: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)
 
@@ -247,6 +255,7 @@ object BuiltIn {
       transferTokenToSelf,
       createContract,
       copyCreateContract,
+      destroyContract,
       selfAddress,
       selfContractId,
       selfTokenId,

@@ -98,6 +98,13 @@ object GasCreate {
   val gas: GasBox = GasBox.unsafe(32000)
 }
 
+trait GasDestroy extends GasSimple {
+  def gas(): GasBox = GasCreate.gas
+}
+object GasDestroy {
+  val gas: GasBox = GasBox.unsafe(10000)
+}
+
 trait GasBalance extends GasSimple {
   def gas(): GasBox = GasBalance.gas
 }
