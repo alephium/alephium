@@ -137,7 +137,7 @@ object UnsignedTransaction {
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       inputs: AVector[(AssetOutputRef, AssetOutput)],
-      outputInfos: AVector[TxOutputInfo],
+      outputs: AVector[TxOutputInfo],
       gas: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
@@ -145,21 +145,19 @@ object UnsignedTransaction {
     assume(gasPrice.value <= ALF.MaxALFValue)
     val gasFee = gasPrice * gas
     for {
-      inputSum <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
-      outputAmount <- outputInfos.foldE(U256.Zero)(
-        _ add _.alfAmount toRight "Output amount overflow"
-      )
-      remainder0      <- inputSum.sub(outputAmount).toRight("Not enough balance")
-      remainder       <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
-      remainingTokens <- checkTokens(inputs, outputInfos)
+      alfRemainder    <- calculateAlfRemainder(inputs, outputs, gasFee)
+      tokensRemainder <- calculateTokensRemainder(inputs, outputs)
+      changeOutputOpt <- calculateChangeOutput(alfRemainder, tokensRemainder, fromLockupScript)
     } yield {
-      var outputs = outputInfos.map {
+      var txOutputs = outputs.map {
         case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
           TxOutput.asset(amount, toLockupScript, tokens, lockTimeOpt)
       }
-      if (remainder > U256.Zero) {
-        outputs = outputs :+ TxOutput.asset(remainder, remainingTokens, fromLockupScript)
+
+      changeOutputOpt.foreach { changeOutput =>
+        txOutputs = txOutputs :+ changeOutput
       }
+
       UnsignedTransaction(
         networkConfig.chainId,
         scriptOpt = None,
@@ -168,12 +166,25 @@ object UnsignedTransaction {
         inputs.map { case (ref, _) =>
           TxInput(ref, fromUnlockScript)
         },
-        outputs
+        txOutputs
       )
     }
   }
 
-  def checkTokens(
+  def calculateAlfRemainder(
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputs: AVector[TxOutputInfo],
+      gasFee: U256
+  ): Either[String, U256] = {
+    for {
+      inputSum     <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
+      outputAmount <- outputs.foldE(U256.Zero)(_ add _.alfAmount toRight "Output amount overflow")
+      remainder0   <- inputSum.sub(outputAmount).toRight("Not enough balance")
+      remainder    <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
+    } yield remainder
+  }
+
+  def calculateTokensRemainder(
       inputs: AVector[(AssetOutputRef, AssetOutput)],
       outputInfos: AVector[TxOutputInfo]
   ): Either[String, AVector[(TokenId, U256)]] = {
@@ -181,8 +192,30 @@ object UnsignedTransaction {
       inputs    <- calculateTotalAmountPerToken(inputs.flatMap(_._2.tokens))
       outputs   <- calculateTotalAmountPerToken(outputInfos.flatMap(_.tokens))
       _         <- checkNoNewTokensInOutputs(inputs, outputs)
-      remaining <- calculateRemainingTokens(inputs, outputs)
-    } yield remaining
+      remainder <- calculateRemainingTokens(inputs, outputs)
+    } yield {
+      remainder.filterNot(_._2 == U256.Zero)
+    }
+  }
+
+  def calculateChangeOutput(
+      alfRemainder: U256,
+      tokensRemainder: AVector[(TokenId, U256)],
+      fromLockupScript: LockupScript.Asset
+  ): Either[String, Option[AssetOutput]] = {
+    if (tokensRemainder.isEmpty) {
+      if (alfRemainder > U256.Zero) {
+        Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
+      } else {
+        Right(None)
+      }
+    } else {
+      if (alfRemainder >= minimumTokenAlfAmount) {
+        Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
+      } else {
+        Left("Not enough Alf for change output because of tokens")
+      }
+    }
   }
 
   private def calculateTotalAmountPerToken(
@@ -216,10 +249,11 @@ object UnsignedTransaction {
       inputTokens: AVector[(TokenId, U256)],
       outputTokens: AVector[(TokenId, U256)]
   ): Either[String, AVector[(TokenId, U256)]] = {
-    inputTokens.foldE(AVector.empty[(TokenId, U256)]) { case (acc, inputToken) =>
-      val outputAmount = outputTokens.find(_._1 == inputToken._1).map(_._2).getOrElse(U256.Zero)
-      inputToken._2.sub(outputAmount).toRight("Not enough balance for token $id").map { remaining =>
-        acc :+ (inputToken._1 -> remaining)
+    inputTokens.foldE(AVector.empty[(TokenId, U256)]) { case (acc, (inputId, inputAmount)) =>
+      val outputAmount = outputTokens.find(_._1 == inputId).fold(U256.Zero)(_._2)
+      inputAmount.sub(outputAmount).toRight(s"Not enough balance for token $inputId").map {
+        remainder =>
+          acc :+ (inputId -> remainder)
       }
     }
   }
