@@ -88,11 +88,11 @@ object TestOperator {
   case object Eq extends TestOperator {
     override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       argsType(0) match {
-        case Type.I256    => Seq(EqI256)
-        case Type.U256    => Seq(EqU256)
-        case Type.Bool    => Seq(EqBool)
-        case Type.ByteVec => Seq(EqByteVec)
-        case Type.Address => Seq(EqAddress)
+        case Type.I256    => Seq(I256Eq)
+        case Type.U256    => Seq(U256Eq)
+        case Type.Bool    => Seq(BoolEq)
+        case Type.ByteVec => Seq(ByteVecEq)
+        case Type.Address => Seq(AddressEq)
         case _            => throw new RuntimeException("Dead branch")
       }
     }
@@ -100,11 +100,11 @@ object TestOperator {
   case object Ne extends TestOperator {
     override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       argsType(0) match {
-        case Type.I256    => Seq(NeI256)
-        case Type.U256    => Seq(NeU256)
-        case Type.Bool    => Seq(NeBool)
-        case Type.ByteVec => Seq(NeByteVec)
-        case Type.Address => Seq(NeAddress)
+        case Type.I256    => Seq(I256Neq)
+        case Type.U256    => Seq(U256Neq)
+        case Type.Bool    => Seq(BoolNeq)
+        case Type.ByteVec => Seq(ByteVecNeq)
+        case Type.Address => Seq(AddressNeq)
         case _            => throw new RuntimeException("Dead branch")
       }
     }
@@ -125,10 +125,10 @@ object TestOperator {
     }
   }
 
-  val Lt: TestOperator = inequality(LtI256, LtU256)
-  val Le: TestOperator = inequality(LeI256, LeU256)
-  val Gt: TestOperator = inequality(GtI256, GtU256)
-  val Ge: TestOperator = inequality(GeI256, GeU256)
+  val Lt: TestOperator = inequality(I256Lt, U256Lt)
+  val Le: TestOperator = inequality(I256Le, U256Le)
+  val Gt: TestOperator = inequality(I256Gt, U256Gt)
+  val Ge: TestOperator = inequality(I256Ge, U256Ge)
 }
 
 sealed trait LogicalOperator extends TestOperator
@@ -143,7 +143,7 @@ object LogicalOperator {
       }
     }
 
-    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolNot)
   }
 
   sealed trait BinaryLogicalOperator extends LogicalOperator {
@@ -156,9 +156,9 @@ object LogicalOperator {
     }
   }
   case object And extends BinaryLogicalOperator {
-    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(AndBool)
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolAnd)
   }
   case object Or extends BinaryLogicalOperator {
-    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(OrBool)
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolOr)
   }
 }

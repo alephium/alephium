@@ -96,12 +96,12 @@ object Instr {
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop,
-    NotBool, AndBool, OrBool, EqBool, NeBool,
-    I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
-    U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
+    BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq,
+    I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
+    U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
     U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
     I256ToU256, U256ToI256,
-    EqByteVec, NeByteVec, EqAddress, NeAddress,
+    ByteVecEq, ByteVecNeq, AddressEq, AddressNeq,
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
@@ -429,27 +429,27 @@ object I256Mod extends BinaryArithmeticInstr[Val.I256] with GasLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.mod(_))(x, y)
 }
-object EqI256 extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+object I256Eq extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.==(_))(x, y)
 }
-object NeI256 extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+object I256Neq extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.!=(_))(x, y)
 }
-object LtI256 extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+object I256Lt extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.<(_))(x, y)
 }
-object LeI256 extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+object I256Le extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.<=(_))(x, y)
 }
-object GtI256 extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+object I256Gt extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.>(_))(x, y)
 }
-object GeI256 extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+object I256Ge extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.>=(_))(x, y)
 }
@@ -505,27 +505,27 @@ object U256SHR extends BinaryArithmeticInstr[Val.U256] with GasLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op((x, y) => x.shr(y))(x, y)
 }
-object EqU256 extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+object U256Eq extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.==(_))(x, y)
 }
-object NeU256 extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+object U256Neq extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.!=(_))(x, y)
 }
-object LtU256 extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+object U256Lt extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.<(_))(x, y)
 }
-object LeU256 extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+object U256Le extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.<=(_))(x, y)
 }
-object GtU256 extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+object U256Gt extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>(_))(x, y)
 }
-object GeU256 extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+object U256Ge extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
 }
@@ -534,7 +534,7 @@ sealed trait LogicInstr
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
     with GasSimple {}
-case object NotBool extends LogicInstr with GasVeryLow {
+case object BoolNot extends LogicInstr with GasVeryLow {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool <- frame.popOpStackT[Val.Bool]()
@@ -553,16 +553,16 @@ trait BinaryBool extends LogicInstr with GasVeryLow {
     } yield ()
   }
 }
-case object AndBool extends BinaryBool {
+case object BoolAnd extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = bool1.and(bool2)
 }
-case object OrBool extends BinaryBool {
+case object BoolOr extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = bool1.or(bool2)
 }
-case object EqBool extends BinaryBool {
+case object BoolEq extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 == bool2)
 }
-case object NeBool extends BinaryBool {
+case object BoolNeq extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 != bool2)
 }
 
@@ -613,10 +613,10 @@ sealed trait EqT[T <: Val] extends ComparisonInstr[T] {
 sealed trait NeT[T <: Val] extends ComparisonInstr[T] {
   def op(x: T, y: T): Val.Bool = Val.Bool(x != y)
 }
-case object EqByteVec extends EqT[Val.ByteVec]
-case object NeByteVec extends NeT[Val.ByteVec]
-case object EqAddress extends EqT[Val.Address]
-case object NeAddress extends NeT[Val.Address]
+case object ByteVecEq  extends EqT[Val.ByteVec]
+case object ByteVecNeq extends NeT[Val.ByteVec]
+case object AddressEq  extends EqT[Val.Address]
+case object AddressNeq extends NeT[Val.Address]
 
 sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
 sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}

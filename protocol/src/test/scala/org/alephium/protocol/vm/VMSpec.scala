@@ -107,7 +107,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
           U256Const0,
           LoadLocal(0),
           U256Const0,
-          GtU256,
+          U256Gt,
           IfFalse(4),
           LoadLocal(0),
           U256Const1,
@@ -289,14 +289,14 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address0),
       AlfRemaining,
       U256Const(Val.U256(10)),
-      EqU256,
+      U256Eq,
       Assert
     )
     val instrs2 = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       AlfRemaining,
       U256Const(Val.U256(20)),
-      EqU256,
+      U256Eq,
       Assert
     )
     passMulti(AVector(instrs0, instrs1, instrs2), AVector.empty[Val])
