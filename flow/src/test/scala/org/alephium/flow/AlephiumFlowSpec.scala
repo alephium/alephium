@@ -25,13 +25,13 @@ import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValidation}
 import org.alephium.protocol._
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.util._
 

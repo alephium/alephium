@@ -24,13 +24,13 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
-import org.alephium.flow.core.TxUtils.{TokenInfo, TxOutputInfo}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -260,7 +260,7 @@ class ServerUtils(implicit
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
       val tokensInfo = destination.tokens.map { token =>
-        TokenInfo(token.id, token.amount)
+        (token.id -> token.amount)
       }
 
       TxOutputInfo(

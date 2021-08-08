@@ -31,7 +31,6 @@ import org.alephium.api.{ApiError, ApiModel}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -41,6 +40,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._

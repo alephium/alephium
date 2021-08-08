@@ -24,10 +24,10 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._

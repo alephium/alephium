@@ -27,7 +27,6 @@ import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
-import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
@@ -39,6 +38,7 @@ import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -106,8 +106,9 @@ object ServerFixture {
       tx: Transaction,
       outputInfos: AVector[TxOutputInfo]
   ): Transaction = {
-    val newOutputs = outputInfos.map { case TxOutputInfo(toLockupScript, amount, _, lockTimeOpt) =>
-      TxOutput.asset(amount, toLockupScript, lockTimeOpt)
+    val newOutputs = outputInfos.map {
+      case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
+        TxOutput.asset(amount, toLockupScript, tokens, lockTimeOpt)
     }
     tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
   }
@@ -117,7 +118,8 @@ object ServerFixture {
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp]
   ): Transaction = {
-    val output = TxOutput.asset(U256.Ten, toLockupScript, lockTimeOpt)
+    // FIXME: take care of tokens
+    val output = TxOutput.asset(U256.Ten, toLockupScript, AVector.empty, lockTimeOpt)
     tx.copy(
       unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
     )

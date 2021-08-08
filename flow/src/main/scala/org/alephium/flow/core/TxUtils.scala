@@ -20,11 +20,11 @@ import scala.annotation.tailrec
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
-import org.alephium.flow.core.TxUtils.TxOutputInfo
 import org.alephium.flow.core.UtxoUtils.Asset
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -119,18 +119,14 @@ trait TxUtils { Self: FlowUtils =>
       case Right(totalAmount) =>
         selectUTXOs(fromLockupScript, totalAmount, outputInfos.length, gasOpt, gasPrice).map {
           _.flatMap { selected =>
-            for {
-              _ <- checkWithMaxTxInputNum(selected.assets)
-              unsignedTx <- UnsignedTransaction
-                .transferAlf(
-                  selected.assets.map(asset => (asset.ref, asset.output)),
-                  fromLockupScript,
-                  fromUnlockScript,
-                  outputInfos.map(info => (info.lockupScript, info.alfAmount, info.lockTime)),
-                  selected.gas,
-                  gasPrice
-                )
-            } yield unsignedTx
+            transferUnsafe(
+              fromLockupScript,
+              fromUnlockScript,
+              selected.assets,
+              outputInfos,
+              selected.gas,
+              gasPrice
+            )
           }
         }
 
@@ -151,13 +147,33 @@ trait TxUtils { Self: FlowUtils =>
 
     for {
       _ <- checkBeforeTransfer(outputInfos, Some(gas))
+      unsignedTx <- transferUnsafe(
+        fromLockupScript,
+        fromUnlockScript,
+        utxos,
+        outputInfos,
+        gas,
+        gasPrice
+      )
+    } yield unsignedTx
+  }
+
+  def transferUnsafe(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      utxos: AVector[Asset],
+      outputInfos: AVector[TxOutputInfo],
+      gas: GasBox,
+      gasPrice: GasPrice
+  ): Either[String, UnsignedTransaction] = {
+    for {
       _ <- checkWithMaxTxInputNum(utxos)
       unsignedTx <- UnsignedTransaction
-        .transferAlf(
+        .transfer(
           utxos.map(asset => (asset.ref, asset.output)),
           fromLockupScript,
           fromUnlockScript,
-          outputInfos.map(info => (info.lockupScript, info.alfAmount, info.lockTime)),
+          outputInfos,
           gas,
           gasPrice
         )
@@ -184,11 +200,12 @@ trait TxUtils { Self: FlowUtils =>
         )
         amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
         unsignedTx <- UnsignedTransaction
-          .transferAlf(
+          .transfer(
             utxos.map(asset => (asset.ref, asset.output)),
             fromLockupScript,
             fromUnlockScript,
-            AVector((toLockupScript, amount, lockTimeOpt)),
+            // FIXME! take care of tokens
+            AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
             gas,
             gasPrice
           )
@@ -302,16 +319,10 @@ trait TxUtils { Self: FlowUtils =>
       minimalGas: GasBox
   ): Either[String, Unit] = {
     gasOpt match {
-      case None      => Right(())
-      case Some(gas) => checkWithMinimalGas(gas, minimalGas)
+      case None => Right(())
+      case Some(gas) =>
+        if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
     }
-  }
-
-  private def checkWithMinimalGas(
-      gas: GasBox,
-      minimalGas: GasBox
-  ): Either[String, Unit] = {
-    if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
   }
 
   private def checkWithMaxTxInputNum(assets: AVector[Asset]): Either[String, Unit] = {
@@ -373,14 +384,6 @@ trait TxUtils { Self: FlowUtils =>
 }
 
 object TxUtils {
-  final case class TokenInfo(id: Hash, amount: U256)
-  final case class TxOutputInfo(
-      lockupScript: LockupScript.Asset,
-      alfAmount: U256,
-      tokens: AVector[TokenInfo],
-      lockTime: Option[TimeStamp]
-  )
-
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
   }
