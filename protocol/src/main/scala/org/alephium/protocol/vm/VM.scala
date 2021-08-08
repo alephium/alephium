@@ -123,8 +123,8 @@ sealed abstract class VM[Ctx <: StatelessContext](
     frameStack.top match {
       case Some(topFrame) =>
         executeCurrentFrame(topFrame) match {
-          case Right(_)    => executeFrames()
-          case Left(error) => Left(error)
+          case Right(_) => executeFrames()
+          case error    => error
         }
       case None => Right(())
     }
@@ -358,8 +358,7 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
-  // dryrun will not commit worldstate changes, which is efficient for tx validation
-  def dryrunTxScript(
+  def runTxScript(
       worldState: WorldState.Cached,
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
@@ -370,7 +369,6 @@ object StatefulVM {
     runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
-  // run will commit worldstate changes
   def runTxScript(
       worldState: WorldState.Cached,
       blockEnv: BlockEnv,

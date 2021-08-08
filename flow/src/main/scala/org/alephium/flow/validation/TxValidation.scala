@@ -70,7 +70,7 @@ trait TxValidation {
           chainIndex <- getChainIndex(tx)
           worldState <- from(flow.getBestCachedWorldState(chainIndex.from))
           fullTx <- fromExeResult(
-            StatefulVM.dryrunTxScript(
+            StatefulVM.runTxScript(
               worldState,
               blockEnv,
               tx,
@@ -658,7 +658,7 @@ object TxValidation {
           case Some(script) =>
             val preAssetOutputs = preOutputs.take(tx.unsigned.inputs.length)
             fromExeResult(
-              StatefulVM.dryrunTxScript(
+              StatefulVM.runTxScript(
                 worldState,
                 blockEnv,
                 tx,

@@ -359,7 +359,7 @@ trait FlowFixture
     val blockEnv   = blockFlow.getDryrunBlockEnv(tx.chainIndex).rightValue
     val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
-      .dryrunTxScript(
+      .runTxScript(
         groupView.worldState,
         blockEnv,
         tx,

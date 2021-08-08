@@ -79,10 +79,9 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
-    output.lockupScript match {
-      case LockupScript.P2C(contractId) =>
-        val contractOutput = output.asInstanceOf[ContractOutput]
-        val outputRef      = nextContractOutputRef(contractOutput)
+    output match {
+      case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
+        val outputRef = nextContractOutputRef(contractOutput)
         generatedOutputs.addOne(output)
         updateContractAsset(contractId, outputRef, contractOutput)
       case _ =>

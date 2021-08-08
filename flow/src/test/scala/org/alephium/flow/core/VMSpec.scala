@@ -257,7 +257,7 @@ class VMSpec extends AlephiumSpec {
 
   it should "not use up contract assets" in new ContractFixture {
     val input =
-      s"""
+      """
          |TxContract Foo() {
          |  pub payable fn foo(address: Address) -> () {
          |    transferAlfFromSelf!(address, alfRemaining!(selfAddress!()))
@@ -281,7 +281,7 @@ class VMSpec extends AlephiumSpec {
 
     val script = Compiler.compileTxScript(main).toOption.get
     intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
-      s"Right(TxScriptExeFailed(${EmptyContractAsset.toString}))"
+      s"Right(TxScriptExeFailed($EmptyContractAsset))"
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
