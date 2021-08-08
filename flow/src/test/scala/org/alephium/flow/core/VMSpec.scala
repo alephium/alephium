@@ -94,8 +94,16 @@ class VMSpec extends AlephiumSpec {
       val txTemplate = block.transactions.head
       txTemplate.copy(unsigned = txTemplate.unsigned.copy(startGas = 1000000))
     }
-    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).toOption.get
-    StatefulVM.runTxScript(worldState, tx, None, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
+    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+    val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue
+    StatefulVM.runTxScript(
+      worldState,
+      blockEnv,
+      tx,
+      None,
+      tx.unsigned.scriptOpt.get,
+      tx.unsigned.startGas
+    ) is
       failed(StackOverflow)
   }
 
@@ -599,6 +607,31 @@ class VMSpec extends AlephiumSpec {
       val block  = payableCall(blockFlow, chainIndex, script)
       addAndCheck(blockFlow, block)
     }
+  }
+
+  it should "fetch block info" in new ContractFixture {
+    def main(latestHeader: BlockHeader) =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
+         |    assert!(blockTarget!() == ${latestHeader.target.value})
+         |  }
+         |}
+         |""".stripMargin
+
+    def test() = {
+      val latestTip    = blockFlow.getHeaderChain(chainIndex).getBestTipUnsafe()
+      val latestHeader = blockFlow.getBlockHeaderUnsafe(latestTip)
+      val script       = Compiler.compileTxScript(main(latestHeader)).rightValue
+      val block        = simpleScript(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+    }
+
+    // we test with three new blocks
+    test()
+    test()
+    test()
   }
 
   behavior of "constant product market"

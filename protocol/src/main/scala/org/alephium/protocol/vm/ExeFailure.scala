@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
+
 import org.alephium.io.IOError
 import org.alephium.serde.SerdeError
 
@@ -76,6 +78,8 @@ case object ContractAssetAlreadyFlushed                        extends ExeFailur
 case object ContractAssetUnloaded                              extends ExeFailure
 case object EmptyContractAsset                                 extends ExeFailure
 case object NoCaller                                           extends ExeFailure
+final case class NegativeTimeStamp(millis: Long)               extends ExeFailure
+final case class InvalidTarget(value: BigInteger)              extends ExeFailure
 
 sealed trait IOFailure {
   def error: IOError

@@ -18,7 +18,8 @@ package org.alephium.protocol.vm
 
 import org.alephium.io.{SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.model.{minimalGas, Target}
+import org.alephium.util.TimeStamp
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {
@@ -27,5 +28,10 @@ trait VMFactory extends StorageFixture {
   }
 
   lazy val statelessContext: StatelessContext =
-    StatelessContext(Hash.zero, minimalGas, Stack.ofCapacity[Signature](0))
+    StatelessContext(
+      BlockEnv(TimeStamp.now(), Target.onePhPerBlock),
+      Hash.zero,
+      minimalGas,
+      Stack.ofCapacity[Signature](0)
+    )
 }

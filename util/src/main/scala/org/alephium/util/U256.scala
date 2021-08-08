@@ -215,6 +215,10 @@ object U256 {
     if (value.isPositive) Some(unsafe(value.v)) else None
   }
 
+  def fromLong(value: Long): Option[U256] = {
+    if (value >= 0) Some(unsafe(value)) else None
+  }
+
   def fromU64(value: U64): U256 = {
     unsafe(value.v)
   }

@@ -445,8 +445,11 @@ object BlockFlowState {
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
       for {
-        _ <- block.getScriptExecutionOrder.foreachE { index =>
-          updateStateForTxScript(worldState, block.transactions(index))
+        _ <- {
+          val blockEnv = BlockEnv.from(block.header)
+          block.getScriptExecutionOrder.foreachE { index =>
+            updateStateForTxScript(worldState, blockEnv, block.transactions(index))
+          }
         }
         _ <- block.transactions.foreachE { tx =>
           updateStateForInOutBlock(worldState, tx, targetGroup)
@@ -492,11 +495,15 @@ object BlockFlowState {
     updateStateForOutputs(worldState, tx, targetGroup)
   }
 
-  def updateStateForTxScript(worldState: WorldState.Cached, tx: Transaction): IOResult[Unit] = {
+  def updateStateForTxScript(
+      worldState: WorldState.Cached,
+      blockEnv: BlockEnv,
+      tx: Transaction
+  ): IOResult[Unit] = {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
         // we set gasRemaining = initial gas as the tx is already validated
-        StatefulVM.runTxScript(worldState, tx, None, script, tx.unsigned.startGas) match {
+        StatefulVM.runTxScript(worldState, blockEnv, tx, None, script, tx.unsigned.startGas) match {
           case Right(_)          => Right(())
           case Left(Left(error)) => Left(error.error)
           case Left(Right(error)) =>

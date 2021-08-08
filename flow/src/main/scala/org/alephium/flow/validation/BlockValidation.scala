@@ -19,7 +19,7 @@ package org.alephium.flow.validation
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.WorldState
+import org.alephium.protocol.vm.{BlockEnv, WorldState}
 import org.alephium.serde._
 import org.alephium.util.U256
 
@@ -176,12 +176,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       netReward: U256
   ): BlockValidationResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
+      val blockEnv = BlockEnv.from(block.header)
       convert(
         nonCoinbaseValidation.checkBlockTx(
           block.chainIndex,
           block.coinbase,
-          block.header,
           groupView,
+          blockEnv,
           Some(netReward)
         )
       )
@@ -252,16 +253,18 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
         _ <- checkBlockDoubleSpending(block)
-        _ <-
+        _ <- {
+          val blockEnv = BlockEnv.from(block.header)
           convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
             nonCoinbaseValidation.checkBlockTx(
               chainIndex,
               block.transactions(index),
-              block.header,
               groupView,
+              blockEnv,
               None
             )
           })
+        }
       } yield ()
     } else {
       validBlock(())

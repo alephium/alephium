@@ -148,8 +148,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
   }
 
-  def getBestTipUnsafe: BlockHash = {
+  def getBestTipUnsafe(): BlockHash = {
     getAllTips.max(blockHashOrdering)
+  }
+
+  def getBestTip(): IOResult[BlockHash] = {
+    IOUtils.tryExecute(getBestTipUnsafe())
   }
 
   def getAllTips: AVector[BlockHash] = {

@@ -25,7 +25,8 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target, Weight}
-import org.alephium.util.{AVector, Duration, EitherF, LruCache, TimeStamp}
+import org.alephium.protocol.vm.BlockEnv
+import org.alephium.util._
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
@@ -128,6 +129,13 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       header    <- getBlockHeader(hash)
       newTarget <- calHashTarget(hash, header.target)
     } yield newTarget
+  }
+
+  def getDryrunBlockEnv(): IOResult[BlockEnv] = {
+    for {
+      tip    <- getBestTip()
+      target <- getHashTarget(tip)
+    } yield BlockEnv(TimeStamp.now(), target)
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {

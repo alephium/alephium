@@ -356,9 +356,17 @@ trait FlowFixture
       txScript: StatefulScript
   ): (AVector[ContractOutputRef], AVector[TxOutput]) = {
     val groupView  = blockFlow.getMutableGroupView(mainGroup).rightValue
+    val blockEnv   = blockFlow.getDryrunBlockEnv(tx.chainIndex).rightValue
     val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
-      .dryrunTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
+      .dryrunTxScript(
+        groupView.worldState,
+        blockEnv,
+        tx,
+        preOutputs,
+        txScript,
+        tx.unsigned.startGas
+      )
       .rightValue
     result.contractInputs -> result.generatedOutputs
   }

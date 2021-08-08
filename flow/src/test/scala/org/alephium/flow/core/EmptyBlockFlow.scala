@@ -43,7 +43,7 @@ trait EmptyBlockFlow extends BlockFlow {
     BlockHeaderChain.fromGenesisUnsafe(storages)
 
   def getAllTips: AVector[BlockHash]                           = ???
-  def getBestTipUnsafe: BlockHash                              = ???
+  def getBestTipUnsafe(): BlockHash                            = ???
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps          = ???
   def updateBestDeps(): IOResult[AVector[TransactionTemplate]] = ???
   def updateBestDepsUnsafe(): AVector[TransactionTemplate]     = ???

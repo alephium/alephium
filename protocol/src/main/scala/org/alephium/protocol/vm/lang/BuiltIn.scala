@@ -71,6 +71,10 @@ object BuiltIn {
     SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
   val checkSignature: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("checkSignature", Seq(Type.ByteVec), Seq(), CheckSignature)
+  val blockTimeStamp: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("blockTimeStamp", Seq.empty, Seq(Type.U256), BlockTimeStamp)
+  val blockTarget: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("blockTarget", Seq.empty, Seq(Type.U256), BlockTarget)
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
     import ConversionBuiltIn.validTypes
@@ -117,6 +121,8 @@ object BuiltIn {
     keccak256,
     assert,
     checkSignature,
+    blockTimeStamp,
+    blockTarget,
     toI256,
     toU256
   ).map(f => f.name -> f).toMap

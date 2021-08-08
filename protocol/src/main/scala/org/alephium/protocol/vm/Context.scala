@@ -21,30 +21,45 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.util.{discard, AVector}
+import org.alephium.util.{discard, AVector, TimeStamp}
 
-trait ChainEnv
-trait BlockEnv
-trait TxEnv
-trait ContractEnv
+final case class BlockEnv(timeStamp: TimeStamp, target: Target)
+object BlockEnv {
+  def from(header: BlockHeader): BlockEnv = BlockEnv(header.timestamp, header.target)
+}
 
 trait StatelessContext extends CostStrategy {
+  def blockEnv: BlockEnv
   def txId: Hash
   def signatures: Stack[Signature]
   def getInitialBalances(): ExeResult[Balances]
 }
 
 object StatelessContext {
-  def apply(txId: Hash, txGas: GasBox, signature: Signature): StatelessContext = {
+  def apply(
+      blockEnv: BlockEnv,
+      txId: Hash,
+      txGas: GasBox,
+      signature: Signature
+  ): StatelessContext = {
     val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
-    apply(txId, txGas, stack)
+    apply(blockEnv, txId, txGas, stack)
   }
 
-  def apply(txId: Hash, txGas: GasBox, signatures: Stack[Signature]): StatelessContext =
-    new Impl(txId, signatures, txGas)
+  def apply(
+      blockEnv: BlockEnv,
+      txId: Hash,
+      txGas: GasBox,
+      signatures: Stack[Signature]
+  ): StatelessContext =
+    new Impl(blockEnv, txId, signatures, txGas)
 
-  final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
-      extends StatelessContext {
+  final class Impl(
+      val blockEnv: BlockEnv,
+      val txId: Hash,
+      val signatures: Stack[Signature],
+      var gasRemaining: GasBox
+  ) extends StatelessContext {
     override def getInitialBalances(): ExeResult[Balances] = failed(NonPayableFrame)
   }
 }
@@ -145,25 +160,27 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
 object StatefulContext {
   def apply(
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputs: AVector[TxOutput]
   ): StatefulContext = {
-    new Impl(tx, worldState, preOutputs, gasRemaining)
+    new Impl(blockEnv, tx, worldState, preOutputs, gasRemaining)
   }
 
   def build(
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputsOpt: Option[AVector[TxOutput]]
   ): ExeResult[StatefulContext] = {
     preOutputsOpt match {
-      case Some(outputs) => Right(apply(tx, gasRemaining, worldState, outputs))
+      case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
         worldState.getPreOutputsForVM(tx) match {
-          case Right(Some(outputs)) => Right(apply(tx, gasRemaining, worldState, outputs))
+          case Right(Some(outputs)) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
           case Right(None)          => failed(NonExistTxInput)
           case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
         }
@@ -171,6 +188,7 @@ object StatefulContext {
   }
 
   final class Impl(
+      val blockEnv: BlockEnv,
       val tx: TransactionAbstract,
       val initWorldState: WorldState.Cached,
       val preOutputs: AVector[TxOutput],

@@ -300,6 +300,7 @@ object StatelessVM {
   final case class AssetScriptExecution(gasRemaining: GasBox)
 
   def runAssetScript(
+      blockEnv: BlockEnv,
       txId: Hash,
       initialGas: GasBox,
       script: StatelessScript,
@@ -307,17 +308,18 @@ object StatelessVM {
       signature: Signature
   ): ExeResult[AssetScriptExecution] = {
     val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
-    runAssetScript(txId, initialGas, script, args, stack)
+    runAssetScript(blockEnv, txId, initialGas, script, args, stack)
   }
 
   def runAssetScript(
+      blockEnv: BlockEnv,
       txId: Hash,
       initialGas: GasBox,
       script: StatelessScript,
       args: AVector[Val],
       signatures: Stack[Signature]
   ): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(txId, initialGas, signatures)
+    val context = StatelessContext(blockEnv, txId, initialGas, signatures)
     val obj     = script.toObject
     execute(context, obj, args)
   }
@@ -359,24 +361,26 @@ object StatefulVM {
   // dryrun will not commit worldstate changes, which is efficient for tx validation
   def dryrunTxScript(
       worldState: WorldState.Cached,
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       preOutputs: AVector[TxOutput],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
-    runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
+    runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
   // run will commit worldstate changes
   def runTxScript(
       worldState: WorldState.Cached,
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       preOutputsOpt: Option[AVector[TxOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
     for {
-      context <- StatefulContext.build(tx, gasRemaining, worldState, preOutputsOpt)
+      context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
     } yield {
       context.commitStates()

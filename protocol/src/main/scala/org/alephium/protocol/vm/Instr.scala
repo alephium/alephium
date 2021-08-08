@@ -105,7 +105,8 @@ object Instr {
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
-    Blake2bByteVec, Keccak256ByteVec, CheckSignature
+    Blake2bByteVec, Keccak256ByteVec, CheckSignature,
+    BlockTimeStamp, BlockTarget
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -696,9 +697,6 @@ case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0
   }
 }
 
-sealed trait CryptoInstr extends StatelessInstr with GasSchedule                         {}
-sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
-
 case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasVeryLow {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -707,6 +705,9 @@ case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0
     } yield ()
   }
 }
+
+sealed trait CryptoInstr extends StatelessInstr with GasSchedule                         {}
+sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
 
 sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
     extends CryptoInstr
@@ -1044,6 +1045,32 @@ object ContractCodeHash extends ContractInstr with GasLow {
       contractId <- frame.popContractId()
       contract   <- frame.ctx.loadContract(contractId)
       _          <- frame.pushOpStack(contract.getCodeHash())
+    } yield ()
+  }
+}
+
+sealed trait BlockInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLow
+
+object BlockTimeStamp extends BlockInstr {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      timestamp <- {
+        val millis = frame.ctx.blockEnv.timeStamp.millis
+        util.U256.fromLong(millis).toRight(Right(NegativeTimeStamp(millis)))
+      }
+      _ <- frame.pushOpStack(Val.U256(timestamp))
+    } yield ()
+  }
+}
+
+object BlockTarget extends BlockInstr {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      target <- {
+        val value = frame.ctx.blockEnv.target.value
+        util.U256.from(value).toRight(Right(InvalidTarget(value)))
+      }
+      _ <- frame.pushOpStack(Val.U256(target))
     } yield ()
   }
 }

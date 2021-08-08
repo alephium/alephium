@@ -232,8 +232,8 @@ object BlockFlow extends StrictLogging {
       intraWeight + diffsWeight
     }
 
-    def getBestTipUnsafe: BlockHash = {
-      aggregateHash(_.getBestTipUnsafe)(blockHashOrdering.max)
+    def getBestTipUnsafe(): BlockHash = {
+      aggregateHash(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
 
     override def getAllTips: AVector[BlockHash] = {
@@ -261,7 +261,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def getBestIntraGroupTip(): BlockHash = {
-      intraGroupChains.reduceBy(_.getBestTipUnsafe)(blockHashOrdering.max)
+      intraGroupChains.reduceBy(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
 
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {
