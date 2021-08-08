@@ -49,16 +49,16 @@ class InstrSpec extends AlephiumSpec {
       BytesConst(Val.ByteVec.default), AddressConst(Val.Address.default),
       LoadLocal(byte), StoreLocal(byte),
       Pop,
-      NotBool, AndBool, OrBool, EqBool,
+      NotBool, AndBool, OrBool, EqBool, NeBool,
       I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
       U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
       U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
       I256ToU256, U256ToI256,
-      EqByteVec, EqAddress,
+      EqByteVec, NeByteVec, EqAddress, NeAddress,
       Jump(int), IfTrue(int), IfFalse(int),
       CallLocal(byte), Return,
       Assert,
-      Blake2bByteVec, Keccak256ByteVec, CheckSignature,
+      Blake2b, Keccak256, Sha256, Sha3, CheckSignature,
       BlockTimeStamp, BlockTarget
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(

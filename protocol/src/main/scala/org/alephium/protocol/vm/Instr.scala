@@ -21,7 +21,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
-import org.alephium.crypto._
+import org.alephium.crypto
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.serde.{deserialize => decode, _}
@@ -96,16 +96,16 @@ object Instr {
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop,
-    NotBool, AndBool, OrBool, EqBool,
+    NotBool, AndBool, OrBool, EqBool, NeBool,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
     U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
     I256ToU256, U256ToI256,
-    EqByteVec, EqAddress,
+    EqByteVec, NeByteVec, EqAddress, NeAddress,
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
-    Blake2bByteVec, Keccak256ByteVec, CheckSignature,
+    Blake2b, Keccak256, Sha256, Sha3, CheckSignature,
     BlockTimeStamp, BlockTarget
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -541,32 +541,28 @@ case object NotBool extends LogicInstr with GasVeryLow {
     } yield ()
   }
 }
-case object AndBool extends LogicInstr with GasVeryLow {
+trait BinaryBool extends LogicInstr with GasVeryLow {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool
+
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool2 <- frame.popOpStackT[Val.Bool]()
       bool1 <- frame.popOpStackT[Val.Bool]()
-      _     <- frame.pushOpStack(bool1.and(bool2))
+      _     <- frame.pushOpStack(op(bool1, bool2))
     } yield ()
   }
 }
-case object OrBool extends LogicInstr with GasVeryLow {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      bool2 <- frame.popOpStackT[Val.Bool]()
-      bool1 <- frame.popOpStackT[Val.Bool]()
-      _     <- frame.pushOpStack(bool1.or(bool2))
-    } yield ()
-  }
+case object AndBool extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = bool1.and(bool2)
 }
-case object EqBool extends LogicInstr with GasVeryLow {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      bool2 <- frame.popOpStackT[Val.Bool]()
-      bool1 <- frame.popOpStackT[Val.Bool]()
-      _     <- frame.pushOpStack(Val.Bool(bool1 == bool2))
-    } yield ()
-  }
+case object OrBool extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = bool1.or(bool2)
+}
+case object EqBool extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 == bool2)
+}
+case object NeBool extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 != bool2)
 }
 
 sealed trait ConversionInstr[R <: Val, U <: Val]
@@ -596,20 +592,30 @@ case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryL
   }
 }
 
-sealed trait EqT[T <: Val]
+sealed trait ComparisonInstr[T <: Val]
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
     with GasVeryLow {
+  def op(x: T, y: T): Val.Bool
+
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       x <- frame.popOpStackT[T]()
       y <- frame.popOpStackT[T]()
-      _ <- frame.pushOpStack(Val.Bool(x == y))
+      _ <- frame.pushOpStack(op(x, y))
     } yield ()
   }
 }
+sealed trait EqT[T <: Val] extends ComparisonInstr[T] {
+  def op(x: T, y: T): Val.Bool = Val.Bool(x == y)
+}
+sealed trait NeT[T <: Val] extends ComparisonInstr[T] {
+  def op(x: T, y: T): Val.Bool = Val.Bool(x != y)
+}
 case object EqByteVec extends EqT[Val.ByteVec]
+case object NeByteVec extends NeT[Val.ByteVec]
 case object EqAddress extends EqT[Val.Address]
+case object NeAddress extends NeT[Val.Address]
 
 sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
 sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}
@@ -706,21 +712,19 @@ case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0
   }
 }
 
-sealed trait CryptoInstr extends StatelessInstr with GasSchedule                         {}
-sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
+sealed trait CryptoInstr extends StatelessInstr with GasSchedule
+sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple
 
-sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
+sealed abstract class HashAlg[H <: RandomBytes]
     extends CryptoInstr
     with StatelessInstrCompanion0
     with GasHash {
-  def convert(t: T): ByteString
-
   def hash(bs: ByteString): H
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      input <- frame.popOpStackT[T]()
-      bytes = convert(input)
+      input <- frame.popOpStackT[Val.ByteVec]()
+      bytes = ByteString.fromArrayUnsafe(input.a.toArray)
       _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
       _ <- frame.pushOpStack(Val.ByteVec.from(hash(bytes)))
     } yield ()
@@ -728,30 +732,27 @@ sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
 }
 
 object HashAlg {
-  trait ByteVecConvertor {
-    def convert(t: Val.ByteVec): ByteString =
-      ByteString.fromArrayUnsafe(t.a.toArray)
-  }
-
   trait Blake2bHash {
-    def hash(bs: ByteString): Blake2b = Blake2b.hash(bs)
+    def hash(bs: ByteString): crypto.Blake2b = crypto.Blake2b.hash(bs)
   }
 
   trait Keccak256Hash {
-    def hash(bs: ByteString): Keccak256 = Keccak256.hash(bs)
+    def hash(bs: ByteString): crypto.Keccak256 = crypto.Keccak256.hash(bs)
+  }
+
+  trait Sha256Hash {
+    def hash(bs: ByteString): crypto.Sha256 = crypto.Sha256.hash(bs)
+  }
+
+  trait Sha3Hash {
+    def hash(bs: ByteString): crypto.Sha3 = crypto.Sha3.hash(bs)
   }
 }
 
-case object Blake2bByteVec
-    extends HashAlg[Val.ByteVec, Blake2b]
-    with HashAlg.ByteVecConvertor
-    with HashAlg.Blake2bHash
-
-// TODO: maybe remove Keccak from the VM
-case object Keccak256ByteVec
-    extends HashAlg[Val.ByteVec, Keccak256]
-    with HashAlg.ByteVecConvertor
-    with HashAlg.Keccak256Hash
+case object Blake2b   extends HashAlg[crypto.Blake2b] with HashAlg.Blake2bHash
+case object Keccak256 extends HashAlg[crypto.Keccak256] with HashAlg.Keccak256Hash
+case object Sha256    extends HashAlg[crypto.Sha256] with HashAlg.Sha256Hash
+case object Sha3      extends HashAlg[crypto.Sha3] with HashAlg.Sha3Hash
 
 case object CheckSignature extends Signature with StatelessInstrCompanion0 with GasSignature {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

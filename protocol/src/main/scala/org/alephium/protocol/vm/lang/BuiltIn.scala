@@ -64,9 +64,13 @@ object BuiltIn {
   sealed abstract class GenericStatelessBuiltIn(val name: String) extends BuiltIn[StatelessContext]
 
   val blake2b: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2bByteVec)
+    SimpleStatelessBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2b)
   val keccak256: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256ByteVec)
+    SimpleStatelessBuiltIn("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256)
+  val sha256: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("sha256", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha256)
+  val sha3: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
   val assert: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
   val checkSignature: SimpleStatelessBuiltIn =
@@ -119,6 +123,8 @@ object BuiltIn {
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
+    sha256,
+    sha3,
     assert,
     checkSignature,
     blockTimeStamp,

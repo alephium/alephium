@@ -44,6 +44,11 @@ object HashSchema {
     new Sha256(bs)
   }
 
+  def unsafeSha3(bs: ByteString): Sha3 = {
+    assume(bs.size == Sha256.length)
+    new Sha3(bs)
+  }
+
   def unsafeByte32(bs: ByteString): Byte32 = {
     assume(bs.size == Byte32.length)
     new Byte32(bs)

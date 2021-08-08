@@ -29,6 +29,7 @@ import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 
+// scalastyle:off no.equal
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
@@ -632,6 +633,29 @@ class VMSpec extends AlephiumSpec {
     test()
     test()
     test()
+  }
+
+  it should "test crypto built-ins" in new ContractFixture {
+    val input = Hex.toHexString(ByteString.fromString("Hello World1"))
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
+         |    assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
+         |    assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
+         |    assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30)
+         |    assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A)
+         |    assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90)
+         |    assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743)
+         |    assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740)
+         |  }
+         |}
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(main).rightValue
+    val block  = simpleScript(blockFlow, chainIndex, script)
+    addAndCheck(blockFlow, block)
   }
 
   behavior of "constant product market"

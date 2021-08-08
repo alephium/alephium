@@ -97,6 +97,18 @@ object TestOperator {
       }
     }
   }
+  case object Ne extends TestOperator {
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Type.I256    => Seq(NeI256)
+        case Type.U256    => Seq(NeU256)
+        case Type.Bool    => Seq(NeBool)
+        case Type.ByteVec => Seq(NeByteVec)
+        case Type.Address => Seq(NeAddress)
+        case _            => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
 
   private def inequality(
       i256Instr: BinaryArithmeticInstr[Val.I256],
@@ -113,7 +125,6 @@ object TestOperator {
     }
   }
 
-  val Ne: TestOperator = inequality(NeI256, NeU256)
   val Lt: TestOperator = inequality(LtI256, LtU256)
   val Le: TestOperator = inequality(LeI256, LeU256)
   val Gt: TestOperator = inequality(GtI256, GtU256)
