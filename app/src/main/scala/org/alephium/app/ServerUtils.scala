@@ -67,6 +67,16 @@ class ServerUtils(implicit
         .flatMap(failed)
     } yield balance
 
+  def getUTXOs(blockFlow: BlockFlow, address: Address.Asset): Try[AVector[UTXO]] =
+    for {
+      _ <- checkGroup(address.lockupScript)
+      utxos <- blockFlow
+        .getUTXOs(address.lockupScript)
+        .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
+        .left
+        .flatMap(failed)
+    } yield utxos
+
   def getGroup(query: GetGroup): Try[Group] = {
     Right(Group(query.address.groupIndex(brokerConfig).value))
   }

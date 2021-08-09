@@ -37,6 +37,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getBlockflow,
     getBlock,
     getBalance,
+    getUTXOs,
     getGroup,
     getHashesAtHeight,
     getChainInfo,

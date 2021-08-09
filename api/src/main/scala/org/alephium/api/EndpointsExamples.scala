@@ -82,6 +82,14 @@ trait EndpointsExamples extends ErrorExamples {
     U256.unsafe(1000)
   )
 
+  private val utxo = UTXO(
+    OutputRef(scriptHint = 23412, key = hash),
+    balance,
+    tokens,
+    ts,
+    ByteString.empty
+  )
+
   private val blockEntry = BlockEntry(
     blockHash,
     timestamp = ts,
@@ -192,6 +200,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val balanceExamples: List[Example[Balance]] =
     simpleExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3))
+
+  implicit val utxosExamples: List[Example[AVector[UTXO]]] =
+    simpleExample(AVector(utxo))
 
   implicit val groupExamples: List[Example[Group]] =
     simpleExample(Group(group = 2))

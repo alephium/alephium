@@ -69,16 +69,22 @@ trait TxUtils { Self: FlowUtils =>
     assume(brokerConfig.contains(groupIndex))
 
     val currentTs = TimeStamp.now()
-    for {
-      groupView <- getImmutableGroupViewIncludePool(groupIndex)
-      utxos     <- groupView.getRelevantUtxos(lockupScript, Int.MaxValue)
-    } yield {
+
+    getUTXOs(lockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
         if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
       }
       (balance, lockedBalance, utxos.length)
     }
+  }
+
+  def getUTXOs(lockupScript: LockupScript.Asset): IOResult[AVector[AssetOutputInfo]] = {
+    val groupIndex = lockupScript.groupIndex
+    assume(brokerConfig.contains(groupIndex))
+
+    getImmutableGroupViewIncludePool(groupIndex)
+      .flatMap(_.getRelevantUtxos(lockupScript, Int.MaxValue))
   }
 
   def transfer(

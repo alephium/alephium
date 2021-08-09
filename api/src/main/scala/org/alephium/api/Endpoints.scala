@@ -155,14 +155,22 @@ trait Endpoints
       .in(path[Address.Asset]("address"))
       .in("balance")
       .out(jsonBody[Balance])
-      .summary("Get the balance of a address")
+      .summary("Get the balance of an address")
+
+  // TODO: query based on token id?
+  val getUTXOs: BaseEndpoint[Address.Asset, AVector[UTXO]] =
+    addressesEndpoint.get
+      .in(path[Address.Asset]("address"))
+      .in("utxos")
+      .out(jsonBody[AVector[UTXO]])
+      .summary("Get the UTXOs of an address")
 
   val getGroup: BaseEndpoint[Address.Asset, Group] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("group")
       .out(jsonBody[Group])
-      .summary("Get the group of a address")
+      .summary("Get the group of an address")
 
   //have to be lazy to let `groupConfig` being initialized
   lazy val getHashesAtHeight: BaseEndpoint[(ChainIndex, Int), HashesAtHeight] =
