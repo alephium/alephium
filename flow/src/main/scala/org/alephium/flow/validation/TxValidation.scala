@@ -68,7 +68,7 @@ trait TxValidation {
           chainIndex <- getChainIndex(tx)
           worldState <- from(flow.getBestCachedWorldState(chainIndex.from))
           fullTx <- fromExeResult(
-            StatefulVM.runTxScript(worldState, tx, preOutputs, script, tx.unsigned.startGas)
+            StatefulVM.dryrunTxScript(worldState, tx, preOutputs, script, tx.unsigned.startGas)
           ).map { result => FlowUtils.convertSuccessfulTx(tx, result) }
         } yield fullTx
     }
@@ -624,7 +624,7 @@ object TxValidation {
           case Some(script) =>
             val preAssetOutputs = preOutputs.take(tx.unsigned.inputs.length)
             fromExeResult(
-              StatefulVM.runTxScript(worldState, tx, preAssetOutputs, script, gasRemaining)
+              StatefulVM.dryrunTxScript(worldState, tx, preAssetOutputs, script, gasRemaining)
             )
               .flatMap { case StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs) =>
                 if (contractInputs != tx.contractInputs) {

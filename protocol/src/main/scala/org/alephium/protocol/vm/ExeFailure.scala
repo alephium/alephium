@@ -43,8 +43,9 @@ case object NoReturnVal                                        extends ExeFailur
 final case class InvalidType(v: Val)                           extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
+case object InsufficientArgs                                   extends ExeFailure
 case object InvalidMethodParamsType                            extends ExeFailure
-case object PrivateExternalMethodCall                          extends ExeFailure
+case object ExternalPrivateMethodCall                          extends ExeFailure
 case object EqualityFailed                                     extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
 case object PcOverflow                                         extends ExeFailure
@@ -68,6 +69,10 @@ case object InvalidTokenId                                     extends ExeFailur
 case object ExpectAContract                                    extends ExeFailure
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
+case object ContractAssetAlreadyInUsing                        extends ExeFailure
+case object ContractAssetAlreadyFlushed                        extends ExeFailure
+case object ContractAssetUnloaded                              extends ExeFailure
+case object EmptyContractAsset                                 extends ExeFailure
 
 sealed trait IOFailure {
   def error: IOError

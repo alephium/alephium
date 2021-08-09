@@ -28,13 +28,11 @@ trait BlockEnv
 trait TxEnv
 trait ContractEnv
 
-trait Context extends CostStrategy {
+trait StatelessContext extends CostStrategy {
   def txId: Hash
   def signatures: Stack[Signature]
-  def getInitialBalances: ExeResult[Frame.Balances]
+  def getInitialBalances(): ExeResult[Balances]
 }
-
-trait StatelessContext extends Context
 
 object StatelessContext {
   def apply(txId: Hash, txGas: GasBox, signature: Signature): StatelessContext = {
@@ -47,14 +45,14 @@ object StatelessContext {
 
   final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
       extends StatelessContext {
-    override def getInitialBalances: ExeResult[Frame.Balances] = failed(NonPayableFrame)
+    override def getInitialBalances(): ExeResult[Balances] = failed(NonPayableFrame)
   }
 }
 
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
-  def outputBalances: Frame.Balances
+  def outputBalances: Balances
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput]        = ArrayBuffer.empty
   lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
@@ -64,9 +62,23 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
     ContractOutputRef.unsafe(txId, output, nextOutputIndex)
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def generateOutput(output: TxOutput): ExeResult[Unit] = {
+    output.lockupScript match {
+      case LockupScript.P2C(contractId) =>
+        val contractOutput = output.asInstanceOf[ContractOutput]
+        val outputRef      = nextContractOutputRef(contractOutput)
+        generatedOutputs.addOne(output)
+        updateContractAsset(contractId, outputRef, contractOutput)
+      case _ =>
+        generatedOutputs.addOne(output)
+        Right(())
+    }
+  }
+
   def createContract(
       code: StatefulContract,
-      initialBalances: Frame.BalancesPerLockup,
+      initialBalances: BalancesPerLockup,
       initialFields: AVector[Val]
   ): ExeResult[Unit] = {
     val contractId = TxOutputRef.key(txId, nextOutputIndex)
@@ -76,22 +88,29 @@ trait StatefulContext extends StatelessContext with ContractPool {
       initialBalances.tokenVector
     )
     val outputRef = nextContractOutputRef(contractOutput)
-    worldState
-      .createContract(code, initialFields, outputRef, contractOutput)
-      .map(_ => discard(generatedOutputs.addOne(contractOutput)))
-      .left
-      .map(e => Left(IOErrorUpdateState(e)))
+    for {
+      _ <- code.check(initialFields)
+      _ <-
+        worldState
+          .createContractUnsafe(code, initialFields, outputRef, contractOutput)
+          .map(_ => discard(generatedOutputs.addOne(contractOutput)))
+          .left
+          .map(e => Left(IOErrorUpdateState(e)))
+    } yield ()
   }
 
-  def useContractAsset(contractId: ContractId): ExeResult[Frame.BalancesPerLockup] = {
-    worldState
-      .useContractAsset(contractId)
-      .map { case (contractOutputRef, contractAsset) =>
-        contractInputs.addOne(contractOutputRef)
-        Frame.BalancesPerLockup.from(contractAsset)
-      }
-      .left
-      .map(e => Left(IOErrorLoadContract(e)))
+  def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {
+    for {
+      balances <- worldState
+        .useContractAsset(contractId)
+        .map { case (contractOutputRef, contractAsset) =>
+          contractInputs.addOne(contractOutputRef)
+          BalancesPerLockup.from(contractAsset)
+        }
+        .left
+        .map(e => Left(IOErrorLoadContract(e)))
+      _ <- markAssetInUsing(contractId)
+    } yield balances
   }
 
   def updateContractAsset(
@@ -99,10 +118,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): ExeResult[Unit] = {
-    worldState
-      .updateContract(contractId, outputRef, output)
-      .left
-      .map(e => Left(IOErrorUpdateState(e)))
+    for {
+      _ <- worldState
+        .updateContract(contractId, outputRef, output)
+        .left
+        .map(e => Left(IOErrorUpdateState(e)))
+      _ <- markAssetFlushed(contractId)
+    } yield ()
   }
 }
 
@@ -111,15 +133,32 @@ object StatefulContext {
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
-      preOutputsOpt: Option[AVector[TxOutput]]
+      preOutputs: AVector[TxOutput]
   ): StatefulContext = {
-    new Impl(tx, worldState, preOutputsOpt, gasRemaining)
+    new Impl(tx, worldState, preOutputs, gasRemaining)
+  }
+
+  def build(
+      tx: TransactionAbstract,
+      gasRemaining: GasBox,
+      worldState: WorldState.Cached,
+      preOutputsOpt: Option[AVector[TxOutput]]
+  ): ExeResult[StatefulContext] = {
+    preOutputsOpt match {
+      case Some(outputs) => Right(apply(tx, gasRemaining, worldState, outputs))
+      case None =>
+        worldState.getPreOutputsForVM(tx) match {
+          case Right(Some(outputs)) => Right(apply(tx, gasRemaining, worldState, outputs))
+          case Right(None)          => failed(NonExistTxInput)
+          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
+        }
+    }
   }
 
   final class Impl(
       val tx: TransactionAbstract,
       val initWorldState: WorldState.Cached,
-      val preOutputsOpt: Option[AVector[TxOutput]],
+      val preOutputs: AVector[TxOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
     override val worldState: WorldState.Staging = initWorldState.staging()
@@ -142,11 +181,10 @@ object StatefulContext {
         "org.wartremover.warts.Serializable"
       )
     )
-    override def getInitialBalances: ExeResult[Frame.Balances] =
+    override def getInitialBalances(): ExeResult[Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
-          preOutputs <- getPreOutputs()
-          balances <- Frame.Balances
+          balances <- Balances
             .from(preOutputs, tx.unsigned.fixedOutputs)
             .toRight(Right(InvalidBalances))
           _ <- balances
@@ -157,16 +195,6 @@ object StatefulContext {
         failed(NonPayableFrame)
       }
 
-    private def getPreOutputs(): ExeResult[AVector[TxOutput]] = preOutputsOpt match {
-      case Some(outputs) => Right(outputs)
-      case None =>
-        initWorldState.getPreOutputsForVM(tx) match {
-          case Right(Some(outputs)) => Right(outputs)
-          case Right(None)          => failed(NonExistTxInput)
-          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
-        }
-    }
-
-    override val outputBalances: Frame.Balances = Frame.Balances.empty
+    override val outputBalances: Balances = Balances.empty
   }
 }

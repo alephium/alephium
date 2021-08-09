@@ -22,9 +22,12 @@ import org.alephium.protocol.model.ContractId
 import org.alephium.util.{AVector, EitherF}
 
 trait ContractPool extends CostStrategy {
+  import ContractPool._
+
   def worldState: WorldState.Staging
 
-  val pool = mutable.Map.empty[ContractId, StatefulContractObject]
+  val pool        = mutable.Map.empty[ContractId, StatefulContractObject]
+  val assetStatus = mutable.Map.empty[ContractId, ContractAssetStatus]
 
   def loadContract(contractKey: ContractId): ExeResult[StatefulContractObject] = {
     pool.get(contractKey) match {
@@ -51,7 +54,7 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  def commitContractStates(): ExeResult[Unit] = {
+  def updateContractStates(): ExeResult[Unit] = {
     EitherF.foreachTry(pool) { case (contractKey, contractObj) =>
       if (contractObj.isUpdated) {
         for {
@@ -65,10 +68,42 @@ trait ContractPool extends CostStrategy {
   }
 
   private def updateState(contractKey: ContractId, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.updateContract(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
+    worldState.updateContractUnsafe(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
+  }
+
+  def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {
+    if (assetStatus.contains(contractId)) {
+      failed(ContractAssetAlreadyInUsing)
+    } else {
+      assetStatus.put(contractId, ContractAssetInUsing)
+      Right(())
+    }
+  }
+
+  def markAssetFlushed(contractId: ContractId): ExeResult[Unit] = {
+    assetStatus.get(contractId) match {
+      case Some(ContractAssetInUsing) => Right(assetStatus.update(contractId, ContractAssetFlushed))
+      case Some(ContractAssetFlushed) => failed(ContractAssetAlreadyFlushed)
+      case None                       => failed(ContractAssetUnloaded)
+    }
+  }
+
+  def checkAllAssetsFlushed(): ExeResult[Unit] = {
+    if (assetStatus.forall(_._2 == ContractAssetFlushed)) {
+      Right(())
+    } else {
+      failed(EmptyContractAsset)
+    }
+  }
+
+  def commitStates(): Unit = {
+    worldState.commit()
+    ()
   }
 }
 
 object ContractPool {
-  final case class State(state: mutable.ArraySeq[Val]) extends AnyVal
+  sealed trait ContractAssetStatus
+  case object ContractAssetInUsing extends ContractAssetStatus
+  case object ContractAssetFlushed extends ContractAssetStatus
 }

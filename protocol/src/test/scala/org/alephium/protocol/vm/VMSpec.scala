@@ -19,6 +19,8 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import org.scalatest.Assertion
+
 import org.alephium.protocol
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.model.minimalGas
@@ -26,31 +28,79 @@ import org.alephium.serde._
 import org.alephium.util._
 
 class VMSpec extends AlephiumSpec with ContextGenerators {
-  it should "not call from private function" in {
-    val method =
-      Method[StatefulContext](
-        isPublic = false,
-        isPayable = false,
-        argsType = AVector.empty,
-        localsLength = 0,
-        returnType = AVector.empty,
-        instrs = AVector.empty
-      )
-    val contract = StatefulContract(AVector.empty, methods = AVector(method))
-    val (obj, context) =
-      prepareContract(contract, AVector[Val]())
-    StatefulVM.execute(context, obj, AVector(Val.U256(U256.Two))) is
-      failed(PrivateExternalMethodCall)
+
+  trait Fixture {
+    val baseMethod = Method[StatefulContext](
+      isPublic = true,
+      isPayable = false,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector.empty
+    )
+
+    def failMainMethod(
+        method: Method[StatefulContext],
+        args: AVector[Val] = AVector.empty,
+        gasLimit: GasBox = minimalGas,
+        failure: ExeFailure
+    ): Assertion = {
+      val contract = StatefulContract(0, methods = AVector(method))
+      failContract(contract, args, gasLimit, failure)
+    }
+
+    def failContract(
+        contract: StatefulContract,
+        args: AVector[Val] = AVector.empty,
+        gasLimit: GasBox = minimalGas,
+        failure: ExeFailure
+    ): Assertion = {
+      val (obj, context) =
+        prepareContract(contract, AVector[Val](), gasLimit)
+      StatefulVM.execute(context, obj, args).leftValue.rightValue is failure
+    }
   }
 
-  it should "overflow oprand stack" in {
+  it should "not call from private function" in new Fixture {
+    failMainMethod(baseMethod.copy(isPublic = false), failure = ExternalPrivateMethodCall)
+  }
+
+  it should "fail when there is no main method" in new Fixture {
+    failContract(
+      StatefulContract(0, AVector.empty),
+      failure = InvalidMethodIndex(0)
+    )
+  }
+
+  it should "check the number of args for entry method" in new Fixture {
+    failMainMethod(baseMethod.copy(argsLength = 1), failure = InvalidMethodArgLength(0, 1))
+  }
+
+  it should "check the number of args for called method" in new Fixture {
+    failContract(
+      StatefulContract(
+        0,
+        AVector(baseMethod.copy(instrs = AVector(CallLocal(1))), baseMethod.copy(argsLength = 1))
+      ),
+      failure = InsufficientArgs
+    )
+  }
+
+  it should "not return values for main function" in new Fixture {
+    failMainMethod(
+      baseMethod.copy(returnLength = 1, instrs = AVector(U256Const0, Return)),
+      failure = NonEmptyReturnForMainFunction
+    )
+  }
+
+  it should "overflow oprand stack" in new Fixture {
     val method =
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector.empty,
+        returnLength = 0,
         instrs = AVector(
           U256Const0,
           U256Const0,
@@ -65,14 +115,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         )
       )
 
-    val contract = StatefulContract(AVector.empty, methods = AVector(method))
-    val (obj, context) =
-      prepareContract(contract, AVector[Val](), 1000000)
-    StatefulVM.execute(
-      context,
-      obj,
-      AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1)))
-    ) is failed(StackOverflow)
+    failMainMethod(
+      method,
+      AVector(Val.U256(U256.unsafe(opStackMaxSize.toLong / 2 - 1))),
+      1000000,
+      StackOverflow
+    )
   }
 
   it should "execute the following script" in {
@@ -80,12 +128,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector(Val.U256),
+        returnLength = 1,
         instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const5, U256Add, Return)
       )
-    val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
+    val contract = StatefulContract(2, methods = AVector(method))
     val (obj, context) =
       prepareContract(contract, AVector[Val](Val.U256(U256.Zero), Val.U256(U256.One)))
     StatefulVM.executeWithOutputs(context, obj, AVector(Val.U256(U256.Two))) isE
@@ -96,18 +144,18 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     val method0 = Method[StatelessContext](
       isPublic = true,
       isPayable = false,
-      argsType = AVector(Val.U256),
+      argsLength = 1,
       localsLength = 1,
-      returnType = AVector(Val.U256),
+      returnLength = 1,
       instrs = AVector(LoadLocal(0), CallLocal(1), Return)
     )
     val method1 =
       Method[StatelessContext](
         isPublic = false,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector(Val.U256),
+        returnLength = 1,
         instrs = AVector(LoadLocal(0), U256Const1, U256Add, Return)
       )
     val script = StatelessScript(methods = AVector(method0, method1))
@@ -119,11 +167,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   trait BalancesFixture {
     val (_, pubKey0) = SignatureSchema.generatePriPub()
     val address0     = Val.Address(LockupScript.p2pkh(pubKey0))
-    val balances0    = Frame.BalancesPerLockup(100, mutable.Map.empty, 0)
+    val balances0    = BalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = Frame.BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
+    val balances1    = BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
       new StatefulContext {
@@ -133,28 +181,33 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
         def nextOutputIndex: Int                  = 0
 
-        def getInitialBalances: ExeResult[Frame.Balances] = {
+        def getInitialBalances(): ExeResult[Balances] = {
           Right(
-            Frame.Balances(
+            Balances(
               ArrayBuffer(address0.lockupScript -> balances0, address1.lockupScript -> balances1)
             )
           )
         }
 
-        override val outputBalances: Frame.Balances = Frame.Balances.empty
+        override val outputBalances: Balances = Balances.empty
       }
 
-    def testInstrs(instrs: AVector[Instr[StatefulContext]], expected: ExeResult[AVector[Val]]) = {
-      val method = Method[StatefulContext](
-        isPublic = true,
-        isPayable = true,
-        argsType = AVector.empty,
-        localsLength = 0,
-        returnType = expected.fold(_ => AVector.empty[Val.Type], _.map(_.tpe)),
-        instrs
-      )
+    def testInstrs(
+        instrs: AVector[AVector[Instr[StatefulContext]]],
+        expected: ExeResult[AVector[Val]]
+    ) = {
+      val methods = instrs.mapWithIndex { case (instrs, index) =>
+        Method[StatefulContext](
+          isPublic = index equals 0,
+          isPayable = true,
+          argsLength = 0,
+          localsLength = 0,
+          returnLength = expected.fold(_ => 0, _.length),
+          instrs
+        )
+      }
       val context = mockContext()
-      val obj     = StatefulScript.from(AVector(method)).get.toObject
+      val obj     = StatefulScript.from(methods).get.toObject
 
       StatefulVM.executeWithOutputs(context, obj, AVector.empty) is expected
 
@@ -162,11 +215,18 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     }
 
     def pass(instrs: AVector[Instr[StatefulContext]], expected: AVector[Val]) = {
-      testInstrs(instrs, Right(expected))
+      testInstrs(AVector(instrs), Right(expected))
+    }
+
+    def passMulti(
+        instrss: AVector[AVector[Instr[StatefulContext]]],
+        expected: AVector[Val]
+    ) = {
+      testInstrs(instrss, Right(expected))
     }
 
     def fail(instrs: AVector[Instr[StatefulContext]], expected: ExeFailure) = {
-      testInstrs(instrs, failed(expected))
+      testInstrs(AVector(instrs), failed(expected))
     }
   }
 
@@ -210,6 +270,32 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
+  }
+
+  it should "pass approved tokens to function call" in new BalancesFixture {
+    val instrs0 = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      U256Const(Val.U256(10)),
+      ApproveAlf,
+      CallLocal(1),
+      AddressConst(address0),
+      U256Const(Val.U256(20)),
+      ApproveAlf,
+      CallLocal(2)
+    )
+    val instrs1 = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      AlfRemaining,
+      U256Const(Val.U256(10)),
+      CheckEqU256
+    )
+    val instrs2 = AVector[Instr[StatefulContext]](
+      AddressConst(address0),
+      AlfRemaining,
+      U256Const(Val.U256(20)),
+      CheckEqU256
+    )
+    passMulti(AVector(instrs0, instrs1, instrs2), AVector.empty[Val])
   }
 
   it should "fail when no enough balance for approval" in new BalancesFixture {
@@ -264,12 +350,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
-        argsType = AVector(Val.U256),
+        argsLength = 1,
         localsLength = 1,
-        returnType = AVector.empty,
+        returnLength = 0,
         instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const1, U256Add, StoreField(1))
       )
-    val contract = StatefulContract(AVector(Val.U256, Val.U256), methods = AVector(method))
+    val contract = StatefulContract(2, methods = AVector(method))
     serialize(contract)(StatefulContract.serde).nonEmpty is true
   }
 }

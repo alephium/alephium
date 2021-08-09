@@ -358,16 +358,17 @@ trait FlowFixture
     val groupView  = blockFlow.getMutableGroupView(mainGroup).rightValue
     val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
-      .runTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
+      .dryrunTxScript(groupView.worldState, tx, preOutputs, txScript, tx.unsigned.startGas)
       .rightValue
     result.contractInputs -> result.generatedOutputs
   }
 
-  def addAndCheck(blockFlow: BlockFlow, block: Block): Assertion = {
+  def addAndCheck(blockFlow: BlockFlow, block: Block): Unit = {
     val blockValidation =
       BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
     blockValidation.validate(block, blockFlow).isRight is true
     blockFlow.addAndUpdateView(block).isRight is true
+    checkOutputs(blockFlow, block)
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
@@ -461,6 +462,20 @@ trait FlowFixture
       .rightValue
       .length is numAssets
     worldState.getContractOutputs(ByteString.empty, Int.MaxValue).rightValue.length is numContracts
+  }
+
+  def checkOutputs(blockFlow: BlockFlow, block: Block): Unit = {
+    val chainIndex = block.chainIndex
+    if (chainIndex.isIntraGroup) {
+      block.nonCoinbase.foreach { tx =>
+        tx.allOutputs.foreachWithIndex { case (output, index) =>
+          val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
+          val worldState =
+            blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+          worldState.existOutput(outputRef) isE true
+        }
+      }
+    }
   }
 }
 

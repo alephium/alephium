@@ -17,22 +17,19 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, EitherF}
 
-sealed abstract class VM[Ctx <: Context](
+sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
     frameStack: Stack[Frame[Ctx]],
     operandStack: Stack[Val]
 ) {
   def execute(obj: ContractObj[Ctx], methodIndex: Int, args: AVector[Val]): ExeResult[Unit] = {
-    for {
-      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack)
-      _          <- frameStack.push(startFrame)
-      _          <- executeFrames()
-    } yield ()
+    execute(obj, methodIndex, args, None)
   }
 
   def executeWithOutputs(
@@ -42,22 +39,32 @@ sealed abstract class VM[Ctx <: Context](
   ): ExeResult[AVector[Val]] = {
     var outputs: AVector[Val]                     = AVector.ofSize(0)
     val returnTo: AVector[Val] => ExeResult[Unit] = returns => { outputs = returns; Right(()) }
+    execute(obj, methodIndex, args, Some(returnTo)).map(_ => outputs)
+  }
+
+  @inline
+  private def execute(
+      obj: ContractObj[Ctx],
+      methodIndex: Int,
+      args: AVector[Val],
+      returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
+  ): ExeResult[Unit] = {
     for {
-      startFrame <- obj.startFrameWithOutputs(ctx, methodIndex, args, operandStack, returnTo)
+      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
-    } yield outputs
+    } yield ()
   }
 
   @tailrec
   private def executeFrames(): ExeResult[Unit] = {
-    if (frameStack.nonEmpty) {
-      executeCurrentFrame(frameStack.topUnsafe) match {
-        case Right(_)    => executeFrames()
-        case Left(error) => Left(error)
-      }
-    } else {
-      Right(())
+    frameStack.top match {
+      case Some(topFrame) =>
+        executeCurrentFrame(topFrame) match {
+          case Right(_)    => executeFrames()
+          case Left(error) => Left(error)
+        }
+      case None => Right(())
     }
   }
 
@@ -75,13 +82,13 @@ sealed abstract class VM[Ctx <: Context](
     for {
       _ <- frameStack.pop()
       _ <- frameStack.top match {
-        case Some(nextFrame) => switchFrame(currentFrame, nextFrame)
-        case None            => completeLastFrame(currentFrame)
+        case Some(previousFrame) => switchBackFrame(currentFrame, previousFrame)
+        case None                => completeLastFrame(currentFrame)
       }
     } yield ()
   }
 
-  protected def switchFrame(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
+  protected def switchBackFrame(currentFrame: Frame[Ctx], nextFrame: Frame[Ctx]): ExeResult[Unit]
 
   protected def completeLastFrame(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
@@ -91,7 +98,7 @@ final class StatelessVM(
     frameStack: Stack[Frame[StatelessContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
-  protected def switchFrame(
+  protected def switchBackFrame(
       currentFrame: Frame[StatelessContext],
       nextFrame: Frame[StatelessContext]
   ): ExeResult[Unit] = Right(())
@@ -104,16 +111,16 @@ final class StatefulVM(
     frameStack: Stack[Frame[StatefulContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
-  protected def switchFrame(
+  protected def switchBackFrame(
       currentFrame: Frame[StatefulContext],
-      nextFrame: Frame[StatefulContext]
+      previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
     if (currentFrame.method.isPayable) {
       val resultOpt = for {
-        currentBalances <- currentFrame.balanceStateOpt
-        nextBalances    <- nextFrame.balanceStateOpt
-        _               <- merge(nextBalances.remaining, currentBalances.remaining)
-        _               <- merge(nextBalances.remaining, currentBalances.approved)
+        currentBalances  <- currentFrame.balanceStateOpt
+        previousBalances <- previousFrame.balanceStateOpt
+        _                <- mergeBack(previousBalances.remaining, currentBalances.remaining)
+        _                <- mergeBack(previousBalances.remaining, currentBalances.approved)
       } yield ()
       resultOpt match {
         case Some(_) => okay
@@ -124,7 +131,7 @@ final class StatefulVM(
     }
   }
 
-  protected def merge(next: Frame.Balances, current: Frame.Balances): Option[Unit] = {
+  protected def mergeBack(previous: Balances, current: Balances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= current.all.length) {
@@ -134,7 +141,7 @@ final class StatefulVM(
         if (balancesPerLockup.scopeDepth <= 0) {
           ctx.outputBalances.add(lockupScript, balancesPerLockup)
         } else {
-          next.add(lockupScript, balancesPerLockup) match {
+          previous.add(lockupScript, balancesPerLockup) match {
             case Some(_) => iter(index + 1)
             case None    => None
           }
@@ -147,7 +154,7 @@ final class StatefulVM(
 
   protected def completeLastFrame(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     for {
-      _ <- ctx.commitContractStates()
+      _ <- ctx.updateContractStates()
       _ <- cleanBalances(lastFrame)
     } yield ()
   }
@@ -165,39 +172,20 @@ final class StatefulVM(
           case None    => failed(InvalidBalances)
         }
         _ <- outputGeneratedBalances(ctx.outputBalances)
+        _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       Right(())
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def outputGeneratedBalances(outputBalances: Frame.Balances): ExeResult[Unit] = {
-    @tailrec
-    def iter(index: Int): ExeResult[Unit] = {
-      if (index >= outputBalances.all.length) {
-        okay
-      } else {
-        val (lockupScript, balances) = outputBalances.all(index)
-        balances.toTxOutput(lockupScript) match {
-          case Right(outputOpt) =>
-            outputOpt.foreach { output =>
-              lockupScript match {
-                case LockupScript.P2C(contractId) =>
-                  val contractOutput = output.asInstanceOf[ContractOutput]
-                  val outputRef      = ctx.nextContractOutputRef(contractOutput)
-                  ctx.updateContractAsset(contractId, outputRef, contractOutput)
-                case _ => ()
-              }
-              ctx.generatedOutputs.addOne(output)
-            }
-            iter(index + 1)
-          case Left(error) => Left(error)
-        }
+  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
+    EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
+      balances.toTxOutput(lockupScript).flatMap {
+        case Some(output) => ctx.generateOutput(output)
+        case None         => Right(())
       }
     }
-
-    iter(0)
   }
 }
 
@@ -211,9 +199,8 @@ object StatelessVM {
       args: AVector[Val],
       signature: Signature
   ): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(txId, initialGas, signature)
-    val obj     = script.toObject
-    execute(context, obj, args)
+    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
+    runAssetScript(txId, initialGas, script, args, stack)
   }
 
   def runAssetScript(
@@ -228,16 +215,20 @@ object StatelessVM {
     execute(context, obj, args)
   }
 
+  private def default(ctx: StatelessContext): StatelessVM = {
+    new StatelessVM(
+      ctx,
+      Stack.ofCapacity(frameStackMaxSize),
+      Stack.ofCapacity(opStackMaxSize)
+    )
+  }
+
   private def execute(
       context: StatelessContext,
       obj: ContractObj[StatelessContext],
       args: AVector[Val]
   ): ExeResult[AssetScriptExecution] = {
-    val vm = new StatelessVM(
-      context,
-      Stack.ofCapacity(frameStackMaxSize),
-      Stack.ofCapacity(opStackMaxSize)
-    )
+    val vm = default(context)
     vm.execute(obj, 0, args).map(_ => AssetScriptExecution(context.gasRemaining))
   }
 
@@ -246,11 +237,7 @@ object StatelessVM {
       obj: ContractObj[StatelessContext],
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    val vm = new StatelessVM(
-      context,
-      Stack.ofCapacity(frameStackMaxSize),
-      Stack.ofCapacity(opStackMaxSize)
-    )
+    val vm = default(context)
     vm.executeWithOutputs(obj, 0, args)
   }
 }
@@ -262,7 +249,8 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
-  def runTxScript(
+  // dryrun will not commit worldstate changes, which is efficient for tx validation
+  def dryrunTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
       preOutputs: AVector[TxOutput],
@@ -272,6 +260,7 @@ object StatefulVM {
     runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
   }
 
+  // run will commit worldstate changes
   def runTxScript(
       worldState: WorldState.Cached,
       tx: TransactionAbstract,
@@ -279,10 +268,11 @@ object StatefulVM {
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(tx, gasRemaining, worldState, preOutputsOpt)
-    val obj     = script.toObject
-    execute(context, obj, AVector.empty).map { _ =>
-      context.worldState.commit()
+    for {
+      context <- StatefulContext.build(tx, gasRemaining, worldState, preOutputsOpt)
+      _       <- execute(context, script.toObject, AVector.empty)
+    } yield {
+      context.commitStates()
       TxScriptExecution(
         context.gasRemaining,
         AVector.from(context.contractInputs),
@@ -291,13 +281,16 @@ object StatefulVM {
     }
   }
 
+  private def default(ctx: StatefulContext): StatefulVM = {
+    new StatefulVM(ctx, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+  }
+
   def execute(
       context: StatefulContext,
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[Unit] = {
-    val vm =
-      new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+    val vm = default(context)
     vm.execute(obj, 0, args)
   }
 
@@ -306,8 +299,7 @@ object StatefulVM {
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    val vm =
-      new StatefulVM(context, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
+    val vm = default(context)
     vm.executeWithOutputs(obj, 0, args)
   }
 }
