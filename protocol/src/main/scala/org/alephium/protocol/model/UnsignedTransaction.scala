@@ -186,11 +186,12 @@ object UnsignedTransaction {
 
   def calculateTokensRemainder(
       inputs: AVector[(AssetOutputRef, AssetOutput)],
-      outputInfos: AVector[TxOutputInfo]
+      outputs: AVector[TxOutputInfo]
   ): Either[String, AVector[(TokenId, U256)]] = {
     for {
+      _         <- checkMinimumAlfForTokens(outputs)
       inputs    <- calculateTotalAmountPerToken(inputs.flatMap(_._2.tokens))
-      outputs   <- calculateTotalAmountPerToken(outputInfos.flatMap(_.tokens))
+      outputs   <- calculateTotalAmountPerToken(outputs.flatMap(_.tokens))
       _         <- checkNoNewTokensInOutputs(inputs, outputs)
       remainder <- calculateRemainingTokens(inputs, outputs)
     } yield {
@@ -216,6 +217,16 @@ object UnsignedTransaction {
         Left("Not enough Alf for change output because of tokens")
       }
     }
+  }
+
+  private def checkMinimumAlfForTokens(
+      outputs: AVector[TxOutputInfo]
+  ): Either[String, Unit] = {
+    val notOk = outputs.exists { output =>
+      output.tokens.nonEmpty && output.alfAmount < minimumTokenAlfAmount
+    }
+
+    Option.when(notOk)("Not enough Alf for change output because of tokens").toLeft(())
   }
 
   private def calculateTotalAmountPerToken(
