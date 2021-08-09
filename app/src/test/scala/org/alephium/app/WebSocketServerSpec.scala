@@ -65,7 +65,7 @@ class WebSocketServerSpec
     val headerHash  = header.hash.toHexString
     val chainIndex  = header.chainIndex
 
-    val result = WebSocketServer.blockNotifyEncode(blockNotify, networkType)
+    val result = WebSocketServer.blockNotifyEncode(blockNotify)
 
     val depsString = AVector.fill(groupConfig.depsNum)(s""""${dep.toHexString}"""").mkString(",")
     show(
@@ -82,9 +82,8 @@ class WebSocketServerSpec
   }
 
   trait Fixture extends ServerFixture {
-    implicit lazy val apiConfig: ApiConfig     = ApiConfig.load(newConfig)
-    implicit lazy val networkType: NetworkType = config.network.networkType
-    lazy val blockflowFetchMaxAge              = apiConfig.blockflowFetchMaxAge
+    implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
+    lazy val blockflowFetchMaxAge          = apiConfig.blockflowFetchMaxAge
   }
 
   trait WebSocketServerFixture extends Fixture {

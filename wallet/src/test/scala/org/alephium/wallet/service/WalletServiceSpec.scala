@@ -25,7 +25,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, U256}
 import org.alephium.wallet.config.WalletConfigFixture
@@ -70,7 +70,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     override lazy val walletService = WalletService(
       blockFlowClient,
       Paths.get(path),
-      config.networkType,
+      config.chainId,
       Duration.ofMinutesUnsafe(10)
     )
 
@@ -106,7 +106,6 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val notFound   = WalletNotFound(new File(tempSecretDir.toString, walletName))
     val address =
       Address.Asset(
-        NetworkType.Devnet,
         LockupScript.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
       )
 
@@ -170,13 +169,13 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     lazy val blockFlowClient =
       BlockFlowClient.apply(
         config.blockflow.uri,
-        config.networkType,
+        config.chainId,
         config.blockflow.blockflowFetchMaxAge,
         config.blockflow.apiKey
       )
 
     lazy val walletService: WalletService =
-      WalletService.apply(blockFlowClient, tempSecretDir, config.networkType, config.lockingTimeout)
+      WalletService.apply(blockFlowClient, tempSecretDir, config.chainId, config.lockingTimeout)
   }
 }
 

@@ -107,13 +107,8 @@ class BlockChainHandler(
     if (brokerConfig.contains(block.chainIndex.from)) {
       val broadcastIntraClique = brokerConfig.brokerNum != 1
       if (isNodeSynced || broadcastIntraClique) {
-        val blockMessage =
-          Message.serialize(NewBlocks(AVector(block)), networkSetting.networkType)
-        val headerMessage =
-          Message.serialize(
-            NewHeaders(AVector(block.header)),
-            networkSetting.networkType
-          )
+        val blockMessage  = Message.serialize(NewBlocks(AVector(block)))
+        val headerMessage = Message.serialize(NewHeaders(AVector(block.header)))
         val event =
           CliqueManager.BroadCastBlock(
             block,

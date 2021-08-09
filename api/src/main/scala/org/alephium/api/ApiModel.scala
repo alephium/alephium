@@ -45,7 +45,6 @@ object ApiModel {
 trait ApiModelCodec {
 
   def blockflowFetchMaxAge: Duration
-  implicit def networkType: NetworkType
 
   implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
   implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
@@ -93,7 +92,7 @@ trait ApiModelCodec {
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
     StringWriter.comap[Address.Asset](_.toBase58)
   implicit lazy val assetAddressReader: Reader[Address.Asset] = StringReader.map { input =>
-    Address.fromBase58(input, networkType) match {
+    Address.fromBase58(input) match {
       case Some(address: Address.Asset) => address
       case Some(_: Address.Contract) =>
         throw Abort(s"Expect asset address, but got contract address: $input")
@@ -105,7 +104,7 @@ trait ApiModelCodec {
   implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
   implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
     Address
-      .fromBase58(input, networkType)
+      .fromBase58(input)
       .getOrElse(
         throw new Abort(s"Unable to decode address from $input")
       )
@@ -116,10 +115,8 @@ trait ApiModelCodec {
     Hex.from(s).flatMap(CliqueId.from).getOrElse(throw new Abort("invalid clique id"))
   }
 
-  implicit val networkTypeWriter: Writer[NetworkType] = StringWriter.comap(_.name)
-  implicit val networkTypeReader: Reader[NetworkType] = StringReader.map { s =>
-    NetworkType.fromName(s).getOrElse(throw new Abort("Invalid network type."))
-  }
+  implicit val chainIdWriter: Writer[ChainId] = ByteWriter.comap[ChainId](_.id)
+  implicit val chainIdReader: Reader[ChainId] = ByteReader.map(ChainId(_))
 
   implicit val fetchResponseRW: RW[FetchResponse] = macroRW
 

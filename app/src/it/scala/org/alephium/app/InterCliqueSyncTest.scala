@@ -26,7 +26,7 @@ import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
-import org.alephium.protocol.model.{BrokerInfo, NetworkType, Version}
+import org.alephium.protocol.model.{BrokerInfo, ChainId, Version}
 import org.alephium.util._
 
 class Injected[T](injection: ByteString => ByteString, ref: ActorRef) extends ActorRefT[T](ref) {
@@ -49,10 +49,10 @@ object Injected {
       ref: ActorRef
   )(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
     val injectionData: ByteString => ByteString = data => {
-      val message = Message.deserialize(data, networkConfig.networkType).toOption.get
+      val message = Message.deserialize(data).toOption.get
       if (injection.isDefinedAt(message)) {
         val injected     = injection.apply(message)
-        val injectedData = Message.serialize(injected, networkConfig.networkType)
+        val injectedData = Message.serialize(injected)
         injectedData
       } else {
         data
@@ -181,15 +181,17 @@ class InterCliqueSyncTest extends AlephiumSpec {
     // scalastyle:on method.length
   }
 
-  it should "ban node if not same network type" in new TestFixture("2-nodes") {
+  it should "ban node if not same chain id" in new TestFixture("2-nodes") {
     val server0 = bootClique(1).servers.head
     server0.start().futureValue is ()
 
-    val currentNetworkType = config.network.networkType
-    currentNetworkType isnot NetworkType.Mainnet
+    val currentChainId = config.network.chainId
+    currentChainId isnot ChainId.AlephiumMainNet
     val modifier: ByteString => ByteString = { data =>
-      val message = Message.deserialize(data, currentNetworkType).toOption.get
-      Message.serialize(message.payload, NetworkType.Mainnet)
+      val message = Message.deserialize(data).toOption.get
+      Message.serialize(message.payload)(new NetworkConfig {
+        override def chainId: ChainId = ChainId.AlephiumMainNet
+      })
     }
     val server1 =
       bootClique(

@@ -37,7 +37,7 @@ class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
     val broker = system.actorOf(
       Broker.props(ActorRefT[Bootstrapper.Command](bootstrapper.ref))(
         brokerConfig,
-        networkSetting.copy(coordinatorAddress = coordinatorAddress)
+        networkConfig.copy(coordinatorAddress = coordinatorAddress)
       )
     )
     watch(broker)

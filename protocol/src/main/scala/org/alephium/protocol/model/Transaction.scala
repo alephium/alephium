@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
-import org.alephium.protocol.config.{EmissionConfig, GroupConfig}
+import org.alephium.protocol.config.{EmissionConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -117,7 +117,7 @@ object Transaction {
       outputs: AVector[AssetOutput],
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
-  ): Transaction = {
+  )(implicit networkConfig: NetworkConfig): Transaction = {
     from(UnsignedTransaction(inputs, outputs), generatedOutputs, privateKey)
   }
 
@@ -125,7 +125,7 @@ object Transaction {
       inputs: AVector[TxInput],
       outputs: AVector[AssetOutput],
       privateKey: PrivateKey
-  ): Transaction = {
+  )(implicit networkConfig: NetworkConfig): Transaction = {
     from(inputs, outputs, AVector.empty, privateKey)
   }
 
@@ -133,7 +133,7 @@ object Transaction {
       inputs: AVector[TxInput],
       outputs: AVector[AssetOutput],
       inputSignatures: AVector[Signature]
-  ): Transaction = {
+  )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
       contractInputs = AVector.empty,
@@ -148,7 +148,7 @@ object Transaction {
       outputs: AVector[AssetOutput],
       generatedOutputs: AVector[TxOutput],
       inputSignatures: AVector[Signature]
-  ): Transaction = {
+  )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
       contractInputs = AVector.empty,
@@ -211,7 +211,7 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp
-  )(implicit emissionConfig: EmissionConfig): Transaction = {
+  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs)
   }
 
@@ -222,7 +222,7 @@ object Transaction {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp
-  )(implicit emissionConfig: EmissionConfig): Transaction = {
+  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
     coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs)
   }
@@ -233,7 +233,7 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp
-  )(implicit emissionConfig: EmissionConfig): Transaction = {
+  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs)
   }
 
@@ -244,7 +244,7 @@ object Transaction {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp
-  )(implicit emissionConfig: EmissionConfig): Transaction = {
+  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val reward       = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
@@ -268,7 +268,9 @@ object Transaction {
     )
   }
 
-  def genesis(balances: AVector[(LockupScript.Asset, U256)]): Transaction = {
+  def genesis(
+      balances: AVector[(LockupScript.Asset, U256)]
+  )(implicit networkConfig: NetworkConfig): Transaction = {
     val outputs = balances.map[AssetOutput] { case (lockupScript, value) =>
       TxOutput.genesis(value, lockupScript)
     }

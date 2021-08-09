@@ -16,12 +16,12 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{CliqueId, GroupIndex, NetworkType}
+import org.alephium.protocol.model.{ChainId, CliqueId, GroupIndex}
 import org.alephium.util.AVector
 
 final case class SelfClique(
     cliqueId: CliqueId,
-    networkType: NetworkType,
+    chainId: ChainId,
     numZerosAtLeastInHash: Int,
     nodes: AVector[PeerAddress],
     selfReady: Boolean,

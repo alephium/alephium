@@ -35,8 +35,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val networkType          = networkSetting.networkType
-    implicit val serverUtils = new ServerUtils(networkType)
+    implicit val serverUtils = new ServerUtils
 
     for {
       targetGroup <- 0 until groups0
@@ -44,9 +43,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       val chainIndex                         = ChainIndex.unsafe(targetGroup, targetGroup)
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-      val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
-      val destination1                       = generateDestination(chainIndex, networkType)
-      val destination2                       = generateDestination(chainIndex, networkType)
+      val fromAddress                        = Address.p2pkh(fromPublicKey)
+      val destination1                       = generateDestination(chainIndex)
+      val destination2                       = generateDestination(chainIndex)
 
       val destinations = AVector(destination1, destination2)
       val buildTransaction = serverUtils
@@ -90,8 +89,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "check tx status for inter group txs" in new FlowFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val networkType          = networkSetting.networkType
-    implicit val serverUtils = new ServerUtils(networkType)
+    implicit val serverUtils = new ServerUtils
 
     for {
       from <- 0 until groups0
@@ -102,9 +100,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       val chainIndex                         = ChainIndex.unsafe(from, to)
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-      val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
-      val destination1                       = generateDestination(chainIndex, networkType)
-      val destination2                       = generateDestination(chainIndex, networkType)
+      val fromAddress                        = Address.p2pkh(fromPublicKey)
+      val destination1                       = generateDestination(chainIndex)
+      val destination2                       = generateDestination(chainIndex)
 
       val destinations = AVector(destination1, destination2)
       val buildTransaction = serverUtils
@@ -156,8 +154,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "check sweep all tx status for intra group txs" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val networkType          = networkSetting.networkType
-    implicit val serverUtils = new ServerUtils(networkType)
+    implicit val serverUtils = new ServerUtils
 
     for {
       targetGroup <- 0 until groups0
@@ -165,7 +162,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val chainIndex                         = ChainIndex.unsafe(targetGroup, targetGroup)
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-      val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
+      val fromAddress                        = Address.p2pkh(fromPublicKey)
       val selfDestination                    = Destination(fromAddress, ALF.oneAlf)
 
       info("Sending some coins to itself twice, creating 3 UTXOs in total for the same public key")
@@ -194,7 +191,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sweep coins from the 3 UTXOs of this public key to another address")
       val senderBalanceBeforeSweep = genesisBalance - block0.transactions.head.gasFeeUnsafe
-      val sweepAllToAddress        = generateAddress(chainIndex, networkType)
+      val sweepAllToAddress        = generateAddress(chainIndex)
       val buildSweepAllTransaction = serverUtils
         .buildSweepAllTransaction(
           blockFlow,
@@ -229,8 +226,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "check sweep all tx status for inter group txs" in new FlowFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val networkType          = networkSetting.networkType
-    implicit val serverUtils = new ServerUtils(networkType)
+    implicit val serverUtils = new ServerUtils
 
     for {
       from <- 0 until groups0
@@ -241,10 +237,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val chainIndex                         = ChainIndex.unsafe(from, to)
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-      val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
+      val fromAddress                        = Address.p2pkh(fromPublicKey)
       val toGroup                            = chainIndex.to
       val (toPrivateKey, toPublicKey, _)     = genesisKeys(toGroup.value)
-      val toAddress                          = Address.p2pkh(networkType, toPublicKey)
+      val toAddress                          = Address.p2pkh(toPublicKey)
       val destination                        = Destination(toAddress, ALF.oneAlf)
 
       info("Sending some coins to an address, resulting 3 UTXOs for its corresponding public key")
@@ -284,7 +280,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sweep coins from the 3 UTXOs for the same public key to another address")
       val senderBalanceBeforeSweep = receiverInitialBalance + ALF.alf(2)
-      val sweepAllToAddress        = generateAddress(chainIndex, networkType)
+      val sweepAllToAddress        = generateAddress(chainIndex)
       val buildSweepAllTransaction = serverUtils
         .buildSweepAllTransaction(
           blockFlow,
@@ -316,13 +312,12 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixture {
-    val networkType = networkSetting.networkType
-    val serverUtils = new ServerUtils(networkType)
+    val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
-    val destination1          = generateDestination(chainIndex, networkType)
-    val destination2          = generateDestination(chainIndex, networkType)
+    val destination1          = generateDestination(chainIndex)
+    val destination2          = generateDestination(chainIndex)
     val destinations          = AVector(destination1, destination2)
 
     val unsignedTx = serverUtils
@@ -349,8 +344,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixture {
-    val networkType = networkSetting.networkType
-    val serverUtils = new ServerUtils(networkType)
+    val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
@@ -367,14 +361,13 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail when outputs belong to different groups" in new FlowFixture {
-    val networkType = networkSetting.networkType
-    val serverUtils = new ServerUtils(networkType)
+    val serverUtils = new ServerUtils
 
     val chainIndex1           = ChainIndex.unsafe(0, 0)
     val chainIndex2           = ChainIndex.unsafe(0, 1)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex1.from.value)
-    val destination1          = generateDestination(chainIndex1, networkType)
-    val destination2          = generateDestination(chainIndex2, networkType)
+    val destination1          = generateDestination(chainIndex1)
+    val destination2          = generateDestination(chainIndex2)
     val destinations          = AVector(destination1, destination2)
 
     val buildTransaction = serverUtils
@@ -387,19 +380,19 @@ class ServerUtilsSpec extends AlephiumSpec {
     buildTransaction.detail is "Different groups for transaction outputs"
   }
 
-  private def generateDestination(chainIndex: ChainIndex, networkType: NetworkType)(implicit
+  private def generateDestination(chainIndex: ChainIndex)(implicit
       groupConfig: GroupConfig
   ): Destination = {
-    val address = generateAddress(chainIndex, networkType)
+    val address = generateAddress(chainIndex)
     val amount  = ALF.oneAlf
     Destination(address, amount)
   }
 
-  private def generateAddress(chainIndex: ChainIndex, networkType: NetworkType)(implicit
+  private def generateAddress(chainIndex: ChainIndex)(implicit
       groupConfig: GroupConfig
   ): Address.Asset = {
     val (_, toPublicKey) = chainIndex.to.generateKey
-    Address.p2pkh(networkType, toPublicKey)
+    Address.p2pkh(toPublicKey)
   }
 
   private def signAndAddToMemPool(

@@ -60,11 +60,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   val apiKey = Hash.generate.toHexString
 
-  val networkType = NetworkType.Mainnet
-
   val inetAddress = InetAddress.getByName("127.0.0.1")
 
-  def generateAddress(): Address.Asset = Address.p2pkh(networkType, PublicKey.generate)
+  def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
 
   def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
     write(data) is jsonRaw.filterNot(_.isWhitespace)
@@ -128,12 +126,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val peerAddress =
       PeerAddress(inetAddress, 9001, 9002, 9003)
     val selfClique =
-      SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peerAddress), true, false, 1, 2)
+      SelfClique(cliqueId, ChainId.AlephiumMainNet, 18, AVector(peerAddress), true, false, 1, 2)
     val jsonRaw =
       s"""
          |{
          |  "cliqueId": "${cliqueId.toHexString}",
-         |  "networkType": "mainnet",
+         |  "chainId": 0,
          |  "numZerosAtLeastInHash": 18,
          |  "nodes": [{"address":"127.0.0.1","restPort":9001,"wsPort":9002,"minerApiPort":9003}],
          |  "selfReady": true,
@@ -267,7 +265,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode BuildTransaction" in {
     val fromPublicKey = PublicKey.generate
     val toKey         = PublicKey.generate
-    val toAddress     = Address.p2pkh(networkType, toKey)
+    val toAddress     = Address.p2pkh(toKey)
 
     {
       val transfer = BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1)))

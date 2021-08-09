@@ -760,7 +760,7 @@
                   "totalBalance": "1000000",
                   "balances": [
                     {
-                      "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                       "balance": "1000000"
                     }
                   ]
@@ -863,7 +863,7 @@
               "example": {
                 "destinations": [
                   {
-                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                     "amount": "1000000"
                   }
                 ]
@@ -980,7 +980,7 @@
                 "$ref": "#/components/schemas/SweepAll"
               },
               "example": {
-                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
               }
             }
           },
@@ -1095,9 +1095,9 @@
                   "$ref": "#/components/schemas/Addresses"
                 },
                 "example": {
-                  "activeAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                   "addresses": [
-                    "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
                   ]
                 }
               }
@@ -1204,7 +1204,7 @@
                   {
                     "addresses": [
                       {
-                        "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                         "group": 2
                       }
                     ]
@@ -1308,7 +1308,7 @@
                   "$ref": "#/components/schemas/Result3"
                 },
                 "example": {
-                  "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
                 }
               }
             }
@@ -1412,7 +1412,7 @@
                 },
                 "example": [
                   {
-                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                     "group": 2
                   }
                 ]
@@ -1512,7 +1512,7 @@
                 "$ref": "#/components/schemas/ChangeActiveAddress"
               },
               "example": {
-                "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
               }
             }
           },
@@ -1696,7 +1696,7 @@
                 },
                 "example": {
                   "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "networkType": "mainnet",
+                  "chainId": 0,
                   "numZerosAtLeastInHash": 18,
                   "nodes": [
                     {
@@ -2242,7 +2242,7 @@
                               {
                                 "type": "asset",
                                 "amount": "1000000000000000000",
-                                "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                                 "tokens": [
                                   {
                                     "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -2388,7 +2388,7 @@
                         {
                           "type": "asset",
                           "amount": "1000000000000000000",
-                          "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3065,7 +3065,7 @@
                       {
                         "type": "asset",
                         "amount": "1000000000000000000",
-                        "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3173,7 +3173,7 @@
                 "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                 "destinations": [
                   {
-                    "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                     "amount": "2",
                     "lockTime": 1611041396892
                   }
@@ -3285,7 +3285,7 @@
               },
               "example": {
                 "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                "toAddress": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                 "lockTime": 1611041396892,
                 "gas": 1,
                 "gasPrice": "1"
@@ -3527,7 +3527,7 @@
                     {
                       "type": "asset",
                       "amount": "1000000000000000000",
-                      "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                       "tokens": [
                         {
                           "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3874,7 +3874,7 @@
                 "$ref": "#/components/schemas/Compile"
               },
               "example": {
-                "address": "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                 "type": "contract",
                 "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
                 "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"
@@ -4192,7 +4192,7 @@
                 },
                 "example": {
                   "addresses": [
-                    "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
                   ]
                 }
               }
@@ -4280,7 +4280,7 @@
               },
               "example": {
                 "addresses": [
-                  "M1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
                 ]
               }
             }
@@ -4413,14 +4413,10 @@
       },
       "Asset": {
         "required": [
-          "networkType",
           "lockupScript"
         ],
         "type": "object",
         "properties": {
-          "networkType": {
-            "$ref": "#/components/schemas/NetworkType"
-          },
           "lockupScript": {
             "$ref": "#/components/schemas/Asset1"
           }
@@ -4899,9 +4895,6 @@
           }
         }
       },
-      "Devnet": {
-        "type": "object"
-      },
       "FetchResponse": {
         "type": "object",
         "properties": {
@@ -4998,9 +4991,6 @@
           }
         }
       },
-      "Mainnet": {
-        "type": "object"
-      },
       "MemPooled": {
         "type": "object"
       },
@@ -5030,19 +5020,6 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/Unban"
-          }
-        ]
-      },
-      "NetworkType": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Devnet"
-          },
-          {
-            "$ref": "#/components/schemas/Mainnet"
-          },
-          {
-            "$ref": "#/components/schemas/Testnet"
           }
         ]
       },
@@ -5257,7 +5234,7 @@
       "SelfClique": {
         "required": [
           "cliqueId",
-          "networkType",
+          "chainId",
           "numZerosAtLeastInHash",
           "selfReady",
           "synced",
@@ -5269,8 +5246,8 @@
           "cliqueId": {
             "type": "string"
           },
-          "networkType": {
-            "$ref": "#/components/schemas/NetworkType"
+          "chainId": {
+            "type": "integer"
           },
           "numZerosAtLeastInHash": {
             "type": "integer"
@@ -5364,9 +5341,6 @@
             "$ref": "#/components/schemas/GasPrice"
           }
         }
-      },
-      "Testnet": {
-        "type": "object"
       },
       "Token": {
         "required": [

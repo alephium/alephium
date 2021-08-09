@@ -18,8 +18,8 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{NetworkType, Version}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.model.Version
 import org.alephium.serde
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 
@@ -38,8 +38,8 @@ object Message {
     Message(header, payload)
   }
 
-  def serialize(message: Message, networkType: NetworkType): ByteString = {
-    val magic    = networkType.magicBytes
+  def serialize(message: Message)(implicit networkConfig: NetworkConfig): ByteString = {
+    val magic    = networkConfig.magicBytes
     val header   = serde.serialize[Header](message.header)
     val payload  = Payload.serialize(message.payload)
     val data     = header ++ payload
@@ -49,14 +49,15 @@ object Message {
     magic ++ checksum ++ length ++ data
   }
 
-  def serialize[T <: Payload](payload: T, networkType: NetworkType): ByteString = {
-    serialize(apply(payload), networkType)
+  def serialize[T <: Payload](payload: T)(implicit networkConfig: NetworkConfig): ByteString = {
+    serialize(apply(payload))
   }
 
-  def _deserialize(input: ByteString, networkType: NetworkType)(implicit
-      config: GroupConfig
+  def _deserialize(input: ByteString)(implicit
+      config: GroupConfig,
+      networkConfig: NetworkConfig
   ): SerdeResult[Staging[Message]] = {
-    MessageSerde.unwrap(input, networkType).flatMap { case (checksum, length, rest) =>
+    MessageSerde.unwrap(input).flatMap { case (checksum, length, rest) =>
       for {
         messageRest <- MessageSerde.extractMessageBytes(length, rest)
         _           <- MessageSerde.checkChecksum(checksum, messageRest.value)
@@ -68,10 +69,11 @@ object Message {
     }
   }
 
-  def deserialize(input: ByteString, networkType: NetworkType)(implicit
-      config: GroupConfig
+  def deserialize(input: ByteString)(implicit
+      config: GroupConfig,
+      networkConfig: NetworkConfig
   ): SerdeResult[Message] = {
-    _deserialize(input, networkType).flatMap { case Staging(message, rest) =>
+    _deserialize(input).flatMap { case Staging(message, rest) =>
       if (rest.isEmpty) {
         Right(message)
       } else {

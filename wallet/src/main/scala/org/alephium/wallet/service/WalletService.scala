@@ -35,7 +35,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex, NetworkType}
+import org.alephium.protocol.model.{Address, ChainId, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, Service, TimeStamp, U256}
 import org.alephium.wallet.Constants
@@ -153,11 +153,11 @@ object WalletService {
   def apply(
       blockFlowClient: BlockFlowClient,
       secretDir: Path,
-      networkType: NetworkType,
+      chainId: ChainId,
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, executionContext: ExecutionContext): WalletService = {
 
-    new Impl(blockFlowClient, secretDir, networkType, lockingTimeout)
+    new Impl(blockFlowClient, secretDir, chainId, lockingTimeout)
   }
 
   final private case class StorageState(secretStorage: SecretStorage, lastAccess: TimeStamp)
@@ -198,14 +198,14 @@ object WalletService {
   private class Impl(
       blockFlowClient: BlockFlowClient,
       secretDir: Path,
-      networkType: NetworkType,
+      chainId: ChainId,
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
       extends WalletService {
 
     private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
 
-    private val path: AVector[Int] = Constants.path(networkType)
+    private val path: AVector[Int] = Constants.path(chainId)
 
     protected def startSelfOnce(): Future[Unit] = {
       Future.fromTry(Try(discard(Files.createDirectories(secretDir))))
@@ -380,7 +380,7 @@ object WalletService {
       withUserWallet(wallet) { secretStorage =>
         secretStorage
           .deriveNextKey()
-          .map(privateKey => Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey))
+          .map(privateKey => Address.p2pkh(privateKey.extendedPublicKey.publicKey))
           .left
           .map(WalletError.from)
       }
@@ -394,7 +394,7 @@ object WalletService {
         withPrivateKeys(secretStorage) { case (_, privateKeys) =>
           (for {
             privateKey <- privateKeys.find(privateKey =>
-              Address.p2pkh(networkType, privateKey.publicKey) == address
+              Address.p2pkh(privateKey.publicKey) == address
             )
             _ <- secretStorage.changeActiveKey(privateKey).toOption
           } yield (())).toRight(UnknownAddress(address): WalletError)
@@ -533,9 +533,9 @@ object WalletService {
     )(errorWrapper: WalletError => M[A]): M[A] =
       withWalletM(wallet) { storage =>
         withPrivateKeysM(storage) { case (active, privateKeys) =>
-          val activeAddress = Address.p2pkh(networkType, active.publicKey)
+          val activeAddress = Address.p2pkh(active.publicKey)
           val addresses =
-            privateKeys.map(privateKey => Address.p2pkh(networkType, privateKey.publicKey))
+            privateKeys.map(privateKey => Address.p2pkh(privateKey.publicKey))
           f((activeAddress, addresses))
         }(errorWrapper)
       }(errorWrapper)
@@ -574,9 +574,8 @@ object WalletService {
     private def buildMinerAddresses(
         privateKeys: AVector[ExtendedPrivateKey]
     ): AVector[AVector[(GroupIndex, Address.Asset, ExtendedPrivateKey)]] = {
-      val addresses = privateKeys.map(privateKey =>
-        (Address.p2pkh(networkType, privateKey.publicKey), privateKey)
-      )
+      val addresses =
+        privateKeys.map(privateKey => (Address.p2pkh(privateKey.publicKey), privateKey))
 
       val addressByGroup = addresses.toSeq.groupBy(_._1.groupIndex)
       val smallestIndex  = addressByGroup.values.map(_.length).minOption.getOrElse(1)
@@ -614,7 +613,7 @@ object WalletService {
       withPrivateKeys(storage) { case (_, keys) =>
         val addressByGroup = keys.toSeq
           .map { privateKey =>
-            Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
+            Address.p2pkh(privateKey.extendedPublicKey.publicKey)
           }
           .groupBy(_.groupIndex)
 
@@ -654,7 +653,7 @@ object WalletService {
         addressByGroup: Map[GroupIndex, Seq[Address.Asset]],
         privateKey: ExtendedPrivateKey
     ): Map[GroupIndex, Seq[Address.Asset]] = {
-      val address = Address.p2pkh(networkType, privateKey.extendedPublicKey.publicKey)
+      val address = Address.p2pkh(privateKey.extendedPublicKey.publicKey)
       val group   = address.groupIndex
       val newKeys = addressByGroup.get(group) match {
         case None       => Seq(address)

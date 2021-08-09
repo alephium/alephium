@@ -19,9 +19,7 @@ package org.alephium.wallet.json
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson._
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.json.Json._
-import org.alephium.json.Json.{ReadWriter => RW}
-import org.alephium.util.AVector
+import org.alephium.json.Json.{ReadWriter => RW, _}
 import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -50,10 +48,9 @@ trait ModelCodecs extends ApiModelCodec {
   implicit val mnemonicRW: RW[Mnemonic] = readwriter[String].bimap[Mnemonic](
     _.toLongString,
     { input =>
-      val words = AVector.from(input.split(" "))
       Mnemonic
-        .fromWords(words)
-        .getOrElse(throw new upickle.core.Abort(s"Cannot validate mnemonic: $input"))
+        .from(input)
+        .getOrElse(throw upickle.core.Abort(s"Cannot validate mnemonic: $input"))
     }
   )
 

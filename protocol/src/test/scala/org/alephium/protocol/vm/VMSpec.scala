@@ -24,11 +24,12 @@ import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.minimalGas
 import org.alephium.serde._
 import org.alephium.util._
 
-class VMSpec extends AlephiumSpec with ContextGenerators {
+class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
 
   trait Fixture {
     val baseMethod = Method[StatefulContext](

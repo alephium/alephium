@@ -27,9 +27,8 @@ import akka.util.ByteString
 import io.prometheus.client.Counter
 
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Message, Payload}
-import org.alephium.protocol.model.NetworkType
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
@@ -47,10 +46,11 @@ object ConnectionHandler {
   case object CloseConnection                extends Command
   final case class Send(message: ByteString) extends Command
 
-  def tryDeserializePayload(data: ByteString, networkType: NetworkType)(implicit
-      config: GroupConfig
+  def tryDeserializePayload(data: ByteString)(implicit
+      groupConfig: GroupConfig,
+      networkConfig: NetworkConfig
   ): SerdeResult[Option[Staging[Payload]]] = {
-    Message._deserialize(data, networkType) match {
+    Message._deserialize(data) match {
       case Right(Staging(message, newRest))   => Right(Some(Staging(message.payload, newRest)))
       case Left(_: SerdeError.NotEnoughBytes) => Right(None)
       case Left(e)                            => Left(e)
@@ -64,7 +64,7 @@ object ConnectionHandler {
   )(implicit val groupConfig: GroupConfig, val networkSetting: NetworkSetting)
       extends ConnectionHandler[Payload] {
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Payload]]] = {
-      tryDeserializePayload(data, networkSetting.networkType)
+      tryDeserializePayload(data)
     }
 
     override def handleNewMessage(payload: Payload): Unit = {

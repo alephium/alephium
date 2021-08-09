@@ -223,7 +223,7 @@ trait BrokerHandler extends FlowDataHandler {
 
   def send(payload: Payload): Unit = {
     brokerConnectionHandler !
-      ConnectionHandler.Send(Message.serialize(payload, networkSetting.networkType))
+      ConnectionHandler.Send(Message.serialize(payload))
   }
 
   override def unhandled(message: Any): Unit =

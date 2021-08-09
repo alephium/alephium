@@ -34,8 +34,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.json.Json._
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, BaseActor, EventBus, Service}
 
@@ -48,10 +47,10 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
     with Service {
   import WebSocketServer._
 
-  implicit val groupConfig: GroupConfig = node.config.broker
-  implicit val networkType: NetworkType = node.config.network.networkType
-  implicit val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
-  lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
+  implicit val groupConfig: GroupConfig     = node.config.broker
+  implicit val networkConfig: NetworkConfig = node.config.network
+  implicit val askTimeout: Timeout          = Timeout(apiConfig.askTimeout.asScala)
+  lazy val blockflowFetchMaxAge             = apiConfig.blockflowFetchMaxAge
 
   private val vertx         = Vertx.vertx()
   private val vertxEventBus = vertx.eventBus()
@@ -108,7 +107,7 @@ object WebSocketServer {
   object EventHandler {
     def props(
         vertxEventBus: VertxEventBus
-    )(implicit networkType: NetworkType, apiConfig: ApiConfig): Props = {
+    )(implicit networkConfig: NetworkConfig, apiConfig: ApiConfig): Props = {
       Props(new EventHandler(vertxEventBus))
     }
 
@@ -117,7 +116,7 @@ object WebSocketServer {
     case object ListSubscribers
   }
   class EventHandler(vertxEventBus: VertxEventBus)(implicit
-      val networkType: NetworkType,
+      val networkConfig: NetworkConfig,
       apiConfig: ApiConfig
   ) extends BaseActor
       with ApiModelCodec {
@@ -129,7 +128,7 @@ object WebSocketServer {
     def receive: Receive = {
       case event: EventBus.Event =>
         subscribers.foreach { subscriber =>
-          vertxEventBus.send(subscriber, handleEvent(event, networkType))
+          vertxEventBus.send(subscriber, handleEvent(event))
         }
       case EventHandler.Subscribe(subscriber) =>
         if (!subscribers.contains(subscriber)) { subscribers += subscriber }
@@ -140,25 +139,21 @@ object WebSocketServer {
     }
   }
 
-  def handleEvent(event: EventBus.Event, networkType: NetworkType)(implicit
-      writer: Writer[BlockEntry]
-  ): String = {
+  def handleEvent(event: EventBus.Event)(implicit writer: Writer[BlockEntry]): String = {
     event match {
       case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params       = blockNotifyEncode(bn, networkType)
+        val params       = blockNotifyEncode(bn)
         val notification = Notification("block_notify", params)
         write(notification)
     }
   }
-  private def blockHeaderEntryfrom(
-      blockNotify: BlockNotify,
-      networkType: NetworkType
-  ): BlockEntry = {
-    BlockEntry.from(blockNotify.block, blockNotify.height, networkType)
+
+  private def blockHeaderEntryfrom(blockNotify: BlockNotify): BlockEntry = {
+    BlockEntry.from(blockNotify.block, blockNotify.height)
   }
 
-  def blockNotifyEncode(blockNotify: BlockNotify, networkType: NetworkType)(implicit
+  def blockNotifyEncode(blockNotify: BlockNotify)(implicit
       writer: Writer[BlockEntry]
   ): ujson.Value =
-    writeJs(blockHeaderEntryfrom(blockNotify, networkType))
+    writeJs(blockHeaderEntryfrom(blockNotify))
 }

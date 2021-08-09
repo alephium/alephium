@@ -26,13 +26,13 @@ import sttp.model.Uri
 
 import org.alephium.api.model.ApiKey
 import org.alephium.conf._
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.model.ChainId
 import org.alephium.util.Duration
 
 final case class WalletConfig(
     port: Option[Int],
     secretDir: Path,
-    networkType: NetworkType,
+    chainId: ChainId,
     lockingTimeout: Duration,
     apiKey: Option[ApiKey],
     blockflow: WalletConfig.BlockFlow
@@ -49,10 +49,12 @@ object WalletConfig {
     val uri: Uri = Uri(host, port)
   }
 
-  implicit val networkTypeReader: ValueReader[NetworkType] = ValueReader[String].map { name =>
-    NetworkType
-      .fromName(name)
-      .getOrElse(throw new ConfigException.BadValue("", s"invalid network type: $name"))
+  implicit val chainIdReader: ValueReader[ChainId] = ValueReader[Int].map { id =>
+    ChainId
+      .from(id)
+      .getOrElse(
+        throw new ConfigException.BadValue("", s"invalid chain id: $id")
+      )
   }
 
   implicit private val apiValueReader: ValueReader[ApiKey] =
@@ -68,7 +70,7 @@ object WalletConfig {
       WalletConfig(
         as[Option[Int]]("port"),
         as[Path]("secretDir"),
-        as[NetworkType]("networkType"),
+        as[ChainId]("chainId"),
         as[Duration]("lockingTimeout"),
         as[Option[ApiKey]]("apiKey"),
         as[WalletConfig.BlockFlow]("blockflow")

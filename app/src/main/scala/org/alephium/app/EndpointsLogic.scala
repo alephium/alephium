@@ -44,7 +44,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -63,12 +63,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
-  implicit lazy val groupConfig: GroupConfig = brokerConfig
-  implicit lazy val networkType: NetworkType = node.config.network.networkType
-  implicit lazy val askTimeout: Timeout      = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig     = brokerConfig
+  implicit lazy val networkConfig: NetworkConfig = node.config.network
+  implicit lazy val askTimeout: Timeout          = Timeout(apiConfig.askTimeout.asScala)
 
-  private lazy val serverUtils: ServerUtils =
-    new ServerUtils(networkType)(brokerConfig, executionContext)
+  private lazy val serverUtils: ServerUtils = new ServerUtils
 
   private var nodesOpt: Option[AVector[PeerAddress]] = None
 
@@ -348,7 +347,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val decodeUnsignedTransactionLogic = serverLogic(decodeUnsignedTransaction) { tx =>
     Future.successful(
-      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(Tx.from(_, networkType))
+      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(Tx.from(_))
     )
   }
 
@@ -371,7 +370,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         case Some(lockupScripts) =>
           Right(
             MinerAddresses(
-              lockupScripts.map(lockupScript => Address.Asset(networkType, lockupScript))
+              lockupScripts.map(lockupScript => Address.Asset(lockupScript))
             )
           )
         case None => Left(ApiError.InternalServerError(s"Miner addresses are not set up"))
@@ -506,11 +505,10 @@ object EndpointsLogic {
       consensus: ConsensusSetting,
       selfReady: Boolean,
       synced: Boolean
-  )(implicit brokerConfig: BrokerConfig, networkType: NetworkType): SelfClique = {
-
+  )(implicit brokerConfig: BrokerConfig, networkConfig: NetworkConfig): SelfClique = {
     SelfClique(
       cliqueInfo.id,
-      networkType,
+      networkConfig.chainId,
       consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)

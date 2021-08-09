@@ -16,8 +16,15 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.model.NetworkType
+import akka.util.ByteString
+
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.ChainId
+import org.alephium.util.Bytes
 
 trait NetworkConfig {
-  def networkType: NetworkType
+  def chainId: ChainId
+
+  lazy val magicBytes: ByteString =
+    Bytes.from(Hash.hash(s"alephium-${chainId.id}").toRandomIntUnsafe)
 }

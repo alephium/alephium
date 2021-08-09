@@ -19,20 +19,16 @@ package org.alephium.wallet.config
 import java.net.InetAddress
 import java.nio.file.Files
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
 import org.alephium.util.{Duration, SocketUtil}
-import org.alephium.wallet.config.WalletConfig
 
-trait WalletConfigFixture extends SocketUtil {
+trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
 
   val host: InetAddress = InetAddress.getByName("127.0.0.1")
   val blockFlowPort     = generatePort()
   val walletPort        = generatePort()
 
   val groupNum = 4
-
-  val networkType = NetworkType.Mainnet
 
   val lockingTimeout = Duration.ofMinutesUnsafe(10)
 
@@ -50,7 +46,7 @@ trait WalletConfigFixture extends SocketUtil {
   lazy val config = WalletConfig(
     Some(walletPort),
     tempSecretDir,
-    networkType,
+    chainId,
     lockingTimeout,
     apiKey,
     WalletConfig.BlockFlow(

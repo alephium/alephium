@@ -27,6 +27,7 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
@@ -41,6 +42,7 @@ trait FlowUtils
     with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
   implicit def consensusConfig: ConsensusSetting
+  implicit def networkConfig: NetworkConfig
 
   val grandPool = GrandPool.empty
 

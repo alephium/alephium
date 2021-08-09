@@ -29,8 +29,7 @@ import org.alephium.wallet.api.model._
 class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)
-  val networkType          = NetworkType.Mainnet
-  val address              = Address.p2pkh(networkType, PublicKey.generate)
+  val address              = Address.p2pkh(PublicKey.generate)
   val group                = 1
   val balance              = U256.One
   val hash                 = Hash.generate

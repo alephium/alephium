@@ -40,7 +40,7 @@ class VMSpec extends AlephiumSpec {
       lockupScript: LockupScript.Asset,
       alfAmount: U256
   ): StatefulScript = {
-    val address  = Address.Asset(NetworkType.Testnet, lockupScript)
+    val address  = Address.Asset(lockupScript)
     val codeRaw  = Hex.toHexString(serialize(code))
     val stateRaw = Hex.toHexString(serialize(initialState))
     val scriptRaw =
@@ -189,7 +189,7 @@ class VMSpec extends AlephiumSpec {
   trait ContractFixture extends FlowFixture {
     val chainIndex     = ChainIndex.unsafe(0, 0)
     val genesisLockup  = getGenesisLockupScript(chainIndex)
-    val genesisAddress = Address.Asset(NetworkType.Testnet, genesisLockup)
+    val genesisAddress = Address.Asset(genesisLockup)
 
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
@@ -523,8 +523,7 @@ class VMSpec extends AlephiumSpec {
       val contractId    = createContract(input, initialState = AVector.empty).key
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
-      val address =
-        Address.Contract(networkSetting.networkType, LockupScript.p2c(contractId)).toBase58
+      val address       = Address.Contract(LockupScript.p2c(contractId)).toBase58
       (contractId.toHexString, address, contractState.code.hash.toHexString)
     }
 
@@ -611,7 +610,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Destroy a contract with contract address")
-      val address = Address.Contract(networkSetting.networkType, LockupScript.P2C(Hash.generate))
+      val address = Address.Contract(LockupScript.P2C(Hash.generate))
       val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
         s"Right(TxScriptExeFailed($InvalidAddressTypeInContractDestroy))"

@@ -19,11 +19,15 @@ package org.alephium.protocol.model
 import org.scalacheck.Gen
 
 import org.alephium.protocol.{ALF, Hash, PublicKey}
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, TimeStamp, U256}
 
-class TransactionSpec extends AlephiumSpec with NoIndexModelGenerators {
+class TransactionSpec
+    extends AlephiumSpec
+    with NoIndexModelGenerators
+    with NetworkConfigFixture.Default {
   it should "generate distinct coinbase transactions" in {
     val (_, key) = GroupIndex.unsafe(0).generateKey
     val script   = LockupScript.p2pkh(key)

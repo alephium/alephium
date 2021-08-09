@@ -20,7 +20,7 @@ import scala.collection.immutable.ArraySeq
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
@@ -28,7 +28,7 @@ import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 class LexerSpec extends AlephiumSpec {
   it should "parse lexer" in {
     val byte32  = Byte32.generate.toHexString
-    val address = Address.p2pkh(NetworkType.Testnet, PublicKey.generate)
+    val address = Address.p2pkh(PublicKey.generate)
 
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
@@ -62,7 +62,7 @@ class LexerSpec extends AlephiumSpec {
 
   it should "parse bytes and address" in {
     val hash    = Hash.random
-    val address = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    val address = Address.p2pkh(PublicKey.generate)
     fastparse.parse(s"#${hash.toHexString}", Lexer.bytes(_)).get.value is
       Val.ByteVec(ArraySeq.from(hash.bytes))
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is

@@ -43,7 +43,7 @@ class ConnectionHandlerSpec
     connection.expectMsg(Tcp.ResumeReading)
 
     val message      = Ping(RequestId.unsafe(1), TimeStamp.now())
-    val messageBytes = Message.serialize(message, config.network.networkType)
+    val messageBytes = Message.serialize(message)
   }
 
   it should "publish misbehavior when receive invalid message" in new Fixture {
@@ -53,7 +53,7 @@ class ConnectionHandlerSpec
       BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
     val handshakeMessage =
       Message(Header(version), Hello.unsafe(brokerInfo.interBrokerInfo, priKey))
-    val handshakeMessageBytes = Message.serialize(handshakeMessage, config.network.networkType)
+    val handshakeMessageBytes = Message.serialize(handshakeMessage)
 
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])

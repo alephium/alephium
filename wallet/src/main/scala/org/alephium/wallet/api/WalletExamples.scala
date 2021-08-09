@@ -22,7 +22,7 @@ import org.alephium.api.ErrorExamples
 import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Hex, U256}
 import org.alephium.wallet.api.model._
@@ -30,40 +30,14 @@ import org.alephium.wallet.api.model._
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 trait WalletExamples extends ErrorExamples {
 
-  private val networkType = NetworkType.Mainnet
   private val lockupScript =
     LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
-  private val address  = Address.Asset(networkType, lockupScript)
+  private val address  = Address.Asset(lockupScript)
   private val password = "my-secret-password"
   private val mnemonic =
     Mnemonic
-      .fromWords(
-        AVector(
-          "vault",
-          "alarm",
-          "sad",
-          "mass",
-          "witness",
-          "property",
-          "virus",
-          "style",
-          "good",
-          "flower",
-          "rice",
-          "alpha",
-          "viable",
-          "evidence",
-          "run",
-          "glare",
-          "pretty",
-          "scout",
-          "evil",
-          "judge",
-          "enroll",
-          "refuse",
-          "another",
-          "lava"
-        )
+      .from(
+        "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
       )
       .get
   private val txId =

@@ -24,8 +24,8 @@ import scala.util.control.Exception.allCatch
 import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
-import org.alephium.protocol.model.{Block, ChainIndex, NetworkType, Transaction}
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.model.{Block, ChainId, ChainIndex, Transaction}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.deserialize
 import org.alephium.util._
@@ -71,8 +71,8 @@ object Configs extends StrictLogging {
     path.toFile
   }
 
-  def getConfigNetwork(rootPath: Path, networkType: NetworkType, overwrite: Boolean): File =
-    getConfigTemplate(rootPath, "network", s"network_${networkType.name}", overwrite)
+  def getConfigNetwork(rootPath: Path, chainId: ChainId, overwrite: Boolean): File =
+    getConfigTemplate(rootPath, "network", s"network_${chainId.networkType}", overwrite)
 
   def getConfigSystem(rootPath: Path, overwrite: Boolean): File = {
     val env = Env.resolve().name
@@ -90,21 +90,21 @@ object Configs extends StrictLogging {
       Right(ConfigFactory.parseFile(file))
     } catch {
       case e: ConfigException =>
-        Left(s"Cannot parse config file: $file, exception: ${e}")
+        Left(s"Cannot parse config file: $file, exception: $e")
     }
 
-  def parseNetworkType(rootPath: Path, config: Config): Either[String, NetworkType] = {
-    if (!config.hasPath("alephium.network.network-type")) {
+  def parseChainId(rootPath: Path, config: Config): Either[String, ChainId] = {
+    if (!config.hasPath("alephium.network.chain-id")) {
       Left(s"""|The network type isn't defined!
                |
                |Please set the network type in your $rootPath/user.conf and try again.
                |
                |Example:
-               |alephium.network.network-type = "testnet"
+               |alephium.network.chain-id = 1 // 0 for alepium mainnet, 1 for alephium testnet
           """.stripMargin)
     } else {
-      val rawNetworkType = config.getString("alephium.network.network-type")
-      NetworkType.fromName(rawNetworkType).toRight(s"Invalid network type: $rawNetworkType")
+      val id = config.getInt("alephium.network.chain-id")
+      ChainId.from(id).toRight(s"Invalid chain id: $id")
     }
   }
 
@@ -112,7 +112,7 @@ object Configs extends StrictLogging {
     val resultEither = for {
       userConfig    <- parseConfigFile(getConfigUser(rootPath))
       systemConfig  <- parseConfigFile(getConfigSystem(rootPath, overwrite))
-      networkType   <- parseNetworkType(rootPath, userConfig.withFallback(systemConfig).resolve())
+      networkType   <- parseChainId(rootPath, userConfig.withFallback(systemConfig).resolve())
       networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
@@ -157,7 +157,8 @@ object Configs extends StrictLogging {
 
   def loadBlockFlow(balances: AVector[(LockupScript.Asset, U256)])(implicit
       groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfig: ConsensusConfig,
+      networkConfig: NetworkConfig
   ): AVector[AVector[Block]] = {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) { case (from, to) =>
       val transactions = if (from == to) {

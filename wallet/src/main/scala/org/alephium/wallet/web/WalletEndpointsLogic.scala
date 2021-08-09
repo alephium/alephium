@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.alephium.api.model.ApiKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.model.ChainId
 import org.alephium.util.{Duration, U256}
 import org.alephium.wallet.api.WalletEndpoints
 import org.alephium.wallet.api.model
@@ -32,7 +32,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
 
   import WalletServer.toApiError
   def walletService: WalletService
-  def networkType: NetworkType
+  def chainId: ChainId
   def blockflowFetchMaxAge: Duration
   implicit def groupConfig: GroupConfig
   implicit def executionContext: ExecutionContext

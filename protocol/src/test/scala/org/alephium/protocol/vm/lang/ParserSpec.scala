@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.protocol.vm.lang.LogicalOperator._
@@ -131,7 +131,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parser contract initial states" in {
     val bytes    = Hash.generate
-    val address  = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    val address  = Address.p2pkh(PublicKey.generate)
     val stateRaw = s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}]"
     val expected =
       Seq[Val](
@@ -147,7 +147,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse bytes and address" in {
     val hash    = Hash.random
-    val address = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    val address = Address.p2pkh(PublicKey.generate)
     fastparse
       .parse(
         s"foo.foo(#${hash.toHexString}, #${hash.toHexString}, @${address.toBase58})",

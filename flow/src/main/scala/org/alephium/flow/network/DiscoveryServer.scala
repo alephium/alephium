@@ -155,7 +155,7 @@ class DiscoveryServer(
 
   def handleUdp: Receive = {
     case UdpServer.Received(data, remote) =>
-      DiscoveryMessage.deserialize(data, networkConfig.networkType) match {
+      DiscoveryMessage.deserialize(data) match {
         case Right(message: DiscoveryMessage) =>
           log.debug(s"Received ${message.payload.getClass.getSimpleName} from $remote")
           handlePayload(remote)(message.payload)

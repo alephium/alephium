@@ -100,8 +100,6 @@ object Miner extends LazyLogging {
 }
 
 trait Miner extends BaseActor with MinerState {
-  def networkType: NetworkType
-
   @volatile var miningStarted: Boolean = false
 
   // scalastyle:off method.length
@@ -153,7 +151,7 @@ trait Miner extends BaseActor with MinerState {
     val txCount    = block.transactions.length
     log.debug(s"MiningCounts: $countsToString")
     val minerAddress =
-      Address.Asset(networkType, block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
+      Address.Asset(block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
     log.info(
       s"A new block ${block.hash.toHexString} got mined for $chainIndex, tx: $txCount, " +
         s"miningCount: $totalCount, target: ${block.header.target}, miner: $minerAddress"

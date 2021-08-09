@@ -209,7 +209,7 @@ trait DiscoveryServerState extends SessionManager {
         log.debug(s"Send ${payload.getClass.getSimpleName} to $remote")
         val message = DiscoveryMessage.from(payload)
         socket ! UdpServer.Send(
-          DiscoveryMessage.serialize(message, networkConfig.networkType, selfCliqueInfo.priKey),
+          DiscoveryMessage.serialize(message, selfCliqueInfo.priKey),
           remote
         )
       case None =>

@@ -19,12 +19,11 @@ package org.alephium.protocol.message
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde._
 import org.alephium.util.{Bytes, Hex}
 
 object MessageSerde {
-
   private val checksumLength: Int = 4
 
   def checksum(data: ByteString): ByteString =
@@ -34,11 +33,10 @@ object MessageSerde {
     Bytes.from(data.length)
 
   def unwrap[M](
-      input: ByteString,
-      networkType: NetworkType
-  ): SerdeResult[(ByteString, Int, ByteString)] = {
+      input: ByteString
+  )(implicit networkConfig: NetworkConfig): SerdeResult[(ByteString, Int, ByteString)] = {
     for {
-      rest         <- checkMagicBytes(input, networkType)
+      rest         <- checkMagicBytes(input)
       checksumRest <- extractChecksum(rest)
       lengthRest <- extractLength(
         checksumRest.rest
@@ -73,15 +71,15 @@ object MessageSerde {
   }
 
   private def checkMagicBytes(
-      data: ByteString,
-      networkType: NetworkType
-  ): SerdeResult[ByteString] = {
-    if (data.length < networkType.magicBytes.length) {
-      Left(SerdeError.notEnoughBytes(networkType.magicBytes.length, data.length))
+      data: ByteString
+  )(implicit networkConfig: NetworkConfig): SerdeResult[ByteString] = {
+    val magicBytes = networkConfig.magicBytes
+    if (data.length < magicBytes.length) {
+      Left(SerdeError.notEnoughBytes(magicBytes.length, data.length))
     } else {
       Either.cond(
-        networkType.magicBytes == data.take(networkType.magicBytes.length),
-        data.drop(networkType.magicBytes.length),
+        magicBytes == data.take(magicBytes.length),
+        data.drop(magicBytes.length),
         SerdeError.wrongFormat(s"Wrong magic bytes")
       )
     }

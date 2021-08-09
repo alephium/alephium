@@ -17,7 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{Block, NetworkType}
+import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, TimeStamp}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -31,7 +31,7 @@ final case class BlockEntry(
     transactions: AVector[Tx]
 )
 object BlockEntry {
-  def from(block: Block, height: Int, networkType: NetworkType): BlockEntry =
+  def from(block: Block, height: Int): BlockEntry =
     BlockEntry(
       hash = block.header.hash,
       timestamp = block.header.timestamp,
@@ -39,6 +39,6 @@ object BlockEntry {
       chainTo = block.header.chainIndex.to.value,
       height = height,
       deps = block.header.blockDeps.deps,
-      transactions = block.transactions.map(Tx.from(_, networkType))
+      transactions = block.transactions.map(Tx.from(_))
     )
 }

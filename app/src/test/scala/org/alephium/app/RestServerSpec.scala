@@ -39,7 +39,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -396,7 +396,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
 
   it should "call POST /miners" in new RestServerFixture {
     withServers {
-      val address      = Address.asset(dummyKeyAddress, networkType).get
+      val address      = Address.asset(dummyKeyAddress).get
       val lockupScript = address.lockupScript
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
         msg match {
@@ -452,7 +452,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
 
   it should "call GET /miners/addresses" in new RestServerFixture {
     withServers {
-      val address      = Address.asset(dummyKeyAddress, networkType).get
+      val address      = Address.asset(dummyKeyAddress).get
       val lockupScript = address.lockupScript
 
       allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -494,7 +494,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
       Put(s"/miners/addresses", body) check { response =>
-        val addresses = newAddresses.map(Address.asset(_, networkType).get)
+        val addresses = newAddresses.map(Address.asset(_).get)
         allHandlersProbe.viewHandler.expectMsg(ViewHandler.UpdateMinerAddresses(addresses))
         response.code is StatusCode.Ok
       }
@@ -706,10 +706,10 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       misbehaviorManagerOpt = Some(misbehaviorManager)
     )
     lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
-    val walletConfig: WalletConfig = WalletConfig(
+    lazy val walletConfig: WalletConfig = WalletConfig(
       None,
       (new java.io.File("")).toPath,
-      NetworkType.Devnet,
+      networkConfig.chainId,
       Duration.ofMinutesUnsafe(0),
       apiConfig.apiKey,
       WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey)
@@ -719,9 +719,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
   }
 
   trait RestServerFixture extends Fixture with SocketUtil {
-
-    implicit lazy val networkType: NetworkType = config.network.networkType
-    implicit lazy val blockflowFetchMaxAge     = Duration.zero
+    implicit lazy val blockflowFetchMaxAge = Duration.zero
 
     private def buildPeer(id: Int): (PeerInfo, ApiConfig) = {
       val peerPort = generatePort()
