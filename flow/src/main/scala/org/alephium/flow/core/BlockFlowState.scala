@@ -24,7 +24,7 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
@@ -34,6 +34,7 @@ trait BlockFlowState extends FlowTipsUtil {
   import BlockFlowState._
 
   implicit def brokerConfig: BrokerConfig
+  implicit def networkConfig: NetworkConfig
   def consensusConfig: ConsensusSetting
   def groups: Int = brokerConfig.groups
   def genesisBlocks: AVector[AVector[Block]]
@@ -439,7 +440,8 @@ object BlockFlowState {
   }
 
   def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
-      brokerConfig: GroupConfig
+      brokerConfig: GroupConfig,
+      networkConfig: NetworkConfig
   ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))

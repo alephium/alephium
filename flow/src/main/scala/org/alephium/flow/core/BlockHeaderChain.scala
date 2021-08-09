@@ -23,12 +23,14 @@ import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{BlockHeader, Target, Weight}
 import org.alephium.protocol.vm.BlockEnv
 import org.alephium.util._
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
+  implicit def networkConfig: NetworkConfig
+
   def headerStorage: BlockHeaderStorage
 
   private lazy val headerCache =
@@ -135,7 +137,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     for {
       tip    <- getBestTip()
       target <- getHashTarget(tip)
-    } yield BlockEnv(TimeStamp.now(), target)
+    } yield BlockEnv(networkConfig.chainId, TimeStamp.now(), target)
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
@@ -188,14 +190,22 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 object BlockHeaderChain {
   def fromGenesisUnsafe(storages: Storages)(
       genesisHeader: BlockHeader
-  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockHeaderChain = {
+  )(implicit
+      brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
+      consensusSetting: ConsensusSetting
+  ): BlockHeaderChain = {
     val initialize = initializeGenesis(genesisHeader)(_)
     createUnsafe(genesisHeader, storages, initialize)
   }
 
   def fromStorageUnsafe(storages: Storages)(
       genesisHeader: BlockHeader
-  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockHeaderChain = {
+  )(implicit
+      brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
+      consensusSetting: ConsensusSetting
+  ): BlockHeaderChain = {
     createUnsafe(genesisHeader, storages, initializeFromStorage)
   }
 
@@ -203,9 +213,14 @@ object BlockHeaderChain {
       rootHeader: BlockHeader,
       storages: Storages,
       initialize: BlockHeaderChain => IOResult[Unit]
-  )(implicit _brokerConfig: BrokerConfig, _consensusSetting: ConsensusSetting): BlockHeaderChain = {
+  )(implicit
+      _brokerConfig: BrokerConfig,
+      _networkConfig: NetworkConfig,
+      _consensusSetting: ConsensusSetting
+  ): BlockHeaderChain = {
     val headerchain = new BlockHeaderChain {
       override val brokerConfig      = _brokerConfig
+      override val networkConfig     = _networkConfig
       override val consensusConfig   = _consensusSetting
       override val headerStorage     = storages.headerStorage
       override val blockStateStorage = storages.blockStateStorage

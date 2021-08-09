@@ -24,7 +24,7 @@ import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash}
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
@@ -247,14 +247,22 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 object BlockChain {
   def fromGenesisUnsafe(storages: Storages)(
       genesisBlock: Block
-  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockChain = {
+  )(implicit
+      brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
+      consensusSetting: ConsensusSetting
+  ): BlockChain = {
     val initialize = initializeGenesis(genesisBlock)(_)
     createUnsafe(genesisBlock, storages, initialize)
   }
 
   def fromStorageUnsafe(storages: Storages)(
       genesisBlock: Block
-  )(implicit brokerConfig: BrokerConfig, consensusSetting: ConsensusSetting): BlockChain = {
+  )(implicit
+      brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
+      consensusSetting: ConsensusSetting
+  ): BlockChain = {
     createUnsafe(genesisBlock, storages, initializeFromStorage)
   }
 
@@ -262,9 +270,14 @@ object BlockChain {
       rootBlock: Block,
       storages: Storages,
       initialize: BlockChain => IOResult[Unit]
-  )(implicit _brokerConfig: BrokerConfig, _consensusSetting: ConsensusSetting): BlockChain = {
+  )(implicit
+      _brokerConfig: BrokerConfig,
+      _networkConfig: NetworkConfig,
+      _consensusSetting: ConsensusSetting
+  ): BlockChain = {
     val blockchain: BlockChain = new BlockChain {
       override val brokerConfig      = _brokerConfig
+      override val networkConfig     = _networkConfig
       override val consensusConfig   = _consensusSetting
       override val blockStorage      = storages.blockStorage
       override val txStorage         = storages.txStorage

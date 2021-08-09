@@ -371,19 +371,19 @@ trait FlowFixture
     result.contractInputs -> result.generatedOutputs
   }
 
-  def addAndCheck(blockFlow: BlockFlow, block: Block): Unit = {
-    val blockValidation =
-      BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+  private def addAndCheck0(blockFlow: BlockFlow, block: Block): Unit = {
+    val blockValidation = BlockValidation.build(blockFlow)
     blockValidation.validate(block, blockFlow).rightValue
     blockFlow.addAndUpdateView(block).rightValue
+  }
+
+  def addAndCheck(blockFlow: BlockFlow, block: Block): Unit = {
+    addAndCheck0(blockFlow, block)
     checkOutputs(blockFlow, block)
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
-    val blockValidation =
-      BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-    blockValidation.validate(block, blockFlow).isRight is true
-    blockFlow.addAndUpdateView(block).isRight is true
+    addAndCheck0(blockFlow, block)
     blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * weightRatio
   }
 

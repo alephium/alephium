@@ -19,10 +19,10 @@ package org.alephium.flow.core
 import scala.language.implicitConversions
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 
 import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signature}
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.validation.{BlockValidation, ExistInvalidTx, TxScriptExeFailed}
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -67,10 +67,10 @@ class VMSpec extends AlephiumSpec {
     val script      = Compiler.compileTxScript(input).toOption.get
     val errorScript = StatefulScript.unsafe(AVector(script.methods.head.copy(isPublic = false)))
 
-    val chainIndex      = ChainIndex.unsafe(0, 0)
-    val block           = simpleScript(blockFlow, chainIndex, errorScript)
-    val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-    blockValidation.validate(block, blockFlow).isRight is false
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = simpleScript(blockFlow, chainIndex, errorScript)
+    intercept[AssertionError](addAndCheck(blockFlow, block)).getMessage is
+      s"Right(ExistInvalidTx(TxScriptExeFailed($ExternalPrivateMethodCall)))"
   }
 
   it should "overflow frame stack" in new FlowFixture {
@@ -165,7 +165,8 @@ class VMSpec extends AlephiumSpec {
 
     val script1 = Compiler.compileTxScript(input1, 1).toOption.get
     val block1  = simpleScript(blockFlow, chainIndex, script1)
-    assertThrows[RuntimeException](addAndCheck(blockFlow, block1, 2))
+    intercept[AssertionError](addAndCheck(blockFlow, block1, 2)).getMessage is
+      s"Right(ExistInvalidTx(TxScriptExeFailed($ExternalPrivateMethodCall)))"
   }
 
   it should "handle contract states" in new CallFixture {
@@ -253,6 +254,21 @@ class VMSpec extends AlephiumSpec {
       val block  = simpleScript(blockFlow, chainIndex, script)
       addAndCheck(blockFlow, block)
     }
+
+    def fail(blockFlow: BlockFlow, block: Block, failure: ExeFailure): Assertion = {
+      intercept[AssertionError](addAndCheck(blockFlow, block)).getMessage is
+        s"Right(ExistInvalidTx(TxScriptExeFailed($failure)))"
+    }
+
+    def fail(
+        blockFlow: BlockFlow,
+        chainIndex: ChainIndex,
+        script: StatefulScript,
+        failure: ExeFailure
+    ) = {
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
+        s"Right(TxScriptExeFailed($failure))"
+    }
   }
 
   it should "not use up contract assets" in new ContractFixture {
@@ -280,8 +296,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).toOption.get
-    intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
-      s"Right(TxScriptExeFailed($EmptyContractAsset))"
+    fail(blockFlow, chainIndex, script, EmptyContractAsset)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -509,10 +524,7 @@ class VMSpec extends AlephiumSpec {
     {
       val script = Compiler.compileTxScript(expect(2)).rightValue
       val block  = simpleScript(blockFlow, chainIndex, script)
-      val blockValidation =
-        BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-      blockValidation.validate(block, blockFlow).leftValue.rightValue is
-        ExistInvalidTx(TxScriptExeFailed(AssertionFailed))
+      fail(blockFlow, block, AssertionFailed)
     }
   }
   // scalastyle:on method.length
@@ -583,8 +595,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("Try to create a new contract with invalid number of fields")
       val script = Compiler.compileTxScript(main("010001")).rightValue
-      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
-        s"Right(TxScriptExeFailed($InvalidFieldLength))"
+      fail(blockFlow, chainIndex, script, InvalidFieldLength)
     }
   }
 
@@ -612,8 +623,7 @@ class VMSpec extends AlephiumSpec {
       info("Destroy a contract with contract address")
       val address = Address.Contract(LockupScript.P2C(Hash.generate))
       val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
-      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
-        s"Right(TxScriptExeFailed($InvalidAddressTypeInContractDestroy))"
+      fail(blockFlow, chainIndex, script, InvalidAddressTypeInContractDestroy)
     }
 
     {
@@ -641,11 +651,12 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
-  it should "fetch block info" in new ContractFixture {
+  it should "fetch block env" in new ContractFixture {
     def main(latestHeader: BlockHeader) =
       s"""
          |TxScript Main {
          |  pub fn main() -> () {
+         |    assert!(chainId!() == #02)
          |    assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
          |    assert!(blockTarget!() == ${latestHeader.target.value})
          |  }

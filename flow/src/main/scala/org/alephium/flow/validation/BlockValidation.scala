@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, WorldState}
 import org.alephium.serde._
@@ -25,6 +25,8 @@ import org.alephium.util.U256
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   import ValidationStatus._
+
+  implicit def networkConfig: NetworkConfig
 
   def headerValidation: HeaderValidation
   def nonCoinbaseValidation: TxValidation
@@ -299,13 +301,20 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 }
 
 object BlockValidation {
+  def build(blockFlow: BlockFlow): BlockValidation =
+    build(blockFlow.brokerConfig, blockFlow.networkConfig, blockFlow.consensusConfig)
+
   def build(implicit
       brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
       consensusConfig: ConsensusConfig
   ): BlockValidation = new Impl()
 
-  class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
-      extends BlockValidation {
+  class Impl(implicit
+      val brokerConfig: BrokerConfig,
+      val networkConfig: NetworkConfig,
+      val consensusConfig: ConsensusConfig
+  ) extends BlockValidation {
     override def headerValidation: HeaderValidation  = HeaderValidation.build
     override def nonCoinbaseValidation: TxValidation = TxValidation.build
   }

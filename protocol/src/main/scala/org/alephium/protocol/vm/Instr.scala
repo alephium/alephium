@@ -106,7 +106,7 @@ object Instr {
     CallLocal, Return,
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifySignature, VerifySecP256K1, VerifyED25519,
-    BlockTimeStamp, BlockTarget,
+    ChainId, BlockTimeStamp, BlockTarget,
     Log1, Log2, Log3, Log4, Log5
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -1122,6 +1122,15 @@ object ContractCodeHash extends ContractInstr with GasLow {
 }
 
 sealed trait BlockInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLow
+
+object ChainId extends BlockInstr {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack {
+      val id = frame.ctx.blockEnv.chainId.id
+      Val.ByteVec(ArraySeq(id))
+    }
+  }
+}
 
 object BlockTimeStamp extends BlockInstr {
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

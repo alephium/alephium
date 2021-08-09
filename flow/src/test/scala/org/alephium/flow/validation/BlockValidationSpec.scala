@@ -180,7 +180,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   trait DoubleSpendingFixture extends FlowFixture {
     val chainIndex      = ChainIndex.unsafe(0, 0)
-    val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+    val blockValidation = BlockValidation.build(blockFlow)
   }
 
   it should "check double spending in a same tx" in new DoubleSpendingFixture {

@@ -21,7 +21,7 @@ import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.protocol.vm.WorldState
 
@@ -64,6 +64,7 @@ object BlockChainWithState {
       storages: Storages
   )(genesisBlock: Block, updateState: BlockFlow.WorldStateUpdater)(implicit
       brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
       consensusSetting: ConsensusSetting
   ): BlockChainWithState = {
     val initialize = initializeGenesis(genesisBlock, storages.emptyWorldState)(_)
@@ -74,6 +75,7 @@ object BlockChainWithState {
       storages: Storages
   )(genesisBlock: Block, updateState: BlockFlow.WorldStateUpdater)(implicit
       brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
       consensusSetting: ConsensusSetting
   ): BlockChainWithState = {
     createUnsafe(genesisBlock, storages, updateState, initializeFromStorage)
@@ -86,10 +88,12 @@ object BlockChainWithState {
       initialize: BlockChainWithState => IOResult[Unit]
   )(implicit
       _brokerConfig: BrokerConfig,
+      _networkConfig: NetworkConfig,
       _consensusSetting: ConsensusSetting
   ): BlockChainWithState = {
     val blockchain = new BlockChainWithState {
       override val brokerConfig      = _brokerConfig
+      override val networkConfig     = _networkConfig
       override val consensusConfig   = _consensusSetting
       override val blockStorage      = storages.blockStorage
       override val txStorage         = storages.txStorage

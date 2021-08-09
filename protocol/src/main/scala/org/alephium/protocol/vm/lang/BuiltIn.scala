@@ -89,6 +89,8 @@ object BuiltIn {
       Seq(Type.Bool),
       VerifyED25519
     )
+  val chainId: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("chainId", Seq.empty, Seq(Type.ByteVec), ChainId)
   val blockTimeStamp: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("blockTimeStamp", Seq.empty, Seq(Type.U256), BlockTimeStamp)
   val blockTarget: SimpleStatelessBuiltIn =
@@ -143,6 +145,7 @@ object BuiltIn {
     verifySignature,
     verifySecP256K1,
     verifyED25519,
+    chainId,
     blockTimeStamp,
     blockTarget,
     toI256,

@@ -74,7 +74,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(headerTs, Target.onePhPerBlock)
+          BlockEnv(networkConfig.chainId, headerTs, Target.onePhPerBlock)
         )
       } yield ()
     }
@@ -368,7 +368,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[GasBox] = {
-      checkWitnesses(tx, preOutputs, BlockEnv(TimeStamp.now(), Target.onePhPerBlock))
+      checkWitnesses(
+        tx,
+        preOutputs,
+        BlockEnv(networkConfig.chainId, TimeStamp.now(), Target.onePhPerBlock)
+      )
     }
   }
 
