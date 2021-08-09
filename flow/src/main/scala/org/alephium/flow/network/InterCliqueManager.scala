@@ -252,8 +252,9 @@ class InterCliqueManager(
     }
   }
 
-  val connecting: LinkedBuffer[InetSocketAddress, Unit] = LinkedBuffer(
-    networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups
+  val connecting: LruCache[InetSocketAddress, Unit] = LruCache(
+    networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups,
+    accessOrder = false
   )
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
     if (!connecting.contains(brokerInfo.address)) {

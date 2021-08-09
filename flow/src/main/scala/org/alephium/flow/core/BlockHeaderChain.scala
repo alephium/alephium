@@ -25,13 +25,15 @@ import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHeader, Target, Weight}
-import org.alephium.util.{AVector, Duration, EitherF, LruCache, TimeStamp}
+import org.alephium.util.{AVector, Duration, EitherF, LruCacheE, TimeStamp}
 
 trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
 
   private lazy val headerCache =
-    LruCache[BlockHash, BlockHeader, IOError](consensusConfig.blockCacheCapacityPerChain)
+    LruCacheE.threadSafe[BlockHash, BlockHeader, IOError](
+      consensusConfig.blockCacheCapacityPerChain
+    )
 
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = {
     headerCache.get(hash)(headerStorage.get(hash))
