@@ -20,7 +20,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.concurrent._
 import scala.io.Source
-import scala.util.Random
+import scala.util.{Random, Using}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{TestActor, TestProbe}
@@ -512,7 +512,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       Put(s"/miners/addresses", wrongGroupBody) check { response =>
         response.code is StatusCode.BadRequest
         response.as[ApiError.BadRequest] is ApiError.BadRequest(
-          s"Address ${dummyKeyAddress} doesn't belong to group 1"
+          s"Address $dummyKeyAddress doesn't belong to group 1"
         )
       }
     }
@@ -563,14 +563,13 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
       val inetAddress = InetAddress.getByName("127.0.0.1")
       val ts          = TimeStamp.now()
 
-      misbehaviorManagerProbe.setAutoPilot(new TestActor.AutoPilot {
-        def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
-          msg match {
-            case GetPeers =>
-              sender ! Peers(AVector(Peer(inetAddress, Banned(ts))))
-              TestActor.NoAutoPilot
-          }
-      })
+      misbehaviorManagerProbe.setAutoPilot((sender: ActorRef, msg: Any) =>
+        msg match {
+          case GetPeers =>
+            sender ! Peers(AVector(Peer(inetAddress, Banned(ts))))
+            TestActor.NoAutoPilot
+        }
+      )
 
       Get(s"/infos/misbehaviors") check { response =>
         response.code is StatusCode.Ok
@@ -602,12 +601,9 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
         val openapiPath = ApiModel.getClass.getResource("/openapi.json")
         val expectedOpenapi =
           read[ujson.Value](
-            Source
-              .fromFile(openapiPath.getPath, "UTF-8")
-              .getLines()
-              .toSeq
-              .mkString("\n")
-              .replaceFirst("12973", s"$port")
+            Using(Source.fromFile(openapiPath.getPath, "UTF-8")) { source =>
+              source.getLines().mkString("\n").replaceFirst("12973", s"$port")
+            }.get
           )
 
         val openapi =
@@ -751,7 +747,7 @@ abstract class RestServerSpec(nbOfNodes: Int, apiKey: Option[ApiKey] = None)
     }
 
     private def buildServers(nb: Int) = {
-      val peers = (0 to nb - 1).map(buildPeer)
+      val peers = (0 until nb).map(buildPeer)
 
       val intraCliqueInfo = IntraCliqueInfo.unsafe(
         dummyIntraCliqueInfo.id,
