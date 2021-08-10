@@ -20,7 +20,6 @@ import scala.annotation.tailrec
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
-import org.alephium.flow.core.UtxoUtils.Asset
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
@@ -121,18 +120,25 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    checkBeforeTransfer(outputInfos, gasOpt) match {
+    val totalAmountE = for {
+      _           <- checkOutputInfos(outputInfos)
+      totalAmount <- checkTotalAmount(outputInfos)
+      _           <- checkWithMinimalGas(gasOpt, minimalGas)
+    } yield totalAmount
+
+    totalAmountE match {
       case Right(totalAmount) =>
         selectUTXOs(fromLockupScript, totalAmount, outputInfos.length, gasOpt, gasPrice).map {
           _.flatMap { selected =>
-            transferUnsafe(
-              fromLockupScript,
-              fromUnlockScript,
-              selected.assets,
-              outputInfos,
-              selected.gas,
-              gasPrice
-            )
+            UnsignedTransaction
+              .transfer(
+                fromLockupScript,
+                fromUnlockScript,
+                selected.assets.map(asset => (asset.ref, asset.output)),
+                outputInfos,
+                selected.gas,
+                gasPrice
+              )
           }
         }
 
@@ -143,47 +149,45 @@ trait TxUtils { Self: FlowUtils =>
 
   def transfer(
       fromPublicKey: PublicKey,
-      utxos: AVector[Asset],
+      utxoRefs: AVector[AssetOutputRef],
       outputInfos: AVector[TxOutputInfo],
-      gas: GasBox,
+      gasOpt: Option[GasBox],
       gasPrice: GasPrice
-  ): Either[String, UnsignedTransaction] = {
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    val groupIndex = utxoRefs.head.hint.groupIndex
+    assume(brokerConfig.contains(groupIndex))
+
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-    for {
-      _ <- checkBeforeTransfer(outputInfos, Some(gas))
-      unsignedTx <- transferUnsafe(
-        fromLockupScript,
-        fromUnlockScript,
-        utxos,
-        outputInfos,
-        gas,
-        gasPrice
-      )
-    } yield unsignedTx
-  }
+    val gasE = for {
+      gas <- gasOpt.toRight("Gas missing when building transaction from provided UTXOs")
+      _   <- checkUTXORefs(utxoRefs)
+      _   <- checkTotalAmount(outputInfos)
+      _   <- checkOutputInfos(outputInfos)
+      _   <- checkWithMinimalGas(gasOpt, minimalGas)
+    } yield gas
 
-  def transferUnsafe(
-      fromLockupScript: LockupScript.Asset,
-      fromUnlockScript: UnlockScript,
-      utxos: AVector[Asset],
-      outputInfos: AVector[TxOutputInfo],
-      gas: GasBox,
-      gasPrice: GasPrice
-  ): Either[String, UnsignedTransaction] = {
-    for {
-      _ <- checkWithMaxTxInputNum(utxos)
-      unsignedTx <- UnsignedTransaction
-        .transfer(
-          fromLockupScript,
-          fromUnlockScript,
-          utxos.map(asset => (asset.ref, asset.output)),
-          outputInfos,
-          gas,
-          gasPrice
-        )
-    } yield unsignedTx
+    gasE match {
+      case Right(gas) =>
+        getImmutableGroupViewIncludePool(groupIndex).flatMap(_.getPrevAssetOutputs(utxoRefs)).map {
+          utxosOpt =>
+            for {
+              utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
+              unsignedTx <- UnsignedTransaction
+                .transfer(
+                  fromLockupScript,
+                  fromUnlockScript,
+                  utxos,
+                  outputInfos,
+                  gas,
+                  gasPrice
+                )
+            } yield unsignedTx
+        }
+      case Left(e) =>
+        Right(Left(e))
+    }
   }
 
   def sweepAll(
@@ -331,14 +335,6 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def checkWithMaxTxInputNum(assets: AVector[Asset]): Either[String, Unit] = {
-    if (assets.length > ALF.MaxTxInputNum) {
-      Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
-    } else {
-      Right(())
-    }
-  }
-
   private def checkOutputInfos(
       outputInfos: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
@@ -355,15 +351,20 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def checkBeforeTransfer(
-      outputInfos: AVector[TxOutputInfo],
-      gasOpt: Option[GasBox]
-  ): Either[String, U256] = {
-    for {
-      totalAmount <- checkTotalAmount(outputInfos)
-      _           <- checkOutputInfos(outputInfos)
-      _           <- checkWithMinimalGas(gasOpt, minimalGas)
-    } yield totalAmount
+  private def checkUTXORefs(
+      utxoRefs: AVector[AssetOutputRef]
+  ): Either[String, Unit] = {
+    if (utxoRefs.isEmpty) {
+      Left("Zero UTXOs")
+    } else {
+      val groupIndexes = utxoRefs.map(_.hint.groupIndex)
+
+      if (groupIndexes.forall(_ == groupIndexes.head)) {
+        Right(())
+      } else {
+        Left("Selected UTXOs are not from the same group")
+      }
+    }
   }
 
   private def selectUTXOs(

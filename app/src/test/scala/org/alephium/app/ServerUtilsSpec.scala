@@ -324,6 +324,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .prepareUnsignedTransaction(
         blockFlow,
         fromPublicKey,
+        outputRefsOpt = None,
         destinations,
         gasOpt = None,
         defaultGasPrice

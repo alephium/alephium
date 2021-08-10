@@ -102,6 +102,7 @@ class ServerUtils(implicit
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         query.fromPublicKey,
+        query.utxos,
         query.destinations,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
@@ -264,6 +265,7 @@ class ServerUtils(implicit
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
+      outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -281,7 +283,15 @@ class ServerUtils(implicit
       )
     }
 
-    blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice) match {
+    val transferResult = outputRefsOpt match {
+      case Some(outputRefs) =>
+        val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
+        blockFlow.transfer(fromPublicKey, assetOutputRefs, outputInfos, gasOpt, gasPrice)
+      case None =>
+        blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice)
+    }
+
+    transferResult match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

@@ -145,6 +145,7 @@ object UnsignedTransaction {
     assume(gasPrice.value <= ALF.MaxALFValue)
     val gasFee = gasPrice * gas
     for {
+      _               <- checkWithMaxTxInputNum(inputs)
       alfRemainder    <- calculateAlfRemainder(inputs, outputs, gasFee)
       tokensRemainder <- calculateTokensRemainder(inputs, outputs)
       changeOutputOpt <- calculateChangeOutput(alfRemainder, tokensRemainder, fromLockupScript)
@@ -168,6 +169,16 @@ object UnsignedTransaction {
         },
         txOutputs
       )
+    }
+  }
+
+  def checkWithMaxTxInputNum(
+      assets: AVector[(AssetOutputRef, AssetOutput)]
+  ): Either[String, Unit] = {
+    if (assets.length > ALF.MaxTxInputNum) {
+      Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
+    } else {
+      Right(())
     }
   }
 
