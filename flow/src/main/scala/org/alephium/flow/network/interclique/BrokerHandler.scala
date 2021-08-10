@@ -17,17 +17,20 @@
 package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
-import org.alephium.flow.handler.{AllHandlers, FlowHandler}
+import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.message.{InvRequest, InvResponse, NewInv}
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash, NewInv}
+import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, FlowData}
+import org.alephium.util.{ActorRefT, AVector, LruCache}
 
 trait BrokerHandler extends BaseBrokerHandler {
+  val seenBlocks: LruCache[BlockHash, Unit] =
+    LruCache[BlockHash, Unit](networkSetting.maxSeenBlocks, accessOrder = true)
+
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
   def allHandlers: AllHandlers
@@ -35,6 +38,18 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
     super.handleHandshakeInfo(remoteBrokerInfo)
     cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
+  }
+
+  override def handleValidFlowData[T <: FlowData](
+      datas: AVector[T],
+      dataOrigin: DataOrigin
+  ): Unit = {
+    datas.foreach {
+      case data: Block => seenBlocks.put(data.hash, ())
+      case _           =>
+    }
+    val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+    allHandlers.dependencyHandler ! message
   }
 
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
@@ -64,6 +79,21 @@ trait BrokerHandler extends BaseBrokerHandler {
         handleInv(hashes)
       case BaseBrokerHandler.Received(NewInv(hashes)) =>
         handleInv(hashes)
+      case BaseBrokerHandler.Received(NewBlockHash(hash)) =>
+        if (validate(hash)) {
+          log.debug(s"Receive new block hash ${hash.shortHex} from $remoteAddress")
+          seenBlocks.put(hash, ())
+          blockFlowSynchronizer ! BlockFlowSynchronizer.Announcement(hash)
+        } else {
+          log.warning(s"Invalid new block hash ${hash.shortHex} from $remoteAddress")
+          handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+        }
+      case BaseBrokerHandler.RelayInventory(hash) =>
+        if (!seenBlocks.contains(hash)) {
+          log.debug(s"Relay new block hash ${hash.shortHex} to $remoteAddress")
+          seenBlocks.put(hash, ())
+          send(NewBlockHash(hash))
+        }
     }
 
     receive
@@ -93,8 +123,12 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
 
+  @inline def validate(hash: BlockHash): Boolean = {
+    brokerConfig.contains(ChainIndex.from(hash).from)
+  }
+
   def validate(locators: AVector[AVector[BlockHash]]): Boolean = {
-    locators.forall(_.forall(hash => brokerConfig.contains(ChainIndex.from(hash).from)))
+    locators.forall(_.forall(validate))
   }
 
   private def handleInv(hashes: AVector[AVector[BlockHash]]): Unit = {
@@ -103,6 +137,7 @@ trait BrokerHandler extends BaseBrokerHandler {
     } else {
       if (validate(hashes)) {
         log.debug(s"Received inv response ${Utils.showFlow(hashes)} from $remoteAddress")
+        hashes.foreach(_.foreach(hash => seenBlocks.put(hash, ())))
         blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
       } else {
         log.warning(s"Invalid inv response from $remoteAddress: ${Utils.showFlow(hashes)}")

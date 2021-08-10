@@ -219,7 +219,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "serialize/deserialize the NewBlocks/NewHeaders/NewInv/NewTxs payload" in {
+  it should "serialize/deserialize the NewBlocks/NewHeaders/NewInv/NewTxs/NewBlockHash payload" in {
     import Hex._
 
     val block1    = blockGen.sample.get
@@ -273,6 +273,11 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         serialize(txTemplate1) ++
         // tx template 2
         serialize(txTemplate2)
+    }
+
+    val newBlockHash = NewBlockHash(block1.hash)
+    verifySerde(newBlockHash) {
+      hex"0d" ++ serialize(block1.hash)
     }
   }
 

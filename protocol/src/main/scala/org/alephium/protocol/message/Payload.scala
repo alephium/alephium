@@ -48,6 +48,7 @@ object Payload {
       case x: NewHeaders      => (NewHeaders, NewHeaders.serialize(x))
       case x: NewInv          => (NewInv, NewInv.serialize(x))
       case x: NewTxs          => (NewTxs, NewTxs.serialize(x))
+      case x: NewBlockHash    => (NewBlockHash, NewBlockHash.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -73,6 +74,7 @@ object Payload {
         case NewHeaders      => NewHeaders._deserialize(rest)
         case NewInv          => NewInv._deserialize(rest)
         case NewTxs          => NewTxs._deserialize(rest)
+        case NewBlockHash    => NewBlockHash._deserialize(rest)
       }
     }
   }
@@ -134,7 +136,8 @@ object Payload {
         NewBlocks,
         NewHeaders,
         NewInv,
-        NewTxs
+        NewTxs,
+        NewBlockHash
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -330,4 +333,12 @@ final case class NewTxs(txs: AVector[TransactionTemplate]) extends Payload.UnSol
 
 object NewTxs extends Payload.Serding[NewTxs] with Payload.Code {
   implicit val serde: Serde[NewTxs] = Serde.forProduct1(apply, p => p.txs)
+}
+
+final case class NewBlockHash(hash: BlockHash) extends Payload.UnSolicited {
+  override def measure(): Unit = NewBlockHash.payloadLabeled.inc()
+}
+
+object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
+  implicit val serde: Serde[NewBlockHash] = Serde.forProduct1(apply, _.hash)
 }

@@ -21,12 +21,40 @@ import scala.collection.mutable
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.BlockHash
-import org.alephium.util.{AVector, BaseActor, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration, TimeStamp, UnsecureRandom}
 
 trait DownloadTracker extends BaseActor {
   def blockflow: BlockFlow
 
   val downloading: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
+  val announcements: mutable.HashMap[BlockHash, mutable.Set[ActorRefT[BrokerHandler.Command]]] =
+    mutable.HashMap.empty
+
+  def addAnnouncement(hash: BlockHash, broker: ActorRefT[BrokerHandler.Command]): Unit = {
+    announcements.get(hash) match {
+      case None          => announcements += hash -> mutable.Set(broker)
+      case Some(brokers) => brokers += broker
+    }
+  }
+
+  def removeAnnouncement(broker: ActorRefT[BrokerHandler.Command]): Unit = {
+    announcements.foreach { case (hash, brokers) =>
+      brokers -= broker
+      if (brokers.isEmpty) {
+        announcements -= hash
+      }
+    }
+  }
+
+  def handleAnnouncement(hash: BlockHash, broker: ActorRefT[BrokerHandler.Command]): Unit = {
+    if (!blockflow.containsUnsafe(hash)) {
+      addAnnouncement(hash, broker)
+      if (!downloading.contains(hash)) {
+        downloading += hash -> TimeStamp.now()
+        broker ! BrokerHandler.DownloadBlocks(AVector(hash))
+      }
+    }
+  }
 
   def needToDownload(hash: BlockHash): Boolean =
     !(blockflow.containsUnsafe(hash) || downloading.contains(hash))
@@ -39,20 +67,37 @@ trait DownloadTracker extends BaseActor {
   }
 
   def finalized(hash: BlockHash): Unit = {
-    downloading.remove(hash)
-    ()
+    downloading -= hash
+    announcements -= hash
   }
 
   def cleanupDownloading(aliveDuration: Duration): Unit = {
-    val threshold = TimeStamp.now().minusUnsafe(aliveDuration)
-    val oldSize   = downloading.size
-    downloading.filterInPlace { case (_, downloadTs) =>
-      downloadTs > threshold
+    val threshold   = TimeStamp.now().minusUnsafe(aliveDuration)
+    val needToRetry = mutable.ArrayBuffer.empty[BlockHash]
+    val oldSize     = downloading.size
+    downloading.filterInPlace { case (hash, downloadTs) =>
+      val isExpired = downloadTs <= threshold
+      if (isExpired && announcements.contains(hash)) {
+        needToRetry += hash
+      }
+      !isExpired
     }
     val newSize   = downloading.size
     val sizeDelta = oldSize - newSize
     if (sizeDelta > 0) {
       log.debug(s"Clean up #sizeDelta hashes from downloading pool")
+    }
+    retryDownloadAnnouncements(needToRetry)
+  }
+
+  def retryDownloadAnnouncements(hashes: Iterable[BlockHash]): Unit = {
+    val currentTs = TimeStamp.now()
+    hashes.foreach { hash =>
+      val brokers        = announcements(hash)
+      val index          = UnsecureRandom.source.nextInt(brokers.size)
+      val selectedBroker = brokers.toIndexedSeq.apply(index)
+      downloading += hash -> currentTs
+      selectedBroker ! BrokerHandler.DownloadBlocks(AVector(hash))
     }
   }
 }

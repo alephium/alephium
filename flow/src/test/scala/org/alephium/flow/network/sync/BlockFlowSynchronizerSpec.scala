@@ -21,8 +21,9 @@ import org.scalatest.concurrent.Eventually
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
-import org.alephium.protocol.Generators
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.protocol.{BlockHash, Generators}
+import org.alephium.util.{AlephiumActorSpec, AVector}
 
 class BlockFlowSynchronizerSpec extends AlephiumActorSpec("BlockFlowSynchronizer") {
   trait Fixture extends FlowFixture with Generators with Eventually {
@@ -43,5 +44,20 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec("BlockFlowSynchronizer
 
     system.stop(probe.ref)
     eventually(blockFlowSynchronizerActor.brokerInfos.isEmpty is true)
+  }
+
+  it should "handle announcement" in new Fixture {
+    val broker     = TestProbe()
+    val brokerInfo = brokerInfoGen.sample.get
+    val blockHash  = BlockHash.generate
+
+    broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.HandShaked(brokerInfo))
+    eventually(blockFlowSynchronizerActor.brokerInfos.contains(broker.ref) is true)
+    broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.Announcement(blockHash))
+    broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
+    eventually(blockFlowSynchronizerActor.announcements.contains(blockHash) is true)
+
+    system.stop(broker.ref)
+    eventually(blockFlowSynchronizerActor.announcements.contains(blockHash) is false)
   }
 }

@@ -44,6 +44,7 @@ object BrokerHandler {
   final case class SyncLocators(hashes: AVector[AVector[BlockHash]]) extends Command
   final case class DownloadHeaders(fromHashes: AVector[BlockHash])   extends Command
   final case class DownloadBlocks(hashes: AVector[BlockHash])        extends Command
+  final case class RelayInventory(hash: BlockHash)                   extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
@@ -247,6 +248,10 @@ trait FlowDataHandler extends BaseHandler {
   def allHandlers: AllHandlers
   def remoteAddress: InetSocketAddress
   def blockflow: BlockFlow
+  def handleValidFlowData[T <: FlowData](datas: AVector[T], dataOrigin: DataOrigin): Unit = {
+    val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+    allHandlers.dependencyHandler ! message
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def handleFlowData[T <: FlowData](
@@ -260,8 +265,7 @@ trait FlowDataHandler extends BaseHandler {
     } else {
       val ok = datas.forall { data => data.chainIndex.relateTo(brokerConfig) == isBlock }
       if (ok) {
-        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-        allHandlers.dependencyHandler ! message
+        handleValidFlowData(datas, dataOrigin)
       } else {
         handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
       }
