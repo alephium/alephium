@@ -104,10 +104,8 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         dustAmount: U256 = U256.Zero
     ): Either[String, AVector[AssetOutputInfo]] = {
       import UtxoUtils._
-      val utxosSorted = utxos.sorted
-      findUtxosWithoutGas(utxosSorted, amount, dustAmount).map { case (_, index) =>
-        utxosSorted.take(index + 1)
-      }
+      val utxosSorted = utxos.sorted(assetOrderByAlf)
+      findUtxosWithoutGas(utxosSorted, amount, dustAmount)(_.output.amount).map(_._2)
     }
 
     def select(
@@ -120,6 +118,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoUtils.select(
         utxos,
         amount,
+        AVector.empty, // FIXME
         gasOpt,
         GasPrice(1),
         GasBox.unsafe(1),

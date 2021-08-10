@@ -240,7 +240,7 @@ object UnsignedTransaction {
     Option.when(notOk)("Not enough Alf for change output because of tokens").toLeft(())
   }
 
-  private def calculateTotalAmountPerToken(
+  def calculateTotalAmountPerToken(
       tokens: AVector[(TokenId, U256)]
   ): Either[String, AVector[(TokenId, U256)]] = {
     tokens.foldE(AVector.empty[(TokenId, U256)]) { case (acc, (id, amount)) =>

@@ -120,15 +120,25 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    val totalAmountE = for {
-      _           <- checkOutputInfos(outputInfos)
-      totalAmount <- checkTotalAmount(outputInfos)
-      _           <- checkWithMinimalGas(gasOpt, minimalGas)
-    } yield totalAmount
+    val totalAmountsE = for {
+      _              <- checkOutputInfos(outputInfos)
+      totalAlfAmount <- checkTotalAmount(outputInfos)
+      _              <- checkWithMinimalGas(gasOpt, minimalGas)
+      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
+        outputInfos.flatMap(_.tokens)
+      )
+    } yield (totalAlfAmount, totalAmountPerToken)
 
-    totalAmountE match {
-      case Right(totalAmount) =>
-        selectUTXOs(fromLockupScript, totalAmount, outputInfos.length, gasOpt, gasPrice).map {
+    totalAmountsE match {
+      case Right((totalAmount, totalAmountPerToken)) =>
+        selectUTXOs(
+          fromLockupScript,
+          totalAmount,
+          totalAmountPerToken,
+          outputInfos.length,
+          gasOpt,
+          gasPrice
+        ).map {
           _.flatMap { selected =>
             UnsignedTransaction
               .transfer(
@@ -161,7 +171,7 @@ trait TxUtils { Self: FlowUtils =>
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
     val gasE = for {
-      gas <- gasOpt.toRight("Gas missing when building transaction from provided UTXOs")
+      gas <- gasOpt.toRight("Gas missing when building transaction from selected UTXOs")
       _   <- checkUTXORefs(utxoRefs)
       _   <- checkTotalAmount(outputInfos)
       _   <- checkOutputInfos(outputInfos)
@@ -369,7 +379,8 @@ trait TxUtils { Self: FlowUtils =>
 
   private def selectUTXOs(
       fromLockupScript: LockupScript.Asset,
-      outputsTotalAmount: U256,
+      totalAlfAmount: U256,
+      totalAmountPerToken: AVector[(TokenId, U256)],
       outputsLength: Int,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -377,7 +388,8 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(fromLockupScript).map { utxos =>
       UtxoUtils.select(
         utxos,
-        outputsTotalAmount,
+        totalAlfAmount,
+        totalAmountPerToken,
         gasOpt,
         gasPrice,
         defaultGasPerInput,
