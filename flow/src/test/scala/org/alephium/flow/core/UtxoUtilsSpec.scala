@@ -105,7 +105,9 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     ): Either[String, AVector[AssetOutputInfo]] = {
       import UtxoUtils._
       val utxosSorted = utxos.sorted(assetOrderByAlf)
-      findUtxosWithoutGas(utxosSorted, amount, dustAmount)(_.output.amount).map(_._2)
+      findUtxosWithoutGas(utxosSorted, amount, dustAmount)(_.output.amount).map {
+        case (_, selectedUtxos, _) => selectedUtxos
+      }
     }
 
     def select(
