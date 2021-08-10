@@ -18,10 +18,18 @@ package org.alephium.util
 
 import java.util.{LinkedHashMap, Map}
 
-object LruCache {
-  def apply[K, V](maxCapacity: Int, accessOrder: Boolean): LruCache[K, V] = {
+object Cache {
+  def lru[K, V](maxCapacity: Int): Cache[K, V] = {
+    Cache(maxCapacity, accessOrder = true)
+  }
+
+  def fifo[K, V](maxCapacity: Int): Cache[K, V] = {
+    Cache(maxCapacity, accessOrder = false)
+  }
+
+  private def apply[K, V](maxCapacity: Int, accessOrder: Boolean): Cache[K, V] = {
     val m = new Inner[K, V](maxCapacity, 32, 0.75f, accessOrder)
-    new LruCache[K, V](m)
+    new Cache[K, V](m)
   }
 
   private class Inner[K, V](
@@ -36,7 +44,7 @@ object LruCache {
   }
 }
 
-class LruCache[K, V](m: LruCache.Inner[K, V]) extends SimpleMap[K, V] {
+class Cache[K, V](m: Cache.Inner[K, V]) extends SimpleMap[K, V] {
   protected def underlying: Map[K, V] = m
 
   def contains(key: K): Boolean = m.containsKey(key)
@@ -46,7 +54,6 @@ class LruCache[K, V](m: LruCache.Inner[K, V]) extends SimpleMap[K, V] {
   def get(key: K): Option[V] = Option(m.get(key))
 
   def put(key: K, value: V): Unit = {
-    m.remove(key)
     m.put(key, value)
     ()
   }

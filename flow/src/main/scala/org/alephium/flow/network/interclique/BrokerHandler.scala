@@ -25,11 +25,10 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash}
 import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector, LruCache}
+import org.alephium.util.{ActorRefT, AVector, Cache}
 
 trait BrokerHandler extends BaseBrokerHandler {
-  val seenBlocks: LruCache[BlockHash, Unit] =
-    LruCache[BlockHash, Unit](networkSetting.maxSeenBlocks, accessOrder = true)
+  val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](networkSetting.maxSeenBlocks)
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
