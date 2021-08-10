@@ -4873,6 +4873,12 @@
               "$ref": "#/components/schemas/Destination"
             }
           },
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRef"
+            }
+          },
           "gas": {
             "type": "integer"
           },
