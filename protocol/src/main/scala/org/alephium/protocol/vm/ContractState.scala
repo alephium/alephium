@@ -21,7 +21,7 @@ import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 final case class ContractState private (
-    code: StatefulContract,
+    code: StatefulContract.HalfDecoded,
     fields: AVector[Val],
     contractOutputRef: ContractOutputRef
 ) {
@@ -42,7 +42,7 @@ object ContractState {
     ContractState(StatefulContract.forSMT, AVector.empty, ContractOutputRef.forSMT)
 
   def unsafe(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       contractOutputRef: ContractOutputRef
   ): ContractState = {

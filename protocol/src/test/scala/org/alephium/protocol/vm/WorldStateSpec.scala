@@ -31,7 +31,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     } yield (assetOutputRef, assetOutput)
   }
 
-  def generateContract: Gen[(StatefulContract, AVector[Val], ContractOutputRef, ContractOutput)] = {
+  def generateContract
+      : Gen[(StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)] = {
     lazy val counterStateGen: Gen[AVector[Val]] =
       Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
     for {
@@ -39,7 +40,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       outputRef     <- contractOutputRefGen(groupIndex)
       output        <- contractOutputGen()
       contractState <- counterStateGen
-    } yield (counterContract, contractState, outputRef, output)
+    } yield (counterContract.toHalfDecoded(), contractState, outputRef, output)
   }
 
   it should "test mutable world state" in {

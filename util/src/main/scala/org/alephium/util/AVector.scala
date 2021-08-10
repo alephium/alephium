@@ -718,6 +718,19 @@ object AVector {
     unsafe(arr)
   }
 
+  @inline def tabulateE[A: ClassTag, E](
+      n: Int
+  )(f: Int => Either[E, A]): Either[E, AVector[A]] = {
+    val arr = new Array[A](n)
+    cfor(0)(_ < n, _ + 1) { i =>
+      f(i) match {
+        case Right(a) => arr(i) = a
+        case Left(e)  => return Left(e)
+      }
+    }
+    Right(unsafe(arr))
+  }
+
   def tabulate[@sp A: ClassTag](n1: Int, n2: Int)(f: (Int, Int) => A): AVector[AVector[A]] = {
     assume(n1 >= 0 && n2 >= 0)
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))

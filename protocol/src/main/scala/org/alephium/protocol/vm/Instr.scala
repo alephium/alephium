@@ -1024,7 +1024,7 @@ object CreateContract extends ContractInstr with GasCreate {
       contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
-      _ <- frame.createContract(contractCode, fields)
+      _ <- frame.createContract(contractCode.toHalfDecoded(), fields)
     } yield ()
   }
 }

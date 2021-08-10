@@ -16,9 +16,11 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.immutable
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
+import akka.util.ByteString
+
+import org.alephium.io.IOError
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
@@ -59,14 +61,18 @@ object Method {
 
 sealed trait Contract[Ctx <: StatelessContext] {
   def fieldLength: Int
-  def methods: AVector[Method[Ctx]]
+  def getMethod(index: Int): ExeResult[Method[Ctx]]
   def hash: Hash
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   def fieldLength: Int = 0
-
+  def methods: AVector[Method[Ctx]]
   def toObject: ScriptObj[Ctx]
+
+  def getMethod(index: Int): ExeResult[Method[Ctx]] = {
+    methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+  }
 }
 
 @HashSerde
@@ -131,32 +137,136 @@ final case class StatefulContract(
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext] {
 
-  def check(initialFields: AVector[Val]): ExeResult[Unit] = {
-    if (validate(initialFields)) {
-      okay
-    } else {
-      failed(InvalidFieldLength)
-    }
+  def getMethod(index: Int): ExeResult[Method[StatefulContext]] = {
+    methods.get(index).toRight(Right(InvalidMethodIndex(index)))
   }
 
   def validate(initialFields: AVector[Val]): Boolean = {
     initialFields.length == fieldLength
   }
 
-  def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
-    StatefulContractObject(this, contractState.fields, address)
-  }
-
-  def toObject(address: Hash, fields: AVector[Val]): StatefulContractObject = {
-    StatefulContractObject(this, fields, address)
+  def toHalfDecoded(): StatefulContract.HalfDecoded = {
+    val methodsBytes = methods.map(Method.statefulSerde.serialize)
+    var count        = 0
+    val methodIndexes = AVector.tabulate(methods.length) { k =>
+      count += methodsBytes(k).length
+      count
+    }
+    StatefulContract.HalfDecoded(
+      fieldLength,
+      methodIndexes,
+      methodsBytes.fold(ByteString.empty)(_ ++ _)
+    )
   }
 }
 
 object StatefulContract {
-  implicit val serde: Serde[StatefulContract] =
-    Serde.forProduct2(StatefulContract.apply, t => (t.fieldLength, t.methods))
+  @HashSerde
+  // We don't need to deserialize the whole contract if we only access part of the methods
+  final case class HalfDecoded(
+      fieldLength: Int,
+      methodIndexes: AVector[Int], // end positions of methods in methodBytes
+      methodsBytes: ByteString
+  ) extends Contract[StatefulContext] {
+    def methodLength: Int = methodIndexes.length
 
-  val forSMT: StatefulContract = StatefulContract(0, AVector(Method.forSMT))
+    def check(initialFields: AVector[Val]): ExeResult[Unit] = {
+      if (validate(initialFields)) {
+        okay
+      } else {
+        failed(InvalidFieldLength)
+      }
+    }
+
+    def validate(initialFields: AVector[Val]): Boolean = {
+      initialFields.length == fieldLength
+    }
+
+    private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodLength)
+
+    def getMethod(index: Int): ExeResult[Method[StatefulContext]] = {
+      if (index >= 0 && index < methodLength) {
+        val method = methods(index)
+        if (method == null) {
+          deserializeMethod(index) match {
+            case Left(error) => ioFailed(IOErrorLoadContract(IOError.Serde(error)))
+            case Right(method) =>
+              methods(index) = method
+              Right(method)
+          }
+        } else {
+          Right(method)
+        }
+      } else {
+        failed(InvalidMethodIndex(index))
+      }
+    }
+
+    private def deserializeMethod(index: Int): SerdeResult[Method[StatefulContext]] = {
+      val methodBytes = if (index == 0) {
+        methodsBytes.take(methodIndexes(0))
+      } else {
+        methodsBytes.slice(methodIndexes(index - 1), methodIndexes(index))
+      }
+      Method.statefulSerde.deserialize(methodBytes)
+    }
+
+    def toContract(): SerdeResult[StatefulContract] = {
+      AVector.tabulateE(methodLength)(deserializeMethod).map(StatefulContract(fieldLength, _))
+    }
+
+    def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
+      StatefulContractObject(this, contractState.fields, address)
+    }
+
+    def toObject(address: Hash, fields: AVector[Val]): StatefulContractObject = {
+      StatefulContractObject(this, fields, address)
+    }
+  }
+
+  object HalfDecoded {
+    private val intsSerde: Serde[AVector[Int]] = avectorSerde[Int]
+    implicit val serde: Serde[HalfDecoded] = new Serde[HalfDecoded] {
+      override def serialize(input: HalfDecoded): ByteString = {
+        intSerde.serialize(input.fieldLength) ++
+          intsSerde.serialize(input.methodIndexes) ++
+          input.methodsBytes
+      }
+
+      override def _deserialize(input: ByteString): SerdeResult[Staging[HalfDecoded]] = {
+        for {
+          fieldLengthRest   <- intSerde._deserialize(input)
+          methodIndexesRest <- intsSerde._deserialize(fieldLengthRest.rest)
+        } yield {
+          // all the `last`, `take` and `drop` calls are safe since contracts are checked in the creation
+          val length      = methodIndexesRest.value.last
+          val data        = methodIndexesRest.rest
+          val methodBytes = data.take(length)
+          val rest        = data.drop(length)
+          Staging(
+            HalfDecoded(fieldLengthRest.value, methodIndexesRest.value, methodBytes),
+            rest
+          )
+        }
+      }
+    }
+  }
+
+  implicit val serde: Serde[StatefulContract] = new Serde[StatefulContract] {
+    override def serialize(input: StatefulContract): ByteString = {
+      HalfDecoded.serde.serialize(input.toHalfDecoded())
+    }
+
+    override def _deserialize(input: ByteString): SerdeResult[Staging[StatefulContract]] = {
+      for {
+        halfDecodedRest <- HalfDecoded.serde._deserialize(input)
+        contract        <- halfDecodedRest.value.toContract()
+      } yield Staging(contract, halfDecodedRest.rest)
+    }
+  }
+
+  val forSMT: StatefulContract.HalfDecoded =
+    StatefulContract(0, AVector(Method.forSMT)).toHalfDecoded()
 }
 
 sealed trait ContractObj[Ctx <: StatelessContext] {
@@ -173,9 +283,7 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 
   def getCodeHash(): Val.ByteVec = Val.ByteVec(immutable.ArraySeq.from(code.hash.bytes))
 
-  def getMethod(index: Int): ExeResult[Method[Ctx]] = {
-    code.methods.get(index).toRight(Right(InvalidMethodIndex(index)))
-  }
+  def getMethod(index: Int): ExeResult[Method[Ctx]] = code.getMethod(index)
 
   def getField(index: Int): ExeResult[Val] = {
     if (fields.isDefinedAt(index)) Right(fields(index)) else failed(InvalidFieldIndex)
@@ -202,7 +310,7 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
 final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext]
 
 final case class StatefulContractObject private (
-    code: StatefulContract,
+    code: StatefulContract.HalfDecoded,
     initialFields: AVector[Val],
     fields: mutable.ArraySeq[Val],
     contractId: ContractId
@@ -214,7 +322,7 @@ final case class StatefulContractObject private (
 
 object StatefulContractObject {
   def apply(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
       initialFields: AVector[Val],
       contractId: ContractId
   ): StatefulContractObject = {

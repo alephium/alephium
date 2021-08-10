@@ -566,6 +566,10 @@ class IntAVectorSpec extends AVectorSpec[Int] {
         checkState(vector, 0, n2, n2, n2, true)
         vector.foreachWithIndex { (elem, index2) => elem is index1 + index2 }
       }
+      AVector.tabulateE[Int, Unit](n1)(Right(_)) isE AVector.tabulate(n1)(identity)
+      AVector
+        .tabulateE[Int, Unit](n1)(k => if (k equals (n1 / 2)) Left(()) else Right(k))
+        .leftValue is ()
     }
   }
 

@@ -30,15 +30,16 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val groupIndex        = GroupIndex.unsafe(0)
     val contractOutputRef = contractOutputRefGen(groupIndex).sample.get
     val contractOutput    = contractOutputGen().sample.get
+    val halfDecoded       = contract.toHalfDecoded()
 
     cachedWorldState.createContractUnsafe(
-      contract,
+      halfDecoded,
       fields,
       contractOutputRef,
       contractOutput
     ) isE ()
 
-    val obj = contract.toObject(contractOutputRef.key, fields)
+    val obj = halfDecoded.toObject(contractOutputRef.key, fields)
     val context = new StatefulContext {
       override val worldState: WorldState.Staging            = cachedWorldState.staging()
       override def outputBalances: Balances                  = ???

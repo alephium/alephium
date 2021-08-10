@@ -93,7 +93,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def createContract(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
       initialBalances: BalancesPerLockup,
       initialFields: AVector[Val]
   ): ExeResult[Unit] = {

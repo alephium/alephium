@@ -114,7 +114,7 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
 
-  def createContract(code: StatefulContract, fields: AVector[Val]): ExeResult[Unit]
+  def createContract(code: StatefulContract.HalfDecoded, fields: AVector[Val]): ExeResult[Unit]
 
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
     advancePC()
@@ -171,10 +171,11 @@ final class StatelessFrame(
   }
 
   // the following should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState]                                         = ???
-  def createContract(code: StatefulContract, fields: AVector[Val]): ExeResult[Unit] = ???
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                          = ???
-  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]]         = ???
+  def balanceStateOpt: Option[BalanceState] = ???
+  def createContract(code: StatefulContract.HalfDecoded, fields: AVector[Val]): ExeResult[Unit] =
+    ???
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                  = ???
+  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
 }
 
 final class StatefulFrame(
@@ -219,7 +220,7 @@ final class StatefulFrame(
     }
   }
 
-  def createContract(code: StatefulContract, fields: AVector[Val]): ExeResult[Unit] = {
+  def createContract(code: StatefulContract.HalfDecoded, fields: AVector[Val]): ExeResult[Unit] = {
     for {
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))

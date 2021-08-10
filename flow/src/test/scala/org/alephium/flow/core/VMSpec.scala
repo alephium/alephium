@@ -27,7 +27,7 @@ import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.serde.serialize
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 
 // scalastyle:off file.size.limit
@@ -200,6 +200,8 @@ class VMSpec extends AlephiumSpec {
       val contractOutputRef =
         TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
 
+      deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
+        .toContract() isE contract
       addAndCheck(blockFlow, block)
       contractOutputRef
     }

@@ -40,7 +40,7 @@ trait WorldState[T] {
   def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
 
   def createContractUnsafe(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
@@ -126,7 +126,7 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
   }
 
   def createContractUnsafe(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
@@ -186,7 +186,7 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
   }
 
   def createContractUnsafe(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
@@ -265,7 +265,7 @@ object WorldState {
     }
 
     def createContractUnsafe(
-        code: StatefulContract,
+        code: StatefulContract.HalfDecoded,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
@@ -342,7 +342,7 @@ object WorldState {
     }
 
     def createContractUnsafe(
-        code: StatefulContract,
+        code: StatefulContract.HalfDecoded,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
