@@ -32,7 +32,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, FlowData}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, FlowData}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -115,17 +115,27 @@ trait BrokerHandler extends FlowDataHandler {
 
   def exchanging: Receive
 
+  def handleNewBlocks(blocks: AVector[Block]): Unit = {
+    log.debug(
+      s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress"
+    )
+    handleFlowData(blocks, dataOrigin, isBlock = true)
+  }
+
+  def handleNewHeaders(headers: AVector[BlockHeader]): Unit = {
+    log.debug(
+      s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress"
+    )
+    handleFlowData(headers, dataOrigin, isBlock = false)
+  }
+
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
       log.debug(
         s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
       send(BlocksRequest(hashes))
-    case Received(NewBlocks(blocks)) =>
-      log.debug(
-        s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress"
-      )
-      handleFlowData(blocks, dataOrigin, isBlock = true)
+    case Received(NewBlocks(blocks)) => handleNewBlocks(blocks)
     case Received(BlocksResponse(requestId, blocks)) =>
       log.debug(
         s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress with $requestId"
@@ -135,11 +145,7 @@ trait BrokerHandler extends FlowDataHandler {
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
         send(BlocksResponse(requestId, blocks))
       }
-    case Received(NewHeaders(headers)) =>
-      log.debug(
-        s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress"
-      )
-      handleFlowData(headers, dataOrigin, isBlock = false)
+    case Received(NewHeaders(headers)) => handleNewHeaders(headers)
     case Received(HeadersResponse(requestId, headers)) =>
       log.debug(
         s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress with $requestId"
@@ -248,10 +254,6 @@ trait FlowDataHandler extends BaseHandler {
   def allHandlers: AllHandlers
   def remoteAddress: InetSocketAddress
   def blockflow: BlockFlow
-  def handleValidFlowData[T <: FlowData](datas: AVector[T], dataOrigin: DataOrigin): Unit = {
-    val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-    allHandlers.dependencyHandler ! message
-  }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def handleFlowData[T <: FlowData](
@@ -265,7 +267,8 @@ trait FlowDataHandler extends BaseHandler {
     } else {
       val ok = datas.forall { data => data.chainIndex.relateTo(brokerConfig) == isBlock }
       if (ok) {
-        handleValidFlowData(datas, dataOrigin)
+        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+        allHandlers.dependencyHandler ! message
       } else {
         handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
       }

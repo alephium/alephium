@@ -46,14 +46,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     brokerHandler.underlyingActor.remoteSynced is false
 
     EventFilter.info(start = "Remote ").intercept {
-      brokerHandler ! FlowHandler.SyncInventories(None, AVector(AVector.empty))
+      brokerHandler ! FlowHandler.SyncInventories(Some(RequestId.random()), AVector(AVector.empty))
     }
     brokerHandler.underlyingActor.selfSynced is false
     brokerHandler.underlyingActor.remoteSynced is true
     cliqueManager.expectNoMessage()
 
     EventFilter.info(start = "Remote ", occurrences = 0).intercept {
-      brokerHandler ! FlowHandler.SyncInventories(None, AVector(AVector.empty))
+      brokerHandler ! FlowHandler.SyncInventories(Some(RequestId.random()), AVector(AVector.empty))
     }
   }
 
@@ -77,7 +77,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     brokerHandler.underlyingActor.selfSynced is false
     brokerHandler.underlyingActor.remoteSynced is false
 
-    brokerHandler ! FlowHandler.SyncInventories(None, AVector(AVector.empty))
+    brokerHandler ! FlowHandler.SyncInventories(Some(RequestId.random()), AVector(AVector.empty))
     brokerHandler ! BaseBrokerHandler.Received(InvResponse(RequestId.random(), AVector.empty))
     eventually {
       brokerHandler.underlyingActor.selfSynced is true
@@ -86,28 +86,18 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     cliqueManager.expectMsg(CliqueManager.Synced(brokerHandler.underlyingActor.remoteBrokerInfo))
   }
 
-  it should "mark block seen when receive inventories" in new Fixture {
+  it should "mark block seen when receive NewBlocks/NewHeaders/NewBlockHash" in new Fixture {
     val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
     def genValidBlockHash(): BlockHash = {
       emptyBlock(blockFlow, chainIndex).hash
     }
 
     val blockHash1 = genValidBlockHash()
-    brokerHandler ! BaseBrokerHandler.Received(
-      InvResponse(RequestId.random(), AVector(AVector(blockHash1)))
-    )
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash1))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash1) is true)
 
-    val blockHash2 = genValidBlockHash()
-    brokerHandler ! BaseBrokerHandler.Received(NewInv(AVector(AVector(blockHash2))))
-    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash2) is true)
-
-    val blockHash3 = genValidBlockHash()
-    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash3))
-    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash3) is true)
-
     val block1 = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(BlocksResponse(RequestId.random(), AVector(block1)))
+    brokerHandler ! BaseBrokerHandler.Received(NewHeaders(AVector(block1.header)))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(block1.hash) is true)
 
     val block2 = emptyBlock(blockFlow, chainIndex)

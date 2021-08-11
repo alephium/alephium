@@ -97,6 +97,7 @@ trait DownloadTracker extends BaseActor {
       val index          = UnsecureRandom.source.nextInt(brokers.size)
       val selectedBroker = brokers.toIndexedSeq.apply(index)
       downloading += hash -> currentTs
+      announcements -= hash
       selectedBroker ! BrokerHandler.DownloadBlocks(AVector(hash))
     }
   }

@@ -147,5 +147,6 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     downloadTrackObj.downloading.keys.toSet is announcements.toSet
     broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(expiredAnn)))
     broker.expectNoMessage()
+    downloadTrackObj.announcements.contains(expiredAnn) is false
   }
 }

@@ -17,14 +17,14 @@
 package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
-import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash, NewInv}
-import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, FlowData}
+import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, LruCache}
 
 trait BrokerHandler extends BaseBrokerHandler {
@@ -40,16 +40,14 @@ trait BrokerHandler extends BaseBrokerHandler {
     cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
   }
 
-  override def handleValidFlowData[T <: FlowData](
-      datas: AVector[T],
-      dataOrigin: DataOrigin
-  ): Unit = {
-    datas.foreach {
-      case data: Block => seenBlocks.put(data.hash, ())
-      case _           =>
-    }
-    val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-    allHandlers.dependencyHandler ! message
+  override def handleNewBlocks(blocks: AVector[Block]): Unit = {
+    blocks.foreach(block => seenBlocks.put(block.hash, ()))
+    super.handleNewBlocks(blocks)
+  }
+
+  override def handleNewHeaders(headers: AVector[BlockHeader]): Unit = {
+    headers.foreach(header => seenBlocks.put(header.hash, ()))
+    super.handleNewHeaders(headers)
   }
 
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
@@ -69,16 +67,13 @@ trait BrokerHandler extends BaseBrokerHandler {
           log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
           handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
         }
-      case FlowHandler.SyncInventories(requestId, inventories) =>
+      case FlowHandler.SyncInventories(Some(requestId), inventories) =>
         log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
         if (inventories.forall(_.isEmpty)) {
           setRemoteSynced()
         }
-        send(requestId.map(InvResponse(_, inventories)).getOrElse(NewInv(inventories)))
-      case BaseBrokerHandler.Received(InvResponse(_, hashes)) =>
-        handleInv(hashes)
-      case BaseBrokerHandler.Received(NewInv(hashes)) =>
-        handleInv(hashes)
+        send(InvResponse(requestId, inventories))
+      case BaseBrokerHandler.Received(InvResponse(_, hashes)) => handleInv(hashes)
       case BaseBrokerHandler.Received(NewBlockHash(hash)) =>
         if (validate(hash)) {
           log.debug(s"Receive new block hash ${hash.shortHex} from $remoteAddress")
@@ -89,7 +84,9 @@ trait BrokerHandler extends BaseBrokerHandler {
           handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
         }
       case BaseBrokerHandler.RelayInventory(hash) =>
-        if (!seenBlocks.contains(hash)) {
+        if (seenBlocks.contains(hash)) {
+          log.debug(s"Remote broker already have the block ${hash.shortHex}")
+        } else {
           log.debug(s"Relay new block hash ${hash.shortHex} to $remoteAddress")
           seenBlocks.put(hash, ())
           send(NewBlockHash(hash))
