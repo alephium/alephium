@@ -34,60 +34,89 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     override def groups: Int = 2
   }
 
-  it should "return the utxos with the amount from small to large" in new Fixture {
+  it should "return the utxos with the amount from small to large, without tokens" in new Fixture {
     val utxos = buildUtxos(20, 10, 30)
 
-    selectWithoutGas(utxos, 10) is Right(AVector(utxos(1)))
-    selectWithoutGas(utxos, 20) is Right(AVector(utxos(1), utxos(0)))
-    selectWithoutGas(utxos, 30) is Right(AVector(utxos(1), utxos(0)))
-    selectWithoutGas(utxos, 40) is Right(AVector(utxos(1), utxos(0), utxos(2)))
-    selectWithoutGas(utxos, 50) is Right(AVector(utxos(1), utxos(0), utxos(2)))
-    selectWithoutGas(utxos, 60) is Right(AVector(utxos(1), utxos(0), utxos(2)))
+    selectWithoutGas(utxos, 10) isE AVector(utxos(1))
+    selectWithoutGas(utxos, 20) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 30) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 40) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 50) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 60) isE AVector(utxos(1), utxos(0), utxos(2))
     selectWithoutGas(utxos, 70).leftValue.startsWith(s"Not enough balance") is true
 
-    selectWithoutGas(utxos, 29, 1) is Right(AVector(utxos(1), utxos(0)))
-    selectWithoutGas(utxos, 29, 2) is Right(AVector(utxos(1), utxos(0), utxos(2)))
-    selectWithoutGas(utxos, 30, 1) is Right(AVector(utxos(1), utxos(0)))
+    selectWithoutGas(utxos, 29, 1) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 29, 2) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 30, 1) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 59, 2).leftValue.startsWith(s"Not enough balance") is true
+  }
+
+  it should "return the utxos with the amount from small to large, with tokens" in new Fixture {
+    val tokenId1 = Hash.hash("tokenId1")
+    val tokenId2 = Hash.hash("tokenId2")
+    val tokenId3 = Hash.hash("tokenId3")
+
+    val utxos = buildUtxosWithTokens(
+      (20, AVector((tokenId1, 10), (tokenId2, 20))),
+      (10, AVector.empty),
+      (30, AVector((tokenId1, 2), (tokenId3, 10)))
+    )
+
+    selectWithoutGas(utxos, 10) isE AVector(utxos(1))
+    selectWithoutGas(utxos, 20) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 30) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 40) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 50) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 60) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 70).leftValue.startsWith(s"Not enough balance") is true
+
+    selectWithoutGas(utxos, 29, 1) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 29, 2) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 30, 1) isE AVector(utxos(1), utxos(0))
     selectWithoutGas(utxos, 59, 2).leftValue.startsWith(s"Not enough balance") is true
   }
 
   it should "return the correct utxos when gas is considered" in new Fixture {
     import UtxoUtils._
     val utxos = buildUtxos(20, 10, 30)
-    select(utxos, 7) is Right(Selected(AVector(utxos(1)), 3))
-    select(utxos, 8) is Right(Selected(AVector(utxos(1), utxos(0)), 4))
-    select(utxos, 26) is Right(Selected(AVector(utxos(1), utxos(0)), 4))
-    select(utxos, 27) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
-    select(utxos, 55) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
+    select(utxos, 7) isE Selected(AVector(utxos(1)), 3)
+    select(utxos, 8) isE Selected(AVector(utxos(1), utxos(0)), 4)
+    select(utxos, 26) isE Selected(AVector(utxos(1), utxos(0)), 4)
+    select(utxos, 27) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 5)
+    select(utxos, 55) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 5)
     select(utxos, 56).leftValue is s"Not enough balance for fee, maybe transfer a smaller amount"
 
-    select(utxos, 25, dustAmount = 2) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 5))
-    select(utxos, 26, dustAmount = 2) is Right(Selected(AVector(utxos(1), utxos(0)), 4))
+    select(utxos, 25, dustAmount = 2) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 5)
+    select(utxos, 26, dustAmount = 2) isE Selected(AVector(utxos(1), utxos(0)), 4)
   }
 
   it should "prefer persisted utxos" in new Fixture {
     val utxos0 = buildUtxos(20, 10)
     val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
-    select(utxos1, 7) is Right(Selected(AVector(utxos1(0)), 3))
+    select(utxos1, 7) isE Selected(AVector(utxos1(0)), 3)
   }
 
   it should "return the correct utxos when gas is preset" in new Fixture {
     val utxos = buildUtxos(20, 10, 30)
-    select(utxos, 9, Some(GasBox.unsafe(1))) is Right(Selected(AVector(utxos(1)), 1))
-    select(utxos, 10, Some(GasBox.unsafe(1))) is Right(Selected(AVector(utxos(1), utxos(0)), 1))
+    select(utxos, 9, Some(GasBox.unsafe(1))) isE Selected(AVector(utxos(1)), 1)
+    select(utxos, 10, Some(GasBox.unsafe(1))) isE Selected(AVector(utxos(1), utxos(0)), 1)
   }
 
   it should "consider minimal gas" in new Fixture {
     val utxos = buildUtxos(20, 10, 30)
-    select(utxos, 1) is Right(Selected(AVector(utxos(1)), 3))
-    select(utxos, 1, minimalGas = 40) is Right(Selected(AVector(utxos(1), utxos(0), utxos(2)), 40))
+    select(utxos, 1) isE Selected(AVector(utxos(1)), 3)
+    select(utxos, 1, minimalGas = 40) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 40)
   }
 
   trait Fixture extends AlephiumConfigFixture {
 
-    def buildOutput(lockupScript: LockupScript.Asset, amount: U256): AssetOutputInfo = {
+    def buildOutput(
+        lockupScript: LockupScript.Asset,
+        tokens: AVector[(TokenId, U256)],
+        amount: U256
+    ): AssetOutputInfo = {
       val output =
-        AssetOutput(amount, lockupScript, TimeStamp.now(), AVector.empty, ByteString.empty)
+        AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
       val ref = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
       AssetOutputInfo(ref, output, PersistedOutput)
     }
@@ -95,17 +124,28 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     val defaultLockupScript = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.get
 
     def buildUtxos(amounts: Int*): AVector[AssetOutputInfo] = {
-      AVector.from(amounts.map { amount => buildOutput(defaultLockupScript, U256.unsafe(amount)) })
+      AVector.from(amounts.map { amount =>
+        buildOutput(defaultLockupScript, AVector.empty, U256.unsafe(amount))
+      })
+    }
+
+    def buildUtxosWithTokens(
+        amounts: (Int, AVector[(TokenId, U256)])*
+    ): AVector[AssetOutputInfo] = {
+      AVector.from(amounts.map { case (amount, tokens) =>
+        buildOutput(defaultLockupScript, tokens, U256.unsafe(amount))
+      })
     }
 
     def selectWithoutGas(
         utxos: AVector[AssetOutputInfo],
         amount: U256,
-        dustAmount: U256 = U256.Zero
+        dustAmount: U256 = U256.Zero,
+        tokens: AVector[(TokenId, U256)] = AVector.empty
     ): Either[String, AVector[AssetOutputInfo]] = {
       import UtxoUtils._
       val utxosSorted = utxos.sorted(assetOrderByAlf)
-      findUtxosWithoutGas(utxosSorted, amount, dustAmount)(asset => Some(asset.output.amount)).map {
+      findUtxosWithoutGas(utxosSorted, amount, tokens, dustAmount).map {
         case (_, selectedUtxos, _) => selectedUtxos
       }
     }
