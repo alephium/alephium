@@ -115,12 +115,13 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
 
     downloadTrack ! BlockFlowSynchronizer.BlockFinalized(randomHashes.head)
     downloadTrackObj.announcements.contains(randomHashes.head) is false
+    downloadTrackObj.announcements.size is (randomHashes.length - 1)
 
     downloadTrackObj.removeAnnouncement(ActorRefT(broker.ref))
     downloadTrackObj.announcements.isEmpty is true
   }
 
-  it should "not download announcement when block is downloading" in new Fixture {
+  it should "not download the announcement when the block is in downloading" in new Fixture {
     val broker           = TestProbe()
     val downloadTrackObj = downloadTrack.underlyingActor
     val currentTs        = TimeStamp.now()
@@ -130,7 +131,7 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     broker.expectNoMessage()
   }
 
-  it should "retry download announcement" in new Fixture {
+  it should "retry to download announcements" in new Fixture {
     val broker           = TestProbe()
     val downloadTrackObj = downloadTrack.underlyingActor
     val announcements    = randomHashes.take(2)

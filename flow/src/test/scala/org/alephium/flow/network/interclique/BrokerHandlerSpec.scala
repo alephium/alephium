@@ -104,6 +104,25 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(block.hash) is true)
   }
 
+  it should "not mark block seen when receive BlocksResponse/HeadersResponse/InvResponse/NewInv" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    brokerHandler ! BaseBrokerHandler.Received(BlocksResponse(RequestId.random(), AVector(block)))
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(block.hash)) is false
+
+    val blockHeader = emptyBlock(blockFlow, chainIndex).header
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersResponse(RequestId.random(), AVector(blockHeader))
+    )
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHeader.hash)) is false
+
+    val blockHash = emptyBlock(blockFlow, chainIndex).hash
+    brokerHandler ! BaseBrokerHandler.Received(
+      InvResponse(RequestId.random(), AVector(AVector(blockHash)))
+    )
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash)) is false
+  }
+
   it should "publish misbehavior when receive invalid hash/block/header" in new Fixture
     with NoIndexModelGenerators {
     @tailrec

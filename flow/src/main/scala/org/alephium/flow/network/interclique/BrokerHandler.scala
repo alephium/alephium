@@ -135,7 +135,6 @@ trait BrokerHandler extends BaseBrokerHandler {
     } else {
       if (validate(hashes)) {
         log.debug(s"Received inv response ${Utils.showFlow(hashes)} from $remoteAddress")
-        hashes.foreach(_.foreach(hash => seenBlocks.put(hash, ())))
         blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
       } else {
         log.warning(s"Invalid inv response from $remoteAddress: ${Utils.showFlow(hashes)}")
