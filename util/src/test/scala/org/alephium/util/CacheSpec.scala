@@ -48,15 +48,22 @@ class CacheSpec extends AlephiumSpec {
   it should "remove elements when there is no capacity" in {
     for (accessOrder <- Seq(true, false)) {
       val cache = if (accessOrder) {
-        Cache.lru[Char, Int](100)
+        Cache.lru[Char, Int](2)
       } else {
-        Cache.fifo[Char, Int](100)
+        Cache.fifo[Char, Int](2)
       }
       cache.put('a', 0)
       cache.put('b', 1)
-      cache.size is 1
-      cache.keys().toSeq is Seq('b')
-      cache.values().toSeq is Seq(1)
+      cache.size is 2
+      cache.get('a') is Some(0)
+      cache.put('c', 2)
+      if (accessOrder) {
+        cache.keys().toSeq is Seq('a', 'c')
+        cache.values().toSeq is Seq(0, 2)
+      } else {
+        cache.keys().toSeq is Seq('b', 'c')
+        cache.values().toSeq is Seq(1, 2)
+      }
     }
   }
 }
