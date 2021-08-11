@@ -98,5 +98,30 @@ class ContractSpec extends AlephiumSpec {
     StatefulContract.check(contract0).leftValue isE EmptyMethods
     val contract1 = StatefulContract(-1, AVector.empty)
     StatefulContract.check(contract1).leftValue isE InvalidFieldLength
+
+    val method = Method[StatefulContext](
+      isPublic = true,
+      isPayable = false,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector.empty
+    )
+    val contract2 = StatefulContract(0, AVector(method))
+    StatefulContract.check(contract2) isE ()
+    val contract3 = StatefulContract(0, AVector(method.copy(argsLength = -1)))
+    StatefulContract.check(contract3).leftValue isE InvalidMethod
+    val contract4 = StatefulContract(0, AVector(method.copy(localsLength = -1)))
+    StatefulContract.check(contract4).leftValue isE InvalidMethod
+    val contract5 = StatefulContract(0, AVector(method.copy(returnLength = -1)))
+    StatefulContract.check(contract5).leftValue isE InvalidMethod
+    val contract6 = StatefulContract(0, AVector(method, method.copy(argsLength = -1)))
+    StatefulContract.check(contract6).leftValue isE InvalidMethod
+    val contract7 = StatefulContract(0, AVector(method, method.copy(localsLength = -1)))
+    StatefulContract.check(contract7).leftValue isE InvalidMethod
+    val contract8 = StatefulContract(0, AVector(method, method.copy(returnLength = -1)))
+    StatefulContract.check(contract8).leftValue isE InvalidMethod
+    val contract9 = StatefulContract(0, AVector(method, method))
+    StatefulContract.check(contract9) isE ()
   }
 }

@@ -288,6 +288,8 @@ object StatefulContract {
       failed(InvalidFieldLength)
     } else if (contract.methods.isEmpty) {
       failed(EmptyMethods)
+    } else if (!contract.methods.forall(Method.validate)) {
+      failed(InvalidMethod)
     } else {
       okay
     }

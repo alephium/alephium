@@ -47,6 +47,7 @@ case object InvalidFieldType                                   extends ExeFailur
 case object EmptyMethods                                       extends ExeFailure
 case object NoReturnVal                                        extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
+final case object InvalidMethod                                extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
 case object InsufficientArgs                                   extends ExeFailure
