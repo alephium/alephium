@@ -158,7 +158,6 @@ object UtxoUtils {
       numOutputs: Int,
       minimalGas: GasBox
   ): Either[String, Selected] = {
-    print(totalAmountPerToken)
     for {
       resultWithoutGas <- findUtxosWithoutGas(
         sortedUtxos,
@@ -198,6 +197,7 @@ object UtxoUtils {
     } else {
       val (tokenId, amount) = totalAmountPerToken.head
       val sortedUtxos       = restOfUtxos.sorted(assetOrderByToken(tokenId))
+
       val foundResult = for {
         remainingTokenAmount <- calculateRemainingTokensAmount(currentUtxos, tokenId, amount)
         result <- findUtxosWithoutGas(sortedUtxos, remainingTokenAmount, U256.Zero)(
@@ -233,9 +233,13 @@ object UtxoUtils {
       }
     }
 
-    iter(U256.Zero, 0) match {
-      case (sum, -1)    => Left(s"Not enough balance: got $sum, expected $amount")
-      case (sum, index) => Right((sum, sortedUtxos.take(index + 1), sortedUtxos.drop(index + 1)))
+    if (amount == U256.Zero) {
+      Right((U256.Zero, AVector.empty, sortedUtxos))
+    } else {
+      iter(U256.Zero, 0) match {
+        case (sum, -1)    => Left(s"Not enough balance: got $sum, expected $amount")
+        case (sum, index) => Right((sum, sortedUtxos.take(index + 1), sortedUtxos.drop(index + 1)))
+      }
     }
   }
 

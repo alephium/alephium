@@ -45,10 +45,10 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     selectWithoutGas(utxos, 60) isE AVector(utxos(1), utxos(0), utxos(2))
     selectWithoutGas(utxos, 70).leftValue.startsWith(s"Not enough balance") is true
 
-    selectWithoutGas(utxos, 29, 1) isE AVector(utxos(1), utxos(0))
-    selectWithoutGas(utxos, 29, 2) isE AVector(utxos(1), utxos(0), utxos(2))
-    selectWithoutGas(utxos, 30, 1) isE AVector(utxos(1), utxos(0))
-    selectWithoutGas(utxos, 59, 2).leftValue.startsWith(s"Not enough balance") is true
+    selectWithoutGas(utxos, 29, dustAmount = 1) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 29, dustAmount = 2) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 30, dustAmount = 1) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 59, dustAmount = 2).leftValue.startsWith(s"Not enough balance") is true
   }
 
   it should "return the utxos with the amount from small to large, with tokens" in new Fixture {
@@ -64,16 +64,53 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
     selectWithoutGas(utxos, 10) isE AVector(utxos(1))
     selectWithoutGas(utxos, 20) isE AVector(utxos(1), utxos(0))
-    selectWithoutGas(utxos, 30) isE AVector(utxos(1), utxos(0))
-    selectWithoutGas(utxos, 40) isE AVector(utxos(1), utxos(0), utxos(2))
-    selectWithoutGas(utxos, 50) isE AVector(utxos(1), utxos(0), utxos(2))
-    selectWithoutGas(utxos, 60) isE AVector(utxos(1), utxos(0), utxos(2))
-    selectWithoutGas(utxos, 70).leftValue.startsWith(s"Not enough balance") is true
+    selectWithoutGas(utxos, 20, AVector((tokenId1, 1))) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 20, AVector((tokenId3, 5))) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 20, AVector((tokenId1, 10))) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 20, AVector((tokenId1, 11))) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(utxos, 20, AVector((tokenId1, 13))).leftValue
+      .startsWith(s"Not enough balance") is true
 
-    selectWithoutGas(utxos, 29, 1) isE AVector(utxos(1), utxos(0))
-    selectWithoutGas(utxos, 29, 2) isE AVector(utxos(1), utxos(0), utxos(2))
-    selectWithoutGas(utxos, 30, 1) isE AVector(utxos(1), utxos(0))
-    selectWithoutGas(utxos, 59, 2).leftValue.startsWith(s"Not enough balance") is true
+    selectWithoutGas(utxos, 30) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 30, AVector((tokenId1, 10), (tokenId2, 15))) isE AVector(
+      utxos(1),
+      utxos(0)
+    )
+    selectWithoutGas(utxos, 40) isE AVector(utxos(1), utxos(0), utxos(2))
+    selectWithoutGas(
+      utxos,
+      40,
+      AVector((tokenId1, 10), (tokenId2, 20), (tokenId3, 10))
+    ) isE AVector(utxos(1), utxos(0), utxos(2))
+
+    selectWithoutGas(
+      utxos,
+      40,
+      AVector((tokenId1, 10), (tokenId2, 20), (tokenId3, 11))
+    ).leftValue.startsWith(s"Not enough balance") is true
+
+    selectWithoutGas(utxos, 70, AVector((tokenId1, 1))).leftValue
+      .startsWith(s"Not enough balance") is true
+
+    selectWithoutGas(
+      utxos,
+      29,
+      AVector((tokenId1, 10), (tokenId2, 15)),
+      dustAmount = 1
+    ) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 29, AVector((tokenId1, 10), (tokenId2, 1)), dustAmount = 2) isE AVector(
+      utxos(1),
+      utxos(0),
+      utxos(2)
+    )
+    selectWithoutGas(
+      utxos,
+      30,
+      AVector((tokenId1, 10), (tokenId2, 20)),
+      dustAmount = 1
+    ) isE AVector(utxos(1), utxos(0))
+    selectWithoutGas(utxos, 59, AVector((tokenId1, 10)), dustAmount = 2).leftValue
+      .startsWith(s"Not enough balance") is true
   }
 
   it should "return the correct utxos when gas is considered" in new Fixture {
@@ -140,8 +177,8 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     def selectWithoutGas(
         utxos: AVector[AssetOutputInfo],
         amount: U256,
-        dustAmount: U256 = U256.Zero,
-        tokens: AVector[(TokenId, U256)] = AVector.empty
+        tokens: AVector[(TokenId, U256)] = AVector.empty,
+        dustAmount: U256 = U256.Zero
     ): Either[String, AVector[AssetOutputInfo]] = {
       import UtxoUtils._
       val utxosSorted = utxos.sorted(assetOrderByAlf)
