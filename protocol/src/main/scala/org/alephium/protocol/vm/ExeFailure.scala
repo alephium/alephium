@@ -65,7 +65,7 @@ case object InvalidAddressTypeInContractDestroy                extends ExeFailur
 case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object UninitializedAddress                               extends ExeFailure
-case object NonPayableFrame                                    extends ExeFailure
+case object ExpectNonPayableMethod                             extends ExeFailure
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure

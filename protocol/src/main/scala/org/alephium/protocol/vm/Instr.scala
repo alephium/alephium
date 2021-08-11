@@ -1072,7 +1072,7 @@ object SelfContractId extends ContractInstr with GasVeryLow {
 object IssueToken extends ContractInstr with GasBalance {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _          <- Either.cond(frame.method.isPayable, (), Right(NonPayableFrame))
+      _          <- Either.cond(frame.method.isPayable, (), Right(ExpectNonPayableMethod))
       contractId <- frame.obj.getContractId()
       amount     <- frame.popOpStackT[Val.U256]()
       tokenId = contractId // tokenId is addressHash

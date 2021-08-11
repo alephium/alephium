@@ -19,9 +19,44 @@ package org.alephium.protocol.vm
 import org.alephium.protocol
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
+  def prepareStatelessScript(
+      script: StatelessScript,
+      gasLimit: GasBox = minimalGas
+  ): (ScriptObj[StatelessContext], StatelessContext) = {
+    val obj = script.toObject
+    val context = StatelessContext.apply(
+      BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
+      Hash.zero,
+      gasLimit,
+      Stack.ofCapacity[protocol.Signature](0)
+    )
+    obj -> context
+  }
+
+  def prepareStatefulScript(
+      script: StatefulScript,
+      gasLimit: GasBox = minimalGas
+  ): (ScriptObj[StatefulContext], StatefulContext) = {
+    val obj = script.toObject
+    val (tx, preOutputs) = {
+      val (tx, preOutputs) = transactionGenWithPreOutputs().sample.get
+      tx.copy(unsigned = tx.unsigned.copy(scriptOpt = Some(script))) -> preOutputs
+    }
+    val context = StatefulContext
+      .build(
+        BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
+        tx,
+        gasLimit,
+        cachedWorldState,
+        Some(preOutputs.map(_.referredOutput))
+      )
+      .rightValue
+    obj -> context
+  }
+
   def prepareContract(
       contract: StatefulContract,
       fields: AVector[Val],
@@ -47,7 +82,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       override def blockEnv: BlockEnv                        = ???
       override def txId: Hash                                = Hash.zero
       override def signatures: Stack[protocol.Signature]     = Stack.ofCapacity(0)
-      override def getInitialBalances(): ExeResult[Balances] = failed(NonPayableFrame)
+      override def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
       override var gasRemaining: GasBox                      = gasLimit
     }
     obj -> context

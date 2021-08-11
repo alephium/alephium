@@ -62,7 +62,7 @@ object StatelessContext {
       val signatures: Stack[Signature],
       var gasRemaining: GasBox
   ) extends StatelessContext {
-    override def getInitialBalances(): ExeResult[Balances] = failed(NonPayableFrame)
+    override def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
   }
 }
 
@@ -226,7 +226,7 @@ object StatefulContext {
             .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {
-        failed(NonPayableFrame)
+        failed(ExpectNonPayableMethod)
       }
 
     override val outputBalances: Balances = Balances.empty

@@ -30,6 +30,68 @@ import org.alephium.serde._
 import org.alephium.util._
 
 class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
+  trait BaseFixture[Ctx <: StatelessContext] {
+    val baseMethod = Method[Ctx](
+      isPublic = true,
+      isPayable = false,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector.empty
+    )
+
+    def test0(instrs: AVector[Instr[Ctx]], expected: ExeResult[Unit]) = {
+      test1(baseMethod.copy(instrs = instrs), expected)
+    }
+
+    def test1(method: Method[Ctx], expected: ExeResult[Unit]) = {
+      test2(AVector(method), expected)
+    }
+
+    def test2(methods: AVector[Method[Ctx]], expected: ExeResult[Unit]): Unit
+  }
+
+  trait StatelessFixture extends BaseFixture[StatelessContext] {
+    def test2(methods: AVector[Method[StatelessContext]], expected: ExeResult[Unit]) = {
+      test3(StatelessScript.unsafe(methods), expected)
+    }
+
+    def test3(script: StatelessScript, expected: ExeResult[Unit]): Unit = {
+      val (obj, context) = prepareStatelessScript(script)
+      StatelessVM.execute(context, obj, AVector.empty).map(_ => ()) is expected
+      ()
+    }
+  }
+
+  it should "check the entry method of stateless scripts" in new StatelessFixture {
+    test1(baseMethod, okay)
+    test1(baseMethod.copy(isPayable = true), failed(ExpectNonPayableMethod))
+    test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
+    // negative locals length is avoided by validations in scripts and contract creations
+    assertThrows[NegativeArraySizeException](test1(baseMethod.copy(localsLength = -1), okay))
+    test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
+  }
+
+  trait StatefulFixture extends BaseFixture[StatefulContext] {
+    def test2(methods: AVector[Method[StatefulContext]], expected: ExeResult[Unit]) = {
+      test3(StatefulScript.unsafe(methods), expected)
+    }
+
+    def test3(script: StatefulScript, expected: ExeResult[Unit]): Unit = {
+      val (obj, context) = prepareStatefulScript(script)
+      StatefulVM.execute(context, obj, AVector.empty).map(_ => ()) is expected
+      ()
+    }
+  }
+
+  it should "check the entry method of stateful scripts" in new StatefulFixture {
+    test1(baseMethod, okay)
+    test1(baseMethod.copy(isPayable = true), failed(InvalidBalances))
+    test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
+    // negative locals length is avoided by validations in scripts and contract creations
+    assertThrows[NegativeArraySizeException](test1(baseMethod.copy(localsLength = -1), okay))
+    test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
+  }
 
   trait Fixture {
     val baseMethod = Method[StatefulContext](

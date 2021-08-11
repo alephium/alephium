@@ -187,7 +187,7 @@ final class StatelessVM(
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatelessContext]] = failed(NonPayableFrame)
+  ): ExeResult[Frame[StatelessContext]] = failed(ExpectNonPayableMethod)
 
   protected def completeLastFrame(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 }
@@ -332,7 +332,7 @@ object StatelessVM {
     )
   }
 
-  private def execute(
+  def execute(
       context: StatelessContext,
       obj: ContractObj[StatelessContext],
       args: AVector[Val]
