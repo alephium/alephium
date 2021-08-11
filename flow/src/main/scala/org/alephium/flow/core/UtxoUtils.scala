@@ -49,8 +49,8 @@ object UtxoUtils {
         } else {
           amountX.compareTo(amountY)
         }
-      case (Some(_), None) => 1
-      case (None, Some(_)) => -1
+      case (Some(_), None) => -1
+      case (None, Some(_)) => 1
       case (None, None)    => assetOrderByAlf.compare(x, y)
     }
   }

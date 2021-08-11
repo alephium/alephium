@@ -35,71 +35,83 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     override def groups: Int = 2
   }
 
-  it should "return the utxos with the amount from small to large, without tokens" in new Fixture {
-    implicit val utxos = buildUtxos(20, 10, 30)
+  it should "return the utxos with the amount from small to large" in new Fixture {
+    {
+      info("without tokens")
+      implicit val utxos = buildUtxos(20, 10, 30)
 
-    UtxoSelection(10).verify(1)
-    UtxoSelection(20).verify(1, 0)
-    UtxoSelection(30).verify(1, 0)
-    UtxoSelection(40).verify(1, 0, 2)
-    UtxoSelection(50).verify(1, 0, 2)
-    UtxoSelection(60).verify(1, 0, 2)
-    UtxoSelection(70).leftValueWithoutGas.startsWith(s"Not enough balance") is true
+      UtxoSelection(10).verify(1)
+      UtxoSelection(20).verify(1, 0)
+      UtxoSelection(30).verify(1, 0)
+      UtxoSelection(40).verify(1, 0, 2)
+      UtxoSelection(50).verify(1, 0, 2)
+      UtxoSelection(60).verify(1, 0, 2)
+      UtxoSelection(70).leftValueWithoutGas.startsWith(s"Not enough balance") is true
 
-    UtxoSelection(29).withDust(1).verify(1, 0)
-    UtxoSelection(29).withDust(2).verify(1, 0, 2)
-    UtxoSelection(30).withDust(1).verify(1, 0)
-    UtxoSelection(59).withDust(2).leftValueWithoutGas.startsWith(s"Not enough balance") is true
-  }
+      UtxoSelection(29).withDust(1).verify(1, 0)
+      UtxoSelection(29).withDust(2).verify(1, 0, 2)
+      UtxoSelection(30).withDust(1).verify(1, 0)
+      UtxoSelection(59).withDust(2).leftValueWithoutGas.startsWith(s"Not enough balance") is true
 
-  it should "return the utxos with the amount from small to large, with tokens" in new Fixture {
-    val tokenId1 = Hash.hash("tokenId1")
-    val tokenId2 = Hash.hash("tokenId2")
-    val tokenId3 = Hash.hash("tokenId3")
+    }
 
-    implicit val utxos = buildUtxosWithTokens(
-      (20, AVector((tokenId1, 10), (tokenId2, 20))),
-      (10, AVector.empty),
-      (30, AVector((tokenId1, 2), (tokenId3, 10)))
-    )
+    {
+      info("with tokens")
+      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId2 = Hash.hash("tokenId2")
+      val tokenId3 = Hash.hash("tokenId3")
 
-    UtxoSelection(10).verify(1)
-    UtxoSelection(20).verify(1, 0)
-    UtxoSelection(20, (tokenId1, 1)).verify(1, 0)
-    UtxoSelection(20, (tokenId3, 5)).verify(1, 0, 2)
-    UtxoSelection(20, (tokenId1, 10)).verify(1, 0)
-    UtxoSelection(20, (tokenId1, 11)).verify(1, 0, 2)
-    UtxoSelection(20, (tokenId1, 13)).leftValueWithoutGas.startsWith(s"Not enough balance") is true
+      implicit val utxos = buildUtxosWithTokens(
+        (20, AVector((tokenId1, 10), (tokenId2, 20))),
+        (10, AVector.empty),
+        (30, AVector((tokenId1, 2), (tokenId3, 10))),
+        (31, AVector((tokenId1, 1)))
+      )
 
-    UtxoSelection(30).verify(1, 0)
-    UtxoSelection(30, (tokenId1, 10), (tokenId2, 15)).verify(1, 0)
-    UtxoSelection(40).verify(1, 0, 2)
-    UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 10)).verify(1, 0, 2)
-    UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 11)).leftValueWithoutGas
-      .startsWith(s"Not enough balance") is true
+      UtxoSelection(10).verify(1)
+      UtxoSelection(20).verify(1, 0)
+      UtxoSelection(20, (tokenId1, 1)).verify(1, 0)
+      UtxoSelection(20, (tokenId3, 5)).verify(1, 0, 2)
+      UtxoSelection(20, (tokenId1, 10)).verify(1, 0)
+      UtxoSelection(20, (tokenId1, 11)).verify(1, 0, 3)
+      UtxoSelection(20, (tokenId1, 14)).leftValueWithoutGas
+        .startsWith(s"Not enough balance") is true
 
-    UtxoSelection(70, (tokenId1, 1)).leftValueWithoutGas.startsWith(s"Not enough balance") is true
-    UtxoSelection(29, (tokenId1, 10), (tokenId2, 15)).withDust(1).verify(1, 0)
-    UtxoSelection(29, (tokenId1, 10), (tokenId2, 1)).withDust(2).verify(1, 0, 2)
-    UtxoSelection(29, (tokenId1, 10), (tokenId2, 20)).withDust(1).verify(1, 0)
-    UtxoSelection(59, (tokenId1, 10))
-      .withDust(2)
-      .leftValueWithoutGas
-      .startsWith(s"Not enough balance") is true
+      UtxoSelection(30).verify(1, 0)
+      UtxoSelection(30, (tokenId1, 10), (tokenId2, 15)).verify(1, 0)
+      UtxoSelection(40).verify(1, 0, 2)
+      UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 10)).verify(1, 0, 2)
+      UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 11)).leftValueWithoutGas
+        .startsWith(s"Not enough balance") is true
+
+      UtxoSelection(92, (tokenId1, 1)).leftValueWithoutGas.startsWith(s"Not enough balance") is true
+      UtxoSelection(29, (tokenId1, 10), (tokenId2, 15)).withDust(1).verify(1, 0)
+      UtxoSelection(29, (tokenId1, 10), (tokenId2, 1)).withDust(2).verify(1, 0, 2)
+      UtxoSelection(29, (tokenId1, 11), (tokenId2, 20)).withDust(1).verify(1, 0, 3)
+      UtxoSelection(29, (tokenId1, 13), (tokenId2, 20)).withDust(1).verify(1, 0, 3, 2)
+      UtxoSelection(90, (tokenId1, 10))
+        .withDust(2)
+        .leftValueWithoutGas
+        .startsWith(s"Not enough balance") is true
+
+    }
   }
 
   it should "return the correct utxos when gas is considered" in new Fixture {
-    implicit val utxos = buildUtxos(20, 10, 30)
+    {
+      info("without tokens")
+      implicit val utxos = buildUtxos(20, 10, 30)
 
-    UtxoSelection(7).verify(gas = 3, 1)
-    UtxoSelection(8).verify(gas = 4, 1, 0)
-    UtxoSelection(26).verify(gas = 4, 1, 0)
-    UtxoSelection(27).verify(gas = 5, 1, 0, 2)
-    UtxoSelection(55).verify(gas = 5, 1, 0, 2)
-    UtxoSelection(56).leftValueWithGas.startsWith("Not enough balance for fee") is true
+      UtxoSelection(7).verify(gas = 3, 1)
+      UtxoSelection(8).verify(gas = 4, 1, 0)
+      UtxoSelection(26).verify(gas = 4, 1, 0)
+      UtxoSelection(27).verify(gas = 5, 1, 0, 2)
+      UtxoSelection(55).verify(gas = 5, 1, 0, 2)
+      UtxoSelection(56).leftValueWithGas.startsWith("Not enough balance for fee") is true
 
-    UtxoSelection(25).withDust(2).verify(gas = 5, 1, 0, 2)
-    UtxoSelection(26).withDust(2).verify(gas = 4, 1, 0)
+      UtxoSelection(25).withDust(2).verify(gas = 5, 1, 0, 2)
+      UtxoSelection(26).withDust(2).verify(gas = 4, 1, 0)
+    }
   }
 
   it should "prefer persisted utxos" in new Fixture {
