@@ -38,7 +38,7 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
       deserialize[UnlockScript](serialize[UnlockScript](unlock)) isE unlock
     }
 
-    val unlock = UnlockScript.p2sh(StatelessScript(AVector.empty), AVector.empty)
+    val unlock = UnlockScript.p2sh(StatelessScript.unsafe(AVector.empty), AVector.empty)
     deserialize[UnlockScript](serialize[UnlockScript](unlock)) isE unlock
   }
 
@@ -53,7 +53,7 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     serialize[UnlockScript](unlock1) is
       Hex.unsafe(s"0102${publicKey0.toHexString}01${publicKey1.toHexString}03")
 
-    val unlock2 = UnlockScript.p2sh(StatelessScript(AVector.empty), AVector.empty)
+    val unlock2 = UnlockScript.p2sh(StatelessScript.unsafe(AVector.empty), AVector.empty)
     serialize[UnlockScript](unlock2) is Hex.unsafe(s"020000")
   }
 

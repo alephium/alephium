@@ -347,7 +347,7 @@ object Ast {
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
-      StatelessScript(methods)
+      StatelessScript.from(methods).getOrElse(throw Compiler.Error("Empty methods"))
     }
   }
 

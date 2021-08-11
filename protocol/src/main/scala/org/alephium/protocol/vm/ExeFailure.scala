@@ -44,6 +44,7 @@ case object InvalidLocalType                                   extends ExeFailur
 case object InvalidFieldIndex                                  extends ExeFailure
 case object InvalidFieldLength                                 extends ExeFailure
 case object InvalidFieldType                                   extends ExeFailure
+case object EmptyMethods                                       extends ExeFailure
 case object NoReturnVal                                        extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure

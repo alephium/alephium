@@ -76,7 +76,7 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
 }
 
 @HashSerde
-final case class StatelessScript(methods: AVector[Method[StatelessContext]])
+final case class StatelessScript private (methods: AVector[Method[StatelessContext]])
     extends Script[StatelessContext] {
   override def toObject: ScriptObj[StatelessContext] = {
     StatelessScriptObject(this)
@@ -86,6 +86,14 @@ final case class StatelessScript(methods: AVector[Method[StatelessContext]])
 object StatelessScript {
   implicit val serde: Serde[StatelessScript] =
     Serde.forProduct1(StatelessScript.apply, _.methods)
+
+  def from(methods: AVector[Method[StatelessContext]]): Option[StatelessScript] = {
+    Option.when(methods.nonEmpty)(new StatelessScript(methods))
+  }
+
+  def unsafe(methods: AVector[Method[StatelessContext]]): StatelessScript = {
+    new StatelessScript(methods)
+  }
 }
 
 @HashSerde
@@ -108,8 +116,7 @@ object StatefulScript {
   }
 
   def from(methods: AVector[Method[StatefulContext]]): Option[StatefulScript] = {
-    val ok = methods.nonEmpty && methods.head.isPublic && methods.tail.forall(m => !m.isPublic)
-    Option.when(ok)(new StatefulScript(methods))
+    Option.when(validate(methods))(new StatefulScript(methods))
   }
 
   def validate(methods: AVector[Method[StatefulContext]]): Boolean = {
@@ -238,8 +245,8 @@ object StatefulContract {
           fieldLengthRest   <- intSerde._deserialize(input)
           methodIndexesRest <- intsSerde._deserialize(fieldLengthRest.rest)
         } yield {
-          // all the `last`, `take` and `drop` calls are safe since contracts are checked in the creation
-          val length      = methodIndexesRest.value.last
+          // all the `take` and `drop` calls are safe since contracts are checked in the creation
+          val length      = methodIndexesRest.value.lastOption.getOrElse(0)
           val data        = methodIndexesRest.rest
           val methodBytes = data.take(length)
           val rest        = data.drop(length)
@@ -262,6 +269,16 @@ object StatefulContract {
         halfDecodedRest <- HalfDecoded.serde._deserialize(input)
         contract        <- halfDecodedRest.value.toContract()
       } yield Staging(contract, halfDecodedRest.rest)
+    }
+  }
+
+  def check(contract: StatefulContract): ExeResult[Unit] = {
+    if (contract.fieldLength < 0) {
+      failed(InvalidFieldLength)
+    } else if (contract.methods.isEmpty) {
+      failed(EmptyMethods)
+    } else {
+      okay
     }
   }
 

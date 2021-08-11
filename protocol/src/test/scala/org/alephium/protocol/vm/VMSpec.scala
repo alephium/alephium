@@ -160,7 +160,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         returnLength = 1,
         instrs = AVector(LoadLocal(0), U256Const1, U256Add, Return)
       )
-    val script = StatelessScript(methods = AVector(method0, method1))
+    val script = StatelessScript.unsafe(AVector(method0, method1))
     val obj    = script.toObject
     StatelessVM.executeWithOutputs(statelessContext, obj, AVector(Val.U256(U256.Two))) isE
       AVector[Val](Val.U256(U256.unsafe(3)))
@@ -338,6 +338,40 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     context.outputBalances.getAlfAmount(address1.lockupScript).get is 11
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
     context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
+  }
+
+  it should "not create invalid contract" in new BalancesFixture {
+    def test(contract: StatefulContract, result: Option[ExeFailure]) = {
+      val instrs = AVector[Instr[StatefulContext]](
+        AddressConst(address0),
+        U256Const(Val.U256(10)),
+        ApproveAlf,
+        BytesConst(Val.ByteVec(ArraySeq.from(serialize(contract)))),
+        BytesConst(Val.ByteVec(ArraySeq.from(serialize(AVector.empty[Val])))),
+        CreateContract
+      )
+      val expected = result match {
+        case Some(failure) => failed(failure)
+        case None          => Right(AVector.empty[Val])
+      }
+      testInstrs(AVector(instrs), expected)
+    }
+
+    val method = Method[StatefulContext](
+      isPublic = true,
+      isPayable = true,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector(Return)
+    )
+    val contract0 = StatefulContract(0, AVector(method))
+    test(contract0, None)
+
+    val contract1 = StatefulContract(0, AVector.empty)
+    test(contract1, Some(EmptyMethods))
+    val contract2 = StatefulContract(-1, AVector.empty)
+    test(contract2, Some(InvalidFieldLength))
   }
 
   it should "serde instructions" in {
