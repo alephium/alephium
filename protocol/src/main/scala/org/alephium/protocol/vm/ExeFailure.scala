@@ -27,6 +27,7 @@ case object InvalidFinalState                                  extends ExeFailur
 final case class NonCategorized(message: String)               extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
 case object StackUnderflow                                     extends ExeFailure
+case object NegativeArgumentInStack                            extends ExeFailure
 case object InsufficientSignatures                             extends ExeFailure
 case object InvalidPublicKey                                   extends ExeFailure
 case object SignedDataIsNot32Bytes                             extends ExeFailure

@@ -55,8 +55,6 @@ class Stack[@sp T: ClassTag](
 
   def isEmpty: Boolean = currentIndex == offset
 
-  def nonEmpty: Boolean = currentIndex != offset
-
   def size: Int = currentIndex - offset
 
   def top: Option[T] = Option.when(currentIndex >= 1)(underlying(currentIndex - 1))
@@ -93,57 +91,28 @@ class Stack[@sp T: ClassTag](
   }
 
   def pop(n: Int): ExeResult[AVector[T]] = {
-    if (n == 0) {
-      Right(AVector.ofSize(0))
-    } else if (n <= size) {
+    if (n > size) {
+      failed(StackUnderflow)
+    } else if (n > 0) {
       val start = currentIndex - n // always >= offset
       val elems = AVector.tabulate(n) { k => underlying(start + k) }
       currentIndex = start
       Right(elems)
+    } else if (n == 0) {
+      Right(AVector.ofSize(0))
     } else {
-      failed(StackUnderflow)
+      failed(NegativeArgumentInStack)
     }
   }
 
-  def remove(total: Int): ExeResult[Unit] = {
-    if (size < total) {
+  def remove(n: Int): ExeResult[Unit] = {
+    if (n > size) {
       failed(StackUnderflow)
-    } else {
-      currentIndex -= total
+    } else if (n > 0) {
+      currentIndex -= n
       Right(())
-    }
-  }
-
-  // Note: index starts from 1
-  def peek(index: Int): ExeResult[T] = {
-    val elemIndex = currentIndex - index
-    if (index < 1) {
-      failed(StackOverflow)
-    } else if (elemIndex < offset) {
-      failed(StackUnderflow)
     } else {
-      Right(underlying(elemIndex))
-    }
-  }
-
-  // Note: index starts from 1
-  def dup(index: Int): ExeResult[Unit] = {
-    peek(index).flatMap(push)
-  }
-
-  // Note: index starts from 2
-  def swap(index: Int): ExeResult[Unit] = {
-    val fromIndex = currentIndex - 1
-    val toIndex   = currentIndex - index
-    if (index <= 1) {
-      failed(StackOverflow)
-    } else if (toIndex < offset) {
-      failed(StackUnderflow)
-    } else {
-      val tmp = underlying(fromIndex)
-      underlying(fromIndex) = underlying(toIndex)
-      underlying(toIndex) = tmp
-      Right(())
+      failed(NegativeArgumentInStack)
     }
   }
 
