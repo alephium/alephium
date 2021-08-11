@@ -63,7 +63,7 @@ object SecP256K1PrivateKey
   override def length: Int = 32
 }
 
-// public key should be compressed, but the format is checked until signature verification
+// public key should be compressed, but the format is not checked until signature verification
 class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
   lazy val unsafePoint: ECPoint = SecP256K1.point(bytes)
 }

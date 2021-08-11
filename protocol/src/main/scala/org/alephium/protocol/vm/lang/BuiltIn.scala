@@ -261,8 +261,8 @@ object BuiltIn {
   val callerAddress: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("callerAddress", Seq.empty, Seq(Type.Address), CallerAddress)
 
-  val isCallerTheTx: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("isCallerTheTx", Seq.empty, Seq(Type.Bool), IsCallerTheTx)
+  val isCalledFromTxScript: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("isCalledFromTxScript", Seq.empty, Seq(Type.Bool), IsCalledFromTxScript)
 
   val callerCodeHash: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("callerCodeHash", Seq.empty, Seq(Type.ByteVec), CallerCodeHash)
@@ -296,7 +296,7 @@ object BuiltIn {
       selfTokenId,
       issueToken,
       callerAddress,
-      isCallerTheTx,
+      isCalledFromTxScript,
       callerCodeHash,
       contractCodeHash
     ).map(f => f.name -> f)

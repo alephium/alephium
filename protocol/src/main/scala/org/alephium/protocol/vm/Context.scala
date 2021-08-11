@@ -132,13 +132,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
       address: LockupScript
   ): ExeResult[Unit] = {
     for {
-      contractAsset <- useContractAsset(contractId)
       _ <- address match {
         case _: LockupScript.Asset => okay
-        case _: LockupScript.P2C   => failed(InvalidAddressInContractDestroy)
+        case _: LockupScript.P2C   => failed(InvalidAddressTypeInContractDestroy)
       }
-      _ <- outputBalances.add(address, contractAsset).toRight(Right(InvalidBalances))
-      _ <- markAssetFlushed(contractId)
+      contractAsset <- useContractAsset(contractId)
+      _             <- outputBalances.add(address, contractAsset).toRight(Right(InvalidBalances))
+      _             <- markAssetFlushed(contractId)
     } yield ()
   }
 

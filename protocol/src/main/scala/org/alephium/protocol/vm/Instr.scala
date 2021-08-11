@@ -114,7 +114,7 @@ object Instr {
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CopyCreateContract, DestroyContract, SelfAddress, SelfContractId, IssueToken,
-    CallerAddress, IsCallerTheTx, CallerCodeHash, ContractCodeHash
+    CallerAddress, IsCalledFromTxScript, CallerCodeHash, ContractCodeHash
   )
   // format: on
 
@@ -1093,11 +1093,11 @@ object CallerAddress extends ContractInstr with GasLow {
   }
 }
 
-object IsCallerTheTx extends ContractInstr with GasLow {
+object IsCalledFromTxScript extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       callerFrame <- frame.getCallerFrame()
-      _           <- frame.pushOpStack(Val.Bool(callerFrame.obj.isCallerTheTx()))
+      _           <- frame.pushOpStack(Val.Bool(callerFrame.obj.isScript()))
     } yield ()
   }
 }

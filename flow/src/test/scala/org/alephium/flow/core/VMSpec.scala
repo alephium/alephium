@@ -537,7 +537,7 @@ class VMSpec extends AlephiumSpec {
          |    assert!(contractCodeHash!(barId) == barCodeHash)
          |    assert!(callerAddress!() == barAddress)
          |    assert!(callerCodeHash!() == barCodeHash)
-         |    assert!(isCallerTheTx!() == false)
+         |    assert!(isCalledFromTxScript!() == false)
          |  }
          |}
          |""".stripMargin
@@ -552,7 +552,7 @@ class VMSpec extends AlephiumSpec {
          |    assert!(contractCodeHash!(fooId) == fooCodeHash)
          |    assert!(contractCodeHash!(barId) == barCodeHash)
          |    Foo(#$fooId).foo(fooId, fooCodeHash, barId, barCodeHash, barAddress)
-         |    assert!(isCallerTheTx!() == true)
+         |    assert!(isCalledFromTxScript!() == true)
          |    assert!(isPaying!(@$genesisAddress) == false)
          |  }
          |}
@@ -582,6 +582,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
+      info("Try to create a new contract with invalid number of fields")
       val script = Compiler.compileTxScript(main("010001")).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
         s"Right(TxScriptExeFailed($InvalidFieldLength))"
@@ -609,16 +610,35 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     {
+      info("Destroy a contract with contract address")
       val address = Address.Contract(networkSetting.networkType, LockupScript.P2C(Hash.generate))
       val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
-        s"Right(TxScriptExeFailed($InvalidAddressInContractDestroy))"
+        s"Right(TxScriptExeFailed($InvalidAddressTypeInContractDestroy))"
     }
 
     {
+      info("Destroy a contract properly")
       val script = Compiler.compileTxScript(main(genesisAddress.toBase58)).rightValue
       val block  = payableCall(blockFlow, chainIndex, script)
       addAndCheck(blockFlow, block)
+    }
+
+    {
+      info("Destroy a contract twice")
+      val fooId = createContract(foo, initialState = AVector.empty).key.toHexString
+      val main =
+        s"""
+           |TxScript Main {
+           |  pub payable fn main() -> () {
+           |    destroyContract!(#$fooId, @${genesisAddress.toBase58})
+           |    destroyContract!(#$fooId, @${genesisAddress.toBase58})
+           |  }
+           |}
+           |""".stripMargin
+      val script = Compiler.compileTxScript(main).rightValue
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+        .startsWith("Left(org.alephium.io.IOError$KeyNotFound") is true
     }
   }
 
