@@ -93,7 +93,6 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         .withDust(2)
         .leftValueWithoutGas
         .startsWith(s"Not enough balance") is true
-
     }
   }
 
@@ -111,6 +110,49 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
       UtxoSelection(25).withDust(2).verify(gas = 5, 1, 0, 2)
       UtxoSelection(26).withDust(2).verify(gas = 4, 1, 0)
+    }
+
+    {
+      info("with tokens")
+      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId2 = Hash.hash("tokenId2")
+      val tokenId3 = Hash.hash("tokenId3")
+
+      implicit val utxos = buildUtxosWithTokens(
+        (20, AVector((tokenId1, 10), (tokenId2, 20))),
+        (10, AVector.empty),
+        (30, AVector((tokenId1, 2), (tokenId3, 10))),
+        (31, AVector((tokenId1, 1)))
+      )
+
+      UtxoSelection(10).verify(gas = 4, 1, 0)
+      UtxoSelection(10, (tokenId1, 1)).verify(gas = 4, 1, 3)
+      UtxoSelection(10, (tokenId1, 2)).verify(gas = 5, 1, 3, 2)
+      UtxoSelection(10, (tokenId1, 5)).verify(gas = 6, 1, 3, 2, 0)
+
+      UtxoSelection(20).verify(gas = 4, 1, 0)
+      UtxoSelection(20, (tokenId1, 10)).verify(gas = 4, 1, 0)
+      UtxoSelection(20, (tokenId1, 11)).verify(gas = 5, 1, 0, 3)
+      UtxoSelection(20, (tokenId1, 12)).verify(gas = 6, 1, 0, 3, 2)
+      UtxoSelection(20, (tokenId1, 14)).leftValueWithGas
+        .startsWith(s"Not enough balance") is true
+
+      UtxoSelection(20, (tokenId2, 10)).verify(gas = 4, 1, 0)
+      UtxoSelection(20, (tokenId2, 15), (tokenId3, 5)).verify(gas = 5, 1, 0, 2)
+      UtxoSelection(20, (tokenId2, 15), (tokenId1, 11)).verify(gas = 5, 1, 0, 3)
+      UtxoSelection(20, (tokenId2, 15), (tokenId1, 13)).verify(gas = 6, 1, 0, 3, 2)
+      UtxoSelection(30, (tokenId2, 15), (tokenId1, 13)).verify(gas = 6, 1, 0, 3, 2)
+      UtxoSelection(30, (tokenId2, 21)).leftValueWithGas
+        .startsWith(s"Not enough balance") is true
+
+      UtxoSelection(85, (tokenId2, 15), (tokenId1, 13)).verify(gas = 6, 1, 0, 2, 3)
+      UtxoSelection(86, (tokenId2, 15), (tokenId1, 13)).leftValueWithGas
+        .startsWith(s"Not enough balance") is true
+      UtxoSelection(83, (tokenId2, 15), (tokenId1, 13)).withDust(2).verify(gas = 6, 1, 0, 2, 3)
+      UtxoSelection(84, (tokenId2, 15), (tokenId1, 13))
+        .withDust(2)
+        .leftValueWithGas
+        .startsWith(s"Not enough balance") is true
     }
   }
 

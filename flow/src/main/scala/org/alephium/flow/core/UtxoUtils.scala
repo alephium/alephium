@@ -113,6 +113,7 @@ object UtxoUtils {
       tokensFoundResult <- findUtxosForTokens(utxosForAlf, remainingUtxos, totalAmountPerToken)
     } yield {
       val (foundUtxos, restOfUtxos, _) = tokensFoundResult
+      val alfAmountWithoutGas          = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       (alfAmountWithoutGas, foundUtxos, restOfUtxos)
     }
   }
