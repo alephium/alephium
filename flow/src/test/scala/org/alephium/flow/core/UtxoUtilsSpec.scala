@@ -157,24 +157,88 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
   }
 
   it should "prefer persisted utxos" in new Fixture {
-    val utxos0          = buildUtxos(20, 10)
-    implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
+    {
+      info("without tokens")
+      val utxos0          = buildUtxos(20, 10)
+      implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
 
-    UtxoSelection(7).verify(gas = 3, 0)
+      UtxoSelection(7).verify(gas = 3, 0)
+    }
+
+    {
+      info("with tokens")
+      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId2 = Hash.hash("tokenId2")
+
+      val utxos0 = buildUtxosWithTokens(
+        (20, AVector((tokenId1, 10))),
+        (10, AVector((tokenId2, 20)))
+      )
+      implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
+
+      UtxoSelection(7).verify(gas = 3, 0)
+      UtxoSelection(7, (tokenId1, 10)).verify(gas = 3, 0)
+      UtxoSelection(7, (tokenId2, 10)).verify(gas = 4, 0, 1)
+    }
   }
 
   it should "return the correct utxos when gas is preset" in new Fixture {
-    implicit val utxos = buildUtxos(20, 10, 30)
+    {
+      info("without tokens")
+      implicit val utxos = buildUtxos(20, 10, 30)
 
-    UtxoSelection(7).withGas(1).verify(gas = 1, 1)
-    UtxoSelection(10).withGas(1).verify(gas = 1, 1, 0)
+      UtxoSelection(7).withGas(1).verify(gas = 1, 1)
+      UtxoSelection(10).withGas(1).verify(gas = 1, 1, 0)
+    }
+
+    {
+      info("with tokens")
+      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId2 = Hash.hash("tokenId2")
+      val tokenId3 = Hash.hash("tokenId3")
+
+      implicit val utxos = buildUtxosWithTokens(
+        (20, AVector((tokenId1, 10), (tokenId2, 20))),
+        (10, AVector.empty),
+        (30, AVector((tokenId1, 2), (tokenId3, 10)))
+      )
+
+      UtxoSelection(7).withGas(1).verify(gas = 1, 1)
+      UtxoSelection(10).withGas(1).verify(gas = 1, 1, 0)
+      UtxoSelection(10, (tokenId2, 15), (tokenId1, 12)).withGas(1).verify(gas = 1, 1, 0, 2)
+      UtxoSelection(40, (tokenId2, 15), (tokenId1, 12), (tokenId3, 10))
+        .withGas(1)
+        .verify(gas = 1, 1, 0, 2)
+      UtxoSelection(10, (tokenId2, 15), (tokenId1, 13))
+        .withGas(1)
+        .leftValueWithGas
+        .startsWith(s"Not enough balance") is true
+    }
   }
 
   it should "consider minimal gas" in new Fixture {
-    implicit val utxos = buildUtxos(20, 10, 30)
+    {
+      info("without tokens")
+      implicit val utxos = buildUtxos(20, 10, 30)
 
-    UtxoSelection(1).verify(gas = 3, 1)
-    UtxoSelection(1).withMinimalGas(40).verify(gas = 40, 1, 0, 2)
+      UtxoSelection(1).verify(gas = 3, 1)
+      UtxoSelection(1).withMinimalGas(40).verify(gas = 40, 1, 0, 2)
+    }
+
+    {
+      info("with tokens")
+      val tokenId1 = Hash.hash("tokenId1")
+
+      implicit val utxos = buildUtxosWithTokens(
+        (20, AVector((tokenId1, 10))),
+        (10, AVector.empty),
+        (30, AVector((tokenId1, 2)))
+      )
+
+      UtxoSelection(1).verify(gas = 3, 1)
+      UtxoSelection(1).withMinimalGas(40).verify(gas = 40, 1, 0, 2)
+      UtxoSelection(1, (tokenId1, 11)).withMinimalGas(40).verify(gas = 40, 1, 2, 0)
+    }
   }
 
   trait Fixture extends AlephiumConfigFixture {
