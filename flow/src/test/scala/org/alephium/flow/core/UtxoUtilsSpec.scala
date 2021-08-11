@@ -20,7 +20,7 @@ import akka.util.ByteString
 import org.scalatest.compatible.Assertion
 
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
-import org.alephium.flow.core.UtxoUtils.Selected
+import org.alephium.flow.core.UtxoUtils._
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -44,12 +44,12 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     UtxoSelection(40).verify(1, 0, 2)
     UtxoSelection(50).verify(1, 0, 2)
     UtxoSelection(60).verify(1, 0, 2)
-    UtxoSelection(70).leftValue.startsWith(s"Not enough balance") is true
+    UtxoSelection(70).leftValueWithoutGas.startsWith(s"Not enough balance") is true
 
     UtxoSelection(29).withDust(1).verify(1, 0)
     UtxoSelection(29).withDust(2).verify(1, 0, 2)
     UtxoSelection(30).withDust(1).verify(1, 0)
-    UtxoSelection(59).withDust(2).leftValue.startsWith(s"Not enough balance") is true
+    UtxoSelection(59).withDust(2).leftValueWithoutGas.startsWith(s"Not enough balance") is true
   }
 
   it should "return the utxos with the amount from small to large, with tokens" in new Fixture {
@@ -69,55 +69,58 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     UtxoSelection(20, (tokenId3, 5)).verify(1, 0, 2)
     UtxoSelection(20, (tokenId1, 10)).verify(1, 0)
     UtxoSelection(20, (tokenId1, 11)).verify(1, 0, 2)
-    UtxoSelection(20, (tokenId1, 13)).leftValue.startsWith(s"Not enough balance") is true
+    UtxoSelection(20, (tokenId1, 13)).leftValueWithoutGas.startsWith(s"Not enough balance") is true
 
     UtxoSelection(30).verify(1, 0)
     UtxoSelection(30, (tokenId1, 10), (tokenId2, 15)).verify(1, 0)
     UtxoSelection(40).verify(1, 0, 2)
     UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 10)).verify(1, 0, 2)
-    UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 11)).leftValue
+    UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 11)).leftValueWithoutGas
       .startsWith(s"Not enough balance") is true
 
-    UtxoSelection(70, (tokenId1, 1)).leftValue.startsWith(s"Not enough balance") is true
+    UtxoSelection(70, (tokenId1, 1)).leftValueWithoutGas.startsWith(s"Not enough balance") is true
     UtxoSelection(29, (tokenId1, 10), (tokenId2, 15)).withDust(1).verify(1, 0)
     UtxoSelection(29, (tokenId1, 10), (tokenId2, 1)).withDust(2).verify(1, 0, 2)
     UtxoSelection(29, (tokenId1, 10), (tokenId2, 20)).withDust(1).verify(1, 0)
     UtxoSelection(59, (tokenId1, 10))
       .withDust(2)
-      .leftValue
+      .leftValueWithoutGas
       .startsWith(s"Not enough balance") is true
   }
 
   it should "return the correct utxos when gas is considered" in new Fixture {
-    import UtxoUtils._
-    val utxos = buildUtxos(20, 10, 30)
-    select(utxos, 7) isE Selected(AVector(utxos(1)), 3)
-    select(utxos, 8) isE Selected(AVector(utxos(1), utxos(0)), 4)
-    select(utxos, 26) isE Selected(AVector(utxos(1), utxos(0)), 4)
-    select(utxos, 27) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 5)
-    select(utxos, 55) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 5)
-    select(utxos, 56).leftValue is s"Not enough balance for fee, maybe transfer a smaller amount"
+    implicit val utxos = buildUtxos(20, 10, 30)
 
-    select(utxos, 25, dustAmount = 2) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 5)
-    select(utxos, 26, dustAmount = 2) isE Selected(AVector(utxos(1), utxos(0)), 4)
+    UtxoSelection(7).verify(gas = 3, 1)
+    UtxoSelection(8).verify(gas = 4, 1, 0)
+    UtxoSelection(26).verify(gas = 4, 1, 0)
+    UtxoSelection(27).verify(gas = 5, 1, 0, 2)
+    UtxoSelection(55).verify(gas = 5, 1, 0, 2)
+    UtxoSelection(56).leftValueWithGas.startsWith("Not enough balance for fee") is true
+
+    UtxoSelection(25).withDust(2).verify(gas = 5, 1, 0, 2)
+    UtxoSelection(26).withDust(2).verify(gas = 4, 1, 0)
   }
 
   it should "prefer persisted utxos" in new Fixture {
-    val utxos0 = buildUtxos(20, 10)
-    val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
-    select(utxos1, 7) isE Selected(AVector(utxos1(0)), 3)
+    val utxos0          = buildUtxos(20, 10)
+    implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
+
+    UtxoSelection(7).verify(gas = 3, 0)
   }
 
   it should "return the correct utxos when gas is preset" in new Fixture {
-    val utxos = buildUtxos(20, 10, 30)
-    select(utxos, 9, Some(GasBox.unsafe(1))) isE Selected(AVector(utxos(1)), 1)
-    select(utxos, 10, Some(GasBox.unsafe(1))) isE Selected(AVector(utxos(1), utxos(0)), 1)
+    implicit val utxos = buildUtxos(20, 10, 30)
+
+    UtxoSelection(7).withGas(1).verify(gas = 1, 1)
+    UtxoSelection(10).withGas(1).verify(gas = 1, 1, 0)
   }
 
   it should "consider minimal gas" in new Fixture {
-    val utxos = buildUtxos(20, 10, 30)
-    select(utxos, 1) isE Selected(AVector(utxos(1)), 3)
-    select(utxos, 1, minimalGas = 40) isE Selected(AVector(utxos(1), utxos(0), utxos(2)), 40)
+    implicit val utxos = buildUtxos(20, 10, 30)
+
+    UtxoSelection(1).verify(gas = 3, 1)
+    UtxoSelection(1).withMinimalGas(40).verify(gas = 40, 1, 0, 2)
   }
 
   trait Fixture extends AlephiumConfigFixture {
@@ -152,51 +155,20 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     case class UtxoSelection(amount: U256, tokens: (TokenId, U256)*)(implicit
         utxos: AVector[AssetOutputInfo]
     ) {
-      import UtxoUtils._
-      val utxosSorted = utxos.sorted(assetOrderByAlf)
-      lazy val result =
+      val utxosSorted            = utxos.sorted(assetOrderByAlf)
+      var dustAmount: U256       = U256.Zero
+      var gasOpt: Option[GasBox] = None
+      var minimalGas: Int        = 1
+
+      lazy val valueWithoutGas =
         findUtxosWithoutGas(utxosSorted, amount, AVector.from(tokens), dustAmount).map {
           case (_, selectedUtxos, _) => selectedUtxos
         }
-      var dustAmount: U256 = U256.Zero
 
-      def verify(utxoIndexes: Int*): Assertion = {
-        val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
-        result isE selectedUtxos
-      }
-
-      def withDust(newDustAmount: U256): UtxoSelection = {
-        dustAmount = newDustAmount
-        this
-      }
-
-      def leftValue = result.leftValue
-    }
-
-    def selectWithoutGas(
-        utxos: AVector[AssetOutputInfo],
-        amount: U256,
-        tokens: AVector[(TokenId, U256)] = AVector.empty,
-        dustAmount: U256 = U256.Zero
-    ): Either[String, AVector[AssetOutputInfo]] = {
-      import UtxoUtils._
-      val utxosSorted = utxos.sorted(assetOrderByAlf)
-      findUtxosWithoutGas(utxosSorted, amount, tokens, dustAmount).map {
-        case (_, selectedUtxos, _) => selectedUtxos
-      }
-    }
-
-    def select(
-        utxos: AVector[AssetOutputInfo],
-        amount: U256,
-        gasOpt: Option[GasBox] = None,
-        dustAmount: U256 = U256.Zero,
-        minimalGas: Int = 1
-    ): Either[String, UtxoUtils.Selected] = {
-      UtxoUtils.select(
+      lazy val valueWithGas = UtxoUtils.select(
         utxos,
         amount,
-        AVector.empty, // FIXME
+        AVector.from(tokens),
         gasOpt,
         GasPrice(1),
         GasBox.unsafe(1),
@@ -205,6 +177,34 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         2,
         GasBox.unsafe(minimalGas)
       )
+
+      def verify(utxoIndexes: Int*): Assertion = {
+        val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
+        valueWithoutGas isE selectedUtxos
+      }
+
+      def verify(gas: GasBox, utxoIndexes: Int*): Assertion = {
+        val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
+        valueWithGas isE Selected(selectedUtxos, gas)
+      }
+
+      def withDust(newDustAmount: U256): UtxoSelection = {
+        dustAmount = newDustAmount
+        this
+      }
+
+      def withGas(gas: Int): UtxoSelection = {
+        gasOpt = Some(GasBox.unsafe(gas))
+        this
+      }
+
+      def withMinimalGas(gas: Int): UtxoSelection = {
+        minimalGas = gas
+        this
+      }
+
+      def leftValueWithoutGas = valueWithoutGas.leftValue
+      def leftValueWithGas    = valueWithGas.leftValue
     }
   }
 }
