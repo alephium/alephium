@@ -17,14 +17,14 @@
 package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
-import org.alephium.flow.handler.{AllHandlers, FlowHandler}
+import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash}
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache}
 
 trait BrokerHandler extends BaseBrokerHandler {
@@ -39,15 +39,17 @@ trait BrokerHandler extends BaseBrokerHandler {
     cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
   }
 
-  override def handleNewBlock(block: Block): Unit = {
-    seenBlocks.put(block.hash, ())
-    super.handleNewBlock(block)
+  private def onFlowData[T <: FlowData](data: FlowData, isBlock: Boolean): Unit = {
+    val datas = AVector(data)
+    if (validateFlowData(datas, isBlock)) {
+      seenBlocks.put(data.hash, ())
+      val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+      allHandlers.dependencyHandler ! message
+    }
   }
 
-  override def handleNewHeader(header: BlockHeader): Unit = {
-    seenBlocks.put(header.hash, ())
-    super.handleNewHeader(header)
-  }
+  override def handleNewBlock(block: Block): Unit         = onFlowData(block, isBlock = true)
+  override def handleNewHeader(header: BlockHeader): Unit = onFlowData(header, isBlock = false)
 
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
 

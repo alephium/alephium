@@ -115,19 +115,10 @@ trait BrokerHandler extends FlowDataHandler {
 
   def exchanging: Receive
 
-  def handleNewBlock(block: Block): Unit = {
-    log.debug(
-      s"Received new block ${block.hash.shortHex} from $remoteAddress"
-    )
+  def handleNewBlock(block: Block): Unit =
     handleFlowData(AVector(block), dataOrigin, isBlock = true)
-  }
-
-  def handleNewHeader(header: BlockHeader): Unit = {
-    log.debug(
-      s"Received new block header ${header.hash.shortHex} from $remoteAddress"
-    )
+  def handleNewHeader(header: BlockHeader): Unit =
     handleFlowData(AVector(header), dataOrigin, isBlock = false)
-  }
 
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
@@ -135,7 +126,11 @@ trait BrokerHandler extends FlowDataHandler {
         s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
       send(BlocksRequest(hashes))
-    case Received(NewBlock(block)) => handleNewBlock(block)
+    case Received(NewBlock(block)) =>
+      log.debug(
+        s"Received new block ${block.hash.shortHex} from $remoteAddress"
+      )
+      handleNewBlock(block)
     case Received(BlocksResponse(requestId, blocks)) =>
       log.debug(
         s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress with $requestId"
@@ -145,7 +140,11 @@ trait BrokerHandler extends FlowDataHandler {
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
         send(BlocksResponse(requestId, blocks))
       }
-    case Received(NewHeader(header)) => handleNewHeader(header)
+    case Received(NewHeader(header)) =>
+      log.debug(
+        s"Received new block header ${header.hash.shortHex} from $remoteAddress"
+      )
+      handleNewHeader(header)
     case Received(HeadersResponse(requestId, headers)) =>
       log.debug(
         s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress with $requestId"
@@ -255,23 +254,28 @@ trait FlowDataHandler extends BaseHandler {
   def remoteAddress: InetSocketAddress
   def blockflow: BlockFlow
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def validateFlowData[T <: FlowData](datas: AVector[T], isBlock: Boolean): Boolean = {
+    if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
+      log.warning(s"The data received does not contain minimal work")
+      handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
+      false
+    } else {
+      val ok = datas.forall { data => data.chainIndex.relateTo(brokerConfig) == isBlock }
+      if (!ok) {
+        handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+      }
+      ok
+    }
+  }
+
   def handleFlowData[T <: FlowData](
       datas: AVector[T],
       dataOrigin: DataOrigin,
       isBlock: Boolean
   ): Unit = {
-    if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
-      log.warning(s"The data received does not contain minimal work")
-      handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
-    } else {
-      val ok = datas.forall { data => data.chainIndex.relateTo(brokerConfig) == isBlock }
-      if (ok) {
-        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-        allHandlers.dependencyHandler ! message
-      } else {
-        handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
-      }
+    if (validateFlowData(datas, isBlock)) {
+      val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+      allHandlers.dependencyHandler ! message
     }
   }
 }

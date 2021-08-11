@@ -37,7 +37,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.{BlockHash, Generators}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{ChainIndex, CliqueInfo}
+import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{ActorRefT, AVector}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
@@ -86,26 +86,26 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     cliqueManager.expectMsg(CliqueManager.Synced(brokerHandler.underlyingActor.remoteBrokerInfo))
   }
 
-  it should "mark block seen when receive NewBlock/NewHeader/NewBlockHash" in new Fixture {
+  it should "mark block seen when receive valid NewBlock/NewHeader/NewBlockHash" in new Fixture
+    with NoIndexModelGenerators {
     val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
-    def genValidBlockHash(): BlockHash = {
-      emptyBlock(blockFlow, chainIndex).hash
-    }
+    val blockHash  = emptyBlock(blockFlow, chainIndex).hash
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash) is true)
 
-    val blockHash1 = genValidBlockHash()
-    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash1))
-    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash1) is true)
+    val blockHeader = blockGen(
+      ChainIndex.unsafe(brokerConfig.groupUntil, brokerConfig.groupUntil)
+    ).sample.get.header
+    brokerHandler ! BaseBrokerHandler.Received(NewHeader(blockHeader))
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHeader.hash) is true)
 
-    val block1 = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(NewHeader(block1.header))
-    eventually(brokerHandler.underlyingActor.seenBlocks.contains(block1.hash) is true)
-
-    val block2 = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(NewBlock(block2))
-    eventually(brokerHandler.underlyingActor.seenBlocks.contains(block2.hash) is true)
+    val block = emptyBlock(blockFlow, chainIndex)
+    brokerHandler ! BaseBrokerHandler.Received(NewBlock(block))
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(block.hash) is true)
   }
 
-  it should "publish misbehavior when receive invalid block hash" in new Fixture {
+  it should "publish misbehavior when receive invalid hash/block/header" in new Fixture
+    with NoIndexModelGenerators {
     @tailrec
     def genInvalidBlockHash(): BlockHash = {
       val hash = BlockHash.generate
@@ -116,15 +116,33 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
       }
     }
 
-    val blockHash = genInvalidBlockHash()
-    val listener  = TestProbe()
+    val invalidHash = genInvalidBlockHash()
+    val listener    = TestProbe()
 
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
-    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(invalidHash))
     listener.expectMsg(
       MisbehaviorManager.InvalidFlowChainIndex(brokerHandler.underlyingActor.remoteAddress)
     )
-    brokerHandler.underlyingActor.seenBlocks.contains(blockHash) is false
+    brokerHandler.underlyingActor.seenBlocks.contains(invalidHash) is false
+
+    val invalidBlock =
+      blockGen(ChainIndex.unsafe(brokerConfig.groupUntil, brokerConfig.groupUntil)).sample.get
+    brokerHandler ! BaseBrokerHandler.Received(NewBlock(invalidBlock))
+    listener.expectMsg(
+      MisbehaviorManager.InvalidFlowChainIndex(brokerHandler.underlyingActor.remoteAddress)
+    )
+    brokerHandler.underlyingActor.seenBlocks.contains(invalidBlock.hash) is false
+
+    val invalidHeader = emptyBlock(
+      blockFlow,
+      ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
+    ).header
+    brokerHandler ! BaseBrokerHandler.Received(NewHeader(invalidHeader))
+    listener.expectMsg(
+      MisbehaviorManager.InvalidFlowChainIndex(brokerHandler.underlyingActor.remoteAddress)
+    )
+    brokerHandler.underlyingActor.seenBlocks.contains(invalidHeader.hash) is false
   }
 
   it should "send announcement only if remote have not seen the block" in new Fixture {
