@@ -40,14 +40,14 @@ trait BrokerHandler extends BaseBrokerHandler {
     cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
   }
 
-  override def handleNewBlocks(blocks: AVector[Block]): Unit = {
-    blocks.foreach(block => seenBlocks.put(block.hash, ()))
-    super.handleNewBlocks(blocks)
+  override def handleNewBlock(block: Block): Unit = {
+    seenBlocks.put(block.hash, ())
+    super.handleNewBlock(block)
   }
 
-  override def handleNewHeaders(headers: AVector[BlockHeader]): Unit = {
-    headers.foreach(header => seenBlocks.put(header.hash, ()))
-    super.handleNewHeaders(headers)
+  override def handleNewHeader(header: BlockHeader): Unit = {
+    seenBlocks.put(header.hash, ())
+    super.handleNewHeader(header)
   }
 
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents

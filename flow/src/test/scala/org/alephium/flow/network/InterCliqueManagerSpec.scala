@@ -33,7 +33,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.SyncedResult
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, OutboundConnection}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.message.{Message, NewBlocks, NewHeaders}
+import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
@@ -371,8 +371,8 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
       val block = emptyBlock(blockFlow, chainIndex)
       CliqueManager.BroadCastBlock(
         block,
-        Message.serialize(NewBlocks(AVector(block)), networkSetting.networkType),
-        Message.serialize(NewHeaders(AVector(block.header)), networkSetting.networkType),
+        Message.serialize(NewBlock(block), networkSetting.networkType),
+        Message.serialize(NewHeader(block.header), networkSetting.networkType),
         origin,
         broadcastInterClique = true
       )

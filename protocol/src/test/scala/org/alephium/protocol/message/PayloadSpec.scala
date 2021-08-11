@@ -219,33 +219,25 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "serialize/deserialize the NewBlocks/NewHeaders/NewInv/NewTxs/NewBlockHash payload" in {
+  it should "serialize/deserialize the NewBlock/NewHeader/NewInv/NewTxs/NewBlockHash payload" in {
     import Hex._
 
-    val block1    = blockGen.sample.get
-    val block2    = blockGen.sample.get
-    val newBlocks = NewBlocks(AVector(block1, block2))
-    verifySerde(newBlocks) {
+    val block1   = blockGen.sample.get
+    val block2   = blockGen.sample.get
+    val newBlock = NewBlock(block1)
+    verifySerde(newBlock) {
       // code id
       hex"09" ++
-        // number of blocks
-        hex"02" ++
         // block 1
-        serialize(block1) ++
-        // block 2
-        serialize(block2)
+        serialize(block1)
     }
 
-    val newHeaders = NewHeaders(AVector(block1.header, block2.header))
-    verifySerde(newHeaders) {
+    val newHeader = NewHeader(block1.header)
+    verifySerde(newHeader) {
       // code id
       hex"0a" ++
-        // number of headers
-        hex"02" ++
         // header 1
-        serialize(block1.header) ++
-        // header 2
-        serialize(block2.header)
+        serialize(block1.header)
     }
 
     val newInv = NewInv(AVector(AVector(block1.hash, block2.hash)))

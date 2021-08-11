@@ -86,7 +86,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     cliqueManager.expectMsg(CliqueManager.Synced(brokerHandler.underlyingActor.remoteBrokerInfo))
   }
 
-  it should "mark block seen when receive NewBlocks/NewHeaders/NewBlockHash" in new Fixture {
+  it should "mark block seen when receive NewBlock/NewHeader/NewBlockHash" in new Fixture {
     val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
     def genValidBlockHash(): BlockHash = {
       emptyBlock(blockFlow, chainIndex).hash
@@ -97,11 +97,11 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash1) is true)
 
     val block1 = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(NewHeaders(AVector(block1.header)))
+    brokerHandler ! BaseBrokerHandler.Received(NewHeader(block1.header))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(block1.hash) is true)
 
     val block2 = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(NewBlocks(AVector(block2)))
+    brokerHandler ! BaseBrokerHandler.Received(NewBlock(block2))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(block2.hash) is true)
   }
 

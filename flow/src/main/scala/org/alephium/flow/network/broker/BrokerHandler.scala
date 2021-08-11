@@ -115,18 +115,18 @@ trait BrokerHandler extends FlowDataHandler {
 
   def exchanging: Receive
 
-  def handleNewBlocks(blocks: AVector[Block]): Unit = {
+  def handleNewBlock(block: Block): Unit = {
     log.debug(
-      s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress"
+      s"Received new block ${block.hash.shortHex} from $remoteAddress"
     )
-    handleFlowData(blocks, dataOrigin, isBlock = true)
+    handleFlowData(AVector(block), dataOrigin, isBlock = true)
   }
 
-  def handleNewHeaders(headers: AVector[BlockHeader]): Unit = {
+  def handleNewHeader(header: BlockHeader): Unit = {
     log.debug(
-      s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress"
+      s"Received new block header ${header.hash.shortHex} from $remoteAddress"
     )
-    handleFlowData(headers, dataOrigin, isBlock = false)
+    handleFlowData(AVector(header), dataOrigin, isBlock = false)
   }
 
   def exchangingCommon: Receive = {
@@ -135,7 +135,7 @@ trait BrokerHandler extends FlowDataHandler {
         s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
       send(BlocksRequest(hashes))
-    case Received(NewBlocks(blocks)) => handleNewBlocks(blocks)
+    case Received(NewBlock(block)) => handleNewBlock(block)
     case Received(BlocksResponse(requestId, blocks)) =>
       log.debug(
         s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress with $requestId"
@@ -145,7 +145,7 @@ trait BrokerHandler extends FlowDataHandler {
       escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
         send(BlocksResponse(requestId, blocks))
       }
-    case Received(NewHeaders(headers)) => handleNewHeaders(headers)
+    case Received(NewHeader(header)) => handleNewHeader(header)
     case Received(HeadersResponse(requestId, headers)) =>
       log.debug(
         s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress with $requestId"

@@ -28,9 +28,9 @@ import org.alephium.flow.validation._
 import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.message.{Message, NewBlocks, NewHeaders}
+import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector, EventBus, EventStream}
+import org.alephium.util.{ActorRefT, EventBus, EventStream}
 
 object BlockChainHandler {
   def props(
@@ -108,10 +108,10 @@ class BlockChainHandler(
       val broadcastIntraClique = brokerConfig.brokerNum != 1
       if (isNodeSynced || broadcastIntraClique) {
         val blockMessage =
-          Message.serialize(NewBlocks(AVector(block)), networkSetting.networkType)
+          Message.serialize(NewBlock(block), networkSetting.networkType)
         val headerMessage =
           Message.serialize(
-            NewHeaders(AVector(block.header)),
+            NewHeader(block.header),
             networkSetting.networkType
           )
         val event =
