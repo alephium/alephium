@@ -48,6 +48,9 @@ object Method {
       t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
     )
 
+  def validate(method: Method[_]): Boolean =
+    method.argsLength >= 0 && method.localsLength >= 0 && method.returnLength >= 0
+
   def forSMT: Method[StatefulContext] =
     Method[StatefulContext](
       isPublic = false,
@@ -84,11 +87,19 @@ final case class StatelessScript private (methods: AVector[Method[StatelessConte
 }
 
 object StatelessScript {
-  implicit val serde: Serde[StatelessScript] =
-    Serde.forProduct1(StatelessScript.apply, _.methods)
+  implicit val serde: Serde[StatelessScript] = {
+    val serde: Serde[StatelessScript] = Serde.forProduct1(StatelessScript.apply, _.methods)
+    serde.validate(script => Either.cond(validate(script.methods), (), s"Invalid script: $script"))
+  }
+
+  private def validate(methods: AVector[Method[StatelessContext]]): Boolean = {
+    methods.nonEmpty &&
+    methods.head.isPublic &&
+    methods.forall(m => !m.isPayable && Method.validate(m))
+  }
 
   def from(methods: AVector[Method[StatelessContext]]): Option[StatelessScript] = {
-    Option.when(methods.nonEmpty)(new StatelessScript(methods))
+    Option.when(validate(methods))(new StatelessScript(methods))
   }
 
   def unsafe(methods: AVector[Method[StatelessContext]]): StatelessScript = {
@@ -120,7 +131,7 @@ object StatefulScript {
   }
 
   def validate(methods: AVector[Method[StatefulContext]]): Boolean = {
-    methods.nonEmpty && methods.head.isPublic && methods.tail.forall(m => !m.isPublic)
+    methods.nonEmpty && methods.head.isPublic && methods.forall(Method.validate)
   }
 
   def alwaysFail: StatefulScript =

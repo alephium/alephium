@@ -16,9 +16,83 @@
 
 package org.alephium.protocol.vm
 
+import org.scalatest.Assertion
+
+import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class ContractSpec extends AlephiumSpec {
+  trait ScriptFixture[Ctx <: StatelessContext] {
+    val method = Method[Ctx](
+      isPublic = true,
+      isPayable = false,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector.empty
+    )
+
+    def pass0(method: Method[Ctx]): Assertion = {
+      pass1(AVector(method))
+    }
+
+    def pass1(methods: AVector[Method[Ctx]]): Assertion
+
+    def fail0(method: Method[Ctx]): Assertion = {
+      fail1(AVector(method))
+    }
+
+    def fail1(methods: AVector[Method[Ctx]]): Assertion
+  }
+
+  it should "validate stateless scripts" in new ScriptFixture[StatelessContext] {
+    def pass1(methods: AVector[Method[StatelessContext]]): Assertion = {
+      val script = StatelessScript.unsafe(methods)
+      deserialize[StatelessScript](serialize(script)) isE script
+    }
+    def fail1(methods: AVector[Method[StatelessContext]]): Assertion = {
+      val script = StatelessScript.unsafe(methods)
+      deserialize[StatelessScript](serialize(script)).leftValue is a[SerdeError.Validation]
+    }
+
+    pass0(method)
+    pass1(AVector(method, method))
+    fail1(AVector.empty)
+    fail0(method.copy(isPublic = false))
+    fail0(method.copy(isPayable = true))
+    fail0(method.copy(argsLength = -1))
+    fail0(method.copy(localsLength = -1))
+    fail0(method.copy(returnLength = -1))
+    pass1(AVector(method, method.copy(isPublic = false)))
+    fail1(AVector(method, method.copy(isPayable = true)))
+    fail1(AVector(method, method.copy(argsLength = -1)))
+    fail1(AVector(method, method.copy(localsLength = -1)))
+    fail1(AVector(method, method.copy(returnLength = -1)))
+  }
+
+  it should "validate stateful scripts" in new ScriptFixture[StatefulContext] {
+    def pass1(methods: AVector[Method[StatefulContext]]): Assertion = {
+      val script = StatefulScript.unsafe(methods)
+      deserialize[StatefulScript](serialize(script)) isE script
+    }
+    def fail1(methods: AVector[Method[StatefulContext]]): Assertion = {
+      val script = StatefulScript.unsafe(methods)
+      deserialize[StatefulScript](serialize(script)).leftValue is a[SerdeError.Validation]
+    }
+
+    pass0(method)
+    pass1(AVector(method, method))
+    fail1(AVector.empty)
+    fail0(method.copy(isPublic = false))
+    fail0(method.copy(argsLength = -1))
+    fail0(method.copy(localsLength = -1))
+    fail0(method.copy(returnLength = -1))
+    pass1(AVector(method, method.copy(isPublic = false)))
+    fail1(AVector(method, method.copy(argsLength = -1)))
+    fail1(AVector(method, method.copy(localsLength = -1)))
+    fail1(AVector(method, method.copy(returnLength = -1)))
+  }
+
   it should "not validate empty scripts" in {
     val contract0 = StatefulContract(0, AVector.empty)
     StatefulContract.check(contract0).leftValue isE EmptyMethods
