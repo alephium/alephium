@@ -133,7 +133,7 @@ object UnsignedTransaction {
     )
   }
 
-  def transfer(
+  def build(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       inputs: AVector[(AssetOutputRef, AssetOutput)],

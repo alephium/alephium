@@ -141,7 +141,7 @@ trait TxUtils { Self: FlowUtils =>
         ).map {
           _.flatMap { selected =>
             UnsignedTransaction
-              .transfer(
+              .build(
                 fromLockupScript,
                 fromUnlockScript,
                 selected.assets.map(asset => (asset.ref, asset.output)),
@@ -189,7 +189,7 @@ trait TxUtils { Self: FlowUtils =>
               for {
                 utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
                 unsignedTx <- UnsignedTransaction
-                  .transfer(
+                  .build(
                     fromLockupScript,
                     fromUnlockScript,
                     utxos,
@@ -225,7 +225,7 @@ trait TxUtils { Self: FlowUtils =>
         )
         amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
         unsignedTx <- UnsignedTransaction
-          .transfer(
+          .build(
             fromLockupScript,
             fromUnlockScript,
             utxos.map(asset => (asset.ref, asset.output)),

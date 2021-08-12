@@ -22,8 +22,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 import org.alephium.protocol.vm.GasBox
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
@@ -375,7 +375,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       checkAddressBalance(fromAddress, genesisBalance - txTemplate.gasFeeUnsafe, 2)
     }
 
-    val utxos = serverUtils.getUTXOs(blockFlow, fromAddress).rightValue
+    val utxos        = serverUtils.getUTXOs(blockFlow, fromAddress).rightValue
     val destination1 = generateDestination(chainIndex, networkType)
     val destination2 = generateDestination(chainIndex, networkType)
     val destinations = AVector(destination1, destination2)
