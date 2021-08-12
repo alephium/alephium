@@ -227,13 +227,13 @@ class TxUtilsSpec extends AlephiumSpec {
       val output2 = output(
         LockupScript.p2pkh(toPubKey),
         ALF.alf(2),
-        (tokenId2, U256.unsafe(10)),
-        (tokenId1, U256.unsafe(40))
+        (tokenId2, U256.unsafe(9)),
+        (tokenId1, U256.unsafe(39))
       )
       AVector(output1, output2)
     }
 
-    UnsignedTransaction
+    val unsignedTx = UnsignedTransaction
       .build(
         fromLockupScript,
         fromUnlockScript,
@@ -243,6 +243,15 @@ class TxUtilsSpec extends AlephiumSpec {
         defaultGasPrice
       )
       .rightValue
+
+    unsignedTx.fixedOutputs.length is 3
+
+    info("verify change output")
+    unsignedTx.fixedOutputs(2).amount is ALF.oneAlf.subUnsafe(defaultGasFee)
+    unsignedTx.fixedOutputs(2).tokens.length is 2
+    unsignedTx.fixedOutputs(2).tokens.foreach { case (_, amount) =>
+      amount is U256.unsafe(1)
+    }
   }
 
   it should "fail when output has token that doesn't exist in input" in new UnsignedTransactionFixture {
@@ -299,6 +308,71 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .leftValue
       .startsWith("Not enough balance for token") is true
+  }
+
+  it should "fail when outputs has tokens but without minimum amount of Alf" in new UnsignedTransactionFixture {
+    val tokenId1 = Hash.hash("tokenId1")
+    val tokenId2 = Hash.hash("tokenId2")
+
+    val inputs = {
+      val input1 = input("input1", ALF.oneAlf, fromLockupScript, (tokenId2, U256.unsafe(10)))
+      val input2 = input("input2", ALF.alf(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+      AVector(input1, input2)
+    }
+
+    val outputs = {
+      info(s"minimumTokenAlfAmount is ${ALF.nanoAlf(1000)}")
+      val output1 =
+        output(LockupScript.p2pkh(toPubKey), ALF.nanoAlf(900), (tokenId2, U256.unsafe(11)))
+      AVector(output1)
+    }
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue
+      .startsWith("Not enough Alf for output with tokens, minimum amount is") is true
+  }
+
+  it should "fail when change output has token but without minumum amount of Alf" in new UnsignedTransactionFixture {
+    val tokenId1 = Hash.hash("tokenId1")
+    val tokenId2 = Hash.hash("tokenId2")
+
+    val inputs = {
+      val input1Amount = defaultGasFee.addUnsafe(minimumTokenAlfAmount).subUnsafe(1)
+      val input1       = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
+      val input2       = input("input2", ALF.alf(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+      AVector(input1, input2)
+    }
+
+    val outputs = {
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf, (tokenId1, U256.unsafe(10)))
+      val output2 = output(
+        LockupScript.p2pkh(toPubKey),
+        ALF.alf(2),
+        (tokenId2, U256.unsafe(9)),
+        (tokenId1, U256.unsafe(39))
+      )
+      AVector(output1, output2)
+    }
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue
+      .startsWith("Not enough Alf for change output because of tokens, minimum amount is") is true
   }
 
   trait LargeUtxos extends FlowFixture {

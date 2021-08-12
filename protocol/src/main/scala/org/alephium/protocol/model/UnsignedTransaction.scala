@@ -225,7 +225,9 @@ object UnsignedTransaction {
       if (alfRemainder >= minimumTokenAlfAmount) {
         Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
       } else {
-        Left("Not enough Alf for change output because of tokens")
+        Left(
+          s"Not enough Alf for change output because of tokens, minimum amount is $minimumTokenAlfAmount"
+        )
       }
     }
   }
@@ -237,7 +239,11 @@ object UnsignedTransaction {
       output.tokens.nonEmpty && output.alfAmount < minimumTokenAlfAmount
     }
 
-    Option.when(notOk)("Not enough Alf for change output because of tokens").toLeft(())
+    if (notOk) {
+      Left(s"Not enough Alf for output with tokens, minimum amount is $minimumTokenAlfAmount")
+    } else {
+      Right(())
+    }
   }
 
   def calculateTotalAmountPerToken(
