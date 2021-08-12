@@ -164,39 +164,44 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    val groupIndex = utxoRefs.head.hint.groupIndex
-    assume(brokerConfig.contains(groupIndex))
+    if (utxoRefs.isEmpty) {
+      Right(Left("Empty UTXOs"))
+    } else {
+      val groupIndex = utxoRefs.head.hint.groupIndex
+      assume(brokerConfig.contains(groupIndex))
 
-    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+      val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+      val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-    val gasE = for {
-      gas <- gasOpt.toRight("Gas missing when building transaction from selected UTXOs")
-      _   <- checkUTXORefs(utxoRefs)
-      _   <- checkTotalAmount(outputInfos)
-      _   <- checkOutputInfos(outputInfos)
-      _   <- checkWithMinimalGas(gasOpt, minimalGas)
-    } yield gas
+      val gasE = for {
+        gas <- gasOpt.toRight("Gas missing when building transaction from selected UTXOs")
+        _   <- checkUTXORefs(utxoRefs)
+        _   <- checkTotalAmount(outputInfos)
+        _   <- checkOutputInfos(outputInfos)
+        _   <- checkWithMinimalGas(gasOpt, minimalGas)
+      } yield gas
 
-    gasE match {
-      case Right(gas) =>
-        getImmutableGroupViewIncludePool(groupIndex).flatMap(_.getPrevAssetOutputs(utxoRefs)).map {
-          utxosOpt =>
-            for {
-              utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
-              unsignedTx <- UnsignedTransaction
-                .transfer(
-                  fromLockupScript,
-                  fromUnlockScript,
-                  utxos,
-                  outputInfos,
-                  gas,
-                  gasPrice
-                )
-            } yield unsignedTx
-        }
-      case Left(e) =>
-        Right(Left(e))
+      gasE match {
+        case Right(gas) =>
+          getImmutableGroupViewIncludePool(groupIndex)
+            .flatMap(_.getPrevAssetOutputs(utxoRefs))
+            .map { utxosOpt =>
+              for {
+                utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
+                unsignedTx <- UnsignedTransaction
+                  .transfer(
+                    fromLockupScript,
+                    fromUnlockScript,
+                    utxos,
+                    outputInfos,
+                    gas,
+                    gasPrice
+                  )
+              } yield unsignedTx
+            }
+        case Left(e) =>
+          Right(Left(e))
+      }
     }
   }
 
@@ -364,16 +369,12 @@ trait TxUtils { Self: FlowUtils =>
   private def checkUTXORefs(
       utxoRefs: AVector[AssetOutputRef]
   ): Either[String, Unit] = {
-    if (utxoRefs.isEmpty) {
-      Left("Zero UTXOs")
-    } else {
-      val groupIndexes = utxoRefs.map(_.hint.groupIndex)
+    val groupIndexes = utxoRefs.map(_.hint.groupIndex)
 
-      if (groupIndexes.forall(_ == groupIndexes.head)) {
-        Right(())
-      } else {
-        Left("Selected UTXOs are not from the same group")
-      }
+    if (groupIndexes.forall(_ == groupIndexes.head)) {
+      Right(())
+    } else {
+      Left("Selected UTXOs are not from the same group")
     }
   }
 
