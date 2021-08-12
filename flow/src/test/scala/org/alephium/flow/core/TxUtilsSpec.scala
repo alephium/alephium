@@ -16,19 +16,15 @@
 
 package org.alephium.flow.core
 
+import akka.util.ByteString
+
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALF, Generators}
-import org.alephium.protocol.model.{
-  defaultGasFee,
-  defaultGasPrice,
-  ChainIndex,
-  Transaction,
-  TransactionTemplate
-}
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, U256}
+import org.alephium.protocol.{ALF, Generators, Hash}
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class TxUtilsSpec extends AlephiumSpec {
   it should "consider minimal gas fee" in new FlowFixture {
@@ -132,6 +128,40 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
+  "UnsignedTransaction.build" should "build transaction" in new FlowFixture {
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val (_, fromPubKey) = chainIndex.to.generateKey
+    val (_, toPubKey)   = chainIndex.to.generateKey
+
+    val fromLockupScript = LockupScript.p2pkh(fromPubKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPubKey)
+
+    val inputs = {
+      val input1 = input("input1", ALF.oneAlf, fromLockupScript)
+      val input2 = input("input2", ALF.cent(50), fromLockupScript)
+
+      AVector(input1, input2)
+    }
+
+    val outputs = {
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf)
+      AVector(output1)
+    }
+
+    noException should be thrownBy {
+      UnsignedTransaction
+        .build(
+          fromLockupScript,
+          fromUnlockScript,
+          inputs,
+          outputs,
+          minimalGas,
+          defaultGasPrice
+        )
+        .rightValue
+    }
+  }
+
   trait LargeUtxos extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)
@@ -194,5 +224,36 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
     val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
     txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
+  }
+
+  private def input(
+      name: String,
+      amount: U256,
+      lockupScript: LockupScript.Asset,
+      tokens: (TokenId, U256)*
+  ): (AssetOutputRef, AssetOutput) = {
+    val ref = AssetOutputRef.unsafeWithScriptHint(new ScriptHint(0), Hash.hash(name))
+    val output = AssetOutput(
+      amount,
+      lockupScript,
+      lockTime = TimeStamp.zero,
+      tokens = AVector.from(tokens),
+      additionalData = ByteString.empty
+    )
+
+    (ref, output)
+  }
+
+  private def output(
+      lockupScript: LockupScript.Asset,
+      alfAmount: U256,
+      tokens: (TokenId, U256)*
+  ): UnsignedTransaction.TxOutputInfo = {
+    UnsignedTransaction.TxOutputInfo(
+      lockupScript,
+      alfAmount,
+      AVector.from(tokens),
+      lockTime = None
+    )
   }
 }
