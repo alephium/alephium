@@ -120,14 +120,15 @@ trait HttpFixture {
 
 trait HttpRouteFixture extends HttpFixture {
   def port: Int
-  def maybeApiKey: Option[String]
 
-  private lazy val maybeHeader:Option[(String,String)] ={
-    maybeApiKey.map(apiKey=> ("X-API-KEY", apiKey))
+  def maybeApiKey:Option[String]
+
+  private def apiKeyHeader(apiKey:Option[String]):Option[(String,String)] ={
+    apiKey.map(apiKey=> ("X-API-KEY", apiKey))
   }
 
-  def Post(endpoint: String, maybeBody: Option[String]): Response[Either[String, String]] = {
-    httpPost(endpoint,maybeBody, maybeHeader)(port).send(backend)
+  def Post(endpoint: String, maybeBody: Option[String], apiKey: Option[String] = maybeApiKey): Response[Either[String, String]] = {
+    httpPost(endpoint,maybeBody, apiKeyHeader(apiKey))(port).send(backend)
   }
 
   def Post(endpoint: String): Response[Either[String, String]]               =
@@ -136,19 +137,15 @@ trait HttpRouteFixture extends HttpFixture {
   def Post(endpoint: String, body: String): Response[Either[String, String]] =
     Post(endpoint, Some(body))
 
-  def Put(endpoint: String, body: String) = {
-    httpPut(endpoint, Some(body),maybeHeader)(port).send(backend)
+  def Put(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
+    httpPut(endpoint, Some(body),apiKeyHeader(apiKey))(port).send(backend)
   }
 
-  def Delete(endpoint: String, body: String) = {
-    httpRequest(Method.DELETE, endpoint, Some(body),maybeHeader)(port).send(backend)
+  def Delete(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
+    httpRequest(Method.DELETE, endpoint, Some(body),apiKeyHeader(apiKey))(port).send(backend)
   }
 
-  def Get(endpoint: String, otherPort: Int = port): Response[Either[String, String]] = {
-    httpGet(endpoint,maybeHeader = maybeHeader)(otherPort).send(backend)
-  }
-
-  def Get(endpoint: String, body: String): Response[Either[String, String]] = {
-    httpGet(endpoint, Some(body),maybeHeader)(port).send(backend)
+  def Get(endpoint: String, otherPort: Int = port, apiKey: Option[String] = maybeApiKey): Response[Either[String, String]] = {
+    httpGet(endpoint, maybeHeader = apiKeyHeader(apiKey))(otherPort).send(backend)
   }
 }
