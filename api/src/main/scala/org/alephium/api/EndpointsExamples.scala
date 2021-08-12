@@ -76,14 +76,14 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val tx = Tx(
     txId,
-    AVector(Input.Asset(OutputRef(scriptHint = 23412, key = hash), serialize(unlockScript))),
+    AVector(Input.Asset(OutputRef(hint = 23412, key = hash), serialize(unlockScript))),
     AVector(Output.Asset(amount = balance, address, tokens, ts, ByteString.empty)),
     1,
     U256.unsafe(1000)
   )
 
   private val utxo = UTXO(
-    OutputRef(scriptHint = 23412, key = hash),
+    OutputRef(hint = 23412, key = hash),
     balance,
     tokens,
     ts,

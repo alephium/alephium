@@ -383,7 +383,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   "ServerUtils.prepareUnsignedTransaction" should "create transaction with provided UTXOs" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
-      OutputRef(utxo.ref.scriptHint, utxo.ref.key)
+      OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
     noException should be thrownBy {
@@ -402,7 +402,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "not create transaction with provided UTXOs, if Gas is not also provided" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
-      OutputRef(utxo.ref.scriptHint, utxo.ref.key)
+      OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
     serverUtils
@@ -421,7 +421,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "not create transaction with provided UTXOs, if Alf amount isn't enough" in new MultipleUtxos {
     val outputRefs = utxos.collect {
       case utxo if utxo.amount.equals(ALF.cent(50)) =>
-        OutputRef(utxo.ref.scriptHint, utxo.ref.key)
+        OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
     outputRefs.length is 1
@@ -455,7 +455,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "not create transaction with without enough gas" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
-      OutputRef(utxo.ref.scriptHint, utxo.ref.key)
+      OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
     serverUtils

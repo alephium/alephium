@@ -19,9 +19,9 @@ package org.alephium.api.model
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{AssetOutputRef, ScriptHint, TxOutputRef}
 
-final case class OutputRef(scriptHint: Int, key: Hash) {
+final case class OutputRef(hint: Int, key: Hash) {
   def unsafeToAssetOutputRef(): AssetOutputRef = {
-    AssetOutputRef.unsafeWithScriptHint(new ScriptHint(scriptHint), key)
+    AssetOutputRef.unsafeWithScriptHint(new ScriptHint(hint), key)
   }
 }
 object OutputRef {

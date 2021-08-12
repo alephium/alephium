@@ -310,6 +310,133 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
+
+    {
+      val tokenId1 = Hash.hash("tokenId1")
+
+      val transfer = BuildTransaction(
+        fromPublicKey,
+        AVector(
+          Destination(
+            toAddress,
+            1,
+            AVector(Token(tokenId1, U256.unsafe(10))),
+            Some(TimeStamp.unsafe(1234))
+          )
+        ),
+        None,
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(1))
+      )
+      val jsonRaw = s"""
+        |{
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "amount": "1",
+        |      "tokens": [
+        |        {
+        |          "id": "${tokenId1.toHexString}",
+        |          "amount": "10"
+        |        }
+        |      ],
+        |      "lockTime": 1234
+        |    }
+        |  ],
+        |  "gas": 1,
+        |  "gasPrice": "1"
+        |}
+        """.stripMargin
+      checkData(transfer, jsonRaw)
+    }
+
+    {
+      val tokenId1 = Hash.hash("tokenId1")
+
+      val transfer = BuildTransaction(
+        fromPublicKey,
+        AVector(
+          Destination(
+            toAddress,
+            1,
+            AVector(Token(tokenId1, U256.unsafe(10))),
+            Some(TimeStamp.unsafe(1234))
+          )
+        ),
+        None,
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(1))
+      )
+      val jsonRaw = s"""
+        |{
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "amount": "1",
+        |      "tokens": [
+        |        {
+        |          "id": "${tokenId1.toHexString}",
+        |          "amount": "10"
+        |        }
+        |      ],
+        |      "lockTime": 1234
+        |    }
+        |  ],
+        |  "gas": 1,
+        |  "gasPrice": "1"
+        |}
+        """.stripMargin
+      checkData(transfer, jsonRaw)
+    }
+
+    {
+      val tokenId1 = Hash.hash("tokenId1")
+      val otxoKey1 = Hash.hash("utxo1")
+
+      val transfer = BuildTransaction(
+        fromPublicKey,
+        AVector(
+          Destination(
+            toAddress,
+            1,
+            AVector(Token(tokenId1, U256.unsafe(10))),
+            Some(TimeStamp.unsafe(1234))
+          )
+        ),
+        Some(AVector(OutputRef(1, otxoKey1))),
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(1))
+      )
+      val jsonRaw = s"""
+        |{
+        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+        |  "destinations": [
+        |    {
+        |      "address": "${toAddress.toBase58}",
+        |      "amount": "1",
+        |      "tokens": [
+        |        {
+        |          "id": "${tokenId1.toHexString}",
+        |          "amount": "10"
+        |        }
+        |      ],
+        |      "lockTime": 1234
+        |    }
+        |  ],
+        |  "utxos": [
+        |    {
+        |      "hint": 1,
+        |      "key": "${otxoKey1.toHexString}"
+        |    }
+        |  ],
+        |  "gas": 1,
+        |  "gasPrice": "1"
+        |}
+        """.stripMargin
+      checkData(transfer, jsonRaw)
+    }
   }
 
   it should "encode/decode BuildTransactionResult" in {
