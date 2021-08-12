@@ -318,34 +318,42 @@ class BlockFlowSpec extends AlephiumSpec {
         AVector.tabulate(groupConfig.groups) { group =>
           if (group equals testToGroup) {
             AVector(
-              config.genesisBlocks(testFromGroup)(testToGroup).hash,
               hashes0(0),
               hashes0(1),
+              hashes0(2),
               hashes0(3),
               hashes0(4),
               hashes0(5)
             )
           } else {
-            AVector(config.genesisBlocks(testFromGroup)(group).hash)
+            AVector.empty
           }
         }
       blockFlow0.getSyncLocators() isE locators0
 
       val blockFlow1 = isolatedBlockFlow()
-      val locators1: AVector[AVector[BlockHash]] = AVector.tabulate(config.broker.groups) { group =>
-        AVector(config.genesisBlocks(testFromGroup)(group).hash)
-      }
+      val locators1: AVector[AVector[BlockHash]] =
+        AVector.tabulate(config.broker.groups)(_ => AVector.empty)
       blockFlow1.getSyncLocators() isE locators1
 
-      blockFlow0.getSyncInventories(locators0) isE
+      blockFlow0.getSyncInventories(locators0, brokerConfig) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
-      blockFlow0.getSyncInventories(locators1) isE
+      blockFlow0.getSyncInventories(locators1, brokerConfig) isE
         AVector.tabulate(groupConfig.groups) { group =>
           if (group equals testToGroup) hashes0 else AVector.empty[BlockHash]
         }
-      blockFlow1.getSyncInventories(locators0) isE
+      val locators2 = AVector.tabulate(groupConfig.groups)(_ => AVector.empty[BlockHash])
+      val inventories = AVector.tabulate(groupConfig.groups) { group =>
+        if (group equals testToGroup) {
+          AVector.from(blocks.map(_.hash))
+        } else {
+          AVector.empty[BlockHash]
+        }
+      }
+      blockFlow0.getSyncInventories(locators2, brokerConfig) isE inventories
+      blockFlow1.getSyncInventories(locators0, brokerConfig) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
-      blockFlow1.getSyncInventories(locators1) isE
+      blockFlow1.getSyncInventories(locators1, brokerConfig) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
     }
   }

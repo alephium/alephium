@@ -31,8 +31,11 @@ object FlowHandler {
 
   sealed trait Command
   case object GetSyncLocators extends Command
-  final case class GetSyncInventories(id: RequestId, locators: AVector[AVector[BlockHash]])
-      extends Command
+  final case class GetSyncInventories(
+      id: RequestId,
+      locators: AVector[AVector[BlockHash]],
+      peerBrokerInfo: BrokerGroupInfo
+  )                                   extends Command
   case object GetIntraSyncInventories extends Command
 
   sealed trait Event
@@ -70,8 +73,8 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
       escapeIOError(blockFlow.getSyncLocators()) { locators =>
         sender() ! SyncLocators(brokerConfig, locators)
       }
-    case GetSyncInventories(requestId, locators) =>
-      escapeIOError(blockFlow.getSyncInventories(locators)) { inventories =>
+    case GetSyncInventories(requestId, locators, peerBrokerInfo) =>
+      escapeIOError(blockFlow.getSyncInventories(locators, peerBrokerInfo)) { inventories =>
         sender() ! SyncInventories(Some(requestId), inventories)
       }
     case GetIntraSyncInventories =>

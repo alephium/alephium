@@ -64,7 +64,11 @@ trait BrokerHandler extends BaseBrokerHandler {
       case BaseBrokerHandler.Received(InvRequest(requestId, locators)) =>
         if (validate(locators)) {
           log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
-          allHandlers.flowHandler ! FlowHandler.GetSyncInventories(requestId, locators)
+          allHandlers.flowHandler ! FlowHandler.GetSyncInventories(
+            requestId,
+            locators,
+            remoteBrokerInfo
+          )
         } else {
           log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
         }

@@ -64,24 +64,34 @@ trait BlockFlow
 
   private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[BlockHash] = {
     if (brokerConfig.contains(chainIndex.from)) {
-      val chain = getHeaderChain(chainIndex)
-      HistoryLocators
-        .sampleHeights(ALF.GenesisHeight, chain.maxHeightUnsafe)
-        .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
+      val chain     = getHeaderChain(chainIndex)
+      val maxHeight = chain.maxHeightUnsafe
+      if (maxHeight == ALF.GenesisHeight) {
+        AVector.empty
+      } else {
+        HistoryLocators
+          .sampleHeights(ALF.GenesisHeight + 1, maxHeight)
+          .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
+      }
     } else {
       AVector.empty
     }
   }
 
   override protected def getSyncInventoriesUnsafe(
-      locators: AVector[AVector[BlockHash]]
+      locators: AVector[AVector[BlockHash]],
+      peerBrokerInfo: BrokerGroupInfo
   ): AVector[AVector[BlockHash]] = {
-    locators.map { locatorsPerChain =>
+    val (groupFrom, _) = brokerConfig.calIntersection(peerBrokerInfo)
+    locators.mapWithIndex { (locatorsPerChain, index) =>
+      val offset     = index / groups
+      val fromGroup  = groupFrom + offset
+      val toGroup    = index % groups
+      val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+      val chain      = getBlockChain(chainIndex)
       if (locatorsPerChain.isEmpty) {
-        AVector.empty[BlockHash]
+        chain.getSyncDataFromHeightUnsafe(ALF.GenesisHeight + 1)
       } else {
-        val chainIndex = ChainIndex.from(locatorsPerChain.head)
-        val chain      = getBlockChain(chainIndex)
         chain.getSyncDataUnsafe(locatorsPerChain)
       }
     }
