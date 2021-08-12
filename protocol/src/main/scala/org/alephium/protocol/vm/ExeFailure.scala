@@ -40,8 +40,8 @@ case object TooManyElses                                       extends ExeFailur
 case object IncompleteIfScript                                 extends ExeFailure
 final case class InvalidScript(message: String)                extends ExeFailure
 case object InvalidParameters                                  extends ExeFailure
-case object InvalidLocalIndex                                  extends ExeFailure
-case object InvalidLocalType                                   extends ExeFailure
+case object InvalidVarIndex                                    extends ExeFailure
+case object InvalidVarType                                     extends ExeFailure
 case object InvalidFieldIndex                                  extends ExeFailure
 case object InvalidFieldLength                                 extends ExeFailure
 case object InvalidFieldType                                   extends ExeFailure

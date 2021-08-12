@@ -512,7 +512,7 @@ object TxValidation {
         blockEnv: BlockEnv
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
-      val signatures = Stack.unsafe(tx.inputSignatures.reverse, tx.inputSignatures.length)
+      val signatures = Stack.popOnly(tx.inputSignatures.reverse)
       EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.startGas) {
         case (gasRemaining, idx) =>
           val unlockScript = tx.unsigned.inputs(idx).unlockScript

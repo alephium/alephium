@@ -22,30 +22,32 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
-  def prepareStatelessScript(
-      script: StatelessScript,
-      gasLimit: GasBox = minimalGas
-  ): (ScriptObj[StatelessContext], StatelessContext) = {
-    val obj = script.toObject
-    val context = StatelessContext.apply(
+  def genStatelessContext(gasLimit: GasBox = minimalGas): StatelessContext =
+    StatelessContext.apply(
       BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
       Hash.zero,
       gasLimit,
       Stack.ofCapacity[protocol.Signature](0)
     )
+
+  def prepareStatelessScript(
+      script: StatelessScript,
+      gasLimit: GasBox = minimalGas
+  ): (ScriptObj[StatelessContext], StatelessContext) = {
+    val obj     = script.toObject
+    val context = genStatelessContext(gasLimit)
     obj -> context
   }
 
-  def prepareStatefulScript(
-      script: StatefulScript,
+  def genStatefulContext(
+      scriptOpt: Option[StatefulScript],
       gasLimit: GasBox = minimalGas
-  ): (ScriptObj[StatefulContext], StatefulContext) = {
-    val obj = script.toObject
+  ): StatefulContext = {
     val (tx, preOutputs) = {
       val (tx, preOutputs) = transactionGenWithPreOutputs().sample.get
-      tx.copy(unsigned = tx.unsigned.copy(scriptOpt = Some(script))) -> preOutputs
+      tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> preOutputs
     }
-    val context = StatefulContext
+    StatefulContext
       .build(
         BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
         tx,
@@ -54,6 +56,14 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
         Some(preOutputs.map(_.referredOutput))
       )
       .rightValue
+  }
+
+  def prepareStatefulScript(
+      script: StatefulScript,
+      gasLimit: GasBox = minimalGas
+  ): (ScriptObj[StatefulContext], StatefulContext) = {
+    val obj     = script.toObject
+    val context = genStatefulContext(scriptOpt = Some(script), gasLimit = gasLimit)
     obj -> context
   }
 

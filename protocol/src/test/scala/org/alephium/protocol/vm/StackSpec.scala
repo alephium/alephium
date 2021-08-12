@@ -21,6 +21,20 @@ import org.scalatest.EitherValues._
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class StackSpec extends AlephiumSpec {
+  it should "initial stack properly" in {
+    val stack0 = Stack.popOnly[Int](AVector(0, 1))
+    stack0.underlying.size is 2
+    stack0.offset is 0
+    stack0.capacity is 2
+    stack0.currentIndex is 2
+
+    val stack1 = Stack.unsafe[Int](AVector(0, 1), 3)
+    stack1.underlying.size is 3
+    stack1.offset is 0
+    stack1.capacity is 3
+    stack1.currentIndex is 2
+  }
+
   it should "push/pop/top" in {
     val stack = Stack.ofCapacity[Int](2)
     stack.isEmpty is true
@@ -64,7 +78,7 @@ class StackSpec extends AlephiumSpec {
   }
 
   it should "pop a number of elements" in {
-    val stack = Stack.unsafe(AVector(1, 2, 3), 3)
+    val stack = Stack.popOnly(AVector(1, 2, 3))
     stack.pop(4).leftValue isE StackUnderflow
     stack.size is 3
     stack.pop(2) isE AVector(2, 3)
@@ -104,5 +118,27 @@ class StackSpec extends AlephiumSpec {
       remainingStack.remainingStack()
     }
     stack.size is 0
+  }
+
+  it should "create var vector" in {
+    val stack             = Stack.ofCapacity[Int](3)
+    val (vector0, stack0) = stack.reserveForVars(1).rightValue
+    vector0.length is 1
+    stack0.capacity is 2
+    val (vector1, stack1) = stack.reserveForVars(3).rightValue
+    vector1.length is 3
+    stack1.capacity is 0
+    stack.reserveForVars(4).leftValue isE StackOverflow
+    stack.reserveForVars(-1).leftValue isE NegativeArgumentInStack
+
+    stack.push(0)
+    val (vector2, stack2) = stack.reserveForVars(1).rightValue
+    vector2.length is 1
+    stack2.capacity is 1
+    val (vector3, stack3) = stack.reserveForVars(2).rightValue
+    vector3.length is 2
+    stack3.capacity is 0
+    stack.reserveForVars(3).leftValue isE StackOverflow
+    stack.reserveForVars(-1).leftValue isE NegativeArgumentInStack
   }
 }

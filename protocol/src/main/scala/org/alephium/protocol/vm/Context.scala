@@ -44,7 +44,7 @@ object StatelessContext {
       txGas: GasBox,
       signature: Signature
   ): StatelessContext = {
-    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
+    val stack = Stack.popOnly[Signature](mutable.ArraySeq(signature))
     apply(blockEnv, txId, txGas, stack)
   }
 

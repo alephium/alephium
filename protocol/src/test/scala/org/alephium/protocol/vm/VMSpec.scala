@@ -67,8 +67,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test1(baseMethod, okay)
     test1(baseMethod.copy(isPayable = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
-    // negative locals length is avoided by validations in scripts and contract creations
-    assertThrows[NegativeArraySizeException](test1(baseMethod.copy(localsLength = -1), okay))
+    test1(baseMethod.copy(localsLength = -1), failed(NegativeArgumentInStack))
     test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
   }
 
@@ -88,8 +87,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test1(baseMethod, okay)
     test1(baseMethod.copy(isPayable = true), failed(InvalidBalances))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
-    // negative locals length is avoided by validations in scripts and contract creations
-    assertThrows[NegativeArraySizeException](test1(baseMethod.copy(localsLength = -1), okay))
+    test1(baseMethod.copy(localsLength = -1), failed(NegativeArgumentInStack))
     test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
   }
 

@@ -29,18 +29,20 @@ object Stack {
   }
 
   def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
-    unsafe(elems, elems.length)
+    val underlying = mutable.ArraySeq.make(elems.toArray)
+    popOnly(underlying)
   }
 
   def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
-    val underlying = mutable.ArraySeq.make(elems.toArray)
-    unsafe(underlying, maxSize)
+    val array = Array.ofDim[T](maxSize)
+    elems.foreachWithIndex((t, index) => array(index) = t)
+    val underlying = mutable.ArraySeq.make(array)
+    new Stack[T](underlying, 0, maxSize, elems.length)
   }
 
-  def unsafe[T: ClassTag](elems: mutable.ArraySeq[T], maxSize: Int): Stack[T] = {
-    assume(elems.length <= maxSize)
-    new Stack(elems, 0, maxSize, elems.length)
+  def popOnly[T: ClassTag](elems: mutable.ArraySeq[T]): Stack[T] = {
+    new Stack(elems, 0, elems.length, elems.length)
   }
 }
 
@@ -118,4 +120,19 @@ class Stack[@sp T: ClassTag](
 
   def remainingStack(): Stack[T] =
     new Stack[T](underlying, currentIndex, maxIndex - currentIndex, currentIndex)
+
+  // reserve n spots on top of the stack for method variables or contract fields
+  def reserveForVars(n: Int): ExeResult[(VarVector[T], Stack[T])] = {
+    val nextStackIndex = currentIndex + n
+    if (nextStackIndex > maxIndex) {
+      failed(StackOverflow)
+    } else if (nextStackIndex >= currentIndex) {
+      val varVector = VarVector.unsafe(underlying, currentIndex, n)
+      val newStack =
+        new Stack[T](underlying, nextStackIndex, maxIndex - nextStackIndex, nextStackIndex)
+      Right(varVector -> newStack)
+    } else {
+      failed(NegativeArgumentInStack)
+    }
+  }
 }

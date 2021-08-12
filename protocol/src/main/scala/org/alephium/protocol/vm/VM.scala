@@ -307,7 +307,7 @@ object StatelessVM {
       args: AVector[Val],
       signature: Signature
   ): ExeResult[AssetScriptExecution] = {
-    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
+    val stack = Stack.popOnly[Signature](mutable.ArraySeq(signature))
     runAssetScript(blockEnv, txId, initialGas, script, args, stack)
   }
 

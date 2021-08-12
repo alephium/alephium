@@ -30,7 +30,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def obj: ContractObj[Ctx]
   def opStack: Stack[Val]
   def method: Method[Ctx]
-  def locals: Array[Val]
+  def locals: VarVector[Val]
   def returnTo: AVector[Val] => ExeResult[Unit]
   def ctx: Ctx
 
@@ -89,15 +89,11 @@ abstract class Frame[Ctx <: StatelessContext] {
   }
 
   def getLocalVal(index: Int): ExeResult[Val] = {
-    if (locals.isDefinedAt(index)) Right(locals(index)) else failed(InvalidLocalIndex)
+    locals.get(index)
   }
 
   def setLocalVal(index: Int, v: Val): ExeResult[Unit] = {
-    if (!locals.isDefinedAt(index)) {
-      failed(InvalidLocalIndex)
-    } else {
-      Right(locals.update(index, v))
-    }
+    locals.set(index, v)
   }
 
   def getField(index: Int): ExeResult[Val] = {
@@ -159,7 +155,7 @@ final class StatelessFrame(
     val obj: ContractObj[StatelessContext],
     val opStack: Stack[Val],
     val method: Method[StatelessContext],
-    val locals: Array[Val],
+    val locals: VarVector[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatelessContext
 ) extends Frame[StatelessContext] {
@@ -183,7 +179,7 @@ final class StatefulFrame(
     val obj: ContractObj[StatefulContext],
     val opStack: Stack[Val],
     val method: Method[StatefulContext],
-    val locals: Array[Val],
+    val locals: VarVector[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
     val callerFrameOpt: Option[Frame[StatefulContext]],
@@ -288,7 +284,7 @@ object Frame {
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatelessContext]] = {
-    build(method, args, new StatelessFrame(0, obj, operandStack, method, _, returnTo, ctx))
+    build(operandStack, method, args, new StatelessFrame(0, obj, _, method, _, returnTo, ctx))
   }
 
   def stateful(
@@ -328,12 +324,13 @@ object Frame {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] = {
     build(
+      operandStack,
       method,
       args,
       new StatefulFrame(
         0,
         obj,
-        operandStack,
+        _,
         method,
         _,
         returnTo,
@@ -348,37 +345,36 @@ object Frame {
   private def build[Ctx <: StatelessContext](
       operandStack: Stack[Val],
       method: Method[Ctx],
-      frameBuilder: (Stack[Val], Array[Val]) => Frame[Ctx]
+      frameBuilder: (Stack[Val], VarVector[Val]) => Frame[Ctx]
   ): ExeResult[Frame[Ctx]] = {
     operandStack.pop(method.argsLength) match {
-      case Right(args) =>
-        val newStack = operandStack.remainingStack()
-        Right(frameBuilder(newStack, prepareLocals(method, args)))
-      case _ => failed(InsufficientArgs)
+      case Right(args) => build(operandStack, method, args, frameBuilder)
+      case _           => failed(InsufficientArgs)
     }
   }
 
   @inline
   private def build[Ctx <: StatelessContext](
+      operandStack: Stack[Val],
       method: Method[Ctx],
       args: AVector[Val],
-      frameBuilder: Array[Val] => Frame[Ctx]
+      frameBuilder: (Stack[Val], VarVector[Val]) => Frame[Ctx]
   ): ExeResult[Frame[Ctx]] = {
     if (args.length != method.argsLength) {
       failed(InvalidMethodArgLength(args.length, method.argsLength))
     } else {
-      Right(frameBuilder(prepareLocals(method, args)))
+      if (method.localsLength == 0) {
+        Right(frameBuilder(operandStack, VarVector.emptyVal))
+      } else {
+        operandStack.reserveForVars(method.localsLength).map { case (localsVector, newStack) =>
+          args.foreachWithIndex((v, index) => localsVector.setUnsafe(index, v))
+          (method.argsLength until method.localsLength).foreach { index =>
+            localsVector.setUnsafe(index, Val.False)
+          }
+          newStack -> localsVector
+          frameBuilder(newStack, localsVector)
+        }
+      }
     }
-  }
-
-  @inline
-  private def prepareLocals[Ctx <: StatelessContext](
-      method: Method[Ctx],
-      args: AVector[Val]
-  ): Array[Val] = {
-    val locals = Array.ofDim[Val](method.localsLength)
-    args.foreachWithIndex((v, index) => locals(index) = v)
-    (method.argsLength until method.localsLength).foreach { index => locals(index) = Val.False }
-    locals
   }
 }
