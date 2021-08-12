@@ -18,6 +18,7 @@ package org.alephium.util
 
 import java.math.BigInteger
 
+import akka.util.ByteString
 class U256Spec extends AlephiumSpec {
   val numGen = (0 to 3).flatMap { i =>
     val n = BigInteger.valueOf(i.toLong)
@@ -191,5 +192,59 @@ class U256Spec extends AlephiumSpec {
     U256.unsafe(0).toInt.get is 0
     U256.unsafe(Int.MaxValue).toInt.get is Int.MaxValue
     U256.unsafe(Int.MaxValue.toLong + 1).toInt is None
+  }
+
+  it should "return if nonZero" in {
+    for {
+      x <- numGen
+    } {
+      U256.unsafe(x).nonZero is x != BigInteger.ZERO
+    }
+  }
+
+  it should "convert from ByteString" in {
+    for {
+      x <- numGen
+    } {
+      val byteString = ByteString.fromArrayUnsafe(x.toByteArray())
+      U256.from(byteString).get.v is x
+    }
+  }
+
+  it should "convert from Int" in {
+    forAll { x: Int =>
+      if (x >= 0) {
+        U256.unsafe(x).v.longValue() is x.toLong
+      } else {
+        assertThrows[AssertionError](U256.unsafe(x))
+      }
+    }
+  }
+
+  it should "convert from I256" in {
+    val i256Gen = List(I256.NegOne, I256.MinValue).map(_.toBigInt)
+    for {
+      x <- numGen.appendedAll(i256Gen)
+    } {
+      if (x >= I256.lowerBound && x < I256.upperBound) {
+        val expected = if (x >= BigInteger.ZERO) U256.from(x) else None
+        U256.fromI256(I256.unsafe(x)) is expected
+      } else {
+        assertThrows[AssertionError](U256.fromI256(I256.unsafe(x)))
+      }
+    }
+  }
+
+  it should "convert to byte" in {
+    for {
+      x <- numGen
+    } {
+      val byte = U256.from(x).get.toByte
+      if (x >= BigInteger.ZERO && x <= BigInteger.valueOf(Byte.MaxValue)) {
+        byte.get is x.byteValue()
+      } else {
+        byte is None
+      }
+    }
   }
 }
