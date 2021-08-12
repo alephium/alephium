@@ -18,21 +18,33 @@ package org.alephium.util
 
 import java.util.{LinkedHashMap, Map}
 
-object LinkedBuffer {
-  def apply[K, V](maxCapacity: Int): LinkedBuffer[K, V] = {
-    val m = new Inner[K, V](maxCapacity, 32, 0.75f)
-    new LinkedBuffer[K, V](m)
+object Cache {
+  def lru[K, V](maxCapacity: Int): Cache[K, V] = {
+    Cache(maxCapacity, accessOrder = true)
   }
 
-  private class Inner[K, V](maxCapacity: Int, initialCapacity: Int, loadFactor: Float)
-      extends LinkedHashMap[K, V](initialCapacity, loadFactor) {
+  def fifo[K, V](maxCapacity: Int): Cache[K, V] = {
+    Cache(maxCapacity, accessOrder = false)
+  }
+
+  private def apply[K, V](maxCapacity: Int, accessOrder: Boolean): Cache[K, V] = {
+    val m = new Inner[K, V](maxCapacity, 32, 0.75f, accessOrder)
+    new Cache[K, V](m)
+  }
+
+  private class Inner[K, V](
+      maxCapacity: Int,
+      initialCapacity: Int,
+      loadFactor: Float,
+      accessOrder: Boolean
+  ) extends LinkedHashMap[K, V](initialCapacity, loadFactor, accessOrder) {
     override protected def removeEldestEntry(eldest: Map.Entry[K, V]): Boolean = {
       this.size > maxCapacity
     }
   }
 }
 
-class LinkedBuffer[K, V](m: LinkedBuffer.Inner[K, V]) extends SimpleMap[K, V] {
+class Cache[K, V](m: Cache.Inner[K, V]) extends SimpleMap[K, V] {
   protected def underlying: Map[K, V] = m
 
   def contains(key: K): Boolean = m.containsKey(key)
@@ -42,7 +54,6 @@ class LinkedBuffer[K, V](m: LinkedBuffer.Inner[K, V]) extends SimpleMap[K, V] {
   def get(key: K): Option[V] = Option(m.get(key))
 
   def put(key: K, value: V): Unit = {
-    m.remove(key)
     m.put(key, value)
     ()
   }

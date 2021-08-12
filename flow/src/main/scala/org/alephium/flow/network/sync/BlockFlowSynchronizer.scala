@@ -42,6 +42,7 @@ object BlockFlowSynchronizer {
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
   final case class BlockFinalized(hash: BlockHash)                      extends Command
   case object CleanDownloading                                          extends Command
+  final case class Announcement(hash: BlockHash)                        extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -79,9 +80,11 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)
     case CleanDownloading        => cleanupDownloading(networkSetting.syncExpiryPeriod)
-    case Terminated(broker) =>
-      log.debug(s"Connection to ${remoteAddress(ActorRefT(broker))} is closing")
-      brokerInfos -= ActorRefT(broker)
+    case Announcement(hash)      => handleAnnouncement(hash, ActorRefT(sender()))
+    case Terminated(actor) =>
+      val broker = ActorRefT[BrokerHandler.Command](actor)
+      log.debug(s"Connection to ${remoteAddress(broker)} is closing")
+      brokerInfos -= broker
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {

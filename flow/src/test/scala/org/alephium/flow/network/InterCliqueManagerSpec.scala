@@ -29,10 +29,12 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
+import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.SyncedResult
-import org.alephium.flow.network.broker.{InboundConnection, OutboundConnection}
+import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, OutboundConnection}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
 class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutures {
@@ -288,6 +290,93 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
     noPublish()
+  }
+
+  it should "send block to peers" in new BroadCastFixture {
+    val brokerInfo0 = genBrokerInfo(0)
+    val brokerInfo1 = genBrokerInfo(1)
+    val brokerInfo2 = genBrokerInfo(0)
+    val broker0     = TestProbe()
+    val broker1     = TestProbe()
+    val broker2     = TestProbe()
+
+    broker0.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo0, InboundConnection))
+    broker1.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo1, InboundConnection))
+    broker2.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo2, InboundConnection))
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
+
+    interCliqueManager ! CliqueManager.Synced(brokerInfo0)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo1)
+
+    val message = genBroadCastBlock(ChainIndex.unsafe(0, 1), DataOrigin.Local)
+    interCliqueManager ! message
+    broker0.expectMsg(BrokerHandler.Send(message.blockMsg))
+    broker1.expectNoMessage()
+    broker2.expectNoMessage()
+  }
+
+  it should "send announcement to peers" in new BroadCastFixture {
+    val brokerInfo0 = genBrokerInfo(0)
+    val brokerInfo1 = genBrokerInfo(1)
+    val brokerInfo2 = genBrokerInfo(0)
+    val brokerInfo3 = genBrokerInfo(0)
+    val broker0     = TestProbe()
+    val broker1     = TestProbe()
+    val broker2     = TestProbe()
+    val broker3     = TestProbe()
+
+    broker0.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo0, InboundConnection))
+    broker1.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo1, InboundConnection))
+    broker2.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo2, InboundConnection))
+    broker3.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo3, InboundConnection))
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is true
+
+    interCliqueManager ! CliqueManager.Synced(brokerInfo0)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo1)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo2)
+
+    val message = genBroadCastBlock(ChainIndex.unsafe(0, 1), DataOrigin.InterClique(brokerInfo0))
+    interCliqueManager ! message
+    broker0.expectNoMessage()
+    broker1.expectNoMessage()
+    broker2.expectMsg(BrokerHandler.RelayInventory(message.block.hash))
+    broker3.expectNoMessage()
+  }
+
+  trait BroadCastFixture extends Fixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.broker.groups"     -> 4,
+      "alephium.broker.broker-num" -> 2,
+      "alephium.broker.broker-id"  -> 0
+    )
+
+    def genBrokerInfo(brokerId: Int): BrokerInfo = {
+      BrokerInfo.unsafe(
+        Generators.cliqueIdGen.sample.get,
+        brokerId = brokerId,
+        groupNumPerBroker = 1,
+        Generators.socketAddressGen.sample.get
+      )
+    }
+
+    def genBroadCastBlock(
+        chainIndex: ChainIndex,
+        origin: DataOrigin
+    ): CliqueManager.BroadCastBlock = {
+      val block = emptyBlock(blockFlow, chainIndex)
+      CliqueManager.BroadCastBlock(
+        block,
+        Message.serialize(NewBlock(block), networkSetting.networkType),
+        Message.serialize(NewHeader(block.header), networkSetting.networkType),
+        origin,
+        broadcastInterClique = true
+      )
+    }
   }
 
   trait Fixture extends FlowFixture with Generators with AlephiumActorSpecLike {

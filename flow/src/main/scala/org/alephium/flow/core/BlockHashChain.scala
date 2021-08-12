@@ -26,7 +26,7 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Weight
-import org.alephium.util.{AVector, EitherF, LruCache, Math, TimeStamp}
+import org.alephium.util.{AVector, EitherF, LruCacheE, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
@@ -124,7 +124,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   private lazy val stateCache =
-    LruCache[BlockHash, BlockState, IOError](consensusConfig.blockCacheCapacityPerChain)
+    LruCacheE.threadSafe[BlockHash, BlockState, IOError](consensusConfig.blockCacheCapacityPerChain)
   def contains(hash: BlockHash): IOResult[Boolean] =
     stateCache.exists(hash)(blockStateStorage.exists(hash))
   def containsUnsafe(hash: BlockHash): Boolean =
