@@ -363,6 +363,8 @@ object Frame {
     if (args.length != method.argsLength) {
       failed(InvalidMethodArgLength(args.length, method.argsLength))
     } else {
+      // already validated in script validation and contract creation
+      assume(method.localsLength >= args.length)
       if (method.localsLength == 0) {
         Right(frameBuilder(operandStack, VarVector.emptyVal))
       } else {

@@ -49,7 +49,7 @@ object Method {
     )
 
   def validate(method: Method[_]): Boolean =
-    method.argsLength >= 0 && method.localsLength >= 0 && method.returnLength >= 0
+    method.argsLength >= 0 && method.localsLength >= method.argsLength && method.returnLength >= 0
 
   def forSMT: Method[StatefulContext] =
     Method[StatefulContext](
@@ -64,6 +64,7 @@ object Method {
 
 sealed trait Contract[Ctx <: StatelessContext] {
   def fieldLength: Int
+  def methodsLength: Int
   def getMethod(index: Int): ExeResult[Method[Ctx]]
   def hash: Hash
 }
@@ -72,6 +73,8 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   def fieldLength: Int = 0
   def methods: AVector[Method[Ctx]]
   def toObject: ScriptObj[Ctx]
+
+  def methodsLength: Int = methods.length
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
     methods.get(index).toRight(Right(InvalidMethodIndex(index)))
@@ -154,6 +157,7 @@ final case class StatefulContract(
     fieldLength: Int,
     methods: AVector[Method[StatefulContext]]
 ) extends Contract[StatefulContext] {
+  def methodsLength: Int = methods.length
 
   def getMethod(index: Int): ExeResult[Method[StatefulContext]] = {
     methods.get(index).toRight(Right(InvalidMethodIndex(index)))
@@ -186,7 +190,7 @@ object StatefulContract {
       methodIndexes: AVector[Int], // end positions of methods in methodBytes
       methodsBytes: ByteString
   ) extends Contract[StatefulContext] {
-    def methodLength: Int = methodIndexes.length
+    def methodsLength: Int = methodIndexes.length
 
     def check(initialFields: AVector[Val]): ExeResult[Unit] = {
       if (validate(initialFields)) {
@@ -200,10 +204,10 @@ object StatefulContract {
       initialFields.length == fieldLength
     }
 
-    private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodLength)
+    private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodsLength)
 
     def getMethod(index: Int): ExeResult[Method[StatefulContext]] = {
-      if (index >= 0 && index < methodLength) {
+      if (index >= 0 && index < methodsLength) {
         val method = methods(index)
         if (method == null) {
           deserializeMethod(index) match {
@@ -230,7 +234,7 @@ object StatefulContract {
     }
 
     def toContract(): SerdeResult[StatefulContract] = {
-      AVector.tabulateE(methodLength)(deserializeMethod).map(StatefulContract(fieldLength, _))
+      AVector.tabulateE(methodsLength)(deserializeMethod).map(StatefulContract(fieldLength, _))
     }
 
     def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {

@@ -67,7 +67,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test1(baseMethod, okay)
     test1(baseMethod.copy(isPayable = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
-    test1(baseMethod.copy(localsLength = -1), failed(NegativeArgumentInStack))
+    intercept[AssertionError](
+      test1(baseMethod.copy(localsLength = -1), okay)
+    ).getMessage is
+      "assumption failed"
     test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
   }
 
@@ -78,7 +81,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     def test3(script: StatefulScript, expected: ExeResult[Unit]): Unit = {
       val (obj, context) = prepareStatefulScript(script)
-      StatefulVM.execute(context, obj, AVector.empty).map(_ => ()) is expected
+      val argsLength     = obj.code.getMethod(0).rightValue.argsLength
+      val args =
+        if (argsLength <= 0) AVector.empty[Val] else AVector.fill[Val](argsLength)(Val.True)
+      StatefulVM.execute(context, obj, args).map(_ => ()) is expected
       ()
     }
   }
@@ -87,8 +93,15 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test1(baseMethod, okay)
     test1(baseMethod.copy(isPayable = true), failed(InvalidBalances))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
-    test1(baseMethod.copy(localsLength = -1), failed(NegativeArgumentInStack))
+    intercept[AssertionError](
+      test1(baseMethod.copy(localsLength = -1), okay)
+    ).getMessage is
+      "assumption failed"
     test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
+    intercept[AssertionError](
+      test1(baseMethod.copy(argsLength = 2, localsLength = 1), okay)
+    ).getMessage is
+      "assumption failed"
   }
 
   trait Fixture {

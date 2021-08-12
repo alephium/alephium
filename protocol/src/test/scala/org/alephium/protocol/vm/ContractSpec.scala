@@ -63,11 +63,13 @@ class ContractSpec extends AlephiumSpec {
     fail0(method.copy(argsLength = -1))
     fail0(method.copy(localsLength = -1))
     fail0(method.copy(returnLength = -1))
+    fail0(method.copy(argsLength = 1, localsLength = 0))
     pass1(AVector(method, method.copy(isPublic = false)))
     fail1(AVector(method, method.copy(isPayable = true)))
     fail1(AVector(method, method.copy(argsLength = -1)))
     fail1(AVector(method, method.copy(localsLength = -1)))
     fail1(AVector(method, method.copy(returnLength = -1)))
+    fail1(AVector(method, method.copy(argsLength = 1, localsLength = 0)))
   }
 
   it should "validate stateful scripts" in new ScriptFixture[StatefulContext] {
@@ -87,10 +89,12 @@ class ContractSpec extends AlephiumSpec {
     fail0(method.copy(argsLength = -1))
     fail0(method.copy(localsLength = -1))
     fail0(method.copy(returnLength = -1))
+    fail0(method.copy(argsLength = 1, localsLength = 0))
     pass1(AVector(method, method.copy(isPublic = false)))
     fail1(AVector(method, method.copy(argsLength = -1)))
     fail1(AVector(method, method.copy(localsLength = -1)))
     fail1(AVector(method, method.copy(returnLength = -1)))
+    fail1(AVector(method, method.copy(argsLength = 1, localsLength = 0)))
   }
 
   it should "not validate empty scripts" in {
@@ -123,5 +127,10 @@ class ContractSpec extends AlephiumSpec {
     StatefulContract.check(contract8).leftValue isE InvalidMethod
     val contract9 = StatefulContract(0, AVector(method, method))
     StatefulContract.check(contract9) isE ()
+    val contract10 = StatefulContract(0, AVector(method.copy(argsLength = 1, localsLength = 0)))
+    StatefulContract.check(contract10).leftValue isE InvalidMethod
+    val contract11 =
+      StatefulContract(0, AVector(method, method.copy(argsLength = 1, localsLength = 0)))
+    StatefulContract.check(contract11).leftValue isE InvalidMethod
   }
 }
