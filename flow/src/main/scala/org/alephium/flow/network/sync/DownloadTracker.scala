@@ -27,22 +27,13 @@ trait DownloadTracker extends BaseActor {
   def blockflow: BlockFlow
 
   val downloading: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
-  val announcements: mutable.HashMap[BlockHash, mutable.Set[ActorRefT[BrokerHandler.Command]]] =
-    mutable.HashMap.empty
+  val announcements =
+    mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[ActorRefT[BrokerHandler.Command]]]
 
   def addAnnouncement(hash: BlockHash, broker: ActorRefT[BrokerHandler.Command]): Unit = {
     announcements.get(hash) match {
-      case None          => announcements += hash -> mutable.Set(broker)
+      case None          => announcements += hash -> mutable.ArrayBuffer(broker)
       case Some(brokers) => brokers += broker
-    }
-  }
-
-  def removeAnnouncement(broker: ActorRefT[BrokerHandler.Command]): Unit = {
-    announcements.foreach { case (hash, brokers) =>
-      brokers -= broker
-      if (brokers.isEmpty) {
-        announcements -= hash
-      }
     }
   }
 
@@ -95,7 +86,7 @@ trait DownloadTracker extends BaseActor {
     hashes.foreach { hash =>
       val brokers        = announcements(hash)
       val index          = UnsecureRandom.source.nextInt(brokers.size)
-      val selectedBroker = brokers.toIndexedSeq.apply(index)
+      val selectedBroker = brokers(index)
       downloading += hash -> currentTs
       announcements -= hash
       selectedBroker ! BrokerHandler.DownloadBlocks(AVector(hash))

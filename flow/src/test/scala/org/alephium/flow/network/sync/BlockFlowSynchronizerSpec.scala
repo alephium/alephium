@@ -56,8 +56,5 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec("BlockFlowSynchronizer
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.Announcement(blockHash))
     broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
     eventually(blockFlowSynchronizerActor.announcements.contains(blockHash) is true)
-
-    system.stop(broker.ref)
-    eventually(blockFlowSynchronizerActor.announcements.contains(blockHash) is false)
   }
 }

@@ -85,7 +85,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       val broker = ActorRefT[BrokerHandler.Command](actor)
       log.debug(s"Connection to ${remoteAddress(broker)} is closing")
       brokerInfos -= broker
-      removeAnnouncement(broker)
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {

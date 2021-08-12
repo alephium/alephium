@@ -116,9 +116,6 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     downloadTrack ! BlockFlowSynchronizer.BlockFinalized(randomHashes.head)
     downloadTrackObj.announcements.contains(randomHashes.head) is false
     downloadTrackObj.announcements.size is (randomHashes.length - 1)
-
-    downloadTrackObj.removeAnnouncement(ActorRefT(broker.ref))
-    downloadTrackObj.announcements.isEmpty is true
   }
 
   it should "not download the announcement when the block is in downloading" in new Fixture {
