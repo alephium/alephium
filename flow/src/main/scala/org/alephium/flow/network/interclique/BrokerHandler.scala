@@ -24,6 +24,7 @@ import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, Mis
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash}
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache}
 
@@ -66,7 +67,6 @@ trait BrokerHandler extends BaseBrokerHandler {
           allHandlers.flowHandler ! FlowHandler.GetSyncInventories(requestId, locators)
         } else {
           log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
-          handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
         }
       case FlowHandler.SyncInventories(Some(requestId), inventories) =>
         log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
@@ -75,15 +75,7 @@ trait BrokerHandler extends BaseBrokerHandler {
         }
         send(InvResponse(requestId, inventories))
       case BaseBrokerHandler.Received(InvResponse(_, hashes)) => handleInv(hashes)
-      case BaseBrokerHandler.Received(NewBlockHash(hash)) =>
-        if (validate(hash)) {
-          log.debug(s"Receive new block hash ${hash.shortHex} from $remoteAddress")
-          seenBlocks.put(hash, ())
-          blockFlowSynchronizer ! BlockFlowSynchronizer.Announcement(hash)
-        } else {
-          log.warning(s"Invalid new block hash ${hash.shortHex} from $remoteAddress")
-          handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
-        }
+      case BaseBrokerHandler.Received(NewBlockHash(hash))     => handleNewBlockHash(hash)
       case BaseBrokerHandler.RelayInventory(hash) =>
         if (seenBlocks.contains(hash)) {
           log.debug(s"Remote broker already have the block ${hash.shortHex}")
@@ -95,6 +87,18 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
 
     receive
+  }
+
+  private def handleNewBlockHash(hash: BlockHash): Unit = {
+    if (validateBlockHash(hash)) {
+      if (!seenBlocks.contains(hash)) {
+        log.debug(s"Receive new block hash ${hash.shortHex} from $remoteAddress")
+        seenBlocks.put(hash, ())
+        blockFlowSynchronizer ! BlockFlowSynchronizer.Announcement(hash)
+      }
+    } else {
+      log.warning(s"Invalid new block hash ${hash.shortHex} from $remoteAddress")
+    }
   }
 
   var selfSynced: Boolean   = false
@@ -121,12 +125,21 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
 
-  @inline def validate(hash: BlockHash): Boolean = {
-    brokerConfig.contains(ChainIndex.from(hash).from)
+  def validateBlockHash(hash: BlockHash): Boolean = {
+    if (!PoW.checkWork(hash, blockflow.consensusConfig.maxMiningTarget)) {
+      handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
+      false
+    } else {
+      val ok = brokerConfig.contains(ChainIndex.from(hash).from)
+      if (!ok) {
+        handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
+      }
+      ok
+    }
   }
 
   def validate(locators: AVector[AVector[BlockHash]]): Boolean = {
-    locators.forall(_.forall(validate))
+    locators.forall(_.forall(validateBlockHash))
   }
 
   private def handleInv(hashes: AVector[AVector[BlockHash]]): Unit = {
@@ -138,7 +151,6 @@ trait BrokerHandler extends BaseBrokerHandler {
         blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
       } else {
         log.warning(s"Invalid inv response from $remoteAddress: ${Utils.showFlow(hashes)}")
-        handleMisbehavior(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
       }
     }
   }

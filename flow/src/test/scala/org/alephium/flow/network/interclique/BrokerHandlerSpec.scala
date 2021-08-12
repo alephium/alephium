@@ -37,6 +37,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.{BlockHash, Generators}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
+import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGenerators}
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -104,7 +105,21 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(block.hash) is true)
   }
 
-  it should "not mark block seen when receive BlocksResponse/HeadersResponse/InvResponse/NewInv" in new Fixture {
+  it should "ignore the duplicated block hash" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
+    val block      = emptyBlock(blockFlow, chainIndex)
+
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(block.hash))
+    blockFlowSynchronizer.expectMsg(
+      BlockFlowSynchronizer.HandShaked(brokerHandler.underlyingActor.remoteBrokerInfo)
+    )
+    eventually(brokerHandler.underlyingActor.seenBlocks.contains(block.hash) is true)
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Announcement(block.hash))
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(block.hash))
+    blockFlowSynchronizer.expectNoMessage()
+  }
+
+  it should "not mark block seen when receive BlocksResponse/HeadersResponse/InvResponse" in new Fixture {
     val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
     val block      = emptyBlock(blockFlow, chainIndex)
     brokerHandler ! BaseBrokerHandler.Received(BlocksResponse(RequestId.random(), AVector(block)))
@@ -135,22 +150,19 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
       }
     }
 
-    val invalidHash = genInvalidBlockHash()
-    val listener    = TestProbe()
+    val invalidHash   = genInvalidBlockHash()
+    val listener      = TestProbe()
+    val remoteAddress = brokerHandler.underlyingActor.remoteAddress
 
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(invalidHash))
-    listener.expectMsg(
-      MisbehaviorManager.InvalidFlowChainIndex(brokerHandler.underlyingActor.remoteAddress)
-    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
     brokerHandler.underlyingActor.seenBlocks.contains(invalidHash) is false
 
     val invalidBlock =
       blockGen(ChainIndex.unsafe(brokerConfig.groupUntil, brokerConfig.groupUntil)).sample.get
     brokerHandler ! BaseBrokerHandler.Received(NewBlock(invalidBlock))
-    listener.expectMsg(
-      MisbehaviorManager.InvalidFlowChainIndex(brokerHandler.underlyingActor.remoteAddress)
-    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
     brokerHandler.underlyingActor.seenBlocks.contains(invalidBlock.hash) is false
 
     val invalidHeader = emptyBlock(
@@ -158,10 +170,27 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
       ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
     ).header
     brokerHandler ! BaseBrokerHandler.Received(NewHeader(invalidHeader))
-    listener.expectMsg(
-      MisbehaviorManager.InvalidFlowChainIndex(brokerHandler.underlyingActor.remoteAddress)
-    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
     brokerHandler.underlyingActor.seenBlocks.contains(invalidHeader.hash) is false
+
+    @tailrec
+    final def genInvalidPoWBlockHash(): BlockHash = {
+      val blockHash = BlockHash.generate
+      if (
+        !PoW.checkWork(blockHash, consensusConfig.maxMiningTarget) &&
+        brokerConfig.contains(ChainIndex.from(blockHash).from)
+      ) {
+        blockHash
+      } else {
+        genInvalidPoWBlockHash()
+      }
+    }
+
+    val invalidPoWHash = genInvalidPoWBlockHash()
+    watch(brokerHandler)
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(invalidPoWHash))
+    listener.expectMsg(MisbehaviorManager.InvalidPoW(remoteAddress))
+    expectTerminated(brokerHandler.ref)
   }
 
   it should "send announcement only if remote have not seen the block" in new Fixture {
@@ -179,9 +208,10 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
   }
 
   trait Fixture {
-    val (allHandler, _)   = TestUtils.createAllHandlersProbe
-    val cliqueManager     = TestProbe()
-    val connectionHandler = TestProbe()
+    val (allHandler, _)       = TestUtils.createAllHandlersProbe
+    val cliqueManager         = TestProbe()
+    val connectionHandler     = TestProbe()
+    val blockFlowSynchronizer = TestProbe()
 
     val brokerHandler = TestActorRef[TestBrokerHandler](
       TestBrokerHandler.props(
@@ -191,7 +221,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
         blockFlow,
         allHandler,
         ActorRefT(cliqueManager.ref),
-        ActorRefT(TestProbe().ref),
+        ActorRefT(blockFlowSynchronizer.ref),
         ActorRefT(connectionHandler.ref)
       )
     )
