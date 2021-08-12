@@ -508,12 +508,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     buildTransaction.detail is "Different groups for transaction outputs"
   }
 
-  private def generateDestination(chainIndex: ChainIndex)(implicit
+  private def generateDestination(
+      chainIndex: ChainIndex,
+      tokens: (TokenId, U256)*
+  )(implicit
       groupConfig: GroupConfig
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = ALF.oneAlf
-    Destination(address, amount, AVector.empty)
+    Destination(address, amount, AVector.from(tokens).map(Token.apply.tupled))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit

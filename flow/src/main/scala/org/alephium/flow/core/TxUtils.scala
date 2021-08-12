@@ -224,13 +224,15 @@ trait TxUtils { Self: FlowUtils =>
           _ add _.output.amount toRight "Input amount overflow"
         )
         amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
+        totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
+          utxos.flatMap(_.output.tokens)
+        )
         unsignedTx <- UnsignedTransaction
           .build(
             fromLockupScript,
             fromUnlockScript,
             utxos.map(asset => (asset.ref, asset.output)),
-            // FIXME! take care of tokens
-            AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
+            AVector(TxOutputInfo(toLockupScript, amount, totalAmountPerToken, lockTimeOpt)),
             gas,
             gasPrice
           )
