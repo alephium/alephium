@@ -23,6 +23,7 @@ import org.alephium.protocol.{ALF, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
+import org.alephium.protocol.vm.GasBox
 
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
@@ -375,13 +376,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     val utxos = serverUtils.getUTXOs(blockFlow, fromAddress).rightValue
-  }
-
-  "ServerUtils.prepareUnsignedTransaction" should "create transaction with provided UTXOs" in new MultipleUtxos {
     val destination1 = generateDestination(chainIndex, networkType)
     val destination2 = generateDestination(chainIndex, networkType)
     val destinations = AVector(destination1, destination2)
+  }
 
+  "ServerUtils.prepareUnsignedTransaction" should "create transaction with provided UTXOs" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
       OutputRef(utxo.ref.scriptHint, utxo.ref.key)
     }
@@ -401,10 +401,6 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with provided UTXOs, if Gas is not also provided" in new MultipleUtxos {
-    val destination1 = generateDestination(chainIndex, networkType)
-    val destination2 = generateDestination(chainIndex, networkType)
-    val destinations = AVector(destination1, destination2)
-
     val outputRefs = utxos.map { utxo =>
       OutputRef(utxo.ref.scriptHint, utxo.ref.key)
     }
@@ -423,10 +419,6 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with provided UTXOs, if Alf amount isn't enough" in new MultipleUtxos {
-    val destination1 = generateDestination(chainIndex, networkType)
-    val destination2 = generateDestination(chainIndex, networkType)
-    val destinations = AVector(destination1, destination2)
-
     val outputRefs = utxos.collect {
       case utxo if utxo.amount.equals(ALF.cent(50)) =>
         OutputRef(utxo.ref.scriptHint, utxo.ref.key)
@@ -448,10 +440,6 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with empty provided UTXOs" in new MultipleUtxos {
-    val destination1 = generateDestination(chainIndex, networkType)
-    val destination2 = generateDestination(chainIndex, networkType)
-    val destinations = AVector(destination1, destination2)
-
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
@@ -463,6 +451,24 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .leftValue
       .detail is "Empty UTXOs"
+  }
+
+  it should "not create transaction with without enough gas" in new MultipleUtxos {
+    val outputRefs = utxos.map { utxo =>
+      OutputRef(utxo.ref.scriptHint, utxo.ref.key)
+    }
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(GasBox.unsafe(100)),
+        defaultGasPrice
+      )
+      .leftValue
+      .detail is "Invalid gas GasBox(100), minimal GasBox(100000)"
   }
 
   "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixture {
