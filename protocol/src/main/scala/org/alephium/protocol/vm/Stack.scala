@@ -25,7 +25,7 @@ import org.alephium.util.AVector
 object Stack {
   def ofCapacity[T: ClassTag](capacity: Int): Stack[T] = {
     val underlying = mutable.ArraySeq.make(new Array[T](capacity))
-    new Stack(underlying, 0, capacity, 0)
+    new Stack(underlying, 0, currentIndex = 0, maxIndex = capacity)
   }
 
   def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
@@ -38,22 +38,22 @@ object Stack {
     val array = Array.ofDim[T](maxSize)
     elems.foreachWithIndex((t, index) => array(index) = t)
     val underlying = mutable.ArraySeq.make(array)
-    new Stack[T](underlying, 0, maxSize, elems.length)
+    new Stack[T](underlying, 0, currentIndex = elems.length, maxIndex = maxSize)
   }
 
   def popOnly[T: ClassTag](elems: mutable.ArraySeq[T]): Stack[T] = {
-    new Stack(elems, 0, elems.length, elems.length)
+    new Stack(elems, 0, currentIndex = elems.length, maxIndex = elems.length)
   }
 }
 
-// Note: current place at underlying is empty
+// Note: the element at currentIndex is empty
 class Stack[@sp T: ClassTag](
     val underlying: mutable.ArraySeq[T],
     val offset: Int,
-    val capacity: Int,
-    var currentIndex: Int
+    var currentIndex: Int,
+    val maxIndex: Int
 ) {
-  val maxIndex: Int = offset + capacity
+  def capacity: Int = maxIndex - offset
 
   def isEmpty: Boolean = currentIndex == offset
 
@@ -119,7 +119,12 @@ class Stack[@sp T: ClassTag](
   }
 
   def remainingStack(): Stack[T] =
-    new Stack[T](underlying, currentIndex, maxIndex - currentIndex, currentIndex)
+    new Stack[T](
+      underlying,
+      offset = currentIndex,
+      currentIndex = currentIndex,
+      maxIndex = maxIndex
+    )
 
   // reserve n spots on top of the stack for method variables or contract fields
   def reserveForVars(n: Int): ExeResult[(VarVector[T], Stack[T])] = {
@@ -129,7 +134,12 @@ class Stack[@sp T: ClassTag](
     } else if (nextStackIndex >= currentIndex) {
       val varVector = VarVector.unsafe(underlying, currentIndex, n)
       val newStack =
-        new Stack[T](underlying, nextStackIndex, maxIndex - nextStackIndex, nextStackIndex)
+        new Stack[T](
+          underlying,
+          offset = nextStackIndex,
+          currentIndex = nextStackIndex,
+          maxIndex = maxIndex
+        )
       Right(varVector -> newStack)
     } else {
       failed(NegativeArgumentInStack)
