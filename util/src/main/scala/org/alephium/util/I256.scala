@@ -126,8 +126,7 @@ object I256 {
   }
 
   def unsafe(bytes: ByteString): I256 = {
-    assume(bytes.length == 32)
-    new I256(new BigInteger(bytes.toArray))
+    unsafe(bytes.toArray)
   }
 
   def unsafe(bytes: Array[Byte]): I256 = {
@@ -149,14 +148,6 @@ object I256 {
 
   def from(value: Long): I256 = {
     new I256(BigInteger.valueOf(value))
-  }
-
-  def fromI64(value: I64): I256 = {
-    from(value.v)
-  }
-
-  def fromU64(value: U64): I256 = {
-    unsafe(value.toBigInt)
   }
 
   def fromU256(value: U256): Option[I256] = {
