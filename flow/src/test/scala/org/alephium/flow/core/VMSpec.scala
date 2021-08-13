@@ -271,6 +271,17 @@ class VMSpec extends AlephiumSpec {
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
         s"Right(TxScriptExeFailed($failure))"
     }
+
+    def checkFooState(
+        contractId: String,
+        contractAssetRef: ContractOutputRef,
+        existed: Boolean
+    ): Assertion = {
+      val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val fooKey     = Hash.from(Hex.from(contractId).get).get
+      worldState.contractState.exist(fooKey) isE existed
+      worldState.outputState.exist(contractAssetRef) isE existed
+    }
   }
 
   it should "not use up contract assets" in new ContractFixture {
@@ -602,23 +613,34 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "destroy contract" in new ContractFixture {
+    def createContract(contract: String): (String, ContractOutputRef) = {
+      val contractId       = createContract(contract, initialState = AVector.empty).key
+      val worldState       = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractAssetRef = worldState.getContractState(contractId).rightValue.contractOutputRef
+      contractId.toHexString -> contractAssetRef
+    }
+
     val foo =
       s"""
          |TxContract Foo() {
-         |  pub fn foo() -> () {
+         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    destroyContract!(targetAddress) // in practice, the contract should check the caller before destruction
          |    return
          |  }
          |}
          |""".stripMargin
-    val fooId = createContract(foo, initialState = AVector.empty).key.toHexString
+    val (fooId, fooAssetRef) = createContract(foo)
+    checkFooState(fooId, fooAssetRef, true)
 
     def main(targetAddress: String) =
       s"""
          |TxScript Main {
          |  pub payable fn main() -> () {
-         |    destroyContract!(#$fooId, @$targetAddress)
+         |    Foo(#$fooId).destroy(@$targetAddress)
          |  }
          |}
+         |
+         |$foo
          |""".stripMargin
 
     {
@@ -626,6 +648,26 @@ class VMSpec extends AlephiumSpec {
       val address = Address.Contract(LockupScript.P2C(Hash.generate))
       val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, InvalidAddressTypeInContractDestroy)
+      checkFooState(fooId, fooAssetRef, true)
+    }
+
+    {
+      info("Destroy a contract twice, this should fail")
+      val main =
+        s"""
+           |TxScript Main {
+           |  pub payable fn main() -> () {
+           |    Foo(#$fooId).destroy(@${genesisAddress.toBase58})
+           |    Foo(#$fooId).destroy(@${genesisAddress.toBase58})
+           |  }
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      val script = Compiler.compileTxScript(main).rightValue
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+        .startsWith("Left(org.alephium.io.IOError$KeyNotFound") is true
+      checkFooState(fooId, fooAssetRef, true) // None of the two destruction will take place
     }
 
     {
@@ -633,23 +675,7 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main(genesisAddress.toBase58)).rightValue
       val block  = payableCall(blockFlow, chainIndex, script)
       addAndCheck(blockFlow, block)
-    }
-
-    {
-      info("Destroy a contract twice")
-      val fooId = createContract(foo, initialState = AVector.empty).key.toHexString
-      val main =
-        s"""
-           |TxScript Main {
-           |  pub payable fn main() -> () {
-           |    destroyContract!(#$fooId, @${genesisAddress.toBase58})
-           |    destroyContract!(#$fooId, @${genesisAddress.toBase58})
-           |  }
-           |}
-           |""".stripMargin
-      val script = Compiler.compileTxScript(main).rightValue
-      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-        .startsWith("Left(org.alephium.io.IOError$KeyNotFound") is true
+      checkFooState(fooId, fooAssetRef, false)
     }
   }
 

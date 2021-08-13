@@ -382,6 +382,10 @@ object WorldState {
       } yield ()
     }
 
+    def removeContractState(contractId: ContractId): IOResult[Unit] = {
+      contractState.remove(contractId)
+    }
+
     // Not supported, use persisted worldstate instead
     def getAssetOutputs(
         outputRefPrefix: ByteString,

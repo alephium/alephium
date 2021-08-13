@@ -244,7 +244,7 @@ object BuiltIn {
   val destroyContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "destroyContract",
-      Seq[Type](Type.ByteVec, Type.Address),
+      Seq[Type](Type.Address),
       Seq.empty,
       DestroyContract
     )

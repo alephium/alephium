@@ -1044,9 +1044,8 @@ object CopyCreateContract extends ContractInstr with GasCreate {
 object DestroyContract extends ContractInstr with GasDestroy {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address    <- frame.popOpStackT[Val.Address]()
-      contractId <- frame.popContractId()
-      _          <- frame.ctx.destroyContract(contractId, address.lockupScript)
+      address <- frame.popOpStackT[Val.Address]()
+      _       <- frame.destroyContract(address.lockupScript)
     } yield ()
   }
 }

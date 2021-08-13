@@ -112,6 +112,8 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def createContract(code: StatefulContract.HalfDecoded, fields: AVector[Val]): ExeResult[Unit]
 
+  def destroyContract(address: LockupScript): ExeResult[Unit]
+
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
     advancePC()
     for {
@@ -170,6 +172,7 @@ final class StatelessFrame(
   def balanceStateOpt: Option[BalanceState] = ???
   def createContract(code: StatefulContract.HalfDecoded, fields: AVector[Val]): ExeResult[Unit] =
     ???
+  def destroyContract(address: LockupScript): ExeResult[Unit]               = ???
   def getCallerFrame(): ExeResult[Frame[StatelessContext]]                  = ???
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
 }
@@ -221,6 +224,17 @@ final class StatefulFrame(
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       _            <- ctx.createContract(code, balances, fields)
+    } yield ()
+  }
+
+  def destroyContract(address: LockupScript): ExeResult[Unit] = {
+    for {
+      contractId   <- obj.getContractId()
+      balanceState <- getBalanceState()
+      contractAssets <- balanceState
+        .useAll(LockupScript.p2c(contractId))
+        .toRight(Right(InvalidBalances))
+      _ <- ctx.destroyContract(contractId, contractAssets, address)
     } yield ()
   }
 
