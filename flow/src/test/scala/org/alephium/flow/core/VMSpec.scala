@@ -624,7 +624,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Foo() {
          |  pub payable fn destroy(targetAddress: Address) -> () {
-         |    destroyContract!(targetAddress) // in practice, the contract should check the caller before destruction
+         |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
          |    return
          |  }
          |}

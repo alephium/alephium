@@ -113,7 +113,7 @@ object Instr {
     LoadField, StoreField, CallExternal,
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-    CreateContract, CopyCreateContract, DestroyContract, SelfAddress, SelfContractId, IssueToken,
+    CreateContract, CopyCreateContract, DestroySelf, SelfAddress, SelfContractId, IssueToken,
     CallerAddress, IsCalledFromTxScript, CallerCodeHash, ContractCodeHash
   )
   // format: on
@@ -1041,7 +1041,7 @@ object CopyCreateContract extends ContractInstr with GasCreate {
   }
 }
 
-object DestroyContract extends ContractInstr with GasDestroy {
+object DestroySelf extends ContractInstr with GasDestroy {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.popOpStackT[Val.Address]()
