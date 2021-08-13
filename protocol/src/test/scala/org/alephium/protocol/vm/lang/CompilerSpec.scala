@@ -188,7 +188,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn verify(pk: ByteVec) -> () {
          |    let hash = #${hash.toHexString}
          |    assert!(hash == blake2b!(pk))
-         |    verifySignature!(pk)
+         |    verifyTxSignature!(pk)
          |    return
          |  }
          |}

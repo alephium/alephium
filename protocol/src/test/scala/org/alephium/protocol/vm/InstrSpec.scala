@@ -58,7 +58,7 @@ class InstrSpec extends AlephiumSpec {
       Jump(int), IfTrue(int), IfFalse(int),
       CallLocal(byte), Return,
       Assert,
-      Blake2b, Keccak256, Sha256, Sha3, VerifySignature, VerifySecP256K1, VerifyED25519,
+      Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       ChainId, BlockTimeStamp, BlockTarget,
       Log1, Log2, Log3, Log4, Log5
     )

@@ -73,8 +73,8 @@ object BuiltIn {
     SimpleStatelessBuiltIn("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
   val assert: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
-  val verifySignature: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("verifySignature", Seq(Type.ByteVec), Seq(), VerifySignature)
+  val verifyTxSignature: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("verifyTxSignature", Seq(Type.ByteVec), Seq(), VerifyTxSignature)
   val verifySecP256K1: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "verifySecP256K1",
@@ -142,7 +142,7 @@ object BuiltIn {
     sha256,
     sha3,
     assert,
-    verifySignature,
+    verifyTxSignature,
     verifySecP256K1,
     verifyED25519,
     chainId,

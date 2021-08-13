@@ -105,7 +105,7 @@ object Instr {
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
-    Blake2b, Keccak256, Sha256, Sha3, VerifySignature, VerifySecP256K1, VerifyED25519,
+    Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     ChainId, BlockTimeStamp, BlockTarget,
     Log1, Log2, Log3, Log4, Log5
   )
@@ -131,9 +131,9 @@ object Instr {
   }
 
   val statelessInstrs: AVector[Option[InstrCompanion[StatelessContext]]] = {
-    val table = Array.fill[Option[InstrCompanion[StatelessContext]]](256)(None)
-    statelessInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
-    AVector.unsafe(table)
+    val array = Array.fill[Option[InstrCompanion[StatelessContext]]](256)(None)
+    statelessInstrs0.foreach(instr => array(toCode(instr)) = Some(instr))
+    AVector.unsafe(array)
   }
 
   val statefulInstrs: AVector[Option[InstrCompanion[StatefulContext]]] = {
@@ -754,9 +754,12 @@ case object Keccak256 extends HashAlg[crypto.Keccak256] with HashAlg.Keccak256Ha
 case object Sha256    extends HashAlg[crypto.Sha256] with HashAlg.Sha256Hash
 case object Sha3      extends HashAlg[crypto.Sha3] with HashAlg.Sha3Hash
 
-sealed trait Signature extends CryptoInstr with StatelessInstrSimpleGas with GasSimple
+sealed trait SignatureInstr extends CryptoInstr with StatelessInstrSimpleGas with GasSimple
 
-case object VerifySignature extends Signature with StatelessInstrCompanion0 with GasSignature {
+case object VerifyTxSignature
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val rawData    = frame.ctx.txId.bytes
     val signatures = frame.ctx.signatures
@@ -775,8 +778,8 @@ case object VerifySignature extends Signature with StatelessInstrCompanion0 with
   }
 }
 
-sealed trait GenericSignature[PubKey, Sig]
-    extends Signature
+sealed trait GenericVerifySignature[PubKey, Sig]
+    extends SignatureInstr
     with StatelessInstrCompanion0
     with GasSignature {
   def buildPubKey(value: Val.ByteVec): Option[PubKey]
@@ -797,7 +800,7 @@ sealed trait GenericSignature[PubKey, Sig]
 }
 
 case object VerifySecP256K1
-    extends GenericSignature[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
+    extends GenericVerifySignature[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
   def buildPubKey(value: Val.ByteVec): Option[crypto.SecP256K1PublicKey] =
     crypto.SecP256K1PublicKey.from(value.a)
   def buildSignature(value: Val.ByteVec): Option[crypto.SecP256K1Signature] =
@@ -811,7 +814,7 @@ case object VerifySecP256K1
 }
 
 case object VerifyED25519
-    extends GenericSignature[crypto.ED25519PublicKey, crypto.ED25519Signature] {
+    extends GenericVerifySignature[crypto.ED25519PublicKey, crypto.ED25519Signature] {
   def buildPubKey(value: Val.ByteVec): Option[crypto.ED25519PublicKey] =
     crypto.ED25519PublicKey.from(value.a)
   def buildSignature(value: Val.ByteVec): Option[crypto.ED25519Signature] =
