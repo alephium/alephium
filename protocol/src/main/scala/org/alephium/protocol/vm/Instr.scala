@@ -1044,11 +1044,15 @@ object CopyCreateContract extends ContractInstr with GasCreate {
   }
 }
 
+// This instruction can only be called from Tx, i.e. IsCalledFromTxScript should return true
+// This instruction will result in an immediate run of Return
 object DestroySelf extends ContractInstr with GasDestroy {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address <- frame.popOpStackT[Val.Address]()
-      _       <- frame.destroyContract(address.lockupScript)
+      callerFrame <- frame.getCallerFrame()
+      _           <- if (callerFrame.obj.isScript()) okay else failed(ContractDestructionShouldBeCalledFromTx)
+      address     <- frame.popOpStackT[Val.Address]()
+      _           <- frame.destroyContract(address.lockupScript)
     } yield ()
   }
 }

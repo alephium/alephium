@@ -272,14 +272,14 @@ class VMSpec extends AlephiumSpec {
         s"Right(TxScriptExeFailed($failure))"
     }
 
-    def checkFooState(
+    def checkContractState(
         contractId: String,
         contractAssetRef: ContractOutputRef,
         existed: Boolean
     ): Assertion = {
-      val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
-      val fooKey     = Hash.from(Hex.from(contractId).get).get
-      worldState.contractState.exist(fooKey) isE existed
+      val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractKey = Hash.from(Hex.from(contractId).get).get
+      worldState.contractState.exist(contractKey) isE existed
       worldState.outputState.exist(contractAssetRef) isE existed
     }
   }
@@ -613,8 +613,11 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "destroy contract" in new ContractFixture {
-    def createContract(contract: String): (String, ContractOutputRef) = {
-      val contractId       = createContract(contract, initialState = AVector.empty).key
+    def prepareContract(
+        contract: String,
+        initialState: AVector[Val]
+    ): (String, ContractOutputRef) = {
+      val contractId       = createContract(contract, initialState).key
       val worldState       = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractAssetRef = worldState.getContractState(contractId).rightValue.contractOutputRef
       contractId.toHexString -> contractAssetRef
@@ -622,15 +625,15 @@ class VMSpec extends AlephiumSpec {
 
     val foo =
       s"""
-         |TxContract Foo() {
+         |TxContract Foo(mut x: U256) {
          |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    x = x + 1
          |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
-         |    return
          |  }
          |}
          |""".stripMargin
-    val (fooId, fooAssetRef) = createContract(foo)
-    checkFooState(fooId, fooAssetRef, true)
+    val (fooId, fooAssetRef) = prepareContract(foo, AVector(Val.U256(0)))
+    checkContractState(fooId, fooAssetRef, true)
 
     def main(targetAddress: String) =
       s"""
@@ -648,7 +651,7 @@ class VMSpec extends AlephiumSpec {
       val address = Address.Contract(LockupScript.P2C(Hash.generate))
       val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, InvalidAddressTypeInContractDestroy)
-      checkFooState(fooId, fooAssetRef, true)
+      checkContractState(fooId, fooAssetRef, true)
     }
 
     {
@@ -667,7 +670,7 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
         .startsWith("Left(org.alephium.io.IOError$KeyNotFound") is true
-      checkFooState(fooId, fooAssetRef, true) // None of the two destruction will take place
+      checkContractState(fooId, fooAssetRef, true) // None of the two destruction will take place
     }
 
     {
@@ -675,7 +678,7 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main(genesisAddress.toBase58)).rightValue
       val block  = payableCall(blockFlow, chainIndex, script)
       addAndCheck(blockFlow, block)
-      checkFooState(fooId, fooAssetRef, false)
+      checkContractState(fooId, fooAssetRef, false)
     }
   }
 

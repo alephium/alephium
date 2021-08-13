@@ -58,6 +58,17 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  def removeContract(contractId: ContractId): ExeResult[Unit] = {
+    for {
+      _ <-
+        worldState.removeContractState(contractId).left.map(e => Left(IOErrorRemoveContract(e)))
+      _ <- markAssetFlushed(contractId)
+    } yield {
+      contractPool.remove(contractId)
+      ()
+    }
+  }
+
   def updateContractStates(): ExeResult[Unit] = {
     EitherF.foreachTry(contractPool) { case (contractKey, contractObj) =>
       if (contractObj.isUpdated) {

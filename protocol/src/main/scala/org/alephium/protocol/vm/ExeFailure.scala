@@ -61,6 +61,7 @@ case object InvalidReturnType                                  extends ExeFailur
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
+case object ContractDestructionShouldBeCalledFromTx            extends ExeFailure
 case object InvalidAddressTypeInContractDestroy                extends ExeFailure
 case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure

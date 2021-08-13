@@ -140,9 +140,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         case _: LockupScript.P2C   => failed(InvalidAddressTypeInContractDestroy)
       }
       _ <- outputBalances.add(address, contractAssets).toRight(Right(InvalidBalances))
-      _ <-
-        worldState.removeContractState(contractId).left.map(e => Left(IOErrorRemoveContract(e)))
-      _ <- markAssetFlushed(contractId)
+      _ <- removeContract(contractId)
     } yield ()
   }
 

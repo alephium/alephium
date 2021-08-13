@@ -235,7 +235,10 @@ final class StatefulFrame(
         .useAll(LockupScript.p2c(contractId))
         .toRight(Right(InvalidBalances))
       _ <- ctx.destroyContract(contractId, contractAssets, address)
-    } yield ()
+      _ <- runReturn()
+    } yield {
+      pc -= 1 // because of the `advancePC` call following this instruction
+    }
   }
 
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
