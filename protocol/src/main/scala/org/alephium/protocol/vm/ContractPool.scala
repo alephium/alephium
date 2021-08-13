@@ -26,11 +26,11 @@ trait ContractPool extends CostStrategy {
 
   def worldState: WorldState.Staging
 
-  val pool        = mutable.Map.empty[ContractId, StatefulContractObject]
-  val assetStatus = mutable.Map.empty[ContractId, ContractAssetStatus]
+  val contractPool = mutable.Map.empty[ContractId, StatefulContractObject]
+  val assetStatus  = mutable.Map.empty[ContractId, ContractAssetStatus]
 
   def loadContractObj(contractKey: ContractId): ExeResult[StatefulContractObject] = {
-    pool.get(contractKey) match {
+    contractPool.get(contractKey) match {
       case Some(obj) => Right(obj)
       case None =>
         for {
@@ -45,17 +45,21 @@ trait ContractPool extends CostStrategy {
     worldState.getContractObj(contractKey).left.map(e => Left(IOErrorLoadContract(e)))
   }
 
+  private var contractFieldSize = 0
   private def add(contractKey: ContractId, obj: StatefulContractObject): ExeResult[Unit] = {
-    if (pool.size < contractPoolMaxSize) {
-      pool.addOne(contractKey -> obj)
-      okay
-    } else {
+    contractFieldSize += obj.initialFields.length
+    if (contractPool.size >= contractPoolMaxSize) {
       failed(ContractPoolOverflow)
+    } else if (contractFieldSize > contractFieldMaxSize) {
+      failed(ContractFieldOverflow)
+    } else {
+      contractPool.addOne(contractKey -> obj)
+      okay
     }
   }
 
   def updateContractStates(): ExeResult[Unit] = {
-    EitherF.foreachTry(pool) { case (contractKey, contractObj) =>
+    EitherF.foreachTry(contractPool) { case (contractKey, contractObj) =>
       if (contractObj.isUpdated) {
         for {
           _ <- chargeContractUpdate()

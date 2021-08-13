@@ -78,6 +78,7 @@ case object InvalidTokenId                                     extends ExeFailur
 case object ExpectAContract                                    extends ExeFailure
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
+case object ContractFieldOverflow                              extends ExeFailure
 case object ContractAssetAlreadyInUsing                        extends ExeFailure
 case object ContractAssetAlreadyFlushed                        extends ExeFailure
 case object ContractAssetUnloaded                              extends ExeFailure

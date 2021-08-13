@@ -23,7 +23,8 @@ package object vm {
   def failed[T](error: ExeFailure): ExeResult[T]  = Left(Right(error))
   def ioFailed[T](error: IOFailure): ExeResult[T] = Left(Left(error))
 
-  val opStackMaxSize: Int      = 0x400
-  val frameStackMaxSize: Int   = 0x400
-  val contractPoolMaxSize: Int = 16 // upto 16 contracts can be called in one tx
+  val opStackMaxSize: Int       = 1024
+  val frameStackMaxSize: Int    = 1024
+  val contractPoolMaxSize: Int  = 16 // upto 16 contracts can be loaded in one tx
+  val contractFieldMaxSize: Int = 512
 }
