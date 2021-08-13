@@ -154,6 +154,8 @@ lazy val app = mainProject("app")
       val artifact: File     = assembly.value
       val artifactTargetPath = "/alephium.jar"
 
+      val userConf: File = file("docker/user-testnet.conf")
+
       val alephiumHome = "/alephium-home"
 
       new Dockerfile {
@@ -162,15 +164,18 @@ lazy val app = mainProject("app")
         // Uncomment the next line and comment the previous one if you want to use GraalVM instead of OpenJDK
         // from("ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2")
 
-        add(artifact, artifactTargetPath)
-
         runRaw(
-          s"mkdir -p $alephiumHome && usermod -d $alephiumHome nobody && chown nobody $alephiumHome"
+          Seq(
+            s"mkdir -p $alephiumHome && usermod -d $alephiumHome nobody && chown nobody $alephiumHome",
+            s"mkdir -p $alephiumHome/.alephium && chown nobody $alephiumHome/.alephium",
+            s"mkdir -p $alephiumHome/.alephium-wallets && chown nobody $alephiumHome/.alephium-wallets"
+          ).mkString(" && ")
         )
         workDir(alephiumHome)
 
-        runRaw("mkdir -p .alephium && chown nobody .alephium")
-        runRaw("mkdir -p .alephium-wallets && chown nobody .alephium-wallets")
+        copy(userConf, file(s"$alephiumHome/.alephium/user.conf"))
+
+        copy(artifact, artifactTargetPath)
 
         expose(12973) // http
         expose(11973) // ws
