@@ -238,7 +238,7 @@ final class StatefulFrame(
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj        <- ctx.loadContract(contractKey)
+      contractObj        <- ctx.loadContractObj(contractKey)
       method             <- contractObj.getMethod(index)
       _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)

@@ -1035,7 +1035,7 @@ object CopyCreateContract extends ContractInstr with GasCreate {
     for {
       fields      <- frame.popFields()
       contractId  <- frame.popContractId()
-      contractObj <- frame.ctx.loadContract(contractId)
+      contractObj <- frame.ctx.loadContractObj(contractId)
       _           <- frame.createContract(contractObj.code, fields)
     } yield ()
   }
@@ -1115,9 +1115,9 @@ object CallerCodeHash extends ContractInstr with GasLow {
 object ContractCodeHash extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      contractId <- frame.popContractId()
-      contract   <- frame.ctx.loadContract(contractId)
-      _          <- frame.pushOpStack(contract.getCodeHash())
+      contractId  <- frame.popContractId()
+      contractObj <- frame.ctx.loadContractObj(contractId)
+      _           <- frame.pushOpStack(contractObj.getCodeHash())
     } yield ()
   }
 }

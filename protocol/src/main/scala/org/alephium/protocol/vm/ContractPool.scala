@@ -29,7 +29,7 @@ trait ContractPool extends CostStrategy {
   val pool        = mutable.Map.empty[ContractId, StatefulContractObject]
   val assetStatus = mutable.Map.empty[ContractId, ContractAssetStatus]
 
-  def loadContract(contractKey: ContractId): ExeResult[StatefulContractObject] = {
+  def loadContractObj(contractKey: ContractId): ExeResult[StatefulContractObject] = {
     pool.get(contractKey) match {
       case Some(obj) => Right(obj)
       case None =>
