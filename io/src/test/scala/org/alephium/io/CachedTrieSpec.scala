@@ -26,22 +26,7 @@ import org.alephium.util.AlephiumSpec
 import org.alephium.util.Bytes.byteStringOrdering
 
 class CachedTrieSpec extends AlephiumSpec {
-  implicit val ordering: Ordering[Hash] = Ordering.by(_.bytes)
-
-  trait Fixture extends StorageFixture {
-    val genesisKey   = Hash.zero
-    val genesisValue = Hash.zero
-    val db           = newDB[Hash, SparseMerkleTrie.Node]
-    val unCached     = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
-
-    var cached: MutableTrie[Hash, Hash] = CachedSMT.from(unCached)
-
-    val logs = mutable.SortedMap.empty[Hash, Hash]
-
-    def generateKV(): (Hash, Hash) = {
-      (Hash.random, Hash.random)
-    }
-  }
+  import CachedTrieSpec.Fixture
 
   it should "test random operations" in new Fixture {
     def testCreate() = {
@@ -103,10 +88,10 @@ class CachedTrieSpec extends AlephiumSpec {
             val newTrie = c.persist().rightValue
             cached = CachedSMT.from(newTrie)
           } else {
-            cached = c.staging()
+            c.staging()
           }
         case c: StagingSMT[Hash, Hash] =>
-          cached = c.commit()
+          c.commit()
       }
 
     def finalTest() = {
@@ -118,7 +103,8 @@ class CachedTrieSpec extends AlephiumSpec {
         case c: CachedSMT[Hash, Hash] =>
           c.persist().rightValue
         case c: StagingSMT[Hash, Hash] =>
-          c.commit().persist().rightValue
+          c.commit()
+          c.underlying.persist().rightValue
       }
       logs.foreach { case (key, _) =>
         newTrie.exist(key) isE false
@@ -149,7 +135,8 @@ class CachedTrieSpec extends AlephiumSpec {
     stagingSMT.put(key0, value1) isE ()
     stagingSMT.caches(key0) is Updated(value1)
 
-    stagingSMT.commit().caches(key0) is Inserted(value1)
+    stagingSMT.commit()
+    stagingSMT.underlying.caches(key0) is Inserted(value1)
   }
 
   it should "test special case: insert -> staging -> remove" in new Fixture {
@@ -162,7 +149,8 @@ class CachedTrieSpec extends AlephiumSpec {
     stagingSMT.remove(key0) isE ()
     stagingSMT.caches(key0) is a[Removed[_]]
 
-    stagingSMT.commit().caches.contains(key0) is false
+    stagingSMT.commit()
+    stagingSMT.underlying.caches.contains(key0) is false
   }
 
   it should "test special case: remove -> staging -> insert" in new Fixture {
@@ -177,6 +165,26 @@ class CachedTrieSpec extends AlephiumSpec {
     stagingSMT.put(key0, value1) isE ()
     stagingSMT.caches(key0) is Inserted(value1)
 
-    stagingSMT.commit().caches(key0) is Updated(value1)
+    stagingSMT.commit()
+    stagingSMT.underlying.caches(key0) is Updated(value1)
+  }
+}
+
+object CachedTrieSpec {
+  implicit val ordering: Ordering[Hash] = Ordering.by(_.bytes)
+
+  trait Fixture extends StorageFixture {
+    val genesisKey   = Hash.zero
+    val genesisValue = Hash.zero
+    val db           = newDB[Hash, SparseMerkleTrie.Node]
+    val unCached     = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+
+    var cached: MutableTrie[Hash, Hash] = CachedSMT.from(unCached)
+
+    val logs = mutable.SortedMap.empty[Hash, Hash]
+
+    def generateKV(): (Hash, Hash) = {
+      (Hash.random, Hash.random)
+    }
   }
 }

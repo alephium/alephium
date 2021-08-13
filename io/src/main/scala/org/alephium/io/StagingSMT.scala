@@ -24,9 +24,11 @@ final class StagingSMT[K, V](
 ) extends CachedTrie[K, V, Modified[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = underlying.getOpt(key)
 
-  def rollback(): CachedSMT[K, V] = underlying
+  def rollback(): Unit = {
+    caches.clear()
+  }
 
-  def commit(): CachedSMT[K, V] = {
+  def commit(): Unit = {
     caches.foreach {
       case (key, updated: Updated[V]) =>
         underlying.caches.get(key) match {
@@ -44,6 +46,6 @@ final class StagingSMT[K, V](
           case _                    => underlying.caches += key -> removed
         }
     }
-    underlying
+    caches.clear()
   }
 }

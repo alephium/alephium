@@ -408,9 +408,15 @@ object WorldState {
       outputState: StagingSMT[TxOutputRef, TxOutput],
       contractState: StagingSMT[Hash, ContractState]
   ) extends AbstractCached {
-    def commit(): Cached = Cached(outputState.commit(), contractState.commit())
+    def commit(): Unit = {
+      outputState.commit()
+      contractState.commit()
+    }
 
-    def rollback(): Cached = Cached(outputState.rollback(), contractState.rollback())
+    def rollback(): Unit = {
+      outputState.rollback()
+      contractState.rollback()
+    }
 
     def persist(): IOResult[Persisted] = ??? // should not be called
   }
