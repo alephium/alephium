@@ -381,10 +381,8 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val script   = Compiler.compileTxScript(main).toOption.get
     val newState = AVector[Val](Val.U256(U256.unsafe(110)))
-    val block    = simpleScript(blockFlow, chainIndex, script)
-    addAndCheck(blockFlow, block)
+    testSimpleScript(main)
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().toOption.get.length is 3
@@ -529,9 +527,7 @@ class VMSpec extends AlephiumSpec {
     // scalastyle:on no.equal
 
     {
-      val script = Compiler.compileTxScript(expect(1)).rightValue
-      val block  = simpleScript(blockFlow, chainIndex, script)
-      addAndCheck(blockFlow, block)
+      testSimpleScript(expect(1))
     }
 
     {
@@ -570,9 +566,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
 
-    val script = Compiler.compileTxScript(main).rightValue
-    val block  = simpleScript(blockFlow, chainIndex, script)
-    addAndCheck(blockFlow, block)
+    testSimpleScript(main)
   }
 
   // scalastyle:off no.equal
@@ -730,9 +724,7 @@ class VMSpec extends AlephiumSpec {
     def test() = {
       val latestTip    = blockFlow.getHeaderChain(chainIndex).getBestTipUnsafe()
       val latestHeader = blockFlow.getBlockHeaderUnsafe(latestTip)
-      val script       = Compiler.compileTxScript(main(latestHeader)).rightValue
-      val block        = simpleScript(blockFlow, chainIndex, script)
-      addAndCheck(blockFlow, block)
+      testSimpleScript(main(latestHeader))
     }
 
     // we test with three new blocks
@@ -753,9 +745,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val script = Compiler.compileTxScript(main).rightValue
-    val block  = simpleScript(blockFlow, chainIndex, script)
-    addAndCheck(blockFlow, block)
+    testSimpleScript(main)
   }
 
   // scalastyle:off regex
