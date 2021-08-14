@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import org.scalacheck.Gen
 
 import org.alephium.io.StorageFixture
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
@@ -48,7 +49,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
     val contractKey                                      = contractOutputRef.key
 
-    val contractObj = StatefulContractObject(code, state, contractOutputRef.key)
+    val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
     val worldState  = WorldState.emptyCached(newDB)
 
     worldState.getOutput(assetOutputRef).isLeft is true
@@ -58,7 +59,13 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.removeAsset(contractOutputRef).isLeft is true
 
     worldState.addAsset(assetOutputRef, assetOutput) isE ()
-    worldState.createContractUnsafe(code, state, contractOutputRef, contractOutput) isE ()
+    worldState.createContractUnsafe(
+      code,
+      Hash.zero,
+      state,
+      contractOutputRef,
+      contractOutput
+    ) isE ()
 
     worldState.getOutput(assetOutputRef) isE assetOutput
     worldState.getOutput(contractOutputRef) isE contractOutput
@@ -78,7 +85,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
     val contractKey                                      = contractOutputRef.key
 
-    val contractObj = StatefulContractObject(code, state, contractOutputRef.key)
+    val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
     val worldState  = WorldState.emptyPersisted(newDB)
 
     worldState.getOutput(assetOutputRef).isLeft is true
@@ -89,7 +96,9 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     val worldState0 = worldState.addAsset(assetOutputRef, assetOutput).rightValue
     val worldState1 =
-      worldState0.createContractUnsafe(code, state, contractOutputRef, contractOutput).rightValue
+      worldState0
+        .createContractUnsafe(code, Hash.zero, state, contractOutputRef, contractOutput)
+        .rightValue
 
     worldState1.getOutput(assetOutputRef) isE assetOutput
     worldState1.getOutput(contractOutputRef) isE contractOutput

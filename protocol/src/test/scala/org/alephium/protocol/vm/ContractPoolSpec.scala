@@ -60,13 +60,14 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       pool.worldState
         .createContractUnsafe(
           contract.toHalfDecoded(),
+          Hash.zero,
           fields(contract.fieldLength),
           outputRef,
           output
         ) isE ()
       val contractId = outputRef.key
       pool.worldState.getContractObj(contractId) isE
-        contract.toHalfDecoded().toObject(contractId, fields(contract.fieldLength))
+        contract.toHalfDecoded().toObjectUnsafe(contractId, Hash.zero, fields(contract.fieldLength))
     }
 
     def createContract(n: Long = 0, fieldLength: Int = 0): (Hash, StatefulContract) = {
@@ -78,7 +79,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     def toObject(contract: StatefulContract, contractId: ContractId) = {
       contract
         .toHalfDecoded()
-        .toObject(contractId, fields(contract.fieldLength))
+        .toObjectUnsafe(contractId, Hash.zero, fields(contract.fieldLength))
     }
   }
 

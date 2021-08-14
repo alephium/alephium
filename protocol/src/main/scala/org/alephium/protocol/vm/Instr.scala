@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.alephium.crypto
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.serde.{deserialize => decode, _}
+import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util
 import org.alephium.util.{AVector, Bytes}
 
@@ -115,7 +115,7 @@ object Instr {
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CopyCreateContract, DestroySelf, SelfAddress, SelfContractId, IssueToken,
-    CallerAddress, IsCalledFromTxScript, CallerCodeHash, ContractCodeHash
+    CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
   )
   // format: on
 
@@ -1057,6 +1057,8 @@ sealed trait ContractInstr
     with GasSimple {}
 
 object CreateContract extends ContractInstr with GasCreate {
+  val fieldsSerde: Serde[AVector[Val]] = serdeImpl[AVector[Val]]
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       fields          <- frame.popFields()
@@ -1065,7 +1067,11 @@ object CreateContract extends ContractInstr with GasCreate {
         Right(SerdeErrorCreateContract(e))
       )
       _ <- StatefulContract.check(contractCode)
-      _ <- frame.createContract(contractCode.toHalfDecoded(), fields)
+      _ <- {
+        val initialStateHash =
+          Hash.doubleHash(contractCodeRaw.bytes ++ fieldsSerde.serialize(fields))
+        frame.createContract(contractCode.toHalfDecoded(), initialStateHash, fields)
+      }
     } yield ()
   }
 }
@@ -1076,7 +1082,12 @@ object CopyCreateContract extends ContractInstr with GasCreate {
       fields      <- frame.popFields()
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
-      _           <- frame.createContract(contractObj.code, fields)
+      _ <- {
+        val contractCodeBytes = encode(contractObj.code)
+        val initialStateHash =
+          Hash.doubleHash(contractCodeBytes ++ CreateContract.fieldsSerde.serialize(fields))
+        frame.createContract(contractObj.code, initialStateHash, fields)
+      }
     } yield ()
   }
 }
@@ -1146,21 +1157,25 @@ object IsCalledFromTxScript extends ContractInstr with GasLow {
   }
 }
 
-object CallerCodeHash extends ContractInstr with GasLow {
+object CallerInitialStateHash extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       callerFrame <- frame.getCallerFrame()
-      _           <- frame.pushOpStack(callerFrame.obj.getCodeHash())
+      statefulObj <- callerFrame.obj match {
+        case obj: StatefulContractObject => Right(obj)
+        case _                           => failed(ExpectStatefulContractObj)
+      }
+      _ <- frame.pushOpStack(statefulObj.getInitialStateHash())
     } yield ()
   }
 }
 
-object ContractCodeHash extends ContractInstr with GasLow {
+object ContractInitialStateHash extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
-      _           <- frame.pushOpStack(contractObj.getCodeHash())
+      _           <- frame.pushOpStack(contractObj.getInitialStateHash())
     } yield ()
   }
 }

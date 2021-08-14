@@ -571,18 +571,18 @@ class VMSpec extends AlephiumSpec {
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
       val address       = Address.Contract(LockupScript.p2c(contractId)).toBase58
-      (contractId.toHexString, address, contractState.code.hash.toHexString)
+      (contractId.toHexString, address, contractState.initialStateHash.toHexString)
     }
 
     val foo =
       s"""
          |TxContract Foo() {
-         |  pub fn foo(fooId: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
+         |  pub fn foo(fooId: ByteVec, fooHash: ByteVec, barId: ByteVec, barHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == fooId)
-         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
-         |    assert!(contractCodeHash!(barId) == barCodeHash)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash)
+         |    assert!(contractInitialStateHash!(barId) == barHash)
          |    assert!(callerAddress!() == barAddress)
-         |    assert!(callerCodeHash!() == barCodeHash)
+         |    assert!(callerInitialStateHash!() == barHash)
          |    assert!(isCalledFromTxScript!() == false)
          |  }
          |}
@@ -592,12 +592,12 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  pub payable fn bar(fooId: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
+         |  pub payable fn bar(fooId: ByteVec, fooHash: ByteVec, barId: ByteVec, barHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
-         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
-         |    assert!(contractCodeHash!(barId) == barCodeHash)
-         |    Foo(#$fooId).foo(fooId, fooCodeHash, barId, barCodeHash, barAddress)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash)
+         |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    Foo(#$fooId).foo(fooId, fooHash, barId, barHash, barAddress)
          |    assert!(isCalledFromTxScript!() == true)
          |    assert!(isPaying!(@$genesisAddress) == false)
          |  }

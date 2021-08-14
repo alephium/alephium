@@ -67,7 +67,7 @@ class InstrSpec extends AlephiumSpec {
       ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
       TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CopyCreateContract, DestroySelf, SelfAddress, SelfContractId, IssueToken,
-      CallerAddress, IsCalledFromTxScript, CallerCodeHash, ContractCodeHash
+      CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
     )
     // format: on
 

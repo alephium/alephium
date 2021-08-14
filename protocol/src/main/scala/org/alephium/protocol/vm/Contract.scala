@@ -238,11 +238,15 @@ object StatefulContract {
     }
 
     def toObject(address: Hash, contractState: ContractState): StatefulContractObject = {
-      StatefulContractObject(this, contractState.fields, address)
+      StatefulContractObject(this, contractState.initialStateHash, contractState.fields, address)
     }
 
-    def toObject(address: Hash, fields: AVector[Val]): StatefulContractObject = {
-      StatefulContractObject(this, fields, address)
+    def toObjectUnsafe(
+        address: Hash,
+        initialStateHash: Hash,
+        fields: AVector[Val]
+    ): StatefulContractObject = {
+      StatefulContractObject(this, initialStateHash, fields, address)
     }
   }
 
@@ -315,8 +319,6 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 
   def isScript(): Boolean = contractIdOpt.isEmpty
 
-  def getCodeHash(): Val.ByteVec = Val.ByteVec(code.hash.bytes)
-
   def getMethod(index: Int): ExeResult[Method[Ctx]] = code.getMethod(index)
 
   def getField(index: Int): ExeResult[Val] = {
@@ -345,11 +347,14 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
 
 final case class StatefulContractObject private (
     code: StatefulContract.HalfDecoded,
-    initialFields: AVector[Val],
+    initialStateHash: Hash,      // the state hash when the contract is created
+    initialFields: AVector[Val], // the initial field values when the contract is loaded
     fields: mutable.ArraySeq[Val],
     contractId: ContractId
 ) extends ContractObj[StatefulContext] {
-  override def contractIdOpt: Option[ContractId] = Some(contractId)
+  def contractIdOpt: Option[ContractId] = Some(contractId)
+
+  def getInitialStateHash(): Val.ByteVec = Val.ByteVec(initialStateHash.bytes)
 
   def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
 }
@@ -357,9 +362,16 @@ final case class StatefulContractObject private (
 object StatefulContractObject {
   def apply(
       code: StatefulContract.HalfDecoded,
+      initialStateHash: Hash,
       initialFields: AVector[Val],
       contractId: ContractId
   ): StatefulContractObject = {
-    new StatefulContractObject(code, initialFields, initialFields.toArray, contractId)
+    new StatefulContractObject(
+      code,
+      initialStateHash,
+      initialFields,
+      initialFields.toArray,
+      contractId
+    )
   }
 }

@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -92,12 +92,13 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
     cachedWorldState.createContractUnsafe(
       halfDecoded,
+      Hash.zero,
       fields,
       contractOutputRef,
       contractOutput
     ) isE ()
 
-    val obj = halfDecoded.toObject(contractOutputRef.key, fields)
+    val obj = halfDecoded.toObjectUnsafe(contractOutputRef.key, Hash.zero, fields)
     val context = new StatefulContext {
       val worldState: WorldState.Staging            = cachedWorldState.staging()
       def outputBalances: Balances                  = ???
