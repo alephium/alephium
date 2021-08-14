@@ -95,6 +95,12 @@ object BuiltIn {
     SimpleStatelessBuiltIn("blockTimeStamp", Seq.empty, Seq(Type.U256), BlockTimeStamp)
   val blockTarget: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("blockTarget", Seq.empty, Seq(Type.U256), BlockTarget)
+  val txId: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("txId", Seq.empty, Seq(Type.ByteVec), TxId)
+  val txCaller: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("txCaller", Seq(Type.U256), Seq(Type.Address), TxCaller)
+  val txCallerSize: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("txCallerSize", Seq.empty, Seq(Type.U256), TxCallerSize)
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
     def toType: Type
@@ -168,6 +174,9 @@ object BuiltIn {
     chainId,
     blockTimeStamp,
     blockTarget,
+    txId,
+    txCaller,
+    txCallerSize,
     toI256,
     toU256,
     toByteVec,

@@ -140,6 +140,12 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
 
   def toByte: Option[Byte] = if (v.bitLength() <= 7) Some(v.intValue().toByte) else None
 
+  def toInt: Option[Int] = try {
+    Some(v.intValueExact())
+  } catch {
+    case _: ArithmeticException => None
+  }
+
   def toBigInt: BigInteger = v
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))

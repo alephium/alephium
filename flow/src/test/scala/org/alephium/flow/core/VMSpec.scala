@@ -741,6 +741,23 @@ class VMSpec extends AlephiumSpec {
     test()
   }
 
+  it should "fetch tx env" in new ContractFixture {
+    val zeroId = Hash.zero
+    val main =
+      s"""
+         |TxScript TxEnv {
+         |  pub fn main() -> () {
+         |    assert!(txId!() != #${zeroId.toHexString})
+         |    assert!(txCaller!(0) == @${genesisAddress.toBase58})
+         |    assert!(txCallerSize!() == 1)
+         |  }
+         |}
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val block  = simpleScript(blockFlow, chainIndex, script)
+    addAndCheck(blockFlow, block)
+  }
+
   // scalastyle:off regex
   it should "test hash built-ins" in new ContractFixture {
     val input = Hex.toHexString(ByteString.fromString("Hello World1"))

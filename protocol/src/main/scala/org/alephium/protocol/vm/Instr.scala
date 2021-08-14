@@ -105,7 +105,7 @@ object Instr {
     CallLocal, Return,
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-    ChainId, BlockTimeStamp, BlockTarget,
+    ChainId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
     Log1, Log2, Log3, Log4, Log5
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -1163,10 +1163,10 @@ object ContractCodeHash extends ContractInstr with GasLow {
   }
 }
 
-sealed trait BlockInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLow
+sealed trait BlockInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
 
 object ChainId extends BlockInstr {
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack {
       val id = frame.ctx.blockEnv.chainId.id
       Val.ByteVec(ByteString(id))
@@ -1175,7 +1175,7 @@ object ChainId extends BlockInstr {
 }
 
 object BlockTimeStamp extends BlockInstr {
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       timestamp <- {
         val millis = frame.ctx.blockEnv.timeStamp.millis
@@ -1187,7 +1187,7 @@ object BlockTimeStamp extends BlockInstr {
 }
 
 object BlockTarget extends BlockInstr {
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       target <- {
         val value = frame.ctx.blockEnv.target.value
@@ -1195,6 +1195,30 @@ object BlockTarget extends BlockInstr {
       }
       _ <- frame.pushOpStack(Val.U256(target))
     } yield ()
+  }
+}
+
+sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
+
+object TxId extends TxInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.ByteVec(frame.ctx.txId.bytes))
+  }
+}
+
+object TxCaller extends TxInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerIndex <- frame.popOpStackT[Val.U256]()
+      caller      <- frame.ctx.getTxCaller(callerIndex)
+      _           <- frame.pushOpStack(caller)
+    } yield ()
+  }
+}
+
+object TxCallerSize extends TxInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
   }
 }
 

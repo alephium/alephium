@@ -186,4 +186,10 @@ class U256Spec extends AlephiumSpec {
     assertThrows[AssertionError](U256.MaxValue.addOneUnsafe())
     assertThrows[AssertionError](U256.Zero.subOneUnsafe())
   }
+
+  it should "Convert to int" in {
+    U256.unsafe(0).toInt.get is 0
+    U256.unsafe(Int.MaxValue).toInt.get is Int.MaxValue
+    U256.unsafe(Int.MaxValue.toLong + 1).toInt is None
+  }
 }
