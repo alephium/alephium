@@ -16,7 +16,6 @@
 
 package org.alephium.util
 
-import scala.collection.immutable.ArraySeq
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
@@ -31,13 +30,6 @@ object Hex {
   def from(s: String): Option[ByteString] =
     try {
       Some(unsafe(s))
-    } catch {
-      case _: Throwable => None
-    }
-
-  def asArraySeq(s: String): Option[ArraySeq[Byte]] =
-    try {
-      Some(ArraySeq.unsafeWrapArray(BHex.decode(s)))
     } catch {
       case _: Throwable => None
     }

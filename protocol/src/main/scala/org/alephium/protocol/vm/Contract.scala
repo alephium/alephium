@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 
 import akka.util.ByteString
 
@@ -315,7 +315,7 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 
   def isScript(): Boolean = contractIdOpt.isEmpty
 
-  def getCodeHash(): Val.ByteVec = Val.ByteVec(immutable.ArraySeq.from(code.hash.bytes))
+  def getCodeHash(): Val.ByteVec = Val.ByteVec(code.hash.bytes)
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = code.getMethod(index)
 

@@ -18,8 +18,6 @@ package org.alephium.protocol.vm
 
 import scala.annotation.{switch, tailrec}
 
-import akka.util.ByteString
-
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
 import org.alephium.serde.deserialize
@@ -74,7 +72,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def popContractId(): ExeResult[ContractId] = {
     for {
       byteVec     <- popOpStackT[Val.ByteVec]()
-      contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
+      contractKey <- Hash.from(byteVec.bytes).toRight(Right(InvalidContractAddress))
     } yield contractKey
   }
 
@@ -82,7 +80,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def popFields(): ExeResult[AVector[Val]] = {
     for {
       fieldsRaw <- popOpStackT[Val.ByteVec]()
-      fields <- deserialize[AVector[Val]](ByteString(fieldsRaw.a)).left.map(e =>
+      fields <- deserialize[AVector[Val]](fieldsRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
     } yield fields

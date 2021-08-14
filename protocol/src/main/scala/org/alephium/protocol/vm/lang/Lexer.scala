@@ -82,7 +82,7 @@ object Lexer {
 
   def bytesInternal[_: P]: P[Val.ByteVec] =
     P(hex).!.map { hexString =>
-      val byteVecOpt = Hex.asArraySeq(hexString).map(ByteVec(_))
+      val byteVecOpt = Hex.from(hexString).map(ByteVec(_))
       byteVecOpt match {
         case Some(byteVec) => byteVec
         case None          => throw Compiler.Error(s"Invalid byteVec: $hexString")

@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.vm.lang
 
-import scala.collection.immutable.ArraySeq
-
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
@@ -34,7 +32,7 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("5u", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
-      Hex.asArraySeq(byte32).get
+      Hex.from(byte32).get
     )
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
       address.lockupScript
@@ -64,7 +62,7 @@ class LexerSpec extends AlephiumSpec {
     val hash    = Hash.random
     val address = Address.p2pkh(PublicKey.generate)
     fastparse.parse(s"#${hash.toHexString}", Lexer.bytes(_)).get.value is
-      Val.ByteVec(ArraySeq.from(hash.bytes))
+      Val.ByteVec(hash.bytes)
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
       Val.Address(address.lockupScript)
   }

@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -313,7 +312,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(100), Val.U256(1), Val.U256(99)))
@@ -322,7 +321,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "fail when there is no token balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
     fail(instrs, NoTokenBalanceForTheAddress)
@@ -336,13 +335,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address0),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken,
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
@@ -379,7 +378,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "fail when no enough balance for approval" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken
     )
@@ -394,7 +393,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       TransferAlf,
       AddressConst(address1),
       AddressConst(address0),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(1)),
       TransferToken,
       AddressConst(address0),
@@ -402,7 +401,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(ArraySeq.from(tokenId.bytes))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
 
@@ -419,8 +418,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         AddressConst(address0),
         U256Const(Val.U256(10)),
         ApproveAlf,
-        BytesConst(Val.ByteVec(ArraySeq.from(serialize(contract)))),
-        BytesConst(Val.ByteVec(ArraySeq.from(serialize(AVector.empty[Val])))),
+        BytesConst(Val.ByteVec(serialize(contract))),
+        BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
         CreateContract
       )
       val expected = result match {

@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.immutable.ArraySeq
-
 import akka.util.ByteString
 
 import org.alephium.serde.{_deserialize => decode, serialize => encode, _}
@@ -55,7 +53,7 @@ object Val {
         case Bool    => decode[Boolean](content).map(_.mapValue(Bool(_)))
         case I256    => decode[util.I256](content).map(_.mapValue(I256(_)))
         case U256    => decode[util.U256](content).map(_.mapValue(U256(_)))
-        case ByteVec => decode[ArraySeq[scala.Byte]](content).map(_.mapValue(ByteVec(_)))
+        case ByteVec => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
         case Address => decode[LockupScript](content).map(_.mapValue(Address(_)))
       }
   }
@@ -89,10 +87,8 @@ object Val {
   final case class I256(v: util.I256) extends Val { def tpe: Val.Type = I256 }
   final case class U256(v: util.U256) extends Val { def tpe: Val.Type = U256 }
 
-  final case class ByteVec(a: ArraySeq[scala.Byte]) extends AnyVal with Val {
+  final case class ByteVec(bytes: ByteString) extends AnyVal with Val {
     def tpe: Val.Type = ByteVec
-
-    def bytes: ByteString = ByteString(a)
   }
   final case class Address(lockupScript: LockupScript) extends AnyVal with Val {
     def tpe: Val.Type = Address
@@ -124,14 +120,14 @@ object Val {
   }
 
   object ByteVec extends Type {
-    implicit val serde: Serde[ByteVec] = byteArraySeqSerde.xmap(ByteVec(_), _.a)
+    implicit val serde: Serde[ByteVec] = bytestringSerde.xmap(ByteVec(_), _.bytes)
     override lazy val id: scala.Byte   = Type.getId(this)
-    override def default: ByteVec      = ByteVec(ArraySeq.empty)
+    override def default: ByteVec      = ByteVec(ByteString.empty)
     override def isNumeric: Boolean    = false
 
     override def toString: String = "ByteVec"
 
-    def from(bytes: RandomBytes): ByteVec = ByteVec(ArraySeq.from(bytes.bytes))
+    def from(bytes: RandomBytes): ByteVec = ByteVec(bytes.bytes)
   }
   object Address extends Type {
     implicit val serde: Serde[Address] = serdeImpl[LockupScript].xmap(Address(_), _.lockupScript)

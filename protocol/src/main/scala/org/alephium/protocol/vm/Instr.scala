@@ -17,7 +17,6 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.switch
-import scala.collection.immutable.ArraySeq
 
 import akka.util.ByteString
 
@@ -724,9 +723,8 @@ sealed abstract class HashAlg[H <: RandomBytes]
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       input <- frame.popOpStackT[Val.ByteVec]()
-      bytes = ByteString.fromArrayUnsafe(input.a.toArray)
-      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
-      _ <- frame.pushOpStack(Val.ByteVec.from(hash(bytes)))
+      _     <- frame.ctx.chargeGasWithSize(this, input.bytes.length)
+      _     <- frame.pushOpStack(Val.ByteVec.from(hash(input.bytes)))
     } yield ()
   }
 }
@@ -765,7 +763,7 @@ case object VerifyTxSignature
     val signatures = frame.ctx.signatures
     for {
       rawPublicKey <- frame.popOpStackT[Val.ByteVec]()
-      publicKey    <- PublicKey.from(rawPublicKey.a).toRight(Right(InvalidPublicKey))
+      publicKey    <- PublicKey.from(rawPublicKey.bytes).toRight(Right(InvalidPublicKey))
       signature    <- signatures.pop()
       _ <- {
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
@@ -802,9 +800,9 @@ sealed trait GenericVerifySignature[PubKey, Sig]
 case object VerifySecP256K1
     extends GenericVerifySignature[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
   def buildPubKey(value: Val.ByteVec): Option[crypto.SecP256K1PublicKey] =
-    crypto.SecP256K1PublicKey.from(value.a)
+    crypto.SecP256K1PublicKey.from(value.bytes)
   def buildSignature(value: Val.ByteVec): Option[crypto.SecP256K1Signature] =
-    crypto.SecP256K1Signature.from(value.a)
+    crypto.SecP256K1Signature.from(value.bytes)
   def verify(
       data: ByteString,
       signature: crypto.SecP256K1Signature,
@@ -816,9 +814,9 @@ case object VerifySecP256K1
 case object VerifyED25519
     extends GenericVerifySignature[crypto.ED25519PublicKey, crypto.ED25519Signature] {
   def buildPubKey(value: Val.ByteVec): Option[crypto.ED25519PublicKey] =
-    crypto.ED25519PublicKey.from(value.a)
+    crypto.ED25519PublicKey.from(value.bytes)
   def buildSignature(value: Val.ByteVec): Option[crypto.ED25519Signature] =
-    crypto.ED25519Signature.from(value.a)
+    crypto.ED25519Signature.from(value.bytes)
   def verify(
       data: ByteString,
       signature: crypto.ED25519Signature,
@@ -861,7 +859,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
     for {
       amount       <- frame.popOpStackT[Val.U256]()
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackT[Val.Address]()
       balanceState <- frame.getBalanceState()
       _ <- balanceState
@@ -889,7 +887,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
     for {
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
       address      <- frame.popOpStackT[Val.Address]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
       amount <- balanceState
         .tokenRemaining(address.lockupScript, tokenId)
@@ -940,7 +938,7 @@ sealed trait Transfer extends AssetInstr {
     for {
       amount       <- frame.popOpStackT[Val.U256]()
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       to           <- toThunk
       from         <- fromThunk
       balanceState <- frame.getBalanceState()
@@ -1024,7 +1022,7 @@ object CreateContract extends ContractInstr with GasCreate {
     for {
       fields          <- frame.popFields()
       contractCodeRaw <- frame.popOpStackT[Val.ByteVec]()
-      contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left.map(e =>
+      contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
       _ <- StatefulContract.check(contractCode)
@@ -1070,7 +1068,7 @@ object SelfContractId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId <- frame.obj.getContractId()
-      _          <- frame.pushOpStack(Val.ByteVec(ArraySeq.from(contractId.bytes)))
+      _          <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
     } yield ()
   }
 }
@@ -1134,7 +1132,7 @@ object ChainId extends BlockInstr {
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack {
       val id = frame.ctx.blockEnv.chainId.id
-      Val.ByteVec(ArraySeq(id))
+      Val.ByteVec(ByteString(id))
     }
   }
 }
