@@ -55,7 +55,7 @@ class VMSpec extends AlephiumSpec {
     Compiler.compileTxScript(scriptRaw).rightValue
   }
 
-  it should "not start with private function" in new FlowFixture {
+  it should "not start with private function" in new ContractFixture {
     val input =
       s"""
          |TxScript Foo {
@@ -66,11 +66,8 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script      = Compiler.compileTxScript(input).toOption.get
     val errorScript = StatefulScript.unsafe(AVector(script.methods.head.copy(isPublic = false)))
-
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = simpleScript(blockFlow, chainIndex, errorScript)
-    intercept[AssertionError](addAndCheck(blockFlow, block)).getMessage is
-      s"Right(ExistInvalidTx(TxScriptExeFailed($ExternalPrivateMethodCall)))"
+    val block       = simpleScript(blockFlow, chainIndex, errorScript)
+    fail(blockFlow, block, ExternalPrivateMethodCall)
   }
 
   it should "overflow frame stack" in new FlowFixture {
@@ -255,6 +252,11 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main).rightValue
       val block  = simpleScript(blockFlow, chainIndex, script)
       addAndCheck(blockFlow, block)
+    }
+
+    def failSimpleScript(main: String, failure: ExeFailure) = {
+      val script = Compiler.compileTxScript(main).rightValue
+      fail(blockFlow, chainIndex, script, failure)
     }
 
     def fail(blockFlow: BlockFlow, block: Block, failure: ExeFailure): Assertion = {
@@ -526,15 +528,8 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     // scalastyle:on no.equal
 
-    {
-      testSimpleScript(expect(1))
-    }
-
-    {
-      val script = Compiler.compileTxScript(expect(2)).rightValue
-      val block  = simpleScript(blockFlow, chainIndex, script)
-      fail(blockFlow, block, AssertionFailed)
-    }
+    testSimpleScript(expect(1))
+    failSimpleScript(expect(2), AssertionFailed)
   }
   // scalastyle:on method.length
 
@@ -735,17 +730,18 @@ class VMSpec extends AlephiumSpec {
 
   it should "fetch tx env" in new ContractFixture {
     val zeroId = Hash.zero
-    val main =
+    def main(index: Int) =
       s"""
          |TxScript TxEnv {
          |  pub fn main() -> () {
          |    assert!(txId!() != #${zeroId.toHexString})
-         |    assert!(txCaller!(0) == @${genesisAddress.toBase58})
+         |    assert!(txCaller!($index) == @${genesisAddress.toBase58})
          |    assert!(txCallerSize!() == 1)
          |  }
          |}
          |""".stripMargin
-    testSimpleScript(main)
+    testSimpleScript(main(0))
+    failSimpleScript(main(1), InvalidTxCallerIndex)
   }
 
   // scalastyle:off regex
