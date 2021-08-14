@@ -217,7 +217,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       BuildTransaction(
         publicKey,
-        AVector(Destination(address, U256.Two, tokens, Some(ts))),
+        AVector(Destination(address, U256.Two, Some(tokens), Some(ts))),
         None,
         Some(GasBox.unsafe(1)),
         Some(GasPrice(U256.One))

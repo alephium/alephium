@@ -23,6 +23,6 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 final case class Destination(
     address: Address.Asset,
     amount: U256,
-    tokens: AVector[Token],
+    tokens: Option[AVector[Token]] = None,
     lockTime: Option[TimeStamp] = None
 )

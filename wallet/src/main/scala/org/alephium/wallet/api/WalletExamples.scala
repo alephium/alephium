@@ -109,7 +109,7 @@ trait WalletExamples extends ErrorExamples {
     simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
 
   implicit val transferExamples: List[Example[Transfer]] =
-    simpleExample(Transfer(AVector(Destination(address, U256.Million, tokens))))
+    simpleExample(Transfer(AVector(Destination(address, U256.Million, Some(tokens)))))
 
   implicit val sweepAllExamples: List[Example[SweepAll]] =
     simpleExample(SweepAll(address))

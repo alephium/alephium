@@ -89,8 +89,8 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Transfer" in {
-    val json     = s"""{"destinations":[{"address":"$address","amount":"$balance","tokens":[]}]}"""
-    val transfer = Transfer(AVector(Destination(address, balance, AVector.empty)))
+    val json     = s"""{"destinations":[{"address":"$address","amount":"$balance"}]}"""
+    val transfer = Transfer(AVector(Destination(address, balance)))
     check(transfer, json)
   }
 

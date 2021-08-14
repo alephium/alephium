@@ -167,14 +167,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     {
       val data: Input = Input.Contract(outputRef)
       val jsonRaw =
-        s"""{"type":"contract","outputRef":{"scriptHint":1234,"key":"${key.toHexString}"}}"""
+        s"""{"type":"contract","outputRef":{"hint":1234,"key":"${key.toHexString}"}}"""
       checkData(data, jsonRaw)
     }
 
     {
       val data: Input = Input.Asset(outputRef, hex"abcd")
       val jsonRaw =
-        s"""{"type":"asset","outputRef":{"scriptHint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
+        s"""{"type":"asset","outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
       checkData(data, jsonRaw)
     }
   }
@@ -269,15 +269,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
     {
       val transfer =
-        BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1, AVector.empty)))
+        BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1)))
       val jsonRaw = s"""
         |{
         |  "fromPublicKey": "${fromPublicKey.toHexString}",
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1",
-        |      "tokens": []
+        |      "amount": "1"
         |    }
         |  ]
         |}
@@ -288,7 +287,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     {
       val transfer = BuildTransaction(
         fromPublicKey,
-        AVector(Destination(toAddress, 1, AVector.empty, Some(TimeStamp.unsafe(1234)))),
+        AVector(Destination(toAddress, 1, None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
@@ -300,7 +299,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |    {
         |      "address": "${toAddress.toBase58}",
         |      "amount": "1",
-        |      "tokens": [],
         |      "lockTime": 1234
         |    }
         |  ],
@@ -320,7 +318,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
           Destination(
             toAddress,
             1,
-            AVector(Token(tokenId1, U256.unsafe(10))),
+            Some(AVector(Token(tokenId1, U256.unsafe(10)))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -360,7 +358,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
           Destination(
             toAddress,
             1,
-            AVector(Token(tokenId1, U256.unsafe(10))),
+            Some(AVector(Token(tokenId1, U256.unsafe(10)))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -401,7 +399,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
           Destination(
             toAddress,
             1,
-            AVector(Token(tokenId1, U256.unsafe(10))),
+            Some(AVector(Token(tokenId1, U256.unsafe(10)))),
             Some(TimeStamp.unsafe(1234))
           )
         ),

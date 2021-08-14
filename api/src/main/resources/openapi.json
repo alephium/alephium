@@ -2257,7 +2257,7 @@
                               {
                                 "type": "asset",
                                 "outputRef": {
-                                  "scriptHint": 23412,
+                                  "hint": 23412,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                                 },
                                 "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -2403,7 +2403,7 @@
                         {
                           "type": "asset",
                           "outputRef": {
-                            "scriptHint": 23412,
+                            "hint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                           },
                           "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -2636,7 +2636,7 @@
                 "example": [
                   {
                     "ref": {
-                      "scriptHint": 23412,
+                      "hint": 23412,
                       "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                     },
                     "amount": "1000000000000000000",
@@ -3200,7 +3200,7 @@
                       {
                         "type": "asset",
                         "outputRef": {
-                          "scriptHint": 23412,
+                          "hint": 23412,
                           "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                         },
                         "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -3672,7 +3672,7 @@
                     {
                       "type": "asset",
                       "outputRef": {
-                        "scriptHint": 23412,
+                        "hint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                       },
                       "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -5231,12 +5231,12 @@
       },
       "OutputRef": {
         "required": [
-          "scriptHint",
+          "hint",
           "key"
         ],
         "type": "object",
         "properties": {
-          "scriptHint": {
+          "hint": {
             "type": "integer"
           },
           "key": {

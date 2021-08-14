@@ -271,9 +271,11 @@ class ServerUtils(implicit
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
-      val tokensInfo = destination.tokens.map { token =>
-        (token.id -> token.amount)
-      }
+      val tokensInfo = destination.tokens
+        .map(_.map { token =>
+          (token.id -> token.amount)
+        })
+        .getOrElse(AVector.empty)
 
       TxOutputInfo(
         destination.address.lockupScript,

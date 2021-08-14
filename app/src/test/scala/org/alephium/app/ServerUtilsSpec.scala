@@ -164,7 +164,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(fromPublicKey)
-      val selfDestination                    = Destination(fromAddress, ALF.oneAlf, AVector.empty)
+      val selfDestination                    = Destination(fromAddress, ALF.oneAlf, None)
 
       info("Sending some coins to itself twice, creating 3 UTXOs in total for the same public key")
       val destinations = AVector(selfDestination, selfDestination)
@@ -242,7 +242,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toGroup                            = chainIndex.to
       val (toPrivateKey, toPublicKey, _)     = genesisKeys(toGroup.value)
       val toAddress                          = Address.p2pkh(toPublicKey)
-      val destination                        = Destination(toAddress, ALF.oneAlf, AVector.empty)
+      val destination                        = Destination(toAddress, ALF.oneAlf)
 
       info("Sending some coins to an address, resulting 3 UTXOs for its corresponding public key")
       val destinations = AVector(destination, destination)
@@ -353,7 +353,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex                         = ChainIndex.unsafe(0, 0)
     val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
     val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
-    val selfDestination                    = Destination(fromAddress, ALF.cent(50), AVector.empty)
+    val selfDestination                    = Destination(fromAddress, ALF.cent(50))
 
     {
       info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
@@ -516,7 +516,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = ALF.oneAlf
-    Destination(address, amount, AVector.from(tokens).map(Token.apply.tupled))
+    Destination(address, amount, Some(AVector.from(tokens).map(Token.apply.tupled)))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit
