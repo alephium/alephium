@@ -113,4 +113,17 @@ class HashSpec extends AlephiumSpec {
       "Hello World5" -> hex"f00b336bacb0a533670463d3e116a7a30c1786074b1e204a1ec0124d0837b938"
     )
   )
+
+  it should "check double hash" in {
+    def test[T <: RandomBytes](hasher: HashSchema[T], bytes: Seq[Byte]) = {
+      hasher.doubleHash(bytes) is hasher.hash(hasher.hash(bytes).bytes)
+    }
+    forAll { bytes: Seq[Byte] =>
+      test(Sha256, bytes)
+      test(Keccak256, bytes)
+      test(Blake2b, bytes)
+      test(Sha3, bytes)
+      test(Blake3, bytes)
+    }
+  }
 }

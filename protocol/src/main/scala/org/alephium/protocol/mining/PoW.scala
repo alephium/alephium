@@ -31,9 +31,7 @@ object PoW {
   }
 
   def hash(headerBlob: ByteString): BlockHash = {
-    val hash0 = Blake3.hash(headerBlob)
-    val hash1 = Blake3.hash(hash0.bytes)
-    hash1
+    Blake3.doubleHash(headerBlob)
   }
 
   def checkWork(data: FlowData): Boolean = {
