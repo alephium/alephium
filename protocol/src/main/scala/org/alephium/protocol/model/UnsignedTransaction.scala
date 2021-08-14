@@ -200,7 +200,7 @@ object UnsignedTransaction {
       outputs: AVector[TxOutputInfo]
   ): Either[String, AVector[(TokenId, U256)]] = {
     for {
-      _         <- checkMinimumAlfForTokens(outputs)
+      _         <- checkMinimalAlfForTokens(outputs)
       inputs    <- calculateTotalAmountPerToken(inputs.flatMap(_._2.tokens))
       outputs   <- calculateTotalAmountPerToken(outputs.flatMap(_.tokens))
       _         <- checkNoNewTokensInOutputs(inputs, outputs)
@@ -222,25 +222,23 @@ object UnsignedTransaction {
         Right(None)
       }
     } else {
-      if (alfRemainder >= minimumTokenAlfAmount) {
+      if (alfRemainder >= minimalAlfAmountPerTxOutput(tokensRemainder.length)) {
         Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
       } else {
-        Left(
-          s"Not enough Alf for change output because of tokens, minimum amount is $minimumTokenAlfAmount"
-        )
+        Left("Not enough Alf for change output")
       }
     }
   }
 
-  private def checkMinimumAlfForTokens(
+  private def checkMinimalAlfForTokens(
       outputs: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
     val notOk = outputs.exists { output =>
-      output.tokens.nonEmpty && output.alfAmount < minimumTokenAlfAmount
+      output.tokens.nonEmpty && output.alfAmount < minimalAlfAmountPerTxOutput(output.tokens.length)
     }
 
     if (notOk) {
-      Left(s"Not enough Alf for output with tokens, minimum amount is $minimumTokenAlfAmount")
+      Left("Not enough Alf for transaction output")
     } else {
       Right(())
     }

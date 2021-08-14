@@ -46,7 +46,9 @@ package object model {
 
   val dustUtxoAmount: U256 = ALF.nanoAlf(1000)
 
-  val minimumTokenAlfAmount: U256 = ALF.nanoAlf(1000)
+  def minimalAlfAmountPerTxOutput(tokenNum: Int): U256 = {
+    ALF.nanoAlf(1000 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
+  }
   //scalastyle:on magic.number
 
   type TokenId    = Hash
