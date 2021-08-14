@@ -22,7 +22,6 @@ import scala.collection.mutable.ArrayBuffer
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, SignatureSchema}
-import org.alephium.protocol
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.minimalGas
 import org.alephium.serde._
@@ -234,7 +233,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       )
     val script = StatelessScript.unsafe(AVector(method0, method1))
     val obj    = script.toObject
-    StatelessVM.executeWithOutputs(statelessContext, obj, AVector(Val.U256(U256.Two))) isE
+    StatelessVM.executeWithOutputs(genStatelessContext(), obj, AVector(Val.U256(U256.Two))) isE
       AVector[Val](Val.U256(U256.unsafe(3)))
   }
 
@@ -249,12 +248,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     def mockContext(): StatefulContext =
       new StatefulContext {
-        val worldState: WorldState.Staging        = cachedWorldState.staging()
-        def blockEnv: BlockEnv                    = ???
-        def txId: Hash                            = Hash.zero
-        var gasRemaining                          = minimalGas
-        def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
-        def nextOutputIndex: Int                  = 0
+        val worldState: WorldState.Staging = cachedWorldState.staging()
+        def blockEnv: BlockEnv             = ???
+        def txEnv: TxEnv                   = ???
+        override def txId: Hash            = Hash.zero
+        var gasRemaining                   = minimalGas
+        def nextOutputIndex: Int           = 0
 
         def getInitialBalances(): ExeResult[Balances] = {
           Right(

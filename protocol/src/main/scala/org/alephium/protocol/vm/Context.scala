@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{Hash, Signature}
@@ -30,39 +29,36 @@ object BlockEnv {
     BlockEnv(networkConfig.chainId, header.timestamp, header.target)
 }
 
+final case class TxEnv(
+    tx: TransactionAbstract,
+    prevOutputs: AVector[TxOutput],
+    signatures: Stack[Signature]
+)
+
 trait StatelessContext extends CostStrategy {
   def blockEnv: BlockEnv
-  def txId: Hash
-  def signatures: Stack[Signature]
+  def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
+
+  def tx: TransactionAbstract      = txEnv.tx
+  def txId: Hash                   = txEnv.tx.id
+  def signatures: Stack[Signature] = txEnv.signatures
 }
 
 object StatelessContext {
   def apply(
       blockEnv: BlockEnv,
-      txId: Hash,
-      txGas: GasBox,
-      signature: Signature
-  ): StatelessContext = {
-    val stack = Stack.popOnly[Signature](mutable.ArraySeq(signature))
-    apply(blockEnv, txId, txGas, stack)
-  }
-
-  def apply(
-      blockEnv: BlockEnv,
-      txId: Hash,
-      txGas: GasBox,
-      signatures: Stack[Signature]
+      txEnv: TxEnv,
+      txGas: GasBox
   ): StatelessContext =
-    new Impl(blockEnv, txId, signatures, txGas)
+    new Impl(blockEnv, txEnv, txGas)
 
   final class Impl(
       val blockEnv: BlockEnv,
-      val txId: Hash,
-      val signatures: Stack[Signature],
+      val txEnv: TxEnv,
       var gasRemaining: GasBox
   ) extends StatelessContext {
-    override def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
+    def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
   }
 }
 
@@ -167,7 +163,8 @@ object StatefulContext {
       worldState: WorldState.Cached,
       preOutputs: AVector[TxOutput]
   ): StatefulContext = {
-    new Impl(blockEnv, tx, worldState, preOutputs, gasRemaining)
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.contractSignatures))
+    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
 
   def build(
@@ -190,18 +187,14 @@ object StatefulContext {
 
   final class Impl(
       val blockEnv: BlockEnv,
-      val tx: TransactionAbstract,
+      val txEnv: TxEnv,
       val initWorldState: WorldState.Cached,
       val preOutputs: AVector[TxOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
-    override val worldState: WorldState.Staging = initWorldState.staging()
+    val worldState: WorldState.Staging = initWorldState.staging()
 
-    override def txId: Hash = tx.id
-
-    override val signatures: Stack[Signature] = Stack.popOnly(tx.contractSignatures)
-
-    override def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
+    def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     /*
      * this should be used only when the tx has passed these checks in validation
@@ -215,7 +208,7 @@ object StatefulContext {
         "org.wartremover.warts.Serializable"
       )
     )
-    override def getInitialBalances(): ExeResult[Balances] =
+    def getInitialBalances(): ExeResult[Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
           balances <- Balances
@@ -229,6 +222,6 @@ object StatefulContext {
         failed(ExpectNonPayableMethod)
       }
 
-    override val outputBalances: Balances = Balances.empty
+    val outputBalances: Balances = Balances.empty
   }
 }

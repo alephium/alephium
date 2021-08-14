@@ -17,9 +17,7 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
-import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
 
@@ -301,25 +299,12 @@ object StatelessVM {
 
   def runAssetScript(
       blockEnv: BlockEnv,
-      txId: Hash,
+      txEnv: TxEnv,
       initialGas: GasBox,
       script: StatelessScript,
-      args: AVector[Val],
-      signature: Signature
+      args: AVector[Val]
   ): ExeResult[AssetScriptExecution] = {
-    val stack = Stack.popOnly[Signature](mutable.ArraySeq(signature))
-    runAssetScript(blockEnv, txId, initialGas, script, args, stack)
-  }
-
-  def runAssetScript(
-      blockEnv: BlockEnv,
-      txId: Hash,
-      initialGas: GasBox,
-      script: StatelessScript,
-      args: AVector[Val],
-      signatures: Stack[Signature]
-  ): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(blockEnv, txId, initialGas, signatures)
+    val context = StatelessContext(blockEnv, txEnv, initialGas)
     val obj     = script.toObject
     execute(context, obj, args)
   }

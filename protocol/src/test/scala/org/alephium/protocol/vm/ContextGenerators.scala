@@ -16,44 +16,57 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol
-import org.alephium.protocol.Hash
+import org.alephium.protocol.Signature
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
-  def genStatelessContext(gasLimit: GasBox = minimalGas): StatelessContext =
+  def genBlockEnv(): BlockEnv = {
+    BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock)
+  }
+
+  def genTxEnv(scriptOpt: Option[StatefulScript] = None, signatures: AVector[Signature]): TxEnv = {
+    val (tx, prevOutputs) = {
+      val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
+      tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> prevOutputs
+    }
+    TxEnv(tx, prevOutputs.map(_.referredOutput), Stack.popOnly(signatures))
+  }
+
+  def genStatelessContext(
+      gasLimit: GasBox = minimalGas,
+      signatures: AVector[Signature] = AVector.empty
+  ): StatelessContext = {
     StatelessContext.apply(
-      BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
-      Hash.zero,
-      gasLimit,
-      Stack.ofCapacity[protocol.Signature](0)
+      genBlockEnv(),
+      genTxEnv(signatures = signatures),
+      gasLimit
     )
+  }
 
   def prepareStatelessScript(
       script: StatelessScript,
-      gasLimit: GasBox = minimalGas
+      gasLimit: GasBox = minimalGas,
+      signatures: AVector[Signature] = AVector.empty
   ): (ScriptObj[StatelessContext], StatelessContext) = {
     val obj     = script.toObject
-    val context = genStatelessContext(gasLimit)
+    val context = genStatelessContext(gasLimit, signatures)
     obj -> context
   }
 
   def genStatefulContext(
       scriptOpt: Option[StatefulScript],
-      gasLimit: GasBox = minimalGas
+      gasLimit: GasBox = minimalGas,
+      signatures: AVector[Signature] = AVector.empty
   ): StatefulContext = {
-    val (tx, preOutputs) = {
-      val (tx, preOutputs) = transactionGenWithPreOutputs().sample.get
-      tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> preOutputs
-    }
+    val txEnv = genTxEnv(scriptOpt, signatures)
     StatefulContext
       .build(
-        BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
-        tx,
+        genBlockEnv(),
+        txEnv.tx,
         gasLimit,
         cachedWorldState,
-        Some(preOutputs.map(_.referredOutput))
+        Some(txEnv.prevOutputs)
       )
       .rightValue
   }
@@ -86,14 +99,13 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
     val obj = halfDecoded.toObject(contractOutputRef.key, fields)
     val context = new StatefulContext {
-      override val worldState: WorldState.Staging            = cachedWorldState.staging()
-      override def outputBalances: Balances                  = ???
-      override def nextOutputIndex: Int                      = ???
-      override def blockEnv: BlockEnv                        = ???
-      override def txId: Hash                                = Hash.zero
-      override def signatures: Stack[protocol.Signature]     = Stack.ofCapacity(0)
-      override def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
-      override var gasRemaining: GasBox                      = gasLimit
+      val worldState: WorldState.Staging            = cachedWorldState.staging()
+      def outputBalances: Balances                  = ???
+      def nextOutputIndex: Int                      = ???
+      def blockEnv: BlockEnv                        = ???
+      def txEnv: TxEnv                              = ???
+      def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
+      var gasRemaining: GasBox                      = gasLimit
     }
     obj -> context
   }

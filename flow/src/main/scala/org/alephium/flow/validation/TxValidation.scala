@@ -513,6 +513,7 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
+      val txEnv      = TxEnv(tx, preOutputs, signatures)
       EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.startGas) {
         case (gasRemaining, idx) =>
           val unlockScript = tx.unsigned.inputs(idx).unlockScript
@@ -521,8 +522,8 @@ object TxValidation {
             gasRemaining,
             preOutputs(idx).lockupScript,
             unlockScript,
-            signatures,
-            blockEnv
+            blockEnv,
+            txEnv
           )
       }
     }
@@ -532,16 +533,16 @@ object TxValidation {
         gasRemaining: GasBox,
         lockupScript: LockupScript,
         unlockScript: UnlockScript,
-        signatures: Stack[Signature],
-        blockEnv: BlockEnv
+        blockEnv: BlockEnv,
+        txEnv: TxEnv
     ): TxValidationResult[GasBox] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-          checkP2pkh(tx, gasRemaining, lock, unlock, signatures)
+          checkP2pkh(tx, gasRemaining, lock, unlock, txEnv.signatures)
         case (lock: LockupScript.P2MPKH, unlock: UnlockScript.P2MPKH) =>
-          checkP2mpkh(tx, gasRemaining, lock, unlock, signatures)
+          checkP2mpkh(tx, gasRemaining, lock, unlock, txEnv.signatures)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-          checkP2SH(tx, gasRemaining, lock, unlock, signatures, blockEnv)
+          checkP2SH(gasRemaining, lock, unlock, blockEnv, txEnv)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -600,43 +601,39 @@ object TxValidation {
     }
 
     protected[validation] def checkP2SH(
-        tx: Transaction,
         gasRemaining: GasBox,
         lock: LockupScript.P2SH,
         unlock: UnlockScript.P2SH,
-        signatures: Stack[Signature],
-        blockEnv: BlockEnv
+        blockEnv: BlockEnv,
+        txEnv: TxEnv
     ): TxValidationResult[GasBox] = {
       checkScript(
-        tx,
         gasRemaining,
         lock.scriptHash,
         unlock.script,
         unlock.params,
-        signatures,
-        blockEnv
+        blockEnv,
+        txEnv
       )
     }
 
     protected[validation] def checkScript(
-        tx: Transaction,
         gasRemaining: GasBox,
         scriptHash: Hash,
         script: StatelessScript,
         params: AVector[Val],
-        signatures: Stack[Signature],
-        blockEnv: BlockEnv
+        blockEnv: BlockEnv,
+        txEnv: TxEnv
     ): TxValidationResult[GasBox] = {
       if (Hash.hash(serialize(script)) != scriptHash) {
         invalidTx(InvalidScriptHash)
       } else {
         StatelessVM.runAssetScript(
           blockEnv,
-          tx.id,
+          txEnv,
           gasRemaining,
           script,
-          params,
-          signatures
+          params
         ) match {
           case Right(result)  => validTx(result.gasRemaining)
           case Left(Right(e)) => invalidTx(InvalidUnlockScript(e))

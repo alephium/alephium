@@ -17,21 +17,11 @@
 package org.alephium.protocol.vm
 
 import org.alephium.io.{SparseMerkleTrie, StorageFixture}
-import org.alephium.protocol.{Hash, Signature}
-import org.alephium.protocol.model.{minimalGas, ChainId, Target}
-import org.alephium.util.TimeStamp
+import org.alephium.protocol.Hash
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {
     val db = newDB[Hash, SparseMerkleTrie.Node]
     WorldState.emptyCached(db)
   }
-
-  lazy val statelessContext: StatelessContext =
-    StatelessContext(
-      BlockEnv(ChainId.AlephiumDevNet, TimeStamp.now(), Target.onePhPerBlock),
-      Hash.zero,
-      minimalGas,
-      Stack.ofCapacity[Signature](0)
-    )
 }
