@@ -24,6 +24,8 @@ import org.alephium.util._
 
 sealed trait Val extends Any {
   def tpe: Val.Type
+
+  def toByteVec(): Val.ByteVec
 }
 
 // scalastyle:off number.of.methods
@@ -78,20 +80,34 @@ object Val {
   }
 
   // TODO: optimize using value class
-  final case class Bool(v: Boolean) extends Val {
+  final case class Bool(v: Boolean) extends AnyVal with Val {
     def tpe: Val.Type                  = Bool
     def not: Val.Bool                  = Bool(!v)
     def and(other: Val.Bool): Val.Bool = Val.Bool(v && other.v)
     def or(other: Val.Bool): Val.Bool  = Val.Bool(v || other.v)
+
+    override def toByteVec(): ByteVec = ByteVec(encode(v))
   }
-  final case class I256(v: util.I256) extends Val { def tpe: Val.Type = I256 }
-  final case class U256(v: util.U256) extends Val { def tpe: Val.Type = U256 }
+  final case class I256(v: util.I256) extends Val {
+    def tpe: Val.Type = I256
+
+    override def toByteVec(): ByteVec = ByteVec(encode(v))
+  }
+  final case class U256(v: util.U256) extends Val {
+    def tpe: Val.Type = U256
+
+    override def toByteVec(): ByteVec = ByteVec(encode(v))
+  }
 
   final case class ByteVec(bytes: ByteString) extends AnyVal with Val {
     def tpe: Val.Type = ByteVec
+
+    override def toByteVec(): ByteVec = this
   }
   final case class Address(lockupScript: LockupScript) extends AnyVal with Val {
     def tpe: Val.Type = Address
+
+    override def toByteVec(): ByteVec = ByteVec(encode(lockupScript))
   }
 
   object Bool extends Type {

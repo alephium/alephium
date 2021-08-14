@@ -106,6 +106,7 @@ object Lexer {
       case _      => Val.Bool(false)
     }
 
+  def opByteVecAdd[_: P]: P[Operator] = P("++").map(_ => Concat)
   def opAdd[_: P]: P[Operator]        = P("+").map(_ => Add)
   def opSub[_: P]: P[Operator]        = P("-").map(_ => Sub)
   def opMul[_: P]: P[Operator]        = P("*").map(_ => Mul)

@@ -69,6 +69,17 @@ object GasHigh {
   val gas: GasBox = GasBox.unsafe(10)
 }
 
+trait GasToByte extends GasFormula {
+  def gas(inputLength: Int): GasBox = GasToByte.gas(inputLength)
+}
+object GasToByte {
+  val baseGas: Int         = 3
+  val extraGasPerWord: Int = 2
+
+  def gas(inputLength: Int): GasBox =
+    GasBox.unsafe(baseGas + extraGasPerWord * ((inputLength + 3) / 8))
+}
+
 trait GasHash extends GasFormula {
   def gas(inputLength: Int): GasBox = GasHash.gas(inputLength)
 }

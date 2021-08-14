@@ -27,8 +27,8 @@ import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.serde.{deserialize, serialize}
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
+import org.alephium.serde.{deserialize, serialize, Serde}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U256, UnsecureRandom}
 
 // scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec {
@@ -541,6 +541,39 @@ class VMSpec extends AlephiumSpec {
     }
   }
   // scalastyle:on method.length
+
+  // scalastyle:off no.equal
+  it should "test ByteVec instructions" in new ContractFixture {
+    def encode[T: Serde](t: T): String = Hex.toHexString(serialize(t))
+
+    val i256    = UnsecureRandom.nextI256()
+    val u256    = UnsecureRandom.nextU256()
+    val address = Address.from(LockupScript.p2c(Hash.random))
+    val bytes0  = Hex.toHexString(Hash.random.bytes)
+    val bytes1  = Hex.toHexString(Hash.random.bytes)
+
+    val main: String =
+      s"""
+         |TxScript ByteVecTest {
+         |  pub fn main() -> () {
+         |    assert!(byteVec!(true) == #${encode(true)})
+         |    assert!(byteVec!(false) == #${encode(false)})
+         |    assert!(byteVec!(${i256}i) == #${encode(i256)})
+         |    assert!(byteVec!(${u256}) == #${encode(u256)})
+         |    assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
+         |    assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
+         |    assert!(size!(byteVec!(true)) == 1)
+         |    assert!(size!(byteVec!(false)) == 1)
+         |    assert!(size!(byteVec!(@${address.toBase58})) == 33)
+         |    assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
+         |  }
+         |}
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(main).rightValue
+    val block  = simpleScript(blockFlow, chainIndex, script)
+    addAndCheck(blockFlow, block)
+  }
 
   // scalastyle:off no.equal
   it should "test contract instructions" in new ContractFixture {

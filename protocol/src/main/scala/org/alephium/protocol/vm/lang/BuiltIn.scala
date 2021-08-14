@@ -97,9 +97,9 @@ object BuiltIn {
     SimpleStatelessBuiltIn("blockTarget", Seq.empty, Seq(Type.U256), BlockTarget)
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
-    import ConversionBuiltIn.validTypes
-
     def toType: Type
+
+    def validTypes: AVector[Type]
 
     def validate(tpe: Type): Boolean = validTypes.contains(tpe) && (tpe != toType)
 
@@ -111,11 +111,10 @@ object BuiltIn {
       }
     }
   }
-  object ConversionBuiltIn {
-    val validTypes: AVector[Type] = AVector(Type.I256, Type.U256)
-  }
 
   val toI256: ConversionBuiltIn = new ConversionBuiltIn("i256") {
+    val validTypes: AVector[Type] = AVector(Type.U256)
+
     override def toType: Type = Type.I256
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
@@ -126,6 +125,8 @@ object BuiltIn {
     }
   }
   val toU256: ConversionBuiltIn = new ConversionBuiltIn("u256") {
+    val validTypes: AVector[Type] = AVector(Type.I256)
+
     override def toType: Type = Type.U256
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
@@ -135,6 +136,25 @@ object BuiltIn {
       }
     }
   }
+
+  val toByteVec: ConversionBuiltIn = new ConversionBuiltIn("byteVec") {
+    val validTypes: AVector[Type] = AVector(Type.Bool, Type.I256, Type.U256, Type.Address)
+
+    override def toType: Type = Type.ByteVec
+
+    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      inputType(0) match {
+        case Type.Bool    => Seq(BoolToByteVec)
+        case Type.I256    => Seq(I256ToByteVec)
+        case Type.U256    => Seq(U256ToByteVec)
+        case Type.Address => Seq(AddressToByteVec)
+        case _            => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+
+  val size: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("size", Seq[Type](Type.ByteVec), Seq[Type](Type.U256), ByteVecSize)
 
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
@@ -149,7 +169,9 @@ object BuiltIn {
     blockTimeStamp,
     blockTarget,
     toI256,
-    toU256
+    toU256,
+    toByteVec,
+    size
   ).map(f => f.name -> f).toMap
 
   val approveAlf: SimpleStatefulBuiltIn =

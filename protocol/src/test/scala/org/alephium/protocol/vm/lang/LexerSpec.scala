@@ -49,13 +49,14 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
   }
 
-  it should "parse modulo operators" in {
+  it should "special operators" in {
     fastparse.parse("⊕", Lexer.opModAdd(_)).get.value is ModAdd
     fastparse.parse("⊖", Lexer.opModSub(_)).get.value is ModSub
     fastparse.parse("⊗", Lexer.opModMul(_)).get.value is ModMul
     fastparse.parse("`+`", Lexer.opModAdd(_)).get.value is ModAdd
     fastparse.parse("`-`", Lexer.opModSub(_)).get.value is ModSub
     fastparse.parse("`*`", Lexer.opModMul(_)).get.value is ModMul
+    fastparse.parse("++", Lexer.opByteVecAdd(_)).get.value is Concat
   }
 
   it should "parse bytes and address" in {

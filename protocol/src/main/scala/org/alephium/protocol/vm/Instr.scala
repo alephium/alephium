@@ -95,12 +95,12 @@ object Instr {
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
     Pop,
-    BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq,
+    BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
     U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
-    I256ToU256, U256ToI256,
-    ByteVecEq, ByteVecNeq, AddressEq, AddressNeq,
+    I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
+    ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
@@ -143,16 +143,12 @@ object Instr {
   }
 }
 
-sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
-sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
-sealed trait StatefulInstrSimpleGas
-    extends StatefulInstr
-    with InstrWithSimpleGas[StatefulContext]
-    with GasSimple {}
+sealed trait StatefulInstr          extends Instr[StatefulContext] with GasSchedule                     {}
+sealed trait StatelessInstr         extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
+sealed trait StatefulInstrSimpleGas extends StatefulInstr with InstrWithSimpleGas[StatefulContext]
 sealed trait StatelessInstrSimpleGas
     extends StatelessInstr
     with InstrWithSimpleGas[StatelessContext]
-    with GasSimple {}
 
 sealed trait InstrCompanion[-Ctx <: StatelessContext] {
   lazy val code: Byte = Instr.toCode(this).toByte
@@ -565,6 +561,21 @@ case object BoolNeq extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 != bool2)
 }
 
+sealed trait ToByteVecInstr[R <: Val, U <: Val]
+    extends StatelessInstr
+    with GasToByte
+    with StatelessInstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      from <- frame.popOpStackT[R]()
+      byteVec = from.toByteVec()
+      _ <- frame.pushOpStack(byteVec)
+      _ <- frame.ctx.chargeGasWithSize(this, byteVec.bytes.size)
+    } yield ()
+  }
+}
+case object BoolToByteVec extends ToByteVecInstr[Val.Bool, Val.ByteVec]
+
 sealed trait ConversionInstr[R <: Val, U <: Val]
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
@@ -586,11 +597,13 @@ case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] with GasVeryL
     util.U256.fromI256(from.v).map(Val.U256.apply).toRight(Right(InvalidConversion(from, Val.U256)))
   }
 }
+case object I256ToByteVec extends ToByteVecInstr[Val.I256, Val.ByteVec]
 case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryLow {
   override def converse(from: Val.U256): ExeResult[Val.I256] = {
     util.I256.fromU256(from.v).map(Val.I256.apply).toRight(Right(InvalidConversion(from, Val.I256)))
   }
 }
+case object U256ToByteVec extends ToByteVecInstr[Val.U256, Val.ByteVec]
 
 sealed trait ComparisonInstr[T <: Val]
     extends StatelessInstrSimpleGas
@@ -614,8 +627,32 @@ sealed trait NeT[T <: Val] extends ComparisonInstr[T] {
 }
 case object ByteVecEq  extends EqT[Val.ByteVec]
 case object ByteVecNeq extends NeT[Val.ByteVec]
-case object AddressEq  extends EqT[Val.Address]
-case object AddressNeq extends NeT[Val.Address]
+case object ByteVecSize
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasVeryLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.popOpStackT[Val.ByteVec]()
+      _ <- frame.pushOpStack(Val.U256(util.U256.unsafe(v.bytes.size)))
+    } yield ()
+  }
+}
+case object ByteVecConcat
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v2 <- frame.popOpStackT[Val.ByteVec]()
+      v1 <- frame.popOpStackT[Val.ByteVec]()
+      _  <- frame.pushOpStack(Val.ByteVec(v1.bytes ++ v2.bytes))
+    } yield ()
+  }
+}
+case object AddressEq        extends EqT[Val.Address]
+case object AddressNeq       extends NeT[Val.Address]
+case object AddressToByteVec extends ToByteVecInstr[Val.Address, Val.ByteVec]
 
 sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
 sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}

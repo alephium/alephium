@@ -73,6 +73,20 @@ object ArithOperator {
   val BitAnd: ArithOperator = u256Binary("BitAnd", U256BitAnd)
   val BitOr: ArithOperator  = u256Binary("BitOr", U256BitOr)
   val Xor: ArithOperator    = u256Binary("Xor", U256Xor)
+
+  val Concat: Operator = new Operator {
+    override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
+      if (argsType.length != 2 || argsType(0) != Type.ByteVec || argsType(1) != Type.ByteVec) {
+        throw Compiler.Error(s"Invalid param types $argsType for $this")
+      } else {
+        Seq(Type.ByteVec)
+      }
+    }
+
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      Seq(ByteVecConcat)
+    }
+  }
 }
 
 sealed trait TestOperator extends Operator {

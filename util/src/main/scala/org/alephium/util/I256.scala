@@ -106,6 +106,8 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
       tmp
     }
   }
+
+  override def toString: String = v.toString
 }
 
 object I256 {
