@@ -146,6 +146,7 @@ object UnsignedTransaction {
     val gasFee = gasPrice * gas
     for {
       _               <- checkWithMaxTxInputNum(inputs)
+      _               <- checkMinimalAlfPerOutput(outputs)
       alfRemainder    <- calculateAlfRemainder(inputs, outputs, gasFee)
       tokensRemainder <- calculateTokensRemainder(inputs, outputs)
       changeOutputOpt <- calculateChangeOutput(alfRemainder, tokensRemainder, fromLockupScript)
@@ -200,7 +201,6 @@ object UnsignedTransaction {
       outputs: AVector[TxOutputInfo]
   ): Either[String, AVector[(TokenId, U256)]] = {
     for {
-      _         <- checkMinimalAlfForTokens(outputs)
       inputs    <- calculateTotalAmountPerToken(inputs.flatMap(_._2.tokens))
       outputs   <- calculateTotalAmountPerToken(outputs.flatMap(_.tokens))
       _         <- checkNoNewTokensInOutputs(inputs, outputs)
@@ -215,14 +215,10 @@ object UnsignedTransaction {
       tokensRemainder: AVector[(TokenId, U256)],
       fromLockupScript: LockupScript.Asset
   ): Either[String, Option[AssetOutput]] = {
-    if (tokensRemainder.isEmpty) {
-      if (alfRemainder > U256.Zero) {
-        Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
-      } else {
-        Right(None)
-      }
+    if (alfRemainder == U256.Zero && tokensRemainder.isEmpty) {
+      Right(None)
     } else {
-      if (alfRemainder >= minimalAlfAmountPerTxOutput(tokensRemainder.length)) {
+      if (alfRemainder > minimalAlfAmountPerTxOutput(tokensRemainder.length)) {
         Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
       } else {
         Left("Not enough Alf for change output")
@@ -230,11 +226,11 @@ object UnsignedTransaction {
     }
   }
 
-  private def checkMinimalAlfForTokens(
+  private def checkMinimalAlfPerOutput(
       outputs: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
     val notOk = outputs.exists { output =>
-      output.tokens.nonEmpty && output.alfAmount < minimalAlfAmountPerTxOutput(output.tokens.length)
+      output.alfAmount < minimalAlfAmountPerTxOutput(output.tokens.length)
     }
 
     if (notOk) {
