@@ -16,16 +16,24 @@
 
 package org.alephium.flow.network.broker
 
-import org.alephium.util.{Duration, Math}
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.util.{Duration, Math, TimeStamp}
 
-class BackoffStrategy(var retryCount: Int) {
-  import BackoffStrategy._
+trait BackoffStrategy {
+  def retry(f: Duration => Unit): Boolean
+}
+
+class DefaultBackoffStrategy(network: NetworkSetting) extends BackoffStrategy {
+  def baseDelay: Duration       = network.backoffBaseDelay
+  def maxDelay: Duration        = network.backoffMaxDelay
+  def maxRetry: Int             = 8
+  protected var retryCount: Int = 0
+  protected def backoff         = Math.min(baseDelay.timesUnsafe(1L << retryCount), maxDelay)
 
   def retry(f: Duration => Unit): Boolean = {
     if (retryCount < maxRetry) {
-      val backoff = baseDelay.timesUnsafe(1L << retryCount)
+      f(backoff)
       retryCount += 1
-      f(Math.min(backoff, maxBackOff))
       true
     } else {
       false
@@ -33,12 +41,36 @@ class BackoffStrategy(var retryCount: Int) {
   }
 }
 
-object BackoffStrategy {
-  def default(): BackoffStrategy = new BackoffStrategy(0)
+object DefaultBackoffStrategy {
+  def apply()(implicit network: NetworkSetting): DefaultBackoffStrategy =
+    new DefaultBackoffStrategy(network)
+}
 
-  // scalastyle:off magic.number
-  val baseDelay: Duration  = Duration.ofMillisUnsafe(500)
-  val maxBackOff: Duration = Duration.ofSecondsUnsafe(8)
-  val maxRetry: Int        = 8
-  // scalastyle:on magic.number
+class ResetBackoffStrategy(network: NetworkSetting) extends DefaultBackoffStrategy(network) {
+  var lastAccess: TimeStamp = TimeStamp.now()
+  val resetDelay: Duration  = network.backoffResetDelay
+
+  override def retry(f: Duration => Unit): Boolean = {
+    if (retryCount == maxRetry) {
+      resetCount()
+    }
+    val retried = super.retry(f)
+    if (retried) {
+      lastAccess = TimeStamp.now()
+    }
+    retried
+  }
+
+  private def resetCount(): Unit = {
+    val elapsedTime = TimeStamp.now().deltaUnsafe(lastAccess)
+    if (elapsedTime >= resetDelay) {
+      retryCount = 0
+      lastAccess = TimeStamp.now()
+    }
+  }
+}
+
+object ResetBackoffStrategy {
+  def apply()(implicit network: NetworkSetting): ResetBackoffStrategy =
+    new ResetBackoffStrategy(network)
 }

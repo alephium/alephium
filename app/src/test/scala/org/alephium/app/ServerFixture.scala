@@ -51,10 +51,9 @@ trait ServerFixture
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NoIndexModelGeneratorsLike {
-  val now = TimeStamp.now()
 
   lazy val dummyBlockHeader =
-    blockGen.sample.get.header.copy(timestamp = (now - Duration.ofMinutes(5).get).get)
+    blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse = FetchResponse(
     AVector(AVector(BlockEntry.from(dummyBlock, 1)))

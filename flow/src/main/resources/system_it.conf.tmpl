@@ -29,6 +29,9 @@ alephium {
     penalty-forgiveness = 1 hour
     penalty-frequency = 10 second
     connection-buffer-capacity-in-byte = 100000000
+    backoff-base-delay = 500 milli
+    backoff-max-delay = 8 second
+    backoff-reset-delay = 30 second
 
     fast-sync-frequency = 2 second
     stable-sync-frequency = 20 second

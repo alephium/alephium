@@ -48,7 +48,7 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
   override def receive: Receive = connecting
 
   def connecting: Receive = {
-    val backoffStrategy = BackoffStrategy.default()
+    val backoffStrategy = DefaultBackoffStrategy()
 
     val receive: Receive = {
       case OutboundBrokerHandler.Retry =>
