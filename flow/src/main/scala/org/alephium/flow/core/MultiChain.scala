@@ -23,6 +23,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.BlockEnv
 import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -131,6 +132,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getMaxHeight(chainIndex: ChainIndex): IOResult[Int] =
     getHeaderChain(chainIndex).maxHeight
+
+  def getDryrunBlockEnv(chainIndex: ChainIndex): IOResult[BlockEnv] = {
+    getHeaderChain(chainIndex).getDryrunBlockEnv()
+  }
 
   /* BlockChain apis */
 

@@ -27,6 +27,7 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
@@ -41,6 +42,7 @@ trait FlowUtils
     with StrictLogging {
   implicit def mempoolSetting: MemPoolSetting
   implicit def consensusConfig: ConsensusSetting
+  implicit def networkConfig: NetworkConfig
 
   val grandPool = GrandPool.empty
 
@@ -154,6 +156,7 @@ trait FlowUtils
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def executeTxTemplates(
       chainIndex: ChainIndex,
+      blockEnv: BlockEnv,
       deps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
       txTemplates: AVector[TransactionTemplate]
@@ -172,7 +175,7 @@ trait FlowUtils
       order
         .foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
-          generateFullTx(groupView, tx, tx.unsigned.scriptOpt.get)
+          generateFullTx(groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
         .map { _ =>
@@ -218,8 +221,9 @@ trait FlowUtils
       templateTs: TimeStamp,
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
+    val blockEnv = BlockEnv(networkConfig.chainId, templateTs, target)
     for {
-      fullTxs      <- executeTxTemplates(chainIndex, loosenDeps, groupView, candidates)
+      fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
       val coinbaseTx =
@@ -275,6 +279,7 @@ trait FlowUtils
 
   def generateFullTx(
       groupView: BlockFlowGroupView[WorldState.Cached],
+      blockEnv: BlockEnv,
       tx: TransactionTemplate,
       script: StatefulScript
   ): IOResult[Transaction] = {
@@ -287,8 +292,9 @@ trait FlowUtils
           case Some(outputs) => Right(outputs)
         }
     } yield {
-      StatefulVM.dryrunTxScript(
+      StatefulVM.runTxScript(
         groupView.worldState,
+        blockEnv,
         tx,
         preOutputs,
         script,

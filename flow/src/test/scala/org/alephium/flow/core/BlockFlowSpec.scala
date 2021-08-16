@@ -129,7 +129,7 @@ class BlockFlowSpec extends AlephiumSpec {
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
-      newBlocks1.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
+      newBlocks1.map(_.hash).contains(blockFlow.getBestTipUnsafe()) is true
 
       val newBlocks2 = for {
         i <- 0 to 1
@@ -138,7 +138,7 @@ class BlockFlowSpec extends AlephiumSpec {
       newBlocks2.foreach { block => addAndCheck(blockFlow, block, 4) }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(2))
-      newBlocks2.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
+      newBlocks2.map(_.hash).contains(blockFlow.getBestTipUnsafe()) is true
 
       val newBlocks3 = for {
         i <- 0 to 1
@@ -147,7 +147,7 @@ class BlockFlowSpec extends AlephiumSpec {
       newBlocks3.foreach { block => addAndCheck(blockFlow, block, 8) }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(3))
-      newBlocks3.map(_.hash).contains(blockFlow.getBestTipUnsafe) is true
+      newBlocks3.map(_.hash).contains(blockFlow.getBestTipUnsafe()) is true
     }
   }
 
@@ -272,7 +272,7 @@ class BlockFlowSpec extends AlephiumSpec {
     newBlocks2.foreach { block => addAndCheck(blockFlow1, block, 4) }
     checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALF.alf(2))
-    newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe) is true
+    newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe()) is true
   }
 
   it should "calculate hashes and blocks for update" in new FlowFixture {

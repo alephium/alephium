@@ -93,7 +93,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
     val dataOrigin = DataOrigin.Local
 
     def txMessage(tx: Transaction) =
-      Message.serialize(NewTxs(AVector(tx.toTemplate)), networkSetting.networkType)
+      Message.serialize(NewTxs(AVector(tx.toTemplate)))
     def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate), dataOrigin)
 
     val txHandler = system.actorOf(TxHandler.props(blockFlow))

@@ -47,31 +47,32 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.Binop(op, acc, right)
       }
     }
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def chainBool[_: P](p: => P[Ast.Expr[Ctx]], op: => P[TestOperator]): P[Ast.Expr[Ctx]] =
-    P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
-      if (rhs.isEmpty) {
-        lhs
-      } else {
-        val (op, right) = rhs(0)
-        val acc         = Ast.Binop(op, lhs, right)
-        rhs.tail
-          .foldLeft((acc, right)) { case ((acc, last), (op, right)) =>
-            (Ast.Binop(And, acc, Ast.Binop(op, last, right)), right)
-          }
-          ._1
-      }
-    }
 
-  // Optimize chained comparisions
-  def expr[_: P]: P[Ast.Expr[Ctx]]         = P(chainBool(andExpr, Lexer.opOr))
-  def andExpr[_: P]: P[Ast.Expr[Ctx]]      = P(chainBool(relationExpr, Lexer.opAnd))
-  def relationExpr[_: P]: P[Ast.Expr[Ctx]] = P(chainBool(arithExpr0, comparision))
-  def comparision[_: P]: P[TestOperator] =
+  // Optimize chained comparisons
+  def expr[_: P]: P[Ast.Expr[Ctx]]         = P(chain(andExpr, Lexer.opOr))
+  def andExpr[_: P]: P[Ast.Expr[Ctx]]      = P(chain(relationExpr, Lexer.opAnd))
+  def relationExpr[_: P]: P[Ast.Expr[Ctx]] = P(comp | arithExpr5)
+  def comp[_: P]: P[Ast.Expr[Ctx]] =
+    P(arithExpr5 ~ comparison ~ arithExpr5).map { case (lhs, op, rhs) => Ast.Binop(op, lhs, rhs) }
+  def comparison[_: P]: P[TestOperator] =
     P(Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)
-  def arithExpr0[_: P]: P[Ast.Expr[Ctx]] = P(chain(arithExpr1, Lexer.opAdd | Lexer.opSub))
+  def arithExpr5[_: P]: P[Ast.Expr[Ctx]] =
+    P(chain(arithExpr4, Lexer.opBitOr))
+  def arithExpr4[_: P]: P[Ast.Expr[Ctx]] =
+    P(chain(arithExpr3, Lexer.opXor))
+  def arithExpr3[_: P]: P[Ast.Expr[Ctx]] =
+    P(chain(arithExpr2, Lexer.opBitAnd))
+  def arithExpr2[_: P]: P[Ast.Expr[Ctx]] =
+    P(chain(arithExpr1, Lexer.opSHL | Lexer.opSHR))
   def arithExpr1[_: P]: P[Ast.Expr[Ctx]] =
-    P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod))
+    P(
+      chain(
+        arithExpr0,
+        Lexer.opByteVecAdd | Lexer.opAdd | Lexer.opSub | Lexer.opModAdd | Lexer.opModSub
+      )
+    )
+  def arithExpr0[_: P]: P[Ast.Expr[Ctx]] =
+    P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def unaryExpr[_: P]: P[Ast.Expr[Ctx]] =
     P(atom | (Lexer.opNot ~ atom).map { case (op, expr) => Ast.UnaryOp.apply[Ctx](op, expr) })
   def atom[_: P]: P[Ast.Expr[Ctx]]

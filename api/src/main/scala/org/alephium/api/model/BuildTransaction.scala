@@ -17,8 +17,8 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -28,6 +28,5 @@ final case class BuildTransaction(
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 ) {
-  def fromAddress(networkType: NetworkType): Address.Asset =
-    Address.Asset(networkType, LockupScript.p2pkh(fromPublicKey))
+  def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
 }

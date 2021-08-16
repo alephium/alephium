@@ -21,13 +21,86 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol
 import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.minimalGas
 import org.alephium.serde._
 import org.alephium.util._
 
-class VMSpec extends AlephiumSpec with ContextGenerators {
+class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
+  trait BaseFixture[Ctx <: StatelessContext] {
+    val baseMethod = Method[Ctx](
+      isPublic = true,
+      isPayable = false,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector.empty
+    )
+
+    def test0(instrs: AVector[Instr[Ctx]], expected: ExeResult[Unit]) = {
+      test1(baseMethod.copy(instrs = instrs), expected)
+    }
+
+    def test1(method: Method[Ctx], expected: ExeResult[Unit]) = {
+      test2(AVector(method), expected)
+    }
+
+    def test2(methods: AVector[Method[Ctx]], expected: ExeResult[Unit]): Unit
+  }
+
+  trait StatelessFixture extends BaseFixture[StatelessContext] {
+    def test2(methods: AVector[Method[StatelessContext]], expected: ExeResult[Unit]) = {
+      test3(StatelessScript.unsafe(methods), expected)
+    }
+
+    def test3(script: StatelessScript, expected: ExeResult[Unit]): Unit = {
+      val (obj, context) = prepareStatelessScript(script)
+      StatelessVM.execute(context, obj, AVector.empty).map(_ => ()) is expected
+      ()
+    }
+  }
+
+  it should "check the entry method of stateless scripts" in new StatelessFixture {
+    test1(baseMethod, okay)
+    test1(baseMethod.copy(isPayable = true), failed(ExpectNonPayableMethod))
+    test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
+    intercept[AssertionError](
+      test1(baseMethod.copy(localsLength = -1), okay)
+    ).getMessage is
+      "assumption failed"
+    test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
+  }
+
+  trait StatefulFixture extends BaseFixture[StatefulContext] {
+    def test2(methods: AVector[Method[StatefulContext]], expected: ExeResult[Unit]) = {
+      test3(StatefulScript.unsafe(methods), expected)
+    }
+
+    def test3(script: StatefulScript, expected: ExeResult[Unit]): Unit = {
+      val (obj, context) = prepareStatefulScript(script)
+      val argsLength     = obj.code.getMethod(0).rightValue.argsLength
+      val args =
+        if (argsLength <= 0) AVector.empty[Val] else AVector.fill[Val](argsLength)(Val.True)
+      StatefulVM.execute(context, obj, args).map(_ => ()) is expected
+      ()
+    }
+  }
+
+  it should "check the entry method of stateful scripts" in new StatefulFixture {
+    test1(baseMethod, okay)
+    test1(baseMethod.copy(isPayable = true), failed(InvalidBalances))
+    test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
+    intercept[AssertionError](
+      test1(baseMethod.copy(localsLength = -1), okay)
+    ).getMessage is
+      "assumption failed"
+    test1(baseMethod.copy(returnLength = -1), failed(NegativeArgumentInStack))
+    intercept[AssertionError](
+      test1(baseMethod.copy(argsLength = 2, localsLength = 1), okay)
+    ).getMessage is
+      "assumption failed"
+  }
 
   trait Fixture {
     val baseMethod = Method[StatefulContext](
@@ -106,7 +179,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
           U256Const0,
           LoadLocal(0),
           U256Const0,
-          GtU256,
+          U256Gt,
           IfFalse(4),
           LoadLocal(0),
           U256Const1,
@@ -158,9 +231,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
         returnLength = 1,
         instrs = AVector(LoadLocal(0), U256Const1, U256Add, Return)
       )
-    val script = StatelessScript(methods = AVector(method0, method1))
+    val script = StatelessScript.unsafe(AVector(method0, method1))
     val obj    = script.toObject
-    StatelessVM.executeWithOutputs(statelessContext, obj, AVector(Val.U256(U256.Two))) isE
+    StatelessVM.executeWithOutputs(genStatelessContext(), obj, AVector(Val.U256(U256.Two))) isE
       AVector[Val](Val.U256(U256.unsafe(3)))
   }
 
@@ -175,11 +248,12 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
 
     def mockContext(): StatefulContext =
       new StatefulContext {
-        val worldState: WorldState.Staging        = cachedWorldState.staging()
-        def txId: Hash                            = Hash.zero
-        var gasRemaining                          = minimalGas
-        def signatures: Stack[protocol.Signature] = Stack.ofCapacity(0)
-        def nextOutputIndex: Int                  = 0
+        val worldState: WorldState.Staging = cachedWorldState.staging()
+        def blockEnv: BlockEnv             = ???
+        def txEnv: TxEnv                   = ???
+        override def txId: Hash            = Hash.zero
+        var gasRemaining                   = minimalGas
+        def nextOutputIndex: Int           = 0
 
         def getInitialBalances(): ExeResult[Balances] = {
           Right(
@@ -237,7 +311,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(100), Val.U256(1), Val.U256(99)))
@@ -246,7 +320,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "fail when there is no token balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
     fail(instrs, NoTokenBalanceForTheAddress)
@@ -260,13 +334,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address0),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken,
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
@@ -287,13 +361,15 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address0),
       AlfRemaining,
       U256Const(Val.U256(10)),
-      CheckEqU256
+      U256Eq,
+      Assert
     )
     val instrs2 = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       AlfRemaining,
       U256Const(Val.U256(20)),
-      CheckEqU256
+      U256Eq,
+      Assert
     )
     passMulti(AVector(instrs0, instrs1, instrs2), AVector.empty[Val])
   }
@@ -301,7 +377,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
   it should "fail when no enough balance for approval" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken
     )
@@ -316,7 +392,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       TransferAlf,
       AddressConst(address1),
       AddressConst(address0),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(1)),
       TransferToken,
       AddressConst(address0),
@@ -324,7 +400,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
       AddressConst(address1),
       AlfRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(mutable.ArraySeq.make(tokenId.bytes.toArray))),
+      BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
 
@@ -335,9 +411,43 @@ class VMSpec extends AlephiumSpec with ContextGenerators {
     context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }
 
+  it should "not create invalid contract" in new BalancesFixture {
+    def test(contract: StatefulContract, result: Option[ExeFailure]) = {
+      val instrs = AVector[Instr[StatefulContext]](
+        AddressConst(address0),
+        U256Const(Val.U256(10)),
+        ApproveAlf,
+        BytesConst(Val.ByteVec(serialize(contract))),
+        BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
+        CreateContract
+      )
+      val expected = result match {
+        case Some(failure) => failed(failure)
+        case None          => Right(AVector.empty[Val])
+      }
+      testInstrs(AVector(instrs), expected)
+    }
+
+    val method = Method[StatefulContext](
+      isPublic = true,
+      isPayable = true,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector(Return)
+    )
+    val contract0 = StatefulContract(0, AVector(method))
+    test(contract0, None)
+
+    val contract1 = StatefulContract(0, AVector.empty)
+    test(contract1, Some(EmptyMethods))
+    val contract2 = StatefulContract(-1, AVector.empty)
+    test(contract2, Some(InvalidFieldLength))
+  }
+
   it should "serde instructions" in {
     Instr.statefulInstrs.foreach {
-      case instrCompanion: StatefulInstrCompanion0 =>
+      case Some(instrCompanion: StatefulInstrCompanion0) =>
         deserialize[Instr[StatefulContext]](
           instrCompanion.serialize()
         ).toOption.get is instrCompanion

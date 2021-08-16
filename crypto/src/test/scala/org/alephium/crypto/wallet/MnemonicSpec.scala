@@ -16,7 +16,7 @@
 
 package org.alephium.crypto.wallet
 
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, Hex}
 
 class MnemonicSpec extends AlephiumSpec {
   it should "pass test vectors from trezor" in {
@@ -170,8 +170,7 @@ class MnemonicSpec extends AlephiumSpec {
 
     val passphrase = "TREZOR"
     cases.foreach { case (_entropy, sentence, _seed, _) =>
-      val worldList = AVector.unsafe(sentence.split(" "))
-      val mnemonic  = Mnemonic.fromWords(worldList).get
+      val mnemonic = Mnemonic.from(sentence).get
 
       val entropy = Hex.from(_entropy).get
       Mnemonic.from(entropy).get is mnemonic

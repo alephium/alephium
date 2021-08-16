@@ -16,7 +16,6 @@
 
 package org.alephium.serde
 
-import scala.collection.mutable
 import scala.util.Random
 
 import akka.util.ByteString
@@ -76,7 +75,7 @@ object RandomBytes {
 
     def length: Int
 
-    def from(bytes: mutable.IndexedSeq[Byte]): Option[T] = {
+    def from(bytes: IndexedSeq[Byte]): Option[T] = {
       if (bytes.length == length) {
         Some(unsafe(ByteString.fromArrayUnsafe(bytes.toArray)))
       } else {

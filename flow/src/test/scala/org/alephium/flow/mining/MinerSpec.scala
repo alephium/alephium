@@ -44,7 +44,7 @@ class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
     val chainIndex                       = chainIndexGen.sample.get
     val blockHandlerProbe                = allHandlersProbes.blockHandlers(chainIndex)
 
-    val miner = TestActorRef[Miner](CpuMiner.props(config.network.networkType, allHandlers))
+    val miner = TestActorRef[Miner](CpuMiner.props(allHandlers))
 
     def checkMining(isMining: Boolean) = {
       miner ! Miner.IsMining

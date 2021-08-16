@@ -17,21 +17,22 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.crypto.Byte32
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
 class LexerSpec extends AlephiumSpec {
   it should "parse lexer" in {
     val byte32  = Byte32.generate.toHexString
-    val address = Address.p2pkh(NetworkType.Testnet, PublicKey.generate)
+    val address = Address.p2pkh(PublicKey.generate)
 
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("5u", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
-      Hex.asArraySeq(byte32).get
+      Hex.from(byte32).get
     )
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
       address.lockupScript
@@ -46,5 +47,24 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
+  }
+
+  it should "special operators" in {
+    fastparse.parse("⊕", Lexer.opModAdd(_)).get.value is ModAdd
+    fastparse.parse("⊖", Lexer.opModSub(_)).get.value is ModSub
+    fastparse.parse("⊗", Lexer.opModMul(_)).get.value is ModMul
+    fastparse.parse("`+`", Lexer.opModAdd(_)).get.value is ModAdd
+    fastparse.parse("`-`", Lexer.opModSub(_)).get.value is ModSub
+    fastparse.parse("`*`", Lexer.opModMul(_)).get.value is ModMul
+    fastparse.parse("++", Lexer.opByteVecAdd(_)).get.value is Concat
+  }
+
+  it should "parse bytes and address" in {
+    val hash    = Hash.random
+    val address = Address.p2pkh(PublicKey.generate)
+    fastparse.parse(s"#${hash.toHexString}", Lexer.bytes(_)).get.value is
+      Val.ByteVec(hash.bytes)
+    fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
+      Val.Address(address.lockupScript)
   }
 }

@@ -16,9 +16,11 @@
 
 package org.alephium.protocol.vm
 
-import scala.annotation.tailrec
+import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
+import org.alephium.protocol.model.ContractId
+import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
 
 abstract class Frame[Ctx <: StatelessContext] {
@@ -26,9 +28,11 @@ abstract class Frame[Ctx <: StatelessContext] {
   def obj: ContractObj[Ctx]
   def opStack: Stack[Val]
   def method: Method[Ctx]
-  def locals: Array[Val]
+  def locals: VarVector[Val]
   def returnTo: AVector[Val] => ExeResult[Unit]
   def ctx: Ctx
+
+  def getCallerFrame(): ExeResult[Frame[Ctx]]
 
   def balanceStateOpt: Option[BalanceState]
 
@@ -64,16 +68,30 @@ abstract class Frame[Ctx <: StatelessContext] {
       }
     }
 
+  @inline
+  def popContractId(): ExeResult[ContractId] = {
+    for {
+      byteVec     <- popOpStackT[Val.ByteVec]()
+      contractKey <- Hash.from(byteVec.bytes).toRight(Right(InvalidContractAddress))
+    } yield contractKey
+  }
+
+  @inline
+  def popFields(): ExeResult[AVector[Val]] = {
+    for {
+      fieldsRaw <- popOpStackT[Val.ByteVec]()
+      fields <- deserialize[AVector[Val]](fieldsRaw.bytes).left.map(e =>
+        Right(SerdeErrorCreateContract(e))
+      )
+    } yield fields
+  }
+
   def getLocalVal(index: Int): ExeResult[Val] = {
-    if (locals.isDefinedAt(index)) Right(locals(index)) else failed(InvalidLocalIndex)
+    locals.get(index)
   }
 
   def setLocalVal(index: Int, v: Val): ExeResult[Unit] = {
-    if (!locals.isDefinedAt(index)) {
-      failed(InvalidLocalIndex)
-    } else {
-      Right(locals.update(index, v))
-    }
+    locals.set(index, v)
   }
 
   def getField(index: Int): ExeResult[Val] = {
@@ -90,6 +108,14 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
 
+  def createContract(
+      code: StatefulContract.HalfDecoded,
+      initialStateHash: Hash,
+      fields: AVector[Val]
+  ): ExeResult[Unit]
+
+  def destroyContract(address: LockupScript): ExeResult[Unit]
+
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
     advancePC()
     for {
@@ -98,38 +124,17 @@ abstract class Frame[Ctx <: StatelessContext] {
     } yield Some(frame)
   }
 
-  def execute(): ExeResult[Option[Frame[Ctx]]]
+  def callExternal(index: Byte): ExeResult[Option[Frame[Ctx]]]
 
-  protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
-    Return.runWith(this).map(_ => None)
-}
-
-final class StatelessFrame(
-    var pc: Int,
-    val obj: ContractObj[StatelessContext],
-    val opStack: Stack[Val],
-    val method: Method[StatelessContext],
-    val locals: Array[Val],
-    val returnTo: AVector[Val] => ExeResult[Unit],
-    val ctx: StatelessContext
-) extends Frame[StatelessContext] {
-  def methodFrame(index: Int): ExeResult[Frame[StatelessContext]] = {
-    for {
-      method <- getMethod(index)
-      frame  <- Frame.stateless(ctx, obj, method, opStack, opStack.push)
-    } yield frame
-  }
-
-  // Should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState] = ???
-
-  @tailrec
-  override def execute(): ExeResult[Option[Frame[StatelessContext]]] = {
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  @tailrec final def execute(): ExeResult[Option[Frame[Ctx]]] = {
     if (pc < pcMax) {
-      method.instrs(pc) match {
-        case CallLocal(index) => callLocal(index)
-        case Return           => runReturn()
-        case instr            =>
+      val instr = method.instrs(pc)
+      (instr.code: @switch) match {
+        case 0 => callLocal(instr.asInstanceOf[CallLocal].index)
+        case 1 => callExternal(instr.asInstanceOf[CallExternal].index)
+        case 2 => runReturn()
+        case _ =>
           // No flatMap for tailrec
           instr.runWith(this) match {
             case Right(_) =>
@@ -144,6 +149,37 @@ final class StatelessFrame(
       failed(PcOverflow)
     }
   }
+
+  protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
+    Return.runWith(this).map(_ => None)
+}
+
+final class StatelessFrame(
+    var pc: Int,
+    val obj: ContractObj[StatelessContext],
+    val opStack: Stack[Val],
+    val method: Method[StatelessContext],
+    val locals: VarVector[Val],
+    val returnTo: AVector[Val] => ExeResult[Unit],
+    val ctx: StatelessContext
+) extends Frame[StatelessContext] {
+  def methodFrame(index: Int): ExeResult[Frame[StatelessContext]] = {
+    for {
+      method <- getMethod(index)
+      frame  <- Frame.stateless(ctx, obj, method, opStack, opStack.push)
+    } yield frame
+  }
+
+  // the following should not be used in stateless context
+  def balanceStateOpt: Option[BalanceState] = ???
+  def createContract(
+      code: StatefulContract.HalfDecoded,
+      initialStateHash: Hash,
+      fields: AVector[Val]
+  ): ExeResult[Unit]                                                        = ???
+  def destroyContract(address: LockupScript): ExeResult[Unit]               = ???
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                  = ???
+  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
 }
 
 final class StatefulFrame(
@@ -151,11 +187,16 @@ final class StatefulFrame(
     val obj: ContractObj[StatefulContext],
     val opStack: Stack[Val],
     val method: Method[StatefulContext],
-    val locals: Array[Val],
+    val locals: VarVector[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
+    val callerFrameOpt: Option[Frame[StatefulContext]],
     val balanceStateOpt: Option[BalanceState]
 ) extends Frame[StatefulContext] {
+  def getCallerFrame(): ExeResult[Frame[StatefulContext]] = {
+    callerFrameOpt.toRight(Right(NoCaller))
+  }
+
   private def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
@@ -165,7 +206,7 @@ final class StatefulFrame(
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
           val newFrameBalances = currentBalances.useApproved()
-          contractObj.addressOpt match {
+          contractObj.contractIdOpt match {
             case Some(contractId) =>
               ctx
                 .useContractAsset(contractId)
@@ -183,12 +224,38 @@ final class StatefulFrame(
     }
   }
 
+  def createContract(
+      code: StatefulContract.HalfDecoded,
+      initialStateHash: Hash,
+      fields: AVector[Val]
+  ): ExeResult[Unit] = {
+    for {
+      balanceState <- getBalanceState()
+      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      _            <- ctx.createContract(code, initialStateHash, balances, fields)
+    } yield ()
+  }
+
+  def destroyContract(address: LockupScript): ExeResult[Unit] = {
+    for {
+      contractId   <- obj.getContractId()
+      balanceState <- getBalanceState()
+      contractAssets <- balanceState
+        .useAll(LockupScript.p2c(contractId))
+        .toRight(Right(InvalidBalances))
+      _ <- ctx.destroyContract(contractId, contractAssets, address)
+      _ <- runReturn()
+    } yield {
+      pc -= 1 // because of the `advancePC` call following this instruction
+    }
+  }
+
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
       method             <- getMethod(index)
       newBalanceStateOpt <- getNewFrameBalancesState(obj, method)
       frame <-
-        Frame.stateful(ctx, newBalanceStateOpt, obj, method, opStack, opStack.push)
+        Frame.stateful(ctx, Some(this), newBalanceStateOpt, obj, method, opStack, opStack.push)
     } yield frame
   }
 
@@ -197,46 +264,30 @@ final class StatefulFrame(
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj        <- ctx.loadContract(contractKey)
+      contractObj        <- ctx.loadContractObj(contractKey)
       method             <- contractObj.getMethod(index)
       _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
       frame <-
-        Frame.stateful(ctx, newBalanceStateOpt, contractObj, method, opStack, opStack.push)
+        Frame.stateful(
+          ctx,
+          Some(this),
+          newBalanceStateOpt,
+          contractObj,
+          method,
+          opStack,
+          opStack.push
+        )
     } yield frame
   }
 
   def callExternal(index: Byte): ExeResult[Option[Frame[StatefulContext]]] = {
     advancePC()
     for {
-      _           <- ctx.chargeGas(GasSchedule.callGas)
-      byteVec     <- popOpStackT[Val.ByteVec]()
-      contractKey <- Hash.from(byteVec.a).toRight(Right(InvalidContractAddress))
-      newFrame    <- externalMethodFrame(contractKey, Bytes.toPosInt(index))
+      _          <- ctx.chargeGas(GasSchedule.callGas)
+      contractId <- popContractId()
+      newFrame   <- externalMethodFrame(contractId, Bytes.toPosInt(index))
     } yield Some(newFrame)
-  }
-
-  @tailrec
-  override def execute(): ExeResult[Option[Frame[StatefulContext]]] = {
-    if (pc < pcMax) {
-      method.instrs(pc) match {
-        case CallLocal(index)    => callLocal(index)
-        case CallExternal(index) => callExternal(index)
-        case Return              => runReturn()
-        case instr               =>
-          // No flatMap for tailrec
-          instr.runWith(this) match {
-            case Right(_) =>
-              advancePC()
-              execute()
-            case Left(e) => Left(e)
-          }
-      }
-    } else if (pc == pcMax) {
-      runReturn()
-    } else {
-      failed(PcOverflow)
-    }
   }
 }
 
@@ -259,11 +310,12 @@ object Frame {
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatelessContext]] = {
-    build(method, args, new StatelessFrame(0, obj, operandStack, method, _, returnTo, ctx))
+    build(operandStack, method, args, new StatelessFrame(0, obj, _, method, _, returnTo, ctx))
   }
 
   def stateful(
       ctx: StatefulContext,
+      callerFrame: Option[Frame[StatefulContext]],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
@@ -281,6 +333,7 @@ object Frame {
         _,
         returnTo,
         ctx,
+        callerFrame,
         balanceStateOpt
       )
     )
@@ -288,6 +341,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
+      callerFrame: Option[Frame[StatefulContext]],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
@@ -296,16 +350,18 @@ object Frame {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] = {
     build(
+      operandStack,
       method,
       args,
       new StatefulFrame(
         0,
         obj,
-        operandStack,
+        _,
         method,
         _,
         returnTo,
         ctx,
+        callerFrame,
         balanceStateOpt
       )
     )
@@ -315,37 +371,38 @@ object Frame {
   private def build[Ctx <: StatelessContext](
       operandStack: Stack[Val],
       method: Method[Ctx],
-      frameBuilder: (Stack[Val], Array[Val]) => Frame[Ctx]
+      frameBuilder: (Stack[Val], VarVector[Val]) => Frame[Ctx]
   ): ExeResult[Frame[Ctx]] = {
     operandStack.pop(method.argsLength) match {
-      case Right(args) =>
-        val newStack = operandStack.remainingStack()
-        Right(frameBuilder(newStack, prepareLocals(method, args)))
-      case _ => failed(InsufficientArgs)
+      case Right(args) => build(operandStack, method, args, frameBuilder)
+      case _           => failed(InsufficientArgs)
     }
   }
 
   @inline
   private def build[Ctx <: StatelessContext](
+      operandStack: Stack[Val],
       method: Method[Ctx],
       args: AVector[Val],
-      frameBuilder: Array[Val] => Frame[Ctx]
+      frameBuilder: (Stack[Val], VarVector[Val]) => Frame[Ctx]
   ): ExeResult[Frame[Ctx]] = {
     if (args.length != method.argsLength) {
       failed(InvalidMethodArgLength(args.length, method.argsLength))
     } else {
-      Right(frameBuilder(prepareLocals(method, args)))
+      // already validated in script validation and contract creation
+      assume(method.localsLength >= args.length)
+      if (method.localsLength == 0) {
+        Right(frameBuilder(operandStack, VarVector.emptyVal))
+      } else {
+        operandStack.reserveForVars(method.localsLength).map { case (localsVector, newStack) =>
+          args.foreachWithIndex((v, index) => localsVector.setUnsafe(index, v))
+          (method.argsLength until method.localsLength).foreach { index =>
+            localsVector.setUnsafe(index, Val.False)
+          }
+          newStack -> localsVector
+          frameBuilder(newStack, localsVector)
+        }
+      }
     }
-  }
-
-  @inline
-  private def prepareLocals[Ctx <: StatelessContext](
-      method: Method[Ctx],
-      args: AVector[Val]
-  ): Array[Val] = {
-    val locals = Array.ofDim[Val](method.localsLength)
-    args.foreachWithIndex((v, index) => locals(index) = v)
-    (method.argsLength until method.localsLength).foreach { index => locals(index) = Val.False }
-    locals
   }
 }

@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
-import org.alephium.protocol.model.{Block, ChainIndex, NetworkType}
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.serde.{serialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -45,17 +45,14 @@ object ExternalMinerMock {
       s"Invalid number of nodes ${nodes.length} for groups ${config.broker.groups}"
     )
 
-    props(
-      config.network.networkType,
-      nodes
-    )(
+    props(nodes)(
       config.broker,
       config.network,
       config.mining
     )
   }
 
-  def props(networkType: NetworkType, nodes: AVector[InetSocketAddress])(implicit
+  def props(nodes: AVector[InetSocketAddress])(implicit
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting,
       miningConfig: MiningSetting
@@ -66,7 +63,7 @@ object ExternalMinerMock {
       override val brokerNum: Int = 1
       override def groups: Int    = groupConfig.groups
     }
-    Props(new ExternalMinerMock(networkType, nodes))
+    Props(new ExternalMinerMock(nodes))
   }
 
   sealed trait Command
@@ -95,7 +92,7 @@ object ExternalMinerMock {
 }
 
 // the addresses should be ordered by brokerId of the nodes
-class ExternalMinerMock(val networkType: NetworkType, nodes: AVector[InetSocketAddress])(implicit
+class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
     val brokerConfig: BrokerConfig,
     val networkSetting: NetworkSetting,
     val miningConfig: MiningSetting

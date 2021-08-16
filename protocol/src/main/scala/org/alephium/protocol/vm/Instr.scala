@@ -17,22 +17,24 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.switch
-import scala.collection.immutable.ArraySeq
-import scala.collection.mutable
 
 import akka.util.ByteString
 
-import org.alephium.crypto._
+import org.alephium.crypto
+import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.serde.{deserialize => decode, _}
+import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util
-import org.alephium.util.{AVector, Bytes, Collection}
+import org.alephium.util.{AVector, Bytes}
 
 // scalastyle:off file.size.limit number.of.types
 
 sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
+  def code: Byte
+
   def serialize(): ByteString
 
+  // this function needs to charge gas manually
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
@@ -44,15 +46,16 @@ sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
     } yield ()
   }
 
+  // this function will not need to take care of charge gas
   def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 object Instr {
   implicit val statelessSerde: Serde[Instr[StatelessContext]] = new Serde[Instr[StatelessContext]] {
-    override def serialize(input: Instr[StatelessContext]): ByteString = input.serialize()
+    def serialize(input: Instr[StatelessContext]): ByteString = input.serialize()
 
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-    override def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatelessContext]]] = {
+    def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatelessContext]]] = {
       for {
         code <- input.headOption.toRight(SerdeError.incompleteData(1, 0))
         instrCompanion <- getStatelessCompanion(code).toRight(
@@ -63,10 +66,10 @@ object Instr {
     }
   }
   implicit val statefulSerde: Serde[Instr[StatefulContext]] = new Serde[Instr[StatefulContext]] {
-    override def serialize(input: Instr[StatefulContext]): ByteString = input.serialize()
+    def serialize(input: Instr[StatefulContext]): ByteString = input.serialize()
 
     @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-    override def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatefulContext]]] = {
+    def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatefulContext]]] = {
       for {
         code <- input.headOption.toRight(SerdeError.incompleteData(1, 0))
         instrCompanion <- getStatefulCompanion(code).toRight(
@@ -78,73 +81,90 @@ object Instr {
   }
 
   def getStatelessCompanion(byte: Byte): Option[InstrCompanion[StatelessContext]] = {
-    Collection.get(statelessInstrs, Bytes.toPosInt(byte))
+    statelessInstrs(Bytes.toPosInt(byte))
   }
 
   def getStatefulCompanion(byte: Byte): Option[InstrCompanion[StatefulContext]] = {
-    Collection.get(statefulInstrs, Bytes.toPosInt(byte))
+    statefulInstrs(Bytes.toPosInt(byte))
   }
 
   // format: off
-  val statelessInstrs: ArraySeq[InstrCompanion[StatelessContext]] = ArraySeq(
+  val statelessInstrs0: AVector[InstrCompanion[StatelessContext]] = AVector(
     ConstTrue, ConstFalse,
     I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
     U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
     I256Const, U256Const,
     BytesConst, AddressConst,
     LoadLocal, StoreLocal,
-    Pop, Pop2, Dup, Dup2, Swap,
-    I256Add, I256Sub, I256Mul, I256Div, I256Mod, EqI256, NeI256, LtI256, LeI256, GtI256, GeI256,
-    U256Add, U256Sub, U256Mul, U256Div, U256Mod, EqU256, NeU256, LtU256, LeU256, GtU256, GeU256,
-    NotBool, AndBool, OrBool,
-                ByteToI256, ByteToU256,
-    I256ToByte,             I256ToU256,
-    U256ToByte, U256ToI256,
-    Forward, Backward,
-    IfTrue, IfFalse, IfAnd, IfOr, IfNotAnd, IfNotOr, // TODO: support long branches, 256 instrs rn
-    IfEqI256, IfNeI256, IfLtI256, IfLeI256, IfGtI256, IfGeI256,
-    IfEqU256, IfNeU256, IfLtU256, IfLeU256, IfGtU256, IfGeU256,
+    Pop,
+    BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
+    I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
+    U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
+    U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
+    I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
+    ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
+    Jump, IfTrue, IfFalse,
     CallLocal, Return,
-    CheckEqBool, CheckEqByte, CheckEqI256, CheckEqU256, CheckEqByteVec,
-    CheckEqBoolVec, CheckEqByteVec, CheckEqI256Vec, CheckEqU256Vec,
-    Blake2bByteVec, Keccak256ByteVec, CheckSignature
+    Assert,
+    Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
+    ChainId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+    Log1, Log2, Log3, Log4, Log5
   )
-  val statefulInstrs: ArraySeq[InstrCompanion[StatefulContext]]   = statelessInstrs ++
-    ArraySeq[InstrCompanion[StatefulContext]](
-      LoadField, StoreField, CallExternal,
-      ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining,
-      TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-      CreateContract, SelfAddress, SelfTokenId, IssueToken
-    )
+  val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
+    LoadField, StoreField, CallExternal,
+    ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
+    TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
+    CreateContract, CopyCreateContract, DestroySelf, SelfAddress, SelfContractId, IssueToken,
+    CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
+  )
   // format: on
 
-  val toCode: Map[InstrCompanion[_], Int] = statefulInstrs.zipWithIndex.toMap
+  val toCode: Map[InstrCompanion[_ <: StatelessContext], Int] = {
+    val instrs0: AVector[InstrCompanion[_ <: StatelessContext]] =
+      AVector(CallLocal, CallExternal, Return)
+    val instrs1: AVector[InstrCompanion[_ <: StatelessContext]] =
+      statelessInstrs0.filter(!instrs0.contains(_)).as[InstrCompanion[_]]
+    val instrs2: AVector[InstrCompanion[_ <: StatelessContext]] =
+      statefulInstrs0.filter(!instrs0.contains(_)).as[InstrCompanion[_]]
+    (instrs0.mapWithIndex((instr, index) => (instr, index)) ++
+      instrs1.mapWithIndex((instr, index) => (instr, index + 3)) ++
+      instrs2.mapWithIndex((instr, index) => (instr, index + 160))).toIterable.toMap
+  }
+
+  val statelessInstrs: AVector[Option[InstrCompanion[StatelessContext]]] = {
+    val array = Array.fill[Option[InstrCompanion[StatelessContext]]](256)(None)
+    statelessInstrs0.foreach(instr => array(toCode(instr)) = Some(instr))
+    AVector.unsafe(array)
+  }
+
+  val statefulInstrs: AVector[Option[InstrCompanion[StatefulContext]]] = {
+    val table = Array.fill[Option[InstrCompanion[StatefulContext]]](256)(None)
+    statelessInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
+    statefulInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
+    AVector.unsafe(table)
+  }
 }
 
-sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
-sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
-sealed trait StatefulInstrSimpleGas
-    extends StatefulInstr
-    with InstrWithSimpleGas[StatefulContext]
-    with GasSimple {}
+sealed trait StatefulInstr          extends Instr[StatefulContext] with GasSchedule                     {}
+sealed trait StatelessInstr         extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
+sealed trait StatefulInstrSimpleGas extends StatefulInstr with InstrWithSimpleGas[StatefulContext]
 sealed trait StatelessInstrSimpleGas
     extends StatelessInstr
     with InstrWithSimpleGas[StatelessContext]
-    with GasSimple {}
 
 sealed trait InstrCompanion[-Ctx <: StatelessContext] {
+  lazy val code: Byte = Instr.toCode(this).toByte
+
   def deserialize[C <: Ctx](input: ByteString): SerdeResult[Staging[Instr[C]]]
 }
 
 sealed abstract class InstrCompanion1[Ctx <: StatelessContext, T: Serde]
     extends InstrCompanion[Ctx] {
-  lazy val code: Byte = Instr.toCode(this).toByte
-
   def apply(t: T): Instr[Ctx]
 
   @inline def from[C <: Ctx](t: T): Instr[C] = apply(t)
 
-  override def deserialize[C <: Ctx](input: ByteString): SerdeResult[Staging[Instr[C]]] = {
+  def deserialize[C <: Ctx](input: ByteString): SerdeResult[Staging[Instr[C]]] = {
     serdeImpl[T]._deserialize(input).map(_.mapValue(from))
   }
 }
@@ -158,8 +178,6 @@ sealed trait StatelessInstrCompanion0
     extends InstrCompanion[StatelessContext]
     with Instr[StatelessContext]
     with GasSchedule {
-  lazy val code: Byte = Instr.toCode(this).toByte
-
   def serialize(): ByteString = ByteString(code)
 
   def deserialize[C <: StatelessContext](input: ByteString): SerdeResult[Staging[Instr[C]]] =
@@ -170,8 +188,6 @@ sealed trait StatefulInstrCompanion0
     extends InstrCompanion[StatefulContext]
     with Instr[StatefulContext]
     with GasSchedule {
-  lazy val code: Byte = Instr.toCode(this).toByte
-
   def serialize(): ByteString = ByteString(code)
 
   def deserialize[C <: StatefulContext](input: ByteString): SerdeResult[Staging[Instr[C]]] =
@@ -221,7 +237,7 @@ object ConstInstr {
 sealed trait ConstInstr0 extends ConstInstr with StatelessInstrCompanion0 {
   def const: Val
 
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(const)
   }
 }
@@ -229,7 +245,7 @@ sealed trait ConstInstr0 extends ConstInstr with StatelessInstrCompanion0 {
 sealed abstract class ConstInstr1[T <: Val] extends ConstInstr {
   def const: T
 
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(const)
   }
 }
@@ -252,33 +268,38 @@ object U256Const3 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsa
 object U256Const4 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(4L)) }
 object U256Const5 extends ConstInstr0 { val const: Val = Val.U256(util.U256.unsafe(5L)) }
 
+@ByteCode
 final case class I256Const(const: Val.I256) extends ConstInstr1[Val.I256] {
-  override def serialize(): ByteString =
-    ByteString(I256Const.code) ++ serdeImpl[util.I256].serialize(const.v)
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[util.I256].serialize(const.v)
 }
 object I256Const extends StatelessInstrCompanion1[Val.I256]
+@ByteCode
 final case class U256Const(const: Val.U256) extends ConstInstr1[Val.U256] {
-  override def serialize(): ByteString =
-    ByteString(U256Const.code) ++ serdeImpl[util.U256].serialize(const.v)
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[util.U256].serialize(const.v)
 }
 object U256Const extends StatelessInstrCompanion1[Val.U256]
 
+@ByteCode
 final case class BytesConst(const: Val.ByteVec) extends ConstInstr1[Val.ByteVec] {
-  override def serialize(): ByteString =
-    ByteString(BytesConst.code) ++ serdeImpl[Val.ByteVec].serialize(const)
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[Val.ByteVec].serialize(const)
 }
 object BytesConst extends StatelessInstrCompanion1[Val.ByteVec]
 
+@ByteCode
 final case class AddressConst(const: Val.Address) extends ConstInstr1[Val.Address] {
-  override def serialize(): ByteString =
-    ByteString(AddressConst.code) ++ serdeImpl[Val.Address].serialize(const)
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[Val.Address].serialize(const)
 }
 object AddressConst extends StatelessInstrCompanion1[Val.Address]
 
 // Note: 0 <= index <= 0xFF
+@ByteCode
 final case class LoadLocal(index: Byte) extends OperandStackInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(LoadLocal.code, index)
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def serialize(): ByteString = ByteString(code, index)
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.getLocalVal(Bytes.toPosInt(index))
       _ <- frame.pushOpStack(v)
@@ -286,9 +307,10 @@ final case class LoadLocal(index: Byte) extends OperandStackInstr with GasVeryLo
   }
 }
 object LoadLocal extends StatelessInstrCompanion1[Byte]
+@ByteCode
 final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(StoreLocal.code, index)
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def serialize(): ByteString = ByteString(code, index)
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.popOpStack()
       _ <- frame.setLocalVal(Bytes.toPosInt(index), v)
@@ -298,9 +320,10 @@ final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryL
 object StoreLocal extends StatelessInstrCompanion1[Byte]
 
 sealed trait FieldInstr extends StatefulInstrSimpleGas with GasSimple {}
+@ByteCode
 final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(LoadField.code, index)
-  override def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def serialize(): ByteString = ByteString(code, index)
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.getField(Bytes.toPosInt(index))
       _ <- frame.pushOpStack(v)
@@ -308,9 +331,10 @@ final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
   }
 }
 object LoadField extends StatefulInstrCompanion1[Byte]
+@ByteCode
 final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
-  override def serialize(): ByteString = ByteString(StoreField.code, index)
-  override def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def serialize(): ByteString = ByteString(code, index)
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.popOpStack()
       _ <- frame.setField(Bytes.toPosInt(index), v)
@@ -322,28 +346,8 @@ object StoreField extends StatefulInstrCompanion1[Byte]
 sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0 with GasVeryLow
 
 case object Pop extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.opStack.remove(1)
-  }
-}
-case object Pop2 extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.remove(2)
-  }
-}
-object Dup extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.dup(1)
-  }
-}
-object Dup2 extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.dup(2)
-  }
-}
-object Swap extends PureStackInstr {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.swap(2)
   }
 }
 
@@ -352,13 +356,13 @@ sealed trait ArithmeticInstr
     with StatelessInstrCompanion0
     with GasSimple {}
 
-sealed trait BinaryArithmeticInstr extends ArithmeticInstr with GasSimple {
-  protected def op(x: Val, y: Val): ExeResult[Val]
+sealed trait BinaryArithmeticInstr[T <: Val] extends ArithmeticInstr with GasSimple {
+  protected def op(x: T, y: T): ExeResult[Val]
 
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      value2 <- frame.popOpStack()
-      value1 <- frame.popOpStack()
+      value2 <- frame.popOpStackT[T]()
+      value1 <- frame.popOpStackT[T]()
       out    <- op(value1, value2)
       _      <- frame.pushOpStack(out)
     } yield ()
@@ -369,163 +373,210 @@ object BinaryArithmeticInstr {
     ArithmeticError(s"Arithmetic error: $op($a, $b)")
   }
 
+  @inline def i256Op(
+      op: (util.I256, util.I256) => util.I256
+  )(x: Val.I256, y: Val.I256): ExeResult[Val.I256] =
+    Right(Val.I256.apply(op(x.v, y.v)))
+
   @inline def i256SafeOp(
       instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Option[util.I256]
-  )(x: Val, y: Val): ExeResult[Val.I256] =
-    (x, y) match {
-      case (a: Val.I256, b: Val.I256) =>
-        op(a.v, b.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(a, b, instr)))
-      case _ => failed(BinaryArithmeticInstr.error(x, y, instr))
-    }
+  )(x: Val.I256, y: Val.I256): ExeResult[Val.I256] =
+    op(x.v, y.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(x, y, instr)))
+
+  @inline def u256Op(
+      op: (util.U256, util.U256) => util.U256
+  )(x: Val.U256, y: Val.U256): ExeResult[Val.U256] =
+    Right(Val.U256.apply(op(x.v, y.v)))
 
   @inline def u256SafeOp(
       instr: ArithmeticInstr,
       op: (util.U256, util.U256) => Option[util.U256]
-  )(x: Val, y: Val): ExeResult[Val.U256] =
-    (x, y) match {
-      case (a: Val.U256, b: Val.U256) =>
-        op(a.v, b.v).map(Val.U256.apply).toRight(Right(BinaryArithmeticInstr.error(a, b, instr)))
-      case _ => failed(BinaryArithmeticInstr.error(x, y, instr))
-    }
+  )(x: Val.U256, y: Val.U256): ExeResult[Val.U256] =
+    op(x.v, y.v).map(Val.U256.apply).toRight(Right(BinaryArithmeticInstr.error(x, y, instr)))
 
   @inline def i256Comp(
-      instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Boolean
-  )(x: Val, y: Val): ExeResult[Val.Bool] =
-    (x, y) match {
-      case (a: Val.I256, b: Val.I256) => Right(Val.Bool(op(a.v, b.v)))
-      case _                          => failed(BinaryArithmeticInstr.error(x, y, instr))
-    }
+  )(x: Val.I256, y: Val.I256): ExeResult[Val.Bool] =
+    Right(Val.Bool(op(x.v, y.v)))
 
   @inline def u256Comp(
-      instr: ArithmeticInstr,
       op: (util.U256, util.U256) => Boolean
-  )(x: Val, y: Val): ExeResult[Val.Bool] =
-    (x, y) match {
-      case (a: Val.U256, b: Val.U256) => Right(Val.Bool(op(a.v, b.v)))
-      case _                          => failed(BinaryArithmeticInstr.error(x, y, instr))
-    }
+  )(x: Val.U256, y: Val.U256): ExeResult[Val.Bool] =
+    Right(Val.Bool(op(x.v, y.v)))
 }
-object I256Add extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object I256Add extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] = {
     BinaryArithmeticInstr.i256SafeOp(this, _.add(_))(x, y)
+  }
 }
-object I256Sub extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object I256Sub extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.sub(_))(x, y)
 }
-object I256Mul extends BinaryArithmeticInstr with GasLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object I256Mul extends BinaryArithmeticInstr[Val.I256] with GasLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.mul(_))(x, y)
 }
-object I256Div extends BinaryArithmeticInstr with GasLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object I256Div extends BinaryArithmeticInstr[Val.I256] with GasLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.div(_))(x, y)
 }
-object I256Mod extends BinaryArithmeticInstr with GasLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object I256Mod extends BinaryArithmeticInstr[Val.I256] with GasLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256SafeOp(this, _.mod(_))(x, y)
 }
-object EqI256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i256Comp(this, _.==(_))(x, y)
+object I256Eq extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(_.==(_))(x, y)
 }
-object NeI256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i256Comp(this, _.!=(_))(x, y)
+object I256Neq extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(_.!=(_))(x, y)
 }
-object LtI256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i256Comp(this, _.<(_))(x, y)
+object I256Lt extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(_.<(_))(x, y)
 }
-object LeI256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i256Comp(this, _.<=(_))(x, y)
+object I256Le extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(_.<=(_))(x, y)
 }
-object GtI256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i256Comp(this, _.>(_))(x, y)
+object I256Gt extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(_.>(_))(x, y)
 }
-object GeI256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.i256Comp(this, _.>=(_))(x, y)
+object I256Ge extends BinaryArithmeticInstr[Val.I256] with GasVeryLow {
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Comp(_.>=(_))(x, y)
 }
-object U256Add extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object U256Add extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
 }
-object U256Sub extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object U256Sub extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.sub(_))(x, y)
 }
-object U256Mul extends BinaryArithmeticInstr with GasLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object U256Mul extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mul(_))(x, y)
 }
-object U256Div extends BinaryArithmeticInstr with GasLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object U256Div extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.div(_))(x, y)
 }
-object U256Mod extends BinaryArithmeticInstr with GasLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
+object U256Mod extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mod(_))(x, y)
 }
-object EqU256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Comp(this, _.==(_))(x, y)
+object U256ModAdd extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(_.modAdd(_))(x, y)
 }
-object NeU256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Comp(this, _.!=(_))(x, y)
+object U256ModSub extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(_.modSub(_))(x, y)
 }
-object LtU256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Comp(this, _.<(_))(x, y)
+object U256ModMul extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(_.modMul(_))(x, y)
 }
-object LeU256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Comp(this, _.<=(_))(x, y)
+object U256BitAnd extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(_.bitAnd(_))(x, y)
 }
-object GtU256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Comp(this, _.>(_))(x, y)
+object U256BitOr extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(_.bitOr(_))(x, y)
 }
-object GeU256 extends BinaryArithmeticInstr with GasVeryLow {
-  protected def op(x: Val, y: Val): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Comp(this, _.>=(_))(x, y)
+object U256Xor extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op(_.xor(_))(x, y)
+}
+object U256SHL extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op((x, y) => x.shl(y))(x, y)
+}
+object U256SHR extends BinaryArithmeticInstr[Val.U256] with GasLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Op((x, y) => x.shr(y))(x, y)
+}
+object U256Eq extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(_.==(_))(x, y)
+}
+object U256Neq extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(_.!=(_))(x, y)
+}
+object U256Lt extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(_.<(_))(x, y)
+}
+object U256Le extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(_.<=(_))(x, y)
+}
+object U256Gt extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(_.>(_))(x, y)
+}
+object U256Ge extends BinaryArithmeticInstr[Val.U256] with GasVeryLow {
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
 }
 
 sealed trait LogicInstr
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
     with GasSimple {}
-case object NotBool extends LogicInstr with GasVeryLow {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object BoolNot extends LogicInstr with GasVeryLow {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool <- frame.popOpStackT[Val.Bool]()
       _    <- frame.pushOpStack(bool.not)
     } yield ()
   }
 }
-case object AndBool extends LogicInstr with GasVeryLow {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+sealed trait BinaryBool extends LogicInstr with GasVeryLow {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bool2 <- frame.popOpStackT[Val.Bool]()
       bool1 <- frame.popOpStackT[Val.Bool]()
-      _     <- frame.pushOpStack(bool1.and(bool2))
+      _     <- frame.pushOpStack(op(bool1, bool2))
     } yield ()
   }
 }
-case object OrBool extends LogicInstr with GasVeryLow {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object BoolAnd extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = bool1.and(bool2)
+}
+case object BoolOr extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = bool1.or(bool2)
+}
+case object BoolEq extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 == bool2)
+}
+case object BoolNeq extends BinaryBool {
+  def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 != bool2)
+}
+
+sealed trait ToByteVecInstr[R <: Val, U <: Val]
+    extends StatelessInstr
+    with GasToByte
+    with StatelessInstrCompanion0 {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      bool2 <- frame.popOpStackT[Val.Bool]()
-      bool1 <- frame.popOpStackT[Val.Bool]()
-      _     <- frame.pushOpStack(bool1.or(bool2))
+      from <- frame.popOpStackT[R]()
+      byteVec = from.toByteVec()
+      _ <- frame.pushOpStack(byteVec)
+      _ <- frame.ctx.chargeGasWithSize(this, byteVec.bytes.size)
     } yield ()
   }
 }
+case object BoolToByteVec extends ToByteVecInstr[Val.Bool, Val.ByteVec]
 
 sealed trait ConversionInstr[R <: Val, U <: Val]
     extends StatelessInstrSimpleGas
@@ -534,7 +585,7 @@ sealed trait ConversionInstr[R <: Val, U <: Val]
 
   def converse(from: R): ExeResult[U]
 
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       from <- frame.popOpStackT[R]()
       to   <- converse(from)
@@ -543,38 +594,67 @@ sealed trait ConversionInstr[R <: Val, U <: Val]
   }
 }
 
-case object ByteToI256 extends ConversionInstr[Val.Byte, Val.I256] with GasVeryLow {
-  override def converse(from: Val.Byte): ExeResult[Val.I256] = {
-    Right(Val.I256(util.I256.from(from.v & 0xffL)))
-  }
-}
-case object ByteToU256 extends ConversionInstr[Val.Byte, Val.U256] with GasVeryLow {
-  override def converse(from: Val.Byte): ExeResult[Val.U256] = {
-    Right(Val.U256(util.U256.unsafe(from.v & 0xffL)))
-  }
-}
-
-case object I256ToByte extends ConversionInstr[Val.I256, Val.Byte] with GasVeryLow {
-  override def converse(from: Val.I256): ExeResult[Val.Byte] = {
-    from.v.toByte.map(Val.Byte.apply).toRight(Right(InvalidConversion(from, Val.Byte)))
-  }
-}
 case object I256ToU256 extends ConversionInstr[Val.I256, Val.U256] with GasVeryLow {
-  override def converse(from: Val.I256): ExeResult[Val.U256] = {
+  def converse(from: Val.I256): ExeResult[Val.U256] = {
     util.U256.fromI256(from.v).map(Val.U256.apply).toRight(Right(InvalidConversion(from, Val.U256)))
   }
 }
-
-case object U256ToByte extends ConversionInstr[Val.U256, Val.Byte] with GasVeryLow {
-  override def converse(from: Val.U256): ExeResult[Val.Byte] = {
-    from.v.toByte.map(Val.Byte.apply).toRight(Right(InvalidConversion(from, Val.U256)))
-  }
-}
+case object I256ToByteVec extends ToByteVecInstr[Val.I256, Val.ByteVec]
 case object U256ToI256 extends ConversionInstr[Val.U256, Val.I256] with GasVeryLow {
-  override def converse(from: Val.U256): ExeResult[Val.I256] = {
+  def converse(from: Val.U256): ExeResult[Val.I256] = {
     util.I256.fromU256(from.v).map(Val.I256.apply).toRight(Right(InvalidConversion(from, Val.I256)))
   }
 }
+case object U256ToByteVec extends ToByteVecInstr[Val.U256, Val.ByteVec]
+
+sealed trait ComparisonInstr[T <: Val]
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasVeryLow {
+  def op(x: T, y: T): Val.Bool
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      x <- frame.popOpStackT[T]()
+      y <- frame.popOpStackT[T]()
+      _ <- frame.pushOpStack(op(x, y))
+    } yield ()
+  }
+}
+sealed trait EqT[T <: Val] extends ComparisonInstr[T] {
+  def op(x: T, y: T): Val.Bool = Val.Bool(x == y)
+}
+sealed trait NeT[T <: Val] extends ComparisonInstr[T] {
+  def op(x: T, y: T): Val.Bool = Val.Bool(x != y)
+}
+case object ByteVecEq  extends EqT[Val.ByteVec]
+case object ByteVecNeq extends NeT[Val.ByteVec]
+case object ByteVecSize
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasVeryLow {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.popOpStackT[Val.ByteVec]()
+      _ <- frame.pushOpStack(Val.U256(util.U256.unsafe(v.bytes.size)))
+    } yield ()
+  }
+}
+case object ByteVecConcat
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasLow {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v2 <- frame.popOpStackT[Val.ByteVec]()
+      v1 <- frame.popOpStackT[Val.ByteVec]()
+      _  <- frame.pushOpStack(Val.ByteVec(v1.bytes ++ v2.bytes))
+    } yield ()
+  }
+}
+case object AddressEq        extends EqT[Val.Address]
+case object AddressNeq       extends NeT[Val.Address]
+case object AddressToByteVec extends ToByteVecInstr[Val.Address, Val.ByteVec]
 
 sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
 sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}
@@ -583,182 +663,78 @@ sealed trait NewI256Vec    extends ObjectInstr with GasSchedule    {}
 sealed trait NewU256Vec    extends ObjectInstr with GasSchedule    {}
 sealed trait NewByte256Vec extends ObjectInstr with GasSchedule    {}
 
-sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh
+sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh {
+  def code: Byte
+  def offset: Int
 
-final case class Forward(offset: Byte) extends ControlInstr {
-  override def serialize(): ByteString = ByteString(Forward.code, offset)
+  def serialize(): ByteString = ByteString(code) ++ serdeImpl[Int].serialize(offset)
+}
 
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.offsetPC(Bytes.toPosInt(offset))
+sealed trait ControlCompanion[T <: StatelessInstr] extends InstrCompanion[StatelessContext] {
+  def apply(offset: Int): T
+
+  def deserialize[C <: StatelessContext](input: ByteString): SerdeResult[Staging[T]] = {
+    ControlCompanion.offsetSerde._deserialize(input).map(_.mapValue(apply))
   }
 }
-object Forward extends StatelessInstrCompanion1[Byte]
-final case class Backward(offset: Byte) extends ControlInstr {
-  override def serialize(): ByteString = ByteString(Backward.code, offset)
+object ControlCompanion {
+  def validate(n: Int): Boolean = (n <= (1 << 16)) && (n >= -(1 << 16))
 
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.offsetPC(-Bytes.toPosInt(offset))
+  val offsetSerde: Serde[Int] = serdeImpl[Int].validate(offset =>
+    if (validate(offset)) Right(()) else Left(s"Invalid offset $offset")
+  )
+}
+
+@ByteCode
+final case class Jump(offset: Int) extends ControlInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.offsetPC(offset)
   }
 }
-object Backward extends StatelessInstrCompanion1[Byte]
+object Jump extends ControlCompanion[Jump]
 
 sealed trait IfJumpInstr extends ControlInstr {
-  def code: Byte
-  def offset: Byte
   def condition(value: Val.Bool): Boolean
 
-  override def serialize(): ByteString = ByteString(code, offset)
-
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       value <- frame.popOpStackT[Val.Bool]()
-      _     <- if (condition(value)) frame.offsetPC(Bytes.toPosInt(offset)) else okay
+      _     <- if (condition(value)) frame.offsetPC(offset) else okay
     } yield ()
   }
 }
-final case class IfTrue(offset: Byte) extends IfJumpInstr {
-  override def code: Byte = IfTrue.code
-
-  override def condition(value: Val.Bool): Boolean = value.v
+@ByteCode
+final case class IfTrue(offset: Int) extends IfJumpInstr {
+  def condition(value: Val.Bool): Boolean = value.v
 }
-case object IfTrue extends StatelessInstrCompanion1[Byte]
-final case class IfFalse(offset: Byte) extends IfJumpInstr {
-  override def code: Byte = IfFalse.code
+object IfTrue extends ControlCompanion[IfTrue]
 
-  override def condition(value: Val.Bool): Boolean = !value.v
+@ByteCode
+final case class IfFalse(offset: Int) extends IfJumpInstr {
+  def condition(value: Val.Bool): Boolean = !value.v
 }
-case object IfFalse extends StatelessInstrCompanion1[Byte]
-
-sealed trait BranchInstr[T <: Val] extends ControlInstr {
-  def code: Byte
-  def offset: Byte
-  def condition(value1: T, value2: T): Boolean
-
-  override def serialize(): ByteString = ByteString(code, offset)
-
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      value2 <- frame.popOpStackT[T]()
-      value1 <- frame.popOpStackT[T]()
-      _      <- if (condition(value1, value2)) frame.offsetPC(Bytes.toPosInt(offset)) else okay
-    } yield ()
-  }
-}
-final case class IfAnd(offset: Byte) extends BranchInstr[Val.Bool] {
-  override def code: Byte = IfAnd.code
-
-  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = value1.v && value2.v
-}
-case object IfAnd extends StatelessInstrCompanion1[Byte]
-final case class IfOr(offset: Byte) extends BranchInstr[Val.Bool] {
-  override def code: Byte = IfOr.code
-
-  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = value1.v || value2.v
-}
-case object IfOr extends StatelessInstrCompanion1[Byte]
-final case class IfNotAnd(offset: Byte) extends BranchInstr[Val.Bool] {
-  override def code: Byte = IfNotAnd.code
-
-  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v && value2.v)
-}
-case object IfNotAnd extends StatelessInstrCompanion1[Byte]
-final case class IfNotOr(offset: Byte) extends BranchInstr[Val.Bool] {
-  override def code: Byte = IfNotOr.code
-
-  override def condition(value1: Val.Bool, value2: Val.Bool): Boolean = !(value1.v || value2.v)
-}
-case object IfNotOr extends StatelessInstrCompanion1[Byte]
-final case class IfEqI256(offset: Byte) extends BranchInstr[Val.I256] {
-  override def code: Byte = IfEqI256.code
-
-  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v == value2.v
-}
-object IfEqI256 extends StatelessInstrCompanion1[Byte]
-final case class IfNeI256(offset: Byte) extends BranchInstr[Val.I256] {
-  override def code: Byte = IfNeI256.code
-
-  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v != value2.v
-}
-object IfNeI256 extends StatelessInstrCompanion1[Byte]
-final case class IfLtI256(offset: Byte) extends BranchInstr[Val.I256] {
-  override def code: Byte = IfLtI256.code
-
-  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v < value2.v
-}
-object IfLtI256 extends StatelessInstrCompanion1[Byte]
-final case class IfLeI256(offset: Byte) extends BranchInstr[Val.I256] {
-  override def code: Byte = IfLeI256.code
-
-  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v <= value2.v
-}
-object IfLeI256 extends StatelessInstrCompanion1[Byte]
-final case class IfGtI256(offset: Byte) extends BranchInstr[Val.I256] {
-  override def code: Byte = IfGtI256.code
-
-  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v > value2.v
-}
-object IfGtI256 extends StatelessInstrCompanion1[Byte]
-final case class IfGeI256(offset: Byte) extends BranchInstr[Val.I256] {
-  override def code: Byte = IfGeI256.code
-
-  override def condition(value1: Val.I256, value2: Val.I256): Boolean = value1.v >= value2.v
-}
-object IfGeI256 extends StatelessInstrCompanion1[Byte]
-final case class IfEqU256(offset: Byte) extends BranchInstr[Val.U256] {
-  override def code: Byte = IfEqU256.code
-
-  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v == value2.v
-}
-object IfEqU256 extends StatelessInstrCompanion1[Byte]
-final case class IfNeU256(offset: Byte) extends BranchInstr[Val.U256] {
-  override def code: Byte = IfNeU256.code
-
-  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v != value2.v
-}
-object IfNeU256 extends StatelessInstrCompanion1[Byte]
-final case class IfLtU256(offset: Byte) extends BranchInstr[Val.U256] {
-  override def code: Byte = IfLtU256.code
-
-  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v < value2.v
-}
-object IfLtU256 extends StatelessInstrCompanion1[Byte]
-final case class IfLeU256(offset: Byte) extends BranchInstr[Val.U256] {
-  override def code: Byte = IfLeU256.code
-
-  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v <= value2.v
-}
-object IfLeU256 extends StatelessInstrCompanion1[Byte]
-final case class IfGtU256(offset: Byte) extends BranchInstr[Val.U256] {
-  override def code: Byte = IfGtU256.code
-
-  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v > value2.v
-}
-object IfGtU256 extends StatelessInstrCompanion1[Byte]
-final case class IfGeU256(offset: Byte) extends BranchInstr[Val.U256] {
-  override def code: Byte = IfGeU256.code
-
-  override def condition(value1: Val.U256, value2: Val.U256): Boolean = value1.v >= value2.v
-}
-object IfGeU256 extends StatelessInstrCompanion1[Byte]
+object IfFalse extends ControlCompanion[IfFalse]
 
 sealed trait CallInstr
+@ByteCode
 final case class CallLocal(index: Byte) extends CallInstr with StatelessInstr with GasCall {
-  override def serialize(): ByteString = ByteString(CallLocal.code, index)
+  def serialize(): ByteString = ByteString(code, index)
 
   // Implemented in frame instead
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = ???
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallLocal extends StatelessInstrCompanion1[Byte]
+@ByteCode
 final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr with GasCall {
-  override def serialize(): ByteString = ByteString(CallExternal.code, index)
+  def serialize(): ByteString = ByteString(code, index)
 
   // Implemented in frame instead
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallExternal extends StatefulInstrCompanion1[Byte]
 
 case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasZero {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       value <- frame.opStack.pop(frame.method.returnLength)
       _     <- frame.returnTo(value)
@@ -766,97 +742,126 @@ case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0
   }
 }
 
-sealed trait CryptoInstr extends StatelessInstr with GasSchedule                         {}
-sealed trait Signature   extends CryptoInstr with StatelessInstrSimpleGas with GasSimple {}
-
-sealed trait CheckEqT[T <: Val]
-    extends StatelessInstrSimpleGas
-    with StatelessInstrCompanion0
-    with GasVeryLow {
-  def check(x: T, y: T): ExeResult[Unit] = {
-    if (x == y) okay else failed(EqualityFailed)
-  }
-
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasVeryLow {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      x <- frame.popOpStackT[T]()
-      y <- frame.popOpStackT[T]()
-      _ <- check(x, y)
+      predicate <- frame.popOpStackT[Val.Bool]()
+      _         <- if (predicate.v) okay else failed(AssertionFailed)
     } yield ()
   }
 }
 
-case object CheckEqBool    extends CheckEqT[Val.Bool]
-case object CheckEqByte    extends CheckEqT[Val.Byte]
-case object CheckEqI256    extends CheckEqT[Val.I256]
-case object CheckEqU256    extends CheckEqT[Val.U256]
-case object CheckEqBoolVec extends CheckEqT[Val.BoolVec]
-case object CheckEqByteVec extends CheckEqT[Val.ByteVec]
-case object CheckEqI256Vec extends CheckEqT[Val.I256Vec]
-case object CheckEqU256Vec extends CheckEqT[Val.U256Vec]
-case object CheckEqAddress extends CheckEqT[Val.Address]
+sealed trait CryptoInstr extends StatelessInstr with GasSchedule
 
-sealed abstract class HashAlg[T <: Val, H <: RandomBytes]
+sealed abstract class HashAlg[H <: RandomBytes]
     extends CryptoInstr
     with StatelessInstrCompanion0
     with GasHash {
-  def convert(t: T): ByteString
-
   def hash(bs: ByteString): H
 
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      input <- frame.popOpStackT[T]()
-      bytes = convert(input)
-      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
-      _ <- frame.pushOpStack(Val.ByteVec.from(hash(bytes)))
+      input <- frame.popOpStackT[Val.ByteVec]()
+      _     <- frame.ctx.chargeGasWithSize(this, input.bytes.length)
+      _     <- frame.pushOpStack(Val.ByteVec.from(hash(input.bytes)))
     } yield ()
   }
 }
 
 object HashAlg {
-  trait ByteVecConvertor {
-    def convert(t: Val.ByteVec): ByteString =
-      ByteString.fromArrayUnsafe(t.a.toArray)
-  }
-
   trait Blake2bHash {
-    def hash(bs: ByteString): Blake2b = Blake2b.hash(bs)
+    def hash(bs: ByteString): crypto.Blake2b = crypto.Blake2b.hash(bs)
   }
 
   trait Keccak256Hash {
-    def hash(bs: ByteString): Keccak256 = Keccak256.hash(bs)
+    def hash(bs: ByteString): crypto.Keccak256 = crypto.Keccak256.hash(bs)
+  }
+
+  trait Sha256Hash {
+    def hash(bs: ByteString): crypto.Sha256 = crypto.Sha256.hash(bs)
+  }
+
+  trait Sha3Hash {
+    def hash(bs: ByteString): crypto.Sha3 = crypto.Sha3.hash(bs)
   }
 }
 
-case object Blake2bByteVec
-    extends HashAlg[Val.ByteVec, Blake2b]
-    with HashAlg.ByteVecConvertor
-    with HashAlg.Blake2bHash
+case object Blake2b   extends HashAlg[crypto.Blake2b] with HashAlg.Blake2bHash
+case object Keccak256 extends HashAlg[crypto.Keccak256] with HashAlg.Keccak256Hash
+case object Sha256    extends HashAlg[crypto.Sha256] with HashAlg.Sha256Hash
+case object Sha3      extends HashAlg[crypto.Sha3] with HashAlg.Sha3Hash
 
-// TODO: maybe remove Keccak from the VM
-case object Keccak256ByteVec
-    extends HashAlg[Val.ByteVec, Keccak256]
-    with HashAlg.ByteVecConvertor
-    with HashAlg.Keccak256Hash
+sealed trait SignatureInstr extends CryptoInstr with StatelessInstrSimpleGas with GasSimple
 
-case object CheckSignature extends Signature with StatelessInstrCompanion0 with GasSignature {
-  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object VerifyTxSignature
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     val rawData    = frame.ctx.txId.bytes
     val signatures = frame.ctx.signatures
     for {
       rawPublicKey <- frame.popOpStackT[Val.ByteVec]()
-      publicKey    <- PublicKey.from(rawPublicKey.a).toRight(Right(InvalidPublicKey))
+      publicKey    <- PublicKey.from(rawPublicKey.bytes).toRight(Right(InvalidPublicKey))
       signature    <- signatures.pop()
       _ <- {
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
           okay
         } else {
-          failed(VerificationFailed)
+          failed(InvalidSignature)
         }
       }
     } yield ()
   }
+}
+
+sealed trait GenericVerifySignature[PubKey, Sig]
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def buildPubKey(value: Val.ByteVec): Option[PubKey]
+  def buildSignature(value: Val.ByteVec): Option[Sig]
+  def verify(data: ByteString, signature: Sig, pubKey: PubKey): Boolean
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      rawSignature <- frame.popOpStackT[Val.ByteVec]()
+      signature    <- buildSignature(rawSignature).toRight(Right(InvalidSignatureFormat))
+      rawPublicKey <- frame.popOpStackT[Val.ByteVec]()
+      publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey))
+      rawData      <- frame.popOpStackT[Val.ByteVec]()
+      _            <- if (rawData.bytes.length == 32) okay else failed(SignedDataIsNot32Bytes)
+      _            <- frame.pushOpStack(Val.Bool(verify(rawData.bytes, signature, publicKey)))
+    } yield ()
+  }
+}
+
+case object VerifySecP256K1
+    extends GenericVerifySignature[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
+  def buildPubKey(value: Val.ByteVec): Option[crypto.SecP256K1PublicKey] =
+    crypto.SecP256K1PublicKey.from(value.bytes)
+  def buildSignature(value: Val.ByteVec): Option[crypto.SecP256K1Signature] =
+    crypto.SecP256K1Signature.from(value.bytes)
+  def verify(
+      data: ByteString,
+      signature: crypto.SecP256K1Signature,
+      pubKey: crypto.SecP256K1PublicKey
+  ): Boolean =
+    crypto.SecP256K1.verify(data, signature, pubKey)
+}
+
+case object VerifyED25519
+    extends GenericVerifySignature[crypto.ED25519PublicKey, crypto.ED25519Signature] {
+  def buildPubKey(value: Val.ByteVec): Option[crypto.ED25519PublicKey] =
+    crypto.ED25519PublicKey.from(value.bytes)
+  def buildSignature(value: Val.ByteVec): Option[crypto.ED25519Signature] =
+    crypto.ED25519Signature.from(value.bytes)
+  def verify(
+      data: ByteString,
+      signature: crypto.ED25519Signature,
+      pubKey: crypto.ED25519PublicKey
+  ): Boolean =
+    crypto.ED25519.verify(data, signature, pubKey)
 }
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance
@@ -893,7 +898,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
     for {
       amount       <- frame.popOpStackT[Val.U256]()
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackT[Val.Address]()
       balanceState <- frame.getBalanceState()
       _ <- balanceState
@@ -921,7 +926,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
     for {
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
       address      <- frame.popOpStackT[Val.Address]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
       amount <- balanceState
         .tokenRemaining(address.lockupScript, tokenId)
@@ -931,9 +936,20 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
   }
 }
 
+object IsPaying extends AssetInstr with StatefulInstrCompanion0 {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address      <- frame.popOpStackT[Val.Address]()
+      balanceState <- frame.getBalanceState()
+      isPaying = balanceState.isPaying(address.lockupScript)
+      _ <- frame.pushOpStack(Val.Bool(isPaying))
+    } yield ()
+  }
+}
+
 sealed trait Transfer extends AssetInstr {
   def getContractLockupScript[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
-    frame.obj.addressOpt.toRight(Right(ExpectAContract)).map(LockupScript.p2c)
+    frame.obj.getContractId().map(LockupScript.p2c)
   }
 
   def transferAlf[C <: StatefulContext](
@@ -961,7 +977,7 @@ sealed trait Transfer extends AssetInstr {
     for {
       amount       <- frame.popOpStackT[Val.U256]()
       tokenIdRaw   <- frame.popOpStackT[Val.ByteVec]()
-      tokenId      <- Hash.from(tokenIdRaw.a).toRight(Right(InvalidTokenId))
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       to           <- toThunk
       from         <- fromThunk
       balanceState <- frame.getBalanceState()
@@ -1041,19 +1057,50 @@ sealed trait ContractInstr
     with GasSimple {}
 
 object CreateContract extends ContractInstr with GasCreate {
+  val fieldsSerde: Serde[AVector[Val]] = serdeImpl[AVector[Val]]
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      fieldsRaw <- frame.popOpStackT[Val.ByteVec]()
-      fields <- decode[AVector[Val]](ByteString(fieldsRaw.a)).left.map(e =>
-        Right(SerdeErrorCreateContract(e))
-      )
+      fields          <- frame.popFields()
       contractCodeRaw <- frame.popOpStackT[Val.ByteVec]()
-      contractCode <- decode[StatefulContract](ByteString(contractCodeRaw.a)).left.map(e =>
+      contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
-      balanceState <- frame.getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- frame.ctx.createContract(contractCode, balances, fields)
+      _ <- StatefulContract.check(contractCode)
+      _ <- {
+        val initialStateHash =
+          Hash.doubleHash(contractCodeRaw.bytes ++ fieldsSerde.serialize(fields))
+        frame.createContract(contractCode.toHalfDecoded(), initialStateHash, fields)
+      }
+    } yield ()
+  }
+}
+
+object CopyCreateContract extends ContractInstr with GasCreate {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      fields      <- frame.popFields()
+      contractId  <- frame.popContractId()
+      contractObj <- frame.ctx.loadContractObj(contractId)
+      _ <- {
+        val contractCodeBytes = encode(contractObj.code)
+        val initialStateHash =
+          Hash.doubleHash(contractCodeBytes ++ CreateContract.fieldsSerde.serialize(fields))
+        frame.createContract(contractObj.code, initialStateHash, fields)
+      }
+    } yield ()
+  }
+}
+
+// This instruction can only be called from Tx, i.e. IsCalledFromTxScript should return true
+// This instruction will result in an immediate run of Return
+object DestroySelf extends ContractInstr with GasDestroy {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      _           <- if (callerFrame.obj.isScript()) okay else failed(ContractDestructionShouldBeCalledFromTx)
+      address     <- frame.popOpStackT[Val.Address]()
+      _           <- frame.destroyContract(address.lockupScript)
     } yield ()
   }
 }
@@ -1061,18 +1108,17 @@ object CreateContract extends ContractInstr with GasCreate {
 object SelfAddress extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
-      _           <- frame.pushOpStack(Val.Address(LockupScript.p2c(addressHash)))
+      address <- frame.obj.getAddress()
+      _       <- frame.pushOpStack(address)
     } yield ()
   }
 }
 
-object SelfTokenId extends ContractInstr with GasVeryLow {
+object SelfContractId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
-      tokenId = addressHash // tokenId is addressHash
-      _ <- frame.pushOpStack(Val.ByteVec(mutable.ArraySeq.from(tokenId.bytes)))
+      contractId <- frame.obj.getContractId()
+      _          <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
     } yield ()
   }
 }
@@ -1080,21 +1126,128 @@ object SelfTokenId extends ContractInstr with GasVeryLow {
 object IssueToken extends ContractInstr with GasBalance {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _           <- Either.cond(frame.method.isPayable, (), Right(NonPayableFrame))
-      addressHash <- frame.obj.addressOpt.toRight(Right(ExpectAContract))
-      amount      <- frame.popOpStackT[Val.U256]()
-      tokenId = addressHash // tokenId is addressHash
+      _          <- Either.cond(frame.method.isPayable, (), Right(ExpectNonPayableMethod))
+      contractId <- frame.obj.getContractId()
+      amount     <- frame.popOpStackT[Val.U256]()
+      tokenId = contractId // tokenId is addressHash
       _ <- frame.ctx.outputBalances
-        .addToken(LockupScript.p2c(addressHash), tokenId, amount.v)
+        .addToken(LockupScript.p2c(contractId), tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
     } yield ()
   }
 }
 
-//trait ContextInstr    extends StatelessInstr
-//trait BlockInfo       extends ContextInstr
-//trait TransactionInfo extends ContextInstr
-//trait InputInfo       extends ContextInstr
-//trait OutputInfo      extends ContextInstr
+// only return the address when the caller is a contract
+object CallerAddress extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      address     <- callerFrame.obj.getAddress()
+      _           <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
 
-//trait ContractInfo extends StatefulInstr
+object IsCalledFromTxScript extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      _           <- frame.pushOpStack(Val.Bool(callerFrame.obj.isScript()))
+    } yield ()
+  }
+}
+
+object CallerInitialStateHash extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      statefulObj <- callerFrame.obj match {
+        case obj: StatefulContractObject => Right(obj)
+        case _                           => failed(ExpectStatefulContractObj)
+      }
+      _ <- frame.pushOpStack(statefulObj.getInitialStateHash())
+    } yield ()
+  }
+}
+
+object ContractInitialStateHash extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractId  <- frame.popContractId()
+      contractObj <- frame.ctx.loadContractObj(contractId)
+      _           <- frame.pushOpStack(contractObj.getInitialStateHash())
+    } yield ()
+  }
+}
+
+sealed trait BlockInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
+
+object ChainId extends BlockInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack {
+      val id = frame.ctx.blockEnv.chainId.id
+      Val.ByteVec(ByteString(id))
+    }
+  }
+}
+
+object BlockTimeStamp extends BlockInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      timestamp <- {
+        val millis = frame.ctx.blockEnv.timeStamp.millis
+        util.U256.fromLong(millis).toRight(Right(NegativeTimeStamp(millis)))
+      }
+      _ <- frame.pushOpStack(Val.U256(timestamp))
+    } yield ()
+  }
+}
+
+object BlockTarget extends BlockInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      target <- {
+        val value = frame.ctx.blockEnv.target.value
+        util.U256.from(value).toRight(Right(InvalidTarget(value)))
+      }
+      _ <- frame.pushOpStack(Val.U256(target))
+    } yield ()
+  }
+}
+
+sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
+
+object TxId extends TxInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.ByteVec(frame.ctx.txId.bytes))
+  }
+}
+
+object TxCaller extends TxInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerIndex <- frame.popOpStackT[Val.U256]()
+      caller      <- frame.ctx.getTxCaller(callerIndex)
+      _           <- frame.pushOpStack(caller)
+    } yield ()
+  }
+}
+
+object TxCallerSize extends TxInstr {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
+  }
+}
+
+sealed trait Log extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasHigh {
+  def n: Int
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.opStack.pop(n).map(_ => ()) // TODO: send the log to an event bus
+  }
+}
+object Log1 extends Log { val n: Int = 1 }
+object Log2 extends Log { val n: Int = 2 }
+object Log3 extends Log { val n: Int = 3 }
+object Log4 extends Log { val n: Int = 4 }
+object Log5 extends Log { val n: Int = 5 }

@@ -371,8 +371,8 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
       val block = emptyBlock(blockFlow, chainIndex)
       CliqueManager.BroadCastBlock(
         block,
-        Message.serialize(NewBlock(block), networkSetting.networkType),
-        Message.serialize(NewHeader(block.header), networkSetting.networkType),
+        Message.serialize(NewBlock(block)),
+        Message.serialize(NewHeader(block.header)),
         origin,
         broadcastInterClique = true
       )

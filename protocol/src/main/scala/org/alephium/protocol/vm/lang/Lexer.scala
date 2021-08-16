@@ -24,6 +24,9 @@ import fastparse.NoWhitespace._
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.Val.ByteVec
+import org.alephium.protocol.vm.lang.ArithOperator._
+import org.alephium.protocol.vm.lang.LogicalOperator._
+import org.alephium.protocol.vm.lang.TestOperator._
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -63,17 +66,12 @@ object Lexer {
       case (_, i)   => i
     }
   def typedNum[_: P]: P[Val] =
-    P(num ~ ("i" | "u" | "b").?.!)
+    P(num ~ ("i" | "u").?.!)
       .map {
         case (n, "i") =>
           I256.from(n) match {
             case Some(value) => Val.I256(value)
             case None        => throw Compiler.Error(s"Invalid I256 value: $n")
-          }
-        case (n, "b") =>
-          U64.from(n).filter(u => u.v < 0x100) match {
-            case Some(value) => Val.Byte(value.v.toByte)
-            case None        => throw Compiler.Error(s"Invalid Byte value: $n")
           }
         case (n, _) =>
           U256.from(n) match {
@@ -84,7 +82,7 @@ object Lexer {
 
   def bytesInternal[_: P]: P[Val.ByteVec] =
     P(hex).!.map { hexString =>
-      val byteVecOpt = Hex.asArraySeq(hexString).map(ByteVec(_))
+      val byteVecOpt = Hex.from(hexString).map(ByteVec(_))
       byteVecOpt match {
         case Some(byteVec) => byteVec
         case None          => throw Compiler.Error(s"Invalid byteVec: $hexString")
@@ -108,11 +106,20 @@ object Lexer {
       case _      => Val.Bool(false)
     }
 
+  def opByteVecAdd[_: P]: P[Operator] = P("++").map(_ => Concat)
   def opAdd[_: P]: P[Operator]        = P("+").map(_ => Add)
   def opSub[_: P]: P[Operator]        = P("-").map(_ => Sub)
   def opMul[_: P]: P[Operator]        = P("*").map(_ => Mul)
   def opDiv[_: P]: P[Operator]        = P("/").map(_ => Div)
   def opMod[_: P]: P[Operator]        = P("%").map(_ => Mod)
+  def opModAdd[_: P]: P[Operator]     = P("⊕" | "`+`").map(_ => ModAdd)
+  def opModSub[_: P]: P[Operator]     = P("⊖" | "`-`").map(_ => ModSub)
+  def opModMul[_: P]: P[Operator]     = P("⊗" | "`*`").map(_ => ModMul)
+  def opSHL[_: P]: P[Operator]        = P("<<").map(_ => SHL)
+  def opSHR[_: P]: P[Operator]        = P(">>").map(_ => SHR)
+  def opBitAnd[_: P]: P[Operator]     = P("&").map(_ => BitAnd)
+  def opXor[_: P]: P[Operator]        = P("^").map(_ => Xor)
+  def opBitOr[_: P]: P[Operator]      = P("|").map(_ => BitOr)
   def opEq[_: P]: P[TestOperator]     = P("==").map(_ => Eq)
   def opNe[_: P]: P[TestOperator]     = P("!=").map(_ => Ne)
   def opLt[_: P]: P[TestOperator]     = P("<").map(_ => Lt)

@@ -27,7 +27,7 @@ import org.scalatest.Assertion
 
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.Generators
-import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
+import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration, TimeStamp}
@@ -38,7 +38,7 @@ class DiscoveryServerStateSpec
   import DiscoveryMessage._
   import DiscoveryServerSpec._
 
-  trait Fixture { self =>
+  trait Fixture extends NetworkConfigFixture.Default { self =>
     def groupSize: Int           = 4
     val udpPort: Int             = SocketUtil.temporaryLocalPort(udp = true)
     def peersPerGroup: Int       = 1
@@ -46,7 +46,6 @@ class DiscoveryServerStateSpec
     def expireDuration: Duration = Duration.ofHoursUnsafe(1)
     def peersTimeout: Duration   = Duration.ofSecondsUnsafe(5)
     val socketProbe              = TestProbe()
-    val networkConfig            = new NetworkConfig { val networkType = NetworkType.Testnet }
 
     implicit lazy val config: DiscoveryConfig with BrokerConfig =
       createConfig(
@@ -80,12 +79,7 @@ class DiscoveryServerStateSpec
         createConfig(groupSize, udpPort, peersPerGroup, scanFrequency)._2
       socketProbe.expectMsgPF() { case send: UdpServer.Send =>
         val message =
-          DiscoveryMessage
-            .deserialize(send.message, networkConfig.networkType)(
-              peerConfig
-            )
-            .toOption
-            .get
+          DiscoveryMessage.deserialize(send.message)(peerConfig, networkConfig).rightValue
         message.payload.asInstanceOf[T]
       }
     }

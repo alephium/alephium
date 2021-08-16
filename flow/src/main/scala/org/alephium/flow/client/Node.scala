@@ -128,17 +128,9 @@ object Node {
     val nodeStateStorage = storages.nodeStateStorage
     val isInitialized    = Utils.unsafe(nodeStateStorage.isInitialized())
     if (isInitialized) {
-      BlockFlow.fromStorageUnsafe(storages, config.genesisBlocks)(
-        config.broker,
-        config.consensus,
-        config.mempool
-      )
+      BlockFlow.fromStorageUnsafe(config, storages)
     } else {
-      val blockflow = BlockFlow.fromGenesisUnsafe(storages, config.genesisBlocks)(
-        config.broker,
-        config.consensus,
-        config.mempool
-      )
+      val blockflow = BlockFlow.fromGenesisUnsafe(config, storages)
       Utils.unsafe(nodeStateStorage.setInitialized())
       blockflow
     }

@@ -165,7 +165,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
-    txValidation.validateTx(tx0, blockFlow) isE ()
+    txValidation.validateTxOnlyForTest(tx0, blockFlow) isE ()
 
     blockFlow
       .transfer(
@@ -193,6 +193,6 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
     val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
-    txValidation.validateTx(sweepTx, blockFlow) isE ()
+    txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
   }
 }

@@ -16,36 +16,56 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{discard, AVector}
+import org.alephium.util.{discard, AVector, TimeStamp}
 
-trait ChainEnv
-trait BlockEnv
-trait TxEnv
-trait ContractEnv
+final case class BlockEnv(chainId: ChainId, timeStamp: TimeStamp, target: Target)
+object BlockEnv {
+  def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
+    BlockEnv(networkConfig.chainId, header.timestamp, header.target)
+}
+
+final case class TxEnv(
+    tx: TransactionAbstract,
+    prevOutputs: AVector[TxOutput],
+    signatures: Stack[Signature]
+)
 
 trait StatelessContext extends CostStrategy {
-  def txId: Hash
-  def signatures: Stack[Signature]
+  def blockEnv: BlockEnv
+  def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
+
+  def tx: TransactionAbstract      = txEnv.tx
+  def txId: Hash                   = txEnv.tx.id
+  def signatures: Stack[Signature] = txEnv.signatures
+
+  def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {
+    indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get) match {
+      case Some(output) => Right(Val.Address(output.lockupScript))
+      case None         => failed(InvalidTxCallerIndex)
+    }
+  }
 }
 
 object StatelessContext {
-  def apply(txId: Hash, txGas: GasBox, signature: Signature): StatelessContext = {
-    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
-    apply(txId, txGas, stack)
-  }
+  def apply(
+      blockEnv: BlockEnv,
+      txEnv: TxEnv,
+      txGas: GasBox
+  ): StatelessContext =
+    new Impl(blockEnv, txEnv, txGas)
 
-  def apply(txId: Hash, txGas: GasBox, signatures: Stack[Signature]): StatelessContext =
-    new Impl(txId, signatures, txGas)
-
-  final class Impl(val txId: Hash, val signatures: Stack[Signature], var gasRemaining: GasBox)
-      extends StatelessContext {
-    override def getInitialBalances(): ExeResult[Balances] = failed(NonPayableFrame)
+  final class Impl(
+      val blockEnv: BlockEnv,
+      val txEnv: TxEnv,
+      var gasRemaining: GasBox
+  ) extends StatelessContext {
+    def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
   }
 }
 
@@ -64,10 +84,9 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
-    output.lockupScript match {
-      case LockupScript.P2C(contractId) =>
-        val contractOutput = output.asInstanceOf[ContractOutput]
-        val outputRef      = nextContractOutputRef(contractOutput)
+    output match {
+      case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
+        val outputRef = nextContractOutputRef(contractOutput)
         generatedOutputs.addOne(output)
         updateContractAsset(contractId, outputRef, contractOutput)
       case _ =>
@@ -77,7 +96,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def createContract(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
+      initialStateHash: Hash,
       initialBalances: BalancesPerLockup,
       initialFields: AVector[Val]
   ): ExeResult[Unit] = {
@@ -92,7 +112,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- code.check(initialFields)
       _ <-
         worldState
-          .createContractUnsafe(code, initialFields, outputRef, contractOutput)
+          .createContractUnsafe(code, initialStateHash, initialFields, outputRef, contractOutput)
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
@@ -113,6 +133,21 @@ trait StatefulContext extends StatelessContext with ContractPool {
     } yield balances
   }
 
+  def destroyContract(
+      contractId: ContractId,
+      contractAssets: BalancesPerLockup,
+      address: LockupScript
+  ): ExeResult[Unit] = {
+    for {
+      _ <- address match {
+        case _: LockupScript.Asset => okay
+        case _: LockupScript.P2C   => failed(InvalidAddressTypeInContractDestroy)
+      }
+      _ <- outputBalances.add(address, contractAssets).toRight(Right(InvalidBalances))
+      _ <- removeContract(contractId)
+    } yield ()
+  }
+
   def updateContractAsset(
       contractId: ContractId,
       outputRef: ContractOutputRef,
@@ -130,25 +165,28 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
 object StatefulContext {
   def apply(
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputs: AVector[TxOutput]
   ): StatefulContext = {
-    new Impl(tx, worldState, preOutputs, gasRemaining)
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.contractSignatures))
+    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
 
   def build(
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputsOpt: Option[AVector[TxOutput]]
   ): ExeResult[StatefulContext] = {
     preOutputsOpt match {
-      case Some(outputs) => Right(apply(tx, gasRemaining, worldState, outputs))
+      case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
         worldState.getPreOutputsForVM(tx) match {
-          case Right(Some(outputs)) => Right(apply(tx, gasRemaining, worldState, outputs))
+          case Right(Some(outputs)) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
           case Right(None)          => failed(NonExistTxInput)
           case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
         }
@@ -156,18 +194,15 @@ object StatefulContext {
   }
 
   final class Impl(
-      val tx: TransactionAbstract,
+      val blockEnv: BlockEnv,
+      val txEnv: TxEnv,
       val initWorldState: WorldState.Cached,
       val preOutputs: AVector[TxOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
-    override val worldState: WorldState.Staging = initWorldState.staging()
+    val worldState: WorldState.Staging = initWorldState.staging()
 
-    override def txId: Hash = tx.id
-
-    override val signatures: Stack[Signature] = Stack.popOnly(tx.contractSignatures)
-
-    override def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
+    def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     /*
      * this should be used only when the tx has passed these checks in validation
@@ -181,7 +216,7 @@ object StatefulContext {
         "org.wartremover.warts.Serializable"
       )
     )
-    override def getInitialBalances(): ExeResult[Balances] =
+    def getInitialBalances(): ExeResult[Balances] =
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
         for {
           balances <- Balances
@@ -192,9 +227,9 @@ object StatefulContext {
             .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {
-        failed(NonPayableFrame)
+        failed(ExpectNonPayableMethod)
       }
 
-    override val outputBalances: Balances = Balances.empty
+    val outputBalances: Balances = Balances.empty
   }
 }

@@ -32,8 +32,8 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, SignatureSchema}
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, CliqueId, NetworkType, TxGenerators}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.model.{Address, ChainId, CliqueId, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model
@@ -50,7 +50,7 @@ class WalletAppSpec
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
   val blockFlowMock =
-    new WalletAppSpec.BlockFlowServerMock(host, blockFlowPort, networkType)
+    new WalletAppSpec.BlockFlowServerMock(host, blockFlowPort)
 
   val walletApp: WalletApp =
     new WalletApp(config)
@@ -66,7 +66,7 @@ class WalletAppSpec
   var address: Address.Asset     = _
   var wallet: String             = "wallet-name"
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
-  val transferAddress            = Address.p2pkh(networkType, transferPublicKey).toBase58
+  val transferAddress            = Address.p2pkh(transferPublicKey).toBase58
   val transferAmount             = 10
   val balanceAmount              = U256.unsafe(42)
 
@@ -262,8 +262,9 @@ class WalletAppSpec
 
 object WalletAppSpec extends {
 
-  class BlockFlowServerMock(address: InetAddress, port: Int, val networkType: NetworkType)(implicit
-      val groupConfig: GroupConfig
+  class BlockFlowServerMock(address: InetAddress, port: Int)(implicit
+      val groupConfig: GroupConfig,
+      val networkConfig: NetworkConfig
   ) extends TxGenerators
       with ApiModelCodec
       with ScalaFutures {
@@ -320,7 +321,7 @@ object WalletAppSpec extends {
     router.route().path("/infos/self-clique").handler { ctx =>
       complete(
         ctx,
-        SelfClique(cliqueId, NetworkType.Mainnet, 18, AVector(peer, peer), true, true, 1, 2)
+        SelfClique(cliqueId, ChainId.AlephiumMainNet, 18, AVector(peer, peer), true, true, 1, 2)
       )
     }
 

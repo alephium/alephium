@@ -41,7 +41,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with Sock
       TestActorRef[MinerApiController](
         MinerApiController.props(allHandlers)(
           brokerConfig,
-          networkSetting.copy(minerApiPort = apiPort),
+          networkConfig.copy(minerApiPort = apiPort),
           miningSetting
         )
       )

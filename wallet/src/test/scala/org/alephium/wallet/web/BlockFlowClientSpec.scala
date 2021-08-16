@@ -41,10 +41,9 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
 
   trait Fixture extends Endpoints with LockupScriptGenerators with EndpointSender {
     implicit val groupConfig: GroupConfig = new GroupConfig { val groups = 4 }
-    val networkType                       = NetworkType.Devnet
     val groupIndex                        = GroupIndex.unsafe(0)
     val (script, publicKey, _)            = addressGen(groupIndex).sample.get
-    val toAddress                         = Address.Asset(networkType, script)
+    val toAddress                         = Address.Asset(script)
     val value                             = U256.from(1000).get
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
     val maybeApiKey                       = None

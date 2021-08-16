@@ -63,7 +63,7 @@ class ViewHandlerSpec extends AlephiumSpec {
     val txProbe = TestProbe()
     lazy val minderAddresses =
       AVector.tabulate(groupConfig.groups)(i =>
-        Address.Asset(networkSetting.networkType, addressGen(GroupIndex.unsafe(i)).sample.get._1)
+        Address.Asset(addressGen(GroupIndex.unsafe(i)).sample.get._1)
       )
     lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow, txProbe.ref))
   }

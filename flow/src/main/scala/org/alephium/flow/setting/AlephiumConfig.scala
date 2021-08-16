@@ -33,7 +33,7 @@ import org.alephium.conf._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Address, Block, NetworkType, Target, Weight}
+import org.alephium.protocol.model.{Address, Block, ChainId, Target, Weight}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, U256}
 
@@ -83,7 +83,7 @@ final case class MiningSetting(
 )
 
 final case class NetworkSetting(
-    networkType: NetworkType,
+    chainId: ChainId,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     pingFrequency: Duration,
@@ -166,7 +166,7 @@ final case class AlephiumConfig(
     genesisBalances: AVector[(LockupScript.Asset, U256)]
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
-    Configs.loadBlockFlow(genesisBalances)(broker, consensus)
+    Configs.loadBlockFlow(genesisBalances)(broker, consensus, network)
 }
 object AlephiumConfig {
   import ConfigUtils._
@@ -192,7 +192,7 @@ object AlephiumConfig {
   }
 
   final private case class TempNetworkSetting(
-      networkType: NetworkType,
+      chainId: ChainId,
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       pingFrequency: Duration,
@@ -215,10 +215,10 @@ object AlephiumConfig {
       restPort: Int,
       wsPort: Int,
       minerApiPort: Int
-  ) {
+  ) extends NetworkConfig {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
-        networkType,
+        chainId,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         pingFrequency,
@@ -275,7 +275,7 @@ object AlephiumConfig {
       node: NodeSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
-      parseMiners(mining.minerAddresses, network.networkType).map { minerAddresses =>
+      parseMiners(mining.minerAddresses).map { minerAddresses =>
         val consensusExtracted = consensus.toConsensusSetting(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         AlephiumConfig(
@@ -287,7 +287,7 @@ object AlephiumConfig {
           mempool,
           wallet,
           node,
-          Genesis(network.networkType)
+          Genesis(network.chainId)
         )
       } match {
         case Right(value) => value

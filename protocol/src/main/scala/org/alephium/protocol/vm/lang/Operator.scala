@@ -32,193 +32,147 @@ sealed trait ArithOperator extends Operator {
     }
   }
 }
-case object Add extends ArithOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(I256Add)
-      case Type.U256 => Seq(U256Add)
-      case _         => throw new RuntimeException("Dead branch")
+object ArithOperator {
+  private def binary(
+      i256Instr: BinaryArithmeticInstr[Val.I256],
+      u256Instr: BinaryArithmeticInstr[Val.U256]
+  ): ArithOperator = {
+    new ArithOperator {
+      override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+        argsType(0) match {
+          case Type.I256 => Seq(i256Instr)
+          case Type.U256 => Seq(u256Instr)
+          case _         => throw new RuntimeException("Dead branch")
+        }
+      }
     }
   }
-}
-case object Sub extends ArithOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(I256Sub)
-      case Type.U256 => Seq(U256Sub)
-      case _         => throw new RuntimeException("Dead branch")
+
+  private def u256Binary(name: String, instr: BinaryArithmeticInstr[Val.U256]): ArithOperator = {
+    new ArithOperator {
+      override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+        argsType(0) match {
+          case Type.U256 => Seq(instr)
+          case _         => throw new RuntimeException(s"$name accepts U256 only")
+        }
+      }
     }
   }
-}
-case object Mul extends ArithOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(I256Mul)
-      case Type.U256 => Seq(U256Mul)
-      case _         => throw new RuntimeException("Dead branch")
+
+  val Add: ArithOperator = binary(I256Add, U256Add)
+  val Sub: ArithOperator = binary(I256Sub, U256Sub)
+  val Mul: ArithOperator = binary(I256Mul, U256Mul)
+  val Div: ArithOperator = binary(I256Div, U256Div)
+  val Mod: ArithOperator = binary(I256Mod, U256Mod)
+
+  val ModAdd: ArithOperator = u256Binary("ModAdd", U256ModAdd)
+  val ModSub: ArithOperator = u256Binary("ModSub", U256ModSub)
+  val ModMul: ArithOperator = u256Binary("ModMul", U256ModMul)
+  val SHL: ArithOperator    = u256Binary("SHL", U256SHL)
+  val SHR: ArithOperator    = u256Binary("SHR", U256SHR)
+  val BitAnd: ArithOperator = u256Binary("BitAnd", U256BitAnd)
+  val BitOr: ArithOperator  = u256Binary("BitOr", U256BitOr)
+  val Xor: ArithOperator    = u256Binary("Xor", U256Xor)
+
+  val Concat: Operator = new Operator {
+    override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
+      if (argsType.length != 2 || argsType(0) != Type.ByteVec || argsType(1) != Type.ByteVec) {
+        throw Compiler.Error(s"Invalid param types $argsType for $this")
+      } else {
+        Seq(Type.ByteVec)
+      }
     }
-  }
-}
-case object Div extends ArithOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(I256Div)
-      case Type.U256 => Seq(U256Div)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-}
-case object Mod extends ArithOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(I256Mod)
-      case Type.U256 => Seq(U256Mod)
-      case _         => throw new RuntimeException("Dead branch")
+
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      Seq(ByteVecConcat)
     }
   }
 }
 
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
-    if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
+    if (argsType.length != 2 || argsType(0) != argsType(1)) {
       throw Compiler.Error(s"Invalid param types $argsType for $this")
     } else {
       Seq(Type.Bool)
     }
   }
+}
+object TestOperator {
+  case object Eq extends TestOperator {
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Type.I256    => Seq(I256Eq)
+        case Type.U256    => Seq(U256Eq)
+        case Type.Bool    => Seq(BoolEq)
+        case Type.ByteVec => Seq(ByteVecEq)
+        case Type.Address => Seq(AddressEq)
+        case _            => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
+  case object Ne extends TestOperator {
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      argsType(0) match {
+        case Type.I256    => Seq(I256Neq)
+        case Type.U256    => Seq(U256Neq)
+        case Type.Bool    => Seq(BoolNeq)
+        case Type.ByteVec => Seq(ByteVecNeq)
+        case Type.Address => Seq(AddressNeq)
+        case _            => throw new RuntimeException("Dead branch")
+      }
+    }
+  }
 
-  def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]]
-}
-case object Eq extends TestOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(EqI256)
-      case Type.U256 => Seq(EqU256)
-      case _         => throw new RuntimeException("Dead branch")
+  private def inequality(
+      i256Instr: BinaryArithmeticInstr[Val.I256],
+      u256Instr: BinaryArithmeticInstr[Val.U256]
+  ): TestOperator = {
+    new TestOperator {
+      override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+        argsType(0) match {
+          case Type.I256 => Seq(i256Instr)
+          case Type.U256 => Seq(u256Instr)
+          case _         => throw new RuntimeException("Expect I256/U256 for inequality test")
+        }
+      }
     }
   }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfNeI256(offset))
-      case Type.U256 => Seq(IfNeU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-}
-case object Ne extends TestOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(NeI256)
-      case Type.U256 => Seq(NeU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfEqI256(offset))
-      case Type.U256 => Seq(IfEqU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-}
-case object Lt extends TestOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(LtI256)
-      case Type.U256 => Seq(LtU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfGeI256(offset))
-      case Type.U256 => Seq(IfGeU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-}
-case object Le extends TestOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(LeI256)
-      case Type.U256 => Seq(LeU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfGtI256(offset))
-      case Type.U256 => Seq(IfGtU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-}
-case object Gt extends TestOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(GtI256)
-      case Type.U256 => Seq(GtU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfLeI256(offset))
-      case Type.U256 => Seq(IfLeU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-}
-case object Ge extends TestOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
-      case Type.I256 => Seq(GeI256)
-      case Type.U256 => Seq(GeU256)
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] = {
-    left(0) match {
-      case Type.I256 => Seq(IfLtI256(offset))
-      case Type.U256 => Seq(IfLtU256(offset))
-      case _         => throw new RuntimeException("Dead branch")
-    }
-  }
+
+  val Lt: TestOperator = inequality(I256Lt, U256Lt)
+  val Le: TestOperator = inequality(I256Le, U256Le)
+  val Gt: TestOperator = inequality(I256Gt, U256Gt)
+  val Ge: TestOperator = inequality(I256Ge, U256Ge)
 }
 
 sealed trait LogicalOperator extends TestOperator
-case object Not extends LogicalOperator {
-  override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
-    if (argsType.length != 1 || argsType(0) != Type.Bool) {
-      throw Compiler.Error(s"Invalid param types $argsType for $this")
-    } else {
-      Seq(Type.Bool)
+
+object LogicalOperator {
+  case object Not extends LogicalOperator {
+    override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
+      if (argsType.length != 1 || argsType(0) != Type.Bool) {
+        throw Compiler.Error(s"Invalid param types $argsType for $this")
+      } else {
+        Seq(Type.Bool)
+      }
     }
+
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolNot)
   }
 
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(NotBool)
-
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] =
-    Seq(IfTrue(offset))
-}
-sealed trait BinaryLogicalOperator extends LogicalOperator {
-  override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
-    if (argsType.length != 2 || argsType(0) != Type.Bool || argsType(1) != Type.Bool) {
-      throw Compiler.Error(s"Invalid param types $argsType for $this")
-    } else {
-      Seq(Type.Bool)
+  sealed trait BinaryLogicalOperator extends LogicalOperator {
+    override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
+      if (argsType.length != 2 || argsType(0) != Type.Bool || argsType(1) != Type.Bool) {
+        throw Compiler.Error(s"Invalid param types $argsType for $this")
+      } else {
+        Seq(Type.Bool)
+      }
     }
   }
-}
-case object And extends BinaryLogicalOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(AndBool)
-
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] =
-    Seq(IfNotAnd(offset))
-}
-case object Or extends BinaryLogicalOperator {
-  override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(OrBool)
-
-  override def toBranchIR(left: Seq[Type], offset: Byte): Seq[Instr[StatelessContext]] =
-    Seq(IfNotOr(offset))
+  case object And extends BinaryLogicalOperator {
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolAnd)
+  }
+  case object Or extends BinaryLogicalOperator {
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolOr)
+  }
 }

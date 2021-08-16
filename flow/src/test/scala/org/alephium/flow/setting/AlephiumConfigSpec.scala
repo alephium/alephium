@@ -26,7 +26,7 @@ import com.typesafe.config.ConfigValueFactory
 import net.ceedubs.ficus.Ficus._
 
 import org.alephium.conf._
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.{Address, ChainId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
 class AlephiumConfigSpec extends AlephiumSpec {
@@ -37,7 +37,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     config.broker.groups is 13
-    config.network.networkType is NetworkType.Devnet
+    config.network.chainId is ChainId(2)
     config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.network.connectionBufferCapacityInByte is 100000000L
   }
@@ -66,8 +66,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
   it should "load miner's addresses" in new AlephiumConfigFixture {
     val minerAddresses = AVector(
-      "D19zzHckZmX9Sjs6yERD15JBLa7HhVXfdrUAMRmLgKFpcr",
-      "D15kHgMQX6ZMH3prxEFcFDkFBv4B7dcffCwVSRCr8nUe7N"
+      "19zzHckZmX9Sjs6yERD15JBLa7HhVXfdrUAMRmLgKFpcr",
+      "15kHgMQX6ZMH3prxEFcFDkFBv4B7dcffCwVSRCr8nUe7N"
     )
 
     override val configValues: Map[String, Any] = Map(
@@ -78,14 +78,14 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     config.mining.minerAddresses is Some(
-      minerAddresses.map(str => Address.asset(str, NetworkType.Devnet).get)
+      minerAddresses.map(str => Address.asset(str).get)
     )
   }
 
   it should "fail to load if miner's addresses are wrong" in new AlephiumConfigFixture {
     val minerAddresses = AVector(
-      "T149bUQbTo6tHa35U3QC1tsAkEDaryyQGJD2S8eomYfcZx",
-      "T1D9PBcRXK5uzrNYokNMB7oh6JpW86sZajJ5gD845cshED"
+      "49bUQbTo6tHa35U3QC1tsAkEDaryyQGJD2S8eomYfcZx",
+      "D9PBcRXK5uzrNYokNMB7oh6JpW86sZajJ5gD845cshED"
     )
 
     override val configValues: Map[String, Any] = Map(

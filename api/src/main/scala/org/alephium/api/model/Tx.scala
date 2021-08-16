@@ -29,26 +29,26 @@ final case class Tx(
 )
 
 object Tx {
-  def from(tx: Transaction, networkType: NetworkType): Tx =
+  def from(tx: Transaction): Tx =
     Tx(
       tx.id,
       tx.unsigned.inputs.map[Input](Input.from) ++
         tx.contractInputs.map[Input](Input.from),
-      tx.unsigned.fixedOutputs.map(Output.from(_, networkType)) ++
-        tx.generatedOutputs.map(Output.from(_, networkType)),
+      tx.unsigned.fixedOutputs.map(Output.from(_)) ++
+        tx.generatedOutputs.map(Output.from),
       tx.unsigned.startGas.value,
       tx.unsigned.gasPrice.value
     )
 
-  def from(unsignedTx: UnsignedTransaction, networkType: NetworkType): Tx =
+  def from(unsignedTx: UnsignedTransaction): Tx =
     Tx(
       unsignedTx.hash,
       unsignedTx.inputs.map(Input.from),
-      unsignedTx.fixedOutputs.map(Output.from(_, networkType)),
+      unsignedTx.fixedOutputs.map(Output.from(_)),
       unsignedTx.startGas.value,
       unsignedTx.gasPrice.value
     )
 
-  def fromTemplate(tx: TransactionTemplate, networkType: NetworkType): Tx =
-    from(tx.unsigned, networkType)
+  def fromTemplate(tx: TransactionTemplate): Tx =
+    from(tx.unsigned)
 }

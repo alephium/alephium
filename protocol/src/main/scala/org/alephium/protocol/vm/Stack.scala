@@ -25,37 +25,37 @@ import org.alephium.util.AVector
 object Stack {
   def ofCapacity[T: ClassTag](capacity: Int): Stack[T] = {
     val underlying = mutable.ArraySeq.make(new Array[T](capacity))
-    new Stack(underlying, 0, capacity, 0)
+    new Stack(underlying, 0, currentIndex = 0, maxIndex = capacity)
   }
 
   def popOnly[T: ClassTag](elems: AVector[T]): Stack[T] = {
-    unsafe(elems, elems.length)
+    val underlying = mutable.ArraySeq.make(elems.toArray)
+    popOnly(underlying)
   }
 
   def unsafe[T: ClassTag](elems: AVector[T], maxSize: Int): Stack[T] = {
     assume(elems.length <= maxSize)
-    val underlying = mutable.ArraySeq.make(elems.toArray)
-    unsafe(underlying, maxSize)
+    val array = Array.ofDim[T](maxSize)
+    elems.foreachWithIndex((t, index) => array(index) = t)
+    val underlying = mutable.ArraySeq.make(array)
+    new Stack[T](underlying, 0, currentIndex = elems.length, maxIndex = maxSize)
   }
 
-  def unsafe[T: ClassTag](elems: mutable.ArraySeq[T], maxSize: Int): Stack[T] = {
-    assume(elems.length <= maxSize)
-    new Stack(elems, 0, maxSize, elems.length)
+  def popOnly[T: ClassTag](elems: mutable.ArraySeq[T]): Stack[T] = {
+    new Stack(elems, 0, currentIndex = elems.length, maxIndex = elems.length)
   }
 }
 
-// Note: current place at underlying is empty
+// Note: the element at currentIndex is empty
 class Stack[@sp T: ClassTag](
     val underlying: mutable.ArraySeq[T],
     val offset: Int,
-    val capacity: Int,
-    var currentIndex: Int
+    var currentIndex: Int,
+    val maxIndex: Int
 ) {
-  val maxIndex: Int = offset + capacity
+  def capacity: Int = maxIndex - offset
 
   def isEmpty: Boolean = currentIndex == offset
-
-  def nonEmpty: Boolean = currentIndex != offset
 
   def size: Int = currentIndex - offset
 
@@ -93,60 +93,56 @@ class Stack[@sp T: ClassTag](
   }
 
   def pop(n: Int): ExeResult[AVector[T]] = {
-    if (n == 0) {
-      Right(AVector.ofSize(0))
-    } else if (n <= size) {
+    if (n > size) {
+      failed(StackUnderflow)
+    } else if (n > 0) {
       val start = currentIndex - n // always >= offset
       val elems = AVector.tabulate(n) { k => underlying(start + k) }
       currentIndex = start
       Right(elems)
+    } else if (n == 0) {
+      Right(AVector.ofSize(0))
     } else {
-      failed(StackUnderflow)
+      failed(NegativeArgumentInStack)
     }
   }
 
-  def remove(total: Int): ExeResult[Unit] = {
-    if (size < total) {
+  def remove(n: Int): ExeResult[Unit] = {
+    if (n > size) {
       failed(StackUnderflow)
-    } else {
-      currentIndex -= total
+    } else if (n > 0) {
+      currentIndex -= n
       Right(())
-    }
-  }
-
-  // Note: index starts from 1
-  def peek(index: Int): ExeResult[T] = {
-    val elemIndex = currentIndex - index
-    if (index < 1) {
-      failed(StackOverflow)
-    } else if (elemIndex < offset) {
-      failed(StackUnderflow)
     } else {
-      Right(underlying(elemIndex))
-    }
-  }
-
-  // Note: index starts from 1
-  def dup(index: Int): ExeResult[Unit] = {
-    peek(index).flatMap(push)
-  }
-
-  // Note: index starts from 2
-  def swap(index: Int): ExeResult[Unit] = {
-    val fromIndex = currentIndex - 1
-    val toIndex   = currentIndex - index
-    if (index <= 1) {
-      failed(StackOverflow)
-    } else if (toIndex < offset) {
-      failed(StackUnderflow)
-    } else {
-      val tmp = underlying(fromIndex)
-      underlying(fromIndex) = underlying(toIndex)
-      underlying(toIndex) = tmp
-      Right(())
+      failed(NegativeArgumentInStack)
     }
   }
 
   def remainingStack(): Stack[T] =
-    new Stack[T](underlying, currentIndex, maxIndex - currentIndex, currentIndex)
+    new Stack[T](
+      underlying,
+      offset = currentIndex,
+      currentIndex = currentIndex,
+      maxIndex = maxIndex
+    )
+
+  // reserve n spots on top of the stack for method variables or contract fields
+  def reserveForVars(n: Int): ExeResult[(VarVector[T], Stack[T])] = {
+    val nextStackIndex = currentIndex + n
+    if (nextStackIndex > maxIndex) {
+      failed(StackOverflow)
+    } else if (nextStackIndex >= currentIndex) {
+      val varVector = VarVector.unsafe(underlying, currentIndex, n)
+      val newStack =
+        new Stack[T](
+          underlying,
+          offset = nextStackIndex,
+          currentIndex = nextStackIndex,
+          maxIndex = maxIndex
+        )
+      Right(varVector -> newStack)
+    } else {
+      failed(NegativeArgumentInStack)
+    }
+  }
 }

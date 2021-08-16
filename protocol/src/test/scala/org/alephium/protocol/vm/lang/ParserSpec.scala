@@ -17,8 +17,11 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
+import org.alephium.protocol.vm.lang.ArithOperator._
+import org.alephium.protocol.vm.lang.LogicalOperator._
+import org.alephium.protocol.vm.lang.TestOperator._
 import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
 
 class ParserSpec extends AlephiumSpec {
@@ -44,15 +47,7 @@ class ParserSpec extends AlephiumSpec {
         Variable(Ident("u"))
       )
     fastparse.parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
-      Binop[StatelessContext](
-        And,
-        Binop(
-          And,
-          Binop(Lt, Variable(Ident("x")), Variable(Ident("y"))),
-          Binop(Le, Variable(Ident("y")), Variable(Ident("y")))
-        ),
-        Binop(Lt, Variable(Ident("y")), Variable(Ident("z")))
-      )
+      Binop[StatelessContext](Lt, Variable(Ident("x")), Variable(Ident("y")))
     fastparse.parse("x && y || z", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Or,
@@ -136,7 +131,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parser contract initial states" in {
     val bytes    = Hash.generate
-    val address  = Address.p2pkh(NetworkType.Mainnet, PublicKey.generate)
+    val address  = Address.p2pkh(PublicKey.generate)
     val stateRaw = s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}]"
     val expected =
       Seq[Val](
@@ -148,5 +143,17 @@ class ParserSpec extends AlephiumSpec {
       )
     fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
     Compiler.compileState(stateRaw).rightValue is AVector.from(expected)
+  }
+
+  it should "parse bytes and address" in {
+    val hash    = Hash.random
+    val address = Address.p2pkh(PublicKey.generate)
+    fastparse
+      .parse(
+        s"foo.foo(#${hash.toHexString}, #${hash.toHexString}, @${address.toBase58})",
+        StatefulParser.contractCall(_)
+      )
+      .get
+      .value is a[ContractCall]
   }
 }

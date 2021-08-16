@@ -22,7 +22,7 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
 import org.alephium.protocol.{BlockHash, Hash, Signature}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
 import org.alephium.util.{AVector, TimeStamp}
@@ -33,6 +33,9 @@ import org.alephium.util.{AVector, TimeStamp}
 class TxOrderBench {
   implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = 4
+  }
+  implicit val networkConfig: NetworkConfig = new NetworkConfig {
+    override def chainId: ChainId = ChainId(0)
   }
   val txNum: Int = 2000
   val header: BlockHeader =

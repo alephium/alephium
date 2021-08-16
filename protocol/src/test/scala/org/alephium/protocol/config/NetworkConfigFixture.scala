@@ -14,14 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol
+package org.alephium.protocol.config
 
-import org.alephium.serde.{serialize, Serde}
+import org.alephium.protocol.model.ChainId
 
-abstract class HashSerde[T: Serde] { self: T =>
-  def hash: Hash
+trait NetworkConfigFixture { self =>
+  def chainId: ChainId
 
-  protected def _getHash: Hash = Hash.hash(serialize[T](this))
+  implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
+    override def chainId: ChainId = self.chainId
+  }
+}
 
-  def shortHex: String = hash.shortHex
+object NetworkConfigFixture {
+  trait Default extends NetworkConfigFixture {
+    val chainId: ChainId = ChainId(2)
+  }
 }

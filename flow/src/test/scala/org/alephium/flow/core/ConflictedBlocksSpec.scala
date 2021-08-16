@@ -19,11 +19,15 @@ package org.alephium.flow.core
 import org.scalacheck.Gen
 
 import org.alephium.protocol.{BlockHash, Hash, Signature}
-import org.alephium.protocol.config.GroupConfigFixture
+import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
-class ConflictedBlocksSpec extends AlephiumSpec with TxInputGenerators with GroupConfigFixture {
+class ConflictedBlocksSpec
+    extends AlephiumSpec
+    with TxInputGenerators
+    with GroupConfigFixture
+    with NetworkConfigFixture.Default {
   val groups   = 3
   val txInputs = Gen.listOfN(10, txInputGen).sample.get.toIndexedSeq
 

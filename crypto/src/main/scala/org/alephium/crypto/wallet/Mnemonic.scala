@@ -80,12 +80,13 @@ object Mnemonic {
     fromEntropyUnsafe(entropy)
   }
 
-  protected[wallet] def validateWords(words: AVector[String]): Boolean = {
+  private def validateWords(words: Array[String]): Boolean = {
     Size.validate(words.length) && words.forall(englishWordlist.contains)
   }
 
-  def fromWords(words: AVector[String]): Option[Mnemonic] = {
-    Option.when(validateWords(words))(new Mnemonic(words))
+  def from(input: String): Option[Mnemonic] = {
+    val words = input.split(" ")
+    Option.when(validateWords(words))(new Mnemonic(AVector.unsafe(words)))
   }
 
   protected[wallet] def validateEntropy(entropy: ByteString): Boolean = {

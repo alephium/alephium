@@ -66,7 +66,7 @@ trait LockupScriptGenerators extends Generators {
   def addressStringGen(groupIndex: GroupIndex): Gen[(String, PublicKey, PrivateKey)] =
     addressGen(groupIndex).map { case (script, publicKey, privateKey) =>
       (
-        Address.from(NetworkType.Devnet, script).toBase58,
+        Address.from(script).toBase58,
         publicKey,
         privateKey
       )
@@ -78,7 +78,7 @@ trait LockupScriptGenerators extends Generators {
       (script, publicKey, privateKey) <- addressGen(groupIndex)
     } yield {
       (
-        Address.from(NetworkType.Devnet, script).toBase58,
+        Address.from(script).toBase58,
         publicKey.toHexString,
         privateKey.toHexString
       )
@@ -117,7 +117,7 @@ trait TxInputGenerators extends Generators {
       hash       <- hashGen
     } yield {
       val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
-      TxInput(outputRef, UnlockScript.p2pkh(PublicKey.zero))
+      TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
 }
 
@@ -169,6 +169,7 @@ trait TxGenerators
     with LockupScriptGenerators
     with TxInputGenerators
     with TokenGenerators {
+  implicit def networkConfig: NetworkConfig
 
   lazy val createdHeightGen: Gen[Int] = Gen.choose(ALF.GenesisHeight, Int.MaxValue)
 
@@ -278,7 +279,7 @@ trait TxGenerators
           }
         balance.toOutput(lockupScript, lockTime, dataGen.sample.get)
       }
-      UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)
+      UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)(networkConfig)
     }
 
   def balancesGen(inputNum: Int, minTokens: Int, maxTokens: Int): Gen[Balances] =
@@ -450,6 +451,7 @@ trait NoIndexModelGenerators
     extends NoIndexModelGeneratorsLike
     with GroupConfigFixture.Default
     with ConsensusConfigFixture.Default
+    with NetworkConfigFixture.Default
 
 object ModelGenerators {
   final case class ScriptPair(

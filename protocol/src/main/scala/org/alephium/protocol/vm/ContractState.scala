@@ -16,12 +16,14 @@
 
 package org.alephium.protocol.vm
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractOutputRef
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 final case class ContractState private (
-    code: StatefulContract,
+    code: StatefulContract.HalfDecoded,
+    initialStateHash: Hash,
     fields: AVector[Val],
     contractOutputRef: ContractOutputRef
 ) {
@@ -36,17 +38,21 @@ final case class ContractState private (
 
 object ContractState {
   implicit val serde: Serde[ContractState] =
-    Serde.forProduct3(ContractState.apply, t => (t.code, t.fields, t.contractOutputRef))
+    Serde.forProduct4(
+      ContractState.apply,
+      t => (t.code, t.initialStateHash, t.fields, t.contractOutputRef)
+    )
 
   val forMPt: ContractState =
-    ContractState(StatefulContract.forSMT, AVector.empty, ContractOutputRef.forSMT)
+    ContractState(StatefulContract.forSMT, Hash.zero, AVector.empty, ContractOutputRef.forSMT)
 
   def unsafe(
-      code: StatefulContract,
+      code: StatefulContract.HalfDecoded,
+      initialStateHash: Hash,
       fields: AVector[Val],
       contractOutputRef: ContractOutputRef
   ): ContractState = {
     assume(code.validate(fields))
-    new ContractState(code, fields, contractOutputRef)
+    new ContractState(code, initialStateHash, fields, contractOutputRef)
   }
 }

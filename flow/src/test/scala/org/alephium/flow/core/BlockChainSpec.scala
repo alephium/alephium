@@ -244,7 +244,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getBlockSlice(lastBlock) isE chainExpected
     chain.isTip(headBlock) is false
     chain.isTip(lastBlock) is true
-    chain.getBestTipUnsafe is lastBlock.hash
+    chain.getBestTipUnsafe() is lastBlock.hash
     chain.maxHeight isE blocks.length
     chain.getAllTips is AVector(lastBlock.hash)
 
@@ -277,7 +277,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getBlockSlice(longChain.last) isE AVector(genesis) ++ longChain
     chain.isTip(longChain.head) is false
     chain.isTip(longChain.last) is true
-    chain.getBestTipUnsafe is longChain.last.hash
+    chain.getBestTipUnsafe() is longChain.last.hash
     chain.maxHeight isE longChain.length
     chain.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
   }

@@ -34,14 +34,14 @@ import org.alephium.util._
 // scalastyle:off magic.number
 trait EndpointsExamples extends ErrorExamples {
 
-  private val networkType = NetworkType.Mainnet
+  private val chainId = ChainId(0)
   private val lockupScript =
     LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
-  private val address                    = Address.Asset(networkType, lockupScript)
+  private val address                    = Address.Asset(lockupScript)
   private val cliqueId                   = CliqueId(publicKey)
   private val port                       = 12344
   private val minerApiPort               = 12355
@@ -140,7 +140,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       SelfClique(
         cliqueId,
-        networkType,
+        chainId,
         numZerosAtLeastInHash = 18,
         peers,
         selfReady = true,

@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import org.alephium.macros.Gas
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.TxOutput
 import org.alephium.serde._
@@ -38,39 +39,45 @@ trait GasFormula extends GasSchedule {
   def gas(size: Int): GasBox
 }
 
-trait GasZero extends GasSimple {
-  def gas(): GasBox = GasZero.gas
-}
+@Gas
+trait GasZero extends GasSimple
 object GasZero {
   val gas: GasBox = GasBox.unsafe(0)
 }
 
-trait GasVeryLow extends GasSimple {
-  def gas(): GasBox = GasVeryLow.gas
-}
+@Gas
+trait GasVeryLow extends GasSimple
 object GasVeryLow {
   val gas: GasBox = GasBox.unsafe(3)
 }
 
-trait GasLow extends GasSimple {
-  def gas(): GasBox = GasLow.gas
-}
+@Gas
+trait GasLow extends GasSimple
 object GasLow {
   val gas: GasBox = GasBox.unsafe(5)
 }
 
-trait GasMid extends GasSimple {
-  def gas(): GasBox = GasMid.gas
-}
+@Gas
+trait GasMid extends GasSimple
 object GasMid {
   val gas: GasBox = GasBox.unsafe(8)
 }
 
-trait GasHigh extends GasSimple {
-  def gas(): GasBox = GasHigh.gas
-}
+@Gas
+trait GasHigh extends GasSimple
 object GasHigh {
   val gas: GasBox = GasBox.unsafe(10)
+}
+
+trait GasToByte extends GasFormula {
+  def gas(inputLength: Int): GasBox = GasToByte.gas(inputLength)
+}
+object GasToByte {
+  val baseGas: Int         = 3
+  val extraGasPerWord: Int = 2
+
+  def gas(inputLength: Int): GasBox =
+    GasBox.unsafe(baseGas + extraGasPerWord * ((inputLength + 3) / 8))
 }
 
 trait GasHash extends GasFormula {
@@ -84,23 +91,26 @@ object GasHash {
     GasBox.unsafe(GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8))
 }
 
-trait GasSignature extends GasSimple {
-  def gas(): GasBox = GasSignature.gas
-}
+@Gas
+trait GasSignature extends GasSimple
 object GasSignature {
   val gas: GasBox = GasBox.unsafe(10000) // TODO: bench this
 }
 
-trait GasCreate extends GasSimple {
-  def gas(): GasBox = GasCreate.gas
-}
+@Gas
+trait GasCreate extends GasSimple
 object GasCreate {
   val gas: GasBox = GasBox.unsafe(32000)
 }
 
-trait GasBalance extends GasSimple {
-  def gas(): GasBox = GasBalance.gas
+@Gas
+trait GasDestroy extends GasSimple
+object GasDestroy {
+  val gas: GasBox = GasBox.unsafe(10000)
 }
+
+@Gas
+trait GasBalance extends GasSimple
 object GasBalance {
   val gas: GasBox = GasBox.unsafe(50)
 }

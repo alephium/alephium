@@ -24,7 +24,11 @@ class I256Spec extends AlephiumSpec {
     List(
       n.subtract(BigInteger.ONE),
       I256.MinValue.toBigInt.add(n),
-      I256.MaxValue.toBigInt.subtract(n)
+      I256.MinValue.divUnsafe(I256.Two).toBigInt.add(n),
+      I256.MaxValue.toBigInt.subtract(n),
+      I256.MaxValue.divUnsafe(I256.Two).toBigInt.add(n),
+      SecureAndSlowRandom.nextI256().toBigInt,
+      SecureAndSlowRandom.nextI256().toBigInt
     )
   }
 

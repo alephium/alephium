@@ -25,7 +25,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{AVector, TimeStamp}
@@ -118,6 +118,7 @@ object BlockFlow extends StrictLogging {
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
     fromGenesisUnsafe(storages, config.genesisBlocks)(
       config.broker,
+      config.network,
       config.consensus,
       config.mempool
     )
@@ -125,6 +126,7 @@ object BlockFlow extends StrictLogging {
 
   def fromGenesisUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
       brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
       consensusSetting: ConsensusSetting,
       memPoolSetting: MemPoolSetting
   ): BlockFlow = {
@@ -140,6 +142,7 @@ object BlockFlow extends StrictLogging {
   def fromStorageUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
     fromStorageUnsafe(storages, config.genesisBlocks)(
       config.broker,
+      config.network,
       config.consensus,
       config.mempool
     )
@@ -147,6 +150,7 @@ object BlockFlow extends StrictLogging {
 
   def fromStorageUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
       brokerConfig: BrokerConfig,
+      networkConfig: NetworkConfig,
       consensusSetting: ConsensusSetting,
       memPoolSetting: MemPoolSetting
   ): BlockFlow = {
@@ -169,6 +173,7 @@ object BlockFlow extends StrictLogging {
       val blockheaderChainBuilder: BlockHeader => BlockHeaderChain
   )(implicit
       val brokerConfig: BrokerConfig,
+      val networkConfig: NetworkConfig,
       val consensusConfig: ConsensusSetting,
       val mempoolSetting: MemPoolSetting
   ) extends BlockFlow {
@@ -242,8 +247,8 @@ object BlockFlow extends StrictLogging {
       intraWeight + diffsWeight
     }
 
-    def getBestTipUnsafe: BlockHash = {
-      aggregateHash(_.getBestTipUnsafe)(blockHashOrdering.max)
+    def getBestTipUnsafe(): BlockHash = {
+      aggregateHash(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
 
     override def getAllTips: AVector[BlockHash] = {
@@ -271,7 +276,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def getBestIntraGroupTip(): BlockHash = {
-      intraGroupChains.reduceBy(_.getBestTipUnsafe)(blockHashOrdering.max)
+      intraGroupChains.reduceBy(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
 
     def calBestDepsUnsafe(group: GroupIndex): BlockDeps = {

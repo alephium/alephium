@@ -16,18 +16,24 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
+
 import org.alephium.io.IOError
 import org.alephium.serde.SerdeError
 
 // scalastyle:off number.of.types
 trait ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
-case object VerificationFailed                                 extends ExeFailure
 final case class NonCategorized(message: String)               extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
 case object StackUnderflow                                     extends ExeFailure
+case object NegativeArgumentInStack                            extends ExeFailure
 case object InsufficientSignatures                             extends ExeFailure
 case object InvalidPublicKey                                   extends ExeFailure
+case object SignedDataIsNot32Bytes                             extends ExeFailure
+case object InvalidSignatureFormat                             extends ExeFailure
+case object InvalidSignature                                   extends ExeFailure
+case object InvalidTxCallerIndex                               extends ExeFailure
 case object InvalidBoolean                                     extends ExeFailure
 case object IntegerOverFlow                                    extends ExeFailure
 final case class ArithmeticError(message: String)              extends ExeFailure
@@ -35,28 +41,34 @@ case object TooManyElses                                       extends ExeFailur
 case object IncompleteIfScript                                 extends ExeFailure
 final case class InvalidScript(message: String)                extends ExeFailure
 case object InvalidParameters                                  extends ExeFailure
-case object InvalidLocalIndex                                  extends ExeFailure
-case object InvalidLocalType                                   extends ExeFailure
+case object InvalidVarIndex                                    extends ExeFailure
+case object InvalidVarType                                     extends ExeFailure
 case object InvalidFieldIndex                                  extends ExeFailure
+case object InvalidFieldLength                                 extends ExeFailure
 case object InvalidFieldType                                   extends ExeFailure
+case object EmptyMethods                                       extends ExeFailure
 case object NoReturnVal                                        extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
+final case object InvalidMethod                                extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
 case object InsufficientArgs                                   extends ExeFailure
 case object InvalidMethodParamsType                            extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
-case object EqualityFailed                                     extends ExeFailure
+case object AssertionFailed                                    extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
 case object PcOverflow                                         extends ExeFailure
 case object InvalidReturnType                                  extends ExeFailure
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
+case object ContractDestructionShouldBeCalledFromTx            extends ExeFailure
+case object InvalidAddressTypeInContractDestroy                extends ExeFailure
 case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object UninitializedAddress                               extends ExeFailure
-case object NonPayableFrame                                    extends ExeFailure
+case object ExpectNonPayableMethod                             extends ExeFailure
+case object ExpectStatefulContractObj                          extends ExeFailure
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure
@@ -69,15 +81,20 @@ case object InvalidTokenId                                     extends ExeFailur
 case object ExpectAContract                                    extends ExeFailure
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
+case object ContractFieldOverflow                              extends ExeFailure
 case object ContractAssetAlreadyInUsing                        extends ExeFailure
 case object ContractAssetAlreadyFlushed                        extends ExeFailure
 case object ContractAssetUnloaded                              extends ExeFailure
 case object EmptyContractAsset                                 extends ExeFailure
+case object NoCaller                                           extends ExeFailure
+final case class NegativeTimeStamp(millis: Long)               extends ExeFailure
+final case class InvalidTarget(value: BigInteger)              extends ExeFailure
 
 sealed trait IOFailure {
   def error: IOError
 }
-final case class IOErrorUpdateState(error: IOError)  extends IOFailure
-final case class IOErrorLoadContract(error: IOError) extends IOFailure
-final case class IOErrorLoadOutputs(error: IOError)  extends IOFailure
-final case class OtherIOError(error: IOError)        extends IOFailure
+final case class IOErrorUpdateState(error: IOError)    extends IOFailure
+final case class IOErrorRemoveContract(error: IOError) extends IOFailure
+final case class IOErrorLoadContract(error: IOError)   extends IOFailure
+final case class IOErrorLoadOutputs(error: IOError)    extends IOFailure
+final case class OtherIOError(error: IOError)          extends IOFailure

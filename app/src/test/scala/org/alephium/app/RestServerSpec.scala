@@ -20,7 +20,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.concurrent._
 import scala.io.Source
-import scala.util.Random
+import scala.util.{Random, Using}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{TestActor, TestProbe}
@@ -39,7 +39,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, NetworkType}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -386,7 +386,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   }
 
   it should "call POST /miners" in {
-    val address      = Address.asset(dummyKeyAddress, networkType).get
+    val address      = Address.asset(dummyKeyAddress).get
     val lockupScript = address.lockupScript
     allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
       msg match {
@@ -440,7 +440,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   }
 
   it should "call GET /miners/addresses" in {
-    val address      = Address.asset(dummyKeyAddress, networkType).get
+    val address      = Address.asset(dummyKeyAddress).get
     val lockupScript = address.lockupScript
 
     allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -480,7 +480,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
     Put(s"/miners/addresses", body) check { response =>
-      val addresses = newAddresses.map(Address.asset(_, networkType).get)
+      val addresses = newAddresses.map(Address.asset(_).get)
       allHandlersProbe.viewHandler.fishForSpecificMessage()(_ =>
         ViewHandler.UpdateMinerAddresses(addresses)
       )
@@ -582,12 +582,9 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
       val openapiPath = ApiModel.getClass.getResource("/openapi.json")
       val expectedOpenapi =
         read[ujson.Value](
-          Source
-            .fromFile(openapiPath.getPath, "UTF-8")
-            .getLines()
-            .toSeq
-            .mkString("\n")
-            .replaceFirst("12973", s"$port")
+          Using(Source.fromFile(openapiPath.getPath, "UTF-8")) { source =>
+            source.getLines().mkString("\n").replaceFirst("12973", s"$port")
+          }.get
         )
 
       val openapi =
@@ -690,7 +687,7 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture with SocketU
   val walletConfig: WalletConfig = WalletConfig(
     None,
     (new java.io.File("")).toPath,
-    NetworkType.Devnet,
+    networkConfig.chainId,
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
     WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey)
@@ -698,8 +695,7 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture with SocketU
 
   lazy val walletApp = new WalletApp(walletConfig)
 
-  implicit lazy val networkType: NetworkType = config.network.networkType
-  implicit lazy val blockflowFetchMaxAge     = Duration.zero
+  implicit lazy val blockflowFetchMaxAge = Duration.zero
 
   private def buildPeer(id: Int): (PeerInfo, ApiConfig) = {
     val peerPort = generatePort()
@@ -731,7 +727,7 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture with SocketU
   }
 
   private def buildServers(nb: Int) = {
-    val peers = (0 to nb - 1).map(buildPeer)
+    val peers = (0 until nb).map(buildPeer)
 
     val intraCliqueInfo = IntraCliqueInfo.unsafe(
       dummyIntraCliqueInfo.id,

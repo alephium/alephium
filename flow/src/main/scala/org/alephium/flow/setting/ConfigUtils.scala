@@ -21,7 +21,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.crypto.Sha256
-import org.alephium.protocol.model.{Address, NetworkType}
+import org.alephium.protocol.model.{Address, ChainId}
 import org.alephium.util.{AVector, Hex}
 
 object ConfigUtils {
@@ -35,21 +35,17 @@ object ConfigUtils {
     }
 
   def parseMiners(
-      minerAddressesOpt: Option[Seq[String]],
-      networkType: NetworkType
+      minerAddressesOpt: Option[Seq[String]]
   ): Either[ConfigException, Option[AVector[Address.Asset]]] = {
     minerAddressesOpt match {
       case Some(minerAddresses) =>
-        AVector.from(minerAddresses).mapE(parseAddresses(_, networkType)).map(Option.apply)
+        AVector.from(minerAddresses).mapE(parseAddresses).map(Option.apply)
       case None => Right(None)
     }
   }
 
-  private def parseAddresses(
-      rawAddress: String,
-      networkType: NetworkType
-  ): Either[ConfigException, Address.Asset] = {
-    Address.fromBase58(rawAddress, networkType) match {
+  private def parseAddresses(rawAddress: String): Either[ConfigException, Address.Asset] = {
+    Address.fromBase58(rawAddress) match {
       case Some(address: Address.Asset) => Right(address)
       case Some(_: Address.Contract) =>
         Left(
@@ -62,15 +58,17 @@ object ConfigUtils {
         Left(
           new ConfigException.BadValue(
             "address",
-            s"Invalid base58 encoding or network-type: $rawAddress"
+            s"Invalid base58 encoding: $rawAddress"
           )
         )
     }
   }
 
-  implicit val networkTypeReader: ValueReader[NetworkType] = ValueReader[String].map { name =>
-    NetworkType
-      .fromName(name)
-      .getOrElse(throw new ConfigException.BadValue("", s"invalid network type: $name"))
+  implicit val chainIdReader: ValueReader[ChainId] = ValueReader[Int].map { id =>
+    ChainId
+      .from(id)
+      .getOrElse(
+        throw new ConfigException.BadValue("", s"invalid chain id: $id")
+      )
   }
 }

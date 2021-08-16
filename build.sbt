@@ -63,9 +63,7 @@ def project(path: String): Project = {
 lazy val macros = project("macros")
   .settings(
     libraryDependencies += `scala-reflect`(scalaVersion.value),
-    wartremoverErrors in (Compile, compile) := Warts.allBut(
-      wartsCompileExcludes :+ Wart.AsInstanceOf: _*
-    )
+    wartremoverErrors in (Compile, compile) := Seq()
   )
 
 lazy val util = project("util")
@@ -351,7 +349,8 @@ val commonSettings = publishSettings ++ Seq(
     "-Ywarn-unused:params",
     "-Ywarn-unused:patvars",
     "-Ywarn-unused:privates",
-    "-Ywarn-value-discard"
+    "-Ywarn-value-discard",
+    "-Ymacro-annotations"
   ),
   scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
   wartremoverErrors in (Compile, compile) := Warts.allBut(wartsCompileExcludes: _*),

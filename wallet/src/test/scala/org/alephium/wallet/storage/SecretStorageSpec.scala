@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.model.NetworkType
+import org.alephium.protocol.model.ChainId
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
 
@@ -34,7 +34,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   val seedGen     = Gen.const(()).map(_ => Mnemonic.generate(24).get.toSeed(""))
   val passwordGen = hashGen.map(_.toHexString)
-  val path        = Constants.path(NetworkType.Devnet)
+  val path        = Constants.path(ChainId.AlephiumMainNet)
 
   it should "create/lock/unlock/delete the secret storage" in {
     forAll(seedGen, passwordGen, passwordGen) { case (seed, password, wrongPassword) =>

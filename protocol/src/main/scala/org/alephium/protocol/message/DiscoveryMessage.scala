@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -203,10 +203,9 @@ object DiscoveryMessage {
 
   def serialize(
       message: DiscoveryMessage,
-      networkType: NetworkType,
       privateKey: PrivateKey
-  ): ByteString = {
-    val magic   = networkType.magicBytes
+  )(implicit networkConfig: NetworkConfig): ByteString = {
+    val magic   = networkConfig.magicBytes
     val header  = Header.serde.serialize(message.header)
     val payload = Payload.serialize(message.payload)
     val signature = message.payload.senderCliqueId match {
@@ -220,11 +219,12 @@ object DiscoveryMessage {
     magic ++ checksum ++ length ++ data
   }
 
-  def deserialize(input: ByteString, networkType: NetworkType)(implicit
-      groupConfig: GroupConfig
+  def deserialize(input: ByteString)(implicit
+      groupConfig: GroupConfig,
+      networkConfig: NetworkConfig
   ): SerdeResult[DiscoveryMessage] = {
     MessageSerde
-      .unwrap(input, networkType)
+      .unwrap(input)
       .flatMap { case (checksum, length, rest) =>
         for {
           messageRest   <- MessageSerde.extractMessageBytes(length, rest)

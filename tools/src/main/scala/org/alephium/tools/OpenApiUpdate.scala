@@ -20,7 +20,6 @@ import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model.ApiKey
 import org.alephium.app.Documentation
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.NetworkType
 import org.alephium.util.Duration
 import org.alephium.wallet.WalletDocumentation
 
@@ -29,20 +28,16 @@ object OpenApiUpdate extends App {
 
   val wallet: WalletDocumentation = new WalletDocumentation {
 
-    override val maybeApiKey: Option[ApiKey]       = None
-    override val blockflowFetchMaxAge: Duration    = Duration.zero
-    implicit override def networkType: NetworkType = NetworkType.Testnet
-    scala.concurrent.ExecutionContext.Implicits.global
-
+    override val maybeApiKey: Option[ApiKey]    = None
+    override val blockflowFetchMaxAge: Duration = Duration.zero
   }
 
   new Documentation {
 
-    override val port                              = 12973
-    override val blockflowFetchMaxAge: Duration    = Duration.zero
-    override val maybeApiKey: Option[ApiKey]       = None
-    override val walletEndpoints                   = wallet.walletEndpoints
-    implicit override val networkType: NetworkType = NetworkType.Testnet
+    override val port                           = 12973
+    override val blockflowFetchMaxAge: Duration = Duration.zero
+    override val maybeApiKey: Option[ApiKey]    = None
+    override val walletEndpoints                = wallet.walletEndpoints
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3
@@ -51,7 +46,6 @@ object OpenApiUpdate extends App {
     private val json = openApiJson(openAPI, dropAuth = maybeApiKey.isEmpty)
 
     import java.io.PrintWriter
-    new PrintWriter("../api/src/main/resources/openapi.json") { write(json); close }
-
+    new PrintWriter("../api/src/main/resources/openapi.json") { write(json); close() }
   }
 }

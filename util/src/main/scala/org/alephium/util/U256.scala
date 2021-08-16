@@ -40,6 +40,10 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     if (validate(underlying)) Some(U256.unsafe(underlying)) else None
   }
 
+  def modAdd(that: U256): U256 = {
+    U256.boundNonNegative(this.v.add(that.v))
+  }
+
   def subUnsafe(that: U256): U256 = {
     val underlying = this.v.subtract(that.v)
     assume(validate(underlying))
@@ -53,6 +57,10 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     if (validate(underlying)) Some(U256.unsafe(underlying)) else None
   }
 
+  def modSub(that: U256): U256 = {
+    U256.boundSub(this.v.subtract(that.v))
+  }
+
   def mulUnsafe(that: U256): U256 = {
     val underlying = this.v.multiply(that.v)
     assume(validate(underlying))
@@ -62,6 +70,10 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   def mul(that: U256): Option[U256] = {
     val underlying = this.v.multiply(that.v)
     if (validate(underlying)) Some(U256.unsafe(underlying)) else None
+  }
+
+  def modMul(that: U256): U256 = {
+    U256.boundNonNegative(this.v.multiply(that.v))
   }
 
   def divUnsafe(that: U256): U256 = {
@@ -86,9 +98,53 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     if (that.isZero) None else Some(U256.unsafe(this.v.remainder(that.v)))
   }
 
+  def bitAnd(that: U256): U256 = {
+    U256.unsafe(this.v.and(that.v))
+  }
+
+  def bitOr(that: U256): U256 = {
+    U256.unsafe(this.v.or(that.v))
+  }
+
+  def xor(that: U256): U256 = {
+    U256.unsafe(this.v.xor(that.v))
+  }
+
+  def shl(n: U256): U256 = {
+    try {
+      val nInt = n.toBigInt.intValueExact()
+      if (nInt >= 0 && nInt < 256) {
+        U256.boundNonNegative(this.v.shiftLeft(nInt))
+      } else {
+        U256.Zero
+      }
+    } catch {
+      case _: ArithmeticException => U256.Zero
+    }
+  }
+
+  def shr(n: U256): U256 = {
+    try {
+      val nInt = n.toBigInt.intValueExact()
+      if (nInt >= 0 && nInt < 256) {
+        U256.unsafe(this.v.shiftRight(nInt))
+      } else {
+        U256.Zero
+      }
+    } catch {
+      case _: ArithmeticException => U256.Zero
+    }
+  }
+
   def compare(that: U256): Int = this.v.compareTo(that.v)
 
   def toByte: Option[Byte] = if (v.bitLength() <= 7) Some(v.intValue().toByte) else None
+
+  def toInt: Option[Int] = try {
+    Some(v.intValueExact())
+  } catch {
+    case _: ArithmeticException => None
+  }
 
   def toBigInt: BigInteger = v
 
@@ -110,6 +166,21 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
 
 object U256 {
   private[util] val upperBound = BigInteger.ONE.shiftLeft(256)
+
+  def boundNonNegative(value: BigInteger): U256 = {
+    assume(value.signum() >= 0)
+    val raw        = value.toByteArray
+    val boundedRaw = if (raw.length > 32) raw.takeRight(32) else raw
+    U256.unsafe(new BigInteger(1, boundedRaw))
+  }
+
+  def boundSub(value: BigInteger): U256 = {
+    if (value.signum() < 0) {
+      U256.unsafe(value.add(upperBound))
+    } else {
+      U256.unsafe(value)
+    }
+  }
 
   def validate(value: BigInteger): Boolean = {
     Number.nonNegative(value) && value.bitLength() <= 256
@@ -148,6 +219,10 @@ object U256 {
 
   def fromI64(value: I64): Option[U256] = {
     if (value.isPositive) Some(unsafe(value.v)) else None
+  }
+
+  def fromLong(value: Long): Option[U256] = {
+    if (value >= 0) Some(unsafe(value)) else None
   }
 
   def fromU64(value: U64): U256 = {

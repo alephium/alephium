@@ -140,7 +140,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       txs: AVector[TransactionTemplate],
       origin: DataOrigin
   ): Unit = {
-    val txMessage = Message.serialize(NewTxs(txs), networkSetting.networkType)
+    val txMessage = Message.serialize(NewTxs(txs))
     val event     = CliqueManager.BroadCastTx(txs, txMessage, chainIndex, origin)
     publishEvent(event)
   }

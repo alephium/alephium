@@ -17,9 +17,7 @@
 package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
-import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
 
@@ -42,6 +40,68 @@ sealed abstract class VM[Ctx <: StatelessContext](
     execute(obj, methodIndex, args, Some(returnTo)).map(_ => outputs)
   }
 
+  def startNonPayableFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[Ctx]]
+
+  def startPayableFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      balanceState: BalanceState,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[Ctx]]
+
+  protected def startPayableFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      method: Method[Ctx],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[Ctx]] = {
+    ctx.getInitialBalances().flatMap { balances =>
+      startPayableFrame(
+        obj,
+        ctx,
+        BalanceState.from(balances),
+        method,
+        args,
+        operandStack,
+        returnTo
+      )
+    }
+  }
+
+  def startFrame(
+      obj: ContractObj[Ctx],
+      ctx: Ctx,
+      methodIndex: Int,
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
+  ): ExeResult[Frame[Ctx]] = {
+    for {
+      method <- obj.getMethod(methodIndex)
+      _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
+      frame <- {
+        val returnTo = returnToOpt.getOrElse(VM.noReturnTo)
+        if (method.isPayable) {
+          startPayableFrame(obj, ctx, method, args, operandStack, returnTo)
+        } else {
+          startNonPayableFrame(obj, ctx, method, args, operandStack, returnTo)
+        }
+      }
+    } yield frame
+  }
+
   @inline
   private def execute(
       obj: ContractObj[Ctx],
@@ -50,7 +110,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Unit] = {
     for {
-      startFrame <- obj.startFrame(ctx, methodIndex, args, operandStack, returnToOpt)
+      startFrame <- startFrame(obj, ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
     } yield ()
@@ -61,8 +121,8 @@ sealed abstract class VM[Ctx <: StatelessContext](
     frameStack.top match {
       case Some(topFrame) =>
         executeCurrentFrame(topFrame) match {
-          case Right(_)    => executeFrames()
-          case Left(error) => Left(error)
+          case Right(_) => executeFrames()
+          case error    => error
         }
       case None => Right(())
     }
@@ -93,6 +153,11 @@ sealed abstract class VM[Ctx <: StatelessContext](
   protected def completeLastFrame(lastFrame: Frame[Ctx]): ExeResult[Unit]
 }
 
+object VM {
+  val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
+    if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
+}
+
 final class StatelessVM(
     ctx: StatelessContext,
     frameStack: Stack[Frame[StatelessContext]],
@@ -102,6 +167,25 @@ final class StatelessVM(
       currentFrame: Frame[StatelessContext],
       nextFrame: Frame[StatelessContext]
   ): ExeResult[Unit] = Right(())
+  def startNonPayableFrame(
+      obj: ContractObj[StatelessContext],
+      ctx: StatelessContext,
+      method: Method[StatelessContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatelessContext]] =
+    Frame.stateless(ctx, obj, method, args, operandStack, returnTo)
+
+  def startPayableFrame(
+      obj: ContractObj[StatelessContext],
+      ctx: StatelessContext,
+      balanceState: BalanceState,
+      method: Method[StatelessContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatelessContext]] = failed(ExpectNonPayableMethod)
 
   protected def completeLastFrame(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 }
@@ -111,6 +195,27 @@ final class StatefulVM(
     frameStack: Stack[Frame[StatefulContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
+  def startNonPayableFrame(
+      obj: ContractObj[StatefulContext],
+      ctx: StatefulContext,
+      method: Method[StatefulContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatefulContext]] =
+    Frame.stateful(ctx, None, None, obj, method, args, operandStack, returnTo)
+
+  def startPayableFrame(
+      obj: ContractObj[StatefulContext],
+      ctx: StatefulContext,
+      balanceState: BalanceState,
+      method: Method[StatefulContext],
+      args: AVector[Val],
+      operandStack: Stack[Val],
+      returnTo: AVector[Val] => ExeResult[Unit]
+  ): ExeResult[Frame[StatefulContext]] =
+    Frame.stateful(ctx, None, Some(balanceState), obj, method, args, operandStack, returnTo)
+
   protected def switchBackFrame(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
@@ -193,24 +298,13 @@ object StatelessVM {
   final case class AssetScriptExecution(gasRemaining: GasBox)
 
   def runAssetScript(
-      txId: Hash,
+      blockEnv: BlockEnv,
+      txEnv: TxEnv,
       initialGas: GasBox,
       script: StatelessScript,
-      args: AVector[Val],
-      signature: Signature
+      args: AVector[Val]
   ): ExeResult[AssetScriptExecution] = {
-    val stack = Stack.unsafe[Signature](mutable.ArraySeq(signature), 1)
-    runAssetScript(txId, initialGas, script, args, stack)
-  }
-
-  def runAssetScript(
-      txId: Hash,
-      initialGas: GasBox,
-      script: StatelessScript,
-      args: AVector[Val],
-      signatures: Stack[Signature]
-  ): ExeResult[AssetScriptExecution] = {
-    val context = StatelessContext(txId, initialGas, signatures)
+    val context = StatelessContext(blockEnv, txEnv, initialGas)
     val obj     = script.toObject
     execute(context, obj, args)
   }
@@ -223,7 +317,7 @@ object StatelessVM {
     )
   }
 
-  private def execute(
+  def execute(
       context: StatelessContext,
       obj: ContractObj[StatelessContext],
       args: AVector[Val]
@@ -249,27 +343,27 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
-  // dryrun will not commit worldstate changes, which is efficient for tx validation
-  def dryrunTxScript(
+  def runTxScript(
       worldState: WorldState.Cached,
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       preOutputs: AVector[TxOutput],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
-    runTxScript(worldState, tx, Some(preOutputs), script, gasRemaining)
+    runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
-  // run will commit worldstate changes
   def runTxScript(
       worldState: WorldState.Cached,
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       preOutputsOpt: Option[AVector[TxOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
     for {
-      context <- StatefulContext.build(tx, gasRemaining, worldState, preOutputsOpt)
+      context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
     } yield {
       context.commitStates()

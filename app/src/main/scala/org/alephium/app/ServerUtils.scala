@@ -28,7 +28,7 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -36,8 +36,9 @@ import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-class ServerUtils(networkType: NetworkType)(implicit
+class ServerUtils(implicit
     brokerConfig: BrokerConfig,
+    networkConfig: NetworkConfig,
     executionContext: ExecutionContext
 ) {
   import ServerUtils._
@@ -46,7 +47,7 @@ class ServerUtils(networkType: NetworkType)(implicit
     val entriesEither = for {
       blocks <- blockFlow.getHeightedBlocks(fetchRequest.fromTs, fetchRequest.toTs)
     } yield blocks.map(_.map { case (block, height) =>
-      BlockEntry.from(block, height, networkType)
+      BlockEntry.from(block, height)
     })
 
     entriesEither match {
@@ -77,7 +78,7 @@ class ServerUtils(networkType: NetworkType)(implicit
       blockFlow
         .getMemPool(chainIndex)
         .getAll(chainIndex)
-        .map(Tx.fromTemplate(_, networkType))
+        .map(Tx.fromTemplate(_))
     )
   }
 
@@ -203,7 +204,7 @@ class ServerUtils(networkType: NetworkType)(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-    } yield BlockEntry.from(block, height, networkType)
+    } yield BlockEntry.from(block, height)
 
   def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =
     for {
@@ -285,7 +286,7 @@ class ServerUtils(networkType: NetworkType)(implicit
   def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
-      Some(s"Address ${Address.from(networkType, lockupScript)}")
+      Some(s"Address ${Address.from(lockupScript)}")
     )
   }
 

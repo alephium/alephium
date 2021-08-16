@@ -19,16 +19,18 @@ package org.alephium.flow.core
 import scala.language.implicitConversions
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 
+import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signature}
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.validation.BlockValidation
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
+import org.alephium.serde.{deserialize, serialize, Serde}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, U256, UnsecureRandom}
 
+// scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
@@ -38,7 +40,7 @@ class VMSpec extends AlephiumSpec {
       lockupScript: LockupScript.Asset,
       alfAmount: U256
   ): StatefulScript = {
-    val address  = Address.Asset(NetworkType.Testnet, lockupScript)
+    val address  = Address.Asset(lockupScript)
     val codeRaw  = Hex.toHexString(serialize(code))
     val stateRaw = Hex.toHexString(serialize(initialState))
     val scriptRaw =
@@ -50,10 +52,10 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileTxScript(scriptRaw).toOption.get
+    Compiler.compileTxScript(scriptRaw).rightValue
   }
 
-  it should "not start with private function" in new FlowFixture {
+  it should "not start with private function" in new ContractFixture {
     val input =
       s"""
          |TxScript Foo {
@@ -64,11 +66,8 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script      = Compiler.compileTxScript(input).toOption.get
     val errorScript = StatefulScript.unsafe(AVector(script.methods.head.copy(isPublic = false)))
-
-    val chainIndex      = ChainIndex.unsafe(0, 0)
-    val block           = simpleScript(blockFlow, chainIndex, errorScript)
-    val blockValidation = BlockValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
-    blockValidation.validate(block, blockFlow).isRight is false
+    val block       = simpleScript(blockFlow, chainIndex, errorScript)
+    fail(blockFlow, block, ExternalPrivateMethodCall)
   }
 
   it should "overflow frame stack" in new FlowFixture {
@@ -94,8 +93,16 @@ class VMSpec extends AlephiumSpec {
       val txTemplate = block.transactions.head
       txTemplate.copy(unsigned = txTemplate.unsigned.copy(startGas = 1000000))
     }
-    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).toOption.get
-    StatefulVM.runTxScript(worldState, tx, None, tx.unsigned.scriptOpt.get, tx.unsigned.startGas) is
+    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+    val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue
+    StatefulVM.runTxScript(
+      worldState,
+      blockEnv,
+      tx,
+      None,
+      tx.unsigned.scriptOpt.get,
+      tx.unsigned.startGas
+    ) is
       failed(StackOverflow)
   }
 
@@ -155,7 +162,8 @@ class VMSpec extends AlephiumSpec {
 
     val script1 = Compiler.compileTxScript(input1, 1).toOption.get
     val block1  = simpleScript(blockFlow, chainIndex, script1)
-    assertThrows[RuntimeException](addAndCheck(blockFlow, block1, 2))
+    intercept[AssertionError](addAndCheck(blockFlow, block1, 2)).getMessage is
+      s"Right(ExistInvalidTx(TxScriptExeFailed($ExternalPrivateMethodCall)))"
   }
 
   it should "handle contract states" in new CallFixture {
@@ -179,16 +187,18 @@ class VMSpec extends AlephiumSpec {
   trait ContractFixture extends FlowFixture {
     val chainIndex     = ChainIndex.unsafe(0, 0)
     val genesisLockup  = getGenesisLockupScript(chainIndex)
-    val genesisAddress = Address.Asset(NetworkType.Testnet, genesisLockup)
+    val genesisAddress = Address.Asset(genesisLockup)
 
     def createContract(input: String, initialState: AVector[Val]): ContractOutputRef = {
-      val contract = Compiler.compileContract(input).toOption.get
+      val contract = Compiler.compileContract(input).rightValue
       val txScript = contractCreation(contract, initialState, genesisLockup, dustUtxoAmount)
       val block    = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
         TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
 
+      deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
+        .toContract() isE contract
       addAndCheck(blockFlow, block)
       contractOutputRef
     }
@@ -237,11 +247,48 @@ class VMSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block1)
       block1
     }
+
+    def testSimpleScript(main: String) = {
+      val script = Compiler.compileTxScript(main).rightValue
+      val block  = simpleScript(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+    }
+
+    def failSimpleScript(main: String, failure: ExeFailure) = {
+      val script = Compiler.compileTxScript(main).rightValue
+      fail(blockFlow, chainIndex, script, failure)
+    }
+
+    def fail(blockFlow: BlockFlow, block: Block, failure: ExeFailure): Assertion = {
+      intercept[AssertionError](addAndCheck(blockFlow, block)).getMessage is
+        s"Right(ExistInvalidTx(TxScriptExeFailed($failure)))"
+    }
+
+    def fail(
+        blockFlow: BlockFlow,
+        chainIndex: ChainIndex,
+        script: StatefulScript,
+        failure: ExeFailure
+    ) = {
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
+        s"Right(TxScriptExeFailed($failure))"
+    }
+
+    def checkContractState(
+        contractId: String,
+        contractAssetRef: ContractOutputRef,
+        existed: Boolean
+    ): Assertion = {
+      val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractKey = Hash.from(Hex.from(contractId).get).get
+      worldState.contractState.exist(contractKey) isE existed
+      worldState.outputState.exist(contractAssetRef) isE existed
+    }
   }
 
   it should "not use up contract assets" in new ContractFixture {
     val input =
-      s"""
+      """
          |TxContract Foo() {
          |  pub payable fn foo(address: Address) -> () {
          |    transferAlfFromSelf!(address, alfRemaining!(selfAddress!()))
@@ -264,8 +311,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).toOption.get
-    intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage is
-      s"Right(TxScriptExeFailed(${EmptyContractAsset.toString}))"
+    fail(blockFlow, chainIndex, script, EmptyContractAsset)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -337,10 +383,8 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val script   = Compiler.compileTxScript(main).toOption.get
     val newState = AVector[Val](Val.U256(U256.unsafe(110)))
-    val block    = simpleScript(blockFlow, chainIndex, script)
-    addAndCheck(blockFlow, block)
+    testSimpleScript(main)
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().toOption.get.length is 3
@@ -377,11 +421,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Foo(mut x: U256) {
-         |  pub payable fn foo() -> () {
-         |    issueToken!(10000000)
-         |  }
-         |}
+         |$input
          |""".stripMargin
     val script = Compiler.compileTxScript(main).toOption.get
 
@@ -422,6 +462,328 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     createContract(input, 2, 2)
+  }
+
+  // scalastyle:off method.length
+  it should "test operators" in new ContractFixture {
+    // scalastyle:off no.equal
+    def expect(out: Int) =
+      s"""
+         |TxScript Inverse {
+         |  pub fn main() -> () {
+         |    let x = 10973
+         |    let mut y = 1
+         |    let mut i = 0
+         |    while (i <= 8) {
+         |      y = y ⊗ (2 ⊖ x ⊗ y)
+         |      i = i + 1
+         |    }
+         |    let r = x ⊗ y
+         |    assert!(r == $out)
+         |
+         |    test()
+         |  }
+         |
+         |  fn test() -> () {
+         |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0)
+         |
+         |    let x = 0
+         |    let y = 1
+         |    assert!(x << 1 == 0)
+         |    assert!(x >> 1 == 0)
+         |    assert!(y << 1 == 2)
+         |    assert!(y >> 1 == 0)
+         |    assert!(y << 255 != 0)
+         |    assert!(y << 256 == 0)
+         |    assert!(x & x == 0)
+         |    assert!(x & y == 0)
+         |    assert!(y & y == 1)
+         |    assert!(x | x == 0)
+         |    assert!(x | y == 1)
+         |    assert!(y | y == 1)
+         |    assert!(x ^ x == 0)
+         |    assert!(x ^ y == 1)
+         |    assert!(y ^ y == 0)
+         |
+         |    assert!((x < y) == true)
+         |    assert!((x <= y) == true)
+         |    assert!((x < x) == false)
+         |    assert!((x <= x) == true)
+         |    assert!((x > y) == false)
+         |    assert!((x >= y) == false)
+         |    assert!((x > x) == false)
+         |    assert!((x >= x) == true)
+         |
+         |    assert!((true && true) == true)
+         |    assert!((true && false) == false)
+         |    assert!((false && false) == false)
+         |    assert!((true || true) == true)
+         |    assert!((true || false) == true)
+         |    assert!((false || false) == false)
+         |
+         |    assert!(!true == false)
+         |    assert!(!false == true)
+         |  }
+         |}
+         |""".stripMargin
+    // scalastyle:on no.equal
+
+    testSimpleScript(expect(1))
+    failSimpleScript(expect(2), AssertionFailed)
+  }
+  // scalastyle:on method.length
+
+  // scalastyle:off no.equal
+  it should "test ByteVec instructions" in new ContractFixture {
+    def encode[T: Serde](t: T): String = Hex.toHexString(serialize(t))
+
+    val i256    = UnsecureRandom.nextI256()
+    val u256    = UnsecureRandom.nextU256()
+    val address = Address.from(LockupScript.p2c(Hash.random))
+    val bytes0  = Hex.toHexString(Hash.random.bytes)
+    val bytes1  = Hex.toHexString(Hash.random.bytes)
+
+    val main: String =
+      s"""
+         |TxScript ByteVecTest {
+         |  pub fn main() -> () {
+         |    assert!(byteVec!(true) == #${encode(true)})
+         |    assert!(byteVec!(false) == #${encode(false)})
+         |    assert!(byteVec!(${i256}i) == #${encode(i256)})
+         |    assert!(byteVec!(${u256}) == #${encode(u256)})
+         |    assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
+         |    assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
+         |    assert!(size!(byteVec!(true)) == 1)
+         |    assert!(size!(byteVec!(false)) == 1)
+         |    assert!(size!(byteVec!(@${address.toBase58})) == 33)
+         |    assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
+         |  }
+         |}
+         |""".stripMargin
+
+    testSimpleScript(main)
+  }
+
+  // scalastyle:off no.equal
+  it should "test contract instructions" in new ContractFixture {
+    def createContract(input: String): (String, String, String) = {
+      val contractId    = createContract(input, initialState = AVector.empty).key
+      val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+      val contractState = worldState.getContractState(contractId).rightValue
+      val address       = Address.Contract(LockupScript.p2c(contractId)).toBase58
+      (contractId.toHexString, address, contractState.initialStateHash.toHexString)
+    }
+
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo(fooId: ByteVec, fooHash: ByteVec, barId: ByteVec, barHash: ByteVec, barAddress: Address) -> () {
+         |    assert!(selfContractId!() == fooId)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash)
+         |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    assert!(callerAddress!() == barAddress)
+         |    assert!(callerInitialStateHash!() == barHash)
+         |    assert!(isCalledFromTxScript!() == false)
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, _, fooHash) = createContract(foo)
+
+    val bar =
+      s"""
+         |TxContract Bar() {
+         |  pub payable fn bar(fooId: ByteVec, fooHash: ByteVec, barId: ByteVec, barHash: ByteVec, barAddress: Address) -> () {
+         |    assert!(selfContractId!() == barId)
+         |    assert!(selfAddress!() == barAddress)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash)
+         |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    Foo(#$fooId).foo(fooId, fooHash, barId, barHash, barAddress)
+         |    assert!(isCalledFromTxScript!() == true)
+         |    assert!(isPaying!(@$genesisAddress) == false)
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val (barId, barAddress, barHash) = createContract(bar)
+
+    def main(state: String) =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Bar(#$barId).bar(#$fooId, #$fooHash, #$barId, #$barHash, @$barAddress)
+         |    approveAlf!(@$genesisAddress, ${ALF.alf(1).v})
+         |    copyCreateContract!(#$fooId, #$state)
+         |    assert!(isPaying!(@$genesisAddress) == true)
+         |  }
+         |}
+         |
+         |$bar
+         |""".stripMargin
+
+    {
+      val script = Compiler.compileTxScript(main("00")).rightValue
+      val block  = payableCall(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+    }
+
+    {
+      info("Try to create a new contract with invalid number of fields")
+      val script = Compiler.compileTxScript(main("010001")).rightValue
+      fail(blockFlow, chainIndex, script, InvalidFieldLength)
+    }
+  }
+
+  it should "destroy contract" in new ContractFixture {
+    def prepareContract(
+        contract: String,
+        initialState: AVector[Val]
+    ): (String, ContractOutputRef) = {
+      val contractId       = createContract(contract, initialState).key
+      val worldState       = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractAssetRef = worldState.getContractState(contractId).rightValue.contractOutputRef
+      contractId.toHexString -> contractAssetRef
+    }
+
+    val foo =
+      s"""
+         |TxContract Foo(mut x: U256) {
+         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    x = x + 1
+         |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, fooAssetRef) = prepareContract(foo, AVector(Val.U256(0)))
+    checkContractState(fooId, fooAssetRef, true)
+
+    def main(targetAddress: String) =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Foo(#$fooId).destroy(@$targetAddress)
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+
+    {
+      info("Destroy a contract with contract address")
+      val address = Address.Contract(LockupScript.P2C(Hash.generate))
+      val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
+      fail(blockFlow, chainIndex, script, InvalidAddressTypeInContractDestroy)
+      checkContractState(fooId, fooAssetRef, true)
+    }
+
+    {
+      info("Destroy a contract twice, this should fail")
+      val main =
+        s"""
+           |TxScript Main {
+           |  pub payable fn main() -> () {
+           |    Foo(#$fooId).destroy(@${genesisAddress.toBase58})
+           |    Foo(#$fooId).destroy(@${genesisAddress.toBase58})
+           |  }
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      val script = Compiler.compileTxScript(main).rightValue
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+        .startsWith("Left(org.alephium.io.IOError$KeyNotFound") is true
+      checkContractState(fooId, fooAssetRef, true) // None of the two destruction will take place
+    }
+
+    {
+      info("Destroy a contract properly")
+      val script = Compiler.compileTxScript(main(genesisAddress.toBase58)).rightValue
+      val block  = payableCall(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+      checkContractState(fooId, fooAssetRef, false)
+    }
+  }
+
+  it should "fetch block env" in new ContractFixture {
+    def main(latestHeader: BlockHeader) =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(chainId!() == #02)
+         |    assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
+         |    assert!(blockTarget!() == ${latestHeader.target.value})
+         |  }
+         |}
+         |""".stripMargin
+
+    def test() = {
+      val latestTip    = blockFlow.getHeaderChain(chainIndex).getBestTipUnsafe()
+      val latestHeader = blockFlow.getBlockHeaderUnsafe(latestTip)
+      testSimpleScript(main(latestHeader))
+    }
+
+    // we test with three new blocks
+    test()
+    test()
+    test()
+  }
+
+  it should "fetch tx env" in new ContractFixture {
+    val zeroId = Hash.zero
+    def main(index: Int) =
+      s"""
+         |TxScript TxEnv {
+         |  pub fn main() -> () {
+         |    assert!(txId!() != #${zeroId.toHexString})
+         |    assert!(txCaller!($index) == @${genesisAddress.toBase58})
+         |    assert!(txCallerSize!() == 1)
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(main(0))
+    failSimpleScript(main(1), InvalidTxCallerIndex)
+  }
+
+  // scalastyle:off regex
+  it should "test hash built-ins" in new ContractFixture {
+    val input = Hex.toHexString(ByteString.fromString("Hello World1"))
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
+         |    assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
+         |    assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
+         |    assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30)
+         |    assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A)
+         |    assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90)
+         |    assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743)
+         |    assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740)
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(main)
+  }
+
+  // scalastyle:off no.equal
+  it should "test signature built-ins" in new ContractFixture {
+    val zero                     = Hash.zero.toHexString
+    val (p256Pri, p256Pub)       = SecP256K1.generatePriPub()
+    val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
+    val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
+    val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig) == true)
+         |    assert!(verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #${SecP256K1Signature.zero.toHexString}) == false)
+         |    assert!(verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig) == true)
+         |    assert!(verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #${ED25519Signature.zero.toHexString}) == false)
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(main)
   }
 
   behavior of "constant product market"
@@ -592,3 +954,4 @@ class VMSpec extends AlephiumSpec {
     contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
   }
 }
+// scalastyle:on file.size.limit no.equal regex

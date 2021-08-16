@@ -27,7 +27,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
-import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.{InvalidSignature => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -71,10 +71,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         _ <- checkStateful(
           chainIndex,
           tx,
-          headerTs,
           cachedWorldState,
           preOutputs.map(_.referredOutput),
-          None
+          None,
+          BlockEnv(networkConfig.chainId, headerTs, Target.onePhPerBlock)
         )
       } yield ()
     }
@@ -126,7 +126,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
       val txNew       = tx.copy(unsigned = unsignedNew)
       failCheck(checkOutputNum(txNew, tx.chainIndex.isIntraGroup), NoOutputs)
-      failValidation(validateTx(txNew, blockFlow), NoOutputs)
+      failValidation(validateTxOnlyForTest(txNew, blockFlow), NoOutputs)
       failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
     }
   }
@@ -164,13 +164,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val txNew0 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(-1)))
     failCheck(checkGasBound(txNew0), InvalidStartGas)
-    failValidation(validateTx(txNew0, blockFlow), InvalidStartGas)
+    failValidation(validateTxOnlyForTest(txNew0, blockFlow), InvalidStartGas)
     val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
     failCheck(checkGasBound(txNew1), InvalidStartGas)
-    failValidation(validateTx(txNew1, blockFlow), InvalidStartGas)
+    failValidation(validateTxOnlyForTest(txNew1, blockFlow), InvalidStartGas)
     val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).rightValue))
     failCheck(checkGasBound(txNew2), InvalidStartGas)
-    failValidation(validateTx(txNew2, blockFlow), InvalidStartGas)
+    failValidation(validateTxOnlyForTest(txNew2, blockFlow), InvalidStartGas)
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
     passCheck(checkGasBound(txNew3))
 
@@ -187,7 +187,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val delta     = U256.MaxValue - alfAmount + 1
         val txNew     = modifyAlfAmount(tx, delta)
         failCheck(checkOutputAmount(txNew), BalanceOverFlow)
-        failValidation(validateTx(txNew, blockFlow), BalanceOverFlow)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), BalanceOverFlow)
         failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
       }
     }
@@ -198,7 +198,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroAlfAmount(tx)
         failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
-        failValidation(validateTx(txNew, blockFlow), AmountIsDustOrZero)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), AmountIsDustOrZero)
         failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
@@ -209,7 +209,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroTokenAmount(tx)
         failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
-        failValidation(validateTx(txNew, blockFlow), AmountIsDustOrZero)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), AmountIsDustOrZero)
         failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
       }
     }
@@ -233,7 +233,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       forAll(localUnsignedGen) { unsignedNew =>
         val txNew = tx.copy(unsigned = unsignedNew)
         failCheck(getChainIndex(txNew), InvalidInputGroupIndex)
-        failValidation(validateTx(txNew, blockFlow), InvalidInputGroupIndex)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidInputGroupIndex)
         failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
       }
     }
@@ -259,7 +259,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         forAll(localUnsignedGen) { unsignedNew =>
           val txNew = tx.copy(unsigned = unsignedNew)
           failCheck(getChainIndex(txNew), InvalidOutputGroupIndex)
-          failValidation(validateTx(txNew, blockFlow), InvalidOutputGroupIndex)
+          failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputGroupIndex)
           failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
         }
       }
@@ -272,7 +272,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
       val txNew       = tx.copy(unsigned = unsignedNew)
       failCheck(checkUniqueInputs(txNew, checkDoubleSpending = true), TxDoubleSpending)
-      failValidation(validateTx(txNew, blockFlow), TxDoubleSpending)
+      failValidation(validateTxOnlyForTest(txNew, blockFlow), TxDoubleSpending)
       failCheck(checkBlockTx(txNew, preOutputs), TxDoubleSpending)
     }
   }
@@ -307,7 +307,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           tx.copy(generatedOutputs = outputsNew)
         }
         failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-        failValidation(validateTx(txNew, blockFlow), OutputDataSizeExceeded)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), OutputDataSizeExceeded)
         failCheck(checkBlockTx(txNew, preOutputs), OutputDataSizeExceeded)
       }
     }
@@ -362,6 +362,17 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         output.copy(tokens = tokensNew)
       }
       tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = outputsNew))
+    }
+
+    def checkWitnesses(
+        tx: Transaction,
+        preOutputs: AVector[TxOutput]
+    ): TxValidationResult[GasBox] = {
+      checkWitnesses(
+        tx,
+        preOutputs,
+        BlockEnv(networkConfig.chainId, TimeStamp.now(), Target.onePhPerBlock)
+      )
     }
   }
 
@@ -474,7 +485,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         .rightValue
     }
 
-    def replaceUnlock(tx: Transaction, unlock: UnlockScript, priKeys: PrivateKey*) = {
+    def replaceUnlock(tx: Transaction, unlock: UnlockScript, priKeys: PrivateKey*): Transaction = {
       val unsigned  = tx.unsigned
       val inputs    = unsigned.inputs
       val theInput  = inputs.head
@@ -487,7 +498,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       }
     }
 
-    def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*) = {
+    def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
       val signatures = privateKeys.map(SignatureSchema.sign(unsigned.hash.bytes, _))
       Transaction.from(unsigned, AVector.from(signatures))
     }
@@ -500,11 +511,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val unsigned = prepareOutput(lockup, unlock)
     val tx0      = Transaction.from(unsigned, priKey)
-    passValidation(validateTx(tx0, blockFlow))
+    passValidation(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2pkh(PublicKey.generate))
-    failValidation(validateTx(tx1, blockFlow), InvalidPublicKeyHash)
+    failValidation(validateTxOnlyForTest(tx1, blockFlow), InvalidPublicKeyHash)
     val tx2 = tx0.copy(inputSignatures = AVector(Signature.generate))
-    failValidation(validateTx(tx2, blockFlow), InvalidSignature)
+    failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidSignature)
   }
 
   it should "validate p2mpkh" in new LockupFixture {
@@ -516,22 +527,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unlock   = UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey1 -> 1))
     val unsigned = prepareOutput(lockup, unlock)
     val tx0      = sign(unsigned, priKey0, priKey1)
-    passValidation(validateTx(tx0, blockFlow))
+    passValidation(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = sign(unsigned, priKey0)
-    failValidation(validateTx(tx1, blockFlow), NotEnoughSignature)
+    failValidation(validateTxOnlyForTest(tx1, blockFlow), NotEnoughSignature)
     val tx2 = sign(unsigned, priKey0, priKey2)
-    failValidation(validateTx(tx2, blockFlow), InvalidSignature)
+    failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidSignature)
     val tx3 = sign(unsigned, priKey1, priKey1)
-    failValidation(validateTx(tx3, blockFlow), InvalidSignature)
+    failValidation(validateTxOnlyForTest(tx3, blockFlow), InvalidSignature)
 
     val tx4 = replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0)))
-    failValidation(validateTx(tx4, blockFlow), InvalidNumberOfPublicKey)
+    failValidation(validateTxOnlyForTest(tx4, blockFlow), InvalidNumberOfPublicKey)
     val tx5 =
       replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey1 -> 3)), priKey0, priKey1)
-    failValidation(validateTx(tx5, blockFlow), InvalidPublicKeyHash)
+    failValidation(validateTxOnlyForTest(tx5, blockFlow), InvalidPublicKeyHash)
     val tx6 =
       replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey0 -> 1)), priKey0, priKey1)
-    failValidation(validateTx(tx6, blockFlow), InvalidPublicKeyHash)
+    failValidation(validateTxOnlyForTest(tx6, blockFlow), InvalidPublicKeyHash)
   }
 
   it should "invalidate p2mpkh in deserialization" in new LockupFixture {
@@ -568,14 +579,16 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "validate p2sh" in new LockupFixture {
+    // scalastyle:off no.equal
     def rawScript(n: Int) =
       s"""
          |AssetScript P2sh {
          |  pub fn main(a: U256) -> () {
-         |    checkEq!(a, $n)
+         |    assert!(a == $n)
          |  }
          |}
          |""".stripMargin
+    // scalastyle:on no.equal
 
     val script   = Compiler.compileAssetScript(rawScript(51)).rightValue
     val lockup   = LockupScript.p2sh(script)
@@ -583,11 +596,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unsigned = prepareOutput(lockup, unlock)
 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
-    passValidation(validateTx(tx0, blockFlow))
+    passValidation(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
-    failValidation(validateTx(tx1, blockFlow), InvalidUnlockScript(EqualityFailed))
+    failValidation(validateTxOnlyForTest(tx1, blockFlow), InvalidUnlockScript(AssertionFailed))
     val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
     val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
-    failValidation(validateTx(tx2, blockFlow), InvalidScriptHash)
+    failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidScriptHash)
   }
 }

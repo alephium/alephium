@@ -18,8 +18,7 @@ package org.alephium.protocol.vm.lang
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{Hash, SignatureSchema}
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -187,8 +186,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |AssetScript P2PKH {
          |  pub fn verify(pk: ByteVec) -> () {
          |    let hash = #${hash.toHexString}
-         |    checkEq!(hash, blake2b!(pk))
-         |    checkSignature!(pk)
+         |    assert!(hash == blake2b!(pk))
+         |    verifyTxSignature!(pk)
          |    return
          |  }
          |}
@@ -196,15 +195,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
     val pubKeyHash       = Hash.hash(pubKey.bytes)
-    val signature        = SignatureSchema.sign(Hash.zero.bytes, priKey)
 
-    val script = Compiler.compileAssetScript(input(pubKeyHash)).toOption.get
+    val script = Compiler.compileAssetScript(input(pubKeyHash)).rightValue
     deserialize[StatelessScript](serialize(script)) isE script
 
-    val args = AVector[Val](Val.ByteVec.from(pubKey))
-    StatelessVM
-      .runAssetScript(Hash.zero, minimalGas, script, args, signature)
-      .isRight is true
+    val args             = AVector[Val](Val.ByteVec.from(pubKey))
+    val statelessContext = genStatelessContext(signatures = AVector(Signature.zero))
+    val signature        = SignatureSchema.sign(statelessContext.txId.bytes, priKey)
+    statelessContext.signatures.pop().rightValue is Signature.zero
+    statelessContext.signatures.push(signature) isE ()
+    StatelessVM.execute(statelessContext, script.toObject, args).isRight is true
+    StatelessVM.execute(statelessContext, script.toObject, args) is
+      failed(StackUnderflow) // no signature in the stack
   }
 
   it should "converse values" in new Fixture {
@@ -394,7 +396,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract Operator() {
          |  pub fn main() -> (U256, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
-         |    let y = 1 < 2 <= 2 < 3
+         |    let y = (1 < 2) && (2 <= 2) && (2 < 3)
          |    let z = !false && false || false
          |
          |    return x, y, z

@@ -16,7 +16,6 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.io.IOResult
@@ -31,6 +30,7 @@ trait EmptyBlockFlow extends BlockFlow {
 
   implicit lazy val brokerConfig: BrokerConfig = config.broker
   implicit lazy val consensusConfig            = config.consensus
+  implicit lazy val networkConfig              = config.network
   implicit lazy val mempoolSetting             = config.mempool
 
   lazy val genesisBlocks: AVector[AVector[Block]] = config.genesisBlocks
@@ -43,7 +43,7 @@ trait EmptyBlockFlow extends BlockFlow {
     BlockHeaderChain.fromGenesisUnsafe(storages)
 
   def getAllTips: AVector[BlockHash]                           = ???
-  def getBestTipUnsafe: BlockHash                              = ???
+  def getBestTipUnsafe(): BlockHash                            = ???
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps          = ???
   def updateBestDeps(): IOResult[AVector[TransactionTemplate]] = ???
   def updateBestDepsUnsafe(): AVector[TransactionTemplate]     = ???

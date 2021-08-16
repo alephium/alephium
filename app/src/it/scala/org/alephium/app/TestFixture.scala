@@ -47,7 +47,7 @@ import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, Block, ChainIndex, NetworkType}
+import org.alephium.protocol.model.{Address, Block, ChainIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
@@ -74,17 +74,16 @@ trait TestFixtureLike
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
-  implicit lazy val apiConfig                = ApiConfig.load(newConfig)
-  implicit lazy val networkType: NetworkType = config.network.networkType
+  implicit lazy val apiConfig = ApiConfig.load(newConfig)
 
   lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
   def generateAccount: (String, String, String) = {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
-    (Address.p2pkh(networkType, pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
+    (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address    = "T1DJa7LiwyNJosMWeDX6MejZQhwHHyh5yF4VYghMVoC2q"
+  val address    = "1DJa7LiwyNJosMWeDX6MejZQhwHHyh5yF4VYghMVoC2q"
   val publicKey  = "03499a66a8a131a8cec4e7f51e919cff7385c34731a156482bdb7e6cdac7d39a3d"
   val privateKey = "b14ce75cf22b0d678f3168d0ac5b2afea070e476c7bc60410245086b369fb17f"
   val mnemonic =
@@ -297,7 +296,7 @@ trait TestFixtureLike
       ) ++ configOverrides
       implicit override lazy val config = {
         val minerAddresses =
-          genesisKeys.map(p => Address.Asset(NetworkType.Testnet, LockupScript.p2pkh(p._2)))
+          genesisKeys.map(p => Address.Asset(LockupScript.p2pkh(p._2)))
 
         val tmp0 = AlephiumConfig.load(newConfig)
         val tmp1 = tmp0.copy(mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses)))

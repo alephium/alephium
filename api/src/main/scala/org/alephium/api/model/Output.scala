@@ -19,7 +19,7 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, NetworkType, TxOutput}
+import org.alephium.protocol.model.{Address, TxOutput}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 sealed trait Output {
@@ -46,12 +46,12 @@ object Output {
       tokens: AVector[Token]
   ) extends Output
 
-  def from(output: TxOutput, networkType: NetworkType): Output = {
+  def from(output: TxOutput): Output = {
     output match {
       case o: model.AssetOutput =>
         Asset(
           o.amount,
-          Address.Asset(networkType, o.lockupScript),
+          Address.Asset(o.lockupScript),
           o.tokens.map((Token.apply).tupled),
           o.lockTime,
           o.additionalData
@@ -59,7 +59,7 @@ object Output {
       case o: model.ContractOutput =>
         Contract(
           o.amount,
-          Address.Contract(networkType, o.lockupScript),
+          Address.Contract(o.lockupScript),
           o.tokens.map((Token.apply).tupled)
         )
     }

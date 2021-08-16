@@ -90,10 +90,10 @@ class DiscoveryServerSpec
     }
   }
 
-  it should "simulate large network" in new ActorFixture with SimulationFixture { self =>
+  it should "simulate large network" in new ActorFixture
+    with SimulationFixture
+    with NetworkConfigFixture.Default { self =>
     val groups = 4
-
-    val networkConfig = new NetworkConfig { val networkType = NetworkType.Testnet }
 
     val cliqueNum = 16
     val cliques   = AVector.fill(cliqueNum)(generateClique())
@@ -225,7 +225,10 @@ class DiscoveryServerSpec
     }
   }
 
-  trait Fixture extends ActorFixture with BrokerConfigFixture.Default {
+  trait Fixture
+      extends ActorFixture
+      with BrokerConfigFixture.Default
+      with NetworkConfigFixture.Default {
 
     override val groups = Gen.choose(2, 10).sample.get
 
@@ -237,7 +240,6 @@ class DiscoveryServerSpec
     val port1               = generatePort()
     val (address1, config1) = createConfig(groups, port1, 2)
     val cliqueInfo1         = generateCliqueInfo(address1, config1)
-    val networkConfig       = new NetworkConfig { val networkType = NetworkType.Testnet }
     val misbehaviorManager0 = buildMisbehaviorManager(system)
     val misbehaviorManager1 = buildMisbehaviorManager(system)
 

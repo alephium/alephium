@@ -202,7 +202,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     connectionHandler.expectNoMessage()
 
     brokerHandler ! BaseBrokerHandler.RelayInventory(blockHash2)
-    val message = Message.serialize(NewBlockHash(blockHash2), networkSetting.networkType)
+    val message = Message.serialize(NewBlockHash(blockHash2))
     connectionHandler.expectMsg(ConnectionHandler.Send(message))
     brokerHandler.underlyingActor.seenBlocks.contains(blockHash2) is true
   }

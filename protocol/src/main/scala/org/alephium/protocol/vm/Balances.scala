@@ -53,9 +53,17 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
     remaining.getTokenAmount(lockupScript, tokenId)
   }
 
+  def isPaying(lockupScript: LockupScript): Boolean = {
+    remaining.all.exists(_._1 == lockupScript) || approved.all.exists(_._1 == lockupScript)
+  }
+
   def useApproved(): BalanceState = {
     val toUse = approved.use()
     BalanceState(toUse, Balances.empty)
+  }
+
+  def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+    remaining.useAll(lockupScript)
   }
 
   def useAlf(lockupScript: LockupScript, amount: U256): Option[Unit] = {
@@ -132,6 +140,17 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     }
     all.clear()
     Balances(newAll)
+  }
+
+  def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+    val index = all.indexWhere { case (ls, _) => ls == lockupScript }
+    if (index == -1) {
+      None
+    } else {
+      val (_, balances) = all(index)
+      all.remove(index)
+      Some(balances)
+    }
   }
 
   def useForNewContract(): Option[BalancesPerLockup] = {

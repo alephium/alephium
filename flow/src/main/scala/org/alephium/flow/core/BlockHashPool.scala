@@ -59,7 +59,7 @@ trait BlockHashPool {
     BlockHashPool.compare(hash0, weight0, hash1, weight1)
   }
 
-  def getBestTipUnsafe: BlockHash
+  def getBestTipUnsafe(): BlockHash
 
   def getAllTips: AVector[BlockHash]
 
