@@ -423,15 +423,17 @@ trait SyncUtils {
     IOUtils.tryExecute(getSyncLocatorsUnsafe())
 
   def getSyncInventories(
-      locators: AVector[AVector[BlockHash]]
+      locators: AVector[AVector[BlockHash]],
+      peerBrokerInfo: BrokerGroupInfo
   ): IOResult[AVector[AVector[BlockHash]]] =
-    IOUtils.tryExecute(getSyncInventoriesUnsafe(locators))
+    IOUtils.tryExecute(getSyncInventoriesUnsafe(locators, peerBrokerInfo))
 
   protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]]
 
   protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]]
 
   protected def getSyncInventoriesUnsafe(
-      locators: AVector[AVector[BlockHash]]
+      locators: AVector[AVector[BlockHash]],
+      peerBrokerInfo: BrokerGroupInfo
   ): AVector[AVector[BlockHash]]
 }

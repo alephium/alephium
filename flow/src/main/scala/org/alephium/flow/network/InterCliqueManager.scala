@@ -164,14 +164,7 @@ class InterCliqueManager(
 
   def handleMessage: Receive = {
     case message: CliqueManager.BroadCastBlock =>
-      val block = message.block
-      log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
-      iterBrokers { (peerId, brokerState) =>
-        if (!message.origin.isFrom(peerId.cliqueId) && brokerState.readyFor(block.chainIndex)) {
-          log.debug(s"Send block to broker $peerId")
-          brokerState.actor ! BrokerHandler.Send(message.blockMsg)
-        }
-      }
+      handleBroadCastBlock(message)
 
     case message: CliqueManager.BroadCastTx =>
       log.debug(s"Broadcasting tx ${message.txs.map(_.id.shortHex)} for ${message.chainIndex}")
@@ -210,6 +203,26 @@ class InterCliqueManager(
     case DiscoveryServer.NeighborPeers(sortedPeers) =>
       extractPeersToConnect(sortedPeers, networkSetting.maxOutboundConnectionsPerGroup)
         .foreach(connectUnsafe)
+  }
+
+  def handleBroadCastBlock(message: CliqueManager.BroadCastBlock): Unit = {
+    val block = message.block
+    log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
+    if (message.origin.isLocal) {
+      iterBrokers { (peerId, brokerState) =>
+        if (brokerState.readyFor(block.chainIndex)) {
+          log.debug(s"Send block to broker $peerId")
+          brokerState.actor ! BrokerHandler.Send(message.blockMsg)
+        }
+      }
+    } else {
+      iterBrokers { (peerId, brokerState) =>
+        if (!message.origin.isFrom(brokerState.info) && brokerState.readyFor(block.chainIndex)) {
+          log.debug(s"Send announcement to broker $peerId")
+          brokerState.actor ! BrokerHandler.RelayInventory(block.hash)
+        }
+      }
+    }
   }
 
   def isSynced(): Boolean = {
@@ -252,7 +265,7 @@ class InterCliqueManager(
     }
   }
 
-  val connecting: LinkedBuffer[InetSocketAddress, Unit] = LinkedBuffer(
+  val connecting: Cache[InetSocketAddress, Unit] = Cache.fifo(
     networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups
   )
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {

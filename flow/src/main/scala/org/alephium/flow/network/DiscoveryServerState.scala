@@ -29,7 +29,7 @@ import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfi
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Duration, LinkedBuffer, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Cache, Duration, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait DiscoveryServerState extends SessionManager {
@@ -53,7 +53,7 @@ trait DiscoveryServerState extends SessionManager {
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
   protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val unreachables = LinkedBuffer[InetSocketAddress, TimeStamp](neighborMax)
+  private val unreachables = Cache.fifo[InetSocketAddress, TimeStamp](neighborMax)
 
   def setSocket(s: ActorRefT[UdpServer.Command]): Unit = {
     socketOpt = Some(s)
@@ -285,8 +285,8 @@ trait SessionManager {
 
   private val pendingMax = 20 * brokerConfig.groups * discoveryConfig.neighborsPerGroup
 
-  val sessions = LinkedBuffer[Id, AwaitReply](pendingMax)
-  val pendings = LinkedBuffer[PeerId, TimeStamp](pendingMax)
+  val sessions = Cache.fifo[Id, AwaitReply](pendingMax)
+  val pendings = Cache.fifo[PeerId, TimeStamp](pendingMax)
 
   def isPending(peerId: PeerId): Boolean = pendings.contains(peerId)
 

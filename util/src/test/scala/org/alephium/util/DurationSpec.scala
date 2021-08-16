@@ -29,10 +29,14 @@ class DurationSpec extends AlephiumSpec {
     dt.toMinutes is jdt.toMinutes
     dt.toHours is jdt.toHours
 
-    if (dt.millis <= Long.MaxValue / 2 && dt.millis >= Long.MaxValue / 2) {
+    if (dt.millis <= Long.MaxValue / 2) {
       (dt + dt).millis is 2 * dt.millis
       (dt timesUnsafe 2).millis is 2 * dt.millis
+      (dt * 2).get.millis is 2 * dt.millis
     }
+
+    (dt / 2).get.millis is dt.millis / 2
+    (dt div 2).get.millis is dt.millis / 2
     (dt - dt).get.millis is 0
     (dt divUnsafe 2).millis is dt.millis / 2
   }
@@ -40,24 +44,53 @@ class DurationSpec extends AlephiumSpec {
   it should "initialize correctly" in {
     Duration.zero.millis is 0
     forAll { millis: Long =>
+      val seconds = millis / 1000
+      val minutes = seconds / 60
+      val hours   = minutes / 60
+      val days    = hours / 24
+
       if (millis >= 0) { // otherwise it will fail in jdk8!
-        JDuration.ofMillis(millis).toMillis
+        val jdMillis = JDuration.ofMillis(millis)
+        jdMillis.toMillis() is millis
+
+        check(Duration.from(jdMillis).get, jdMillis)
         check(Duration.ofMillisUnsafe(millis), JDuration.ofMillis(millis))
+        check(Duration.ofMillis(millis).get, JDuration.ofMillis(millis))
 
-        val seconds = millis / 1000
         check(Duration.ofSecondsUnsafe(seconds), JDuration.ofSeconds(seconds))
+        check(Duration.ofSeconds(seconds).get, JDuration.ofSeconds(seconds))
 
-        val minutes = seconds / 60
         check(Duration.ofMinutesUnsafe(minutes), JDuration.ofMinutes(minutes))
+        check(Duration.ofMinutes(minutes).get, JDuration.ofMinutes(minutes))
 
-        val hours = minutes / 60
         check(Duration.ofHoursUnsafe(hours), JDuration.ofHours(hours))
+        check(Duration.ofHours(hours).get, JDuration.ofHours(hours))
 
-        val days = hours / 24
         check(Duration.ofDaysUnsafe(days), JDuration.ofDays(days))
+        check(Duration.ofDays(days).get, JDuration.ofDays(days))
       } else {
         assertThrows[AssertionError](Duration.ofMillisUnsafe(millis))
         Duration.ofMillis(millis) is None
+
+        if (seconds < 0) {
+          assertThrows[AssertionError](Duration.ofSecondsUnsafe(seconds))
+          Duration.ofSeconds(seconds) is None
+        }
+
+        if (minutes < 0) {
+          assertThrows[AssertionError](Duration.ofMinutesUnsafe(minutes))
+          Duration.ofMinutes(minutes) is None
+        }
+
+        if (hours < 0) {
+          assertThrows[AssertionError](Duration.ofHoursUnsafe(hours))
+          Duration.ofHours(hours) is None
+        }
+
+        if (days < 0) {
+          assertThrows[AssertionError](Duration.ofDaysUnsafe(days))
+          Duration.ofDays(days) is None
+        }
       }
     }
   }

@@ -17,14 +17,14 @@
 package org.alephium.flow.network.sync
 
 import akka.actor.Props
-import akka.testkit.TestActorRef
+import akka.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.{AVector, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 
 class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
   trait Fixture { F =>
@@ -98,5 +98,53 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
 
     downloadTrackObj.cleanupDownloading(Duration.zero)
     downloadTrackObj.downloading.size is 0
+  }
+
+  it should "track announcement" in new Fixture {
+    val broker           = TestProbe()
+    val downloadTrackObj = downloadTrack.underlyingActor
+
+    hashes.foreach(hash => downloadTrackObj.handleAnnouncement(hash, ActorRefT(broker.ref)))
+    downloadTrackObj.announcements.isEmpty is true
+    broker.expectNoMessage()
+
+    randomHashes.foreach(hash => downloadTrackObj.handleAnnouncement(hash, ActorRefT(broker.ref)))
+    downloadTrackObj.announcements.keys.toSet is randomHashes.toSet
+    randomHashes.foreach(hash => broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(hash))))
+    downloadTrackObj.downloading.keys.toSet is randomHashes.toSet
+
+    downloadTrack ! BlockFlowSynchronizer.BlockFinalized(randomHashes.head)
+    downloadTrackObj.announcements.contains(randomHashes.head) is false
+    downloadTrackObj.announcements.size is (randomHashes.length - 1)
+  }
+
+  it should "not download the announcement when the block is in downloading" in new Fixture {
+    val broker           = TestProbe()
+    val downloadTrackObj = downloadTrack.underlyingActor
+    val currentTs        = TimeStamp.now()
+
+    randomHashes.foreach(hash => downloadTrackObj.downloading.addOne(hash -> currentTs))
+    randomHashes.foreach(hash => downloadTrackObj.handleAnnouncement(hash, ActorRefT(broker.ref)))
+    broker.expectNoMessage()
+  }
+
+  it should "retry to download announcements" in new Fixture {
+    val broker           = TestProbe()
+    val downloadTrackObj = downloadTrack.underlyingActor
+    val announcements    = randomHashes.take(2)
+    val expiredAnn       = announcements.head
+    val downloadTs       = TimeStamp.now().minusUnsafe(Duration.ofMinutesUnsafe(1))
+
+    announcements.foreach(hash => downloadTrackObj.addAnnouncement(hash, ActorRefT(broker.ref)))
+    downloadTrackObj.downloading.addOne(expiredAnn         -> downloadTs)
+    downloadTrackObj.downloading.addOne(announcements.last -> TimeStamp.now())
+    randomHashes.drop(2).foreach(hash => downloadTrackObj.downloading.addOne(hash -> downloadTs))
+    downloadTrackObj.downloading.keys.toSet is randomHashes.toSet
+
+    downloadTrackObj.cleanupDownloading(Duration.ofSecondsUnsafe(10))
+    downloadTrackObj.downloading.keys.toSet is announcements.toSet
+    broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(expiredAnn)))
+    broker.expectNoMessage()
+    downloadTrackObj.announcements.contains(expiredAnn) is false
   }
 }

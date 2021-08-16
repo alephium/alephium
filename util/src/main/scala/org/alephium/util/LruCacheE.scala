@@ -21,33 +21,47 @@ import java.util.Map.Entry
 
 import scala.jdk.CollectionConverters._
 
-object LruCache {
-  def apply[K, V, E](maxCapacity: Int): LruCache[K, V, E] = {
-    apply(maxCapacity, 32, 0.75f)
+object LruCacheE {
+  def threadSafe[K, V, E](maxCapacity: Int): LruCacheE[K, V, E] = {
+    threadSafe(maxCapacity, 32, 0.75f)
   }
 
-  def apply[K, V, E](
+  def threadSafe[K, V, E](
       maxCapacity: Int,
       initialCapacity: Int,
       loadFactor: Float
-  ): LruCache[K, V, E] = {
+  ): LruCacheE[K, V, E] = {
     val m = new Inner[K, V](maxCapacity, initialCapacity, loadFactor)
-    new LruCache[K, V, E](m)
+    new ThreadSafeLruCache[K, V, E](m)
   }
 
-  private class Inner[K, V](maxCapacity: Int, initialCapacity: Int, loadFactor: Float)
-      extends LinkedHashMap[K, V](initialCapacity, loadFactor) {
+  def threadUnsafe[K, V, E](maxCapacity: Int): LruCacheE[K, V, E] = {
+    threadUnsafe(maxCapacity, 32, 0.75f)
+  }
+
+  def threadUnsafe[K, V, E](
+      maxCapacity: Int,
+      initialCapacity: Int,
+      loadFactor: Float
+  ): LruCacheE[K, V, E] = {
+    val m = new Inner[K, V](maxCapacity, initialCapacity, loadFactor)
+    new ThreadUnsafeLruCache[K, V, E](m)
+  }
+
+  class Inner[K, V](maxCapacity: Int, initialCapacity: Int, loadFactor: Float)
+      extends LinkedHashMap[K, V](initialCapacity, loadFactor, true) {
     override protected def removeEldestEntry(eldest: Map.Entry[K, V]): Boolean = {
       this.size > maxCapacity
     }
   }
 }
 
-class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
+trait LruCacheE[K, V, E] extends Lock {
+  def m: LruCacheE.Inner[K, V]
+
   def get(key: K)(genValue: => Either[E, V]): Either[E, V] = {
     getInCache(key) match {
       case Some(value) =>
-        refresh(key, value)
         Right(value)
       case None =>
         genValue.map { value =>
@@ -60,7 +74,6 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
   def getUnsafe(key: K)(genValue: => V): V = {
     getInCache(key) match {
       case Some(value) =>
-        refresh(key, value)
         value
       case None =>
         val value = genValue
@@ -72,7 +85,6 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
   def getOpt(key: K)(genValueOpt: => Either[E, Option[V]]): Either[E, Option[V]] = {
     getInCache(key) match {
       case Some(value) =>
-        refresh(key, value)
         Right(Some(value))
       case None =>
         genValueOpt.map { valueOpt => valueOpt.map(value => { putInCache(key, value); value }) }
@@ -82,7 +94,6 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
   def getOptUnsafe(key: K)(genValueOpt: => Option[V]): Option[V] = {
     getInCache(key) match {
       case Some(value) =>
-        refresh(key, value)
         Some(value)
       case None =>
         genValueOpt.map(value => { putInCache(key, value); value })
@@ -117,16 +128,17 @@ class LruCache[K, V, E](m: LruCache.Inner[K, V]) extends RWLock {
       ()
     }
 
-  private def refresh(key: K, value: V): Unit =
-    writeOnly {
-      m.remove(key)
-      m.put(key, value)
-      ()
-    }
-
   def keys: Iterable[K] = m.keySet().asScala
 
   def values: Iterable[V] = m.values().asScala
 
   def entries: Iterable[Entry[K, V]] = m.entrySet().asScala
 }
+
+class ThreadSafeLruCache[K, V, E](val m: LruCacheE.Inner[K, V])
+    extends LruCacheE[K, V, E]
+    with RWLock
+
+class ThreadUnsafeLruCache[K, V, E](val m: LruCacheE.Inner[K, V])
+    extends LruCacheE[K, V, E]
+    with NoLock

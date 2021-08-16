@@ -130,12 +130,12 @@ trait BlockFlowState extends FlowTipsUtil {
 
   // Cache latest blocks for assisting merkle trie
   private val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
-    LruCache[BlockHash, BlockCache, IOError](
+    LruCacheE.threadSafe[BlockHash, BlockCache, IOError](
       consensusConfig.blockCacheCapacityPerChain * brokerConfig.depsNum
     )
   }
 
-  def getGroupCache(groupIndex: GroupIndex): LruCache[BlockHash, BlockCache, IOError] = {
+  def getGroupCache(groupIndex: GroupIndex): LruCacheE[BlockHash, BlockCache, IOError] = {
     assume(brokerConfig.contains(groupIndex))
     groupCaches(groupIndex.value - brokerConfig.groupFrom)
   }

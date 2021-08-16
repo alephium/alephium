@@ -72,7 +72,18 @@ trait WalletExamples extends ErrorExamples {
     simpleExample(WalletCreation.Result(walletName, mnemonic))
 
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
-    simpleExample(WalletRestore(password, mnemonic, None, None, None))
+    List(
+      Example(
+        WalletRestore(password, mnemonic, None, None, None),
+        name = None,
+        summary = Some("Default")
+      ),
+      Example(
+        WalletRestore(password, mnemonic, Some(true), Some(walletName), Some(mnemonicPassphrase)),
+        name = None,
+        summary = Some("More settings")
+      )
+    )
 
   implicit val walletRestoreResultExamples: List[Example[WalletRestore.Result]] =
     simpleExample(WalletRestore.Result(walletName))

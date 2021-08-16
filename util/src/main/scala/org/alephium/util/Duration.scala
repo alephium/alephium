@@ -22,11 +22,7 @@ import scala.concurrent.duration.{FiniteDuration => SDuration, MILLISECONDS}
 
 // Note: millis should always be positive
 class Duration(val millis: Long) extends AnyVal with Ordered[Duration] {
-  def toSeconds: Long = {
-    val seconds   = millis / 1000
-    val remainder = millis % 1000
-    if (remainder < 0) seconds - 1 else seconds
-  }
+  def toSeconds: Long = millis / 1000
 
   def toMinutes: Long = toSeconds / 60
 

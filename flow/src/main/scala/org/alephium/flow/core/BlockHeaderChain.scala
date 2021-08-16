@@ -34,7 +34,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def headerStorage: BlockHeaderStorage
 
   private lazy val headerCache =
-    LruCache[BlockHash, BlockHeader, IOError](consensusConfig.blockCacheCapacityPerChain)
+    LruCacheE.threadSafe[BlockHash, BlockHeader, IOError](
+      consensusConfig.blockCacheCapacityPerChain
+    )
 
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = {
     headerCache.get(hash)(headerStorage.get(hash))
@@ -148,12 +150,16 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } else {
       val lastCanonicalHash = reversed(lastCanonicalIndex)
       val heightFrom        = getHeightUnsafe(lastCanonicalHash) + 1
-      val heightTo          = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
-      if (Utils.unsafe(isRecentHeight(heightFrom))) {
-        getRecentDataUnsafe(heightFrom, heightTo)
-      } else {
-        getSyncDataUnsafe(heightFrom, heightTo)
-      }
+      getSyncDataFromHeightUnsafe(heightFrom)
+    }
+  }
+
+  def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
+    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
+    if (Utils.unsafe(isRecentHeight(heightFrom))) {
+      getRecentDataUnsafe(heightFrom, heightTo)
+    } else {
+      getSyncDataUnsafe(heightFrom, heightTo)
     }
   }
 

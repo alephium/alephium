@@ -18,9 +18,9 @@ package org.alephium.util
 
 import org.scalatest.Assertion
 
-class LruCacheSpec extends AlephiumSpec {
+class LruCacheESpec extends AlephiumSpec {
   trait Fixture {
-    val cache = LruCache[Char, Int, Unit](maxCapacity = 2)
+    val cache = LruCacheE.threadSafe[Char, Int, Unit](maxCapacity = 2)
 
     def testKeys(keys: Char*): Assertion = {
       cache.keys.toSet is Set(keys: _*)

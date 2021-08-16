@@ -18,7 +18,12 @@ package org.alephium.util
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-trait RWLock {
+trait Lock {
+  def readOnly[T](f: => T): T
+  def writeOnly[T](f: => T): T
+}
+
+trait RWLock extends Lock {
   private val lock      = new ReentrantReadWriteLock()
   private val readLock  = lock.readLock()
   private val writeLock = lock.writeLock()
@@ -43,4 +48,9 @@ trait RWLock {
       writeLock.unlock()
     }
   }
+}
+
+trait NoLock extends Lock {
+  @inline def readOnly[T](f: => T): T  = identity(f)
+  @inline def writeOnly[T](f: => T): T = identity(f)
 }
