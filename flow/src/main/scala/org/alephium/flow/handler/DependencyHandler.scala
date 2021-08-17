@@ -16,16 +16,19 @@
 
 package org.alephium.flow.handler
 
+import java.util.{LinkedHashMap, Map => JMap}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import akka.actor.Props
 
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, FlowData}
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
 import org.alephium.util.EventStream.Subscriber
 
 object DependencyHandler {
@@ -33,7 +36,7 @@ object DependencyHandler {
       blockFlow: BlockFlow,
       blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
       headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
-  ): Props =
+  )(implicit networkSetting: NetworkSetting): Props =
     Props(new DependencyHandler(blockFlow, blockHandlers, headerHandlers))
 
   sealed trait Command
@@ -43,13 +46,21 @@ object DependencyHandler {
 
   sealed trait Event
   final case class Pendings(datas: AVector[BlockHash]) extends Event
+
+  final case class PendingStatus(
+      data: FlowData,
+      event: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin,
+      timestamp: TimeStamp
+  )
 }
 
 class DependencyHandler(
     val blockFlow: BlockFlow,
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
-) extends DependencyHandlerState
+)(implicit val networkSetting: NetworkSetting)
+    extends DependencyHandlerState
     with Subscriber {
   import DependencyHandler._
 
@@ -66,15 +77,15 @@ class DependencyHandler(
     case Invalid(hash) =>
       uponInvalidData(hash)
     case GetPendings =>
-      sender() ! Pendings(AVector.from(pending.keys))
+      sender() ! Pendings(AVector.from(pending.keys()))
   }
 
   def processReadies(): Unit = {
     val readies = extractReadies()
     readies.foreach {
-      case (block: Block, broker, origin) =>
+      case PendingStatus(block: Block, broker, origin, _) =>
         blockHandlers(block.chainIndex) ! BlockChainHandler.Validate(block, broker, origin)
-      case (header: BlockHeader, broker, origin) =>
+      case PendingStatus(header: BlockHeader, broker, origin, _) =>
         headerHandlers(header.chainIndex) ! HeaderChainHandler.Validate(header, broker, origin)
       case _ => () // dead branch
     }
@@ -82,10 +93,36 @@ class DependencyHandler(
 }
 
 trait DependencyHandlerState extends IOBaseActor {
-  def blockFlow: BlockFlow
+  import DependencyHandler.PendingStatus
 
-  val pending =
-    mutable.HashMap.empty[BlockHash, (FlowData, ActorRefT[ChainHandler.Event], DataOrigin)]
+  def blockFlow: BlockFlow
+  def networkSetting: NetworkSetting
+
+  val cacheSize =
+    maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 11 / 10 // slightly larger than maxSyncBlocks
+  val pending = Cache.fifo[BlockHash, PendingStatus] {
+    (map: LinkedHashMap[BlockHash, PendingStatus], eldest: JMap.Entry[BlockHash, PendingStatus]) =>
+      if (map.size > cacheSize) {
+        removePending(eldest.getKey())
+      }
+      val threshold = TimeStamp.now().minusUnsafe(networkSetting.syncCleanupFrequency)
+      if (eldest.getValue().timestamp <= threshold) {
+        val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
+        val iterator = map.entrySet().iterator()
+        var continue = true
+        while (continue && iterator.hasNext) {
+          val entry = iterator.next()
+          if (entry.getValue().timestamp <= threshold) {
+            toRemove.addOne(entry.getKey())
+          } else {
+            continue = false
+          }
+        }
+        toRemove.foreach(removePending)
+      }
+  }
+  mutable.HashMap.empty[BlockHash, (FlowData, ActorRefT[ChainHandler.Event], DataOrigin)]
+
   val missing      = mutable.HashMap.empty[BlockHash, ArrayBuffer[BlockHash]]
   val missingIndex = mutable.HashMap.empty[BlockHash, ArrayBuffer[BlockHash]]
   val readies      = mutable.HashSet.empty[BlockHash]
@@ -98,7 +135,7 @@ trait DependencyHandlerState extends IOBaseActor {
   ): Unit = {
     escapeIOError(blockFlow.contains(data.hash)) { existing =>
       if (!existing && !pending.contains(data.hash)) {
-        pending(data.hash) = (data, broker, origin)
+        pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
 
         escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
           if (missingDeps.nonEmpty) {
@@ -118,8 +155,8 @@ trait DependencyHandlerState extends IOBaseActor {
     }
   }
 
-  def extractReadies(): AVector[(FlowData, ActorRefT[ChainHandler.Event], DataOrigin)] = {
-    val result = AVector.from(readies.view.map(pending.apply))
+  def extractReadies(): AVector[PendingStatus] = {
+    val result = AVector.from(readies.view.map(pending.unsafe))
     processing.addAll(readies)
     readies.clear()
     result
@@ -145,19 +182,19 @@ trait DependencyHandlerState extends IOBaseActor {
   }
 
   def uponInvalidData(hash: BlockHash): Unit = {
-    readies -= hash
-    processing -= hash
-
-    invalidPending(hash)
+    removePending(hash)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def invalidPending(hash: BlockHash): Unit = {
-    pending -= hash
+  private def removePending(hash: BlockHash): Unit = {
+    pending.remove(hash)
     missing -= hash
     missingIndex.get(hash).foreach { children =>
       missingIndex -= hash
-      children.foreach(invalidPending)
+      children.foreach(removePending)
     }
+
+    readies -= hash
+    processing -= hash
   }
 }
