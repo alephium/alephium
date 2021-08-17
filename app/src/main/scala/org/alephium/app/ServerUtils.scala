@@ -71,8 +71,8 @@ class ServerUtils(implicit
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
-        .getUTXOs(address.lockupScript)
-        .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
+        .getUTXOsIncludePool(address.lockupScript)
+        .map(_.map(UTXO.from))
         .left
         .flatMap(failed)
     } yield utxos
@@ -271,11 +271,14 @@ class ServerUtils(implicit
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
-      val tokensInfo = destination.tokens
-        .map(_.map { token =>
-          (token.id -> token.amount)
-        })
-        .getOrElse(AVector.empty)
+      val tokensInfo = destination.tokens match {
+        case Some(tokens) =>
+          tokens.map { token =>
+            (token.id -> token.amount)
+          }
+        case None =>
+          AVector.empty[(TokenId, U256)]
+      }
 
       TxOutputInfo(
         destination.address.lockupScript,

@@ -19,6 +19,7 @@ package org.alephium.app
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.UtxoUtils
 import org.alephium.protocol.{ALF, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -355,30 +356,28 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
     val selfDestination                    = Destination(fromAddress, ALF.cent(50))
 
-    {
-      info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
-      val destinations = AVector(selfDestination)
-      val buildTransaction = serverUtils
-        .buildTransaction(
-          blockFlow,
-          BuildTransaction(fromPublicKey, destinations)
-        )
-        .rightValue
-
-      val txTemplate = signAndAddToMemPool(
-        buildTransaction.txId,
-        buildTransaction.unsignedTx,
-        chainIndex,
-        fromPrivateKey
+    info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
+    val selfDestinations = AVector(selfDestination)
+    val buildTransaction = serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, selfDestinations)
       )
-
-      checkAddressBalance(fromAddress, genesisBalance - txTemplate.gasFeeUnsafe, 2)
-    }
+      .rightValue
+    val txTemplate = signAndAddToMemPool(
+      buildTransaction.txId,
+      buildTransaction.unsignedTx,
+      chainIndex,
+      fromPrivateKey
+    )
+    val fromAddressBalance = genesisBalance - txTemplate.gasFeeUnsafe
+    checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos        = serverUtils.getUTXOs(blockFlow, fromAddress).rightValue
     val destination1 = generateDestination(chainIndex, networkType)
     val destination2 = generateDestination(chainIndex, networkType)
     val destinations = AVector(destination1, destination2)
+
   }
 
   "ServerUtils.prepareUnsignedTransaction" should "create transaction with provided UTXOs" in new MultipleUtxos {
@@ -400,12 +399,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "not create transaction with provided UTXOs, if Gas is not also provided" in new MultipleUtxos {
+  it should "use default gas if Gas is not provided" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
       OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
-    serverUtils
+    // ALF.oneAlf is transferred to each destination
+    val unsignedTx = serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
         fromPublicKey,
@@ -414,8 +414,19 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = None,
         defaultGasPrice
       )
-      .leftValue
-      .detail is "Gas missing when building transaction from selected UTXOs"
+      .rightValue
+
+    val fromAddressBalanceAfterTransfer = {
+      val defaultGas    = UtxoUtils.estimateGas(outputRefs.length, destinations.length)
+      val defaultGasFee = defaultGasPrice * defaultGas
+      fromAddressBalance - ALF.oneAlf.mulUnsafe(2) - defaultGasFee
+    }
+
+    unsignedTx.fixedOutputs.map(_.amount).toSeq should contain theSameElementsAs Seq(
+      ALF.oneAlf,
+      ALF.oneAlf,
+      fromAddressBalanceAfterTransfer
+    )
   }
 
   it should "not create transaction with provided UTXOs, if Alf amount isn't enough" in new MultipleUtxos {
@@ -453,7 +464,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Empty UTXOs"
   }
 
-  it should "not create transaction with without enough gas" in new MultipleUtxos {
+  it should "not create transaction without enough gas" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
       OutputRef(utxo.ref.hint, utxo.ref.key)
     }

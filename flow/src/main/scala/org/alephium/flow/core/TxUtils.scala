@@ -69,7 +69,7 @@ trait TxUtils { Self: FlowUtils =>
 
     val currentTs = TimeStamp.now()
 
-    getUTXOs(lockupScript).map { utxos =>
+    getUTXOsIncludePool(lockupScript).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
         if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
@@ -78,7 +78,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getUTXOs(lockupScript: LockupScript.Asset): IOResult[AVector[AssetOutputInfo]] = {
+  def getUTXOsIncludePool(lockupScript: LockupScript.Asset): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
@@ -173,16 +173,18 @@ trait TxUtils { Self: FlowUtils =>
       val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
       val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-      val gasE = for {
-        gas <- gasOpt.toRight("Gas missing when building transaction from selected UTXOs")
-        _   <- checkUTXORefs(utxoRefs)
-        _   <- checkTotalAmount(outputInfos)
-        _   <- checkOutputInfos(outputInfos)
-        _   <- checkWithMinimalGas(gasOpt, minimalGas)
-      } yield gas
+      val checkResult = for {
+        _ <- checkUTXORefs(utxoRefs)
+        _ <- checkTotalAmount(outputInfos)
+        _ <- checkOutputInfos(outputInfos)
+        _ <- checkWithMinimalGas(gasOpt, minimalGas)
+      } yield ()
 
-      gasE match {
-        case Right(gas) =>
+      checkResult match {
+        case Right(()) =>
+          // Probably be more liberal and count the change output here as well.
+          val gas = gasOpt.getOrElse(UtxoUtils.estimateGas(utxoRefs.length, outputInfos.length))
+
           getImmutableGroupViewIncludePool(groupIndex)
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>

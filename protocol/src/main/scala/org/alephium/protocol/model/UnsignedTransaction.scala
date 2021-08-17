@@ -23,7 +23,7 @@ import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-/** Upto one new token might be issued in each transaction exception for the coinbase transaction
+/** Up to one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
   *
   * @param chainId the id of the chain which can accept the tx
