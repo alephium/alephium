@@ -27,19 +27,76 @@ object Cache {
     Cache(maxCapacity, accessOrder = false)
   }
 
+  def fifo[K, V](
+      maxCapacity: Int,
+      getTimeStamp: V => TimeStamp,
+      expiryDuration: Duration
+  ): Cache[K, V] = {
+    Cache(maxCapacity, getTimeStamp, expiryDuration, accessOrder = false)
+  }
+
+  def fifo[K, V](
+      removal: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit
+  ): Cache[K, V] = {
+    apply(removal, accessOrder = false)
+  }
+
   private def apply[K, V](maxCapacity: Int, accessOrder: Boolean): Cache[K, V] = {
-    val m = new Inner[K, V](maxCapacity, 32, 0.75f, accessOrder)
+    Cache[K, V](
+      (map: LinkedHashMap[K, V], eldest: Map.Entry[K, V]) =>
+        if (map.size() > maxCapacity) { map.remove(eldest.getKey()); () },
+      accessOrder
+    )
+  }
+
+  private def apply[K, V](
+      maxCapacity: Int,
+      getTimeStamp: V => TimeStamp,
+      expiryDuration: Duration,
+      accessOrder: Boolean
+  ): Cache[K, V] = {
+    val m = new Inner[K, V](
+      removeEldest = (map, eldest) => {
+        if (map.size > maxCapacity) {
+          map.remove(eldest.getKey())
+        }
+
+        val threshold = TimeStamp.now().minusUnsafe(expiryDuration)
+        var continue  = true
+        val iterator  = map.entrySet().iterator()
+        while (continue && iterator.hasNext) {
+          val entry = iterator.next()
+          if (getTimeStamp(entry.getValue()) <= threshold) {
+            iterator.remove()
+          } else {
+            continue = false
+          }
+        }
+      },
+      32,
+      0.75f,
+      accessOrder
+    )
+    new Cache[K, V](m)
+  }
+
+  private def apply[K, V](
+      removal: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit,
+      accessOrder: Boolean
+  ): Cache[K, V] = {
+    val m = new Inner(removal, 32, 0.75f, accessOrder)
     new Cache[K, V](m)
   }
 
   private class Inner[K, V](
-      maxCapacity: Int,
+      removeEldest: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit,
       initialCapacity: Int,
       loadFactor: Float,
       accessOrder: Boolean
   ) extends LinkedHashMap[K, V](initialCapacity, loadFactor, accessOrder) {
     override protected def removeEldestEntry(eldest: Map.Entry[K, V]): Boolean = {
-      this.size > maxCapacity
+      removeEldest(this, eldest)
+      false // always return false since we remove elements manually
     }
   }
 }
