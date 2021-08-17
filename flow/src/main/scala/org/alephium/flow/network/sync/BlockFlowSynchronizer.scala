@@ -26,13 +26,15 @@ import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
 
 object BlockFlowSynchronizer {
   def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
-      networkSetting: NetworkSetting
+      networkSetting: NetworkSetting,
+      brokerConfig: BrokerConfig
   ): Props =
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
@@ -46,7 +48,8 @@ object BlockFlowSynchronizer {
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
-    networkSetting: NetworkSetting
+    val networkSetting: NetworkSetting,
+    val brokerConfig: BrokerConfig
 ) extends IOBaseActor
     with Subscriber
     with DownloadTracker
@@ -79,8 +82,8 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)
-    case CleanDownloading        => cleanupDownloading(networkSetting.syncExpiryPeriod)
-    case Announcement(hash)      => handleAnnouncement(hash, ActorRefT(sender()))
+    case CleanDownloading        => cleanupSyncing(networkSetting.syncExpiryPeriod)
+    case Announcement(hash)      => handleAnnouncement(hash)
     case Terminated(actor) =>
       val broker = ActorRefT[BrokerHandler.Command](actor)
       log.debug(s"Connection to ${remoteAddress(broker)} is closing")
