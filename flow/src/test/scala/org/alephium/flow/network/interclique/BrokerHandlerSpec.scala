@@ -27,7 +27,7 @@ import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
+import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TestUtils}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
@@ -87,18 +87,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     cliqueManager.expectMsg(CliqueManager.Synced(brokerHandler.underlyingActor.remoteBrokerInfo))
   }
 
-  it should "mark block seen when receive valid NewBlock/NewHeader/NewBlockHash" in new Fixture
+  it should "mark block seen when receive valid NewBlock/NewBlockHash" in new Fixture
     with NoIndexModelGenerators {
     val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
     val blockHash  = emptyBlock(blockFlow, chainIndex).hash
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash) is true)
-
-    val blockHeader = blockGen(
-      ChainIndex.unsafe(brokerConfig.groupUntil, brokerConfig.groupUntil)
-    ).sample.get.header
-    brokerHandler ! BaseBrokerHandler.Received(NewHeader(blockHeader))
-    eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHeader.hash) is true)
 
     val block = emptyBlock(blockFlow, chainIndex)
     brokerHandler ! BaseBrokerHandler.Received(NewBlock(block))
@@ -150,9 +144,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
       }
     }
 
-    val invalidHash   = genInvalidBlockHash()
-    val listener      = TestProbe()
-    val remoteAddress = brokerHandler.underlyingActor.remoteAddress
+    val invalidHash = genInvalidBlockHash()
+    val listener    = TestProbe()
 
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(invalidHash))
@@ -207,11 +200,39 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     brokerHandler.underlyingActor.seenBlocks.contains(blockHash2) is true
   }
 
+  it should "publish misbehavior when receive deep forked block" in new Fixture {
+    val chainIndex         = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
+    val invalidForkedBlock = emptyBlock(blockFlow, chainIndex)
+    val listener           = TestProbe()
+    val blockChain         = blockFlow.getBlockChain(chainIndex)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    blockChain.maxHeightUnsafe is 2
+    val validForkedBlock = emptyBlock(blockFlow, chainIndex)
+    (0 until maxForkDepth).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+    blockChain.maxHeightUnsafe is (2 + maxForkDepth)
+
+    brokerHandler ! BaseBrokerHandler.Received(NewBlock(validForkedBlock))
+    val message = DependencyHandler.AddFlowData(
+      AVector(validForkedBlock),
+      brokerHandler.underlyingActor.dataOrigin
+    )
+    allHandlerProbes.dependencyHandler.expectMsg(message)
+
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+    brokerHandler ! BaseBrokerHandler.Received(NewBlock(invalidForkedBlock))
+    listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
   trait Fixture {
-    val (allHandler, _)       = TestUtils.createAllHandlersProbe
-    val cliqueManager         = TestProbe()
-    val connectionHandler     = TestProbe()
-    val blockFlowSynchronizer = TestProbe()
+    val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe
+    val cliqueManager                  = TestProbe()
+    val connectionHandler              = TestProbe()
+    val blockFlowSynchronizer          = TestProbe()
+    val maxForkDepth                   = 5
 
     val brokerHandler = TestActorRef[TestBrokerHandler](
       TestBrokerHandler.props(
@@ -222,9 +243,11 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
         allHandler,
         ActorRefT(cliqueManager.ref),
         ActorRefT(blockFlowSynchronizer.ref),
-        ActorRefT(connectionHandler.ref)
+        ActorRefT(connectionHandler.ref),
+        maxForkDepth
       )
     )
+    val remoteAddress = brokerHandler.underlyingActor.remoteAddress
   }
 }
 
@@ -238,7 +261,8 @@ object TestBrokerHandler {
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
       blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-      brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
+      brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
+      maxForkDepth: Int
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
       new TestBrokerHandler(
@@ -249,7 +273,8 @@ object TestBrokerHandler {
         allHandlers,
         cliqueManager,
         blockFlowSynchronizer,
-        brokerConnectionHandler
+        brokerConnectionHandler,
+        maxForkDepth
       )
     )
 }
@@ -262,7 +287,8 @@ class TestBrokerHandler(
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-    override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
+    override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
+    override val maxForkDepth: Int
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseInboundBrokerHandler
     with BrokerHandler {

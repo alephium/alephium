@@ -32,7 +32,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, FlowData}
+import org.alephium.protocol.model.{Block, BrokerInfo, FlowData}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -117,8 +117,6 @@ trait BrokerHandler extends FlowDataHandler {
 
   def handleNewBlock(block: Block): Unit =
     handleFlowData(AVector(block), dataOrigin, isBlock = true)
-  def handleNewHeader(header: BlockHeader): Unit =
-    handleFlowData(AVector(header), dataOrigin, isBlock = false)
 
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
@@ -144,7 +142,7 @@ trait BrokerHandler extends FlowDataHandler {
       log.debug(
         s"Received new block header ${header.hash.shortHex} from $remoteAddress"
       )
-      handleNewHeader(header)
+      handleFlowData(AVector(header), dataOrigin, isBlock = false)
     case Received(HeadersResponse(requestId, headers)) =>
       log.debug(
         s"Received #${headers.length} headers ${Utils.showDataDigest(headers)} from $remoteAddress with $requestId"
