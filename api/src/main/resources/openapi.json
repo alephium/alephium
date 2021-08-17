@@ -879,7 +879,7 @@
                 "destinations": [
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "amount": "1000000"
+                    "amount": "1000000",
                     "tokens": [
                       {
                         "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",

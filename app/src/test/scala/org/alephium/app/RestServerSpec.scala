@@ -200,18 +200,18 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  ]
         |}
         """.stripMargin
-      ) check { response =>
-        response.code is StatusCode.Ok
-        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-          ServerFixture.dummyTransferTx(
-            dummyTx,
-            AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
-          )
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+        ServerFixture.dummyTransferTx(
+          dummyTx,
+          AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
         )
-      }
-      Post(
-        s"/transactions/build",
-        body = s"""
+      )
+    }
+    Post(
+      s"/transactions/build",
+      body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
         |  "destinations": [
@@ -224,18 +224,17 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  ]
         |}
         """.stripMargin
-      ) check { response =>
-        response.code is StatusCode.Ok
-        response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-          ServerFixture.dummyTransferTx(
-            dummyTx,
-            AVector(
-              TxOutputInfo(
-                dummyToLockupScript,
-                U256.One,
-                AVector.empty,
-                Some(TimeStamp.unsafe(1234))
-              )
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+        ServerFixture.dummyTransferTx(
+          dummyTx,
+          AVector(
+            TxOutputInfo(
+              dummyToLockupScript,
+              U256.One,
+              AVector.empty,
+              Some(TimeStamp.unsafe(1234))
             )
           )
         )

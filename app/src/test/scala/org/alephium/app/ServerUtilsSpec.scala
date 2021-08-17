@@ -347,13 +347,12 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait MultipleUtxos extends FlowFixture {
-    val networkType          = networkSetting.networkType
-    implicit val serverUtils = new ServerUtils(networkType)
+    implicit val serverUtils = new ServerUtils
 
     implicit val bf                        = blockFlow
     val chainIndex                         = ChainIndex.unsafe(0, 0)
     val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
-    val fromAddress                        = Address.p2pkh(networkType, fromPublicKey)
+    val fromAddress                        = Address.p2pkh(fromPublicKey)
     val selfDestination                    = Destination(fromAddress, ALF.cent(50))
 
     info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
@@ -374,8 +373,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos        = serverUtils.getUTXOs(blockFlow, fromAddress).rightValue
-    val destination1 = generateDestination(chainIndex, networkType)
-    val destination2 = generateDestination(chainIndex, networkType)
+    val destination1 = generateDestination(chainIndex)
+    val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
 
   }
