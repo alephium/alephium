@@ -181,7 +181,7 @@ class InterCliqueManager(
           peerId,
           brokerState.info.address,
           brokerState.isSynced,
-          brokerState.info.groupNumPerBroker
+          brokerConfig.remoteGroupNum(brokerState.info)
         )
       }
       sender() ! syncStatuses
@@ -385,16 +385,16 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       brokerInfo: BrokerInfo,
       maxOutboundConnectionsPerGroup: Int
   ): Boolean = {
-    brokerConfig.intersect(brokerInfo) && !containsBroker(brokerInfo) && {
-      val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
-      (groupFrom until groupUntil).exists { group =>
+    !containsBroker(brokerInfo) && {
+      brokerConfig.calIntersection(brokerInfo).exists { group =>
         getOutConnectionPerGroup(GroupIndex.unsafe(group)) < maxOutboundConnectionsPerGroup
       }
     }
   }
 
   def handleNewBroker(brokerInfo: BrokerInfo, connectionType: ConnectionType): Unit = {
-    if (brokerConfig.intersect(brokerInfo)) {
+    val range = brokerConfig.calIntersection(brokerInfo)
+    if (range.nonEmpty) {
       brokers.get(brokerInfo.peerId) match {
         case None =>
           handleNewConnection(brokerInfo, connectionType)
@@ -420,8 +420,8 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       brokerInfo: BrokerInfo,
       maxInboundConnectionsPerGroup: Int
   ): Unit = {
-    val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
-    val available = (groupFrom until groupUntil).exists { group =>
+    val range = brokerConfig.calIntersection(brokerInfo)
+    val available = range.exists { group =>
       getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
     }
     if (available) {
@@ -448,26 +448,21 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       brokerInfo: BrokerInfo,
       maxOutboundConnectionsPerGroup: Int
   ): Boolean = {
-    val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
-    needOutgoingConnections(groupFrom, groupUntil, maxOutboundConnectionsPerGroup)
+    val range = brokerConfig.calIntersection(brokerInfo)
+    needOutgoingConnections(range, maxOutboundConnectionsPerGroup)
   }
 
   def needOutgoingConnections(
       maxOutboundConnectionsPerGroup: Int
   ): Boolean = {
-    needOutgoingConnections(
-      brokerConfig.groupFrom,
-      brokerConfig.groupUntil,
-      maxOutboundConnectionsPerGroup
-    )
+    needOutgoingConnections(brokerConfig.groupRange, maxOutboundConnectionsPerGroup)
   }
 
   private def needOutgoingConnections(
-      groupFrom: Int,
-      groupUntil: Int,
+      range: Range,
       maxOutboundConnectionsPerGroup: Int
   ): Boolean = {
-    (groupFrom until groupUntil).exists { group =>
+    range.exists { group =>
       getOutConnectionPerGroup(GroupIndex.unsafe(group)) < maxOutboundConnectionsPerGroup
     }
   }
@@ -481,14 +476,13 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       peerPerGroupCount(group) = getOutConnectionPerGroup(GroupIndex.unsafe(group))
     }
     sortedPeers.filter { brokerInfo =>
-      val (groupFrom, groupUntil) = brokerConfig.calIntersection(brokerInfo)
+      val range = brokerConfig.calIntersection(brokerInfo)
       val ok = {
         (brokerInfo.peerId.cliqueId != selfCliqueId) &&
         !containsBroker(brokerInfo) &&
-        (groupUntil > groupFrom) &&
-        (groupFrom until groupUntil).exists(peerPerGroupCount(_) < maxOutboundConnectionsPerGroup)
+        range.exists(peerPerGroupCount(_) < maxOutboundConnectionsPerGroup)
       }
-      if (ok) (groupFrom until groupUntil).foreach(peerPerGroupCount(_) += 1)
+      if (ok) range.foreach(peerPerGroupCount(_) += 1)
       ok
     }
   }

@@ -25,12 +25,12 @@ import org.alephium.util.{AVector, TimeStamp}
 class GrandPool(val mempools: AVector[MemPool])(implicit
     val brokerConfig: BrokerConfig
 ) {
-  def getMemPool(mainGroup: GroupIndex): MemPool = {
-    mempools(mainGroup.value - brokerConfig.groupFrom)
+  @inline def getMemPool(mainGroup: GroupIndex): MemPool = {
+    mempools(brokerConfig.groupIndexOfBroker(mainGroup))
   }
 
-  def getMemPool(chainIndex: ChainIndex): MemPool = {
-    mempools(chainIndex.from.value - brokerConfig.groupFrom)
+  @inline def getMemPool(chainIndex: ChainIndex): MemPool = {
+    getMemPool(chainIndex.from)
   }
 
   def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
@@ -41,7 +41,7 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
 object GrandPool {
   def empty(implicit brokerConfig: BrokerConfig, memPoolSetting: MemPoolSetting): GrandPool = {
     val mempools = AVector.tabulate(brokerConfig.groupNumPerBroker) { idx =>
-      val group = GroupIndex.unsafe(brokerConfig.groupFrom + idx)
+      val group = GroupIndex.unsafe(brokerConfig.groupRange(idx))
       MemPool.empty(group)
     }
     new GrandPool(mempools)

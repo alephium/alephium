@@ -29,6 +29,7 @@ final case class SelfClique(
     groupNumPerBroker: Int,
     groups: Int
 ) {
-  def peer(groupIndex: GroupIndex): PeerAddress =
-    nodes((groupIndex.value / groupNumPerBroker) % nodes.length)
+  def brokerNum: Int = nodes.length
+
+  def peer(groupIndex: GroupIndex): PeerAddress = nodes(groupIndex.value % brokerNum)
 }

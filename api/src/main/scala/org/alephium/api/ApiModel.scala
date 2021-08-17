@@ -217,16 +217,16 @@ trait ApiModelCodec {
     readwriter[ujson.Value].bimap[BrokerInfo](
       peer =>
         ujson.Obj(
-          "cliqueId"          -> writeJs(peer.cliqueId),
-          "brokerId"          -> writeJs(peer.brokerId),
-          "groupNumPerBroker" -> writeJs(peer.groupNumPerBroker),
-          "address"           -> writeJs(peer.address)
+          "cliqueId"  -> writeJs(peer.cliqueId),
+          "brokerId"  -> writeJs(peer.brokerId),
+          "brokerNum" -> writeJs(peer.brokerNum),
+          "address"   -> writeJs(peer.address)
         ),
       json =>
         BrokerInfo.unsafe(
           read[CliqueId](json("cliqueId")),
           read[Int](json("brokerId")),
-          read[Int](json("groupNumPerBroker")),
+          read[Int](json("brokerNum")),
           read[InetSocketAddress](json("address"))
         )
     )

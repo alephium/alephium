@@ -42,14 +42,14 @@ trait ConflictedBlocks {
     )
   )
 
-  def getCache(block: Block): GroupCache =
-    caches(block.chainIndex.from.value - brokerConfig.groupFrom)
+  @inline def getCache(block: Block): GroupCache =
+    getCache(block.hash)
 
-  def getCache(hash: BlockHash): GroupCache =
-    caches(ChainIndex.from(hash).from.value - brokerConfig.groupFrom)
+  @inline def getCache(hash: BlockHash): GroupCache =
+    getCache(ChainIndex.from(hash).from)
 
-  def getCache(target: GroupIndex): GroupCache =
-    caches(target.value - brokerConfig.groupFrom)
+  @inline def getCache(target: GroupIndex): GroupCache =
+    caches(brokerConfig.groupIndexOfBroker(target))
 
   def cacheForConflicts(block: Block): Unit = getCache(block).add(block)
 

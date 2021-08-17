@@ -146,10 +146,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val neighborCliques = NeighborPeers(AVector(dummyPeerInfo))
     val cliqueIdString  = dummyPeerInfo.cliqueId.toHexString
     def jsonRaw(cliqueId: String) =
-      s"""{"peers":[{"cliqueId":"$cliqueId","brokerId":1,"groupNumPerBroker":3,"address":{"addr":"127.0.0.1","port":9000}}]}"""
+      s"""{"peers":[{"cliqueId":"$cliqueId","brokerId":1,"brokerNum":3,"address":{"addr":"127.0.0.1","port":9000}}]}"""
     checkData(neighborCliques, jsonRaw(cliqueIdString))
 
-    parseFail[NeighborPeers](jsonRaw("OOPS")) is "invalid clique id at index 106"
+    parseFail[NeighborPeers](jsonRaw("OOPS")) is "invalid clique id at index 98"
   }
 
   it should "encode/decode GetBalance" in {

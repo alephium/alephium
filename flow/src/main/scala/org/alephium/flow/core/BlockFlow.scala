@@ -46,19 +46,20 @@ trait BlockFlow
 
   def calWeight(block: Block): IOResult[Weight]
 
-  override protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]] = {
+  override protected def getSyncLocatorsUnsafe(): AVector[(ChainIndex, AVector[BlockHash])] = {
     getSyncLocatorsUnsafe(brokerConfig)
   }
 
   private def getSyncLocatorsUnsafe(
       peerBrokerInfo: BrokerGroupInfo
-  ): AVector[AVector[BlockHash]] = {
-    val (groupFrom, groupUntil) = brokerConfig.calIntersection(peerBrokerInfo)
-    AVector.tabulate((groupUntil - groupFrom) * groups) { index =>
-      val offset    = index / groups
-      val fromGroup = groupFrom + offset
-      val toGroup   = index % groups
-      getSyncLocatorsUnsafe(ChainIndex.unsafe(fromGroup, toGroup))
+  ): AVector[(ChainIndex, AVector[BlockHash])] = {
+    val range = brokerConfig.calIntersection(peerBrokerInfo)
+    AVector.tabulate(range.length * groups) { index =>
+      val offset     = index / groups
+      val fromGroup  = range(offset)
+      val toGroup    = index % groups
+      val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+      chainIndex -> getSyncLocatorsUnsafe(ChainIndex.unsafe(fromGroup, toGroup))
     }
   }
 
@@ -82,10 +83,10 @@ trait BlockFlow
       locators: AVector[AVector[BlockHash]],
       peerBrokerInfo: BrokerGroupInfo
   ): AVector[AVector[BlockHash]] = {
-    val (groupFrom, _) = brokerConfig.calIntersection(peerBrokerInfo)
+    val range = brokerConfig.calIntersection(peerBrokerInfo)
     locators.mapWithIndex { (locatorsPerChain, index) =>
       val offset     = index / groups
-      val fromGroup  = groupFrom + offset
+      val fromGroup  = range(offset)
       val toGroup    = index % groups
       val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
       val chain      = getBlockChain(chainIndex)
@@ -99,7 +100,7 @@ trait BlockFlow
 
   override protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker * brokerConfig.groups) { index =>
-      val fromGroup = brokerConfig.groupFrom + index / brokerConfig.groups
+      val fromGroup = brokerConfig.groupRange(index / brokerConfig.groups)
       val toGroup   = index % brokerConfig.groups
       val chain     = getBlockChain(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
       chain.getLatestHashesUnsafe()

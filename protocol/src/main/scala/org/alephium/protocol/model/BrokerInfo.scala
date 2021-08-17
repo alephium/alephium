@@ -24,36 +24,38 @@ import org.alephium.serde._
 
 trait BrokerGroupInfo {
   def brokerId: Int
-  def groupNumPerBroker: Int
+  def brokerNum: Int
 
-  lazy val groupFrom: Int = brokerId * groupNumPerBroker
-
-  lazy val groupUntil: Int = (brokerId + 1) * groupNumPerBroker
-
-  def groupRange: Range = groupFrom until groupUntil
+  @inline def groupIndexOfBroker(group: GroupIndex): Int = groupIndexOfBrokerUnsafe(group.value)
+  @inline def groupIndexOfBrokerUnsafe(group: Int): Int  = group / brokerNum
+  @inline def brokerIndex(group: GroupIndex): Int        = brokerIndexUnsafe(group.value)
+  @inline def brokerIndexUnsafe(group: Int): Int         = group % brokerNum
 
   def contains(index: GroupIndex): Boolean = containsRaw(index.value)
 
-  def containsRaw(index: Int): Boolean = groupFrom <= index && index < groupUntil
+  def containsRaw(group: Int): Boolean = brokerIndexUnsafe(group) == brokerId
 
-  def intersect(another: BrokerGroupInfo): Boolean =
-    BrokerInfo.intersect(groupFrom, groupUntil, another.groupFrom, another.groupUntil)
-
-  def calIntersection(another: BrokerGroupInfo): (Int, Int) = {
-    (math.max(groupFrom, another.groupFrom), math.min(groupUntil, another.groupUntil))
+  def intersect(another: BrokerGroupInfo): Boolean = {
+    if (brokerNum == another.brokerNum) {
+      brokerId == another.brokerId
+    } else if (brokerNum < another.brokerNum) {
+      (another.brokerNum % brokerNum == 0) && (another.brokerId % brokerNum == brokerId)
+    } else {
+      (brokerNum % another.brokerNum == 0) && (brokerId % another.brokerNum == another.brokerId)
+    }
   }
 }
 
 final case class BrokerInfo private (
     cliqueId: CliqueId,
     brokerId: Int,
-    groupNumPerBroker: Int,
+    brokerNum: Int,
     address: InetSocketAddress
 ) extends BrokerGroupInfo {
   def peerId: PeerId = PeerId(cliqueId, brokerId)
 
   def interBrokerInfo: InterBrokerInfo =
-    InterBrokerInfo.unsafe(cliqueId, brokerId, groupNumPerBroker)
+    InterBrokerInfo.unsafe(cliqueId, brokerId, brokerNum)
 }
 
 object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
@@ -61,44 +63,32 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
     unsafe(
       remoteBroker.cliqueId,
       remoteBroker.brokerId,
-      remoteBroker.groupNumPerBroker,
+      remoteBroker.brokerNum,
       remoteAddress
     )
 
   val _serde: Serde[BrokerInfo] =
-    Serde.forProduct4(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker, t.address))
+    Serde.forProduct4(unsafe, t => (t.cliqueId, t.brokerId, t.brokerNum, t.address))
 
   override def validate(info: BrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    validate(info.brokerId, info.groupNumPerBroker)
-  }
-
-  def from(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int, address: InetSocketAddress)(
-      implicit config: GroupConfig
-  ): Option[BrokerInfo] = {
-    if (validate(brokerId, groupNumPerBroker).isRight) {
-      Some(new BrokerInfo(cliqueId, brokerId, groupNumPerBroker, address))
-    } else {
-      None
-    }
+    validate(info.brokerId, info.brokerNum)
   }
 
   def unsafe(
       cliqueId: CliqueId,
       brokerId: Int,
-      groupNumPerBroker: Int,
+      brokerNum: Int,
       address: InetSocketAddress
   ): BrokerInfo =
-    new BrokerInfo(cliqueId, brokerId, groupNumPerBroker, address)
+    new BrokerInfo(cliqueId, brokerId, brokerNum, address)
 
-  def validate(id: Int, groupNumPerBroker: Int)(implicit
+  def validate(id: Int, brokerNum: Int)(implicit
       config: GroupConfig
   ): Either[String, Unit] = {
-    if (id < 0 || id >= config.groups) {
+    if (id < 0 || id >= brokerNum) {
       Left(s"BrokerInfo - invalid id: $id")
-    } else if (groupNumPerBroker <= 0 || (config.groups % groupNumPerBroker != 0)) {
-      Left(s"BrokerInfo - invalid groupNumPerBroker: $groupNumPerBroker")
-    } else if (id >= (config.groups / groupNumPerBroker)) {
-      Left(s"BrokerInfo - invalid id: $id")
+    } else if (brokerNum > config.groups || (config.groups % brokerNum != 0)) {
+      Left(s"BrokerInfo - invalid brokerNum: $brokerNum")
     } else {
       Right(())
     }
@@ -113,7 +103,7 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
 final case class InterBrokerInfo private (
     cliqueId: CliqueId,
     brokerId: Int,
-    groupNumPerBroker: Int
+    brokerNum: Int
 ) extends BrokerGroupInfo {
   def peerId: PeerId = PeerId(cliqueId, brokerId)
   def hash(implicit serializer: Serializer[InterBrokerInfo]): Hash = {
@@ -123,12 +113,12 @@ final case class InterBrokerInfo private (
 
 object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {
   val _serde: Serde[InterBrokerInfo] =
-    Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.groupNumPerBroker))
+    Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.brokerNum))
 
   def unsafe(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int): InterBrokerInfo =
     new InterBrokerInfo(cliqueId, brokerId, groupNumPerBroker)
 
   def validate(info: InterBrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
-    BrokerInfo.validate(info.brokerId, info.groupNumPerBroker)
+    BrokerInfo.validate(info.brokerId, info.brokerNum)
   }
 }

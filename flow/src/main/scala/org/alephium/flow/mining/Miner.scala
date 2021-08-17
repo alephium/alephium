@@ -143,7 +143,7 @@ trait Miner extends BaseActor with MinerState {
   def handleNewBlock(block: Block, miningCount: U256): Unit = {
     val chainIndex = block.chainIndex
     assume(brokerConfig.contains(chainIndex.from))
-    val fromShift = chainIndex.from.value - brokerConfig.groupFrom
+    val fromShift = brokerConfig.groupIndexOfBroker(chainIndex.from)
     val to        = chainIndex.to.value
     increaseCounts(fromShift, to, miningCount)
 
@@ -159,7 +159,7 @@ trait Miner extends BaseActor with MinerState {
   }
 
   def handleNoBlock(chainIndex: ChainIndex, miningCount: U256): Unit = {
-    val fromShift = chainIndex.from.value - brokerConfig.groupFrom
+    val fromShift = brokerConfig.groupIndexOfBroker(chainIndex.from)
     val to        = chainIndex.to.value
     increaseCounts(fromShift, to, miningCount)
     if (miningStarted) {
@@ -173,7 +173,7 @@ trait Miner extends BaseActor with MinerState {
       to: Int,
       template: MiningBlob
   ): Unit = {
-    val index = ChainIndex.unsafe(fromShift + brokerConfig.groupFrom, to)
+    val index = ChainIndex.unsafe(brokerConfig.groupRange(fromShift), to)
     scheduleOnce(self, Miner.Mine(index, template), miningConfig.batchDelay)
   }
 

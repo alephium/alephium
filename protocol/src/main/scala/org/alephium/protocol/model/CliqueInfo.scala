@@ -23,7 +23,7 @@ import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-// All the groups [0, ..., G-1] are divided into G/gFactor continuous groups
+// All the groups [0, ..., G-1] are assigned to different brokers based `% brokerNum`
 // Assume the peers are ordered according to the groups they correspond to
 final case class CliqueInfo private (
     id: CliqueId,
@@ -42,19 +42,19 @@ final case class CliqueInfo private (
 
   def intraBrokers: AVector[BrokerInfo] = {
     internalAddresses.mapWithIndex { (internalAddress, index) =>
-      BrokerInfo.unsafe(id, index, groupNumPerBroker, internalAddress)
+      BrokerInfo.unsafe(id, index, brokerNum, internalAddress)
     }
   }
 
   def coordinatorAddress: InetSocketAddress = internalAddresses.head
 
   def selfInterBrokerInfo(implicit brokerConfig: BrokerGroupInfo): InterBrokerInfo =
-    InterBrokerInfo.unsafe(id, brokerConfig.brokerId, groupNumPerBroker)
+    InterBrokerInfo.unsafe(id, brokerConfig.brokerId, brokerNum)
 
   def selfBrokerInfo(implicit brokerConfig: BrokerGroupInfo): Option[BrokerInfo] = {
     val brokerId = brokerConfig.brokerId
     externalAddresses(brokerId) map { address =>
-      BrokerInfo.unsafe(id, brokerId, groupNumPerBroker, address)
+      BrokerInfo.unsafe(id, brokerId, brokerNum, address)
     }
   }
 
@@ -62,7 +62,7 @@ final case class CliqueInfo private (
   def interBrokers: Option[AVector[BrokerInfo]] = {
     Option.when(externalAddresses.forall(_.nonEmpty))(externalAddresses.mapWithIndex {
       case (addressOpt, brokerId) =>
-        BrokerInfo.unsafe(id, brokerId, groupNumPerBroker, addressOpt.get)
+        BrokerInfo.unsafe(id, brokerId, brokerNum, addressOpt.get)
     })
   }
 }

@@ -31,7 +31,7 @@ class SmartContractTest extends AlephiumSpec {
 
     val selfClique = clique.selfClique()
     val group      = request[Group](getGroup(address), clique.masterRestPort)
-    val index      = group.group / selfClique.groupNumPerBroker
+    val index      = group.group % selfClique.brokerNum
     val restPort   = selfClique.nodes(index).restPort
 
     def contract(code: String, state: Option[String] = None): Hash = {

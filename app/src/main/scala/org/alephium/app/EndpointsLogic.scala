@@ -484,7 +484,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   ): Future[Either[ApiError[_ <: StatusCode], Uri]] =
     nodesOpt match {
       case Some(nodes) =>
-        val peer = nodes((fromGroup.value / brokerConfig.groupNumPerBroker) % nodes.length)
+        val peer = nodes(brokerConfig.brokerIndex(fromGroup))
         Future.successful(Right(Uri(peer.address.getHostAddress, peer.restPort)))
       case None =>
         fetchSelfClique().map { selfCliqueEither =>
@@ -496,7 +496,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
           }
         }
     }
-
 }
 
 object EndpointsLogic {
@@ -515,7 +514,7 @@ object EndpointsLogic {
       ),
       selfReady = selfReady,
       synced = synced,
-      cliqueInfo.groupNumPerBroker,
+      groupNumPerBroker = cliqueInfo.groupNumPerBroker,
       brokerConfig.groups
     )
   }

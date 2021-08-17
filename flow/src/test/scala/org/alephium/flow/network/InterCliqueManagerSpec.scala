@@ -294,18 +294,22 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
 
   it should "send block to peers" in new BroadCastFixture {
     val brokerInfo0 = genBrokerInfo(0)
-    val brokerInfo1 = genBrokerInfo(1)
+    val brokerInfo1 = genBrokerInfo(2)
     val brokerInfo2 = genBrokerInfo(0)
+    val brokerInfo3 = genBrokerInfo(1)
     val broker0     = TestProbe()
     val broker1     = TestProbe()
     val broker2     = TestProbe()
+    val broker3     = TestProbe()
 
     broker0.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo0, InboundConnection))
     broker1.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo1, InboundConnection))
     broker2.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo2, InboundConnection))
+    broker3.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo3, InboundConnection))
     interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
     interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
     interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is false
 
     interCliqueManager ! CliqueManager.Synced(brokerInfo0)
     interCliqueManager ! CliqueManager.Synced(brokerInfo1)
@@ -319,7 +323,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
 
   it should "send announcement to peers" in new BroadCastFixture {
     val brokerInfo0 = genBrokerInfo(0)
-    val brokerInfo1 = genBrokerInfo(1)
+    val brokerInfo1 = genBrokerInfo(2)
     val brokerInfo2 = genBrokerInfo(0)
     val brokerInfo3 = genBrokerInfo(0)
     val broker0     = TestProbe()
@@ -359,7 +363,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
       BrokerInfo.unsafe(
         Generators.cliqueIdGen.sample.get,
         brokerId = brokerId,
-        groupNumPerBroker = 1,
+        brokerNum = groups0,
         Generators.socketAddressGen.sample.get
       )
     }
@@ -448,7 +452,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
       BrokerInfo.unsafe(
         cliqueIdGen.sample.get,
         info.brokerId,
-        info.groupNumPerBroker,
+        info.brokerNum,
         socketAddressGen.sample.get
       )
     }

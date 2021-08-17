@@ -39,7 +39,7 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGenerators}
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
   it should "set remote synced" in new Fixture {
@@ -89,13 +89,16 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
 
   it should "mark block seen when receive valid NewBlock/NewHeader/NewBlockHash" in new Fixture
     with NoIndexModelGenerators {
-    val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
+    val brokerGroup    = UnsecureRandom.sample(brokerConfig.groupRange)
+    val nonBrokerGroup = (brokerGroup + 1) % groups
+
+    val chainIndex = ChainIndex.unsafe(brokerGroup, brokerGroup)
     val blockHash  = emptyBlock(blockFlow, chainIndex).hash
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash) is true)
 
     val blockHeader = blockGen(
-      ChainIndex.unsafe(brokerConfig.groupUntil, brokerConfig.groupUntil)
+      ChainIndex.unsafe(nonBrokerGroup, nonBrokerGroup)
     ).sample.get.header
     brokerHandler ! BaseBrokerHandler.Received(NewHeader(blockHeader))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHeader.hash) is true)
@@ -106,8 +109,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
   }
 
   it should "ignore the duplicated block hash" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
-    val block      = emptyBlock(blockFlow, chainIndex)
+    val brokerGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+    val chainIndex  = ChainIndex.unsafe(brokerGroup, brokerGroup)
+    val block       = emptyBlock(blockFlow, chainIndex)
 
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(block.hash))
     blockFlowSynchronizer.expectMsg(
@@ -120,8 +124,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
   }
 
   it should "not mark block seen when receive BlocksResponse/HeadersResponse/InvResponse" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
-    val block      = emptyBlock(blockFlow, chainIndex)
+    val brokerGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+    val chainIndex  = ChainIndex.unsafe(brokerGroup, brokerGroup)
+    val block       = emptyBlock(blockFlow, chainIndex)
     brokerHandler ! BaseBrokerHandler.Received(BlocksResponse(RequestId.random(), AVector(block)))
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(block.hash)) is false
 
@@ -150,9 +155,11 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
       }
     }
 
-    val invalidHash   = genInvalidBlockHash()
-    val listener      = TestProbe()
-    val remoteAddress = brokerHandler.underlyingActor.remoteAddress
+    val invalidHash    = genInvalidBlockHash()
+    val listener       = TestProbe()
+    val remoteAddress  = brokerHandler.underlyingActor.remoteAddress
+    val brokerGroup    = UnsecureRandom.sample(brokerConfig.groupRange)
+    val nonBrokerGroup = (brokerGroup + 1) % groups
 
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(invalidHash))
@@ -160,14 +167,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
     brokerHandler.underlyingActor.seenBlocks.contains(invalidHash) is false
 
     val invalidBlock =
-      blockGen(ChainIndex.unsafe(brokerConfig.groupUntil, brokerConfig.groupUntil)).sample.get
+      blockGen(ChainIndex.unsafe(nonBrokerGroup, nonBrokerGroup)).sample.get
     brokerHandler ! BaseBrokerHandler.Received(NewBlock(invalidBlock))
     listener.expectMsg(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))
     brokerHandler.underlyingActor.seenBlocks.contains(invalidBlock.hash) is false
 
     val invalidHeader = emptyBlock(
       blockFlow,
-      ChainIndex.unsafe(brokerConfig.groupFrom, brokerConfig.groupFrom)
+      ChainIndex.unsafe(brokerGroup, brokerGroup)
     ).header
     brokerHandler ! BaseBrokerHandler.Received(NewHeader(invalidHeader))
     listener.expectMsg(MisbehaviorManager.InvalidFlowChainIndex(remoteAddress))

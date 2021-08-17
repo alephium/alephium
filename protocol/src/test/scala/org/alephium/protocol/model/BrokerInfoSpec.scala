@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import org.scalacheck.Gen
 
 import org.alephium.protocol.Generators
-import org.alephium.protocol.config.{CliqueConfig, GroupConfig, GroupConfigFixture}
+import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, GroupConfig, GroupConfigFixture}
 import org.alephium.util.AlephiumSpec
 
 class BrokerInfoSpec extends AlephiumSpec {
@@ -34,7 +34,7 @@ class BrokerInfoSpec extends AlephiumSpec {
           }
           forAll(brokerInfoGen) { brokerInfo =>
             val count = (0 until _groups).count(brokerInfo.containsRaw)
-            count is cliqueConfig.groupNumPerBroker
+            count is BrokerConfig.range(brokerInfo.brokerId, _groups, brokerInfo.brokerNum).length
           }
         }
       }
@@ -48,18 +48,17 @@ class BrokerInfoSpec extends AlephiumSpec {
     }
     forAll(groupNumPerBrokerGen) { _groupNumPerBroker =>
       val cliqueConfig = new CliqueConfig {
-        override def brokerNum: Int              = groups / groupNumPerBroker
-        override lazy val groupNumPerBroker: Int = _groupNumPerBroker
-        override val groups: Int                 = self.groups
+        override def brokerNum: Int = groups / _groupNumPerBroker
+        override val groups: Int    = self.groups
       }
       0 until cliqueConfig.brokerNum foreach { id =>
-        BrokerInfo.validate(id, _groupNumPerBroker).isRight is true
+        BrokerInfo.validate(id, groups / _groupNumPerBroker).isRight is true
       }
       cliqueConfig.brokerNum until (2 * cliqueConfig.brokerNum) foreach { id =>
-        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig).isRight is false
+        BrokerInfo.validate(id, groups / _groupNumPerBroker)(cliqueConfig).isRight is false
       }
       -cliqueConfig.brokerNum until 0 foreach { id =>
-        BrokerInfo.validate(id, _groupNumPerBroker)(cliqueConfig).isRight is false
+        BrokerInfo.validate(id, groups / _groupNumPerBroker)(cliqueConfig).isRight is false
       }
     }
   }

@@ -497,7 +497,7 @@ trait TestFixtureLike
     def getGroup(address: String) =
       request[Group](Fixture.getGroup(address), masterRestPort)
 
-    def getServer(fromGroup: Int): Server = servers((fromGroup % groups0) / groupsPerBroker)
+    def getServer(fromGroup: Int): Server = servers(fromGroup % brokers)
     def getRestPort(fromGroup: Int): Int  = getServer(fromGroup).config.network.restPort
 
     def start(): Unit = {

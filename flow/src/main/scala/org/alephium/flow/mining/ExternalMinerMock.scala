@@ -99,7 +99,6 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
 ) extends Miner {
   private val apiConnections =
     Array.ofDim[Option[ActorRefT[ConnectionHandler.Command]]](nodes.length)
-  private val groupNumPerBroker = brokerConfig.groups / nodes.length
 
   def receive: Receive = handleMining orElse handleMiningTasks orElse handleConnection
 
@@ -137,7 +136,7 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
   }
 
   def publishNewBlock(block: Block): Unit = {
-    val nodeIndex  = block.chainIndex.from.value / groupNumPerBroker
+    val nodeIndex  = block.chainIndex.from.value % nodes.length
     val message    = SubmitBlock(serialize(block))
     val serialized = ClientMessage.serialize(message)
     apiConnections(nodeIndex).foreach(_ ! ConnectionHandler.Send(serialized))
