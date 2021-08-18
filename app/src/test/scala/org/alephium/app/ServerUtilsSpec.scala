@@ -298,6 +298,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         toPrivateKey
       )
 
+      // Spend 3 UTXOs and generate 2 outputs, including a change output
+      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateGas(3, 2)
+
       checkAddressBalance(
         sweepAllToAddress,
         senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
@@ -372,7 +375,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fromAddressBalance = genesisBalance - txTemplate.gasFeeUnsafe
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
-    val utxos        = serverUtils.getUTXOs(blockFlow, fromAddress).rightValue
+    val utxos        = serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -416,7 +419,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val fromAddressBalanceAfterTransfer = {
-      val defaultGas    = UtxoUtils.estimateGas(outputRefs.length, destinations.length)
+      val defaultGas    = UtxoUtils.estimateGas(outputRefs.length, destinations.length + 1)
       val defaultGasFee = defaultGasPrice * defaultGas
       fromAddressBalance - ALF.oneAlf.mulUnsafe(2) - defaultGasFee
     }

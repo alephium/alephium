@@ -67,12 +67,12 @@ class ServerUtils(implicit
         .flatMap(failed)
     } yield balance
 
-  def getUTXOs(blockFlow: BlockFlow, address: Address.Asset): Try[AVector[UTXO]] =
+  def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address.Asset): Try[AVector[UTXO]] =
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
         .getUTXOsIncludePool(address.lockupScript)
-        .map(_.map(UTXO.from))
+        .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
         .flatMap(failed)
     } yield utxos

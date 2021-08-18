@@ -104,7 +104,7 @@ lazy val rpc = project("rpc")
   .dependsOn(json, util % "test->test;compile->compile")
 
 lazy val api = project("api")
-  .dependsOn(flow, json, protocol, crypto, serde, util % "test->test;compile->compile")
+  .dependsOn(json, protocol, crypto, serde, util % "test->test;compile->compile")
   .settings(
     libraryDependencies ++= Seq(
       `scala-logging`,

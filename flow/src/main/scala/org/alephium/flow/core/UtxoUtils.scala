@@ -129,11 +129,7 @@ object UtxoUtils {
     currentTotalAmountPerTokenE.map { currentTotalAmountPerToken =>
       currentTotalAmountPerToken.find(_._1 == tokenId) match {
         case Some((_, amt)) =>
-          if (amt >= amount) {
-            U256.Zero
-          } else {
-            amount.subUnsafe(amt)
-          }
+          amount.sub(amt).getOrElse(U256.Zero)
 
         case None =>
           amount

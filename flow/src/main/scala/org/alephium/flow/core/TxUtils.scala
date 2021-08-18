@@ -182,8 +182,7 @@ trait TxUtils { Self: FlowUtils =>
 
       checkResult match {
         case Right(()) =>
-          // Probably be more liberal and count the change output here as well.
-          val gas = gasOpt.getOrElse(UtxoUtils.estimateGas(utxoRefs.length, outputInfos.length))
+          val gas = gasOpt.getOrElse(UtxoUtils.estimateGas(utxoRefs.length, outputInfos.length + 1))
 
           getImmutableGroupViewIncludePool(groupIndex)
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
@@ -221,7 +220,7 @@ trait TxUtils { Self: FlowUtils =>
       val utxos = allUtxos.takeUpto(ALF.MaxTxInputNum) // sweep as much as we can
       for {
         _   <- checkWithMinimalGas(gasOpt, minimalGas)
-        gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateGas(utxos.length, 1)))
+        gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateGas(utxos.length, 2)))
         totalAmount <- utxos.foldE(U256.Zero)(
           _ add _.output.amount toRight "Input amount overflow"
         )
