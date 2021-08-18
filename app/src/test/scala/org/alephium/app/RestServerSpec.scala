@@ -134,6 +134,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   it should "call GET /addresses/<address>/utxos" in {
     Get(s"/addresses/$dummyKeyAddress/utxos") check { response =>
       response.code is StatusCode.Ok
+      response.as[AVector[UTXO]].length is 2
     }
   }
 

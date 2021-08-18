@@ -118,6 +118,7 @@ object UtxoUtils {
     }
   }
 
+  // TODO: optimize this method
   def calculateRemainingTokensAmount(
       utxos: AVector[Asset],
       tokenId: TokenId,

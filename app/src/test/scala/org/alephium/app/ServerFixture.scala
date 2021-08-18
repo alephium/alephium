@@ -21,12 +21,14 @@ import scala.util.Random
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
+import akka.util.ByteString
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
@@ -74,6 +76,7 @@ trait ServerFixture
 
   lazy val dummyHashesAtHeight = HashesAtHeight(AVector.empty)
   lazy val dummyChainInfo      = ChainInfo(0)
+
   lazy val dummyTx = transactionGen()
     .retryUntil(tx => tx.unsigned.inputs.nonEmpty && tx.unsigned.fixedOutputs.nonEmpty)
     .sample
@@ -118,8 +121,12 @@ object ServerFixture {
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp]
   ): Transaction = {
-    // FIXME: take care of tokens
-    val output = TxOutput.asset(U256.Ten, toLockupScript, AVector.empty, lockTimeOpt)
+    val output = TxOutput.asset(
+      U256.Ten,
+      toLockupScript,
+      AVector((Hash.hash("token1"), U256.One), (Hash.hash("token2"), U256.Two)),
+      lockTimeOpt
+    )
     tx.copy(
       unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
     )
@@ -214,6 +221,19 @@ object ServerFixture {
 
     override def getBalance(lockupScript: LockupScript.Asset): IOResult[(U256, U256, Int)] =
       Right((U256.Zero, U256.Zero, 0))
+
+    override def getUTXOsIncludePool(
+        lockupScript: LockupScript.Asset
+    ): IOResult[AVector[AssetOutputInfo]] = {
+      val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
+        val tokens = AVector((Hash.hash("token1"), U256.One))
+        val output = AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
+        val ref    = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
+        AssetOutputInfo(ref, output, FlowUtils.PersistedOutput)
+      }
+
+      Right(assetOutputInfos)
+    }
 
     override def transfer(
         fromPublicKey: PublicKey,
