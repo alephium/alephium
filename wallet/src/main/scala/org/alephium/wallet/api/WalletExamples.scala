@@ -108,6 +108,12 @@ trait WalletExamples extends ErrorExamples {
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
 
+  implicit val getMnemonicExamples: List[Example[GetMnemonic]] =
+    simpleExample(GetMnemonic(password))
+
+  implicit val getMnemonicResultExamples: List[Example[GetMnemonic.Result]] =
+    simpleExample(GetMnemonic.Result(mnemonic))
+
   implicit val transferExamples: List[Example[Transfer]] =
     simpleExample(Transfer(AVector(Destination(address, U256.Million, Some(tokens)))))
 

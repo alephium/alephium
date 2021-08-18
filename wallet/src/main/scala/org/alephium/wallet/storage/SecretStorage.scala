@@ -44,6 +44,7 @@ trait SecretStorage {
       : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
   def deriveNextKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit]
+  def getMnemonic(password: String): Either[SecretStorage.Error, Mnemonic]
 }
 
 object SecretStorage {
@@ -257,6 +258,14 @@ object SecretStorage {
       } yield {
         maybeState = Some(state.copy(activeKey = key))
         ()
+      }
+    }
+
+    override def getMnemonic(password: String): Either[SecretStorage.Error, Mnemonic] = {
+      for {
+        state <- stateFromFile(file, password, path)
+      } yield {
+        state.mnemonic
       }
     }
 

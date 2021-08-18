@@ -74,8 +74,7 @@ class WalletAppSpec
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
       .map(name => s""","walletName":"$name"""")
       .getOrElse("")}}"""
-  val unlockJson = s"""{"password":"$password"}"""
-  val deleteJson = s"""{"password":"$password"}"""
+  val passwordJson = s"""{"password":"$password"}"""
   def transferJson(amount: Int) =
     s"""{"destinations":[{"address":"$transferAddress","amount":"$amount","tokens":[]}]}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
@@ -85,11 +84,12 @@ class WalletAppSpec
   def create(size: Int, maybeName: Option[String] = None) =
     Post("/wallets", creationJson(size, maybeName))
   def restore(mnemonic: Mnemonic) = Put("/wallets", restoreJson(mnemonic))
-  def unlock()                    = Post(s"/wallets/$wallet/unlock", unlockJson)
+  def unlock()                    = Post(s"/wallets/$wallet/unlock", passwordJson)
   def lock()                      = Post(s"/wallets/$wallet/lock")
-  def delete()                    = Delete(s"/wallets/$wallet", deleteJson)
+  def delete()                    = Delete(s"/wallets/$wallet", passwordJson)
   def getBalance()                = Get(s"/wallets/$wallet/balances")
   def getAddresses()              = Get(s"/wallets/$wallet/addresses")
+  def getMnemonic()               = Get(s"/wallets/$wallet/mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int)       = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def deriveNextAddress()         = Post(s"/wallets/$wallet/derive-next-address")
   def changeActiveAddress(address: Address) =
@@ -212,6 +212,11 @@ class WalletAppSpec
 
     getAddresses() check { response =>
       response.as[model.Addresses] is addresses
+      response.code is StatusCode.Ok
+    }
+
+    getMnemonic() check { response =>
+      response.as[model.GetMnemonic.Result].mnemonic is mnemonic
       response.code is StatusCode.Ok
     }
 

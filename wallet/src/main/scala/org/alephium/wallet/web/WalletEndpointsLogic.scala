@@ -126,6 +126,17 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         .map(toApiError)
     )
   }
+
+  val getMnemonicLogic = serverLogic(getMnemonic) { case (wallet, getMnemonicParam) =>
+    Future.successful(
+      walletService
+        .getMnemonic(wallet, getMnemonicParam.password)
+        .map(model.GetMnemonic.Result.apply)
+        .left
+        .map(toApiError)
+    )
+  }
+
   val transferLogic = serverLogic(transfer) { case (wallet, tr) =>
     walletService
       .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice)

@@ -68,6 +68,9 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       secretStorage.unlock(password) is Right(())
       secretStorage.getCurrentPrivateKey() isE privateKey
 
+      secretStorage.getMnemonic(password) is Right(mnemonic)
+      secretStorage.getMnemonic(wrongPassword).isLeft is true
+
       secretStorage.delete(password) is Right(())
       secretStorage.unlock(password) is Left(SecretStorage.SecretFileError)
     }

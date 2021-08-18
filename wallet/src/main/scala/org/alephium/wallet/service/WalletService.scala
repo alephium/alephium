@@ -86,6 +86,7 @@ trait WalletService extends Service {
   def changeActiveAddress(wallet: String, address: Address.Asset): Either[WalletError, Unit]
   def listWallets(): Either[WalletError, AVector[(String, Boolean)]]
   def getWallet(wallet: String): Either[WalletError, (String, Boolean)]
+  def getMnemonic(wallet: String, password: String): Either[WalletError, Mnemonic]
 }
 
 object WalletService {
@@ -414,6 +415,15 @@ object WalletService {
     override def getWallet(wallet: String): Either[WalletError, (String, Boolean)] = {
       withWallet(wallet) { secretStorage =>
         Right((wallet, secretStorage.isLocked()))
+      }
+    }
+
+    override def getMnemonic(wallet: String, password: String): Either[WalletError, Mnemonic] = {
+      withWallet(wallet) { secretStorage =>
+        secretStorage
+          .getMnemonic(password)
+          .left
+          .map(WalletError.from)
       }
     }
 

@@ -159,6 +159,18 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .map(_.toSet) isE AVector.empty[(String, Boolean)].toSet
   }
 
+  it should "get back mnemonic" in new Fixure {
+    val (walletName, mnemonic) =
+      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
+
+    walletService
+      .getMnemonic(walletName, password) isE mnemonic
+
+    walletService
+      .getMnemonic(walletName, "wrongPassword")
+      .leftValue is WalletService.InvalidPassword
+  }
+
   trait Fixure extends WalletConfigFixture {
 
     val password     = "password"

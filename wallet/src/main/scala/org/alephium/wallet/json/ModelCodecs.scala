@@ -67,4 +67,8 @@ trait ModelCodecs extends ApiModelCodec {
   implicit val walletCreationResultRW: RW[WalletCreation.Result] = macroRW
 
   implicit val walletSatusRW: RW[WalletStatus] = macroRW
+
+  implicit val getMnemonicRW: RW[GetMnemonic] = macroRW
+
+  implicit val getMnemonicResultRW: RW[GetMnemonic.Result] = macroRW
 }

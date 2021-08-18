@@ -145,7 +145,7 @@ trait HttpRouteFixture extends HttpFixture {
     httpRequest(Method.DELETE, endpoint, Some(body),apiKeyHeader(apiKey))(port).send(backend)
   }
 
-  def Get(endpoint: String, otherPort: Int = port, apiKey: Option[String] = maybeApiKey): Response[Either[String, String]] = {
-    httpGet(endpoint, maybeHeader = apiKeyHeader(apiKey))(otherPort).send(backend)
+  def Get(endpoint: String, otherPort: Int = port, apiKey: Option[String] = maybeApiKey, maybeBody: Option[String] =None): Response[Either[String, String]] = {
+    httpGet(endpoint, maybeHeader = apiKeyHeader(apiKey), maybeBody = maybeBody)(otherPort).send(backend)
   }
 }
