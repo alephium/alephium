@@ -131,6 +131,12 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     }
   }
 
+  it should "call GET /addresses/<address>/utxos" in {
+    Get(s"/addresses/$dummyKeyAddress/utxos") check { response =>
+      response.code is StatusCode.Ok
+    }
+  }
+
   it should "call GET /blockflow/hashes" in {
     Get(s"/blockflow/hashes?fromGroup=1&toGroup=1&height=1") check { response =>
       response.code is StatusCode.Ok
