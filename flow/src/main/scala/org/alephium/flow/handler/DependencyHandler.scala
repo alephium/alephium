@@ -121,7 +121,6 @@ trait DependencyHandlerState extends IOBaseActor {
         toRemove.foreach(removePending)
       }
   }
-  mutable.HashMap.empty[BlockHash, (FlowData, ActorRefT[ChainHandler.Event], DataOrigin)]
 
   val missing      = mutable.HashMap.empty[BlockHash, ArrayBuffer[BlockHash]]
   val missingIndex = mutable.HashMap.empty[BlockHash, ArrayBuffer[BlockHash]]
