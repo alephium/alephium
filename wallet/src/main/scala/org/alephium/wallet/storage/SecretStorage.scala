@@ -83,6 +83,21 @@ object SecretStorage {
             state.mnemonic
           )
       )
+
+    def from(state: State): Either[Error, StoredState] = {
+      val index = state.privateKeys.indexWhere(_.privateKey == state.activeKey.privateKey)
+      for {
+        _ <- Either.cond(index >= 0, (), UnknownKey)
+      } yield {
+        StoredState(
+          state.seed,
+          state.isMiner,
+          state.privateKeys.length,
+          index,
+          state.mnemonic.toLongString
+        )
+      }
+    }
   }
 
   final private case class State(
@@ -222,19 +237,8 @@ object SecretStorage {
         latestKey     <- state.privateKeys.lastOption.toRight(InvalidState)
         newPrivateKey <- deriveNextPrivateKey(state.seed, latestKey)
         keys = state.privateKeys :+ newPrivateKey
-        _ <- storeStateToFile(
-          file,
-          StoredState(
-            state.seed,
-            state.isMiner,
-            keys.length,
-            keys.length - 1,
-            state.mnemonic.toLongString
-          ),
-          state.password
-        )
+        _ <- updateState(state.copy(activeKey = newPrivateKey, privateKeys = keys))
       } yield {
-        maybeState = Some(state.copy(activeKey = newPrivateKey, privateKeys = keys))
         newPrivateKey
       }
     }
@@ -242,22 +246,24 @@ object SecretStorage {
     override def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit] = {
       for {
         state <- getState
-        index = state.privateKeys.indexWhere(_.privateKey == key.privateKey)
-        _ <- Either.cond(index >= 0, (), UnknownKey)
-        _ <- storeStateToFile(
-          file,
-          StoredState(
-            state.seed,
-            state.isMiner,
-            state.privateKeys.length,
-            index,
-            state.mnemonic.toLongString
-          ),
-          state.password
-        )
+        _     <- updateState(state.copy(activeKey = key))
       } yield {
-        maybeState = Some(state.copy(activeKey = key))
         ()
+      }
+    }
+
+    private def updateState(state: State): Either[SecretStorage.Error, Unit] = {
+      synchronized {
+        for {
+          storedState <- StoredState.from(state)
+          _ <- storeStateToFile(
+            file,
+            storedState,
+            state.password
+          )
+        } yield {
+          maybeState = Some(state)
+        }
       }
     }
 
