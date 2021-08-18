@@ -33,6 +33,16 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def blockStorage: BlockStorage
   def txStorage: TxStorage
 
+  def validateBlockHeight(block: Block, maxForkDepth: Int): IOResult[Boolean] = {
+    for {
+      tipHeight    <- maxHeight
+      parentHeight <- getHeight(block.parentHash)
+    } yield {
+      val blockHeight = parentHeight + 1
+      (blockHeight + maxForkDepth) >= tipHeight
+    }
+  }
+
   def getBlock(hash: BlockHash): IOResult[Block] = {
     blockStorage.get(hash)
   }

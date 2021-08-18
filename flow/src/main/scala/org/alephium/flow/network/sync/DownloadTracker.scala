@@ -20,76 +20,47 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Duration, TimeStamp, UnsecureRandom}
+import org.alephium.protocol.config.BrokerConfig
+import org.alephium.util.{AVector, BaseActor, Duration, TimeStamp}
 
 trait DownloadTracker extends BaseActor {
   def blockflow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  implicit def networkSetting: NetworkSetting
 
-  val downloading: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
-  val announcements =
-    mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[ActorRefT[BrokerHandler.Command]]]
+  val syncing: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
+  val blockFetcher: BlockFetcher                     = BlockFetcher(blockflow)
 
-  def addAnnouncement(hash: BlockHash, broker: ActorRefT[BrokerHandler.Command]): Unit = {
-    announcements.get(hash) match {
-      case None          => announcements += hash -> mutable.ArrayBuffer(broker)
-      case Some(brokers) => brokers += broker
-    }
-  }
-
-  def handleAnnouncement(hash: BlockHash, broker: ActorRefT[BrokerHandler.Command]): Unit = {
-    if (!blockflow.containsUnsafe(hash)) {
-      addAnnouncement(hash, broker)
-      if (!downloading.contains(hash)) {
-        downloading += hash -> TimeStamp.now()
-        broker ! BrokerHandler.DownloadBlocks(AVector(hash))
-      }
-    }
+  def handleAnnouncement(hash: BlockHash): Unit = {
+    blockFetcher.fetch(hash).foreach(sender() ! _)
   }
 
   def needToDownload(hash: BlockHash): Boolean =
-    !(blockflow.containsUnsafe(hash) || downloading.contains(hash))
+    !(blockflow.containsUnsafe(hash) || syncing.contains(hash))
 
   def download(hashes: AVector[AVector[BlockHash]]): Unit = {
     val currentTs  = TimeStamp.now()
     val toDownload = hashes.flatMap(_.filter(needToDownload))
-    toDownload.foreach(hash => downloading.addOne(hash -> currentTs))
+    toDownload.foreach(hash => syncing.addOne(hash -> currentTs))
     sender() ! BrokerHandler.DownloadBlocks(toDownload)
   }
 
   def finalized(hash: BlockHash): Unit = {
-    downloading -= hash
-    announcements -= hash
+    syncing -= hash
   }
 
-  def cleanupDownloading(aliveDuration: Duration): Unit = {
-    val threshold   = TimeStamp.now().minusUnsafe(aliveDuration)
-    val needToRetry = mutable.ArrayBuffer.empty[BlockHash]
-    val oldSize     = downloading.size
-    downloading.filterInPlace { case (hash, downloadTs) =>
-      val isExpired = downloadTs <= threshold
-      if (isExpired && announcements.contains(hash)) {
-        needToRetry += hash
-      }
-      !isExpired
+  def cleanupSyncing(aliveDuration: Duration): Unit = {
+    val threshold = TimeStamp.now().minusUnsafe(aliveDuration)
+    val oldSize   = syncing.size
+    syncing.filterInPlace { case (_, timestamp) =>
+      timestamp > threshold
     }
-    val newSize   = downloading.size
+    val newSize   = syncing.size
     val sizeDelta = oldSize - newSize
     if (sizeDelta > 0) {
-      log.debug(s"Clean up #sizeDelta hashes from downloading pool")
-    }
-    retryDownloadAnnouncements(needToRetry)
-  }
-
-  def retryDownloadAnnouncements(hashes: Iterable[BlockHash]): Unit = {
-    val currentTs = TimeStamp.now()
-    hashes.foreach { hash =>
-      val brokers        = announcements(hash)
-      val index          = UnsecureRandom.source.nextInt(brokers.size)
-      val selectedBroker = brokers(index)
-      downloading += hash -> currentTs
-      announcements -= hash
-      selectedBroker ! BrokerHandler.DownloadBlocks(AVector(hash))
+      log.debug(s"Clean up #$sizeDelta hashes from syncing pool")
     }
   }
 }
