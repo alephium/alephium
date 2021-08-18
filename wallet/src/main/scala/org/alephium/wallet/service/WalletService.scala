@@ -26,7 +26,6 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-import akka.util.ByteString
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
@@ -219,15 +218,16 @@ object WalletService {
 
     private def createOrRestoreWallet(
         password: String,
-        seed: ByteString,
         mnemonic: Mnemonic,
+        mnemonicPassphrase: Option[String],
         isMiner: Boolean,
         walletName: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
+      val seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
       for {
         file <- buildWalletFile(walletName)
         storage <- SecretStorage
-          .create(seed, password, isMiner, file, path)
+          .create(seed, password, isMiner, file, path, mnemonic)
           .left
           .map(_ => CannotCreateEncryptedFile(secretDir))
         _ <- if (isMiner) computeNextMinerAddresses(storage) else Right(())
@@ -246,9 +246,8 @@ object WalletService {
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
       val mnemonic = Mnemonic.generate(mnemonicSize)
-      val seed     = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
 
-      createOrRestoreWallet(password, seed, mnemonic, isMiner, walletName)
+      createOrRestoreWallet(password, mnemonic, mnemonicPassphrase, isMiner, walletName)
     }
 
     override def restoreWallet(
@@ -258,9 +257,9 @@ object WalletService {
         walletName: Option[String],
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, String] = {
-      val seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-      createOrRestoreWallet(password, seed, mnemonic, isMiner, walletName).map { case (name, _) =>
-        name
+      createOrRestoreWallet(password, mnemonic, mnemonicPassphrase, isMiner, walletName).map {
+        case (name, _) =>
+          name
       }
     }
 

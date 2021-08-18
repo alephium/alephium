@@ -26,7 +26,7 @@ import akka.util.ByteString
 
 import org.alephium.api.UtilJson._
 import org.alephium.crypto.AES
-import org.alephium.crypto.wallet.BIP32
+import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.json.Json._
 import org.alephium.serde.{deserialize, serialize, Serde}
@@ -65,14 +65,22 @@ object SecretStorage {
       seed: ByteString,
       isMiner: Boolean,
       numberOfAddresses: Int,
-      activeAddressIndex: Int
+      activeAddressIndex: Int,
+      mnemonic: String
   )
 
   object StoredState {
     implicit val serde: Serde[StoredState] =
-      Serde.forProduct4(
+      Serde.forProduct5(
         apply,
-        state => (state.seed, state.isMiner, state.numberOfAddresses, state.activeAddressIndex)
+        state =>
+          (
+            state.seed,
+            state.isMiner,
+            state.numberOfAddresses,
+            state.activeAddressIndex,
+            state.mnemonic
+          )
       )
   }
 
@@ -81,7 +89,8 @@ object SecretStorage {
       password: String,
       isMiner: Boolean,
       activeKey: ExtendedPrivateKey,
-      privateKeys: AVector[ExtendedPrivateKey]
+      privateKeys: AVector[ExtendedPrivateKey],
+      mnemonic: Mnemonic
   )
 
   final private case class SecretFile(
@@ -115,7 +124,8 @@ object SecretStorage {
       password: String,
       isMiner: Boolean,
       file: File,
-      path: AVector[Int]
+      path: AVector[Int],
+      mnemonic: Mnemonic
   ): Either[Error, SecretStorage] = {
     if (file.exists) {
       Left(SecretFileAlreadyExists)
@@ -123,7 +133,13 @@ object SecretStorage {
       for {
         _ <- storeStateToFile(
           file,
-          StoredState(seed, isMiner, numberOfAddresses = 1, activeAddressIndex = 0),
+          StoredState(
+            seed,
+            isMiner,
+            numberOfAddresses = 1,
+            activeAddressIndex = 0,
+            mnemonic.toLongString
+          ),
           password
         )
         state <- stateFromFile(file, password, path)
@@ -207,7 +223,13 @@ object SecretStorage {
         keys = state.privateKeys :+ newPrivateKey
         _ <- storeStateToFile(
           file,
-          StoredState(state.seed, state.isMiner, keys.length, keys.length - 1),
+          StoredState(
+            state.seed,
+            state.isMiner,
+            keys.length,
+            keys.length - 1,
+            state.mnemonic.toLongString
+          ),
           state.password
         )
       } yield {
@@ -223,7 +245,13 @@ object SecretStorage {
         _ <- Either.cond(index >= 0, (), UnknownKey)
         _ <- storeStateToFile(
           file,
-          StoredState(state.seed, state.isMiner, state.privateKeys.length, index),
+          StoredState(
+            state.seed,
+            state.isMiner,
+            state.privateKeys.length,
+            index,
+            state.mnemonic.toLongString
+          ),
           state.password
         )
       } yield {
@@ -260,10 +288,11 @@ object SecretStorage {
           .left
           .map(_ => CannotDecryptSecret)
         state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
+        mnemonic    <- Mnemonic.from(state.mnemonic).toRight(InvalidState)
         privateKeys <- deriveKeys(state.seed, state.numberOfAddresses, path)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
       } yield {
-        State(state.seed, password, state.isMiner, active, privateKeys)
+        State(state.seed, password, state.isMiner, active, privateKeys, mnemonic)
       }
     }.toEither.left.map(_ => SecretFileError).flatten
   }
