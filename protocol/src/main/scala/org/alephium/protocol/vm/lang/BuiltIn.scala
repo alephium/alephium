@@ -79,14 +79,14 @@ object BuiltIn {
     SimpleStatelessBuiltIn(
       "verifySecP256K1",
       Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
-      Seq(Type.Bool),
+      Seq.empty,
       VerifySecP256K1
     )
   val verifyED25519: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "verifyED25519",
       Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
-      Seq(Type.Bool),
+      Seq.empty,
       VerifyED25519
     )
   val chainId: SimpleStatelessBuiltIn =
