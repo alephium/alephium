@@ -321,7 +321,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     broker2.expectNoMessage()
   }
 
-  it should "send announcement to peers" in new BroadCastFixture {
+  it should "send block announcements to peers" in new BroadCastFixture {
     val brokerInfo0 = genBrokerInfo(0)
     val brokerInfo1 = genBrokerInfo(2)
     val brokerInfo2 = genBrokerInfo(0)
@@ -348,7 +348,41 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     interCliqueManager ! message
     broker0.expectNoMessage()
     broker1.expectNoMessage()
-    broker2.expectMsg(BrokerHandler.RelayInventory(message.block.hash))
+    broker2.expectMsg(BrokerHandler.RelayBlock(message.block.hash))
+    broker3.expectNoMessage()
+  }
+
+  it should "send tx announcements to peers" in new BroadCastFixture {
+    val brokerInfo0 = genBrokerInfo(0)
+    val brokerInfo1 = genBrokerInfo(2)
+    val brokerInfo2 = genBrokerInfo(0)
+    val brokerInfo3 = genBrokerInfo(0)
+    val broker0     = TestProbe()
+    val broker1     = TestProbe()
+    val broker2     = TestProbe()
+    val broker3     = TestProbe()
+
+    broker0.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo0, InboundConnection))
+    broker1.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo1, InboundConnection))
+    broker2.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo2, InboundConnection))
+    broker3.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo3, InboundConnection))
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is true
+
+    interCliqueManager ! CliqueManager.Synced(brokerInfo0)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo1)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo2)
+
+    val txHashes   = AVector.fill(4)(Hash.generate)
+    val chainIndex = ChainIndex.unsafe(0, 1)
+    val message =
+      CliqueManager.BroadCastTx(txHashes, chainIndex, DataOrigin.InterClique(brokerInfo0))
+    interCliqueManager ! message
+    broker0.expectNoMessage()
+    broker1.expectNoMessage()
+    broker2.expectMsg(BrokerHandler.RelayTxs(AVector((chainIndex, txHashes))))
     broker3.expectNoMessage()
   }
 

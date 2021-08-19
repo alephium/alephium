@@ -22,11 +22,10 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
+import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.message.{Message, NewTxs}
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, BaseActor, EventStream, Hex, TimeStamp}
@@ -36,7 +35,6 @@ object TxHandler {
       blockFlow: BlockFlow
   )(implicit
       groupConfig: GroupConfig,
-      networkSetting: NetworkSetting,
       memPoolSetting: MemPoolSetting
   ): Props =
     Props(new TxHandler(blockFlow))
@@ -56,7 +54,6 @@ object TxHandler {
 
 class TxHandler(blockFlow: BlockFlow)(implicit
     groupConfig: GroupConfig,
-    networkSetting: NetworkSetting,
     memPoolSetting: MemPoolSetting
 ) extends BaseActor
     with EventStream.Publisher {
@@ -140,8 +137,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       txs: AVector[TransactionTemplate],
       origin: DataOrigin
   ): Unit = {
-    val txMessage = Message.serialize(NewTxs(txs))
-    val event     = CliqueManager.BroadCastTx(txs, txMessage, chainIndex, origin)
+    val event = CliqueManager.BroadCastTx(txs.map(_.id), chainIndex, origin)
     publishEvent(event)
   }
 

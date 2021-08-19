@@ -18,19 +18,21 @@ package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.maxSyncBlocksPerChain
-import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler}
+import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash}
+import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.message._
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex}
+import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, TransactionTemplate}
 import org.alephium.util.{ActorRefT, AVector, Cache}
 
 trait BrokerHandler extends BaseBrokerHandler {
-  val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](networkSetting.maxSeenBlocks)
+  val maxCapacity: Int                   = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
+  val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxCapacity)
+  val seenTxs: Cache[Hash, Unit]         = Cache.fifo[Hash, Unit](maxCapacity)
   val maxForkDepth: Int                  = maxSyncBlocksPerChain
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
@@ -86,7 +88,7 @@ trait BrokerHandler extends BaseBrokerHandler {
         send(InvResponse(requestId, inventories))
       case BaseBrokerHandler.Received(InvResponse(_, hashes)) => handleInv(hashes)
       case BaseBrokerHandler.Received(NewBlockHash(hash))     => handleNewBlockHash(hash)
-      case BaseBrokerHandler.RelayInventory(hash) =>
+      case BaseBrokerHandler.RelayBlock(hash) =>
         if (seenBlocks.contains(hash)) {
           log.debug(s"Remote broker already have the block ${hash.shortHex}")
         } else {
@@ -94,9 +96,108 @@ trait BrokerHandler extends BaseBrokerHandler {
           seenBlocks.put(hash, ())
           send(NewBlockHash(hash))
         }
+      case BaseBrokerHandler.RelayTxs(hashes) =>
+        handleRelayTxs(hashes)
+      case BaseBrokerHandler.Received(NewTxHashes(hashes)) =>
+        handleNewTxHashes(hashes)
+      case BaseBrokerHandler.DownloadTxs(hashes) =>
+        log.debug(s"Download txs ${showChainIndexedHashes(hashes)} from $remoteAddress")
+        send(TxsRequest(hashes))
+      case BaseBrokerHandler.Received(TxsRequest(id, hashes)) =>
+        handleTxsRequest(id, hashes)
+      case BaseBrokerHandler.Received(TxsResponse(id, txs)) =>
+        handleTxsResponse(id, txs)
     }
 
     receive
+  }
+
+  def showChainIndexedHashes(hashes: AVector[(ChainIndex, AVector[Hash])]): String = {
+    hashes.map(p => s"${p._1} -> ${Utils.showDigest(p._2)}").mkString(", ")
+  }
+
+  private def handleRelayTxs(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
+    val invs = hashes.fold(AVector.empty[(ChainIndex, AVector[Hash])]) {
+      case (acc, (chainIndex, txHashes)) =>
+        val selected = txHashes.filter { hash =>
+          val peerHaveTx = seenTxs.contains(hash)
+          if (peerHaveTx) {
+            log.debug(s"Remote broker already have the tx ${hash.shortHex}")
+          } else {
+            seenTxs.put(hash, ())
+          }
+          !peerHaveTx
+        }
+        if (selected.isEmpty) {
+          acc
+        } else {
+          acc :+ ((chainIndex, selected))
+        }
+    }
+    send(NewTxHashes(invs))
+  }
+
+  private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
+    log.debug(s"Received txs hashes ${showChainIndexedHashes(hashes)} from $remoteAddress")
+    val result = hashes.mapE { case (chainIndex, txHashes) =>
+      if (!brokerConfig.contains(chainIndex.from)) {
+        Left(())
+      } else {
+        val invs = txHashes.filter { hash =>
+          val duplicated = seenTxs.contains(hash)
+          if (!duplicated) {
+            seenTxs.put(hash, ())
+          }
+          !duplicated
+        }
+        Right((chainIndex, invs))
+      }
+    }
+    result match {
+      case Right(announcements) =>
+        blockFlowSynchronizer ! BlockFlowSynchronizer.TxsAnnouncement(announcements)
+      case _ =>
+        log.debug(s"Received invalid tx hashes from $remoteAddress")
+        handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+    }
+  }
+
+  private def handleTxsRequest(
+      id: RequestId,
+      hashes: AVector[(ChainIndex, AVector[Hash])]
+  ): Unit = {
+    log.debug(
+      s"Received txs request ${showChainIndexedHashes(hashes)} from $remoteAddress with $id"
+    )
+    val result = hashes.foldE(AVector.empty[TransactionTemplate]) {
+      case (acc, (chainIndex, txHashes)) =>
+        if (!brokerConfig.contains(chainIndex.from)) {
+          Left(())
+        } else {
+          val sharedPool = blockflow.getMemPool(chainIndex).getSharedPool(chainIndex)
+          val txs        = sharedPool.getTxs(txHashes)
+          Right(acc ++ txs)
+        }
+    }
+    result match {
+      case Right(txs) => send(TxsResponse(id, txs))
+      case _ =>
+        log.debug(s"Received invalid txs request from $remoteAddress")
+        handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+    }
+  }
+
+  private def handleTxsResponse(id: RequestId, txs: AVector[TransactionTemplate]): Unit = {
+    log.debug(
+      s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id))} from $remoteAddress with $id"
+    )
+    if (txs.nonEmpty) {
+      if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
+        handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+      } else {
+        allHandlers.txHandler ! TxHandler.AddToGrandPool(txs, dataOrigin)
+      }
+    }
   }
 
   private def handleNewBlockHash(hash: BlockHash): Unit = {
@@ -104,7 +205,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       if (!seenBlocks.contains(hash)) {
         log.debug(s"Receive new block hash ${hash.shortHex} from $remoteAddress")
         seenBlocks.put(hash, ())
-        blockFlowSynchronizer ! BlockFlowSynchronizer.Announcement(hash)
+        blockFlowSynchronizer ! BlockFlowSynchronizer.BlockAnnouncement(hash)
       }
     } else {
       log.warning(s"Invalid new block hash ${hash.shortHex} from $remoteAddress")

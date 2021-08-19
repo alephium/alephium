@@ -17,6 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, LockFixture, TimeStamp, U256}
@@ -81,6 +82,13 @@ class SharedPoolSpec
 
   it should "use read lock for containing" in new Fixture {
     checkReadLock(rwl)(true, pool.contains(block.transactions.head.id), false)
+  }
+
+  it should "use read lock for getting" in new Fixture {
+    pool.add(txTemplates, now)
+    val txIds = block.transactions.map(_.id) :+ Hash.generate
+    checkReadLock(rwl)(AVector.empty, pool.getTxs(txIds), txTemplates)
+    checkReadLock(rwl)(AVector.empty, pool.getTxs(block.transactions.map(_.id)), txTemplates)
   }
 
   it should "use write lock for adding" in new Fixture {

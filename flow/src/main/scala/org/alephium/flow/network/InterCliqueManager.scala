@@ -169,11 +169,11 @@ class InterCliqueManager(
       handleBroadCastBlock(message)
 
     case message: CliqueManager.BroadCastTx =>
-      log.debug(s"Broadcasting tx ${message.txs.map(_.id.shortHex)} for ${message.chainIndex}")
-      iterBrokers { (peerId, brokerState) =>
+      log.debug(s"Broadcasting tx ${message.hashes.map(_.shortHex)} for ${message.chainIndex}")
+      randomIterBrokers { (peerId, brokerState) =>
         if (!message.origin.isFrom(peerId.cliqueId) && brokerState.readyFor(message.chainIndex)) {
-          log.debug(s"Send tx to broker $peerId")
-          brokerState.actor ! BrokerHandler.Send(message.txMsg)
+          log.debug(s"Send tx announcements to broker $peerId")
+          brokerState.actor ! BrokerHandler.RelayTxs(AVector(message.chainIndex -> message.hashes))
         }
       }
 
@@ -221,7 +221,7 @@ class InterCliqueManager(
       randomIterBrokers { (peerId, brokerState) =>
         if (!message.origin.isFrom(brokerState.info) && brokerState.readyFor(block.chainIndex)) {
           log.debug(s"Send announcement to broker $peerId")
-          brokerState.actor ! BrokerHandler.RelayInventory(block.hash)
+          brokerState.actor ! BrokerHandler.RelayBlock(block.hash)
         }
       }
     }

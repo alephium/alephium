@@ -113,12 +113,7 @@ class ViewHandler(
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
     if (txs.nonEmpty) {
-      // delay this broadcast so that peers have download this block
-      scheduleOnce(
-        txHandler.ref,
-        TxHandler.Broadcast(txs),
-        Duration.ofSecondsUnsafe(2)
-      )
+      txHandler.ref ! TxHandler.Broadcast(txs)
     }
   }
 }

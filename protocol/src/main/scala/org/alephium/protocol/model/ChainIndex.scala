@@ -18,6 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.serde._
 import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
@@ -47,6 +48,12 @@ class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
 }
 
 object ChainIndex {
+  implicit val serde: Serde[ChainIndex] =
+    Serde.forProduct2[Int, Int, ChainIndex](
+      (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
+      chainIndex => (chainIndex.from.value, chainIndex.to.value)
+    )
+
   def from(from: Int, to: Int)(implicit config: GroupConfig): Option[ChainIndex] = {
     if (validate(from, to)) {
       Some(new ChainIndex(GroupIndex.unsafe(from), GroupIndex.unsafe(to)))

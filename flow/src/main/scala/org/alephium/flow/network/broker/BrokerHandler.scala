@@ -29,22 +29,24 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.Validation
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{Block, BrokerInfo, FlowData}
+import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, FlowData}
 import org.alephium.util._
 
 object BrokerHandler {
   sealed trait Command
-  case object HandShakeTimeout                                       extends Command
-  final case class Send(data: ByteString)                            extends Command
-  final case class Received(payload: Payload)                        extends Command
-  case object SendPing                                               extends Command
-  final case class SyncLocators(hashes: AVector[AVector[BlockHash]]) extends Command
-  final case class DownloadHeaders(fromHashes: AVector[BlockHash])   extends Command
-  final case class DownloadBlocks(hashes: AVector[BlockHash])        extends Command
-  final case class RelayInventory(hash: BlockHash)                   extends Command
+  case object HandShakeTimeout                                               extends Command
+  final case class Send(data: ByteString)                                    extends Command
+  final case class Received(payload: Payload)                                extends Command
+  case object SendPing                                                       extends Command
+  final case class SyncLocators(hashes: AVector[AVector[BlockHash]])         extends Command
+  final case class DownloadHeaders(fromHashes: AVector[BlockHash])           extends Command
+  final case class DownloadBlocks(hashes: AVector[BlockHash])                extends Command
+  final case class RelayBlock(hash: BlockHash)                               extends Command
+  final case class RelayTxs(hashes: AVector[(ChainIndex, AVector[Hash])])    extends Command
+  final case class DownloadTxs(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
@@ -152,9 +154,6 @@ trait BrokerHandler extends FlowDataHandler {
       escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
         send(HeadersResponse(requestId, headers))
       }
-    case Received(NewTxs(txs)) =>
-      log.debug(s"SendTxs received: ${Utils.showDigest(txs.map(_.id))}")
-      allHandlers.txHandler ! TxHandler.AddToSharedPool(txs, dataOrigin)
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }
