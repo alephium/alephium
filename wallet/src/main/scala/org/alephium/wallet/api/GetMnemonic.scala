@@ -18,8 +18,8 @@ package org.alephium.wallet.api.model
 
 import org.alephium.crypto.wallet.Mnemonic
 
-final case class GetMnemonic(password: String)
+final case class RevealMnemonic(password: String)
 
-object GetMnemonic {
+object RevealMnemonic {
   final case class Result(mnemonic: Mnemonic)
 }

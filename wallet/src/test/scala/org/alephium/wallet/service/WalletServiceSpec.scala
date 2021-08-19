@@ -164,10 +164,10 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
 
     walletService
-      .getMnemonic(walletName, password) isE mnemonic
+      .revealMnemonic(walletName, password) isE mnemonic
 
     walletService
-      .getMnemonic(walletName, "wrongPassword")
+      .revealMnemonic(walletName, "wrongPassword")
       .leftValue is WalletService.InvalidPassword
   }
 

@@ -20,4 +20,6 @@ import sttp.tapir.EndpointIO.Example
 
 trait Examples {
   def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
+  def defaultExample[T](t: T): Example[T]      = Example(t, None, Some("Default"))
+  def moreSettingsExample[T](t: T): Example[T] = Example(t, None, Some("More settings"))
 }

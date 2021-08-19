@@ -667,8 +667,20 @@
               "schema": {
                 "$ref": "#/components/schemas/WalletUnlock"
               },
-              "example": {
-                "password": "my-secret-password"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "password": "my-secret-password"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonicPassphrase": "optional-mnemonic-passphrase"
+                  }
+                }
               }
             }
           },
@@ -873,7 +885,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GetMnemonic"
+                "$ref": "#/components/schemas/RevealMnemonic"
               },
               "example": {
                 "password": "my-secret-password"
@@ -5200,17 +5212,6 @@
           }
         }
       },
-      "GetMnemonic": {
-        "required": [
-          "password"
-        ],
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string"
-          }
-        }
-      },
       "Group": {
         "required": [
           "group"
@@ -5529,6 +5530,17 @@
         "properties": {
           "address": {
             "$ref": "#/components/schemas/Asset"
+          }
+        }
+      },
+      "RevealMnemonic": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
           }
         }
       },

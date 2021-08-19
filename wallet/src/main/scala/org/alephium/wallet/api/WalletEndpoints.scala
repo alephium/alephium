@@ -131,11 +131,11 @@ trait WalletEndpoints
       .in(jsonBody[ChangeActiveAddress])
       .summary("Choose the active address")
 
-  val getMnemonic: BaseEndpoint[(String, GetMnemonic), GetMnemonic.Result] =
+  val revealMnemonic: BaseEndpoint[(String, RevealMnemonic), RevealMnemonic.Result] =
     wallet.post
       .in("mnemonic")
-      .in(jsonBody[GetMnemonic])
-      .out(jsonBody[GetMnemonic.Result])
+      .in(jsonBody[RevealMnemonic])
+      .out(jsonBody[RevealMnemonic.Result])
       .summary("Show your mnemonic")
 
   val getMinerAddresses: BaseEndpoint[String, AVector[MinerAddressesInfo]] =

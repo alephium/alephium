@@ -47,7 +47,7 @@ trait SecretStorage {
       : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
   def deriveNextKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def changeActiveKey(key: ExtendedPrivateKey): Either[SecretStorage.Error, Unit]
-  def getMnemonic(password: String): Either[SecretStorage.Error, Mnemonic]
+  def revealMnemonic(password: String): Either[SecretStorage.Error, Mnemonic]
 }
 
 object SecretStorage {
@@ -63,11 +63,8 @@ object SecretStorage {
   case object SecretFileAlreadyExists extends Error
   case object UnknownKey              extends Error
 
-  implicit private val mnemonicSerde: Serde[Mnemonic] =
-    Serde.forProduct1(
-      Mnemonic.unsafe,
-      _.words
-    )
+  implicit private val mnemonicSerde: Serde[Mnemonic] = Serde.forProduct1(Mnemonic.unsafe, _.words)
+
   final case class SecretFileNotFound(file: File) extends Error
 
   final case class StoredState(
@@ -90,18 +87,13 @@ object SecretStorage {
           )
       )
 
-    def from(state: State): Either[Error, StoredState] = {
+    def from(state: State, mnemonic: Mnemonic): Either[Error, StoredState] = {
       val index = state.privateKeys.indexWhere(_.privateKey == state.activeKey.privateKey)
-      for {
-        _ <- Either.cond(index >= 0, (), UnknownKey)
-      } yield {
-        StoredState(
-          state.mnemonic,
-          state.isMiner,
-          state.privateKeys.length,
-          index
-        )
-      }
+      Either.cond(
+        index >= 0,
+        StoredState(mnemonic, state.isMiner, state.privateKeys.length, index),
+        UnknownKey
+      )
     }
   }
 
@@ -110,8 +102,7 @@ object SecretStorage {
       password: String,
       isMiner: Boolean,
       activeKey: ExtendedPrivateKey,
-      privateKeys: AVector[ExtendedPrivateKey],
-      mnemonic: Mnemonic
+      privateKeys: AVector[ExtendedPrivateKey]
   )
 
   final private case class SecretFile(
@@ -263,7 +254,8 @@ object SecretStorage {
     private def updateState(state: State): Either[SecretStorage.Error, Unit] = {
       synchronized {
         for {
-          storedState <- StoredState.from(state)
+          mnemonic    <- revealMnemonicFromFile(file, state.password)
+          storedState <- StoredState.from(state, mnemonic)
           _ <- storeStateToFile(
             file,
             storedState,
@@ -275,13 +267,8 @@ object SecretStorage {
       }
     }
 
-    override def getMnemonic(password: String): Either[SecretStorage.Error, Mnemonic] = {
-      for {
-        state <- getState
-        _     <- validatePassword(file, password)
-      } yield {
-        state.mnemonic
-      }
+    override def revealMnemonic(password: String): Either[SecretStorage.Error, Mnemonic] = {
+      revealMnemonicFromFile(file, password)
     }
 
     private def deriveNextPrivateKey(
@@ -297,49 +284,64 @@ object SecretStorage {
     private def getState: Either[Error, State] = maybeState.toRight(Locked)
   }
 
-  private def stateFromFile(
-      file: File,
-      password: String,
-      path: AVector[Int],
-      mnemonicPassphrase: Option[String]
-  ): Either[Error, State] = {
-    Using(Source.fromFile(file)("UTF-8")) { source =>
-      val rawFile = source.getLines().mkString
-      for {
-        secretFile <- Try(read[SecretFile](rawFile)).toEither.left.map(_ => CannotParseFile)
-        stateBytes <- AES
-          .decrypt(secretFile.toAESEncrytped, password)
-          .toEither
-          .left
-          .map(_ => CannotDecryptSecret)
-        state <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
-        seed = state.mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-        privateKeys <- deriveKeys(seed, state.numberOfAddresses, path)
-        active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
-      } yield {
-        State(seed, password, state.isMiner, active, privateKeys, state.mnemonic)
-      }
-    }.toEither.left.map(_ => SecretFileError).flatten
-  }
-
-  private def validatePassword(
+  private def decryptStateFile(
       file: File,
       password: String
-  ): Either[Error, Unit] = {
+  ): Either[Error, ByteString] = {
     Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
         secretFile <- Try(read[SecretFile](rawFile)).toEither.left.map(_ =>
           (CannotParseFile: Error)
         )
-        _ <- AES
+        stateBytes <- AES
           .decrypt(secretFile.toAESEncrytped, password)
           .toEither
           .left
           .map(_ => CannotDecryptSecret)
-      } yield (())
+      } yield stateBytes
     }.toEither.left.map(_ => SecretFileError).flatten
   }
+
+  private def storedStateFromFile(
+      file: File,
+      password: String
+  ): Either[Error, StoredState] = {
+    for {
+      stateBytes <- decryptStateFile(file, password)
+      state      <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
+    } yield {
+      state
+    }
+  }
+
+  private def stateFromFile(
+      file: File,
+      password: String,
+      path: AVector[Int],
+      mnemonicPassphrase: Option[String]
+  ): Either[Error, State] = {
+    for {
+      state <- storedStateFromFile(file, password)
+      seed = state.mnemonic.toSeed(mnemonicPassphrase)
+      privateKeys <- deriveKeys(seed, state.numberOfAddresses, path)
+      active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
+    } yield {
+      State(seed, password, state.isMiner, active, privateKeys)
+    }
+  }
+
+  private def revealMnemonicFromFile(
+      file: File,
+      password: String
+  ): Either[Error, Mnemonic] = {
+    storedStateFromFile(file, password).map(_.mnemonic)
+  }
+
+  private def validatePassword(
+      file: File,
+      password: String
+  ): Either[Error, Unit] = decryptStateFile(file, password).map(_ => ())
 
   private def deriveKeys(
       seed: ByteString,

@@ -36,7 +36,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   it should "create/lock/unlock/delete the secret storage" in {
     forAll(mnemonicGen, passwordGen, passwordGen) { case (mnemonic, password, wrongPassword) =>
-      val seed  = mnemonic.toSeed("")
+      val seed  = mnemonic.toSeed(None)
       val name  = Hash.generate.shortHex
       val file  = new File(s"$secretDir/$name")
       val miner = false
@@ -68,8 +68,8 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       secretStorage.unlock(password, None) is Right(())
       secretStorage.getCurrentPrivateKey() isE privateKey
 
-      secretStorage.getMnemonic(password) is Right(mnemonic)
-      secretStorage.getMnemonic(wrongPassword).isLeft is true
+      secretStorage.revealMnemonic(password) is Right(mnemonic)
+      secretStorage.revealMnemonic(wrongPassword).isLeft is true
 
       secretStorage.delete(password) is Right(())
       secretStorage.unlock(password, None) is Left(SecretStorage.SecretFileError)
@@ -78,7 +78,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   it should "handle mnemonic passphrase" in {
     forAll(mnemonicGen, passwordGen, passwordGen) { case (mnemonic, password, passphrase) =>
-      val seed  = mnemonic.toSeed(passphrase)
+      val seed  = mnemonic.toSeed(Some(passphrase))
       val name  = Hash.generate.shortHex
       val file  = new File(s"$secretDir/$name")
       val miner = false

@@ -29,11 +29,11 @@ import org.alephium.util.{AVector, Bits, SecureAndSlowRandom}
 
 //scalastyle:off magic.number
 
-final case class Mnemonic(words: AVector[String]) extends AnyVal {
+final case class Mnemonic private (words: AVector[String]) extends AnyVal {
 
-  def toSeed(passphrase: String): ByteString = {
+  def toSeed(passphraseOpt: Option[String]): ByteString = {
     val mnemonic     = toLongString.toCharArray
-    val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
+    val extendedPass = s"mnemonic${passphraseOpt.getOrElse("")}".getBytes(StandardCharsets.UTF_8)
     val spec = new PBEKeySpec(
       mnemonic,
       extendedPass,

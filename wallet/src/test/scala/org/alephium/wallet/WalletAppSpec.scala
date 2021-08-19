@@ -98,7 +98,7 @@ class WalletAppSpec
   def delete()              = Delete(s"/wallets/$wallet", passwordJson)
   def getBalance()          = Get(s"/wallets/$wallet/balances")
   def getAddresses()        = Get(s"/wallets/$wallet/addresses")
-  def getMnemonic()         = Get(s"/wallets/$wallet/mnemonic", maybeBody = Some(passwordJson))
+  def revealMnemonic()      = Get(s"/wallets/$wallet/mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
   def changeActiveAddress(address: Address) =
@@ -224,8 +224,8 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
-    getMnemonic() check { response =>
-      response.as[model.GetMnemonic.Result].mnemonic is mnemonic
+    revealMnemonic() check { response =>
+      response.as[model.RevealMnemonic.Result].mnemonic is mnemonic
       response.code is StatusCode.Ok
     }
 
