@@ -102,6 +102,9 @@ object TxOutput {
 
 /** @param amount the number of ALF in the output
   * @param lockupScript guarding script for unspent output
+  * @param lockTime the timestamp until when the tx can be used.
+  *                 it's zero by default, and will be replaced with block timestamp in worldstate if it's zero
+  *                 we could implement relative time lock based on block timestamp
   * @param tokens secondary tokens in the output
   * @param additionalData data payload for additional information
   */

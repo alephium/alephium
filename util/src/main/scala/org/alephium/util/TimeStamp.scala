@@ -17,6 +17,8 @@
 package org.alephium.util
 
 class TimeStamp(val millis: Long) extends AnyVal with Ordered[TimeStamp] {
+  def isZero(): Boolean = millis == 0
+
   def plusMillis(millisToAdd: Long): Option[TimeStamp] =
     TimeStamp.from(millis + millisToAdd)
 

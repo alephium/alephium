@@ -88,7 +88,13 @@ class TxUtilsSpec extends AlephiumSpec {
       tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
-          groupView.getPreOutput(outputRef) isE Some(output)
+          if (chainIndex.isIntraGroup) {
+            // the block is persisted and the lockTime of each output is updated as block timestamp
+            groupView.getPreOutput(outputRef) isE Some(output.copy(lockTime = block.timestamp))
+          } else {
+            // the block is not persisted yet, so the lockTime of each output is still zero
+            groupView.getPreOutput(outputRef) isE Some(output)
+          }
         } else {
           groupView.getPreOutput(outputRef) isE None
         }
