@@ -259,6 +259,16 @@ trait FlowFixture
     block
   }
 
+  def mineWithTxs(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      txs: AVector[Transaction]
+  ): Block = {
+    val block = mine(blockFlow, chainIndex)((_, _) => txs)
+    block.chainIndex is chainIndex
+    block
+  }
+
   def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     @tailrec
     def iter(current: Block): Block = {
