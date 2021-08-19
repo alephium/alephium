@@ -66,6 +66,6 @@ object MiningBlob {
 
     val headerBlob = serialize(dummyHeader)
     val txsBlob    = serialize(transactions)
-    MiningBlob(headerBlob.dropRight(Nonce.byteLength), target.value, txsBlob)
+    MiningBlob(headerBlob.drop(Nonce.byteLength), target.value, txsBlob)
   }
 }

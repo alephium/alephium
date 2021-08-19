@@ -101,7 +101,7 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
     val chainIndex = ChainIndex.unsafe(0, 1)
     val block      = emptyBlock(blockFlow, chainIndex)
     val template   = MiningBlob.from(block)
-    val headerBlob = serialize(block.header).dropRight(Nonce.byteLength)
+    val headerBlob = serialize(block.header).drop(Nonce.byteLength)
 
     @tailrec
     def iter[T](f: => Option[T]): T = {
@@ -114,7 +114,7 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
     val block0 = iter(Miner.mine(chainIndex, template))._1
     addAndCheck(blockFlow, block0)
     val nonce      = iter(Miner.mine(chainIndex, headerBlob, block.target))._1
-    val block1Blob = headerBlob ++ nonce.value ++ serialize(block.transactions)
+    val block1Blob = nonce.value ++ headerBlob ++ serialize(block.transactions)
     val block1     = deserialize[Block](block1Blob).rightValue
     addAndCheck(blockFlow, block1)
   }
