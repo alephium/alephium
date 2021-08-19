@@ -471,7 +471,7 @@ object ModelGenerators {
     }
   }
 
-  case class AssetInputInfo(txInput: TxInput, referredOutput: TxOutput, privateKey: PrivateKey)
+  case class AssetInputInfo(txInput: TxInput, referredOutput: AssetOutput, privateKey: PrivateKey)
 }
 
 class ModelGeneratorsSpec extends AlephiumSpec with TokenGenerators with DefaultGenerators {

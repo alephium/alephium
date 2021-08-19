@@ -361,19 +361,19 @@ object FlowUtils {
     )
   }
 
-  def deductGas(inputs: AVector[TxOutput], gasFee: U256): AVector[TxOutput] = {
+  def deductGas(inputs: AVector[AssetOutput], gasFee: U256): AVector[AssetOutput] = {
     inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
   }
 
   def convertFailedScriptTx(
-      preOutputs: AVector[TxOutput],
+      preOutputs: AVector[AssetOutput],
       txTemplate: TransactionTemplate
   ): Transaction = {
     val remainingBalances = deductGas(preOutputs, txTemplate.gasFeeUnsafe)
     Transaction(
       txTemplate.unsigned,
       AVector.empty,
-      generatedOutputs = remainingBalances,
+      generatedOutputs = remainingBalances.as[TxOutput],
       txTemplate.inputSignatures,
       txTemplate.contractSignatures
     )

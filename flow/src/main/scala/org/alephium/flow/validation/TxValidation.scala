@@ -51,7 +51,7 @@ trait TxValidation {
       _ <- checkStatefulExceptTxScript(
         fullTx,
         blockEnv,
-        preOutputs ++ preContractOutputs,
+        preOutputs.as[TxOutput] ++ preContractOutputs,
         None
       )
     } yield ()
@@ -61,7 +61,7 @@ trait TxValidation {
       blockEnv: BlockEnv,
       tx: TransactionTemplate,
       flow: BlockFlow,
-      preOutputs: AVector[TxOutput]
+      preOutputs: AVector[AssetOutput]
   ): TxValidationResult[Transaction] = {
     tx.unsigned.scriptOpt match {
       case None => validTx(FlowUtils.convertNonScriptTx(tx))
@@ -149,9 +149,9 @@ trait TxValidation {
     } yield ()
   }
 
-  def fromGetPreOutputs(
-      getPreOutputs: IOResult[Option[AVector[TxOutput]]]
-  ): TxValidationResult[AVector[TxOutput]] = {
+  protected def fromGetPreOutputs[Output <: TxOutput](
+      getPreOutputs: IOResult[Option[AVector[Output]]]
+  ): TxValidationResult[AVector[Output]] = {
     getPreOutputs match {
       case Right(Some(outputs)) => Right(outputs)
       case Right(None)          => Left(Right(NonExistInput))
@@ -204,7 +204,8 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       gasRemaining <- checkStatefulExceptTxScript(tx, blockEnv, preOutputs, coinbaseNetReward)
-      _            <- checkTxScript(chainIndex, tx, gasRemaining, worldState, preOutputs, blockEnv)
+      preAssetOutputs = getPrevAssetOutputs(preOutputs, tx)
+      _ <- checkTxScript(chainIndex, tx, gasRemaining, worldState, preAssetOutputs, blockEnv)
     } yield ()
   }
   protected[validation] def checkStatefulExceptTxScript(
@@ -226,6 +227,13 @@ trait TxValidation {
       worldState: MutableWorldState
   ): TxValidationResult[AVector[TxOutput]]
 
+  protected def getPrevAssetOutputs(
+      prevOutputs: AVector[TxOutput],
+      tx: Transaction
+  ): AVector[AssetOutput] = {
+    prevOutputs.take(tx.unsigned.inputs.length).asUnsafe[AssetOutput]
+  }
+
   // format off for the sake of reading and checking rules
   // format: off
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
@@ -246,7 +254,7 @@ trait TxValidation {
       tx: Transaction,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
-      preOutputs: AVector[TxOutput],
+      preOutputs: AVector[AssetOutput],
       blockEnv: BlockEnv): TxValidationResult[Unit]
   // format: on
 }
@@ -257,6 +265,7 @@ object TxValidation {
 
   def build(implicit groupConfig: GroupConfig): TxValidation = new Impl()
 
+  // scalastyle:off number.of.methods
   class Impl(implicit val groupConfig: GroupConfig) extends TxValidation {
     protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
       val inputNum = tx.unsigned.inputs.length
@@ -513,7 +522,8 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
-      val txEnv      = TxEnv(tx, preOutputs, signatures)
+      val txEnv =
+        TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
       EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.startGas) {
         case (gasRemaining, idx) =>
           val unlockScript = tx.unsigned.inputs(idx).unlockScript
@@ -647,13 +657,12 @@ object TxValidation {
         tx: Transaction,
         gasRemaining: GasBox,
         worldState: WorldState.Cached,
-        preOutputs: AVector[TxOutput],
+        preAssetOutputs: AVector[AssetOutput],
         blockEnv: BlockEnv
     ): TxValidationResult[Unit] = {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
-            val preAssetOutputs = preOutputs.take(tx.unsigned.inputs.length)
             fromExeResult(
               StatefulVM.runTxScript(
                 worldState,
@@ -680,4 +689,5 @@ object TxValidation {
       }
     }
   }
+  // scalastyle:on number.of.methods
 }
