@@ -29,51 +29,62 @@ object HttpFixture {
     }
   }
 
-  implicit class RichEitherResponse(val response: Response[Either[String,String]]) extends AnyVal {
-     def as[T:Reader]: T = {
-       val body = response.body match {
-         case Right(r)=>r
-         case Left(l)=>l
-       }
-       read[T](body)
-     }
+  implicit class RichEitherResponse(val response: Response[Either[String, String]]) extends AnyVal {
+    def as[T: Reader]: T = {
+      val body = response.body match {
+        case Right(r) => r
+        case Left(l)  => l
+      }
+      read[T](body)
+    }
   }
 }
 
 trait HttpFixture {
 
-  type HttpRequest = RequestT[Identity,Either[String,String],Any]
+  type HttpRequest = RequestT[Identity, Either[String, String], Any]
 
   val backend = HttpURLConnectionBackend()
 
-  def httpRequest[T,R](
+  def httpRequest[T, R](
       method: Method,
       endpoint: String,
       maybeBody: Option[String] = None,
       maybeHeader: Option[(String, String)] = None
-  ): Int =>  HttpRequest = { port =>
-
+  ): Int => HttpRequest = { port =>
     val request = basicRequest
-      .method(method,parseUri(endpoint).port(port))
+      .method(method, parseUri(endpoint).port(port))
 
     val requestWithBody = maybeBody match {
       case Some(body) => request.body(body).contentType("application/json")
-      case None         => request
+      case None       => request
     }
 
     val requestWithHeaders = maybeHeader match {
       case Some((key, value)) => requestWithBody.header(key, value)
-      case None         => requestWithBody
+      case None               => requestWithBody
     }
 
     requestWithHeaders
   }
 
-  def httpGet(endpoint: String, maybeBody: Option[String] = None, maybeHeader: Option[(String, String)] = None) =
+  def httpGet(
+      endpoint: String,
+      maybeBody: Option[String] = None,
+      maybeHeader: Option[(String, String)] = None
+  ) =
     httpRequest(Method.GET, endpoint, maybeBody, maybeHeader)
-  def httpPost(endpoint: String, maybeBody: Option[String] = None, maybeHeader: Option[(String, String)] = None) =
+  def httpPost(
+      endpoint: String,
+      maybeBody: Option[String] = None,
+      maybeHeader: Option[(String, String)] = None
+  ) =
     httpRequest(Method.POST, endpoint, maybeBody, maybeHeader)
-  def httpPut(endpoint: String, maybeBody: Option[String] = None, maybeHeader: Option[(String, String)] = None) =
+  def httpPut(
+      endpoint: String,
+      maybeBody: Option[String] = None,
+      maybeHeader: Option[(String, String)] = None
+  ) =
     httpRequest(Method.PUT, endpoint, maybeBody, maybeHeader)
 
 // scalastyle:off no.equal
@@ -121,31 +132,41 @@ trait HttpFixture {
 trait HttpRouteFixture extends HttpFixture {
   def port: Int
 
-  def maybeApiKey:Option[String]
+  def maybeApiKey: Option[String]
 
-  private def apiKeyHeader(apiKey:Option[String]):Option[(String,String)] ={
-    apiKey.map(apiKey=> ("X-API-KEY", apiKey))
+  private def apiKeyHeader(apiKey: Option[String]): Option[(String, String)] = {
+    apiKey.map(apiKey => ("X-API-KEY", apiKey))
   }
 
-  def Post(endpoint: String, maybeBody: Option[String], apiKey: Option[String] = maybeApiKey): Response[Either[String, String]] = {
-    httpPost(endpoint,maybeBody, apiKeyHeader(apiKey))(port).send(backend)
+  def Post(
+      endpoint: String,
+      maybeBody: Option[String],
+      apiKey: Option[String] = maybeApiKey
+  ): Response[Either[String, String]] = {
+    httpPost(endpoint, maybeBody, apiKeyHeader(apiKey))(port).send(backend)
   }
 
-  def Post(endpoint: String): Response[Either[String, String]]               =
+  def Post(endpoint: String): Response[Either[String, String]] =
     Post(endpoint, None)
 
   def Post(endpoint: String, body: String): Response[Either[String, String]] =
     Post(endpoint, Some(body))
 
   def Put(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
-    httpPut(endpoint, Some(body),apiKeyHeader(apiKey))(port).send(backend)
+    httpPut(endpoint, Some(body), apiKeyHeader(apiKey))(port).send(backend)
   }
 
   def Delete(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
-    httpRequest(Method.DELETE, endpoint, Some(body),apiKeyHeader(apiKey))(port).send(backend)
+    httpRequest(Method.DELETE, endpoint, Some(body), apiKeyHeader(apiKey))(port).send(backend)
   }
 
-  def Get(endpoint: String, otherPort: Int = port, apiKey: Option[String] = maybeApiKey, maybeBody: Option[String] =None): Response[Either[String, String]] = {
-    httpGet(endpoint, maybeHeader = apiKeyHeader(apiKey), maybeBody = maybeBody)(otherPort).send(backend)
+  def Get(
+      endpoint: String,
+      otherPort: Int = port,
+      apiKey: Option[String] = maybeApiKey,
+      maybeBody: Option[String] = None
+  ): Response[Either[String, String]] = {
+    httpGet(endpoint, maybeHeader = apiKeyHeader(apiKey), maybeBody = maybeBody)(otherPort)
+      .send(backend)
   }
 }
