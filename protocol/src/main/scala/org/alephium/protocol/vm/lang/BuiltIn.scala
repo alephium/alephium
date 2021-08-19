@@ -101,6 +101,20 @@ object BuiltIn {
     SimpleStatelessBuiltIn("txCaller", Seq(Type.U256), Seq(Type.Address), TxCaller)
   val txCallerSize: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("txCallerSize", Seq.empty, Seq(Type.U256), TxCallerSize)
+  val verifyAbsoluteLocktime: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "verifyAbsoluteLocktime",
+      Seq(Type.U256),
+      Seq.empty,
+      VerifyAbsoluteLocktime
+    )
+  val verifyRelativeLocktime: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "verifyRelativeLocktime",
+      Seq(Type.U256, Type.U256),
+      Seq.empty,
+      VerifyRelativeLocktime
+    )
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
     def toType: Type
@@ -177,6 +191,8 @@ object BuiltIn {
     txId,
     txCaller,
     txCallerSize,
+    verifyAbsoluteLocktime,
+    verifyRelativeLocktime,
     toI256,
     toU256,
     toByteVec,

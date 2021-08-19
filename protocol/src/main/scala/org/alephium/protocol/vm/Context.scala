@@ -45,7 +45,7 @@ trait StatelessContext extends CostStrategy {
   def signatures: Stack[Signature] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
-    indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get).toRight(Right(InvalidTxCallerIndex))
+    indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get).toRight(Right(InvalidTxInputIndex))
   }
 
   def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {

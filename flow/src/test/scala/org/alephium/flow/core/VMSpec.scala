@@ -28,7 +28,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize, Serde}
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U256, UnsecureRandom}
+import org.alephium.util._
 
 // scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec {
@@ -741,7 +741,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     testSimpleScript(main(0))
-    failSimpleScript(main(1), InvalidTxCallerIndex)
+    failSimpleScript(main(1), InvalidTxInputIndex)
   }
 
   // scalastyle:off regex
@@ -784,6 +784,32 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     testSimpleScript(main)
+  }
+
+  it should "test locktime built-ins" in new ContractFixture {
+    // avoid genesis blocks due to genesis timestamp
+    val block = transfer(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    def main(absoluteTimeLock: TimeStamp, relativeTimeLock: Duration, txIndex: Int) =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    verifyAbsoluteLocktime!(${absoluteTimeLock.millis})
+         |    verifyRelativeLocktime!(${txIndex}, ${relativeTimeLock.millis})
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(main(block.timestamp, Duration.unsafe(1), 0))
+    failSimpleScript(main(block.timestamp, Duration.unsafe(1), 1), InvalidTxInputIndex)
+    failSimpleScript(
+      main(TimeStamp.now() + Duration.ofMinutesUnsafe(1), Duration.unsafe(1), 0),
+      AbsoluteLockTimeVerificationFailed
+    )
+    failSimpleScript(
+      main(block.timestamp, Duration.ofMinutesUnsafe(1), 0),
+      RelativeLockTimeVerificationFailed
+    )
   }
 
   behavior of "constant product market"

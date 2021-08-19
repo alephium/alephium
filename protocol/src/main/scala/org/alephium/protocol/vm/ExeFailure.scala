@@ -33,7 +33,7 @@ case object InvalidPublicKey                                   extends ExeFailur
 case object SignedDataIsNot32Bytes                             extends ExeFailure
 case object InvalidSignatureFormat                             extends ExeFailure
 case object InvalidSignature                                   extends ExeFailure
-case object InvalidTxCallerIndex                               extends ExeFailure
+case object InvalidTxInputIndex                                extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure
