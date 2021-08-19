@@ -60,6 +60,11 @@ object SecretStorage {
   case object SecretFileAlreadyExists extends Error
   case object UnknownKey              extends Error
 
+  implicit private val mnemonicSerde: Serde[Mnemonic] =
+    Serde.forProduct1(
+      Mnemonic.unsafe,
+      _.words
+    )
   final case class SecretFileNotFound(file: File) extends Error
 
   final case class StoredState(
@@ -67,7 +72,7 @@ object SecretStorage {
       isMiner: Boolean,
       numberOfAddresses: Int,
       activeAddressIndex: Int,
-      mnemonic: String
+      mnemonic: Mnemonic
   )
 
   object StoredState {
@@ -94,7 +99,7 @@ object SecretStorage {
           state.isMiner,
           state.privateKeys.length,
           index,
-          state.mnemonic.toLongString
+          state.mnemonic
         )
       }
     }
@@ -154,7 +159,7 @@ object SecretStorage {
             isMiner,
             numberOfAddresses = 1,
             activeAddressIndex = 0,
-            mnemonic.toLongString
+            mnemonic
           ),
           password
         )
@@ -303,11 +308,10 @@ object SecretStorage {
           .left
           .map(_ => CannotDecryptSecret)
         state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
-        mnemonic    <- Mnemonic.from(state.mnemonic).toRight(InvalidState)
         privateKeys <- deriveKeys(state.seed, state.numberOfAddresses, path)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
       } yield {
-        State(state.seed, password, state.isMiner, active, privateKeys, mnemonic)
+        State(state.seed, password, state.isMiner, active, privateKeys, state.mnemonic)
       }
     }.toEither.left.map(_ => SecretFileError).flatten
   }

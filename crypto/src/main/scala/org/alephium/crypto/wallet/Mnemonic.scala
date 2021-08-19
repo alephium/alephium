@@ -29,7 +29,8 @@ import org.alephium.util.{AVector, Bits, SecureAndSlowRandom}
 
 //scalastyle:off magic.number
 
-final case class Mnemonic private (words: AVector[String]) extends AnyVal {
+final case class Mnemonic(words: AVector[String]) extends AnyVal {
+
   def toSeed(passphrase: String): ByteString = {
     val mnemonic     = toLongString.toCharArray
     val extendedPass = s"mnemonic${passphrase}".getBytes(StandardCharsets.UTF_8)
@@ -87,6 +88,10 @@ object Mnemonic {
   def from(input: String): Option[Mnemonic] = {
     val words = input.split(" ")
     Option.when(validateWords(words))(new Mnemonic(AVector.unsafe(words)))
+  }
+
+  def unsafe(words: AVector[String]): Mnemonic = {
+    new Mnemonic(words)
   }
 
   protected[wallet] def validateEntropy(entropy: ByteString): Boolean = {
