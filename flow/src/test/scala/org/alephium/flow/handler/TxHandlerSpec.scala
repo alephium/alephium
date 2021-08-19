@@ -86,6 +86,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
     EventFilter.debug("Start to clean tx pools", occurrences = 5).intercept {
       system.actorOf(TxHandler.props(blockFlow))
     }
+
+    system.terminate()
   }
 
   trait Fixture extends FlowFixture with TxGenerators {

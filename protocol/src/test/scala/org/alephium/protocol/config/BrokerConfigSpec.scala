@@ -41,18 +41,24 @@ class BrokerConfigSpec extends AlephiumSpec {
 
   it should "calculate intersection" in {
     def test0(a: BrokerConfig, b: BrokerConfig, range: Range) = {
+      a.remoteRange(b) is b.groupRange
+      a.remoteGroupNum(b) is b.groupNumPerBroker
       a.intersect(b) is true
       a.calIntersection(b) is range
     }
 
     def test1(a: BrokerConfig, b: BrokerConfig) = {
+      a.remoteRange(b) is b.groupRange
+      a.remoteGroupNum(b) is b.groupNumPerBroker
       a.intersect(b) is false
+      a.calIntersection(b).isEmpty is true
     }
 
     val config0 = buildConfig(0, 1, 12)
     val config1 = buildConfig(2, 4, 12)
     val config2 = buildConfig(1, 3, 12)
     val config3 = buildConfig(6, 12, 12)
+    val config4 = buildConfig(7, 12, 12)
     test0(config0, config0, config0.groupRange)
     test0(config0, config1, config1.groupRange)
     test0(config0, config2, config2.groupRange)
@@ -69,6 +75,7 @@ class BrokerConfigSpec extends AlephiumSpec {
     test0(config3, config1, config3.groupRange)
     test1(config3, config2)
     test0(config3, config3, config3.groupRange)
+    test1(config3, config4)
   }
 
   def buildConfig(_brokerId: Int, _brokerNum: Int, _groups: Int): BrokerConfig = new BrokerConfig {
