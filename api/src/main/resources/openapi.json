@@ -2054,7 +2054,7 @@
                   {
                     "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "brokerId": 1,
-                    "groupNumPerBroker": 1,
+                    "brokerNum": 1,
                     "address": {
                       "addr": "1.2.3.4",
                       "port": 12344
@@ -4900,7 +4900,7 @@
         "required": [
           "cliqueId",
           "brokerId",
-          "groupNumPerBroker",
+          "brokerNum",
           "address"
         ],
         "type": "object",
@@ -4911,7 +4911,7 @@
           "brokerId": {
             "type": "integer"
           },
-          "groupNumPerBroker": {
+          "brokerNum": {
             "type": "integer"
           },
           "address": {

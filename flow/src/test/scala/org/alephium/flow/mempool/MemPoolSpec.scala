@@ -16,11 +16,9 @@
 
 package org.alephium.flow.mempool
 
-import scala.util.Random
-
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, LockFixture, TimeStamp}
+import org.alephium.util.{AVector, LockFixture, TimeStamp, UnsecureRandom}
 
 class MemPoolSpec
     extends AlephiumFlowSpec
@@ -40,12 +38,9 @@ class MemPoolSpec
   it should "contain/add/remove for transactions" in {
     forAll(blockGen) { block =>
       val txTemplates = block.transactions.map(_.toTemplate)
-      val group =
-        GroupIndex.unsafe(
-          brokerConfig.groupFrom + Random.nextInt(brokerConfig.groupNumPerBroker)
-        )
-      val pool  = MemPool.empty(group)
-      val index = block.chainIndex
+      val group       = GroupIndex.unsafe(UnsecureRandom.sample(brokerConfig.groupRange))
+      val pool        = MemPool.empty(group)
+      val index       = block.chainIndex
       if (index.from.equals(group)) {
         txTemplates.foreach(pool.contains(index, _) is false)
         pool.addToTxPool(index, txTemplates, now) is block.transactions.length

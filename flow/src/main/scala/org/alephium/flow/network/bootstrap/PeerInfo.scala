@@ -71,13 +71,26 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
 
   override def validate(info: PeerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
     for {
-      _ <- BrokerInfo.validate(info.id, info.groupNumPerBroker)
+      _ <- check(info.groupNumPerBroker)
+      _ <- BrokerInfo.validate(info.id, config.groups / info.groupNumPerBroker)
       _ <- info.externalAddress.fold[Either[String, Unit]](Right(()))(address =>
         Configs.validatePort(address.getPort)
       )
       _ <- Configs.validatePort(info.restPort)
       _ <- Configs.validatePort(info.wsPort)
     } yield ()
+  }
+
+  private def check(groupNumPerBroker: Int)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (
+      (groupNumPerBroker <= 0) ||
+      (groupNumPerBroker > config.groups) ||
+      (config.groups % groupNumPerBroker != 0)
+    ) {
+      Left(s"PeerInfo: invalid groupNumPerBroker: $groupNumPerBroker")
+    } else {
+      Right(())
+    }
   }
 
   def self(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): PeerInfo = {

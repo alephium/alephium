@@ -31,7 +31,7 @@ import org.alephium.protocol.{ALF, BlockHash, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256, UnsecureRandom}
 
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
@@ -39,7 +39,7 @@ class BlockFlowSpec extends AlephiumSpec {
       blockFlow.getWeight(block.hash) isE Weight.zero
     }
 
-    checkBalance(blockFlow, brokerConfig.groupFrom, genesisBalance)
+    checkBalance(blockFlow, brokerConfig.groupRange.head, genesisBalance)
   }
 
   it should "work for at least 2 user group when adding blocks sequentially" in new FlowFixture {
@@ -80,7 +80,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
   it should "set proper initial bestDeps" in new FlowFixture {
     val validation = blockFlow.bestDeps.zipWithIndex.forall { case (bestDep, fromShift) =>
-      val mainGroup = GroupIndex.unsafe(brokerConfig.groupFrom + fromShift)
+      val mainGroup = GroupIndex.unsafe(brokerConfig.groupRange(fromShift))
       blockFlow.checkFlowDepsUnsafe(bestDep, mainGroup)
     }
     validation is true
@@ -223,7 +223,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
   it should "update mempool when there are conflicted txs" in new FlowFixture {
     if (brokerConfig.groups >= 2) {
-      forAll(Gen.choose(brokerConfig.groupFrom, brokerConfig.groupUntil - 1)) { mainGroup =>
+      brokerConfig.groupRange.foreach { mainGroup =>
         val blockFlow  = genesisBlockFlow()
         val blockFlow1 = genesisBlockFlow()
 
@@ -306,7 +306,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     (0 until brokerConfig.groups).foreach { testToGroup =>
       val blockFlow0    = isolatedBlockFlow()
-      val testFromGroup = brokerConfig.groupFrom
+      val testFromGroup = UnsecureRandom.sample(brokerConfig.groupRange)
       val blocks = (1 to 6).map { k =>
         val block =
           transferOnlyForIntraGroup(blockFlow0, ChainIndex.unsafe(testFromGroup, testToGroup))
@@ -314,9 +314,9 @@ class BlockFlowSpec extends AlephiumSpec {
         block
       }
       val hashes0 = AVector.from(blocks.map(_.hash))
-      val locators0: AVector[AVector[BlockHash]] =
-        AVector.tabulate(groupConfig.groups) { group =>
-          if (group equals testToGroup) {
+      val locators0: AVector[(ChainIndex, AVector[BlockHash])] =
+        AVector.tabulate(groupConfig.groups) { toGroup =>
+          val hashes: AVector[BlockHash] = if (toGroup equals testToGroup) {
             AVector(
               hashes0(0),
               hashes0(1),
@@ -328,17 +328,20 @@ class BlockFlowSpec extends AlephiumSpec {
           } else {
             AVector.empty
           }
+          ChainIndex.unsafe(testFromGroup, toGroup) -> hashes
         }
       blockFlow0.getSyncLocators() isE locators0
 
       val blockFlow1 = isolatedBlockFlow()
-      val locators1: AVector[AVector[BlockHash]] =
-        AVector.tabulate(config.broker.groups)(_ => AVector.empty)
+      val locators1: AVector[(ChainIndex, AVector[BlockHash])] =
+        AVector.tabulate(config.broker.groups)(toGroup =>
+          ChainIndex.unsafe(testFromGroup, toGroup) -> AVector.empty[BlockHash]
+        )
       blockFlow1.getSyncLocators() isE locators1
 
-      blockFlow0.getSyncInventories(locators0, brokerConfig) isE
+      blockFlow0.getSyncInventories(locators0.map(_._2), brokerConfig) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
-      blockFlow0.getSyncInventories(locators1, brokerConfig) isE
+      blockFlow0.getSyncInventories(locators1.map(_._2), brokerConfig) isE
         AVector.tabulate(groupConfig.groups) { group =>
           if (group equals testToGroup) hashes0 else AVector.empty[BlockHash]
         }
@@ -351,9 +354,9 @@ class BlockFlowSpec extends AlephiumSpec {
         }
       }
       blockFlow0.getSyncInventories(locators2, brokerConfig) isE inventories
-      blockFlow1.getSyncInventories(locators0, brokerConfig) isE
+      blockFlow1.getSyncInventories(locators0.map(_._2), brokerConfig) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
-      blockFlow1.getSyncInventories(locators1, brokerConfig) isE
+      blockFlow1.getSyncInventories(locators1.map(_._2), brokerConfig) isE
         AVector.fill(groupConfig.groups)(AVector.empty[BlockHash])
     }
   }
@@ -384,9 +387,8 @@ class BlockFlowSpec extends AlephiumSpec {
   behavior of "Balance"
 
   it should "transfer token inside a same group" in new FlowFixture {
-    val testGroup =
-      Random.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
-    val block = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(testGroup, testGroup))
+    val testGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+    val block     = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(testGroup, testGroup))
     block.nonCoinbase.nonEmpty is true
     addAndCheck(blockFlow, block, 1)
 
@@ -413,10 +415,8 @@ class BlockFlowSpec extends AlephiumSpec {
     val blockFlow0 = BlockFlow.fromGenesisUnsafe(config, storages)
     val blockFlow1 = BlockFlow.fromGenesisUnsafe(anotherConfig, anotherStorages)
 
-    val fromGroup =
-      Random.nextInt(brokerConfig.groupNumPerBroker) + brokerConfig.groupFrom
-    val toGroup =
-      Random.nextInt(brokerConfig.groupNumPerBroker) + anotherConfig.broker.groupFrom
+    val fromGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+    val toGroup   = UnsecureRandom.sample(anotherConfig.broker.groupRange)
 
     val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
     block.nonCoinbase.nonEmpty is true

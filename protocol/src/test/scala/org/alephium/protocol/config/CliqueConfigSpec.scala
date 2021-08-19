@@ -14,22 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.config
 
-import org.alephium.protocol.model.{ChainId, CliqueId, GroupIndex}
-import org.alephium.util.AVector
+import org.alephium.util.AlephiumSpec
 
-final case class SelfClique(
-    cliqueId: CliqueId,
-    chainId: ChainId,
-    numZerosAtLeastInHash: Int,
-    nodes: AVector[PeerAddress],
-    selfReady: Boolean,
-    synced: Boolean,
-    groupNumPerBroker: Int,
-    groups: Int
-) {
-  def brokerNum: Int = nodes.length
+class CliqueConfigSpec extends AlephiumSpec {
+  it should "validate broker id" in {
+    val cliqueConfig = new CliqueConfig {
+      override def brokerNum: Int = 3
+      override def groups: Int    = 3
+    }
 
-  def peer(groupIndex: GroupIndex): PeerAddress = nodes(groupIndex.value % brokerNum)
+    cliqueConfig.validate(0) is true
+    cliqueConfig.validate(2) is true
+    cliqueConfig.validate(-1) is false
+    cliqueConfig.validate(3) is false
+  }
 }

@@ -38,7 +38,7 @@ object Platform extends StrictLogging {
         Files.tmpDir.resolve(s".alephium-${env.name}-${Hash.random.toHexString}")
     }
     if (!JFiles.exists(rootPath)) {
-      logger.info(s"Creating root path: $rootPath")
+      Env.forProd(logger.info(s"Creating root path: $rootPath"))
       rootPath.toFile.mkdir()
     }
     rootPath

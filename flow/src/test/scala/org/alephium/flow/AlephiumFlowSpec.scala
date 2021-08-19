@@ -423,7 +423,7 @@ trait FlowFixture
         s"weight: $weight, from: ${index.from}, to: ${index.to} hash: ${tip.shortHex}, deps: $deps"
       }
       .mkString("", "\n", "\n")
-    val bestDeps = (brokerConfig.groupFrom until brokerConfig.groupUntil)
+    val bestDeps = brokerConfig.groupRange
       .map { group =>
         val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
         val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")

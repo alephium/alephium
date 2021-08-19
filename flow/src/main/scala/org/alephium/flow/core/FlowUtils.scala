@@ -419,7 +419,7 @@ trait SyncUtils {
   def getIntraSyncInventories(): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getIntraSyncInventoriesUnsafe())
 
-  def getSyncLocators(): IOResult[AVector[AVector[BlockHash]]] =
+  def getSyncLocators(): IOResult[AVector[(ChainIndex, AVector[BlockHash])]] =
     IOUtils.tryExecute(getSyncLocatorsUnsafe())
 
   def getSyncInventories(
@@ -430,7 +430,7 @@ trait SyncUtils {
 
   protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]]
 
-  protected def getSyncLocatorsUnsafe(): AVector[AVector[BlockHash]]
+  protected def getSyncLocatorsUnsafe(): AVector[(ChainIndex, AVector[BlockHash])]
 
   protected def getSyncInventoriesUnsafe(
       locators: AVector[AVector[BlockHash]],

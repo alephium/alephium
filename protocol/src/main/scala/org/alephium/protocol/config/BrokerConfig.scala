@@ -22,6 +22,15 @@ import org.alephium.util.AVector
 trait BrokerConfig extends GroupConfig with CliqueConfig with BrokerGroupInfo {
   def brokerId: Int
 
+  lazy val groupNumPerBroker: Int = groups / brokerNum
+
+  lazy val groupRange: Range = BrokerConfig.range(brokerId, groups, brokerNum)
+
+  @inline def remoteRange(remote: BrokerGroupInfo): Range =
+    BrokerConfig.range(remote.brokerId, groups, remote.brokerNum)
+
+  @inline def remoteGroupNum(remote: BrokerGroupInfo): Int = groups / remote.brokerNum
+
   lazy val chainIndexes: AVector[ChainIndex] =
     AVector.from(
       for {
@@ -29,4 +38,31 @@ trait BrokerConfig extends GroupConfig with CliqueConfig with BrokerGroupInfo {
         to   <- 0 until groups
       } yield ChainIndex.unsafe(from, to)(this)
     )
+
+  def calIntersection(another: BrokerGroupInfo): Range = {
+    if (brokerNum == another.brokerNum) {
+      if (brokerId == another.brokerId) groupRange else BrokerConfig.empty
+    } else if (brokerNum < another.brokerNum) {
+      if ((another.brokerNum % brokerNum == 0) && (another.brokerId % brokerNum == brokerId)) {
+        Range(another.brokerId, groups, another.brokerNum)
+      } else {
+        BrokerConfig.empty
+      }
+    } else {
+      if (
+        (brokerNum % another.brokerNum == 0) && (brokerId % another.brokerNum == another.brokerId)
+      ) {
+        groupRange
+      } else {
+        BrokerConfig.empty
+      }
+    }
+  }
+}
+
+object BrokerConfig {
+  val empty: Range = Range(0, -1)
+
+  @inline def range(brokerId: Int, groups: Int, brokerNum: Int): Range =
+    Range(brokerId, groups, brokerNum)
 }

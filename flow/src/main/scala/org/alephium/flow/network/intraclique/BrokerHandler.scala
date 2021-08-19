@@ -63,7 +63,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def dataOrigin: DataOrigin = DataOrigin.IntraClique(remoteBrokerInfo)
 
   private def handleInv(hashes: AVector[AVector[BlockHash]]): Unit = {
-    assume(hashes.length == remoteBrokerInfo.groupNumPerBroker * brokerConfig.groups)
+    assume(hashes.length * remoteBrokerInfo.brokerNum == brokerConfig.chainNum)
     val (headersToSync, blocksToSync) =
       BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)
     send(HeadersRequest(headersToSync))
@@ -79,7 +79,7 @@ object BrokerHandler {
   )(implicit brokerConfig: BrokerConfig): (AVector[BlockHash], AVector[BlockHash]) = {
     var headersToSync = AVector.empty[BlockHash]
     var blocksToSync  = AVector.empty[BlockHash]
-    (0 until remoteBrokerInfo.groupNumPerBroker).foreach { groupShift =>
+    (0 until brokerConfig.remoteGroupNum(remoteBrokerInfo)).foreach { groupShift =>
       (0 until brokerConfig.groups).foreach { toGroup =>
         val toSync =
           hashes(groupShift * brokerConfig.groups + toGroup).filter(!blockflow.containsUnsafe(_))

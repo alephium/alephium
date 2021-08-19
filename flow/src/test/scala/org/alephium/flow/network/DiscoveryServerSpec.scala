@@ -131,7 +131,7 @@ class DiscoveryServerSpec
         server.tell(DiscoveryServer.GetNeighborPeers(None), probe.ref)
 
         probe.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
-          (peers.sumBy(_.groupNumPerBroker) >= 5 * groups) is true
+          (peers.sumBy(peer => groups / peer.brokerNum) >= 5 * groups) is true
         }
       }
     }

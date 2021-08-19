@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerGroupInfo, NoIndexModelGeneratorsLike}
+import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex, NoIndexModelGeneratorsLike}
 import org.alephium.util.AVector
 
 class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexModelGeneratorsLike {
@@ -32,23 +32,27 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec("FlowHandler") with NoIndexM
       override def brokerNum: Int = 2
     }
     val brokerGroupInfo1 = new BrokerGroupInfo {
-      override def brokerId: Int          = 2
-      override def groupNumPerBroker: Int = 2
+      override def brokerId: Int  = 2
+      override def brokerNum: Int = 3
     }
     val brokerGroupInfo2 = new BrokerGroupInfo {
-      override def brokerId: Int          = 1
-      override def groupNumPerBroker: Int = 2
+      override def brokerId: Int  = 1
+      override def brokerNum: Int = 3
     }
     val brokerGroupInfo3 = new BrokerGroupInfo {
-      override def brokerId: Int          = 0
-      override def groupNumPerBroker: Int = 2
+      override def brokerId: Int  = 0
+      override def brokerNum: Int = 3
     }
 
-    val locators  = AVector.tabulate(3 * 6) { k => AVector.fill(k)(BlockHash.generate) }
-    val flowEvent = FlowHandler.SyncLocators(brokerGroupInfo0, locators)
+    val locatorsWithIndex = AVector.tabulate(3 * 6) { k =>
+      ChainIndex.unsafe(k / 6 * 2 + 1, k % 6)(brokerGroupInfo0) ->
+        AVector.fill(k)(BlockHash.generate)
+    }
+    val flowEvent = FlowHandler.SyncLocators(brokerGroupInfo0, locatorsWithIndex)
+    val locators  = locatorsWithIndex.map(_._2)
     flowEvent.filerFor(brokerGroupInfo0) is locators
-    flowEvent.filerFor(brokerGroupInfo1) is locators.takeRight(2 * groupNum)
-    flowEvent.filerFor(brokerGroupInfo2) is locators.take(1 * groupNum)
-    flowEvent.filerFor(brokerGroupInfo3) is locators.take(0 * groupNum)
+    flowEvent.filerFor(brokerGroupInfo1) is locators.takeRight(groupNum)
+    flowEvent.filerFor(brokerGroupInfo2) is locators.take(groupNum)
+    flowEvent.filerFor(brokerGroupInfo3) is locators.drop(groupNum).take(groupNum)
   }
 }

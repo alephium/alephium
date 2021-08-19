@@ -38,14 +38,14 @@ class ViewHandlerSpec extends AlephiumSpec {
     }
 
     for {
-      from <- 0 to 1
+      from <- Seq(0, 2)
       to   <- 0 until 4
     } {
       ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is (from equals to)
     }
 
     for {
-      from <- 2 to 3
+      from <- Seq(1, 3)
       to   <- 0 until 4
     } {
       ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is true

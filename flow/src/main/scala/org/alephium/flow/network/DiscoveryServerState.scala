@@ -77,7 +77,9 @@ trait DiscoveryServerState extends SessionManager {
   def getPeersNum: Int = table.size
 
   def getPeersWeight: Int = {
-    table.values.foldLeft(0)(_ + _.info.groupNumPerBroker)
+    table.values.foldLeft(0) { case (weight, peerStatus) =>
+      weight + brokerConfig.remoteGroupNum(peerStatus.info)
+    }
   }
 
   def getNeighbors(target: CliqueId): AVector[BrokerInfo] = {

@@ -42,18 +42,14 @@ object FlowHandler {
   final case class BlocksLocated(blocks: AVector[Block]) extends Event
   final case class SyncInventories(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
       extends Event
-  final case class SyncLocators(selfBrokerInfo: BrokerConfig, hashes: AVector[AVector[BlockHash]])
-      extends Command {
+  final case class SyncLocators(
+      selfBrokerInfo: BrokerConfig,
+      hashes: AVector[(ChainIndex, AVector[BlockHash])]
+  ) extends Command {
     def filerFor(another: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
-      val (groupFrom, groupUntil) = selfBrokerInfo.calIntersection(another)
-      if (groupUntil <= groupFrom) {
-        AVector.empty
-      } else {
-        hashes.slice(
-          (groupFrom - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups,
-          (groupUntil - selfBrokerInfo.groupFrom) * selfBrokerInfo.groups
-        )
-      }
+      hashes
+        .filter { case (chainIndex, _) => another.contains(chainIndex.from) }
+        .map { case (_, locators) => locators }
     }
   }
   final case class BlockNotify(block: Block, height: Int) extends EventBus.Event

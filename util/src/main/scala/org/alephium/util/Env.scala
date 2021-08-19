@@ -37,4 +37,11 @@ object Env {
       case _       => Prod
     }
   }
+
+  def forProd(f: => Unit): Unit = {
+    resolve() match {
+      case Prod => f
+      case _    => ()
+    }
+  }
 }

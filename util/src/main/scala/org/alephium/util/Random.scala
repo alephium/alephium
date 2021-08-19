@@ -55,6 +55,11 @@ trait AbstractRandom {
     val random = nextNonZeroInt()
     if (random != 0) U32.unsafe(math.abs(random)) else nextNonZeroU32()
   }
+
+  def sample[T](xs: Seq[T]): T = {
+    val index = source.nextInt(xs.length)
+    xs(index)
+  }
 }
 
 object UnsecureRandom extends AbstractRandom {
