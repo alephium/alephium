@@ -25,13 +25,13 @@ import org.alephium.serde.{u256Serde => _, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BlockHeader(
+    nonce: Nonce,
     version: Byte,
     blockDeps: BlockDeps,
     depStateHash: Hash,
     txsHash: Hash,
     timestamp: TimeStamp,
-    target: Target,
-    nonce: Nonce
+    target: Target
 ) extends FlowData {
   lazy val hash: BlockHash = PoW.hash(this)
 
@@ -100,14 +100,14 @@ object BlockHeader {
     Serde.forProduct7(
       apply,
       bh =>
-        (bh.version, bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target, bh.nonce)
+        (bh.nonce, bh.version, bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target)
     )
 
   def genesis(txsHash: Hash, target: Target, nonce: Nonce)(implicit
       config: GroupConfig
   ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
-    BlockHeader(defaultBlockVersion, deps, Hash.zero, txsHash, ALF.GenesisTimestamp, target, nonce)
+    BlockHeader(nonce, defaultBlockVersion, deps, Hash.zero, txsHash, ALF.GenesisTimestamp, target)
   }
 
   def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit
@@ -134,7 +134,7 @@ object BlockHeader {
       nonce: Nonce
   ): BlockHeader = {
     val blockDeps = BlockDeps.unsafe(deps)
-    BlockHeader(defaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target, nonce)
+    BlockHeader(nonce, defaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target)
   }
 
   def unsafe(
