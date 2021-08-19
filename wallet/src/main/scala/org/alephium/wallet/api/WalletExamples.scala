@@ -100,7 +100,7 @@ trait WalletExamples extends ErrorExamples {
     simpleExample(AVector(WalletStatus(walletName, locked = true)))
 
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
-    simpleExample(WalletUnlock(password))
+    simpleExample(WalletUnlock(password, None))
 
   implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
     simpleExample(WalletDeletion(password))

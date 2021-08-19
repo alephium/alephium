@@ -76,7 +76,10 @@ trait WalletEndpointsLogic extends WalletEndpoints {
   }
   val unlockWalletLogic = serverLogic(unlockWallet) { case (wallet, walletUnlock) =>
     Future.successful(
-      walletService.unlockWallet(wallet, walletUnlock.password).left.map(toApiError)
+      walletService
+        .unlockWallet(wallet, walletUnlock.password, walletUnlock.mnemonicPassphrase)
+        .left
+        .map(toApiError)
     )
   }
   val deleteWalletLogic = serverLogic(deleteWallet) { case (wallet, walletDeletion) =>

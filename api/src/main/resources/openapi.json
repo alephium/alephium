@@ -5874,6 +5874,9 @@
         "properties": {
           "password": {
             "type": "string"
+          },
+          "mnemonicPassphrase": {
+            "type": "string"
           }
         }
       }

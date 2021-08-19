@@ -42,7 +42,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       val miner = false
 
       val secretStorage =
-        SecretStorage.create(seed, password, miner, file, path, mnemonic).toOption.get
+        SecretStorage.create(mnemonic, None, password, miner, file, path).toOption.get
       val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
       secretStorage.getCurrentPrivateKey() isE privateKey
@@ -63,16 +63,43 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       secretStorage.lock()
       secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
 
-      secretStorage.unlock(wrongPassword).isLeft is true
+      secretStorage.unlock(wrongPassword, None).isLeft is true
 
-      secretStorage.unlock(password) is Right(())
+      secretStorage.unlock(password, None) is Right(())
       secretStorage.getCurrentPrivateKey() isE privateKey
 
       secretStorage.getMnemonic(password) is Right(mnemonic)
       secretStorage.getMnemonic(wrongPassword).isLeft is true
 
       secretStorage.delete(password) is Right(())
-      secretStorage.unlock(password) is Left(SecretStorage.SecretFileError)
+      secretStorage.unlock(password, None) is Left(SecretStorage.SecretFileError)
+    }
+  }
+
+  it should "handle mnemonic passphrase" in {
+    forAll(mnemonicGen, passwordGen, passwordGen) { case (mnemonic, password, passphrase) =>
+      val seed  = mnemonic.toSeed(passphrase)
+      val name  = Hash.generate.shortHex
+      val file  = new File(s"$secretDir/$name")
+      val miner = false
+
+      val secretStorage =
+        SecretStorage.create(mnemonic, Some(passphrase), password, miner, file, path).toOption.get
+
+      val privateKey = BIP32.btcMasterKey(seed).derive(path).get
+
+      secretStorage.getCurrentPrivateKey() isE privateKey
+
+      secretStorage.lock()
+
+      //unlocking without passphrase gives another seed
+      secretStorage.unlock(password, None)
+      secretStorage.getCurrentPrivateKey() isnotE privateKey
+
+      secretStorage.lock()
+
+      secretStorage.unlock(password, Some(passphrase))
+      secretStorage.getCurrentPrivateKey() isE privateKey
     }
   }
 
@@ -86,7 +113,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     )
 
     val rawFile =
-      """{"encrypted":"6fe09b873d5a9ae3afba629a9f905e914c5daf4a20b7f67c7553f9bfad68e548053002c472a0243ce2cdb3bb233e17a8a7fb1707a61e9f90a35cd347877bbf4e82ed06fd74161bfe536151b6f32e7d10f232d669304859daf84bef3c696f383fa58017cb469750e0bb017a95a1ef64331e0a6ce7bd06c53209ddcaf9172faa753f3a1240c6bc2b926859b0feede02ccbc27de9dfa0ce6112c87e9d26df3834766f9ed316c37a7a9285e29631d5451afdc5be8d00c0b276b872aaed7f747e83905c340ce635c070c41cb1fa9b0c25765eb909b0ab5c89b226617ad6949ef23b556f6343f61a1c32e9e49104e8","salt":"d1a5c20b8fc9b66fc56065be0f0780fdf1a5e55e07fdfeaa7214b681209ad5b8c4e4e4d0deb0e168d62616638730928b1663980206416f766a49da05eda14f1e","iv":"db6f4123a633fb6d98a49445870ea59db50bc0132ca362c5f00b4db63a4b4f4d873347e2143dbbbe82e904cb819f52414d76b2f58d91ab75628db44cd2e594d0","version":1}"""
+      """{"encrypted":"47216dec548143e584a97c32fc0d2019b28dd39e44221ed7306ce1d6072e7b5e9e334d4ae389848619b345ded3eddbeb9b863f60aa4968d41baf556d9937cbb70d88740feb04c8c30b756201b2a14a9c9cbe77fd20af9d91ad1346995fbab28312ee2857749d27453938031a04ef3773756239fedefcedec549b1b095a7710a639745440406592acfd22224cc7a2db81600acbc6a0f244ff0dcf863f79a58f22f3df303713741fb8209c","salt":"ab9426ea499680ebd7a84eaade6bdfe5ecdad8b25d0dd92277bae845fd11c1ad58766311b02ca41fa509d06ef5afa2e8bf817b6febcb78fc9d831b71a1de8138","iv":"1eb45e5397e7f7edfa5f699c8c4966c7ca07a32f2c77bd730fa71e5746fdf09895b309aba2da5e0a24a00529ccb4c18839dd4cb5f34083672b1f3364f86524c1","version":1}"""
 
     val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
@@ -95,9 +122,9 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     outWriter.write(rawFile)
     outWriter.close()
 
-    val secretStorage = SecretStorage.fromFile(file, password, path).toOption.get
+    val secretStorage = SecretStorage.fromFile(file, password, path, None).toOption.get
 
-    secretStorage.unlock(password) is Right(())
+    secretStorage.unlock(password, None) is Right(())
 
     secretStorage.getCurrentPrivateKey() isE privateKey
   }
@@ -106,7 +133,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     val fileName        = scala.util.Random.nextString(10)
     val nonExistingFile = new File(fileName)
     SecretStorage
-      .fromFile(nonExistingFile, "password", path)
+      .fromFile(nonExistingFile, "password", path, None)
       .swap
       .toOption
       .get is SecretStorage.SecretFileError

@@ -16,4 +16,5 @@
 
 package org.alephium.wallet.api.model
 
-final case class WalletUnlock(password: String)
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class WalletUnlock(password: String, mnemonicPassphrase: Option[String] = None)

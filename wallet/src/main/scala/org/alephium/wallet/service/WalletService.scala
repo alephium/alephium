@@ -61,7 +61,11 @@ trait WalletService extends Service {
   ): Either[WalletError, String]
 
   def lockWallet(wallet: String): Either[WalletError, Unit]
-  def unlockWallet(wallet: String, password: String): Either[WalletError, Unit]
+  def unlockWallet(
+      wallet: String,
+      password: String,
+      mnemonicPassphrase: Option[String]
+  ): Either[WalletError, Unit]
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address.Asset, U256)]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
@@ -224,11 +228,10 @@ object WalletService {
         isMiner: Boolean,
         walletName: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
-      val seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
       for {
         file <- buildWalletFile(walletName)
         storage <- SecretStorage
-          .create(seed, password, isMiner, file, path, mnemonic)
+          .create(mnemonic, mnemonicPassphrase, password, isMiner, file, path)
           .left
           .map(_ => CannotCreateEncryptedFile(secretDir))
         _ <- if (isMiner) computeNextMinerAddresses(storage) else Right(())
@@ -268,9 +271,13 @@ object WalletService {
       Right(secretStorages.get(wallet).foreach(_.lock()))
     }
 
-    override def unlockWallet(wallet: String, password: String): Either[WalletError, Unit] =
+    override def unlockWallet(
+        wallet: String,
+        password: String,
+        mnemonicPassphrase: Option[String]
+    ): Either[WalletError, Unit] =
       withWalletM(wallet) { secretStorage =>
-        secretStorage.unlock(password).left.map(WalletError.from)
+        secretStorage.unlock(password, mnemonicPassphrase).left.map(WalletError.from)
       }(Left.apply)
 
     override def deleteWallet(wallet: String, password: String): Either[WalletError, Unit] =

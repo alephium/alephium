@@ -35,7 +35,10 @@ import org.alephium.wallet.Constants
 
 trait SecretStorage {
   def lock(): Unit
-  def unlock(password: String): Either[SecretStorage.Error, Unit]
+  def unlock(
+      password: String,
+      mnemonicPassphrase: Option[String]
+  ): Either[SecretStorage.Error, Unit]
   def delete(password: String): Either[SecretStorage.Error, Unit]
   def isLocked(): Boolean
   def isMiner(): Either[SecretStorage.Error, Boolean]
@@ -68,24 +71,22 @@ object SecretStorage {
   final case class SecretFileNotFound(file: File) extends Error
 
   final case class StoredState(
-      seed: ByteString,
+      mnemonic: Mnemonic,
       isMiner: Boolean,
       numberOfAddresses: Int,
-      activeAddressIndex: Int,
-      mnemonic: Mnemonic
+      activeAddressIndex: Int
   )
 
   object StoredState {
     implicit val serde: Serde[StoredState] =
-      Serde.forProduct5(
+      Serde.forProduct4(
         apply,
         state =>
           (
-            state.seed,
+            state.mnemonic,
             state.isMiner,
             state.numberOfAddresses,
-            state.activeAddressIndex,
-            state.mnemonic
+            state.activeAddressIndex
           )
       )
 
@@ -95,11 +96,10 @@ object SecretStorage {
         _ <- Either.cond(index >= 0, (), UnknownKey)
       } yield {
         StoredState(
-          state.seed,
+          state.mnemonic,
           state.isMiner,
           state.privateKeys.length,
-          index,
-          state.mnemonic
+          index
         )
       }
     }
@@ -141,12 +141,12 @@ object SecretStorage {
   }
 
   def create(
-      seed: ByteString,
+      mnemonic: Mnemonic,
+      mnemonicPassphrase: Option[String],
       password: String,
       isMiner: Boolean,
       file: File,
-      path: AVector[Int],
-      mnemonic: Mnemonic
+      path: AVector[Int]
   ): Either[Error, SecretStorage] = {
     if (file.exists) {
       Left(SecretFileAlreadyExists)
@@ -155,15 +155,14 @@ object SecretStorage {
         _ <- storeStateToFile(
           file,
           StoredState(
-            seed,
+            mnemonic,
             isMiner,
             numberOfAddresses = 1,
-            activeAddressIndex = 0,
-            mnemonic
+            activeAddressIndex = 0
           ),
           password
         )
-        state <- stateFromFile(file, password, path)
+        state <- stateFromFile(file, password, path, mnemonicPassphrase)
       } yield {
         new Impl(file, Some(state), path)
       }
@@ -173,10 +172,11 @@ object SecretStorage {
   private[storage] def fromFile(
       file: File,
       password: String,
-      path: AVector[Int]
+      path: AVector[Int],
+      mnemonicPassphrase: Option[String]
   ): Either[Error, SecretStorage] = {
     for {
-      state <- stateFromFile(file, password, path)
+      state <- stateFromFile(file, password, path, mnemonicPassphrase)
     } yield {
       new Impl(file, Some(state), path)
     }
@@ -194,9 +194,12 @@ object SecretStorage {
       }
     }
 
-    override def unlock(password: String): Either[Error, Unit] = {
+    override def unlock(
+        password: String,
+        mnemonicPassphrase: Option[String]
+    ): Either[Error, Unit] = {
       for {
-        state <- stateFromFile(file, password, path)
+        state <- stateFromFile(file, password, path, mnemonicPassphrase)
       } yield {
         maybeState = Some(state)
       }
@@ -204,7 +207,7 @@ object SecretStorage {
 
     override def delete(password: String): Either[Error, Unit] = {
       for {
-        _   <- stateFromFile(file, password, path)
+        _   <- validatePassword(file, password)
         res <- Try(Files.delete(file.toPath())).toEither.left.map(_ => SecretFileError)
       } yield {
         res
@@ -274,7 +277,8 @@ object SecretStorage {
 
     override def getMnemonic(password: String): Either[SecretStorage.Error, Mnemonic] = {
       for {
-        state <- stateFromFile(file, password, path)
+        state <- getState
+        _     <- validatePassword(file, password)
       } yield {
         state.mnemonic
       }
@@ -296,7 +300,8 @@ object SecretStorage {
   private def stateFromFile(
       file: File,
       password: String,
-      path: AVector[Int]
+      path: AVector[Int],
+      mnemonicPassphrase: Option[String]
   ): Either[Error, State] = {
     Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
@@ -307,12 +312,32 @@ object SecretStorage {
           .toEither
           .left
           .map(_ => CannotDecryptSecret)
-        state       <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
-        privateKeys <- deriveKeys(state.seed, state.numberOfAddresses, path)
+        state <- deserialize[StoredState](stateBytes).left.map(_ => SecretFileError)
+        seed = state.mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
+        privateKeys <- deriveKeys(seed, state.numberOfAddresses, path)
         active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
       } yield {
-        State(state.seed, password, state.isMiner, active, privateKeys, state.mnemonic)
+        State(seed, password, state.isMiner, active, privateKeys, state.mnemonic)
       }
+    }.toEither.left.map(_ => SecretFileError).flatten
+  }
+
+  private def validatePassword(
+      file: File,
+      password: String
+  ): Either[Error, Unit] = {
+    Using(Source.fromFile(file)("UTF-8")) { source =>
+      val rawFile = source.getLines().mkString
+      for {
+        secretFile <- Try(read[SecretFile](rawFile)).toEither.left.map(_ =>
+          (CannotParseFile: Error)
+        )
+        _ <- AES
+          .decrypt(secretFile.toAESEncrytped, password)
+          .toEither
+          .left
+          .map(_ => CannotDecryptSecret)
+      } yield (())
     }.toEither.left.map(_ => SecretFileError).flatten
   }
 
