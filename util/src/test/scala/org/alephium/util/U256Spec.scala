@@ -19,6 +19,7 @@ package org.alephium.util
 import java.math.BigInteger
 
 import akka.util.ByteString
+
 class U256Spec extends AlephiumSpec {
   val numGen = (0 to 3).flatMap { i =>
     val n = BigInteger.valueOf(i.toLong)
@@ -188,7 +189,7 @@ class U256Spec extends AlephiumSpec {
     assertThrows[AssertionError](U256.Zero.subOneUnsafe())
   }
 
-  it should "Convert to int" in {
+  it should "convert to int" in {
     U256.unsafe(0).toInt.get is 0
     U256.unsafe(Int.MaxValue).toInt.get is Int.MaxValue
     U256.unsafe(Int.MaxValue.toLong + 1).toInt is None
@@ -246,5 +247,11 @@ class U256Spec extends AlephiumSpec {
         byte is None
       }
     }
+  }
+
+  it should "convert to Long" in {
+    U256.unsafe(0).toLong.get is 0
+    U256.unsafe(Long.MaxValue).toLong.get is Long.MaxValue
+    U256.unsafe(Long.MaxValue).addUnsafe(U256.One).toLong is None
   }
 }

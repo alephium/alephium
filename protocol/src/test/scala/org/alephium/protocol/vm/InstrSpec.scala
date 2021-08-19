@@ -16,9 +16,12 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.util.{AlephiumSpec, AVector, UnsecureRandom}
+import org.alephium.protocol.Signature
+import org.alephium.protocol.model.ChainId.AlephiumMainNet
+import org.alephium.protocol.model.Target
+import org.alephium.util._
 
-class InstrSpec extends AlephiumSpec {
+class InstrSpec extends AlephiumSpec with NumericHelpers {
   import Instr._
 
   it should "initialize proper bytecodes" in {
@@ -60,6 +63,7 @@ class InstrSpec extends AlephiumSpec {
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       ChainId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+      VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
@@ -79,6 +83,142 @@ class InstrSpec extends AlephiumSpec {
     }
     statefulInstrs.foreach { instr =>
       statefulSerde.deserialize(statefulSerde.serialize(instr)) isE instr
+    }
+  }
+
+  trait StatelessFixture extends ContextGenerators {
+    def prepareFrame(
+        instrs: AVector[Instr[StatelessContext]],
+        blockEnv: Option[BlockEnv] = None,
+        txEnv: Option[TxEnv] = None
+    ): Frame[StatelessContext] = {
+      val baseMethod = Method[StatelessContext](
+        isPublic = true,
+        isPayable = false,
+        argsLength = 0,
+        localsLength = 0,
+        returnLength = 0,
+        instrs
+      )
+      val ctx = genStatelessContext(
+        blockEnv = blockEnv,
+        txEnv = txEnv
+      )
+      val obj = StatelessScript.unsafe(AVector(baseMethod)).toObject
+      Frame
+        .stateless(ctx, obj, obj.getMethod(0).rightValue, Stack.ofCapacity(10), VM.noReturnTo)
+        .rightValue
+    }
+  }
+
+  it should "verify absolute lock time" in new StatelessFixture {
+    def prepare(timeLock: TimeStamp, blockTs: TimeStamp): Frame[StatelessContext] = {
+      val frame = prepareFrame(
+        AVector.empty,
+        blockEnv = Some(
+          BlockEnv(
+            AlephiumMainNet,
+            blockTs,
+            Target.onePhPerBlock
+          )
+        )
+      )
+      frame.pushOpStack(Val.U256(timeLock.millis))
+      frame
+    }
+
+    {
+      info("time lock is still locked")
+      val now   = TimeStamp.now()
+      val frame = prepare(now, now.minusUnsafe(Duration.ofSecondsUnsafe(1)))
+      VerifyAbsoluteLocktime.runWith(frame) is failed(AbsoluteLockTimeVerificationFailed)
+    }
+
+    {
+      info("time lock is unlocked (1)")
+      val now   = TimeStamp.now()
+      val frame = prepare(now, now)
+      VerifyAbsoluteLocktime.runWith(frame) isE ()
+    }
+
+    {
+      info("time lock is unlocked (2)")
+      val now   = TimeStamp.now()
+      val frame = prepare(now, now.plus(Duration.ofSecondsUnsafe(1)).get)
+      VerifyAbsoluteLocktime.runWith(frame) isE ()
+    }
+  }
+
+  it should "verify relative lock time" in new StatelessFixture {
+    def prepare(
+        timeLock: Duration,
+        blockTs: TimeStamp,
+        txLockTime: TimeStamp,
+        txIndex: Int = 0
+    ): Frame[StatelessContext] = {
+      val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
+      val frame = prepareFrame(
+        AVector.empty,
+        blockEnv = Some(
+          BlockEnv(
+            AlephiumMainNet,
+            blockTs,
+            Target.onePhPerBlock
+          )
+        ),
+        txEnv = Some(
+          TxEnv(
+            tx,
+            prevOutputs.map(_.referredOutput.copy(lockTime = txLockTime)),
+            Stack.ofCapacity[Signature](0)
+          )
+        )
+      )
+      frame.pushOpStack(Val.U256(txIndex))
+      frame.pushOpStack(Val.U256(timeLock.millis))
+      frame
+    }
+
+    {
+      info("tx inputs are not from worldstate, and the locktime of the UTXOs is zero")
+      val frame = prepare(
+        timeLock = Duration.ofSecondsUnsafe(1),
+        blockTs = TimeStamp.now(),
+        txLockTime = TimeStamp.zero
+      )
+      VerifyRelativeLocktime.runWith(frame) is failed(RelativeLockTimeExpectPersistedUtxo)
+    }
+
+    {
+      info("the relative lock is still locked")
+      val frame = prepare(
+        timeLock = Duration.ofSecondsUnsafe(1),
+        blockTs = TimeStamp.now(),
+        txLockTime = TimeStamp.now()
+      )
+      VerifyRelativeLocktime.runWith(frame) is failed(RelativeLockTimeVerificationFailed)
+    }
+
+    {
+      info("the relative lock is unlocked (1)")
+      val now = TimeStamp.now()
+      val frame = prepare(
+        timeLock = Duration.ofSecondsUnsafe(1),
+        blockTs = now,
+        txLockTime = now.minusUnsafe(Duration.ofSecondsUnsafe(1))
+      )
+      VerifyRelativeLocktime.runWith(frame) isE ()
+    }
+
+    {
+      info("the relative lock is unlocked (2)")
+      val now = TimeStamp.now()
+      val frame = prepare(
+        timeLock = Duration.ofSecondsUnsafe(1),
+        blockTs = now.plus(Duration.ofSecondsUnsafe(2)).get,
+        txLockTime = now
+      )
+      VerifyRelativeLocktime.runWith(frame) isE ()
     }
   }
 }

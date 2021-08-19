@@ -82,4 +82,15 @@ class TimeStampSpec extends AlephiumSpec {
       }
     }
   }
+
+  it should "plus" in {
+    val t0 = TimeStamp.zero
+    val t1 = TimeStamp.unsafe(1)
+    val d0 = Duration.unsafe(Long.MaxValue - 1)
+    val d1 = Duration.unsafe(Long.MaxValue)
+    t0.plus(d0).get.millis is d0.millis
+    t0.plus(d1).get.millis is d1.millis
+    t1.plus(d0).get.millis is d1.millis
+    t1.plus(d1) is None
+  }
 }

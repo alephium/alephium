@@ -46,6 +46,9 @@ class TimeStamp(val millis: Long) extends AnyVal with Ordered[TimeStamp] {
   def plusHoursUnsafe(hoursToAdd: Long): TimeStamp =
     TimeStamp.unsafe(millis + hoursToAdd * 60 * 60 * 1000)
 
+  def plus(duration: Duration): Option[TimeStamp] =
+    TimeStamp.from(millis + duration.millis)
+
   def +(duration: Duration): TimeStamp =
     TimeStamp.unsafe(millis + duration.millis)
 
