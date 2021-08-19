@@ -18,6 +18,8 @@ package org.alephium.flow.network
 
 import java.net.InetSocketAddress
 
+import scala.util.Random
+
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.Tcp
@@ -209,14 +211,14 @@ class InterCliqueManager(
     val block = message.block
     log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
     if (message.origin.isLocal) {
-      iterBrokers { (peerId, brokerState) =>
+      randomIterBrokers { (peerId, brokerState) =>
         if (brokerState.readyFor(block.chainIndex)) {
           log.debug(s"Send block to broker $peerId")
           brokerState.actor ! BrokerHandler.Send(message.blockMsg)
         }
       }
     } else {
-      iterBrokers { (peerId, brokerState) =>
+      randomIterBrokers { (peerId, brokerState) =>
         if (!message.origin.isFrom(brokerState.info) && brokerState.readyFor(block.chainIndex)) {
           log.debug(s"Send announcement to broker $peerId")
           brokerState.actor ! BrokerHandler.RelayInventory(block.hash)
@@ -329,6 +331,21 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     brokers.collect { case (peerId, state) =>
       f(peerId, state)
     }.toSeq
+  }
+
+  def randomIterBrokers(f: (PeerId, BrokerState) => Unit): Unit = {
+    val buf = brokers.toArray
+    def swap(i1: Int, i2: Int): Unit = {
+      val tmp = buf(i1)
+      buf(i1) = buf(i2)
+      buf(i2) = tmp
+    }
+
+    for (n <- buf.length to 2 by -1) {
+      val k = Random.nextInt(n)
+      swap(n - 1, k)
+    }
+    buf.foreach { case (peerId, state) => f(peerId, state) }
   }
 
   def setSynced(brokerInfo: BrokerInfo): Unit = {
