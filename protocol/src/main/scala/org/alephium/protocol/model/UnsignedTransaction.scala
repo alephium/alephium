@@ -23,7 +23,7 @@ import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-/** Upto one new token might be issued in each transaction exception for the coinbase transaction
+/** Up to one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
   *
   * @param chainId the id of the chain which can accept the tx
@@ -133,11 +133,11 @@ object UnsignedTransaction {
     )
   }
 
-  def transferAlf(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
+  def build(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      outputInfos: AVector[(LockupScript.Asset, U256, Option[TimeStamp])],
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputs: AVector[TxOutputInfo],
       gas: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
@@ -145,17 +145,21 @@ object UnsignedTransaction {
     assume(gasPrice.value <= ALF.MaxALFValue)
     val gasFee = gasPrice * gas
     for {
-      inputSum     <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight s"Input amount overflow")
-      outputAmount <- outputInfos.foldE(U256.Zero)(_ add _._2 toRight s"Output amount overflow")
-      remainder0   <- inputSum.sub(outputAmount).toRight(s"Not enough balance")
-      remainder    <- remainder0.sub(gasFee).toRight(s"Not enough balance for gas fee")
+      _               <- checkWithMaxTxInputNum(inputs)
+      _               <- checkMinimalAlfPerOutput(outputs)
+      alfRemainder    <- calculateAlfRemainder(inputs, outputs, gasFee)
+      tokensRemainder <- calculateTokensRemainder(inputs, outputs)
+      changeOutputOpt <- calculateChangeOutput(alfRemainder, tokensRemainder, fromLockupScript)
     } yield {
-      var outputs = outputInfos.map { case (toLockupScript, amount, lockTimeOpt) =>
-        TxOutput.asset(amount, toLockupScript, lockTimeOpt)
+      var txOutputs = outputs.map {
+        case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
+          TxOutput.asset(amount, toLockupScript, tokens, lockTimeOpt)
       }
-      if (remainder > U256.Zero) {
-        outputs = outputs :+ TxOutput.asset(remainder, fromLockupScript)
+
+      changeOutputOpt.foreach { changeOutput =>
+        txOutputs = txOutputs :+ changeOutput
       }
+
       UnsignedTransaction(
         networkConfig.chainId,
         scriptOpt = None,
@@ -164,8 +168,122 @@ object UnsignedTransaction {
         inputs.map { case (ref, _) =>
           TxInput(ref, fromUnlockScript)
         },
-        outputs
+        txOutputs
       )
     }
   }
+
+  def checkWithMaxTxInputNum(
+      assets: AVector[(AssetOutputRef, AssetOutput)]
+  ): Either[String, Unit] = {
+    if (assets.length > ALF.MaxTxInputNum) {
+      Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
+    } else {
+      Right(())
+    }
+  }
+
+  def calculateAlfRemainder(
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputs: AVector[TxOutputInfo],
+      gasFee: U256
+  ): Either[String, U256] = {
+    for {
+      inputSum     <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
+      outputAmount <- outputs.foldE(U256.Zero)(_ add _.alfAmount toRight "Output amount overflow")
+      remainder0   <- inputSum.sub(outputAmount).toRight("Not enough balance")
+      remainder    <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
+    } yield remainder
+  }
+
+  def calculateTokensRemainder(
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputs: AVector[TxOutputInfo]
+  ): Either[String, AVector[(TokenId, U256)]] = {
+    for {
+      inputs    <- calculateTotalAmountPerToken(inputs.flatMap(_._2.tokens))
+      outputs   <- calculateTotalAmountPerToken(outputs.flatMap(_.tokens))
+      _         <- checkNoNewTokensInOutputs(inputs, outputs)
+      remainder <- calculateRemainingTokens(inputs, outputs)
+    } yield {
+      remainder.filterNot(_._2 == U256.Zero)
+    }
+  }
+
+  def calculateChangeOutput(
+      alfRemainder: U256,
+      tokensRemainder: AVector[(TokenId, U256)],
+      fromLockupScript: LockupScript.Asset
+  ): Either[String, Option[AssetOutput]] = {
+    if (alfRemainder == U256.Zero && tokensRemainder.isEmpty) {
+      Right(None)
+    } else {
+      if (alfRemainder > minimalAlfAmountPerTxOutput(tokensRemainder.length)) {
+        Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
+      } else {
+        Left("Not enough Alf for change output")
+      }
+    }
+  }
+
+  private def checkMinimalAlfPerOutput(
+      outputs: AVector[TxOutputInfo]
+  ): Either[String, Unit] = {
+    val notOk = outputs.exists { output =>
+      output.alfAmount < minimalAlfAmountPerTxOutput(output.tokens.length)
+    }
+
+    if (notOk) {
+      Left("Not enough Alf for transaction output")
+    } else {
+      Right(())
+    }
+  }
+
+  def calculateTotalAmountPerToken(
+      tokens: AVector[(TokenId, U256)]
+  ): Either[String, AVector[(TokenId, U256)]] = {
+    tokens.foldE(AVector.empty[(TokenId, U256)]) { case (acc, (id, amount)) =>
+      val index = acc.indexWhere(_._1 == id)
+      if (index == -1) {
+        Right(acc :+ (id -> amount))
+      } else {
+        acc(index)._2.add(amount).toRight(s"Amount overflow for token $id").map { amt =>
+          acc.replace(index, (id, amt))
+        }
+      }
+    }
+  }
+
+  private def checkNoNewTokensInOutputs(
+      inputs: AVector[(TokenId, U256)],
+      outputs: AVector[(TokenId, U256)]
+  ): Either[String, Unit] = {
+    val newTokens = outputs.map(_._1).toSet -- inputs.map(_._1).toSet
+    if (newTokens.nonEmpty) {
+      Left(s"New tokens found in outputs: $newTokens")
+    } else {
+      Right(())
+    }
+  }
+
+  private def calculateRemainingTokens(
+      inputTokens: AVector[(TokenId, U256)],
+      outputTokens: AVector[(TokenId, U256)]
+  ): Either[String, AVector[(TokenId, U256)]] = {
+    inputTokens.foldE(AVector.empty[(TokenId, U256)]) { case (acc, (inputId, inputAmount)) =>
+      val outputAmount = outputTokens.find(_._1 == inputId).fold(U256.Zero)(_._2)
+      inputAmount.sub(outputAmount).toRight(s"Not enough balance for token $inputId").map {
+        remainder =>
+          acc :+ (inputId -> remainder)
+      }
+    }
+  }
+
+  final case class TxOutputInfo(
+      lockupScript: LockupScript.Asset,
+      alfAmount: U256,
+      tokens: AVector[(TokenId, U256)],
+      lockTime: Option[TimeStamp]
+  )
 }

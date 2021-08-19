@@ -30,6 +30,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -66,6 +67,16 @@ class ServerUtils(implicit
         .flatMap(failed)
     } yield balance
 
+  def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address.Asset): Try[AVector[UTXO]] =
+    for {
+      _ <- checkGroup(address.lockupScript)
+      utxos <- blockFlow
+        .getUTXOsIncludePool(address.lockupScript)
+        .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
+        .left
+        .flatMap(failed)
+    } yield utxos
+
   def getGroup(query: GetGroup): Try[Group] = {
     Right(Group(query.address.groupIndex(brokerConfig).value))
   }
@@ -91,6 +102,7 @@ class ServerUtils(implicit
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         query.fromPublicKey,
+        query.utxos,
         query.destinations,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
@@ -253,15 +265,43 @@ class ServerUtils(implicit
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
+      outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = destinations.map { destination =>
-      (destination.address.lockupScript, destination.amount, destination.lockTime)
+      val tokensInfo = destination.tokens match {
+        case Some(tokens) =>
+          tokens.map { token =>
+            (token.id -> token.amount)
+          }
+        case None =>
+          AVector.empty[(TokenId, U256)]
+      }
+
+      TxOutputInfo(
+        destination.address.lockupScript,
+        destination.amount,
+        tokensInfo,
+        destination.lockTime
+      )
     }
 
-    blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice) match {
+    val transferResult = outputRefsOpt match {
+      case Some(outputRefs) =>
+        val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
+        if (allAssetType) {
+          val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
+          blockFlow.transfer(fromPublicKey, assetOutputRefs, outputInfos, gasOpt, gasPrice)
+        } else {
+          Right(Left("Selected UTXOs must be of asset type"))
+        }
+      case None =>
+        blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice)
+    }
+
+    transferResult match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)

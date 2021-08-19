@@ -45,6 +45,10 @@ package object model {
   val maximalGas: GasBox        = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
 
   val dustUtxoAmount: U256 = ALF.nanoAlf(1000)
+
+  def minimalAlfAmountPerTxOutput(tokenNum: Int): U256 = {
+    ALF.nanoAlf(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
+  }
   //scalastyle:on magic.number
 
   type TokenId    = Hash

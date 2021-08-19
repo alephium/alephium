@@ -123,6 +123,7 @@ object BlockFlowClient {
             BuildTransaction(
               publicKey,
               destinations,
+              None,
               gas,
               gasPrice
             )

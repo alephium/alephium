@@ -31,6 +31,7 @@ import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValida
 import org.alephium.protocol._
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.util._
 
@@ -149,7 +150,7 @@ trait FlowFixture
       val (toPrivateKey, toPublicKey)      = chainIndex.to.generateKey
       val lockupScript: LockupScript.Asset = LockupScript.p2pkh(toPublicKey)
       keyManager += lockupScript -> toPrivateKey
-      (lockupScript, outputAmount, lockTimeOpt)
+      TxOutputInfo(lockupScript, outputAmount, AVector.empty, lockTimeOpt)
     }
     val unsignedTx =
       blockFlow.transfer(publicKey, outputInfos, None, defaultGasPrice).rightValue.rightValue

@@ -16,16 +16,24 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{AssetOutputRef, Hint, TxOutputRef}
+import akka.util.ByteString
 
-final case class OutputRef(hint: Int, key: Hash) {
-  def unsafeToAssetOutputRef(): AssetOutputRef = {
-    AssetOutputRef.unsafe(Hint.unsafe(hint), key)
+import org.alephium.api.model.Token
+import org.alephium.protocol.model.{AssetOutput, AssetOutputRef}
+import org.alephium.util.{AVector, TimeStamp, U256}
+
+final case class UTXO(
+    ref: OutputRef,
+    amount: U256,
+    tokens: AVector[Token],
+    lockTime: TimeStamp,
+    additionalData: ByteString
+)
+
+object UTXO {
+  def from(ref: AssetOutputRef, output: AssetOutput): UTXO = {
+    import output._
+
+    UTXO(OutputRef.from(ref), amount, tokens.map((Token.apply).tupled), lockTime, additionalData)
   }
-}
-
-object OutputRef {
-  def from(outputRef: TxOutputRef): OutputRef =
-    OutputRef(outputRef.hint.value, outputRef.key)
 }

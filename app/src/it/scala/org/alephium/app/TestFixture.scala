@@ -423,7 +423,8 @@ trait TestFixtureLike
         |  "destinations": [
         |    {
         |      "address": "$toAddress",
-        |      "amount": "$amount"
+        |      "amount": "$amount",
+        |      "tokens": []
         |    }
         |  ]
         |}
@@ -439,7 +440,7 @@ trait TestFixtureLike
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
-      Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}"}]}""")
+      Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}","tokens":[]}]}""")
     )
   }
   def submitTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {

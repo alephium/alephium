@@ -19,7 +19,7 @@ package org.alephium.wallet.api
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.ErrorExamples
-import org.alephium.api.model.Destination
+import org.alephium.api.model.{Destination, Token}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
@@ -47,6 +47,11 @@ trait WalletExamples extends ErrorExamples {
   private val mnemonicPassphrase = "optional-mnemonic-passphrase"
   private val fromGroup          = 2
   private val toGroup            = 1
+  // scalastyle:off magic.number
+  private val tokens = AVector(
+    Token(Hash.hash("token1"), U256.unsafe(42)),
+    Token(Hash.hash("token2"), U256.unsafe(1000))
+  )
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
@@ -104,7 +109,7 @@ trait WalletExamples extends ErrorExamples {
     simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
 
   implicit val transferExamples: List[Example[Transfer]] =
-    simpleExample(Transfer(AVector(Destination(address, U256.Million))))
+    simpleExample(Transfer(AVector(Destination(address, U256.Million, Some(tokens)))))
 
   implicit val sweepAllExamples: List[Example[SweepAll]] =
     simpleExample(SweepAll(address))
