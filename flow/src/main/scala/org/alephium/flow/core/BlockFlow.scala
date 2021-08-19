@@ -28,7 +28,7 @@ import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, Env, TimeStamp}
 
 trait BlockFlow
     extends MultiChain
@@ -131,7 +131,7 @@ object BlockFlow extends StrictLogging {
       consensusSetting: ConsensusSetting,
       memPoolSetting: MemPoolSetting
   ): BlockFlow = {
-    logger.info(s"Initialize storage for BlockFlow")
+    Env.forProd(logger.info(s"Initialize storage for BlockFlow"))
     new BlockFlowImpl(
       genesisBlocks,
       BlockChainWithState.fromGenesisUnsafe(storages),
@@ -162,7 +162,7 @@ object BlockFlow extends StrictLogging {
       BlockHeaderChain.fromStorageUnsafe(storages)
     )
     blockflow.sanityCheckUnsafe()
-    logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers")
+    Env.forProd(logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers"))
     blockflow.updateBestDepsAfterLoadingUnsafe()
     blockflow
   }

@@ -66,7 +66,7 @@ object Configs extends StrictLogging {
 
   def getConfigFile(rootPath: Path, name: String): File = {
     val path = rootPath.resolve(s"$name.conf")
-    logger.info(s"Using $name configuration file at $path \n")
+    Env.forProd(logger.info(s"Using $name configuration file at $path \n"))
 
     path.toFile
   }
