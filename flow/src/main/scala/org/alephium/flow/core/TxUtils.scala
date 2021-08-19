@@ -174,7 +174,7 @@ trait TxUtils { Self: FlowUtils =>
       val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
       val checkResult = for {
-        _ <- checkUTXORefs(utxoRefs)
+        _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkTotalAmount(outputInfos)
         _ <- checkOutputInfos(outputInfos)
         _ <- checkWithMinimalGas(gasOpt, minimalGas)
@@ -369,16 +369,16 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def checkUTXORefs(
+  private def checkUTXOsInSameGroup(
       utxoRefs: AVector[AssetOutputRef]
   ): Either[String, Unit] = {
     val groupIndexes = utxoRefs.map(_.hint.groupIndex)
 
-    if (groupIndexes.forall(_ == groupIndexes.head)) {
-      Right(())
-    } else {
-      Left("Selected UTXOs are not from the same group")
-    }
+    Either.cond(
+      groupIndexes.forall(_ == groupIndexes.head),
+      (),
+      "Selected UTXOs are not from the same group"
+    )
   }
 
   private def selectUTXOs(

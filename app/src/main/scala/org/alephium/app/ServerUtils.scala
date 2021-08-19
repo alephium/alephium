@@ -290,8 +290,13 @@ class ServerUtils(implicit
 
     val transferResult = outputRefsOpt match {
       case Some(outputRefs) =>
-        val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
-        blockFlow.transfer(fromPublicKey, assetOutputRefs, outputInfos, gasOpt, gasPrice)
+        val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
+        if (allAssetType) {
+          val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
+          blockFlow.transfer(fromPublicKey, assetOutputRefs, outputInfos, gasOpt, gasPrice)
+        } else {
+          Right(Left("Selected UTXOs must be of asset type"))
+        }
       case None =>
         blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice)
     }

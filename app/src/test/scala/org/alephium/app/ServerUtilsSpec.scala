@@ -484,6 +484,24 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Invalid gas GasBox(100), minimal GasBox(100000)"
   }
 
+  it should "not create transaction when not all utxos are of asset type" in new MultipleUtxos {
+    val outputRefs = utxos.map { utxo =>
+      OutputRef(utxo.ref.hint & 10, utxo.ref.key)
+    }
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        defaultGasPrice
+      )
+      .leftValue
+      .detail is "Selected UTXOs must be of asset type"
+  }
+
   "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixture {
     val serverUtils = new ServerUtils
 

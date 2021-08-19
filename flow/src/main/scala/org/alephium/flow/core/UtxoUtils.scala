@@ -263,7 +263,8 @@ object UtxoUtils {
   ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
-      val gas    = estimateGas(gasPerInput, gasPerOutput, sizeOfSelectedUTXOs + index, numOutputs, minimalGas)
+      val gas =
+        estimateGas(gasPerInput, gasPerOutput, sizeOfSelectedUTXOs + index, numOutputs, minimalGas)
       val gasFee = gasPrice * gas
       if (validate(sum, totalAlfAmount.addUnsafe(gasFee), dustUtxoAmount)) {
         (sum, index)
