@@ -833,7 +833,7 @@ sealed trait GenericVerifySignature[PubKey, Sig]
       publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey))
       rawData      <- frame.popOpStackT[Val.ByteVec]()
       _            <- if (rawData.bytes.length == 32) okay else failed(SignedDataIsNot32Bytes)
-      _            <- frame.pushOpStack(Val.Bool(verify(rawData.bytes, signature, publicKey)))
+      _            <- if (verify(rawData.bytes, signature, publicKey)) okay else failed(InvalidSignature)
     } yield ()
   }
 }

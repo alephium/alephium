@@ -772,18 +772,18 @@ class VMSpec extends AlephiumSpec {
     val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
     val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
-    val main =
+    def main(p256Sig: String, ed25519Sig: String) =
       s"""
          |TxScript Main {
          |  pub fn main() -> () {
-         |    assert!(verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig) == true)
-         |    assert!(verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #${SecP256K1Signature.zero.toHexString}) == false)
-         |    assert!(verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig) == true)
-         |    assert!(verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #${ED25519Signature.zero.toHexString}) == false)
+         |    verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
+         |    verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
          |  }
          |}
          |""".stripMargin
-    testSimpleScript(main)
+    testSimpleScript(main(p256Sig, ed25519Sig))
+    failSimpleScript(main(SecP256K1Signature.zero.toHexString, ed25519Sig), InvalidSignature)
+    failSimpleScript(main(p256Sig, ED25519Signature.zero.toHexString), InvalidSignature)
   }
 
   it should "test locktime built-ins" in new ContractFixture {
