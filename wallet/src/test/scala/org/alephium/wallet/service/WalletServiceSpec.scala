@@ -94,7 +94,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     walletService.getAddresses(walletName).leftValue is WalletService.WalletLocked
 
-    walletService.unlockWallet(walletName, password).isRight is true
+    walletService.unlockWallet(walletName, password, None).isRight is true
 
     walletService.getAddresses(walletName).isRight is true
   }
@@ -109,7 +109,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
         LockupScript.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
       )
 
-    walletService.unlockWallet(walletName, "").leftValue is notFound
+    walletService.unlockWallet(walletName, "", None).leftValue is notFound
     walletService.getBalances(walletName).futureValue.leftValue is notFound
     walletService.getAddresses(walletName).leftValue is notFound
     walletService.getMinerAddresses(walletName).leftValue is notFound
@@ -157,6 +157,18 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService
       .listWallets()
       .map(_.toSet) isE AVector.empty[(String, Boolean)].toSet
+  }
+
+  it should "get back mnemonic" in new Fixure {
+    val (walletName, mnemonic) =
+      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
+
+    walletService
+      .revealMnemonic(walletName, password) isE mnemonic
+
+    walletService
+      .revealMnemonic(walletName, "wrongPassword")
+      .leftValue is WalletService.InvalidPassword
   }
 
   trait Fixure extends WalletConfigFixture {

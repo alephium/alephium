@@ -76,7 +76,10 @@ trait WalletEndpointsLogic extends WalletEndpoints {
   }
   val unlockWalletLogic = serverLogic(unlockWallet) { case (wallet, walletUnlock) =>
     Future.successful(
-      walletService.unlockWallet(wallet, walletUnlock.password).left.map(toApiError)
+      walletService
+        .unlockWallet(wallet, walletUnlock.password, walletUnlock.mnemonicPassphrase)
+        .left
+        .map(toApiError)
     )
   }
   val deleteWalletLogic = serverLogic(deleteWallet) { case (wallet, walletDeletion) =>
@@ -126,6 +129,17 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         .map(toApiError)
     )
   }
+
+  val revealMnemonicLogic = serverLogic(revealMnemonic) { case (wallet, revealMnemonicParam) =>
+    Future.successful(
+      walletService
+        .revealMnemonic(wallet, revealMnemonicParam.password)
+        .map(model.RevealMnemonic.Result.apply)
+        .left
+        .map(toApiError)
+    )
+  }
+
   val transferLogic = serverLogic(transfer) { case (wallet, tr) =>
     walletService
       .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice)

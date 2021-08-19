@@ -26,7 +26,6 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-import akka.util.ByteString
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
@@ -62,7 +61,11 @@ trait WalletService extends Service {
   ): Either[WalletError, String]
 
   def lockWallet(wallet: String): Either[WalletError, Unit]
-  def unlockWallet(wallet: String, password: String): Either[WalletError, Unit]
+  def unlockWallet(
+      wallet: String,
+      password: String,
+      mnemonicPassphrase: Option[String]
+  ): Either[WalletError, Unit]
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address.Asset, U256)]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
@@ -87,6 +90,7 @@ trait WalletService extends Service {
   def changeActiveAddress(wallet: String, address: Address.Asset): Either[WalletError, Unit]
   def listWallets(): Either[WalletError, AVector[(String, Boolean)]]
   def getWallet(wallet: String): Either[WalletError, (String, Boolean)]
+  def revealMnemonic(wallet: String, password: String): Either[WalletError, Mnemonic]
 }
 
 object WalletService {
@@ -219,15 +223,15 @@ object WalletService {
 
     private def createOrRestoreWallet(
         password: String,
-        seed: ByteString,
         mnemonic: Mnemonic,
+        mnemonicPassphrase: Option[String],
         isMiner: Boolean,
         walletName: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
       for {
         file <- buildWalletFile(walletName)
         storage <- SecretStorage
-          .create(seed, password, isMiner, file, path)
+          .create(mnemonic, mnemonicPassphrase, password, isMiner, file, path)
           .left
           .map(_ => CannotCreateEncryptedFile(secretDir))
         _ <- if (isMiner) computeNextMinerAddresses(storage) else Right(())
@@ -246,9 +250,8 @@ object WalletService {
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
       val mnemonic = Mnemonic.generate(mnemonicSize)
-      val seed     = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
 
-      createOrRestoreWallet(password, seed, mnemonic, isMiner, walletName)
+      createOrRestoreWallet(password, mnemonic, mnemonicPassphrase, isMiner, walletName)
     }
 
     override def restoreWallet(
@@ -258,9 +261,9 @@ object WalletService {
         walletName: Option[String],
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, String] = {
-      val seed = mnemonic.toSeed(mnemonicPassphrase.getOrElse(""))
-      createOrRestoreWallet(password, seed, mnemonic, isMiner, walletName).map { case (name, _) =>
-        name
+      createOrRestoreWallet(password, mnemonic, mnemonicPassphrase, isMiner, walletName).map {
+        case (name, _) =>
+          name
       }
     }
 
@@ -268,9 +271,13 @@ object WalletService {
       Right(secretStorages.get(wallet).foreach(_.lock()))
     }
 
-    override def unlockWallet(wallet: String, password: String): Either[WalletError, Unit] =
+    override def unlockWallet(
+        wallet: String,
+        password: String,
+        mnemonicPassphrase: Option[String]
+    ): Either[WalletError, Unit] =
       withWalletM(wallet) { secretStorage =>
-        secretStorage.unlock(password).left.map(WalletError.from)
+        secretStorage.unlock(password, mnemonicPassphrase).left.map(WalletError.from)
       }(Left.apply)
 
     override def deleteWallet(wallet: String, password: String): Either[WalletError, Unit] =
@@ -415,6 +422,15 @@ object WalletService {
     override def getWallet(wallet: String): Either[WalletError, (String, Boolean)] = {
       withWallet(wallet) { secretStorage =>
         Right((wallet, secretStorage.isLocked()))
+      }
+    }
+
+    override def revealMnemonic(wallet: String, password: String): Either[WalletError, Mnemonic] = {
+      withWallet(wallet) { secretStorage =>
+        secretStorage
+          .revealMnemonic(password)
+          .left
+          .map(WalletError.from)
       }
     }
 

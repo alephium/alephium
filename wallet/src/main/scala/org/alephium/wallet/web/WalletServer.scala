@@ -66,6 +66,7 @@ class WalletServer(
     deriveNextAddressLogic,
     deriveNextMinerAddressesLogic,
     changeActiveAddressLogic,
+    revealMnemonicLogic,
     listWalletsLogic,
     getWalletLogic
   ).map(route(_))

@@ -667,8 +667,20 @@
               "schema": {
                 "$ref": "#/components/schemas/WalletUnlock"
               },
-              "example": {
-                "password": "my-secret-password"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "password": "my-secret-password"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonicPassphrase": "optional-mnemonic-passphrase"
+                  }
+                }
               }
             }
           },
@@ -852,6 +864,118 @@
         }
       }
     },
+    "/wallets/{wallet_name}/mnemonic": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Show your mnemonic",
+        "operationId": "postWalletsWallet_nameMnemonic",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevealMnemonic"
+              },
+              "example": {
+                "password": "my-secret-password"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result2"
+                },
+                "example": {
+                  "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets/{wallet_name}/transfer": {
       "post": {
         "tags": [
@@ -902,7 +1026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result2"
+                  "$ref": "#/components/schemas/Result3"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -1016,7 +1140,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result2"
+                  "$ref": "#/components/schemas/Result3"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -1330,7 +1454,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result3"
+                  "$ref": "#/components/schemas/Result4"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
@@ -5370,6 +5494,17 @@
       },
       "Result2": {
         "required": [
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "mnemonic": {
+            "type": "string"
+          }
+        }
+      },
+      "Result3": {
+        "required": [
           "txId",
           "fromGroup",
           "toGroup"
@@ -5387,7 +5522,7 @@
           }
         }
       },
-      "Result3": {
+      "Result4": {
         "required": [
           "address"
         ],
@@ -5395,6 +5530,17 @@
         "properties": {
           "address": {
             "$ref": "#/components/schemas/Asset"
+          }
+        }
+      },
+      "RevealMnemonic": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
           }
         }
       },
@@ -5739,6 +5885,9 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          },
+          "mnemonicPassphrase": {
             "type": "string"
           }
         }

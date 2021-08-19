@@ -33,15 +33,20 @@ trait EndpointSender extends BaseEndpoint with SttpClientInterpreter {
 
   val maybeApiKey: Option[ApiKey]
 
-  def createRequest[I,O](endpoint:BaseEndpoint[I,O], params:I, uri:Uri):Request[Either[ApiError[_ <: StatusCode],O],Any]  = {
-    toRequestThrowDecodeFailures(endpoint.endpoint, Some(uri)).apply((maybeApiKey,params))
+  def createRequest[I, O](
+      endpoint: BaseEndpoint[I, O],
+      params: I,
+      uri: Uri
+  ): Request[Either[ApiError[_ <: StatusCode], O], Any] = {
+    toRequestThrowDecodeFailures(endpoint.endpoint, Some(uri)).apply((maybeApiKey, params))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-       def send[A,B](endpoint:BaseEndpoint[A,B], params:A,uri:Uri)(implicit executionContext:ExecutionContext):Future[Either[ApiError[_ <: StatusCode],B]] = {
-            backend
-              .send(createRequest(endpoint,params,uri))
-              .map(_.body)
-       }
+  def send[A, B](endpoint: BaseEndpoint[A, B], params: A, uri: Uri)(implicit
+      executionContext: ExecutionContext
+  ): Future[Either[ApiError[_ <: StatusCode], B]] = {
+    backend
+      .send(createRequest(endpoint, params, uri))
+      .map(_.body)
+  }
 }
-

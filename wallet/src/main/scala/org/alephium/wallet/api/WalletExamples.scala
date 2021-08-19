@@ -56,21 +56,15 @@ trait WalletExamples extends ErrorExamples {
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
-    Example(
-      WalletCreation(password, None, None, None, None),
-      name = None,
-      summary = Some("Default")
-    ),
-    Example(
+    defaultExample(WalletCreation(password, None, None, None, None)),
+    moreSettingsExample(
       WalletCreation(
         password,
         Some(walletName),
         Some(true),
         Some(mnemonicPassphrase),
         Some(Mnemonic.Size.list.head)
-      ),
-      name = None,
-      summary = Some("More settings")
+      )
     )
   )
   implicit val walletCreationResultExamples: List[Example[WalletCreation.Result]] =
@@ -78,15 +72,11 @@ trait WalletExamples extends ErrorExamples {
 
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
     List(
-      Example(
-        WalletRestore(password, mnemonic, None, None, None),
-        name = None,
-        summary = Some("Default")
+      defaultExample(
+        WalletRestore(password, mnemonic, None, None, None)
       ),
-      Example(
-        WalletRestore(password, mnemonic, Some(true), Some(walletName), Some(mnemonicPassphrase)),
-        name = None,
-        summary = Some("More settings")
+      moreSettingsExample(
+        WalletRestore(password, mnemonic, Some(true), Some(walletName), Some(mnemonicPassphrase))
       )
     )
 
@@ -100,13 +90,22 @@ trait WalletExamples extends ErrorExamples {
     simpleExample(AVector(WalletStatus(walletName, locked = true)))
 
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
-    simpleExample(WalletUnlock(password))
+    List(
+      defaultExample(WalletUnlock(password, None)),
+      moreSettingsExample(WalletUnlock(password, Some(mnemonicPassphrase)))
+    )
 
   implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
     simpleExample(WalletDeletion(password))
 
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
+
+  implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =
+    simpleExample(RevealMnemonic(password))
+
+  implicit val revealMnemonicResultExamples: List[Example[RevealMnemonic.Result]] =
+    simpleExample(RevealMnemonic.Result(mnemonic))
 
   implicit val transferExamples: List[Example[Transfer]] =
     simpleExample(Transfer(AVector(Destination(address, U256.Million, Some(tokens)))))
