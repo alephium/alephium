@@ -21,7 +21,7 @@ import sttp.tapir.server.vertx.VertxFutureServerOptions
 import org.alephium.api.DecodeFailureHandler
 
 object ServerOptions extends DecodeFailureHandler {
-   val serverOptions: VertxFutureServerOptions=
+  val serverOptions: VertxFutureServerOptions =
     VertxFutureServerOptions.customInterceptors(
       decodeFailureHandler = myDecodeFailureHandler
     )

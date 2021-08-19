@@ -34,7 +34,7 @@ object WalletGen extends App {
     val mnemonic = Mnemonic.generate(24).get
     // scalastyle:on magic.number
 
-    val seed        = mnemonic.toSeed("")
+    val seed        = mnemonic.toSeed(None)
     val extendedKey = BIP32.btcMasterKey(seed).derive(Constants.path(chainId)).get
     val priKey      = extendedKey.privateKey
     val pubKey      = extendedKey.publicKey

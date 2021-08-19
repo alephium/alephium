@@ -71,6 +71,28 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getTimestamp(genesis.hash) isE ALF.GenesisTimestamp
   }
 
+  it should "validate block height" in new Fixture {
+    val chain              = buildBlockChain()
+    val maxForkDepth       = 5
+    val deepForkedBlock    = chainGenOf(1, genesis).sample.get.head
+    val mainChainPart1     = chainGenOf(4, genesis).sample.get
+    val validBlock         = chainGenOf(1, mainChainPart1.last).sample.get.head
+    val blockWithoutParent = chainGenOf(1, validBlock).sample.get.head
+    val mainChainPart2     = chainGenOf(4, mainChainPart1.last).sample.get
+
+    addBlocks(chain, mainChainPart1)
+    chain.maxHeightUnsafe is 4
+    chain.validateBlockHeight(deepForkedBlock, maxForkDepth) isE true
+    addBlocks(chain, mainChainPart2)
+    chain.maxHeightUnsafe is 8
+    chain.validateBlockHeight(deepForkedBlock, maxForkDepth) isE false
+    chain.validateBlockHeight(validBlock, maxForkDepth) isE true
+    chain.contains(validBlock) isE false
+    chain
+      .validateBlockHeight(blockWithoutParent, maxForkDepth)
+      .leftValue is a[IOError.KeyNotFound[BlockHash]]
+  }
+
   it should "add block correctly" in new Fixture {
     val block = blockGen0.sample.get
     val chain = buildBlockChain()

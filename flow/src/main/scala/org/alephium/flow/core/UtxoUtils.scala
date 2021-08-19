@@ -18,23 +18,40 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
-import org.alephium.protocol.model.{defaultGasPerInput, defaultGasPerOutput, minimalGas}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util._
 
 /*
- * We sort the utxos based on the amount and type
- *   - the utxos with smaller amounts are selected first
- *   - the utxos with higher persisted level are selected first (confirmed utxos are of high priority)
+ * We sort the Utxos based on the amount and type
+ *   - the Utxos with higher persisted level are selected first (confirmed Utxos are of high priority)
+ *   - the Utxos with smaller amounts are selected first
+ *   - the above logic applies to both ALF and tokens.
  */
 // scalastyle:off parameter.number
 object UtxoUtils {
-  implicit val assetOrder: Ordering[Asset] = (x: Asset, y: Asset) => {
+  val assetOrderByAlf: Ordering[Asset] = (x: Asset, y: Asset) => {
     val compare1 = x.outputType.cachedLevel.compareTo(y.outputType.cachedLevel)
     if (compare1 != 0) {
       compare1
     } else {
       x.output.amount.compareTo(y.output.amount)
+    }
+  }
+
+  def assetOrderByToken(id: TokenId): Ordering[Asset] = (x: Asset, y: Asset) => {
+    val compare1 = x.outputType.cachedLevel.compareTo(y.outputType.cachedLevel)
+
+    (x.output.tokens.find(_._1 == id), y.output.tokens.find(_._1 == id)) match {
+      case (Some((_, amountX)), Some((_, amountY))) =>
+        if (compare1 != 0) {
+          compare1
+        } else {
+          amountX.compareTo(amountY)
+        }
+      case (Some(_), None) => -1
+      case (None, Some(_)) => 1
+      case (None, None)    => assetOrderByAlf.compare(x, y)
     }
   }
 
@@ -44,7 +61,8 @@ object UtxoUtils {
   // to select a list of utxos of value (amount + gas fees for inputs and outputs)
   def select(
       utxos: AVector[Asset],
-      amount: U256,
+      totalAlfAmount: U256,
+      totalAmountPerToken: AVector[(TokenId, U256)],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       gasPerInput: GasBox,
@@ -53,18 +71,20 @@ object UtxoUtils {
       numOutputs: Int,
       minimalGas: GasBox
   ): Either[String, Selected] = {
-    val sortedUtxos = utxos.sorted
+    val sortedUtxosByAlf = utxos.sorted(assetOrderByAlf)
 
     gasOpt match {
       case Some(gas) =>
-        findUtxosWithoutGas(sortedUtxos, amount.addUnsafe(gasPrice * gas), dustUtxoAmount).map {
-          case (_, index) =>
-            Selected(sortedUtxos.take(index + 1), gas)
-        }
+        val amountWithGas = totalAlfAmount.addUnsafe(gasPrice * gas)
+        findUtxosWithoutGas(sortedUtxosByAlf, amountWithGas, totalAmountPerToken, dustUtxoAmount)
+          .map { case (_, selected, _) =>
+            Selected(selected, gas)
+          }
       case None =>
         select(
-          sortedUtxos,
-          amount,
+          sortedUtxosByAlf,
+          totalAlfAmount,
+          totalAmountPerToken,
           gasPrice,
           gasPerInput,
           gasPerOutput,
@@ -75,9 +95,57 @@ object UtxoUtils {
     }
   }
 
-  def select(
+  def validate(sum: U256, amount: U256, dustAmount: U256): Boolean = {
+    (sum == amount) || (sum >= amount.addUnsafe(dustAmount))
+  }
+
+  def findUtxosWithoutGas(
       sortedUtxos: AVector[Asset],
-      amount: U256,
+      alfAmount: U256,
+      totalAmountPerToken: AVector[(TokenId, U256)],
+      dustUtxoAmount: U256
+  ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
+    for {
+      alfFoundResult <- findUtxosWithoutGas(sortedUtxos, alfAmount, dustUtxoAmount)(asset =>
+        Some(asset.output.amount)
+      )
+      (alfAmountWithoutGas, utxosForAlf, remainingUtxos) = alfFoundResult
+      tokensFoundResult <- findUtxosForTokens(utxosForAlf, remainingUtxos, totalAmountPerToken)
+    } yield {
+      val (foundUtxos, restOfUtxos, _) = tokensFoundResult
+      val alfAmountWithoutGas          = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
+      (alfAmountWithoutGas, foundUtxos, restOfUtxos)
+    }
+  }
+
+  // TODO: optimize this method
+  def calculateRemainingTokensAmount(
+      utxos: AVector[Asset],
+      tokenId: TokenId,
+      amount: U256
+  ): Either[String, U256] = {
+    val currentTotalAmountPerTokenE = UnsignedTransaction.calculateTotalAmountPerToken(
+      utxos.flatMap(_.output.tokens)
+    )
+    currentTotalAmountPerTokenE.map { currentTotalAmountPerToken =>
+      currentTotalAmountPerToken.find(_._1 == tokenId) match {
+        case Some((_, amt)) =>
+          amount.sub(amt).getOrElse(U256.Zero)
+
+        case None =>
+          amount
+      }
+    }
+  }
+
+  def estimateGas(numInputs: Int, numOutputs: Int): GasBox = {
+    estimateGas(defaultGasPerInput, defaultGasPerOutput, numInputs, numOutputs, minimalGas)
+  }
+
+  private def select(
+      sortedUtxos: AVector[Asset],
+      totalAlfAmount: U256,
+      totalAmountPerToken: AVector[(TokenId, U256)],
       gasPrice: GasPrice,
       gasPerInput: GasBox,
       gasPerOutput: GasBox,
@@ -86,12 +154,18 @@ object UtxoUtils {
       minimalGas: GasBox
   ): Either[String, Selected] = {
     for {
-      sum_startIndex <- findUtxosWithoutGas(sortedUtxos, amount, dustUtxoAmount)
-      sum_index <- findUtxosWithGas(
+      resultWithoutGas <- findUtxosWithoutGas(
         sortedUtxos,
-        sum_startIndex._1,
-        sum_startIndex._2,
-        amount,
+        totalAlfAmount,
+        totalAmountPerToken,
+        dustUtxoAmount
+      )
+      (amountWithoutGas, utxosWithoutGas, restOfUtxos) = resultWithoutGas
+      resultForGas <- findUtxosWithGas(
+        restOfUtxos,
+        amountWithoutGas,
+        utxosWithoutGas.length,
+        totalAlfAmount,
         gasPrice,
         gasPerInput,
         gasPerOutput,
@@ -100,27 +174,52 @@ object UtxoUtils {
         minimalGas
       )
     } yield {
-      val selectedUtxos = sortedUtxos.take(sum_index._2 + 1)
-      val gas           = estimateGas(gasPerInput, gasPerOutput, selectedUtxos.length, numOutputs, minimalGas)
-      Selected(selectedUtxos, gas)
+      val (_, extraUtxosForGas, _) = resultForGas
+      val utxos                    = utxosWithoutGas ++ extraUtxosForGas
+      val gas                      = estimateGas(gasPerInput, gasPerOutput, utxos.length, numOutputs, minimalGas)
+      Selected(utxos, gas)
     }
   }
 
-  def validate(sum: U256, amount: U256, dustAmount: U256): Boolean = {
-    (sum == amount) || (sum >= amount.addUnsafe(dustAmount))
+  @tailrec
+  private def findUtxosForTokens(
+      currentUtxos: AVector[Asset],
+      restOfUtxos: AVector[Asset],
+      totalAmountPerToken: AVector[(TokenId, U256)]
+  ): Either[String, (AVector[Asset], AVector[Asset], AVector[(TokenId, U256)])] = {
+    if (totalAmountPerToken.isEmpty) {
+      Right((currentUtxos, restOfUtxos, totalAmountPerToken))
+    } else {
+      val (tokenId, amount) = totalAmountPerToken.head
+      val sortedUtxos       = restOfUtxos.sorted(assetOrderByToken(tokenId))
+
+      val foundResult = for {
+        remainingTokenAmount <- calculateRemainingTokensAmount(currentUtxos, tokenId, amount)
+        result <- findUtxosWithoutGas(sortedUtxos, remainingTokenAmount, U256.Zero)(
+          _.output.tokens.find(_._1 == tokenId).map(_._2)
+        )
+      } yield result
+
+      foundResult match {
+        case Right((_, foundUtxos, otherUtxos)) =>
+          findUtxosForTokens(currentUtxos ++ foundUtxos, otherUtxos, totalAmountPerToken.tail)
+        case Left(e) =>
+          Left(e)
+      }
+    }
   }
 
-  def findUtxosWithoutGas(
+  private def findUtxosWithoutGas(
       sortedUtxos: AVector[Asset],
       amount: U256,
       dustUtxoAmount: U256
-  ): Either[String, (U256, Int)] = {
+  )(getAmount: Asset => Option[U256]): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
       if (index >= sortedUtxos.length) {
         (sum, -1)
       } else {
-        val newSum = sum.addUnsafe(sortedUtxos(index).output.amount)
+        val newSum = sum.addUnsafe(getAmount(sortedUtxos(index)).getOrElse(U256.Zero))
         if (validate(newSum, amount, dustUtxoAmount)) {
           (newSum, index)
         } else {
@@ -129,50 +228,17 @@ object UtxoUtils {
       }
     }
 
-    iter(U256.Zero, 0) match {
-      case (sum, -1) => Left(s"Not enough balance: got $sum, expected $amount")
-      case result    => Right(result)
-    }
-  }
-
-  // scalastyle:off parameter.number
-  def findUtxosWithGas(
-      sortedUtxos: AVector[Asset],
-      sum: U256,
-      currentIndex: Int,
-      amount: U256,
-      gasPrice: GasPrice,
-      gasPerInput: GasBox,
-      gasPerOutput: GasBox,
-      dustUtxoAmount: U256,
-      numOutputs: Int,
-      minimalGas: GasBox
-  ): Either[String, (U256, Int)] = {
-    @tailrec
-    def iter(sum: U256, index: Int): (U256, Int) = {
-      val gas         = estimateGas(gasPerInput, gasPerOutput, index + 1, numOutputs, minimalGas)
-      val gasFee      = gasPrice * gas
-      val totalAmount = amount.addUnsafe(gasFee)
-      if (validate(sum, totalAmount, dustUtxoAmount)) {
-        (sum, index)
-      } else {
-        val nextIndex = index + 1
-        if (nextIndex == sortedUtxos.length) {
-          (sum, -1)
-        } else {
-          iter(sum.addUnsafe(sortedUtxos(nextIndex).output.amount), nextIndex)
-        }
+    if (amount == U256.Zero) {
+      Right((U256.Zero, AVector.empty, sortedUtxos))
+    } else {
+      iter(U256.Zero, 0) match {
+        case (sum, -1)    => Left(s"Not enough balance: got $sum, expected $amount")
+        case (sum, index) => Right((sum, sortedUtxos.take(index + 1), sortedUtxos.drop(index + 1)))
       }
     }
-
-    iter(sum, currentIndex) match {
-      case (_, -1) => Left(s"Not enough balance for fee, maybe transfer a smaller amount")
-      case result  => Right(result)
-    }
   }
-  // scalastyle:on parameter.number
 
-  def estimateGas(
+  private def estimateGas(
       gasPerInput: GasBox,
       gasPerOutput: GasBox,
       numInputs: Int,
@@ -183,10 +249,37 @@ object UtxoUtils {
     Math.max(gas, minimalGas)
   }
 
-  def estimateGas(
-      numInputs: Int,
-      numOutputs: Int
-  ): GasBox = {
-    estimateGas(defaultGasPerInput, defaultGasPerOutput, numInputs, numOutputs, minimalGas)
+  private def findUtxosWithGas(
+      restOfUtxos: AVector[Asset],
+      currentAlfSum: U256,
+      sizeOfSelectedUTXOs: Int,
+      totalAlfAmount: U256,
+      gasPrice: GasPrice,
+      gasPerInput: GasBox,
+      gasPerOutput: GasBox,
+      dustUtxoAmount: U256,
+      numOutputs: Int,
+      minimalGas: GasBox
+  ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
+    @tailrec
+    def iter(sum: U256, index: Int): (U256, Int) = {
+      val gas =
+        estimateGas(gasPerInput, gasPerOutput, sizeOfSelectedUTXOs + index, numOutputs, minimalGas)
+      val gasFee = gasPrice * gas
+      if (validate(sum, totalAlfAmount.addUnsafe(gasFee), dustUtxoAmount)) {
+        (sum, index)
+      } else {
+        if (index == restOfUtxos.length) {
+          (sum, -1)
+        } else {
+          iter(sum.addUnsafe(restOfUtxos(index).output.amount), index + 1)
+        }
+      }
+    }
+
+    iter(currentAlfSum, 0) match {
+      case (_, -1)      => Left(s"Not enough balance for fee, maybe transfer a smaller amount")
+      case (sum, index) => Right((sum, restOfUtxos.take(index), restOfUtxos.drop(index)))
+    }
   }
 }

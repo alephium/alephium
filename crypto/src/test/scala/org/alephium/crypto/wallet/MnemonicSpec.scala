@@ -176,7 +176,7 @@ class MnemonicSpec extends AlephiumSpec {
       Mnemonic.from(entropy).get is mnemonic
 
       val seed = Hex.from(_seed).get
-      mnemonic.toSeed(passphrase) is seed
+      mnemonic.toSeed(Some(passphrase)) is seed
     }
   }
 }

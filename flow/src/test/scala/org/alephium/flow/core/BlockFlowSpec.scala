@@ -491,7 +491,7 @@ class BlockFlowSpec extends AlephiumSpec {
         toPrivateKey.publicKey,
         toLockupScript,
         None,
-        ALF.nanoAlf(1),
+        ALF.nanoAlf(1000),
         None,
         defaultGasPrice
       )
@@ -504,7 +504,7 @@ class BlockFlowSpec extends AlephiumSpec {
           toPrivateKey.publicKey,
           toLockupScript,
           None,
-          ALF.nanoAlf(1),
+          ALF.nanoAlf(1000),
           None,
           defaultGasPrice
         )

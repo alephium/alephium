@@ -667,8 +667,20 @@
               "schema": {
                 "$ref": "#/components/schemas/WalletUnlock"
               },
-              "example": {
-                "password": "my-secret-password"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "password": "my-secret-password"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonicPassphrase": "optional-mnemonic-passphrase"
+                  }
+                }
               }
             }
           },
@@ -852,6 +864,118 @@
         }
       }
     },
+    "/wallets/{wallet_name}/mnemonic": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Show your mnemonic",
+        "operationId": "postWalletsWallet_nameMnemonic",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevealMnemonic"
+              },
+              "example": {
+                "password": "my-secret-password"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result2"
+                },
+                "example": {
+                  "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets/{wallet_name}/transfer": {
       "post": {
         "tags": [
@@ -879,7 +1003,17 @@
                 "destinations": [
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "amount": "1000000"
+                    "amount": "1000000",
+                    "tokens": [
+                      {
+                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                        "amount": "42"
+                      },
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "1000"
+                      }
+                    ]
                   }
                 ]
               }
@@ -892,7 +1026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result2"
+                  "$ref": "#/components/schemas/Result3"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -1006,7 +1140,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result2"
+                  "$ref": "#/components/schemas/Result3"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -1320,7 +1454,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result3"
+                  "$ref": "#/components/schemas/Result4"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
@@ -2247,7 +2381,7 @@
                               {
                                 "type": "asset",
                                 "outputRef": {
-                                  "scriptHint": 23412,
+                                  "hint": 23412,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                                 },
                                 "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -2393,7 +2527,7 @@
                         {
                           "type": "asset",
                           "outputRef": {
-                            "scriptHint": 23412,
+                            "hint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                           },
                           "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -2500,7 +2634,7 @@
         "tags": [
           "Addresses"
         ],
-        "summary": "Get the balance of a address",
+        "summary": "Get the balance of an address",
         "operationId": "getAddressesAddressBalance",
         "parameters": [
           {
@@ -2596,12 +2730,132 @@
         }
       }
     },
+    "/addresses/{address}/utxos": {
+      "get": {
+        "tags": [
+          "Addresses"
+        ],
+        "summary": "Get the UTXOs of an address",
+        "operationId": "getAddressesAddressUtxos",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UTXO"
+                  }
+                },
+                "example": [
+                  {
+                    "ref": {
+                      "hint": 23412,
+                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                    },
+                    "amount": "1000000000000000000",
+                    "tokens": [
+                      {
+                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                        "amount": "42"
+                      },
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "1000"
+                      }
+                    ],
+                    "lockTime": 1611041396892,
+                    "additionalData": ""
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/addresses/{address}/group": {
       "get": {
         "tags": [
           "Addresses"
         ],
-        "summary": "Get the group of a address",
+        "summary": "Get the group of an address",
         "operationId": "getAddressesAddressGroup",
         "parameters": [
           {
@@ -3070,7 +3324,7 @@
                       {
                         "type": "asset",
                         "outputRef": {
-                          "scriptHint": 23412,
+                          "hint": 23412,
                           "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                         },
                         "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -3190,6 +3444,16 @@
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                     "amount": "2",
+                    "tokens": [
+                      {
+                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                        "amount": "42"
+                      },
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "1000"
+                      }
+                    ],
                     "lockTime": 1611041396892
                   }
                 ],
@@ -3532,7 +3796,7 @@
                     {
                       "type": "asset",
                       "outputRef": {
-                        "scriptHint": 23412,
+                        "hint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                       },
                       "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
@@ -4733,6 +4997,12 @@
               "$ref": "#/components/schemas/Destination"
             }
           },
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRef"
+            }
+          },
           "gas": {
             "type": "integer"
           },
@@ -4903,6 +5173,12 @@
           "amount": {
             "type": "integer",
             "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
           },
           "lockTime": {
             "type": "integer",
@@ -5079,12 +5355,12 @@
       },
       "OutputRef": {
         "required": [
-          "scriptHint",
+          "hint",
           "key"
         ],
         "type": "object",
         "properties": {
-          "scriptHint": {
+          "hint": {
             "type": "integer"
           },
           "key": {
@@ -5218,6 +5494,17 @@
       },
       "Result2": {
         "required": [
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "mnemonic": {
+            "type": "string"
+          }
+        }
+      },
+      "Result3": {
+        "required": [
           "txId",
           "fromGroup",
           "toGroup"
@@ -5235,7 +5522,7 @@
           }
         }
       },
-      "Result3": {
+      "Result4": {
         "required": [
           "address"
         ],
@@ -5243,6 +5530,17 @@
         "properties": {
           "address": {
             "$ref": "#/components/schemas/Asset"
+          }
+        }
+      },
+      "RevealMnemonic": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
           }
         }
       },
@@ -5454,6 +5752,37 @@
           }
         ]
       },
+      "UTXO": {
+        "required": [
+          "ref",
+          "amount",
+          "lockTime",
+          "additionalData"
+        ],
+        "type": "object",
+        "properties": {
+          "ref": {
+            "$ref": "#/components/schemas/OutputRef"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "additionalData": {
+            "type": "string"
+          }
+        }
+      },
       "Unauthorized": {
         "required": [
           "detail"
@@ -5556,6 +5885,9 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          },
+          "mnemonicPassphrase": {
             "type": "string"
           }
         }

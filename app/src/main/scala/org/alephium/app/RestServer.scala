@@ -76,6 +76,7 @@ class RestServer(
       getBlockflowLogic,
       getBlockLogic,
       getBalanceLogic,
+      getUTXOsLogic,
       getGroupLogic,
       getHashesAtHeightLogic,
       getChainInfoLogic,

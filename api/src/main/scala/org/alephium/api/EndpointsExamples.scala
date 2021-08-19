@@ -76,10 +76,18 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val tx = Tx(
     txId,
-    AVector(Input.Asset(OutputRef(scriptHint = 23412, key = hash), serialize(unlockScript))),
+    AVector(Input.Asset(OutputRef(hint = 23412, key = hash), serialize(unlockScript))),
     AVector(Output.Asset(amount = balance, address, tokens, ts, ByteString.empty)),
     1,
     U256.unsafe(1000)
+  )
+
+  private val utxo = UTXO(
+    OutputRef(hint = 23412, key = hash),
+    balance,
+    tokens,
+    ts,
+    ByteString.empty
   )
 
   private val blockEntry = BlockEntry(
@@ -193,6 +201,9 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val balanceExamples: List[Example[Balance]] =
     simpleExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3))
 
+  implicit val utxosExamples: List[Example[AVector[UTXO]]] =
+    simpleExample(AVector(utxo))
+
   implicit val groupExamples: List[Example[Group]] =
     simpleExample(Group(group = 2))
 
@@ -206,7 +217,8 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       BuildTransaction(
         publicKey,
-        AVector(Destination(address, U256.Two, Some(ts))),
+        AVector(Destination(address, U256.Two, Some(tokens), Some(ts))),
+        None,
         Some(GasBox.unsafe(1)),
         Some(GasPrice(U256.One))
       )

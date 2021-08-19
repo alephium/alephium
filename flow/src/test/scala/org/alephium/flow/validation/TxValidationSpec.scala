@@ -27,6 +27,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._
@@ -480,7 +481,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val block                 = transfer(blockFlow, genesisPriKey, lockup, ALF.alf(2))
       addAndCheck(blockFlow, block)
       blockFlow
-        .transfer(lockup, unlock, AVector((lockup, ALF.alf(1), None)), None, defaultGasPrice)
+        .transfer(
+          lockup,
+          unlock,
+          AVector(TxOutputInfo(lockup, ALF.alf(1), AVector.empty, None)),
+          None,
+          defaultGasPrice
+        )
         .rightValue
         .rightValue
     }

@@ -61,6 +61,7 @@ class WalletAppSpec
   walletApp.start().futureValue is ()
 
   val password                   = Hash.generate.toHexString
+  val mnemonicPassphrase         = "mnemonic-passphrase"
   var mnemonic: Mnemonic         = _
   var addresses: model.Addresses = _
   var address: Address.Asset     = _
@@ -74,10 +75,16 @@ class WalletAppSpec
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
       .map(name => s""","walletName":"$name"""")
       .getOrElse("")}}"""
-  val unlockJson = s"""{"password":"$password"}"""
-  val deleteJson = s"""{"password":"$password"}"""
+  val passwordJson = s"""{"password":"$password"}"""
+  def passwordWithPassphraseJson(mnemonicPassphrase: String) =
+    s"""{"password":"$password", "mnemonicPassphrase":"$mnemonicPassphrase"}"""
+  def unlockJson(mnemonicPassphrase: Option[String]) =
+    mnemonicPassphrase match {
+      case None       => passwordJson
+      case Some(pass) => passwordWithPassphraseJson(pass)
+    }
   def transferJson(amount: Int) =
-    s"""{"destinations":[{"address":"$transferAddress","amount":"$amount"}]}"""
+    s"""{"destinations":[{"address":"$transferAddress","amount":"$amount","tokens":[]}]}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""
@@ -85,13 +92,15 @@ class WalletAppSpec
   def create(size: Int, maybeName: Option[String] = None) =
     Post("/wallets", creationJson(size, maybeName))
   def restore(mnemonic: Mnemonic) = Put("/wallets", restoreJson(mnemonic))
-  def unlock()                    = Post(s"/wallets/$wallet/unlock", unlockJson)
-  def lock()                      = Post(s"/wallets/$wallet/lock")
-  def delete()                    = Delete(s"/wallets/$wallet", deleteJson)
-  def getBalance()                = Get(s"/wallets/$wallet/balances")
-  def getAddresses()              = Get(s"/wallets/$wallet/addresses")
-  def transfer(amount: Int)       = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def deriveNextAddress()         = Post(s"/wallets/$wallet/derive-next-address")
+  def unlock(mnemonicPassphrase: Option[String] = None) =
+    Post(s"/wallets/$wallet/unlock", unlockJson(mnemonicPassphrase))
+  def lock()                = Post(s"/wallets/$wallet/lock")
+  def delete()              = Delete(s"/wallets/$wallet", passwordJson)
+  def getBalance()          = Get(s"/wallets/$wallet/balances")
+  def getAddresses()        = Get(s"/wallets/$wallet/addresses")
+  def revealMnemonic()      = Get(s"/wallets/$wallet/mnemonic", maybeBody = Some(passwordJson))
+  def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
+  def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
   def changeActiveAddress(address: Address) =
     Post(s"/wallets/$wallet/change-active-address", changeActiveAddressJson(address))
   def listWallets() = Get("/wallets")
@@ -215,6 +224,11 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
+    revealMnemonic() check { response =>
+      response.as[model.RevealMnemonic.Result].mnemonic is mnemonic
+      response.code is StatusCode.Ok
+    }
+
     val newMnemonic = Mnemonic.generate(24).get
     restore(newMnemonic) check { response =>
       wallet = response.as[model.WalletRestore.Result].walletName
@@ -253,6 +267,34 @@ class WalletAppSpec
       write(
         response.as[ujson.Value]
       ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
+    }
+
+    //handle passphrase
+    Post("/wallets", passwordWithPassphraseJson(mnemonicPassphrase)) check { response =>
+      val result = response.as[model.WalletCreation.Result]
+      mnemonic = result.mnemonic
+      wallet = result.walletName
+      response.code is StatusCode.Ok
+    }
+
+    getAddresses() check { response =>
+      addresses = response.as[model.Addresses]
+      address = addresses.activeAddress
+      response.code is StatusCode.Ok
+    }
+
+    lock()
+    unlock()
+
+    getAddresses() check { response =>
+      response.as[model.Addresses].activeAddress isnot address
+    }
+
+    lock()
+    unlock(Some(mnemonicPassphrase))
+
+    getAddresses() check { response =>
+      response.as[model.Addresses].activeAddress is address
     }
 
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())

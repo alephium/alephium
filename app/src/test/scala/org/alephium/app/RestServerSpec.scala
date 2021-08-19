@@ -40,6 +40,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -130,6 +131,14 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     }
   }
 
+  it should "call GET /addresses/<address>/utxos" in {
+    val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
+    Get(s"/addresses/$dummyKeyAddress/utxos", getPort(group)) check { response =>
+      response.code is StatusCode.Ok
+      response.as[AVector[UTXO]].length is 2
+    }
+  }
+
   it should "call GET /blockflow/hashes" in {
     Get(s"/blockflow/hashes?fromGroup=1&toGroup=1&height=1") check { response =>
       response.code is StatusCode.Ok
@@ -193,7 +202,8 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "tokens": []
         |    }
         |  ]
         |}
@@ -201,7 +211,10 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     ) check { response =>
       response.code is StatusCode.Ok
       response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-        ServerFixture.dummyTransferTx(dummyTx, AVector((dummyToLockupScript, U256.One, None)))
+        ServerFixture.dummyTransferTx(
+          dummyTx,
+          AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+        )
       )
     }
     Post(
@@ -213,6 +226,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |    {
         |      "address": "$dummyToAddress",
         |      "amount": "1",
+        |      "tokens": [],
         |      "lockTime": "1234"
         |    }
         |  ]
@@ -223,7 +237,14 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
       response.as[BuildTransactionResult] is dummyBuildTransactionResult(
         ServerFixture.dummyTransferTx(
           dummyTx,
-          AVector((dummyToLockupScript, U256.One, Some(TimeStamp.unsafe(1234))))
+          AVector(
+            TxOutputInfo(
+              dummyToLockupScript,
+              U256.One,
+              AVector.empty,
+              Some(TimeStamp.unsafe(1234))
+            )
+          )
         )
       )
     }
@@ -238,7 +259,8 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1"
+        |      "amount": "1",
+        |      "tokens": []
         |    }
         |  ]
         |}

@@ -47,4 +47,6 @@ object Hint {
   def ofAsset(scriptHint: ScriptHint): Hint = new Hint(scriptHint.value)
 
   def ofContract(scriptHint: ScriptHint): Hint = new Hint(scriptHint.value ^ 1)
+
+  def unsafe(value: Int): Hint = new Hint(value)
 }

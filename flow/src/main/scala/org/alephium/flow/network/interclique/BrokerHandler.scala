@@ -17,6 +17,7 @@
 package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
+import org.alephium.flow.core.maxSyncBlocksPerChain
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
@@ -25,11 +26,12 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.message.{InvRequest, InvResponse, NewBlockHash}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, FlowData}
+import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex}
 import org.alephium.util.{ActorRefT, AVector, Cache}
 
 trait BrokerHandler extends BaseBrokerHandler {
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](networkSetting.maxSeenBlocks)
+  val maxForkDepth: Int                  = maxSyncBlocksPerChain
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
@@ -40,17 +42,21 @@ trait BrokerHandler extends BaseBrokerHandler {
     cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
   }
 
-  private def onFlowData[T <: FlowData](data: FlowData, isBlock: Boolean): Unit = {
-    val datas = AVector(data)
-    if (validateFlowData(datas, isBlock)) {
-      seenBlocks.put(data.hash, ())
-      val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-      allHandlers.dependencyHandler ! message
+  override def handleNewBlock(block: Block): Unit = {
+    val blocks = AVector(block)
+    if (validateFlowData(blocks, isBlock = true)) {
+      val blockChain = blockflow.getBlockChain(block.chainIndex)
+      blockChain.validateBlockHeight(block, maxForkDepth) match {
+        case Right(true) =>
+          seenBlocks.put(block.hash, ())
+          val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
+          allHandlers.dependencyHandler ! message
+        case _ =>
+          log.debug(s"Receive new block ${block.shortHex} which have invalid height")
+          handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+      }
     }
   }
-
-  override def handleNewBlock(block: Block): Unit         = onFlowData(block, isBlock = true)
-  override def handleNewHeader(header: BlockHeader): Unit = onFlowData(header, isBlock = false)
 
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
 

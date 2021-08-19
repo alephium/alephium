@@ -38,6 +38,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     json,
     conf,
     protocol,
+    http,
     wallet,
     tools
   )

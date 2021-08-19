@@ -33,6 +33,7 @@ trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
     unlockWallet,
     deleteWallet,
     getBalances,
+    revealMnemonic,
     transfer,
     sweepAll,
     getAddresses,

@@ -47,6 +47,20 @@ trait BlockFlowGroupView[WS <: WorldState[_]] {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def getPrevAssetOutputs(
+      inputs: AVector[AssetOutputRef]
+  ): IOResult[Option[AVector[(AssetOutputRef, AssetOutput)]]] = {
+    inputs.foldE(Option(AVector.ofSize[(AssetOutputRef, AssetOutput)](inputs.length))) {
+      case (Some(outputs), input) =>
+        getPreOutput(input).map(_.map { output =>
+          val assetOutput = output.asInstanceOf[AssetOutput]
+          outputs :+ (input -> assetOutput)
+        })
+      case (None, _) => Right(None)
+    }
+  }
+
   def getPreContractOutputs(
       inputs: AVector[ContractOutputRef]
   ): IOResult[Option[AVector[TxOutput]]] = {

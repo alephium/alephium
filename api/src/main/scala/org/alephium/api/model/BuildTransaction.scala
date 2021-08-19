@@ -25,6 +25,7 @@ import org.alephium.util.AVector
 final case class BuildTransaction(
     fromPublicKey: PublicKey,
     destinations: AVector[Destination],
+    utxos: Option[AVector[OutputRef]] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 ) {

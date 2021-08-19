@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api
+package org.alephium.wallet.api.model
 
-import sttp.tapir.EndpointIO.Example
+import org.alephium.crypto.wallet.Mnemonic
 
-trait Examples {
-  def simpleExample[T](t: T): List[Example[T]] = List(Example(t, None, None))
-  def defaultExample[T](t: T): Example[T]      = Example(t, None, Some("Default"))
-  def moreSettingsExample[T](t: T): Example[T] = Example(t, None, Some("More settings"))
+final case class RevealMnemonic(password: String)
+
+object RevealMnemonic {
+  final case class Result(mnemonic: Mnemonic)
 }
