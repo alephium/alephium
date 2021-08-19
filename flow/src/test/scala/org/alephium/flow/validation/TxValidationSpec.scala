@@ -380,7 +380,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "get previous outputs of tx inputs" in new StatefulFixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, inputInfos) =>
       prepareWorldState(inputInfos)
-      getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput)
+      getPreOutputs(tx, cachedWorldState) isE inputInfos.map(_.referredOutput).as[TxOutput]
     }
   }
 
@@ -449,7 +449,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
       {
         val txNew = tx.copy(inputSignatures = tx.inputSignatures.init)
-        failCheck(checkWitnesses(txNew, inputsState), NotEnoughSignature)
+        failCheck(checkWitnesses(txNew, inputsState.as[TxOutput]), NotEnoughSignature)
         failCheck(checkBlockTx(txNew, preparedWorldState), NotEnoughSignature)
       }
 
@@ -458,7 +458,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val inputNew              = sample.copy(unlockScript = unlock)
         val inputsNew             = inputs.replace(sampleIndex, inputNew)
         val txNew                 = tx.copy(unsigned = unsigned.copy(inputs = inputsNew))
-        failCheck(checkWitnesses(txNew, inputsState), InvalidPublicKeyHash)
+        failCheck(checkWitnesses(txNew, inputsState.as[TxOutput]), InvalidPublicKeyHash)
       }
 
       {
@@ -466,7 +466,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
         val signaturesNew    = tx.inputSignatures.replace(sampleIndex, signature)
         val txNew            = tx.copy(inputSignatures = signaturesNew)
-        failCheck(checkWitnesses(txNew, inputsState), InvalidSignature)
+        failCheck(checkWitnesses(txNew, inputsState.as[TxOutput]), InvalidSignature)
         failCheck(checkBlockTx(txNew, preparedWorldState), InvalidSignature)
       }
     }

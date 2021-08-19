@@ -31,7 +31,7 @@ object BlockEnv {
 
 final case class TxEnv(
     tx: TransactionAbstract,
-    prevOutputs: AVector[TxOutput],
+    prevOutputs: AVector[AssetOutput],
     signatures: Stack[Signature]
 )
 
@@ -169,7 +169,7 @@ object StatefulContext {
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
-      preOutputs: AVector[TxOutput]
+      preOutputs: AVector[AssetOutput]
   ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.contractSignatures))
     new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
@@ -180,7 +180,7 @@ object StatefulContext {
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
-      preOutputsOpt: Option[AVector[TxOutput]]
+      preOutputsOpt: Option[AVector[AssetOutput]]
   ): ExeResult[StatefulContext] = {
     preOutputsOpt match {
       case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
@@ -197,7 +197,7 @@ object StatefulContext {
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
       val initWorldState: WorldState.Cached,
-      val preOutputs: AVector[TxOutput],
+      val preOutputs: AVector[AssetOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
     val worldState: WorldState.Staging = initWorldState.staging()

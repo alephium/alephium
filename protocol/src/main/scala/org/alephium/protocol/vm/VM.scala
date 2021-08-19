@@ -347,7 +347,7 @@ object StatefulVM {
       worldState: WorldState.Cached,
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
-      preOutputs: AVector[TxOutput],
+      preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {
@@ -358,7 +358,7 @@ object StatefulVM {
       worldState: WorldState.Cached,
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
-      preOutputsOpt: Option[AVector[TxOutput]],
+      preOutputsOpt: Option[AVector[AssetOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
   ): ExeResult[TxScriptExecution] = {

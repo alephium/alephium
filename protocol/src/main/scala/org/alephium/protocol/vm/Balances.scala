@@ -182,7 +182,7 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
 
 object Balances {
   // TODO: optimize this
-  def from(inputs: AVector[TxOutput], outputs: AVector[AssetOutput]): Option[Balances] = {
+  def from(inputs: AVector[AssetOutput], outputs: AVector[AssetOutput]): Option[Balances] = {
     val inputBalances = inputs.fold(Option(empty)) {
       case (Some(balances), input) =>
         balances.add(input.lockupScript, BalancesPerLockup.from(input)).map(_ => balances)

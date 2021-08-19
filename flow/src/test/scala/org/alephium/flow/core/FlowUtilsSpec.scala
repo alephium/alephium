@@ -51,7 +51,7 @@ class FlowUtilsSpec extends AlephiumSpec {
         Transaction(
           unsignedTx,
           AVector.empty,
-          firstOutput +: assets.tail.map(_.referredOutput),
+          (firstOutput +: assets.tail.map(_.referredOutput)).as[TxOutput],
           tx.inputSignatures,
           tx.contractSignatures
         )

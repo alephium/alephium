@@ -21,10 +21,28 @@ import akka.util.ByteString
 import org.alephium.io._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
-import org.alephium.serde.Serde
+import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
 trait WorldState[T] {
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def getAsset(outputRef: AssetOutputRef): IOResult[AssetOutput] = {
+    // we use asInstanceOf for optimization
+    getOutput(outputRef) match {
+      case Right(_: ContractOutput) => Left(WorldState.expectedAssetError)
+      case result                   => result.asInstanceOf[IOResult[AssetOutput]]
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def getAssetOpt(outputRef: AssetOutputRef): IOResult[Option[AssetOutput]] = {
+    // we use asInstanceOf for optimization
+    getOutputOpt(outputRef) match {
+      case Right(Some(_: ContractOutput)) => Left(WorldState.expectedAssetError)
+      case result                         => result.asInstanceOf[IOResult[Option[AssetOutput]]]
+    }
+  }
+
   def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
 
   def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]]
@@ -59,11 +77,11 @@ trait WorldState[T] {
 
   def persist(): IOResult[WorldState.Persisted]
 
-  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[Option[AVector[TxOutput]]] = {
+  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[Option[AVector[AssetOutput]]] = {
     val inputs = tx.unsigned.inputs
-    inputs.foldE[IOError, Option[AVector[TxOutput]]](Some(AVector.ofSize(inputs.length))) {
+    inputs.foldE[IOError, Option[AVector[AssetOutput]]](Some(AVector.ofSize(inputs.length))) {
       case (Some(outputs), input) =>
-        getOutputOpt(input.outputRef).map {
+        getAssetOpt(input.outputRef).map {
           case Some(output) => Some(outputs :+ output)
           case None         => None
         }
@@ -204,6 +222,8 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
 }
 
 object WorldState {
+  val expectedAssetError: IOError = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
+
   final case class Persisted(
       outputState: SparseMerkleTrie[TxOutputRef, TxOutput],
       contractState: SparseMerkleTrie[Hash, ContractState]

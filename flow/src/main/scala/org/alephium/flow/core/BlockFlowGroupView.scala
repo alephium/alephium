@@ -29,9 +29,18 @@ trait BlockFlowGroupView[WS <: WorldState[_]] {
 
   def getPreOutput(outputRef: TxOutputRef): IOResult[Option[TxOutput]]
 
-  def getPreOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[TxOutput]]] = {
-    inputs.foldE(Option(AVector.ofSize[TxOutput](inputs.length))) {
-      case (Some(outputs), input) => getPreOutput(input.outputRef).map(_.map(outputs :+ _))
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def getAsset(outputRef: TxOutputRef): IOResult[Option[AssetOutput]] = {
+    // we use asInstanceOf for optimization
+    getPreOutput(outputRef) match {
+      case Right(Some(_: ContractOutput)) => Left(WorldState.expectedAssetError)
+      case result                         => result.asInstanceOf[IOResult[Option[AssetOutput]]]
+    }
+  }
+
+  def getPreOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[AssetOutput]]] = {
+    inputs.foldE(Option(AVector.ofSize[AssetOutput](inputs.length))) {
+      case (Some(outputs), input) => getAsset(input.outputRef).map(_.map(outputs :+ _))
       case (None, _)              => Right(None)
     }
   }
@@ -39,7 +48,7 @@ trait BlockFlowGroupView[WS <: WorldState[_]] {
   def getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
     getPreOutputs(tx.unsigned.inputs).flatMap {
       case Some(outputs) =>
-        tx.contractInputs.foldE(Option(outputs)) {
+        tx.contractInputs.foldE(Option(outputs.as[TxOutput])) {
           case (Some(outputs), input) => getPreOutput(input).map(_.map(outputs :+ _))
           case (None, _)              => Right(None)
         }
