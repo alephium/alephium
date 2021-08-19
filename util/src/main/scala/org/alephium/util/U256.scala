@@ -146,6 +146,12 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     case _: ArithmeticException => None
   }
 
+  def toLong: Option[Long] = try {
+    Some(v.longValueExact())
+  } catch {
+    case _: ArithmeticException => None
+  }
+
   def toBigInt: BigInteger = v
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))

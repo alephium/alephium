@@ -35,11 +35,13 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
   def genStatelessContext(
       gasLimit: GasBox = minimalGas,
-      signatures: AVector[Signature] = AVector.empty
+      signatures: AVector[Signature] = AVector.empty,
+      blockEnv: Option[BlockEnv] = None,
+      txEnv: Option[TxEnv] = None
   ): StatelessContext = {
     StatelessContext.apply(
-      genBlockEnv(),
-      genTxEnv(signatures = signatures),
+      blockEnv.getOrElse(genBlockEnv()),
+      txEnv.getOrElse(genTxEnv(signatures = signatures)),
       gasLimit
     )
   }

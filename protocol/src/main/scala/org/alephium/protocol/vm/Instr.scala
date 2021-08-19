@@ -23,9 +23,10 @@ import akka.util.ByteString
 import org.alephium.crypto
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
+import org.alephium.protocol.model.AssetOutput
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util
-import org.alephium.util.{AVector, Bytes}
+import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 
 // scalastyle:off file.size.limit number.of.types
 
@@ -108,6 +109,7 @@ object Instr {
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     ChainId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+    VerifyAbsoluteLocktime, VerifyRelativeLocktime,
     Log1, Log2, Log3, Log4, Log5
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -1215,15 +1217,15 @@ object BlockTarget extends BlockInstr {
   }
 }
 
-sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
+sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0
 
-object TxId extends TxInstr {
+object TxId extends TxInstr with GasLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.ByteVec(frame.ctx.txId.bytes))
   }
 }
 
-object TxCaller extends TxInstr {
+object TxCaller extends TxInstr with GasLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       callerIndex <- frame.popOpStackT[Val.U256]()
@@ -1233,9 +1235,66 @@ object TxCaller extends TxInstr {
   }
 }
 
-object TxCallerSize extends TxInstr {
+object TxCallerSize extends TxInstr with GasLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
+  }
+}
+
+sealed trait LockTimeInstr extends TxInstr {
+  def popTimeStamp[C <: StatelessContext](frame: Frame[C]): ExeResult[TimeStamp] = {
+    for {
+      u256 <- frame.popOpStackT[Val.U256]()
+      res  <- u256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
+    } yield res
+  }
+
+  def popDuraton[C <: StatelessContext](frame: Frame[C]): ExeResult[Duration] = {
+    for {
+      u256 <- frame.popOpStackT[Val.U256]()
+      res  <- u256.v.toLong.map(Duration.unsafe).toRight(Right(LockTimeOverflow))
+    } yield res
+  }
+}
+
+object VerifyAbsoluteLocktime extends LockTimeInstr with GasMid {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      lockUntil <- popTimeStamp(frame)
+      _ <-
+        if (lockUntil > frame.ctx.blockEnv.timeStamp) {
+          failed(AbsoluteLockTimeVerificationFailed)
+        } else {
+          okay
+        }
+    } yield ()
+  }
+}
+
+object VerifyRelativeLocktime extends LockTimeInstr with GasHigh {
+  def getLockUntil(output: AssetOutput, lockDuration: Duration): ExeResult[TimeStamp] = {
+    val lockTime = output.lockTime
+    if (lockTime.isZero()) {
+      // when the lock time of the Utxo is zero, it's not persisted into worldstate yet
+      failed(RelativeLockTimeExpectPersistedUtxo)
+    } else {
+      lockTime.plus(lockDuration).toRight(Right(LockTimeOverflow))
+    }
+  }
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      lockDuration    <- popDuraton(frame)
+      prevOutputIndex <- frame.popOpStackT[Val.U256]()
+      preOutput       <- frame.ctx.getTxPrevOutput(prevOutputIndex)
+      lockUntil       <- getLockUntil(preOutput, lockDuration)
+      _ <-
+        if (lockUntil > frame.ctx.blockEnv.timeStamp) {
+          failed(RelativeLockTimeVerificationFailed)
+        } else {
+          okay
+        }
+    } yield {}
   }
 }
 
