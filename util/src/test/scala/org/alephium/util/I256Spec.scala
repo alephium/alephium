@@ -18,6 +18,8 @@ package org.alephium.util
 
 import java.math.BigInteger
 
+import akka.util.ByteString
+
 class I256Spec extends AlephiumSpec {
   val numGen = (0L to 3L).flatMap { i =>
     val n = BigInteger.valueOf(i)
@@ -130,5 +132,47 @@ class I256Spec extends AlephiumSpec {
 
   it should "construct from Long" in {
     forAll { x: Long => I256.from(x).toBigInt is BigInteger.valueOf(x) }
+  }
+
+  it should "convert from ByteString" in {
+    for {
+      x <- numGen
+    } {
+      val byteString = ByteString.fromArrayUnsafe(x.toByteArray())
+      I256.from(byteString).get.v is x
+    }
+  }
+
+  it should "convert from U256" in {
+    val u256Gen = List(I256.MaxValue.toBigInt.add(BigInteger.ONE), U256.MaxValue.toBigInt)
+    for {
+      x <- numGen.appendedAll(u256Gen)
+    } {
+      if (x >= BigInteger.ZERO && x < U256.upperBound) {
+        val expected = if (x < I256.upperBound) I256.from(x) else None
+        I256.fromU256(U256.unsafe(x)) is expected
+      } else {
+        assertThrows[AssertionError](I256.fromU256(U256.unsafe(x)))
+      }
+    }
+  }
+
+  it should "convert to byte" in {
+    for {
+      x <- numGen
+    } {
+      val byte = I256.from(x).get.toByte
+      if (x >= BigInteger.valueOf(Byte.MinValue) && x <= BigInteger.valueOf(Byte.MaxValue)) {
+        byte.get is x.byteValue()
+      } else {
+        byte is None
+      }
+    }
+  }
+
+  it should "convert from Int" in {
+    forAll { x: Int =>
+      I256.from(x).v.longValue() is x.toLong
+    }
   }
 }

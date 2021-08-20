@@ -23,6 +23,8 @@ class MathSpec extends AlephiumSpec {
     }
 
     Math.max(OrderedClass(1), OrderedClass(2)) is OrderedClass(2)
+    Math.max(OrderedClass(2), OrderedClass(1)) is OrderedClass(2)
     Math.min(OrderedClass(1), OrderedClass(2)) is OrderedClass(1)
+    Math.min(OrderedClass(2), OrderedClass(1)) is OrderedClass(1)
   }
 }
