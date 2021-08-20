@@ -217,11 +217,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
 
   it should "cleanup cache based on capacity" in new Fixture {
     val capacity = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
-    brokerHandler.underlyingActor.maxCapacity is capacity
+    brokerHandler.underlyingActor.maxBlockCapacity is capacity
+    brokerHandler.underlyingActor.maxTxsCapacity is (capacity * 32)
     val txHash0 = Hash.generate
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, AVector(txHash0)))))
     brokerHandler.underlyingActor.seenTxs.contains(txHash0) is true
-    val txHashes = AVector.fill(capacity)(Hash.generate)
+    val txHashes = AVector.fill(brokerHandler.underlyingActor.maxTxsCapacity)(Hash.generate)
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes))))
     brokerHandler.underlyingActor.seenTxs.contains(txHash0) is false
     brokerHandler.underlyingActor.seenTxs.keys().toSet is txHashes.toSet

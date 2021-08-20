@@ -114,12 +114,13 @@ class FetcherSpec extends AlephiumActorSpec("fetcher") {
     )
 
     val fetcherObj = fetcher.underlyingActor
-    fetcherObj.maxCapacity is (2 * 1 * 10)
+    fetcherObj.maxBlockCapacity is (2 * 1 * 10)
+    fetcherObj.maxTxsCapacity is (2 * 1 * 10) * 32
     val hash0 = BlockHash.generate
     fetcher ! BlockFlowSynchronizer.BlockAnnouncement(hash0)
     expectMsg(BrokerHandler.DownloadBlocks(AVector(hash0)))
     fetcherObj.fetchingBlocks.contains(hash0) is true
-    val hashes = (0 until fetcherObj.maxCapacity).map { _ =>
+    val hashes = (0 until fetcherObj.maxBlockCapacity).map { _ =>
       val hash = BlockHash.generate
       fetcher ! BlockFlowSynchronizer.BlockAnnouncement(hash)
       expectMsg(BrokerHandler.DownloadBlocks(AVector(hash)))

@@ -37,11 +37,12 @@ trait Fetcher extends BaseActor {
   def blockflow: BlockFlow
   def isNodeSynced: Boolean
 
-  val maxCapacity: Int = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
+  val maxBlockCapacity: Int = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
+  val maxTxsCapacity: Int   = maxBlockCapacity * 32
   val fetchingBlocks: Cache[BlockHash, State] =
-    Cache.fifo(maxCapacity, _.timestamp, networkSetting.syncExpiryPeriod)
+    Cache.fifo(maxBlockCapacity, _.timestamp, networkSetting.syncExpiryPeriod)
   val fetchingTxs: Cache[Hash, State] =
-    Cache.fifo(maxCapacity, _.timestamp, networkSetting.syncExpiryPeriod)
+    Cache.fifo(maxTxsCapacity, _.timestamp, networkSetting.syncExpiryPeriod)
 
   def needToFetch[T](fetching: Cache[T, State], inventory: T, timestamp: TimeStamp): Boolean = {
     fetching.get(inventory) match {

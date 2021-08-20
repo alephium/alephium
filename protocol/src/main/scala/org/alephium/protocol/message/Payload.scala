@@ -351,7 +351,7 @@ trait IndexedHashes {
   def hashes: AVector[(ChainIndex, AVector[Hash])]
 }
 
-trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
+sealed trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
   override def validate(input: T)(implicit config: GroupConfig): Either[String, Unit] = {
     if (input.hashes.forall(p => IndexedSerding.check(p._1))) {
       Right(())

@@ -30,9 +30,10 @@ import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, TransactionTe
 import org.alephium.util.{ActorRefT, AVector, Cache}
 
 trait BrokerHandler extends BaseBrokerHandler {
-  val maxCapacity: Int                   = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
-  val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxCapacity)
-  val seenTxs: Cache[Hash, Unit]         = Cache.fifo[Hash, Unit](maxCapacity)
+  val maxBlockCapacity: Int              = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
+  val maxTxsCapacity: Int                = maxBlockCapacity * 32
+  val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
+  val seenTxs: Cache[Hash, Unit]         = Cache.fifo[Hash, Unit](maxTxsCapacity)
   val maxForkDepth: Int                  = maxSyncBlocksPerChain
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
