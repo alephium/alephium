@@ -98,7 +98,7 @@ class WalletAppSpec
   def delete()              = Delete(s"/wallets/$wallet", passwordJson)
   def getBalance()          = Get(s"/wallets/$wallet/balances")
   def getAddresses()        = Get(s"/wallets/$wallet/addresses")
-  def revealMnemonic()      = Get(s"/wallets/$wallet/mnemonic", maybeBody = Some(passwordJson))
+  def revealMnemonic()      = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
   def changeActiveAddress(address: Address) =

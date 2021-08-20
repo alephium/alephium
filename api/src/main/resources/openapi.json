@@ -864,13 +864,13 @@
         }
       }
     },
-    "/wallets/{wallet_name}/mnemonic": {
-      "post": {
+    "/wallets/{wallet_name}/reveal-mnemonic": {
+      "get": {
         "tags": [
           "Wallets"
         ],
-        "summary": "Show your mnemonic",
-        "operationId": "postWalletsWallet_nameMnemonic",
+        "summary": "Reveal your mnemonic. !!! use it with caution !!!",
+        "operationId": "getWalletsWallet_nameReveal-mnemonic",
         "parameters": [
           {
             "name": "wallet_name",
