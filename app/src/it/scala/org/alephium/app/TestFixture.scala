@@ -511,7 +511,7 @@ trait TestFixtureLike
     }
 
     def stop(): Unit = {
-      servers.map(_.start()).foreach(_.futureValue is ())
+      servers.map(_.stop()).foreach(_.futureValue is ())
     }
 
     def startWs(): Unit = {
