@@ -20,7 +20,6 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-import akka.actor.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import net.ceedubs.ficus.Ficus._
@@ -29,8 +28,6 @@ import org.alephium.util.{Duration, Service}
 import org.alephium.wallet.config.WalletConfig
 
 object Main extends App with Service with StrictLogging {
-  implicit val system: ActorSystem = ActorSystem("wallet-app")
-
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global

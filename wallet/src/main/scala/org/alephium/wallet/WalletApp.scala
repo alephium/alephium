@@ -71,17 +71,17 @@ class WalletApp(config: WalletConfig)(implicit
   override val subServices: ArraySeq[Service] = ArraySeq(walletService)
 
   protected def startSelfOnce(): Future[Unit] = {
-    val vertx  = Vertx.vertx()
-    val router = Router.router(vertx)
-    vertx
-      .fileSystem()
-      .existsBlocking(
-        "META-INF/resources/webjars/swagger-ui/"
-      ) // Fix swagger ui being not found on the first call
-    val server: HttpServer = vertx.createHttpServer().requestHandler(router)
     config.port match {
       case None => Future.successful(())
       case Some(port) =>
+        val vertx  = Vertx.vertx()
+        val router = Router.router(vertx)
+        vertx
+          .fileSystem()
+          .existsBlocking(
+            "META-INF/resources/webjars/swagger-ui/"
+          ) // Fix swagger ui being not found on the first call
+        val server: HttpServer = vertx.createHttpServer().requestHandler(router)
         routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
         for {
           binding <- server.listen(port, "127.0.0.1").asScala
