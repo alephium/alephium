@@ -47,7 +47,7 @@ object Version {
   val clientId: String = s"scala-alephium/$release/${System.getProperty("os.name")}"
 
   def fromReleaseVersion(release: String): Option[Version] = {
-    val regex = """^(\d+)\.(\d+)\.(\d+)(\+.+)?""".r
+    val regex = """^(\d+)\.(\d+)\.(\d+)(.*)?""".r
     release match {
       case regex(major, minor, patch, _) =>
         Option(Version(major.toInt, minor.toInt, patch.toInt))
