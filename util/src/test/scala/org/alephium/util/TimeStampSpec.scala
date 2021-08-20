@@ -93,4 +93,9 @@ class TimeStampSpec extends AlephiumSpec {
     t1.plus(d0).get.millis is d1.millis
     t1.plus(d1) is None
   }
+
+  it should "test if the timestamp is zero" in {
+    TimeStamp.zero.isZero() is true
+    TimeStamp.unsafe(1).isZero() is false
+  }
 }
