@@ -51,6 +51,7 @@ class MiningTest extends AlephiumSpec {
 
     clique.stopMining()
     clique.stop()
+    clique.servers.foreach(_.flowSystem.whenTerminated.futureValue)
   }
 
   it should "work with external miner" in new Fixture("2-nodes-external-miner", 2) {
