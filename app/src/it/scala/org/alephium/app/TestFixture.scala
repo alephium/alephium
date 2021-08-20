@@ -144,13 +144,13 @@ trait TestFixtureLike
   val blockNotifyProbe = TestProbe()
 
   def unitRequest(request: Int => HttpRequest, port: Int = defaultRestMasterPort): Assertion = {
-    val response = request(port).send(backend)
+    val response = request(port).send(backend).futureValue
     response.code is StatusCode.Ok
   }
 
   def request[T: Reader](request: Int => HttpRequest, port: Int): T = {
     eventually {
-      val response = request(port).send(backend)
+      val response = request(port).send(backend).futureValue
 
       val body = response.body match {
         case Right(r) => r
@@ -165,7 +165,7 @@ trait TestFixtureLike
       port: Int = defaultRestMasterPort,
       statusCode: StatusCode
   ): Assertion = {
-    val response = request(port).send(backend)
+    val response = request(port).send(backend).futureValue
     response.code is statusCode
   }
 

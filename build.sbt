@@ -224,7 +224,7 @@ lazy val conf = project("conf")
   )
 
 lazy val http = project("http")
-  .dependsOn(api, json)
+  .dependsOn(api, json, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
       `tapir-vertx`,
