@@ -18,9 +18,11 @@ package org.alephium.http
 
 import org.scalatest.Assertion
 import sttp.client3._
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.{Method, Uri}
 
 import org.alephium.json.Json._
+import org.alephium.util.AlephiumFutureSpec
 
 object HttpFixture {
   implicit class RichResponse[T](val response: Response[T]) extends AnyVal {
@@ -44,7 +46,7 @@ trait HttpFixture {
 
   type HttpRequest = RequestT[Identity, Either[String, String], Any]
 
-  val backend = HttpURLConnectionBackend()
+  val backend = AsyncHttpClientFutureBackend()
 
   def httpRequest[T, R](
       method: Method,
@@ -129,7 +131,7 @@ trait HttpFixture {
   }
 }
 
-trait HttpRouteFixture extends HttpFixture {
+trait HttpRouteFixture extends HttpFixture with AlephiumFutureSpec {
   def port: Int
 
   def maybeApiKey: Option[String]
@@ -143,7 +145,7 @@ trait HttpRouteFixture extends HttpFixture {
       maybeBody: Option[String],
       apiKey: Option[String] = maybeApiKey
   ): Response[Either[String, String]] = {
-    httpPost(endpoint, maybeBody, apiKeyHeader(apiKey))(port).send(backend)
+    httpPost(endpoint, maybeBody, apiKeyHeader(apiKey))(port).send(backend).futureValue
   }
 
   def Post(endpoint: String): Response[Either[String, String]] =
@@ -153,11 +155,13 @@ trait HttpRouteFixture extends HttpFixture {
     Post(endpoint, Some(body))
 
   def Put(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
-    httpPut(endpoint, Some(body), apiKeyHeader(apiKey))(port).send(backend)
+    httpPut(endpoint, Some(body), apiKeyHeader(apiKey))(port).send(backend).futureValue
   }
 
   def Delete(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
-    httpRequest(Method.DELETE, endpoint, Some(body), apiKeyHeader(apiKey))(port).send(backend)
+    httpRequest(Method.DELETE, endpoint, Some(body), apiKeyHeader(apiKey))(port)
+      .send(backend)
+      .futureValue
   }
 
   def Get(
@@ -168,5 +172,6 @@ trait HttpRouteFixture extends HttpFixture {
   ): Response[Either[String, String]] = {
     httpGet(endpoint, maybeHeader = apiKeyHeader(apiKey), maybeBody = maybeBody)(otherPort)
       .send(backend)
+      .futureValue
   }
 }
