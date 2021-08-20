@@ -303,7 +303,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val txTemplate1 = transactionGen().sample.get.toTemplate
     val txTemplate2 = transactionGen().sample.get.toTemplate
-    val chainIndex  = ChainIndex.unsafe(0, 0)
+    val chainIndex  = chainIndexGen.sample.get
     val newTxHashes = NewTxHashes(AVector((chainIndex, AVector(txTemplate1.id, txTemplate2.id))))
     verifySerde(newTxHashes) {
       // code id
@@ -311,7 +311,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         // number of chain
         hex"01" ++
         // chain index
-        hex"0000" ++
+        Hex.unsafe(s"0${chainIndex.from.value}0${chainIndex.to.value}") ++
         // number of hash
         hex"02" ++
         // tx1 hash
@@ -319,6 +319,24 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         // tx2 hash
         serialize(txTemplate2.id)
     }
+
+    info("NewTxHashes with invalid chain index")
+    Payload
+      .deserialize(
+        // code id
+        hex"0d" ++
+          // number of chain
+          hex"01" ++
+          // invalid chain index
+          hex"0f0f" ++
+          // number of hash
+          hex"02" ++
+          // tx1 hash
+          serialize(txTemplate1.id) ++
+          // tx2 hash
+          serialize(txTemplate2.id)
+      )
+      .leftValue is SerdeError.validation("Invalid ChainIndex in Tx payload")
   }
 
   private def verifySerde(payload: Payload)(blob: ByteString): Assertion = {

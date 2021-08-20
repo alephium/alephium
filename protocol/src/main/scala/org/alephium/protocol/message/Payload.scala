@@ -170,9 +170,6 @@ object Payload {
   }
 
   sealed trait UnSolicited extends Payload
-
-  implicit private[message] val chainIndexedHashes: Serde[(ChainIndex, AVector[Hash])] =
-    Serde.tuple2[ChainIndex, AVector[Hash]]
 }
 
 sealed trait HandShake extends Payload.UnSolicited {
@@ -350,23 +347,56 @@ object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
   implicit val serde: Serde[NewBlockHash] = Serde.forProduct1(apply, _.hash)
 }
 
+trait IndexedHashes {
+  def hashes: AVector[(ChainIndex, AVector[Hash])]
+}
+
+trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
+  override def validate(input: T)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (input.hashes.forall(p => IndexedSerding.check(p._1))) {
+      Right(())
+    } else {
+      Left("Invalid ChainIndex in Tx payload")
+    }
+  }
+}
+
+object IndexedSerding {
+  implicit private[message] val txSerde: Serde[(ChainIndex, AVector[Hash])] = {
+    implicit val indexSerde: Serde[ChainIndex] =
+      Serde.forProduct2[Int, Int, ChainIndex](
+        (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
+        chainIndex => (chainIndex.from.value, chainIndex.to.value)
+      )
+    Serde.tuple2[ChainIndex, AVector[Hash]]
+  }
+
+  @inline private def check(
+      chainIndex: ChainIndex
+  )(implicit config: GroupConfig): Boolean = {
+    ChainIndex.validate(chainIndex.from.value, chainIndex.to.value)
+  }
+}
+
 final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])])
-    extends Payload.UnSolicited {
+    extends Payload.UnSolicited
+    with IndexedHashes {
   override def measure(): Unit = NewTxHashes.payloadLabeled.inc()
 }
 
-object NewTxHashes extends Payload.Serding[NewTxHashes] with Payload.Code {
-  import Payload.chainIndexedHashes
-  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(apply, p => p.hashes)
+object NewTxHashes extends IndexedSerding[NewTxHashes] with Payload.Code {
+  import IndexedSerding.txSerde
+  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
 }
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[Hash])])
-    extends Payload.Solicited {
+    extends Payload.Solicited
+    with IndexedHashes {
   override def measure(): Unit = TxsRequest.payloadLabeled.inc()
 }
 
-object TxsRequest extends Payload.Serding[TxsRequest] with Payload.Code {
-  import Payload.chainIndexedHashes
+object TxsRequest extends IndexedSerding[TxsRequest] with Payload.Code {
+  import IndexedSerding.txSerde
   implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
 
   def apply(hashes: AVector[(ChainIndex, AVector[Hash])]): TxsRequest =

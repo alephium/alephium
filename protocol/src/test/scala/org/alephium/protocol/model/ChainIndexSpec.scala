@@ -52,13 +52,4 @@ class ChainIndexSpec extends AlephiumSpec with NoIndexModelGenerators {
     val index2 = new ChainIndex(new GroupIndex(999999), new GroupIndex(999999))
     index1 is index2
   }
-
-  it should "serialize/deserialize the chain index" in {
-    import org.alephium.serde._
-    forAll(groupIndexGen, groupIndexGen) { (from, to) =>
-      val chainIndex = ChainIndex(from, to)
-      val serialized = serialize(chainIndex)
-      deserialize[ChainIndex](serialized) isE chainIndex
-    }
-  }
 }
