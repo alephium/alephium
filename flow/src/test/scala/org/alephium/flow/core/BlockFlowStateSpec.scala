@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.FlowFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.model._
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
 class BlockFlowStateSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -57,7 +57,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     }
   }
 
-  it should "use block time as lock time for UTXOs" in new LockTimeFixture {
+  it should "use block time as lock time for UTXOs when the original lock time in TxOutput is zero" in new LockTimeFixture {
     for {
       fromGroup <- 0 until groups0
       toGroup   <- 0 until groups0
@@ -65,6 +65,21 @@ class BlockFlowStateSpec extends AlephiumSpec {
       val blockFlow  = isolatedBlockFlow()
       val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
       val block      = transfer(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+
+      val tx = block.nonCoinbase.head
+      checkUtxo(blockFlow, chainIndex, block, tx)
+    }
+  }
+
+  it should "use block time as lock time for UTXOs when the original lock time in TxOutput is nonzero" in new LockTimeFixture {
+    for {
+      group <- 0 until groups0
+    } {
+      val blockFlow  = isolatedBlockFlow()
+      val chainIndex = ChainIndex.unsafe(group, group)
+      val lockTime   = TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(1))
+      val block      = transfer(blockFlow, chainIndex, lockTimeOpt = Some(lockTime))
       addAndCheck(blockFlow, block)
 
       val tx = block.nonCoinbase.head

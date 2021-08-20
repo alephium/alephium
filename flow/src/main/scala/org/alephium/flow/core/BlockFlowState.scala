@@ -531,7 +531,7 @@ object BlockFlowState {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
         val outputUpdated =
-          if (output.lockTime.isZero()) output.copy(lockTime = blockTs) else output
+          if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
         worldState.addAsset(outputRef, outputUpdated)
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
