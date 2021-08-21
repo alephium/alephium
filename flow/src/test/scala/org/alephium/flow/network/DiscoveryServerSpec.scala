@@ -184,10 +184,19 @@ class DiscoveryServerSpec
 
   it should "refuse to discover a banned clique" in new Fixture {
 
-    misbehaviorManager0.ref ! MisbehaviorManager.InvalidMessage(address1)
-
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
     server1 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
+
+    eventually {
+      val probe0 = TestProbe()
+      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
+      probe0.expectMsgPF(probeTimeout) { case DiscoveryServer.NeighborPeers(peers) =>
+        peers.length is groups + 1 // self clique peers + server0
+        peers.map(_.address).contains(address1) is true
+      }
+    }
+
+    server0 ! MisbehaviorManager.PeerBanned(address1.getAddress)
 
     eventually {
       val probe0 = TestProbe()
@@ -234,7 +243,7 @@ class DiscoveryServerSpec
     val (address0, config0) = createConfig(groups, port0, 2)
     val cliqueInfo0         = generateCliqueInfo(address0, config0)
     val port1               = generatePort()
-    val (address1, config1) = createConfig(groups, port1, 2)
+    val (address1, config1) = createConfig(groups, port1, 2, hostname = "127.0.0.2")
     val cliqueInfo1         = generateCliqueInfo(address1, config1)
     val misbehaviorManager0 = buildMisbehaviorManager(system)
     val misbehaviorManager1 = buildMisbehaviorManager(system)
@@ -264,9 +273,10 @@ object DiscoveryServerSpec {
       _peersPerGroup: Int,
       _scanFrequency: Duration = Duration.unsafe(200),
       _expireDuration: Duration = Duration.ofHoursUnsafe(1),
-      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5)
+      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5),
+      hostname: String = "127.0.0.1"
   ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
-    val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
+    val publicAddress: InetSocketAddress = new InetSocketAddress(hostname, port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
       val scanFrequency: Duration     = _scanFrequency
