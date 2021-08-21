@@ -25,7 +25,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.{BlockHash, Generators}
 import org.alephium.util.{AlephiumActorSpec, AVector}
 
-class BlockFlowSynchronizerSpec extends AlephiumActorSpec("BlockFlowSynchronizer") {
+class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture with Generators with Eventually {
     val (allHandlers, _) = TestUtils.createAllHandlersProbe
     val blockFlowSynchronizer = TestActorRef[BlockFlowSynchronizer](

@@ -29,7 +29,7 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TxGenerators}
 import org.alephium.util.{AlephiumActorSpec, AVector, UnsecureRandom}
 
-class FetcherSpec extends AlephiumActorSpec("fetcher") {
+class FetcherSpec extends AlephiumActorSpec {
   class TestFetcher(val blockflow: BlockFlow)(implicit
       val brokerConfig: BrokerConfig,
       val networkSetting: NetworkSetting

@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.alephium.crypto.Blake2b
 import org.alephium.util.AlephiumActorSpec
 
-class UdpServerSpec extends AlephiumActorSpec("UdpServer") {
+class UdpServerSpec extends AlephiumActorSpec {
   it should "read and write messages" in new Fixture {
     val (bindAddress0, udpServer0) = createUdpServer()
     val (bindAddress1, udpServer1) = createUdpServer()

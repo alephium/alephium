@@ -32,7 +32,7 @@ import org.alephium.protocol.model._
 import org.alephium.util._
 
 class DiscoveryServerSpec
-    extends RefinedAlephiumActorSpec
+    extends AlephiumActorSpec
     with ScalaFutures
     with Eventually
     with SocketUtil
@@ -90,9 +90,8 @@ class DiscoveryServerSpec
     }
   }
 
-  it should "simulate large network" in new ActorFixture
-    with SimulationFixture
-    with NetworkConfigFixture.Default { self =>
+  it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
+    self =>
     val groups = 4
 
     val cliqueNum = 16
@@ -225,10 +224,7 @@ class DiscoveryServerSpec
     }
   }
 
-  trait Fixture
-      extends ActorFixture
-      with BrokerConfigFixture.Default
-      with NetworkConfigFixture.Default {
+  trait Fixture extends BrokerConfigFixture.Default with NetworkConfigFixture.Default {
 
     override val groups = Gen.choose(2, 10).sample.get
 
@@ -243,15 +239,17 @@ class DiscoveryServerSpec
     val misbehaviorManager0 = buildMisbehaviorManager(system)
     val misbehaviorManager1 = buildMisbehaviorManager(system)
 
-    val server0 =
+    lazy val server0 =
       TestActorRef[DiscoveryServer](
         DiscoveryServer.props(address0, misbehaviorManager0)(brokerConfig, config0, networkConfig)
-      )
-    val server1 =
+      )(system)
+
+    val system1 = createSystem()
+    lazy val server1 =
       TestActorRef[DiscoveryServer](
         DiscoveryServer
           .props(address1, misbehaviorManager1, address0)(brokerConfig, config1, networkConfig)
-      )
+      )(system1)
 
     val misbehaviorProbe = TestProbe()
     system.eventStream.subscribe(misbehaviorProbe.ref, classOf[MisbehaviorManager.InvalidMessage])

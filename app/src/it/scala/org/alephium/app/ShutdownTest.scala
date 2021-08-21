@@ -24,8 +24,8 @@ import akka.testkit.TestProbe
 
 import org.alephium.util._
 
-class ShutdownTest extends AlephiumSpec {
-  it should "shutdown the node when Tcp port is used" in new TestFixture("1-node") {
+class ShutdownTest extends AlephiumActorSpec {
+  it should "shutdown the node when Tcp port is used" in new CliqueFixture {
     val connection = TestProbe()
     IO(Tcp) ! Tcp.Bind(connection.ref, new InetSocketAddress("127.0.0.1", defaultMasterPort))
 
@@ -39,9 +39,7 @@ class ShutdownTest extends AlephiumSpec {
     }
   }
 
-  it should "shutdown the clique when one node of the clique is down" in new TestFixture(
-    "2-nodes"
-  ) {
+  it should "shutdown the clique when one node of the clique is down" in new CliqueFixture {
     val clique = bootClique(nbOfNodes = 2)
     clique.start()
 

@@ -16,81 +16,64 @@
 
 package org.alephium.util
 
-import scala.concurrent.Await
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration.Duration
 import scala.language.implicitConversions
+import scala.reflect.ClassTag
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestKitBase}
-import com.typesafe.config.ConfigFactory
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
-import org.scalatest.concurrent.ScalaFutures
+import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
+import akka.testkit.{TestActorRef, TestKit}
+import com.typesafe.config.{Config, ConfigFactory}
+import org.scalatest.BeforeAndAfterEach
 
-class AlephiumActorSpec(val name: String) extends AlephiumActorSpecLike {
-  implicit lazy val system: ActorSystem = createSystem(name)
-}
+trait AlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with ActorKit {
+  implicit def actorSpec: AlephiumActorSpec = this
 
-trait AlephiumActorSpecLike
-    extends TestKitBase
-    with ImplicitSender
-    with AlephiumSpec
-    with BeforeAndAfterAll
-    with AlephiumActorSpec.Utils {
-  def createSystem(name: String, config: String = AlephiumActorSpec.warningConfig): ActorSystem = {
-    ActorSystem(
-      s"$name-${SecureAndSlowRandom.nextU256().toString}",
-      ConfigFactory.parseString(config)
-    )
+  def actorSystemConfig: Config = AlephiumActorSpec.warningConfig
+
+  val systems: ArrayBuffer[ActorSystem] = ArrayBuffer.empty[ActorSystem]
+  implicit def system: ActorSystem      = systems.synchronized(systems.head)
+  var testKit: TestKit                  = _
+
+  def createSystem(configOpt: Option[Config] = None): ActorSystem = {
+    val name   = s"test-${systems.length}-${UnsecureRandom.source.nextLong()}"
+    val system = ActorSystem(name, configOpt.getOrElse(actorSystemConfig))
+    systems.addOne(system)
+    system
   }
 
-  override def afterAll(): Unit = {
-    TestKit.shutdownActorSystem(system)
+  override def beforeEach(): Unit = systems.synchronized {
+    super.beforeEach()
+    createSystem()
+    testKit = new TestKit(system)
+    ()
   }
-}
 
-trait RefinedAlephiumActorSpec
-    extends AlephiumSpec
-    with BeforeAndAfterEach
-    with ScalaFutures
-    with AlephiumActorSpec.Utils {
-  @volatile var _system: ActorSystem = _
-
-  override def afterEach(): Unit = {
+  override def afterEach(): Unit = systems.synchronized {
     super.afterEach()
-    if (_system != null) {
-      Await.result(_system.terminate(), Duration.ofSecondsUnsafe(10).asScala)
-      ()
+    systems.foreach { system =>
+      TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
     }
+    systems.clear()
   }
 
-  trait SystemFixture {
-    implicit val system: ActorSystem =
-      ActorSystem("test", ConfigFactory.parseString(AlephiumActorSpec.warningConfig))
-    _system = system
-
-    // TestActorRef can't be used together with Stash sometimes, ref: internet
-    def newTestActorRef[T <: Actor](props: Props): TestActorRef[T] = {
-      newTestActorRef(props, SecureAndSlowRandom.nextU256().toString)
-    }
-
-    def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
-      akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
-    }
+  // TestActorRef can't be used together with Stash sometimes, ref: internet
+  def newTestActorRef[T <: Actor](props: Props): TestActorRef[T] = {
+    newTestActorRef(props, SecureAndSlowRandom.nextU256().toString)
   }
 
-  trait ActorFixture extends SystemFixture with TestKitBase with ImplicitSender
+  def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
+    akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
+  }
 }
 
 object AlephiumActorSpec {
-  lazy val warningConfig = config("WARNING")
-  lazy val infoConfig    = config("INFO")
-  lazy val debugConfig   = config("DEBUG")
+  lazy val warningConfig: Config = config("WARNING")
+  lazy val infoConfig: Config    = config("INFO")
+  lazy val debugConfig: Config   = config("DEBUG")
 
-  trait Utils {
-    implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
-  }
-
-  def config(logLevel: String): String =
-    s"""
+  def config(logLevel: String): Config =
+    ConfigFactory.parseString(s"""
       |akka {
       |  loglevel = "$logLevel"
       |  loggers = ["akka.testkit.TestEventListener"]
@@ -111,5 +94,26 @@ object AlephiumActorSpec {
       |    }
       |  }
       |}
-    """.stripMargin
+    """.stripMargin)
+}
+
+trait ActorKit {
+  def testKit: TestKit
+
+  implicit def safeActor[T](ref: ActorRef): ActorRefT[T] = ActorRefT(ref)
+
+  def testActor: ActorRef              = testKit.testActor
+  implicit def self: ActorRef          = testKit.testActor
+  def watch(ref: ActorRef): ActorRef   = testKit.watch(ref)
+  def unwatch(ref: ActorRef): ActorRef = testKit.unwatch(ref)
+  def expectMsg[T](obj: T): T          = testKit.expectMsg(obj)
+  def expectNoMsg(): Unit              = testKit.expectNoMessage()
+  def expectNoMessage(): Unit          = testKit.expectNoMessage()
+
+  def expectMsgType[T](implicit t: ClassTag[T]): T = testKit.expectMsgType[T]
+  def expectMsgPF[T](max: Duration = Duration.Undefined, hint: String = "")(
+      f: PartialFunction[Any, T]
+  ): T = testKit.expectMsgPF(max, hint)(f)
+  def expectTerminated(target: ActorRef, max: Duration = Duration.Undefined): Terminated =
+    testKit.expectTerminated(target, max)
 }

@@ -29,7 +29,7 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
 
-class MinerStateSpec extends AlephiumFlowActorSpec("FairMinerState") { Spec =>
+class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
 
   val minerAddresses =
     AVector.tabulate(groups0)(g => getGenesisLockupScript(ChainIndex.unsafe(g, 0)))

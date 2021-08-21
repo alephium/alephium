@@ -32,9 +32,7 @@ import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration, TimeStamp}
 
-class DiscoveryServerStateSpec
-    extends AlephiumActorSpec("DiscoveryServer")
-    with NoIndexModelGenerators {
+class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenerators {
   import DiscoveryMessage._
   import DiscoveryServerSpec._
 

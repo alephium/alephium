@@ -30,7 +30,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model.{ChainIndex, FlowData, Nonce}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
-class DependencyHandlerSpec extends AlephiumActorSpec("DependencyHandlerSpec") {
+class DependencyHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture { Self =>
     lazy val brokerProbe = TestProbe()
     lazy val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)

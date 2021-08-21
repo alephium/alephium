@@ -18,7 +18,6 @@ package org.alephium.flow
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.concurrent.Await
 import scala.language.implicitConversions
 
 import akka.util.ByteString
@@ -495,11 +494,9 @@ trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixt
   }
 }
 
-class AlephiumFlowActorSpec(name: String) extends AlephiumActorSpec(name) with AlephiumFlowSpec {
+class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec {
   override def afterAll(): Unit = {
     super.afterAll()
     cleanStorages()
-    Await.result(system.terminate(), Duration.ofSecondsUnsafe(2).asScala)
-    ()
   }
 }

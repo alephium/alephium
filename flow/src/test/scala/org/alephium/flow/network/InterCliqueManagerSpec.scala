@@ -19,11 +19,10 @@ package org.alephium.flow.network
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorRef
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
-import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
@@ -37,8 +36,9 @@ import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
-class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutures {
-  implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
+class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with ScalaFutures {
+  override def actorSystemConfig = AlephiumActorSpec.debugConfig
+  implicit val timeout: Timeout  = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
   it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
     val connection = TestProbe()
@@ -417,12 +417,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     }
   }
 
-  trait Fixture extends FlowFixture with Generators with AlephiumActorSpecLike {
-    val name: String = s"InterCliqueManger-${Hash.random.shortHex}"
-
-    implicit override lazy val system: ActorSystem =
-      ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
-
+  trait Fixture extends FlowFixture with Generators {
     lazy val maxOutboundConnectionsPerGroup: Int = config.network.maxOutboundConnectionsPerGroup
     lazy val maxInboundConnectionsPerGroup: Int  = config.network.maxInboundConnectionsPerGroup
 

@@ -18,18 +18,16 @@ package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestProbe}
-import com.typesafe.config.ConfigFactory
 import org.scalacheck.Gen
 
-import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumActorSpec, AVector}
 
-class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
+class TxHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "broadcast valid tx" in new Fixture {
     val tx = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
@@ -79,14 +77,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec("TxHandlerSpec") {
   it should "clean tx pool regularly" in new FlowFixture {
     override val configValues = Map(("alephium.mempool.clean-frequency", "300 ms"))
 
-    implicit lazy val system: ActorSystem =
-      ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
+    implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.debugConfig))
 
     EventFilter.debug("Start to clean tx pools", occurrences = 5).intercept {
       system.actorOf(TxHandler.props(blockFlow))
     }
-
-    system.terminate()
   }
 
   trait Fixture extends FlowFixture with TxGenerators {

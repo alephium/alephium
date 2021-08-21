@@ -41,7 +41,7 @@ import org.alephium.protocol.message._
 import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGeneratorsLike}
 import org.alephium.util.{ActorRefT, AVector, UnsecureRandom}
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandlerSpec") {
+class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "set remote synced" in new Fixture {
     brokerHandler.underlyingActor.selfSynced is false
     brokerHandler.underlyingActor.remoteSynced is false

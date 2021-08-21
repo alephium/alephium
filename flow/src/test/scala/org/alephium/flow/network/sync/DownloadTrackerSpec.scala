@@ -26,7 +26,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
-class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
+class DownloadTrackerSpec extends AlephiumFlowActorSpec {
   trait Fixture { F =>
     val blockflow = genesisBlockFlow()
     val hashes = AVector.from((1 to 5).map { k =>
