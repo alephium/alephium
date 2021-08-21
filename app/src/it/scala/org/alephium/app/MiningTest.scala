@@ -21,8 +21,8 @@ import org.alephium.flow.mining.Miner
 import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._
 
-class MiningTest extends AlephiumSpec {
-  class Fixture(name: String, numNodes: Int) extends TestFixture(name) {
+class MiningTest extends AlephiumActorSpec {
+  class Fixture(numNodes: Int) extends CliqueFixture {
     val clique = bootClique(nbOfNodes = numNodes)
     clique.start()
     clique.startWs()
@@ -33,7 +33,7 @@ class MiningTest extends AlephiumSpec {
     request[Balance](getBalance(address), restPort) is initialBalance
   }
 
-  it should "work with 2 nodes" in new Fixture("2-nodes", 2) {
+  it should "work with 2 nodes" in new Fixture(2) {
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
     clique.startMining()
     confirmTx(tx, restPort)
@@ -54,7 +54,7 @@ class MiningTest extends AlephiumSpec {
     clique.servers.foreach(_.flowSystem.whenTerminated.futureValue)
   }
 
-  it should "work with external miner" in new Fixture("2-nodes-external-miner", 2) {
+  it should "work with external miner" in new Fixture(2) {
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
     val server0 = clique.servers(0)
@@ -75,7 +75,7 @@ class MiningTest extends AlephiumSpec {
     clique.stop()
   }
 
-  it should "mine all the txs" in new Fixture("many-txs", 1) {
+  it should "mine all the txs" in new Fixture(1) {
     clique.startMining()
 
     val n = 10

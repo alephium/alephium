@@ -33,7 +33,7 @@ import org.alephium.protocol.message.{Hello, Payload, Pong, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{ActorRefT, Duration}
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec("BrokerHandler") {
+class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "handshake with new connection" in new Fixture {
     val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
     val brokerInfo =

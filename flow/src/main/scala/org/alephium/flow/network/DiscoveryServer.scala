@@ -150,6 +150,7 @@ class DiscoveryServer(
 
   def ready: Receive = {
     subscribeEvent(self, classOf[InterCliqueManager.Unreachable])
+    subscribeEvent(self, classOf[MisbehaviorManager.PeerBanned])
     handleUdp orElse handleCommand orElse handleBanning
   }
 

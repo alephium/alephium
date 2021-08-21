@@ -29,12 +29,10 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.util._
 
-class TcpControllerSpec
-    extends AlephiumSpec
-    with AlephiumConfigFixture
-    with RefinedAlephiumActorSpec {
+class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
 
-  trait Fixture extends Eventually with ActorFixture {
+  trait Fixture extends Eventually {
+    implicit val system = createSystem()
 
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()

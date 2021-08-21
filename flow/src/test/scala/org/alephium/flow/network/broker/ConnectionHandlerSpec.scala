@@ -28,9 +28,7 @@ import org.alephium.protocol.message.{Header, Hello, Message, Ping, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId, Version}
 import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
-class ConnectionHandlerSpec
-    extends AlephiumActorSpec("ConnectionHandler")
-    with AlephiumConfigFixture {
+class ConnectionHandlerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
   trait Fixture {
     val remoteAddress = SocketUtil.temporaryServerAddress()
     val connection    = TestProbe()

@@ -75,24 +75,20 @@ object Injected {
 
 }
 
-class InterCliqueSyncTest extends AlephiumSpec {
-  it should "boot and sync two cliques of 2 nodes" in new Fixture("2-cliques-of-2-nodes") {
+class InterCliqueSyncTest extends AlephiumActorSpec {
+  it should "boot and sync two cliques of 2 nodes" in new Fixture {
     test(2, 2)
   }
 
-  it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture(
-    "clique-1-node-clique-2-node"
-  ) {
+  it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture {
     test(1, 2)
   }
 
-  it should "boot and sync two cliques of 2 and 1 nodes" in new Fixture(
-    "clique-2-node-clique-1-node"
-  ) {
+  it should "boot and sync two cliques of 2 and 1 nodes" in new Fixture {
     test(2, 1)
   }
 
-  it should "support injection" in new Fixture("clique-2-node-clique-1-node-injection") {
+  it should "support injection" in new Fixture {
     test(
       2,
       1,
@@ -101,7 +97,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     )
   }
 
-  class Fixture(name: String) extends TestFixture(name) {
+  class Fixture extends CliqueFixture {
 
     // scalastyle:off method.length
     def test(
@@ -181,7 +177,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     // scalastyle:on method.length
   }
 
-  it should "ban node if not same chain id" in new TestFixture("2-nodes") {
+  it should "ban node if not same chain id" in new CliqueFixture {
     val server0 = bootClique(1).servers.head
     server0.start().futureValue is ()
 
@@ -219,7 +215,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "ban node if send invalid pong" in new TestFixture("2-nodes") {
+  it should "ban node if send invalid pong" in new CliqueFixture {
     val injection: PartialFunction[Payload, Payload] = { case Pong(requestId) =>
       val updatedRequestId = if (requestId.value.addUnsafe(U32.One) != U32.Zero) {
         RequestId(requestId.value.addUnsafe(U32.One))
@@ -265,7 +261,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "ban node if spamming" in new TestFixture("2-nodes") {
+  it should "ban node if spamming" in new CliqueFixture {
     val injectionData: ByteString => ByteString = { _ =>
       ByteString.fromArray(Array.fill[Byte](51)(-1))
     }
@@ -298,9 +294,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "boot and sync two cliques of 2 nodes when version is compatible" in new Fixture(
-    "2-cliques-of-2-nodes"
-  ) {
+  it should "boot and sync two cliques of 2 nodes when version is compatible" in new Fixture {
     val clique2Version = Version.release.copy(minor = Version.release.minor + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload) =>
       Message(Header(clique2Version), payload)
@@ -313,7 +307,7 @@ class InterCliqueSyncTest extends AlephiumSpec {
     )
   }
 
-  it should "ban node if version is not compatible" in new TestFixture("2-nodes") {
+  it should "ban node if version is not compatible" in new CliqueFixture {
     val dummyVersion = Version.release.copy(major = Version.release.major + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload: Hello) =>
       Message(Header(dummyVersion), payload)

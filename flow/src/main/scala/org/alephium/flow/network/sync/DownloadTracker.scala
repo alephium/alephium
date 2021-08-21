@@ -20,22 +20,13 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util.{AVector, BaseActor, Duration, TimeStamp}
 
 trait DownloadTracker extends BaseActor {
   def blockflow: BlockFlow
-  implicit def brokerConfig: BrokerConfig
-  implicit def networkSetting: NetworkSetting
 
   val syncing: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
-  val blockFetcher: BlockFetcher                     = BlockFetcher(blockflow)
-
-  def handleAnnouncement(hash: BlockHash): Unit = {
-    blockFetcher.fetch(hash).foreach(sender() ! _)
-  }
 
   def needToDownload(hash: BlockHash): Boolean =
     !(blockflow.containsUnsafe(hash) || syncing.contains(hash))

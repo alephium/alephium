@@ -26,7 +26,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager._
 import org.alephium.protocol.Generators
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
-class MisbehaviorManagerSpec extends AlephiumFlowActorSpec("MisbehaviorManagerSpec") {
+class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
   it should "start without peers" in new Fixture {
     misbehaviorManager ! GetPeers
     expectMsg(Peers(AVector.empty))

@@ -22,8 +22,8 @@ import org.alephium.api.model.SelfClique
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util._
 
-class IntraCliqueSyncTest extends AlephiumSpec {
-  it should "boot and sync single node clique" in new TestFixture("1-node") {
+class IntraCliqueSyncTest extends AlephiumActorSpec {
+  it should "boot and sync single node clique" in new CliqueFixture {
     val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
     server.start().futureValue is (())
     eventually(request[SelfClique](getSelfClique, defaultRestMasterPort).selfReady is true)
@@ -31,7 +31,7 @@ class IntraCliqueSyncTest extends AlephiumSpec {
     server.stop().futureValue is ()
   }
 
-  it should "boot and sync two nodes clique" in new TestFixture("2-nodes") {
+  it should "boot and sync two nodes clique" in new CliqueFixture {
     val server0 = bootNode(publicPort = defaultMasterPort, brokerId = 0)
     server0.start().futureValue is ()
 

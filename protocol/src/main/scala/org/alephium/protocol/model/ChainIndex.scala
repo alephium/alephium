@@ -73,7 +73,7 @@ object ChainIndex {
   }
 
   @inline
-  private def validate(from: Int, to: Int)(implicit config: GroupConfig): Boolean = {
+  def validate(from: Int, to: Int)(implicit config: GroupConfig): Boolean = {
     0 <= from && from < config.groups && 0 <= to && to < config.groups
   }
 

@@ -21,10 +21,10 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow._
 import org.alephium.flow.network.bootstrap.InfoFixture
-import org.alephium.protocol.model.NoIndexModelGeneratorsLike
+import org.alephium.util.AlephiumActorSpec
 
-class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
-  it should "bootstrap a master" in new MasterFixture("BootstrapperSpec-master") {
+class BootstrapperSpec extends AlephiumActorSpec {
+  it should "bootstrap a master" in new MasterFixture {
     val bootstrapper = system.actorOf(Bootstrapper.props(serverProbe.ref, cliqueManagerProbe.ref))
 
     serverProbe.expectMsg(TcpController.Start(bootstrapper))
@@ -51,7 +51,7 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     expectMsg(intraCliqueInfo)
   }
 
-  it should "bootstrap a peer" in new AlephiumFlowActorSpec("BootstrapperSpec") {
+  it should "bootstrap a peer" in new FlowFixture {
     val serverProbe        = TestProbe()
     val cliqueManagerProbe = TestProbe()
 
@@ -59,7 +59,7 @@ class BootstrapperSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     serverProbe.expectMsg(TcpController.Start(bootstrapper))
   }
 
-  class MasterFixture(name: String) extends AlephiumFlowActorSpec(name) with InfoFixture {
+  class MasterFixture extends FlowFixture with InfoFixture {
     override val configValues = Map(
       ("alephium.network.internal-address", s"127.0.0.1:9972"),
       ("alephium.network.coordinator-address", s"127.0.0.1:9972"),

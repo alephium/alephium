@@ -23,11 +23,10 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
-class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
+class DownloadTrackerSpec extends AlephiumFlowActorSpec {
   trait Fixture { F =>
     val blockflow = genesisBlockFlow()
     val hashes = AVector.from((1 to 5).map { k =>
@@ -41,9 +40,7 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec("DownloadTracker") {
     }
 
     class TestDownloadTracker extends DownloadTracker {
-      override def blockflow: BlockFlow            = F.blockflow
-      override lazy val brokerConfig: BrokerConfig = config.broker
-      override lazy val networkSetting             = config.network
+      override def blockflow: BlockFlow = F.blockflow
 
       override def receive: Receive = {
         case BlockFlowSynchronizer.SyncInventories(hashes) =>

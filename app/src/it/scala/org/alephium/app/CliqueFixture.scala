@@ -53,21 +53,17 @@ import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
-class TestFixture(val name: String) extends TestFixtureLike {
-  implicit lazy val system: ActorSystem = createSystem(name)
-  implicit lazy val executionContext    = system.dispatcher
-}
-
 // scalastyle:off method.length
 // scalastyle:off number.of.methods
-trait TestFixtureLike
-    extends AlephiumActorSpecLike
+class CliqueFixture(implicit spec: AlephiumActorSpec)
+    extends AlephiumSpec
     with AlephiumConfigFixture
     with NumericHelpers
     with ApiModelCodec
     with HttpFixture
     with ScalaFutures
     with Eventually { Fixture =>
+  implicit val system: ActorSystem = spec.system
 
   private val vertx      = Vertx.vertx()
   private val httpClient = vertx.createHttpClient()

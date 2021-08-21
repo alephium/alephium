@@ -22,9 +22,9 @@ import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.util._
 
-class SmartContractTest extends AlephiumSpec {
+class SmartContractTest extends AlephiumActorSpec {
 
-  it should "compile/execute smart contracts" in new TestFixture("swap") {
+  it should "compile/execute smart contracts" in new CliqueFixture {
 
     val clique = bootClique(nbOfNodes = 2)
     clique.start()

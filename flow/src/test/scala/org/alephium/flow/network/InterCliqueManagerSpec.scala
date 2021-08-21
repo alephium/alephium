@@ -19,11 +19,10 @@ package org.alephium.flow.network
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorRef
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
-import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
@@ -37,8 +36,9 @@ import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
-class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutures {
-  implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
+class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with ScalaFutures {
+  override def actorSystemConfig = AlephiumActorSpec.debugConfig
+  implicit val timeout: Timeout  = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
   it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
     val connection = TestProbe()
@@ -321,7 +321,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     broker2.expectNoMessage()
   }
 
-  it should "send announcement to peers" in new BroadCastFixture {
+  it should "send block announcements to peers" in new BroadCastFixture {
     val brokerInfo0 = genBrokerInfo(0)
     val brokerInfo1 = genBrokerInfo(2)
     val brokerInfo2 = genBrokerInfo(0)
@@ -348,7 +348,41 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     interCliqueManager ! message
     broker0.expectNoMessage()
     broker1.expectNoMessage()
-    broker2.expectMsg(BrokerHandler.RelayInventory(message.block.hash))
+    broker2.expectMsg(BrokerHandler.RelayBlock(message.block.hash))
+    broker3.expectNoMessage()
+  }
+
+  it should "send tx announcements to peers" in new BroadCastFixture {
+    val brokerInfo0 = genBrokerInfo(0)
+    val brokerInfo1 = genBrokerInfo(2)
+    val brokerInfo2 = genBrokerInfo(0)
+    val brokerInfo3 = genBrokerInfo(0)
+    val broker0     = TestProbe()
+    val broker1     = TestProbe()
+    val broker2     = TestProbe()
+    val broker3     = TestProbe()
+
+    broker0.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo0, InboundConnection))
+    broker1.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo1, InboundConnection))
+    broker2.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo2, InboundConnection))
+    broker3.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo3, InboundConnection))
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is true
+
+    interCliqueManager ! CliqueManager.Synced(brokerInfo0)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo1)
+    interCliqueManager ! CliqueManager.Synced(brokerInfo2)
+
+    val txHashes   = AVector.fill(4)(Hash.generate)
+    val chainIndex = ChainIndex.unsafe(0, 1)
+    val message =
+      CliqueManager.BroadCastTx(txHashes, chainIndex, DataOrigin.InterClique(brokerInfo0))
+    interCliqueManager ! message
+    broker0.expectNoMessage()
+    broker1.expectNoMessage()
+    broker2.expectMsg(BrokerHandler.RelayTxs(AVector((chainIndex, txHashes))))
     broker3.expectNoMessage()
   }
 
@@ -383,12 +417,7 @@ class InterCliqueManagerSpec extends AlephiumSpec with Generators with ScalaFutu
     }
   }
 
-  trait Fixture extends FlowFixture with Generators with AlephiumActorSpecLike {
-    val name: String = s"InterCliqueManger-${Hash.random.shortHex}"
-
-    implicit override lazy val system: ActorSystem =
-      ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.debugConfig))
-
+  trait Fixture extends FlowFixture with Generators {
     lazy val maxOutboundConnectionsPerGroup: Int = config.network.maxOutboundConnectionsPerGroup
     lazy val maxInboundConnectionsPerGroup: Int  = config.network.maxInboundConnectionsPerGroup
 

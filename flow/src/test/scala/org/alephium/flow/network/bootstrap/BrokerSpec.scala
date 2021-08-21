@@ -25,7 +25,7 @@ import org.alephium.flow.network.Bootstrapper
 import org.alephium.serde.Staging
 import org.alephium.util.ActorRefT
 
-class BrokerSpec extends AlephiumFlowActorSpec("BrokerSpec") with InfoFixture {
+class BrokerSpec extends AlephiumFlowActorSpec with InfoFixture {
   it should "follow this workflow" in {
     val connection         = TestProbe()
     val bootstrapper       = TestProbe()

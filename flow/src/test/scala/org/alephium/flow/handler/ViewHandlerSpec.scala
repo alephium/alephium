@@ -29,7 +29,7 @@ import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScrip
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
-class ViewHandlerSpec extends AlephiumSpec {
+class ViewHandlerSpec extends AlephiumActorSpec {
   it should "update when necessary" in {
     implicit val brokerConfig = new BrokerConfig {
       override def brokerId: Int  = 1
@@ -54,11 +54,9 @@ class ViewHandlerSpec extends AlephiumSpec {
 
   trait Fixture
       extends FlowFixture
-      with AlephiumActorSpecLike
       with Eventually
       with IntegrationPatience
       with LockupScriptGenerators {
-    implicit val system = createSystem("ViewHandlerSpec")
 
     val txProbe = TestProbe()
     lazy val minderAddresses =

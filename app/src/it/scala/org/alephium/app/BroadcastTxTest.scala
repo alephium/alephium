@@ -24,10 +24,8 @@ import org.alephium.api.model._
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
-class BroadcastTxTest extends AlephiumSpec {
-  it should "not broadcast tx between intra clique node" in new TestFixture(
-    "broadcast-tx-2-nodes"
-  ) {
+class BroadcastTxTest extends AlephiumActorSpec {
+  it should "not broadcast tx between intra clique node" in new CliqueFixture {
     val clique = bootClique(nbOfNodes = 2)
     clique.start()
 
@@ -40,9 +38,7 @@ class BroadcastTxTest extends AlephiumSpec {
     clique.stop()
   }
 
-  it should "broadcast sequential txs between inter clique node" in new TestFixture(
-    "broadcast-tx-inter-clique"
-  ) {
+  it should "broadcast sequential txs between inter clique node" in new CliqueFixture {
     val clique1           = bootClique(nbOfNodes = 1)
     val masterPortClique1 = clique1.masterTcpPort
 

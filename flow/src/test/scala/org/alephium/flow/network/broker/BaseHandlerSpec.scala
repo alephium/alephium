@@ -21,7 +21,7 @@ import akka.actor.Props
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.Generators.socketAddressGen
 
-class BaseHandlerSpec extends AlephiumFlowActorSpec("BaseHandlerSpec") {
+class BaseHandlerSpec extends AlephiumFlowActorSpec {
   it should "stop the actor when deal with critical misbehaviors" in new Fixture {
     val message = MisbehaviorManager.InvalidPoW(socketAddressGen.sample.get)
     handler ! message

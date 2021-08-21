@@ -26,10 +26,7 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.serde.Staging
 
-class BrokerConnectorSpec
-    extends AlephiumFlowActorSpec("BrokerConnector")
-    with InfoFixture
-    with ModelGenerators {
+class BrokerConnectorSpec extends AlephiumFlowActorSpec with InfoFixture with ModelGenerators {
   it should "follow this workflow" in {
     val connection        = TestProbe()
     val cliqueCoordinator = TestProbe()

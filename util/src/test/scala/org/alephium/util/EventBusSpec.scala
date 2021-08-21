@@ -18,7 +18,7 @@ package org.alephium.util
 
 import akka.testkit.TestProbe
 
-class EventBusSpec extends AlephiumActorSpec("EventBus") {
+class EventBusSpec extends AlephiumActorSpec {
 
   case object Dummy extends EventBus.Event
 

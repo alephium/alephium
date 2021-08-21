@@ -18,22 +18,18 @@ package org.alephium.flow.mining
 
 import scala.util.Random
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorRef
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, TestActor, TestActorRef, TestProbe}
-import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumActorSpec, AVector, SocketUtil}
+import org.alephium.util.{AVector, SocketUtil}
 
-class MinerApiControllerSpec extends AlephiumFlowActorSpec("MinerApi") with SocketUtil {
-  implicit override lazy val system: ActorSystem =
-    ActorSystem(name, ConfigFactory.parseString(AlephiumActorSpec.infoConfig))
-
+class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   trait Fixture extends Eventually {
     val apiPort                         = generatePort()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe

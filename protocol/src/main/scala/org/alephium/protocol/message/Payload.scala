@@ -25,6 +25,8 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
 
+//scalastyle:off number.of.types
+
 sealed trait Payload extends Product with Serializable {
   val name = productPrefix
 
@@ -33,6 +35,7 @@ sealed trait Payload extends Product with Serializable {
 
 object Payload {
 
+  //scalastyle:off cyclomatic.complexity
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
       case x: Hello           => (Hello, Hello.serialize(x))
@@ -47,15 +50,19 @@ object Payload {
       case x: NewBlock        => (NewBlock, NewBlock.serialize(x))
       case x: NewHeader       => (NewHeader, NewHeader.serialize(x))
       case x: NewInv          => (NewInv, NewInv.serialize(x))
-      case x: NewTxs          => (NewTxs, NewTxs.serialize(x))
       case x: NewBlockHash    => (NewBlockHash, NewBlockHash.serialize(x))
+      case x: NewTxHashes     => (NewTxHashes, NewTxHashes.serialize(x))
+      case x: TxsRequest      => (TxsRequest, TxsRequest.serialize(x))
+      case x: TxsResponse     => (TxsResponse, TxsResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
+  //scalastyle:on cyclomatic.complexity
 
   val deserializerCode: Deserializer[Code] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
+  //scalastyle:off cyclomatic.complexity
   def _deserialize(
       input: ByteString
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
@@ -73,11 +80,14 @@ object Payload {
         case NewBlock        => NewBlock._deserialize(rest)
         case NewHeader       => NewHeader._deserialize(rest)
         case NewInv          => NewInv._deserialize(rest)
-        case NewTxs          => NewTxs._deserialize(rest)
         case NewBlockHash    => NewBlockHash._deserialize(rest)
+        case NewTxHashes     => NewTxHashes._deserialize(rest)
+        case TxsRequest      => TxsRequest._deserialize(rest)
+        case TxsResponse     => TxsResponse._deserialize(rest)
       }
     }
   }
+  //scalastyle:on cyclomatic.complexity
 
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Payload] =
     _deserialize(input).flatMap { case Staging(output, rest) =>
@@ -136,8 +146,10 @@ object Payload {
         NewBlock,
         NewHeader,
         NewInv,
-        NewTxs,
-        NewBlockHash
+        NewBlockHash,
+        NewTxHashes,
+        TxsRequest,
+        TxsResponse
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -327,18 +339,76 @@ object NewInv extends Payload.Serding[NewInv] with Payload.Code {
   implicit val serde: Serde[NewInv] = Serde.forProduct1(apply, _.hashes)
 }
 
-final case class NewTxs(txs: AVector[TransactionTemplate]) extends Payload.UnSolicited {
-  override def measure(): Unit = NewTxs.payloadLabeled.inc()
-}
-
-object NewTxs extends Payload.Serding[NewTxs] with Payload.Code {
-  implicit val serde: Serde[NewTxs] = Serde.forProduct1(apply, p => p.txs)
-}
-
 final case class NewBlockHash(hash: BlockHash) extends Payload.UnSolicited {
   override def measure(): Unit = NewBlockHash.payloadLabeled.inc()
 }
 
 object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
   implicit val serde: Serde[NewBlockHash] = Serde.forProduct1(apply, _.hash)
+}
+
+trait IndexedHashes {
+  def hashes: AVector[(ChainIndex, AVector[Hash])]
+}
+
+sealed trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
+  override def validate(input: T)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (input.hashes.forall(p => IndexedSerding.check(p._1))) {
+      Right(())
+    } else {
+      Left("Invalid ChainIndex in Tx payload")
+    }
+  }
+}
+
+object IndexedSerding {
+  implicit private[message] val txSerde: Serde[(ChainIndex, AVector[Hash])] = {
+    implicit val indexSerde: Serde[ChainIndex] =
+      Serde.forProduct2[Int, Int, ChainIndex](
+        (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
+        chainIndex => (chainIndex.from.value, chainIndex.to.value)
+      )
+    Serde.tuple2[ChainIndex, AVector[Hash]]
+  }
+
+  @inline private def check(
+      chainIndex: ChainIndex
+  )(implicit config: GroupConfig): Boolean = {
+    ChainIndex.validate(chainIndex.from.value, chainIndex.to.value)
+  }
+}
+
+final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])])
+    extends Payload.UnSolicited
+    with IndexedHashes {
+  override def measure(): Unit = NewTxHashes.payloadLabeled.inc()
+}
+
+object NewTxHashes extends IndexedSerding[NewTxHashes] with Payload.Code {
+  import IndexedSerding.txSerde
+  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+}
+
+final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[Hash])])
+    extends Payload.Solicited
+    with IndexedHashes {
+  override def measure(): Unit = TxsRequest.payloadLabeled.inc()
+}
+
+object TxsRequest extends IndexedSerding[TxsRequest] with Payload.Code {
+  import IndexedSerding.txSerde
+  implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+
+  def apply(hashes: AVector[(ChainIndex, AVector[Hash])]): TxsRequest =
+    TxsRequest(RequestId.random(), hashes)
+}
+
+final case class TxsResponse(id: RequestId, txs: AVector[TransactionTemplate])
+    extends Payload.Solicited {
+  override def measure(): Unit = TxsResponse.payloadLabeled.inc()
+}
+
+object TxsResponse extends Payload.Serding[TxsResponse] with Payload.Code {
+  implicit val serde: Serde[TxsResponse] =
+    Serde.forProduct2(apply, p => (p.id, p.txs))
 }

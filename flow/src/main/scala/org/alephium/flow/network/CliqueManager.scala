@@ -26,6 +26,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker.ConnectionType
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
@@ -59,8 +60,7 @@ object CliqueManager {
   ) extends Command
       with EventStream.Event
   final case class BroadCastTx(
-      txs: AVector[TransactionTemplate],
-      txMsg: ByteString,
+      hashes: AVector[Hash],
       chainIndex: ChainIndex,
       origin: DataOrigin
   ) extends Command

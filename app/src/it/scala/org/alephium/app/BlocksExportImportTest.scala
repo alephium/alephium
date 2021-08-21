@@ -18,8 +18,8 @@ package org.alephium.app
 
 import org.alephium.util._
 
-class BlocksExportImportTest extends AlephiumSpec {
-  it should "correcly export/import blocks" in new TestFixture("export-import-blocks") {
+class BlocksExportImportTest extends AlephiumActorSpec {
+  it should "correcly export/import blocks" in new CliqueFixture {
     val filename = s"export-import-test-${TimeStamp.now().millis}"
 
     val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)

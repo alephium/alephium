@@ -29,7 +29,7 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, Duration}
 
-class MinerSpec extends AlephiumFlowActorSpec("Miner") with ScalaFutures {
+class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
 
   implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
 

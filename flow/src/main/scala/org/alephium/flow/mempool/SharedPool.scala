@@ -40,6 +40,15 @@ class SharedPool private (
     txs.contains(txId)
   }
 
+  def getTxs(txIds: AVector[Hash]): AVector[TransactionTemplate] = readOnly {
+    txIds.fold(AVector.empty[TransactionTemplate]) { (acc, txId) =>
+      txs.get(txId) match {
+        case Some(tx) => acc :+ tx
+        case None     => acc
+      }
+    }
+  }
+
   def collectForBlock(maxNum: Int): AVector[TransactionTemplate] = readOnly {
     txs.getMaxValues(maxNum)
   }
