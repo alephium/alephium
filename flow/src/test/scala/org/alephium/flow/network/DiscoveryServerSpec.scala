@@ -184,7 +184,7 @@ class DiscoveryServerSpec
       peers.map(_.address).contains(address0) is true
     }
 
-    server0 ! MisbehaviorManager.PeerBanned(address1.getAddress)
+    misbehaviorManager0.ref ! MisbehaviorManager.InvalidMessage(address1)
 
     withPeers(server0) { peers =>
       // self clique peers might get removed as server0 and server1 have the same host address
