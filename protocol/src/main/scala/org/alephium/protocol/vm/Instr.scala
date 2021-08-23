@@ -1099,10 +1099,8 @@ object CopyCreateContract extends ContractInstr with GasCreate {
 object DestroySelf extends ContractInstr with GasDestroy {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      callerFrame <- frame.getCallerFrame()
-      _           <- if (callerFrame.obj.isScript()) okay else failed(ContractDestructionShouldBeCalledFromTx)
-      address     <- frame.popOpStackT[Val.Address]()
-      _           <- frame.destroyContract(address.lockupScript)
+      address <- frame.popOpStackT[Val.Address]()
+      _       <- frame.destroyContract(address.lockupScript)
     } yield ()
   }
 }

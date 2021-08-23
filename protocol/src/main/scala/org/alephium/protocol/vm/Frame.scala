@@ -239,6 +239,8 @@ final class StatefulFrame(
   def destroyContract(address: LockupScript): ExeResult[Unit] = {
     for {
       contractId   <- obj.getContractId()
+      callerFrame  <- getCallerFrame()
+      _            <- checkCallerForContractDestruction(contractId, callerFrame)
       balanceState <- getBalanceState()
       contractAssets <- balanceState
         .useAll(LockupScript.p2c(contractId))
@@ -247,6 +249,23 @@ final class StatefulFrame(
       _ <- runReturn()
     } yield {
       pc -= 1 // because of the `advancePC` call following this instruction
+    }
+  }
+
+  private def checkCallerForContractDestruction(
+      contractId: ContractId,
+      callerFrame: Frame[StatefulContext]
+  ): ExeResult[Unit] = {
+    if (callerFrame.obj.isScript()) {
+      okay
+    } else {
+      callerFrame.obj.getContractId().flatMap { callerContractId =>
+        if (callerContractId == contractId) {
+          failed(ContractDestructionShouldNotBeCalledFromSelf)
+        } else {
+          okay
+        }
+      }
     }
   }
 

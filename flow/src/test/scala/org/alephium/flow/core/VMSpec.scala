@@ -635,17 +635,19 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
-  it should "destroy contract" in new ContractFixture {
+  trait DestroyFixture extends ContractFixture {
     def prepareContract(
         contract: String,
-        initialState: AVector[Val]
+        initialState: AVector[Val] = AVector.empty
     ): (String, ContractOutputRef) = {
       val contractId       = createContract(contract, initialState).key
       val worldState       = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractAssetRef = worldState.getContractState(contractId).rightValue.contractOutputRef
       contractId.toHexString -> contractAssetRef
     }
+  }
 
+  it should "destroy contract" in new DestroyFixture {
     val foo =
       s"""
          |TxContract Foo(mut x: U256) {
@@ -698,11 +700,81 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Destroy a contract properly")
-      val script = Compiler.compileTxScript(main(genesisAddress.toBase58)).rightValue
-      val block  = payableCall(blockFlow, chainIndex, script)
-      addAndCheck(blockFlow, block)
+      callTxScript(main(genesisAddress.toBase58))
       checkContractState(fooId, fooAssetRef, false)
     }
+  }
+
+  it should "call contract destroy function from another contract" in new DestroyFixture {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, fooAssetRef) = prepareContract(foo)
+    checkContractState(fooId, fooAssetRef, true)
+
+    val bar =
+      s"""
+         |TxContract Bar() {
+         |  pub payable fn bar(targetAddress: Address) -> () {
+         |    Foo(#$fooId).destroy(targetAddress) // in practice, the contract should check the caller before destruction
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector.empty).key.toHexString
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Bar(#$barId).bar(@${genesisAddress.toBase58})
+         |  }
+         |}
+         |
+         |$bar
+         |""".stripMargin
+
+    callTxScript(main)
+    checkContractState(fooId, fooAssetRef, false)
+  }
+
+  it should "not call contract destroy function from the same contract" in new DestroyFixture {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  pub payable fn foo(targetAddress: Address) -> () {
+         |    approveAlf!(selfAddress!(), alfRemaining!(selfAddress!()))
+         |    destroy(targetAddress)
+         |  }
+         |
+         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, fooAssetRef) = prepareContract(foo)
+    checkContractState(fooId, fooAssetRef, true)
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Foo(#$fooId).foo(@${genesisAddress.toBase58})
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage.startsWith(
+      "Left(org.alephium.io.IOError$KeyNotFound: java.lang.Exception: Key ContractOutputRef("
+    ) is true
   }
 
   it should "fetch block env" in new ContractFixture {
