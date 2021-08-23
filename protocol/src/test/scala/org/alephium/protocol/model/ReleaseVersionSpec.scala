@@ -14,21 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.protocol.model
 
-import org.alephium.protocol.WireVersion
-import org.alephium.serde.Serde
+import org.alephium.protocol.Generators
+import org.alephium.util.AlephiumSpec
 
-final case class Header(version: WireVersion)
+class ReleaseVersionSpec extends AlephiumSpec {
+  it should "get version from release string" in {
+    forAll(Generators.versionGen) { case (versionStr, version) =>
+      ReleaseVersion.from(versionStr) contains version
+    }
 
-object Header {
-  implicit val serde: Serde[Header] = WireVersion.serde
-    .validate(_version =>
-      if (_version == WireVersion.currentWireVersion) {
-        Right(())
-      } else {
-        Left(s"Invalid version: got ${_version}, expect: ${WireVersion.currentWireVersion.value}")
-      }
-    )
-    .xmap(apply, _.version)
+    val release = "0.1.1-rc1"
+    ReleaseVersion.from(release) is Some(ReleaseVersion(0, 1, 1))
+  }
 }

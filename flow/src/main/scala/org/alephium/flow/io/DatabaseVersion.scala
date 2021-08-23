@@ -14,21 +14,14 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.flow.io
 
-import org.alephium.protocol.WireVersion
 import org.alephium.serde.Serde
 
-final case class Header(version: WireVersion)
+final case class DatabaseVersion(value: Int) extends AnyVal
 
-object Header {
-  implicit val serde: Serde[Header] = WireVersion.serde
-    .validate(_version =>
-      if (_version == WireVersion.currentWireVersion) {
-        Right(())
-      } else {
-        Left(s"Invalid version: got ${_version}, expect: ${WireVersion.currentWireVersion.value}")
-      }
-    )
-    .xmap(apply, _.version)
+object DatabaseVersion {
+  implicit val serde: Serde[DatabaseVersion] = Serde.forProduct1(apply, _.value)
+
+  val currentDBVersion: DatabaseVersion = DatabaseVersion(0)
 }

@@ -17,9 +17,7 @@
 package org.alephium.flow.io
 
 import org.alephium.io.{IOError, RocksDBSource}
-import org.alephium.protocol.Generators
 import org.alephium.protocol.config.GroupConfigFixture
-import org.alephium.protocol.model.Version
 import org.alephium.util.AlephiumSpec
 
 class NodeStateStorageSpec
@@ -32,30 +30,20 @@ class NodeStateStorageSpec
     source => NodeStateRockDBStorage(source, RocksDBSource.ColumnFamily.All)
 
   it should "check database compatibility" in {
-    val initDbVersion = Generators.versionGen.sample.get._2
-    storage.setDatabaseVersion(initDbVersion) isE ()
-    storage.getDatabaseVersion() isE Some(initDbVersion)
+    storage.setDatabaseVersion(DatabaseVersion.currentDBVersion) isE ()
+    storage.getDatabaseVersion() isE Some(DatabaseVersion.currentDBVersion)
+    storage.checkDatabaseCompatibility() isE ()
 
-    forAll(Generators.versionGen, Generators.versionGen) {
-      case ((_, minimalVersion), (_, nodeVersion)) if minimalVersion <= nodeVersion =>
-        val dbVersion = storage.getDatabaseVersion().rightValue.get
-        if (dbVersion < minimalVersion || dbVersion > nodeVersion) {
-          storage
-            .checkDatabaseCompatibility(minimalVersion, nodeVersion)
-            .leftValue is a[IOError.Other]
-        } else {
-          storage.checkDatabaseCompatibility(minimalVersion, nodeVersion) isE ()
-          storage.getDatabaseVersion() isE Some(nodeVersion)
-        }
-      case _ => true
-    }
+    val invalidDBVersion = DatabaseVersion(DatabaseVersion.currentDBVersion.value + 1)
+    storage.setDatabaseVersion(invalidDBVersion) isE ()
+    storage.getDatabaseVersion() isE Some(invalidDBVersion)
+    storage.checkDatabaseCompatibility().leftValue is a[IOError.Other]
   }
 
   it should "update database version when init" in {
     storage.getDatabaseVersion() isE None
 
-    val version: Version = Generators.versionGen.sample.get._2
-    storage.checkDatabaseCompatibility(version, version) isE ()
-    storage.getDatabaseVersion() isE Some(version)
+    storage.checkDatabaseCompatibility() isE ()
+    storage.getDatabaseVersion() isE Some(DatabaseVersion.currentDBVersion)
   }
 }

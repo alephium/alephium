@@ -24,9 +24,10 @@ import akka.util.ByteString
 
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
+import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
-import org.alephium.protocol.model.{BrokerInfo, ChainId, Version}
+import org.alephium.protocol.model.{BrokerInfo, ChainId}
 import org.alephium.util._
 
 class Injected[T](injection: ByteString => ByteString, ref: ActorRef) extends ActorRefT[T](ref) {
@@ -294,21 +295,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "boot and sync two cliques of 2 nodes when version is compatible" in new Fixture {
-    val clique2Version = Version.release.copy(minor = Version.release.minor + 1)
-    val injection: PartialFunction[Message, Message] = { case Message(_, payload) =>
-      Message(Header(clique2Version), payload)
-    }
-    test(
-      2,
-      2,
-      clique1ConnectionBuild = Injected.noModification,
-      clique2ConnectionBuild = Injected.message(injection, _)
-    )
-  }
-
   it should "ban node if version is not compatible" in new CliqueFixture {
-    val dummyVersion = Version.release.copy(major = Version.release.major + 1)
+    val dummyVersion = WireVersion(WireVersion.currentWireVersion.value + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload: Hello) =>
       Message(Header(dummyVersion), payload)
     }
