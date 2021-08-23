@@ -14,21 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.protocol.model
 
-import org.alephium.protocol.Protocol
-import org.alephium.serde.{intSerde, Serde}
+import org.alephium.protocol.Generators
+import org.alephium.util.AlephiumSpec
 
-final case class Header(version: Int) extends AnyVal
+class ReleaseVersionSpec extends AlephiumSpec {
+  it should "get version from release string" in {
+    forAll(Generators.versionGen) { case (versionStr, version) =>
+      ReleaseVersion.from(versionStr) contains version
+    }
 
-object Header {
-  implicit val serde: Serde[Header] = intSerde
-    .validate(_version =>
-      if (_version == Protocol.WireProtocolVersion) {
-        Right(())
-      } else {
-        Left(s"Invalid version: got ${_version}, expect: ${Protocol.WireProtocolVersion}")
-      }
-    )
-    .xmap(Header.apply, _.version)
+    val release = "0.1.1-rc1"
+    ReleaseVersion.from(release) is Some(ReleaseVersion(0, 1, 1))
+  }
 }

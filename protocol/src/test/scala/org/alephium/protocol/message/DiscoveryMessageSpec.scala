@@ -19,13 +19,14 @@ package org.alephium.protocol.message
 import java.net.InetSocketAddress
 
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.{Protocol, SignatureSchema}
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
+import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
 class DiscoveryMessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
-  import DiscoveryMessage.Code
+  import DiscoveryMessage.{Code, Header}
 
   implicit val ordering: Ordering[Code[_]] = Ordering.by(Code.toInt(_))
 
@@ -59,6 +60,17 @@ class DiscoveryMessageSpec extends AlephiumSpec with NetworkConfigFixture.Defaul
       val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
       val neighborsPerGroup: Int      = 1
     }
+  }
+
+  it should "serialize/deserialize the Header when version compatible" in {
+    val header = Header(Protocol.DiscoveryProtocolVersion)
+    val bytes  = serialize(header)
+    deserialize[Header](bytes) isE header
+  }
+
+  it should "deserialize failed when version not compatible" in {
+    val bytes = serialize(Header(Protocol.WireProtocolVersion + 1))
+    deserialize[Header](bytes).leftValue is a[SerdeError]
   }
 
   it should "support serde for all message types" in new DiscoveryConfigFixture

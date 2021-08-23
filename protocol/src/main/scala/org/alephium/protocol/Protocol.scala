@@ -14,28 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.model
+package org.alephium.protocol
 
-import org.alephium.protocol.Generators
-import org.alephium.util.AlephiumSpec
-
-class VersionSpec extends AlephiumSpec {
-  it should "get version from release string" in {
-    forAll(Generators.versionGen) { case (versionStr, version) =>
-      Version.fromReleaseVersion(versionStr) contains version
-    }
-  }
-
-  it should "compatible between same major version" in {
-    val major    = 10
-    val version1 = Version(major, 100, 0)
-    val version2 = Version(major, 0, 1000)
-    version1.compatible(version2) is true
-  }
-
-  it should "not compatible between different major version" in {
-    val version1 = Version(10, 100, 0)
-    val version2 = Version(9, 100, 0)
-    version1.compatible(version2) is false
-  }
+object Protocol {
+  val WireProtocolVersion: Int      = 0
+  val DiscoveryProtocolVersion: Int = 0
+  val DatabaseVersion: Int          = 0
 }

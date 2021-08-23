@@ -19,10 +19,9 @@ package org.alephium.protocol.model
 import org.alephium.protocol.BuildInfo
 import org.alephium.serde.Serde
 
-final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Version] {
-  def compatible(version: Version): Boolean = major == version.major
-
-  override def compare(that: Version): Int = {
+final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
+    extends Ordered[ReleaseVersion] {
+  override def compare(that: ReleaseVersion): Int = {
     major.compare(that.major) match {
       case 0 =>
         minor.compare(that.minor) match {
@@ -36,25 +35,24 @@ final case class Version(major: Int, minor: Int, patch: Int) extends Ordered[Ver
   override def toString: String = s"v$major.$minor.$patch"
 }
 
-object Version {
-  val release: Version = fromReleaseVersion(BuildInfo.version).getOrElse(
+object ReleaseVersion {
+  val current: ReleaseVersion = from(BuildInfo.version).getOrElse(
     throw new RuntimeException(
       s"Invalid release version: ${BuildInfo.version}"
     )
   )
-  val dbMinimalVersion: Version = release
 
-  val clientId: String = s"scala-alephium/$release/${System.getProperty("os.name")}"
+  val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
 
-  def fromReleaseVersion(release: String): Option[Version] = {
+  def from(release: String): Option[ReleaseVersion] = {
     val regex = """^(\d+)\.(\d+)\.(\d+)(.*)?""".r
     release match {
       case regex(major, minor, patch, _) =>
-        Option(Version(major.toInt, minor.toInt, patch.toInt))
+        Option(ReleaseVersion(major.toInt, minor.toInt, patch.toInt))
       case _ => None
     }
   }
 
-  implicit val serde: Serde[Version] =
-    Serde.forProduct3(Version.apply, v => (v.major, v.minor, v.patch))
+  implicit val serde: Serde[ReleaseVersion] =
+    Serde.forProduct3(ReleaseVersion.apply, v => (v.major, v.minor, v.patch))
 }

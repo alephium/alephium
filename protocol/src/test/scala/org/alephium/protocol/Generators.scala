@@ -148,7 +148,7 @@ trait Generators extends NumericHelpers {
       port <- portGen
     } yield new InetSocketAddress(s"$ip0.$ip1.$ip2.$ip3", port)
 
-  lazy val versionGen: Gen[(String, Version)] = {
+  lazy val versionGen: Gen[(String, ReleaseVersion)] = {
     val positiveInt = Gen.choose(0, Int.MaxValue)
     for {
       major    <- positiveInt
@@ -157,7 +157,7 @@ trait Generators extends NumericHelpers {
       commitId <- Gen.option(Gen.hexStr)
     } yield (
       s"$major.$minor.$patch${commitId.map(id => s"+$id").getOrElse("")}",
-      Version(major, minor, patch)
+      ReleaseVersion(major, minor, patch)
     )
   }
 }

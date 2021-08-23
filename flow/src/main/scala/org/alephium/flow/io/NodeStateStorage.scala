@@ -24,7 +24,7 @@ import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ChainIndex, Version}
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -48,40 +48,35 @@ trait NodeStateStorage extends RawKeyValueStorage {
   private val dbVersionKey =
     Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
 
-  def setDatabaseVersion(version: Version): IOResult[Unit] =
+  def setDatabaseVersion(version: Int): IOResult[Unit] =
     IOUtils.tryExecute {
       putRawUnsafe(dbVersionKey, serialize(version))
     }
 
-  def getDatabaseVersion(): IOResult[Option[Version]] =
+  def getDatabaseVersion(): IOResult[Option[Int]] =
     IOUtils.tryExecute {
-      getOptRawUnsafe(dbVersionKey).map(deserialize[Version](_) match {
+      getOptRawUnsafe(dbVersionKey).map(deserialize[Int](_) match {
         case Left(e)  => throw e
         case Right(v) => v
       })
     }
 
-  def checkDatabaseCompatibility(
-      dbMinimalVersion: Version,
-      nodeVersion: Version
-  ): IOResult[Unit] = {
+  def checkDatabaseCompatibility(version: Int): IOResult[Unit] = {
     getDatabaseVersion().flatMap {
       case Some(dbVersion) =>
-        if (dbVersion < dbMinimalVersion || dbVersion > nodeVersion) {
+        if (dbVersion != version) {
           Left(
             IOError.Other(
               new RuntimeException(
-                s"Database version is $dbVersion, node supported minimal version is $dbMinimalVersion, node version is $nodeVersion"
+                s"Database version is not compatible: got $dbVersion, expect $version"
               )
             )
           )
-        } else if (dbMinimalVersion <= dbVersion && dbVersion < nodeVersion) {
-          setDatabaseVersion(nodeVersion)
         } else {
           Right(())
         }
       case None =>
-        setDatabaseVersion(nodeVersion)
+        setDatabaseVersion(version)
     }
   }
 
