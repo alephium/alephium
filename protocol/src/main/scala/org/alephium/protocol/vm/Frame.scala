@@ -171,15 +171,20 @@ final class StatelessFrame(
   }
 
   // the following should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState] = ???
+  def balanceStateOpt: Option[BalanceState] = None
   def createContract(
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
       fields: AVector[Val]
-  ): ExeResult[Unit]                                                        = ???
-  def destroyContract(address: LockupScript): ExeResult[Unit]               = ???
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]]                  = ???
-  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] = ???
+  ): ExeResult[Unit]                                          = StatelessFrame.notAllowed
+  def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]    = StatelessFrame.notAllowed
+  def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
+    StatelessFrame.notAllowed
+}
+
+object StatelessFrame {
+  val notAllowed: ExeResult[Nothing] = failed(ExpectStatefulFrame)
 }
 
 final class StatefulFrame(

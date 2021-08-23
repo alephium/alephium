@@ -23,6 +23,7 @@ import org.alephium.serde.SerdeError
 
 // scalastyle:off number.of.types
 trait ExeFailure
+case object ExpectStatefulFrame                                extends ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
 final case class NonCategorized(message: String)               extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
