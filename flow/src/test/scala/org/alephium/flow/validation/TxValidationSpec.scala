@@ -163,16 +163,16 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx = transactionGen(1, 1).sample.get
     passCheck(checkGasBound(tx))
 
-    val txNew0 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(-1)))
+    val txNew0 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafeTest(-1)))
     failCheck(checkGasBound(txNew0), InvalidStartGas)
     failValidation(validateTxOnlyForTest(txNew0, blockFlow), InvalidStartGas)
-    val txNew1 = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafeTest(0)))
+    val txNew1 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafeTest(0)))
     failCheck(checkGasBound(txNew1), InvalidStartGas)
     failValidation(validateTxOnlyForTest(txNew1, blockFlow), InvalidStartGas)
-    val txNew2 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas.use(1).rightValue))
+    val txNew2 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = minimalGas.use(1).rightValue))
     failCheck(checkGasBound(txNew2), InvalidStartGas)
     failValidation(validateTxOnlyForTest(txNew2, blockFlow), InvalidStartGas)
-    val txNew3 = tx.copy(unsigned = tx.unsigned.copy(startGas = minimalGas))
+    val txNew3 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = minimalGas))
     passCheck(checkGasBound(txNew3))
 
     val txNew4 = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(0)))

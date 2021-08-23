@@ -119,7 +119,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkTotalGas(block: Block): BlockValidationResult[Unit] = {
-    val totalGas = block.transactions.fold(0)(_ + _.unsigned.startGas.value)
+    val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
     if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooManyGasUsed)
   }
 
@@ -202,7 +202,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     val unsigned = coinbase.unsigned
     if (
       unsigned.scriptOpt.isEmpty &&
-      unsigned.startGas == minimalGas &&
+      unsigned.gasAmount == minimalGas &&
       unsigned.gasPrice == defaultGasPrice &&
       unsigned.inputs.length == inputsNum &&
       unsigned.fixedOutputs.length == outputsNum &&

@@ -24,7 +24,7 @@ final case class Tx(
     id: Hash,
     inputs: AVector[Input],
     outputs: AVector[Output],
-    startGas: Int,
+    gasAmount: Int,
     gasPrice: U256
 )
 
@@ -36,7 +36,7 @@ object Tx {
         tx.contractInputs.map[Input](Input.from),
       tx.unsigned.fixedOutputs.map(Output.from(_)) ++
         tx.generatedOutputs.map(Output.from),
-      tx.unsigned.startGas.value,
+      tx.unsigned.gasAmount.value,
       tx.unsigned.gasPrice.value
     )
 
@@ -45,7 +45,7 @@ object Tx {
       unsignedTx.hash,
       unsignedTx.inputs.map(Input.from),
       unsignedTx.fixedOutputs.map(Output.from(_)),
-      unsignedTx.startGas.value,
+      unsignedTx.gasAmount.value,
       unsignedTx.gasPrice.value
     )
 

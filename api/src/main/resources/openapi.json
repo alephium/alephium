@@ -2406,7 +2406,7 @@
                                 "additionalData": ""
                               }
                             ],
-                            "startGas": 1,
+                            "gasAmount": 1,
                             "gasPrice": "1000"
                           }
                         ]
@@ -2552,7 +2552,7 @@
                           "additionalData": ""
                         }
                       ],
-                      "startGas": 1,
+                      "gasAmount": 1,
                       "gasPrice": "1000"
                     }
                   ]
@@ -3335,7 +3335,7 @@
                             "additionalData": ""
                           }
                         ],
-                        "startGas": 1,
+                        "gasAmount": 1,
                         "gasPrice": "1000"
                       }
                     ]
@@ -3809,7 +3809,7 @@
                       "additionalData": ""
                     }
                   ],
-                  "startGas": 1,
+                  "gasAmount": 1,
                   "gasPrice": "1000"
                 }
               }
@@ -5679,7 +5679,7 @@
       "Tx": {
         "required": [
           "id",
-          "startGas",
+          "gasAmount",
           "gasPrice"
         ],
         "type": "object",
@@ -5699,7 +5699,7 @@
               "$ref": "#/components/schemas/Output"
             }
           },
-          "startGas": {
+          "gasAmount": {
             "type": "integer"
           },
           "gasPrice": {
