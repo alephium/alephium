@@ -29,7 +29,6 @@ import io.prometheus.client.Gauge
 import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.protocol.Protocol
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Files => AFiles}
 
@@ -102,7 +101,7 @@ class BootUp extends StrictLogging {
 
   def checkDatabaseCompatibility(): Unit = {
     server.storages.nodeStateStorage
-      .checkDatabaseCompatibility(Protocol.DatabaseVersion) match {
+      .checkDatabaseCompatibility() match {
       case Left(error) =>
         logger.error(s"Database compatibility check error: $error")
         sys.exit(1)

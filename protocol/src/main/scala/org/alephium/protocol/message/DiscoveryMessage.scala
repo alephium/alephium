@@ -21,7 +21,7 @@ import scala.reflect.ClassTag
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{Hash, PrivateKey, Protocol, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -41,21 +41,23 @@ object DiscoveryMessage {
   }
 
   def from(payload: Payload): DiscoveryMessage = {
-    val header = Header(Protocol.DiscoveryProtocolVersion)
+    val header = Header(DiscoveryVersion.currentDiscoveryVersion)
     DiscoveryMessage(header, payload)
   }
 
-  final case class Header(version: Int) extends AnyVal
+  final case class Header(version: DiscoveryVersion)
   object Header {
-    implicit val serde: Serde[Header] = intSerde
+    implicit val serde: Serde[Header] = DiscoveryVersion.serde
       .validate(_version =>
-        if (_version == Protocol.DiscoveryProtocolVersion) {
+        if (_version == DiscoveryVersion.currentDiscoveryVersion) {
           Right(())
         } else {
-          Left(s"Invalid version: got ${_version}, expect: ${Protocol.DiscoveryProtocolVersion}")
+          Left(
+            s"Invalid version: got ${_version}, expect: ${DiscoveryVersion.currentDiscoveryVersion}"
+          )
         }
       )
-      .xmap(Header.apply, _.version)
+      .xmap(apply, _.version)
   }
 
   trait Payload {

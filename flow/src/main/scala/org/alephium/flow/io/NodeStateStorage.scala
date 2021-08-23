@@ -48,27 +48,27 @@ trait NodeStateStorage extends RawKeyValueStorage {
   private val dbVersionKey =
     Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
 
-  def setDatabaseVersion(version: Int): IOResult[Unit] =
+  def setDatabaseVersion(version: DatabaseVersion): IOResult[Unit] =
     IOUtils.tryExecute {
       putRawUnsafe(dbVersionKey, serialize(version))
     }
 
-  def getDatabaseVersion(): IOResult[Option[Int]] =
+  def getDatabaseVersion(): IOResult[Option[DatabaseVersion]] =
     IOUtils.tryExecute {
-      getOptRawUnsafe(dbVersionKey).map(deserialize[Int](_) match {
+      getOptRawUnsafe(dbVersionKey).map(deserialize[DatabaseVersion](_) match {
         case Left(e)  => throw e
         case Right(v) => v
       })
     }
 
-  def checkDatabaseCompatibility(version: Int): IOResult[Unit] = {
+  def checkDatabaseCompatibility(): IOResult[Unit] = {
     getDatabaseVersion().flatMap {
       case Some(dbVersion) =>
-        if (dbVersion != version) {
+        if (dbVersion != DatabaseVersion.currentDBVersion) {
           Left(
             IOError.Other(
               new RuntimeException(
-                s"Database version is not compatible: got $dbVersion, expect $version"
+                s"Database version is not compatible: got $dbVersion, expect ${DatabaseVersion.currentDBVersion}"
               )
             )
           )
@@ -76,7 +76,7 @@ trait NodeStateStorage extends RawKeyValueStorage {
           Right(())
         }
       case None =>
-        setDatabaseVersion(version)
+        setDatabaseVersion(DatabaseVersion.currentDBVersion)
     }
   }
 

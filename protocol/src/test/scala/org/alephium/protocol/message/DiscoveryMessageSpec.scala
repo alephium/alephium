@@ -19,7 +19,7 @@ package org.alephium.protocol.message
 import java.net.InetSocketAddress
 
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.{Protocol, SignatureSchema}
+import org.alephium.protocol.{DiscoveryVersion, SignatureSchema}
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.serde._
@@ -63,13 +63,14 @@ class DiscoveryMessageSpec extends AlephiumSpec with NetworkConfigFixture.Defaul
   }
 
   it should "serialize/deserialize the Header when version compatible" in {
-    val header = Header(Protocol.DiscoveryProtocolVersion)
+    val header = Header(DiscoveryVersion.currentDiscoveryVersion)
     val bytes  = serialize(header)
     deserialize[Header](bytes) isE header
   }
 
   it should "deserialize failed when version not compatible" in {
-    val bytes = serialize(Header(Protocol.WireProtocolVersion + 1))
+    val invalidVersion = DiscoveryVersion(DiscoveryVersion.currentDiscoveryVersion.value + 1)
+    val bytes          = serialize(Header(invalidVersion))
     deserialize[Header](bytes).leftValue is a[SerdeError]
   }
 

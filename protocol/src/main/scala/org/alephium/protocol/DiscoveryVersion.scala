@@ -16,8 +16,12 @@
 
 package org.alephium.protocol
 
-object Protocol {
-  val WireProtocolVersion: Int      = 0
-  val DiscoveryProtocolVersion: Int = 0
-  val DatabaseVersion: Int          = 0
+import org.alephium.serde.Serde
+
+final case class DiscoveryVersion(value: Int) extends AnyVal
+
+object DiscoveryVersion {
+  implicit val serde: Serde[DiscoveryVersion] = Serde.forProduct1(apply, _.value)
+
+  val currentDiscoveryVersion: DiscoveryVersion = DiscoveryVersion(0)
 }

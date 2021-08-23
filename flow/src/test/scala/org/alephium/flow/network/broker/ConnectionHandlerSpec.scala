@@ -23,7 +23,7 @@ import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
 
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{Protocol, SignatureSchema}
+import org.alephium.protocol.{SignatureSchema, WireVersion}
 import org.alephium.protocol.message.{Header, Hello, Message, Ping, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumActorSpec, TimeStamp}
@@ -45,12 +45,12 @@ class ConnectionHandlerSpec extends AlephiumActorSpec with AlephiumConfigFixture
   }
 
   it should "publish misbehavior when receive invalid message" in new Fixture {
-    val version          = Protocol.WireProtocolVersion + 1
+    val invalidVersion   = WireVersion(WireVersion.currentWireVersion.value + 1)
     val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
     val brokerInfo =
       BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
     val handshakeMessage =
-      Message(Header(version), Hello.unsafe(brokerInfo.interBrokerInfo, priKey))
+      Message(Header(invalidVersion), Hello.unsafe(brokerInfo.interBrokerInfo, priKey))
     val handshakeMessageBytes = Message.serialize(handshakeMessage)
 
     val listener = TestProbe()

@@ -24,7 +24,7 @@ import akka.util.ByteString
 
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
-import org.alephium.protocol.Protocol
+import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, ChainId}
@@ -296,7 +296,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "ban node if version is not compatible" in new CliqueFixture {
-    val dummyVersion = Protocol.WireProtocolVersion + 1
+    val dummyVersion = WireVersion(WireVersion.currentWireVersion.value + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload: Hello) =>
       Message(Header(dummyVersion), payload)
     }

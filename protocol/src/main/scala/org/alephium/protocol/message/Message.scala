@@ -18,7 +18,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.Protocol
+import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.serde
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
@@ -34,7 +34,7 @@ final case class Message(header: Header, payload: Payload)
 object Message {
 
   def apply[T <: Payload](payload: T): Message = {
-    val header = Header(Protocol.WireProtocolVersion)
+    val header = Header(WireVersion.currentWireVersion)
     Message(header, payload)
   }
 

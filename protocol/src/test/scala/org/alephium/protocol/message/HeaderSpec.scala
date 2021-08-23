@@ -16,19 +16,20 @@
 
 package org.alephium.protocol.message
 
-import org.alephium.protocol.Protocol
+import org.alephium.protocol.WireVersion
 import org.alephium.serde._
 import org.alephium.util.AlephiumSpec
 
 class HeaderSpec extends AlephiumSpec {
   it should "serialize/deserialize the Header when version compatible" in {
-    val header = Header(Protocol.WireProtocolVersion)
+    val header = Header(WireVersion.currentWireVersion)
     val bytes  = serialize(header)
     deserialize[Header](bytes) isE header
   }
 
   it should "deserialize failed when version not compatible" in {
-    val bytes = serialize(Header(Protocol.WireProtocolVersion + 1))
+    val invalidVersion = WireVersion(WireVersion.currentWireVersion.value + 1)
+    val bytes          = serialize(Header(invalidVersion))
     deserialize[Header](bytes).leftValue is a[SerdeError]
   }
 }
