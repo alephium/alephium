@@ -375,7 +375,7 @@ trait FlowFixture
         tx,
         preOutputs,
         txScript,
-        tx.unsigned.startGas
+        tx.unsigned.gasAmount
       )
       .rightValue
     result.contractInputs -> result.generatedOutputs

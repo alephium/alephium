@@ -28,7 +28,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
   *
   * @param chainId the id of the chain which can accept the tx
   * @param scriptOpt optional script for invoking stateful contracts
-  * @param startGas the amount of gas can be used for tx execution
+  * @param gasAmount the amount of gas can be used for tx execution
   * @param inputs a vector of TxInput
   * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
@@ -36,7 +36,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 final case class UnsignedTransaction(
     chainId: ChainId,
     scriptOpt: Option[StatefulScript],
-    startGas: GasBox,
+    gasAmount: GasBox,
     gasPrice: GasPrice,
     inputs: AVector[TxInput],
     fixedOutputs: AVector[AssetOutput]
@@ -70,9 +70,9 @@ object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] = {
     val serde: Serde[UnsignedTransaction] = Serde.forProduct6(
       UnsignedTransaction.apply,
-      t => (t.chainId, t.scriptOpt, t.startGas, t.gasPrice, t.inputs, t.fixedOutputs)
+      t => (t.chainId, t.scriptOpt, t.gasAmount, t.gasPrice, t.inputs, t.fixedOutputs)
     )
-    serde.validate(tx => if (GasBox.validate(tx.startGas)) Right(()) else Left("Invalid Gas"))
+    serde.validate(tx => if (GasBox.validate(tx.gasAmount)) Right(()) else Left("Invalid Gas"))
   }
 
   def apply(

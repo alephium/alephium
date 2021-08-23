@@ -231,7 +231,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val hash = Hash.generate
     val tx   = Tx(hash, AVector.empty, AVector.empty, 1, U256.unsafe(100))
     val jsonRaw =
-      s"""{"id":"${hash.toHexString}","inputs":[],"outputs":[],"startGas":1,"gasPrice":"100"}"""
+      s"""{"id":"${hash.toHexString}","inputs":[],"outputs":[],"gasAmount":1,"gasPrice":"100"}"""
     checkData(tx, jsonRaw)
   }
 

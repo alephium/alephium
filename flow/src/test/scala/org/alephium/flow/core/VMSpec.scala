@@ -91,7 +91,7 @@ class VMSpec extends AlephiumSpec {
     val block      = simpleScript(blockFlow, chainIndex, script)
     val tx = {
       val txTemplate = block.transactions.head
-      txTemplate.copy(unsigned = txTemplate.unsigned.copy(startGas = 1000000))
+      txTemplate.copy(unsigned = txTemplate.unsigned.copy(gasAmount = 1000000))
     }
     val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
     val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue
@@ -101,7 +101,7 @@ class VMSpec extends AlephiumSpec {
       tx,
       None,
       tx.unsigned.scriptOpt.get,
-      tx.unsigned.startGas
+      tx.unsigned.gasAmount
     ) is
       failed(StackOverflow)
   }

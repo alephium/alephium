@@ -167,12 +167,12 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   it should "check the amount of gas" in new Fixture {
     val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val tx    = block.nonCoinbase.head
-    tx.unsigned.startGas is minimalGas
+    tx.unsigned.gasAmount is minimalGas
 
     val modified0 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(tx))
     passValidation(checkTotalGas(modified0))
 
-    val tx1       = tx.copy(unsigned = tx.unsigned.copy(startGas = GasBox.unsafe(minimalGas.value + 1)))
+    val tx1       = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafe(minimalGas.value + 1)))
     val modified1 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock - 1)(tx) :+ tx1)
     failValidation(checkTotalGas(modified1), TooManyGasUsed)
     failValidation(checkBlock(modified1, blockFlow), TooManyGasUsed)

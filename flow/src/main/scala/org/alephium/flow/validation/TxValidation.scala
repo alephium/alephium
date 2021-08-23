@@ -76,7 +76,7 @@ trait TxValidation {
               tx,
               preOutputs,
               script,
-              tx.unsigned.startGas
+              tx.unsigned.gasAmount
             )
           ).map { result => FlowUtils.convertSuccessfulTx(tx, result) }
         } yield fullTx
@@ -310,7 +310,7 @@ object TxValidation {
     }
 
     protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit] = {
-      if (!GasBox.validate(tx.unsigned.startGas)) {
+      if (!GasBox.validate(tx.unsigned.gasAmount)) {
         invalidTx(InvalidStartGas)
       } else if (!checkGasPrice(tx.unsigned.gasPrice)) {
         invalidTx(InvalidGasPrice)
@@ -524,7 +524,7 @@ object TxValidation {
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
       val txEnv =
         TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
-      EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.startGas) {
+      EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.gasAmount) {
         case (gasRemaining, idx) =>
           val unlockScript = tx.unsigned.inputs(idx).unlockScript
           checkLockupScript(

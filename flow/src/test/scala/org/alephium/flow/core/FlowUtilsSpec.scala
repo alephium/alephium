@@ -121,7 +121,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
   it should "truncate txs w.r.t. tx number and gas" in new FlowFixture {
     val tx  = transfer(blockFlow, ChainIndex.unsafe(0, 0)).nonCoinbase.head.toTemplate
-    val gas = tx.unsigned.startGas.value
+    val gas = tx.unsigned.gasAmount.value
 
     val txs = AVector(tx, tx)
     FlowUtils.truncateTxs(txs, 0, GasBox.unsafe(gas * 2)) is txs.take(0)

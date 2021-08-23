@@ -298,7 +298,7 @@ trait FlowUtils
         tx,
         preOutputs,
         script,
-        tx.unsigned.startGas
+        tx.unsigned.gasAmount
       ) match {
         case Left(_)       => FlowUtils.convertFailedScriptTx(preOutputs, tx)
         case Right(result) => FlowUtils.convertSuccessfulTx(tx, result)
@@ -403,7 +403,7 @@ object FlowUtils {
     @tailrec
     def iter(gasSum: Int, index: Int): Int = {
       if (index < txs.length) {
-        val newSum = gasSum + txs(index).unsigned.startGas.value
+        val newSum = gasSum + txs(index).unsigned.gasAmount.value
         if (newSum > 0 && newSum <= maximalGas.value) iter(newSum, index + 1) else index
       } else {
         index
