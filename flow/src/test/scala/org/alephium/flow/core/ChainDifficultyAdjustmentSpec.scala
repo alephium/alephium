@@ -47,7 +47,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     def getTimestamp(hash: BlockHash): IOResult[TimeStamp] = Right(chainInfo(hash)._2)
 
-    def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
+    def chainBackUntil(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
       val maxHeight: Int = getHeight(hash).rightValue
       val hashes = AVector
         .from(chainInfo.filter { case (_, (height, _)) =>
@@ -96,9 +96,9 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val data       = AVector.fill(n)(BlockHash.random -> TimeStamp.zero)
       val fixture    = new MockFixture { setup(data) }
       val latestHash = data.last._1
-      fixture.chainBack(latestHash, 0) isE data.tail.map(_._1)
+      fixture.chainBackUntil(latestHash, 0) isE data.tail.map(_._1)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      fixture.calHashTarget(latestHash, currentTarget) isE currentTarget
+      fixture.calNextHashTarget(latestHash, currentTarget) isE currentTarget
     }
   }
 
@@ -113,7 +113,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
       calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calHashTarget(hash, currentTarget) isE currentTarget
+      calNextHashTarget(hash, currentTarget) isE currentTarget
     }
   }
 
@@ -132,7 +132,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
       calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calHashTarget(hash, currentTarget) isE
+      calNextHashTarget(hash, currentTarget) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
   }
@@ -152,7 +152,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
       calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calHashTarget(hash, currentTarget) isE
+      calNextHashTarget(hash, currentTarget) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
   }
@@ -174,7 +174,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     val initialTarget =
       Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
-    var currentTarget = calHashTarget(getHash(currentHeight), initialTarget).rightValue
+    var currentTarget = calNextHashTarget(getHash(currentHeight), initialTarget).rightValue
     currentTarget is initialTarget
     def stepSimulation(finalTarget: Target) = {
       val ratio =
@@ -184,7 +184,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val nextTs   = currentTs.plusMillisUnsafe(duration.toLong)
       val newHash  = BlockHash.random
       addNew(newHash, nextTs)
-      currentTarget = calHashTarget(newHash, currentTarget).rightValue
+      currentTarget = calNextHashTarget(newHash, currentTarget).rightValue
     }
 
     def checkRatio(ratio: Double, expected: Double) = {

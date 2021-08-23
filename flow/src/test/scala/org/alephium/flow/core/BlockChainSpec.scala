@@ -473,10 +473,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "test chainBack" in new UnforkedFixture {
-    chain.chainBack(genesis.hash, ALF.GenesisHeight) isE AVector.empty[BlockHash]
-    chain.chainBack(blocks.last.hash, ALF.GenesisHeight) isE blocks.map(_.hash)
-    chain.chainBack(blocks.last.hash, ALF.GenesisHeight + 1) isE blocks.tail.map(_.hash)
-    chain.chainBack(blocks.init.last.hash, ALF.GenesisHeight) isE blocks.init.map(_.hash)
+    chain.chainBackUntil(genesis.hash, ALF.GenesisHeight) isE AVector.empty[BlockHash]
+    chain.chainBackUntil(blocks.last.hash, ALF.GenesisHeight) isE blocks.map(_.hash)
+    chain.chainBackUntil(blocks.last.hash, ALF.GenesisHeight + 1) isE blocks.tail.map(_.hash)
+    chain.chainBackUntil(blocks.init.last.hash, ALF.GenesisHeight) isE blocks.init.map(_.hash)
   }
 
   it should "test getPredecessor" in new UnforkedFixture {

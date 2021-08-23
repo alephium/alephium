@@ -51,7 +51,7 @@ trait BlockHashPool {
   def getBlockHashSlice(hash: BlockHash): IOResult[AVector[BlockHash]]
 
   // Hashes ordered by height
-  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
+  def chainBackUntil(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
 
   final val blockHashOrdering: Ordering[BlockHash] = { (hash0: BlockHash, hash1: BlockHash) =>
     val weight0 = getWeightUnsafe(hash0)

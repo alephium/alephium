@@ -31,21 +31,21 @@ trait ChainDifficultyAdjustment {
 
   def getTimestamp(hash: BlockHash): IOResult[TimeStamp]
 
-  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
+  def chainBackUntil(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
 
   // TODO: optimize this
   final protected[core] def calTimeSpan(hash: BlockHash, height: Int): IOResult[Duration] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALF.GenesisHeight)
     for {
-      hashes        <- chainBack(hash, earlyHeight)
+      hashes        <- chainBackUntil(hash, earlyHeight)
       timestampNow  <- getTimestamp(hash)
       timestampLast <- getTimestamp(hashes.head)
     } yield timestampNow.deltaUnsafe(timestampLast)
   }
 
   // DigiShield DAA V3 variant
-  final protected[core] def calHashTarget(
+  final protected[core] def calNextHashTarget(
       hash: BlockHash,
       currentTarget: Target
   ): IOResult[Target] = {
