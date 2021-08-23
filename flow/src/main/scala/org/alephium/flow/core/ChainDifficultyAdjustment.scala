@@ -45,7 +45,7 @@ trait ChainDifficultyAdjustment {
   }
 
   // DigiShield DAA V3 variant
-  final protected[core] def calNextHashTarget(
+  final protected[core] def calNextHashTargetRaw(
       hash: BlockHash,
       currentTarget: Target
   ): IOResult[Target] = {

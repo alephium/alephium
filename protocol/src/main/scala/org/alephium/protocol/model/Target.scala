@@ -43,7 +43,8 @@ object Target {
 
   val maxBigInt: BigInteger = BigInteger.ONE.shiftLeft(256)
 
-  val Max: Target = unsafe(maxBigInt.subtract(BigInteger.ONE))
+  val Max: Target  = unsafe(maxBigInt.subtract(BigInteger.ONE))
+  val Zero: Target = unsafe(BigInteger.ZERO)
 
   def unsafe(byteString: ByteString): Target = {
     require(byteString.length == 4)
@@ -89,4 +90,14 @@ object Target {
   val onePhPerBlock: Target  = from(HashRate.onePhPerSecond, Duration.ofSecondsUnsafe(1))
   val oneEhPerBlock: Target  = from(HashRate.oneEhPerSecond, Duration.ofSecondsUnsafe(1))
   val a128EhPerBlock: Target = from(HashRate.a128EhPerSecond, Duration.ofSecondsUnsafe(1))
+
+  def clipByTwoTimes(maxTarget: Target, newTarget: Target): Target = {
+    assume(maxTarget >= newTarget)
+    val lowerBound = maxTarget.value.shiftRight(1)
+    if (newTarget.value.compareTo(lowerBound) < 0) {
+      Target.unsafe(lowerBound)
+    } else {
+      newTarget
+    }
+  }
 }

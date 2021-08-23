@@ -77,4 +77,15 @@ class TargetSpec extends AlephiumSpec {
     target1.value is target0.value.divide(2)
     target2.value is target0.value.multiply(2)
   }
+
+  it should "clip target" in {
+    val target0 = Target.unsafe(Hex.unsafe("20FFFFFF"))
+    val target1 = Target.unsafe(Hex.unsafe("207FFFFF"))
+    val target2 = Target.unsafe(Hex.unsafe("207FFFFE"))
+    val target3 = Target.unsafe(Hex.unsafe("20800000"))
+    Target.clipByTwoTimes(target0, target1) is target1
+    Target.clipByTwoTimes(target0, target2) is target1
+    Target.clipByTwoTimes(target0, target3) is target3
+    assertThrows[AssertionError](Target.clipByTwoTimes(target2, target1))
+  }
 }

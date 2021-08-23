@@ -54,6 +54,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     getBlockHeader(hash).map(_.timestamp)
   }
 
+  def getTarget(hash: BlockHash): IOResult[Target] = {
+    getBlockHeader(hash).map(_.target)
+  }
+
   def add(header: BlockHeader, weight: Weight): IOResult[Unit] = {
     assume(!header.isGenesis)
     val parentHash = header.parentHash
@@ -128,17 +132,17 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
-  def getNextHashTarget(hash: BlockHash): IOResult[Target] = {
+  def getNextHashTargetRaw(hash: BlockHash): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
-      newTarget <- calNextHashTarget(hash, header.target)
+      newTarget <- calNextHashTargetRaw(hash, header.target)
     } yield newTarget
   }
 
   def getDryrunBlockEnv(): IOResult[BlockEnv] = {
     for {
       tip    <- getBestTip()
-      target <- getNextHashTarget(tip)
+      target <- getNextHashTargetRaw(tip)
     } yield BlockEnv(networkConfig.chainId, TimeStamp.now(), target)
   }
 
