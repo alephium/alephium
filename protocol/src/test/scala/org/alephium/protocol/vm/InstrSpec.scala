@@ -70,8 +70,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadField(byte), StoreField(byte), CallExternal(byte),
       ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
       TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-      CreateContract, CopyCreateContract, DestroySelf, SelfAddress, SelfContractId, IssueToken,
-      CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
+      CreateContract, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress, IssueToken,
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
     )
     // format: on
 

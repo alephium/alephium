@@ -581,6 +581,7 @@ class VMSpec extends AlephiumSpec {
          |    assert!(selfContractId!() == fooId)
          |    assert!(contractInitialStateHash!(fooId) == fooHash)
          |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    assert!(callerContractId!() == barId)
          |    assert!(callerAddress!() == barAddress)
          |    assert!(callerInitialStateHash!() == barHash)
          |    assert!(isCalledFromTxScript!() == false)

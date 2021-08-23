@@ -116,8 +116,8 @@ object Instr {
     LoadField, StoreField, CallExternal,
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-    CreateContract, CopyCreateContract, DestroySelf, SelfAddress, SelfContractId, IssueToken,
-    CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
+    CreateContract, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress, IssueToken,
+    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
   )
   // format: on
 
@@ -1135,6 +1135,16 @@ object IssueToken extends ContractInstr with GasBalance {
       _ <- frame.ctx.outputBalances
         .addToken(LockupScript.p2c(contractId), tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
+    } yield ()
+  }
+}
+
+object CallerContractId extends ContractInstr with GasLow {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerFrame <- frame.getCallerFrame()
+      contractId  <- callerFrame.obj.getContractId()
+      _           <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
     } yield ()
   }
 }
