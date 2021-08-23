@@ -16,7 +16,7 @@
 
 package org.alephium.flow.validation
 
-import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
@@ -77,9 +77,9 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       _      <- checkDepsNum(header)
       _      <- checkDepsIndex(header)
       _      <- checkWorkAmount(header)
-      _      <- checkWorkTarget(header, flow.getHeaderChain(header))
       _      <- checkPoLW(header)
       _      <- checkDepsMissing(header, flow)
+      _      <- checkWorkTarget(header, flow)
       _      <- checkDepStateHash(header, flow)
     } yield ()
   }
@@ -118,7 +118,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   protected[validation] def checkDepsIndex(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkDepsMissing(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkDepStateHash(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
-  protected[validation] def checkWorkTarget(header: BlockHeader, headerChain: BlockHeaderChain): HeaderValidationResult[Unit]
+  protected[validation] def checkWorkTarget(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkPoLW(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkUncleDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
@@ -286,11 +286,13 @@ object HeaderValidation {
 
     protected[validation] def checkWorkTarget(
         header: BlockHeader,
-        headerChain: BlockHeaderChain
+        blockFlow: BlockFlow
     ): HeaderValidationResult[Unit] = {
-      ValidationStatus.from(headerChain.getNextHashTarget(header.parentHash)).flatMap { target =>
-        if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
-      }
+      ValidationStatus
+        .from(blockFlow.getNextHashTarget(header.chainIndex, header.blockDeps))
+        .flatMap { target =>
+          if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
+        }
     }
 
     protected[validation] def checkPoLW(

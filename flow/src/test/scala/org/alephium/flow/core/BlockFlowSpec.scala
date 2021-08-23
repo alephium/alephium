@@ -33,6 +33,8 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256, UnsecureRandom}
 
+// scalastyle:off file.size.limit
+
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
     config.genesisBlocks.flatMap(identity).foreach { block =>
@@ -382,6 +384,48 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfig.emission.stableMaxRewardPerChain
     ).min
     (block.coinbase.alfAmountInOutputs.get > minimalReward.subUnsafe(defaultGasFee)) is true
+  }
+
+  it should "increase difficulty and reduce target gradually" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    while ({
+      val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+      val nextTargetRaw = blockFlow
+        .getHeaderChain(chainIndex)
+        .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to))
+        .rightValue
+        .value
+      BigInt(nextTargetRaw) > (consensusConfig.maxMiningTarget.value / 2)
+    }) {
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+    }
+  }
+
+  it should "clip hash target" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      // we increase the difficulty for the last block of the DAA window (17 blocks)
+      if (k equals consensusConfig.powAveragingWindow) {
+        val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(2))
+        val newBlock  = block.copy(header = block.header.copy(target = newTarget))
+        blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock)).rightValue
+      } else {
+        addAndCheck(blockFlow, block)
+        val bestDep = blockFlow.getBestDeps(chainIndex.from)
+        blockFlow.getNextHashTarget(chainIndex, bestDep) isE consensusConfig.maxMiningTarget
+      }
+    }
+    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+    val nextTargetRaw = blockFlow
+      .getHeaderChain(chainIndex)
+      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to))
+      .rightValue
+      .value
+    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
+    val nextTargetClipped = blockFlow.getNextHashTarget(chainIndex, bestDeps).rightValue
+    nextTargetClipped is Target.unsafe(consensusConfig.maxMiningTarget.value / 2)
   }
 
   behavior of "Balance"

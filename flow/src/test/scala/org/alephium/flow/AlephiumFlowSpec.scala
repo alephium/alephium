@@ -287,9 +287,9 @@ trait FlowFixture
     val txs              = prepareTxs(blockFlow, chainIndex)
     val blockTs          = TimeStamp.now()
 
-    val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
-    mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs)
+    val target     = blockFlow.getNextHashTarget(chainIndex, deps).rightValue
+    val coinbaseTx = Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs)
+    mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs, target)
   }
 
   def mineWithoutCoinbase(
@@ -316,6 +316,10 @@ trait FlowFixture
       target: Target = consensusConfig.maxMiningTarget
   ): Block = {
     mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), txs, blockTs, target)
+  }
+
+  def reMine(blockFlow: BlockFlow, chainIndex: ChainIndex, block: Block): Block = {
+    mine0(blockFlow, chainIndex, block.blockDeps, block.transactions, block.timestamp, block.target)
   }
 
   def mine0(

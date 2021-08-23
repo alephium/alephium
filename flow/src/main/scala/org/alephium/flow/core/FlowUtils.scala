@@ -191,10 +191,9 @@ trait FlowUtils
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     assume(brokerConfig.contains(chainIndex.from))
-    val singleChain = getBlockChain(chainIndex)
-    val bestDeps    = getBestDeps(chainIndex.from)
+    val bestDeps = getBestDeps(chainIndex.from)
     for {
-      target       <- singleChain.getNextHashTarget(bestDeps.getOutDep(chainIndex.to))
+      target       <- getNextHashTarget(chainIndex, bestDeps)
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
