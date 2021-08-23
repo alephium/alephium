@@ -299,8 +299,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       newHeight <- getHeight(newHash)
       oldHeight <- getHeight(oldHash)
       heightUntil = math.min(newHeight, oldHeight) - 1 // h - 1 to include earlier one
-      newBack <- chainBack(newHash, heightUntil)
-      oldBack <- chainBack(oldHash, heightUntil)
+      newBack <- chainBackUntil(newHash, heightUntil)
+      oldBack <- chainBackUntil(oldHash, heightUntil)
       diff    <- calHashDiffFromSameHeight(newBack.head, oldBack.head)
     } yield {
       ChainDiff(oldBack.tail.reverse ++ diff.toRemove.reverse, diff.toAdd ++ newBack.tail)

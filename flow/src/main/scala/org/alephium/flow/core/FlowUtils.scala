@@ -194,17 +194,17 @@ trait FlowUtils
     val singleChain = getBlockChain(chainIndex)
     val bestDeps    = getBestDeps(chainIndex.from)
     for {
-      target       <- singleChain.getHashTarget(bestDeps.getOutDep(chainIndex.to))
+      target       <- singleChain.getNextHashTarget(bestDeps.getOutDep(chainIndex.to))
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
-      loosenDeps <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
-      groupView  <- getMutableGroupView(chainIndex.from, loosenDeps)
-      candidates <- collectTransactions(chainIndex, groupView, bestDeps)
-      template <- prepareBlockFlowUnsafe(
+      loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
+      groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
+      txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
+      template <- prepareBlockFlow(
         chainIndex,
         loosenDeps,
         groupView,
-        candidates,
+        txCandidates,
         target,
         templateTs,
         miner
@@ -212,7 +212,7 @@ trait FlowUtils
     } yield template
   }
 
-  def prepareBlockFlowUnsafe(
+  def prepareBlockFlow(
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],

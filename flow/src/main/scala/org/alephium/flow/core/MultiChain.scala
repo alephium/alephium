@@ -82,8 +82,8 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getPredecessor(hash: BlockHash, height: Int): IOResult[BlockHash] =
     getHashChain(hash).getPredecessor(hash, height)
 
-  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] =
-    getHashChain(hash).chainBack(hash, heightUntil)
+  def chainBackUntil(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] =
+    getHashChain(hash).chainBackUntil(hash, heightUntil)
 
   def getState(hash: BlockHash): IOResult[BlockState] =
     getHashChain(hash).getState(hash)

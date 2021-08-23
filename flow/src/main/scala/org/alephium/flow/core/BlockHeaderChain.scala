@@ -114,12 +114,12 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def chainBack(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
+  def chainBackUntil(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]] = {
     getHeight(hash).flatMap {
       case height if height > heightUntil =>
         getBlockHeader(hash).flatMap { header =>
           if (height > heightUntil + 1) {
-            chainBack(header.parentHash, heightUntil).map(_ :+ hash)
+            chainBackUntil(header.parentHash, heightUntil).map(_ :+ hash)
           } else {
             Right(AVector(hash))
           }
@@ -128,17 +128,17 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     }
   }
 
-  def getHashTarget(hash: BlockHash): IOResult[Target] = {
+  def getNextHashTarget(hash: BlockHash): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
-      newTarget <- calHashTarget(hash, header.target)
+      newTarget <- calNextHashTarget(hash, header.target)
     } yield newTarget
   }
 
   def getDryrunBlockEnv(): IOResult[BlockEnv] = {
     for {
       tip    <- getBestTip()
-      target <- getHashTarget(tip)
+      target <- getNextHashTarget(tip)
     } yield BlockEnv(networkConfig.chainId, TimeStamp.now(), target)
   }
 

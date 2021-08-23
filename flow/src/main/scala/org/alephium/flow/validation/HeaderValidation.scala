@@ -288,7 +288,7 @@ object HeaderValidation {
         header: BlockHeader,
         headerChain: BlockHeaderChain
     ): HeaderValidationResult[Unit] = {
-      ValidationStatus.from(headerChain.getHashTarget(header.parentHash)).flatMap { target =>
+      ValidationStatus.from(headerChain.getNextHashTarget(header.parentHash)).flatMap { target =>
         if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
       }
     }
