@@ -24,12 +24,15 @@ import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{Duration, TimeStamp, U256}
 
 class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
+  import Emission.{yearsUntilStable, yearsUntilNoReward}
+
   // scalastyle:off magic.number
-  val yearsUntilStable: Int = 4
   val blocksInAboutOneYearPerChain: Long =
     Duration.ofDaysUnsafe(365L).millis / blockTargetTime.millis
   val blocksToStableMaxReward: Long       = blocksInAboutOneYearPerChain * yearsUntilStable
+  val blocksToNoReward: Long              = blocksInAboutOneYearPerChain * yearsUntilNoReward
   val durationToStableMaxReward: Duration = blockTargetTime.timesUnsafe(blocksToStableMaxReward)
+  val durationToNoReward: Duration        = blockTargetTime.timesUnsafe(blocksToNoReward)
   // scalastyle:on magic.number
 
   val initialMaxRewardPerChain: U256         = share(Emission.initialMaxReward)
@@ -67,7 +70,9 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   def rewardMax(blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
     require(blockTs >= launchTs)
     val elapsed = blockTs.deltaUnsafe(launchTs)
-    if (elapsed >= durationToStableMaxReward) {
+    if (elapsed >= durationToNoReward) {
+      U256.Zero
+    } else if (elapsed >= durationToStableMaxReward) {
       stableMaxRewardPerChain
     } else {
       val reducedCents = ALF.cent(elapsed.millis / durationToDropAboutOnceCent.millis)
@@ -142,5 +147,8 @@ object Emission {
   private[mining] val initialMaxReward: U256         = ALF.alf(60)
   private[mining] val stableMaxReward: U256          = ALF.alf(20)
   private[mining] val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
+
+  val yearsUntilStable: Int   = 4
+  val yearsUntilNoReward: Int = 82
   //scalastyle:on magic.number
 }
