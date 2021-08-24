@@ -483,7 +483,7 @@ object TxValidation {
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[Unit] = {
       if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
-        validTx(())
+        validTx(()) // the balance is validated in VM execution
       } else {
         for {
           inputBalances  <- computeTokenBalances(preOutputs)
