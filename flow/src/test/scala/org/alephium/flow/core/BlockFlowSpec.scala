@@ -386,37 +386,67 @@ class BlockFlowSpec extends AlephiumSpec {
     (block.coinbase.alfAmountInOutputs.get > minimalReward.subUnsafe(defaultGasFee)) is true
   }
 
-  it should "increase difficulty and reduce target gradually" in new FlowFixture {
+  it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
+    var lastTarget = consensusConfig.maxMiningTarget
     while ({
-      val bestDeps = blockFlow.getBestDeps(chainIndex.from)
-      val nextTargetRaw = blockFlow
-        .getHeaderChain(chainIndex)
-        .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to))
-        .rightValue
-        .value
-      BigInt(nextTargetRaw) > (consensusConfig.maxMiningTarget.value / 2)
-    }) {
       val block = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
+      if (lastTarget != Target.Max) {
+        if (block.target < lastTarget) {
+          lastTarget = block.target
+          true
+        } else if (block.target equals lastTarget) {
+          false
+        } else {
+          // the target is increasing, which is wrong
+          assert(false)
+          true
+        }
+      } else {
+        lastTarget = block.target
+        true
+      }
+    }) {}
+  }
+
+  trait DifficultyFixture extends FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    def prepareBlocks(scale: Int) = {
+      (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
+        val block = emptyBlock(blockFlow, chainIndex)
+        // we increase the difficulty for the last block of the DAA window (17 blocks)
+        if (k equals consensusConfig.powAveragingWindow) {
+          val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(scale))
+          val newBlock  = block.copy(header = block.header.copy(target = newTarget))
+          blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock)).rightValue
+        } else {
+          addAndCheck(blockFlow, block)
+          val bestDep = blockFlow.getBestDeps(chainIndex.from)
+          blockFlow.getNextHashTarget(chainIndex, bestDep) isE consensusConfig.maxMiningTarget
+        }
+      }
     }
   }
 
-  it should "clip hash target" in new FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
-      val block = emptyBlock(blockFlow, chainIndex)
-      // we increase the difficulty for the last block of the DAA window (17 blocks)
-      if (k equals consensusConfig.powAveragingWindow) {
-        val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(2))
-        val newBlock  = block.copy(header = block.header.copy(target = newTarget))
-        blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock)).rightValue
-      } else {
-        addAndCheck(blockFlow, block)
-        val bestDep = blockFlow.getBestDeps(chainIndex.from)
-        blockFlow.getNextHashTarget(chainIndex, bestDep) isE consensusConfig.maxMiningTarget
-      }
-    }
+  it should "calculate weighted target" in new DifficultyFixture {
+    prepareBlocks(2)
+
+    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+    val nextTargetRaw = blockFlow
+      .getHeaderChain(chainIndex)
+      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to))
+      .rightValue
+      .value
+    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
+    val nextTargetClipped = blockFlow.getNextHashTarget(chainIndex, bestDeps).rightValue
+    (nextTargetClipped > Target.unsafe(consensusConfig.maxMiningTarget.value / 2)) is true
+  }
+
+  it should "clip target" in new DifficultyFixture {
+    prepareBlocks(8 * groups0)
+
     val bestDeps = blockFlow.getBestDeps(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
