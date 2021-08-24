@@ -41,7 +41,7 @@ import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -129,6 +129,19 @@ object ServerFixture {
     )
     tx.copy(
       unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
+    )
+  }
+
+  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): Address.Asset = {
+    Address.Asset(
+      LockupScript
+        .p2mpkh(
+          publicKeys.map { publicKey =>
+            PublicKey.from(Hex.from(publicKey).get).get
+          },
+          mrequired
+        )
+        .get
     )
   }
 
@@ -237,6 +250,16 @@ object ServerFixture {
 
     override def transfer(
         fromPublicKey: PublicKey,
+        outputInfos: AVector[TxOutputInfo],
+        gasOpt: Option[GasBox],
+        gasPrice: GasPrice
+    ): IOResult[Either[String, UnsignedTransaction]] = {
+      Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
+    }
+
+    override def transfer(
+        fromLockupScript: LockupScript.Asset,
+        fromUnlockScript: UnlockScript,
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice

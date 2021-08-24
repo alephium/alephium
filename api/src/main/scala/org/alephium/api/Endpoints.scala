@@ -75,6 +75,11 @@ trait Endpoints
       .in("addresses")
       .tag("Addresses")
 
+  private val multisigEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("multisig")
+      .tag("Multi-signature")
+
   private val transactionsEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
       .in("transactions")
@@ -217,6 +222,27 @@ trait Endpoints
       .in(jsonBody[SubmitTransaction])
       .out(jsonBody[TxResult])
       .summary("Submit a signed transaction")
+
+  val buildMultisigAddress: BaseEndpoint[BuildMultisigAddress, BuildMultisigAddress.Result] =
+    multisigEndpoint.post
+      .in("address")
+      .in(jsonBody[BuildMultisigAddress])
+      .out(jsonBody[BuildMultisigAddress.Result])
+      .summary("Create the multisig address and unlock script")
+
+  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransactionResult] =
+    multisigEndpoint.post
+      .in("build")
+      .in(jsonBody[BuildMultisig])
+      .out(jsonBody[BuildTransactionResult])
+      .summary("Build a multisig unsigned transaction")
+
+  val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, TxResult] =
+    multisigEndpoint.post
+      .in("submit")
+      .in(jsonBody[SubmitMultisig])
+      .out(jsonBody[TxResult])
+      .summary("Submit a multi-signed transaction")
 
   lazy val getTransactionStatus
       : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =

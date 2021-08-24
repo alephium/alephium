@@ -225,6 +225,19 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
     }
   }
+
+  val buildMultisigAddressLogic = serverLogic(buildMultisigAddress) { buildMultisig =>
+    Future.successful(
+      serverUtils
+        .buildMultisigAddress(
+          buildMultisig.keys,
+          buildMultisig.mrequired
+        )
+        .left
+        .map(ApiError.BadRequest(_))
+    )
+  }
+
   val buildTransactionLogic = serverLogicRedirect(buildTransaction)(
     buildTransaction =>
       withSyncedClique {
@@ -236,6 +249,19 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         )
       },
     bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)
+  )
+
+  val buildMultisigLogic = serverLogicRedirect(buildMultisig)(
+    buildMultisig =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils.buildMultisig(
+            blockFlow,
+            buildMultisig
+          )
+        )
+      },
+    bt => bt.fromAddress.lockupScript.groupIndex(brokerConfig)
   )
 
   val buildSweepAllTransactionLogic = serverLogicRedirect(buildSweepAllTransaction)(
@@ -254,6 +280,18 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   val submitTransactionLogic =
     serverLogicRedirectWith[SubmitTransaction, TransactionTemplate, TxResult](submitTransaction)(
       tx => serverUtils.createTxTemplate(tx),
+      tx =>
+        withSyncedClique {
+          serverUtils.submitTransaction(txHandler, tx)
+        },
+      _.fromGroup
+    )
+
+  val submitMultisigTransactionLogic =
+    serverLogicRedirectWith[SubmitMultisig, TransactionTemplate, TxResult](
+      submitMultisigTransaction
+    )(
+      tx => serverUtils.createMultisigTxTemplate(tx),
       tx =>
         withSyncedClique {
           serverUtils.submitTransaction(txHandler, tx)
