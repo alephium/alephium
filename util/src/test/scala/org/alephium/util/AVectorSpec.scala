@@ -491,6 +491,13 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     }
   }
 
+  it should "zipWithIndex" in new FixtureF {
+    forAll(vectorGen) { vc =>
+      val expected = vc.toSeq.zipWithIndex
+      vc.zipWithIndex.toSeq is expected
+    }
+  }
+
   it should "collect" in new FixtureF {
     AVector(-1, 2, 3).collect { case i if i > 0 => i * i } is AVector(4, 9)
   }

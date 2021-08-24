@@ -300,6 +300,10 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     Right(AVector.unsafe(array))
   }
 
+  def zipWithIndex: AVector[(A, Int)] = {
+    AVector.tabulate(length) { i => (apply(i), i) }
+  }
+
   def filter(p: A => Boolean): AVector[A] = {
     filterImpl(p, true)
   }
