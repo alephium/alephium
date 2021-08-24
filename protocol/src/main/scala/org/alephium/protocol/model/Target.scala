@@ -20,9 +20,10 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.serde._
-import org.alephium.util.{Bytes, Duration, Hex, Number}
+import org.alephium.util.{AVector, Bytes, Duration, Hex, Number}
 
 /*
  * value = mantissa * 256 ^ (exponent - 3)
@@ -90,6 +91,18 @@ object Target {
   val onePhPerBlock: Target  = from(HashRate.onePhPerSecond, Duration.ofSecondsUnsafe(1))
   val oneEhPerBlock: Target  = from(HashRate.oneEhPerSecond, Duration.ofSecondsUnsafe(1))
   val a128EhPerBlock: Target = from(HashRate.a128EhPerSecond, Duration.ofSecondsUnsafe(1))
+
+  // The final target is the weighted average of the adjusted target and deps targets
+  // average == (selfTarget * (2G+1) + sum(depTarget)) / 4G
+  def average(newTarget: Target, depTargets: AVector[Target])(implicit
+      groupConfig: GroupConfig
+  ): Target = {
+    val selfWeight         = 2 * groupConfig.groups + 1
+    val selfWeightedTarget = newTarget.value.multiply(BigInteger.valueOf(selfWeight.toLong))
+    val totalDepsTarget    = depTargets.fold(BigInteger.ZERO)(_ add _.value)
+    val average            = (selfWeightedTarget add totalDepsTarget).divide(groupConfig.targetAverageCount)
+    Target.unsafe(average)
+  }
 
   def clipByTwoTimes(maxTarget: Target, newTarget: Target): Target = {
     assume(maxTarget >= newTarget)

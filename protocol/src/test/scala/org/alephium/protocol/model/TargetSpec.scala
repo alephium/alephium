@@ -18,10 +18,13 @@ package org.alephium.protocol.model
 
 import java.math.BigInteger
 
+import scala.math.BigInt.javaBigInteger2bigInt
+
 import org.scalatest.Assertion
 
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.mining.HashRate
-import org.alephium.util.{AlephiumSpec, Duration, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex}
 
 class TargetSpec extends AlephiumSpec {
   it should "check special values" in {
@@ -87,5 +90,21 @@ class TargetSpec extends AlephiumSpec {
     Target.clipByTwoTimes(target0, target2) is target1
     Target.clipByTwoTimes(target0, target3) is target3
     assertThrows[AssertionError](Target.clipByTwoTimes(target2, target1))
+  }
+
+  it should "average targets" in new GroupConfigFixture.Default {
+    val target = Target.unsafe(Hex.unsafe("200FFFFF"))
+    val value  = target.value
+    Target.average(target, AVector.fill(2 * groups - 1)(target)) is target
+    Target.average(Target.Zero, AVector.fill(2 * groups - 1)(target)) is
+      Target.unsafe(target.value * (2 * groups - 1) / (4 * groups))
+    Target.average(target, AVector.fill(2 * groups - 1)(Target.Zero)) is
+      Target.unsafe(target.value * (2 * groups + 1) / (4 * groups))
+    val target1 = Target.unsafe(value * (2 * groups + 1))
+    Target.average(target1, AVector.fill(2 * groups - 1)(target)) is
+      Target.unsafe(value * (2 * groups + 3) / 2)
+    val target2 = Target.unsafe(value * (2 * groups + 1))
+    Target.average(target, AVector.fill(2 * groups - 1)(target2)) is
+      Target.unsafe(value * (2 * groups + 1) / 2)
   }
 }
