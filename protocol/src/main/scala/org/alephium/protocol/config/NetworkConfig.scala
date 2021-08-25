@@ -19,12 +19,12 @@ package org.alephium.protocol.config
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ChainId
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util.Bytes
 
 trait NetworkConfig {
-  def chainId: ChainId
+  def networkId: NetworkId
 
   lazy val magicBytes: ByteString =
-    Bytes.from(Hash.hash(s"alephium-${chainId.id}").toRandomIntUnsafe)
+    Bytes.from(Hash.hash(s"alephium-${networkId.id}").toRandomIntUnsafe)
 }

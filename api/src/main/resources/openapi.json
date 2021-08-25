@@ -1845,7 +1845,7 @@
                 },
                 "example": {
                   "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "chainId": 0,
+                  "networkId": 0,
                   "numZerosAtLeastInHash": 18,
                   "nodes": [
                     {
@@ -5932,7 +5932,7 @@
       "SelfClique": {
         "required": [
           "cliqueId",
-          "chainId",
+          "networkId",
           "numZerosAtLeastInHash",
           "selfReady",
           "synced",
@@ -5944,7 +5944,7 @@
           "cliqueId": {
             "type": "string"
           },
-          "chainId": {
+          "networkId": {
             "type": "integer"
           },
           "numZerosAtLeastInHash": {

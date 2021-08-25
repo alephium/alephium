@@ -21,7 +21,7 @@ import java.nio.file.Files
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.model.ChainId
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
 
@@ -32,7 +32,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   val mnemonicGen = Mnemonic.generate(24).get
   val passwordGen = hashGen.map(_.toHexString)
-  val path        = Constants.path(ChainId.AlephiumMainNet)
+  val path        = Constants.path(NetworkId.AlephiumMainNet)
 
   it should "create/lock/unlock/delete the secret storage" in {
     forAll(mnemonicGen, passwordGen, passwordGen) { case (mnemonic, password, wrongPassword) =>

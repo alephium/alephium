@@ -143,7 +143,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     for {
       tip    <- getBestTip()
       target <- getNextHashTargetRaw(tip)
-    } yield BlockEnv(networkConfig.chainId, TimeStamp.now(), target)
+    } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target)
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {

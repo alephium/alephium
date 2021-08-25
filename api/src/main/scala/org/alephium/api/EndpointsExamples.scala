@@ -34,7 +34,7 @@ import org.alephium.util._
 // scalastyle:off magic.number
 trait EndpointsExamples extends ErrorExamples {
 
-  private val chainId = ChainId(0)
+  private val networkId = NetworkId(0)
   private val lockupScript =
     LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
@@ -148,7 +148,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       SelfClique(
         cliqueId,
-        chainId,
+        networkId,
         numZerosAtLeastInHash = 18,
         peers,
         selfReady = true,

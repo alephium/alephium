@@ -115,8 +115,8 @@ trait ApiModelCodec {
     Hex.from(s).flatMap(CliqueId.from).getOrElse(throw new Abort("invalid clique id"))
   }
 
-  implicit val chainIdWriter: Writer[ChainId] = ByteWriter.comap[ChainId](_.id)
-  implicit val chainIdReader: Reader[ChainId] = ByteReader.map(ChainId(_))
+  implicit val networkIdWriter: Writer[NetworkId] = ByteWriter.comap[NetworkId](_.id)
+  implicit val networkIdReader: Reader[NetworkId] = ByteReader.map(NetworkId(_))
 
   implicit val fetchResponseRW: RW[FetchResponse] = macroRW
 

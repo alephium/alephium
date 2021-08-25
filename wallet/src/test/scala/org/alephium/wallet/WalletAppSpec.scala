@@ -33,7 +33,7 @@ import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{Address, ChainId, CliqueId, TxGenerators}
+import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model
@@ -363,7 +363,7 @@ object WalletAppSpec extends {
     router.route().path("/infos/self-clique").handler { ctx =>
       complete(
         ctx,
-        SelfClique(cliqueId, ChainId.AlephiumMainNet, 18, AVector(peer, peer), true, true, 1, 2)
+        SelfClique(cliqueId, NetworkId.AlephiumMainNet, 18, AVector(peer, peer), true, true, 1, 2)
       )
     }
 

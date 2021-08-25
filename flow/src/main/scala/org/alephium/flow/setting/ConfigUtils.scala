@@ -21,7 +21,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.crypto.Sha256
-import org.alephium.protocol.model.{Address, ChainId}
+import org.alephium.protocol.model.{Address, NetworkId}
 import org.alephium.util.{AVector, Hex}
 
 object ConfigUtils {
@@ -64,8 +64,8 @@ object ConfigUtils {
     }
   }
 
-  implicit val chainIdReader: ValueReader[ChainId] = ValueReader[Int].map { id =>
-    ChainId
+  implicit val networkIdReader: ValueReader[NetworkId] = ValueReader[Int].map { id =>
+    NetworkId
       .from(id)
       .getOrElse(
         throw new ConfigException.BadValue("", s"invalid chain id: $id")

@@ -549,7 +549,7 @@ object EndpointsLogic {
   )(implicit brokerConfig: BrokerConfig, networkConfig: NetworkConfig): SelfClique = {
     SelfClique(
       cliqueInfo.id,
-      networkConfig.chainId,
+      networkConfig.networkId,
       consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)

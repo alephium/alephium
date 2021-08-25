@@ -25,7 +25,7 @@ import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{Block, ChainId, ChainIndex, Transaction}
+import org.alephium.protocol.model.{Block, ChainIndex, NetworkId, Transaction}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.deserialize
 import org.alephium.util._
@@ -71,8 +71,8 @@ object Configs extends StrictLogging {
     path.toFile
   }
 
-  def getConfigNetwork(rootPath: Path, chainId: ChainId, overwrite: Boolean): File =
-    getConfigTemplate(rootPath, "network", s"network_${chainId.networkType}", overwrite)
+  def getConfigNetwork(rootPath: Path, networkId: NetworkId, overwrite: Boolean): File =
+    getConfigTemplate(rootPath, "network", s"network_${networkId.networkType}", overwrite)
 
   def getConfigSystem(rootPath: Path, overwrite: Boolean): File = {
     val env = Env.resolve().name
@@ -93,18 +93,18 @@ object Configs extends StrictLogging {
         Left(s"Cannot parse config file: $file, exception: $e")
     }
 
-  def parseChainId(rootPath: Path, config: Config): Either[String, ChainId] = {
-    if (!config.hasPath("alephium.network.chain-id")) {
-      Left(s"""|The network type isn't defined!
+  def parseNetworkId(rootPath: Path, config: Config): Either[String, NetworkId] = {
+    if (!config.hasPath("alephium.network.network-id")) {
+      Left(s"""|The network-id isn't configed!
                |
-               |Please set the network type in your $rootPath/user.conf and try again.
+               |Please set the network-id in your $rootPath/user.conf and try again.
                |
                |Example:
-               |alephium.network.chain-id = 1 // 0 for alepium mainnet, 1 for alephium testnet
+               |alephium.network.network-id = 1 // 0 for alepium mainnet, 1 for alephium testnet
           """.stripMargin)
     } else {
-      val id = config.getInt("alephium.network.chain-id")
-      ChainId.from(id).toRight(s"Invalid chain id: $id")
+      val id = config.getInt("alephium.network.network-id")
+      NetworkId.from(id).toRight(s"Invalid chain id: $id")
     }
   }
 
@@ -112,7 +112,7 @@ object Configs extends StrictLogging {
     val resultEither = for {
       userConfig    <- parseConfigFile(getConfigUser(rootPath))
       systemConfig  <- parseConfigFile(getConfigSystem(rootPath, overwrite))
-      networkType   <- parseChainId(rootPath, userConfig.withFallback(systemConfig).resolve())
+      networkType   <- parseNetworkId(rootPath, userConfig.withFallback(systemConfig).resolve())
       networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {

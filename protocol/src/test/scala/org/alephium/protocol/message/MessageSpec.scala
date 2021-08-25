@@ -18,7 +18,7 @@ package org.alephium.protocol.message
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.ChainId
+import org.alephium.protocol.model.NetworkId
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, Bytes, Hex}
 
@@ -91,7 +91,7 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
   it should "fail to deserialize if magic number doesn't match" in {
     Message
       .deserialize(Message.serialize(message)(new NetworkConfig {
-        override def chainId: ChainId = ChainId.AlephiumMainNet
+        override def networkId: NetworkId = NetworkId.AlephiumMainNet
       }))
       .swap isE
       SerdeError.wrongFormat("Wrong magic bytes")

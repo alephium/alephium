@@ -21,13 +21,13 @@ import scala.annotation.tailrec
 import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ChainId, GroupIndex}
+import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.wallet.Constants
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object WalletGen extends App {
   @tailrec
-  def gen(chainId: ChainId, groupIndex: GroupIndex)(implicit
+  def gen(networkId: NetworkId, groupIndex: GroupIndex)(implicit
       config: GroupConfig
   ): (Address, SecP256K1PublicKey, SecP256K1PrivateKey, Mnemonic) = {
     // scalastyle:off magic.number
@@ -35,32 +35,33 @@ object WalletGen extends App {
     // scalastyle:on magic.number
 
     val seed        = mnemonic.toSeed(None)
-    val extendedKey = BIP32.btcMasterKey(seed).derive(Constants.path(chainId)).get
+    val extendedKey = BIP32.btcMasterKey(seed).derive(Constants.path(networkId)).get
     val priKey      = extendedKey.privateKey
     val pubKey      = extendedKey.publicKey
     val address     = Address.p2pkh(pubKey)
     if (address.groupIndex == groupIndex) {
       (address, pubKey, priKey, mnemonic)
     } else {
-      gen(chainId, groupIndex)
+      gen(networkId, groupIndex)
     }
   }
 
   // scalastyle:off regex
-  Seq[(ChainId, Int)](ChainId(1) -> 4, ChainId(2) -> 3).foreach { case (chainId, groupNum) =>
-    printLine(chainId.networkType.name)
-    implicit val config: GroupConfig = new GroupConfig {
-      override def groups: Int = groupNum
-    }
-    (0 until groupNum).foreach { g =>
-      printLine(s"group: $g")
-      val (address, pubKey, priKey, mnemonic) = gen(chainId, GroupIndex.unsafe(g))
-      printLine(s"address: ${address.toBase58}")
-      printLine(s"pubKey: ${pubKey.toHexString}")
-      printLine(s"priKey: ${priKey.toHexString}")
-      printLine(s"mnemonic: ${mnemonic.toLongString}")
-    }
-    printLine("")
+  Seq[(NetworkId, Int)](NetworkId(1) -> 4, NetworkId(2) -> 3).foreach {
+    case (networkId, groupNum) =>
+      printLine(networkId.networkType.name)
+      implicit val config: GroupConfig = new GroupConfig {
+        override def groups: Int = groupNum
+      }
+      (0 until groupNum).foreach { g =>
+        printLine(s"group: $g")
+        val (address, pubKey, priKey, mnemonic) = gen(networkId, GroupIndex.unsafe(g))
+        printLine(s"address: ${address.toBase58}")
+        printLine(s"pubKey: ${pubKey.toHexString}")
+        printLine(s"priKey: ${priKey.toHexString}")
+        printLine(s"mnemonic: ${mnemonic.toLongString}")
+      }
+      printLine("")
   }
 
   def printLine(text: String): Unit = {

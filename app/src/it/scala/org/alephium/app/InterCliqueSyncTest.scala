@@ -27,7 +27,7 @@ import org.alephium.api.model._
 import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
-import org.alephium.protocol.model.{BrokerInfo, ChainId}
+import org.alephium.protocol.model.{BrokerInfo, NetworkId}
 import org.alephium.util._
 
 class Injected[T](injection: ByteString => ByteString, ref: ActorRef) extends ActorRefT[T](ref) {
@@ -182,12 +182,12 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     val server0 = bootClique(1).servers.head
     server0.start().futureValue is ()
 
-    val currentChainId = config.network.chainId
-    currentChainId isnot ChainId.AlephiumMainNet
+    val currentNetworkId = config.network.networkId
+    currentNetworkId isnot NetworkId.AlephiumMainNet
     val modifier: ByteString => ByteString = { data =>
       val message = Message.deserialize(data).toOption.get
       Message.serialize(message.payload)(new NetworkConfig {
-        override def chainId: ChainId = ChainId.AlephiumMainNet
+        override def networkId: NetworkId = NetworkId.AlephiumMainNet
       })
     }
     val server1 =

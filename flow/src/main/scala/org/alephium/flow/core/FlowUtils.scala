@@ -220,7 +220,7 @@ trait FlowUtils
       templateTs: TimeStamp,
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
-    val blockEnv = BlockEnv(networkConfig.chainId, templateTs, target)
+    val blockEnv = BlockEnv(networkConfig.networkId, templateTs, target)
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)

@@ -17,18 +17,18 @@
 package org.alephium.wallet
 
 import org.alephium.crypto.wallet.BIP32
-import org.alephium.protocol.model.ChainId
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util.AVector
 
 // scalastyle:off magic.number
 object Constants {
   //As defined in: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
-  def path(chainId: ChainId): AVector[Int] = {
-    val coinType: Int = chainId.networkType match {
+  def path(networkId: NetworkId): AVector[Int] = {
+    val coinType: Int = networkId.networkType match {
       //TODO change mainnet coin type when it's added to slip-44 list
-      case ChainId.MainNet => 1234
-      case ChainId.TestNet => 1
-      case ChainId.DevNet  => -1
+      case NetworkId.MainNet => 1234
+      case NetworkId.TestNet => 1
+      case NetworkId.DevNet  => -1
     }
     AVector(BIP32.harden(44), BIP32.harden(coinType), BIP32.harden(0), 0, 0)
   }

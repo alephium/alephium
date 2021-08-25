@@ -33,7 +33,7 @@ import org.alephium.conf._
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Address, Block, ChainId, Target, Weight}
+import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, U256}
 
@@ -83,7 +83,7 @@ final case class MiningSetting(
 )
 
 final case class NetworkSetting(
-    chainId: ChainId,
+    networkId: NetworkId,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     pingFrequency: Duration,
@@ -191,7 +191,7 @@ object AlephiumConfig {
   }
 
   final private case class TempNetworkSetting(
-      chainId: ChainId,
+      networkId: NetworkId,
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       pingFrequency: Duration,
@@ -216,7 +216,7 @@ object AlephiumConfig {
   ) extends NetworkConfig {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
       NetworkSetting(
-        chainId,
+        networkId,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         pingFrequency,
@@ -284,7 +284,7 @@ object AlephiumConfig {
           mempool,
           wallet,
           node,
-          Genesis(network.chainId)
+          Genesis(network.networkId)
         )
       } match {
         case Right(value) => value
