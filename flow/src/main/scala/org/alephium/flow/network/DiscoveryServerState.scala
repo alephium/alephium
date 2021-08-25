@@ -306,11 +306,7 @@ trait SessionManager {
     sessions.get(id).exists { session =>
       sessions.remove(id)
       pendings.remove(brokerInfo.peerId)
-      if (session.remote == brokerInfo.address) {
-        true
-      } else {
-        false
-      }
+      session.remote == brokerInfo.address
     }
   }
 
