@@ -1556,7 +1556,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/AddressInfo"
+                    "$ref": "#/components/schemas/MinerAddressInfo"
                   }
                 },
                 "example": [
@@ -4986,21 +4986,6 @@
           }
         }
       },
-      "AddressInfo": {
-        "required": [
-          "address",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "$ref": "#/components/schemas/Asset"
-          },
-          "group": {
-            "type": "integer"
-          }
-        }
-      },
       "Addresses": {
         "required": [
           "activeAddress"
@@ -5659,6 +5644,21 @@
       "MemPooled": {
         "type": "object"
       },
+      "MinerAddressInfo": {
+        "required": [
+          "address",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Asset"
+          },
+          "group": {
+            "type": "integer"
+          }
+        }
+      },
       "MinerAddresses": {
         "type": "object",
         "properties": {
@@ -5676,7 +5676,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AddressInfo"
+              "$ref": "#/components/schemas/MinerAddressInfo"
             }
           }
         }

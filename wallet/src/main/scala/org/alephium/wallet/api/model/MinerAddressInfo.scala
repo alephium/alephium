@@ -18,4 +18,4 @@ package org.alephium.wallet.api.model
 
 import org.alephium.protocol.model.Address
 
-final case class AddressInfo(address: Address.Asset, group: Int)
+final case class MinerAddressInfo(address: Address.Asset, group: Int)

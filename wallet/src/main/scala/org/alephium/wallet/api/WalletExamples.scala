@@ -122,14 +122,14 @@ trait WalletExamples extends ErrorExamples {
   implicit val addressExamples: List[Example[Address]] =
     simpleExample(address)
 
-  implicit val addressInfoExamples: List[Example[AddressInfo]] =
-    simpleExample(AddressInfo(address, fromGroup))
+  implicit val minerAddressInfoExamples: List[Example[MinerAddressInfo]] =
+    simpleExample(MinerAddressInfo(address, fromGroup))
 
   implicit val minerAddressesInfoExample: List[Example[AVector[MinerAddressesInfo]]] =
-    simpleExample(AVector(MinerAddressesInfo(AVector(AddressInfo(address, fromGroup)))))
+    simpleExample(AVector(MinerAddressesInfo(AVector(MinerAddressInfo(address, fromGroup)))))
 
-  implicit val addressessInfoExamples: List[Example[AVector[AddressInfo]]] =
-    simpleExample(AVector(AddressInfo(address, fromGroup)))
+  implicit val addressessInfoExamples: List[Example[AVector[MinerAddressInfo]]] =
+    simpleExample(AVector(MinerAddressInfo(address, fromGroup)))
 
   implicit val changeActiveAddressExamples: List[Example[ChangeActiveAddress]] =
     simpleExample(ChangeActiveAddress(address))

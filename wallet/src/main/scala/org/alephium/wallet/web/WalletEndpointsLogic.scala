@@ -120,7 +120,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
           addresses.map { p =>
             model.MinerAddressesInfo(
               p.map { case (group, ad) =>
-                model.AddressInfo(ad, group.value)
+                model.MinerAddressInfo(ad, group.value)
               }
             )
           }
@@ -167,7 +167,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     Future.successful(
       walletService
         .deriveNextMinerAddresses(wallet)
-        .map(_.map(address => model.AddressInfo(address, address.groupIndex.value)))
+        .map(_.map(address => model.MinerAddressInfo(address, address.groupIndex.value)))
         .left
         .map(toApiError)
     )
