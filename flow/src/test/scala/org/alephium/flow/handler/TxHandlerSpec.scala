@@ -17,12 +17,13 @@
 package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
-import akka.testkit.{EventFilter, TestProbe}
+import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumActorSpec, AVector}
@@ -74,6 +75,32 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
+  it should "fetch txs" in new Fixture {
+    val chainIndexGen = Gen.const(chainIndex)
+    val tx1           = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
+    val memPool       = blockFlow.getMemPool(chainIndex)
+    val maxCapacity   = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+
+    txHandler.underlyingActor.maxCapacity is maxCapacity
+    (0 until TxHandler.MaxDownloadTimes).foreach { _ =>
+      txHandler ! TxHandler.TxAnnouncements(AVector((chainIndex, AVector(tx1.id))))
+      expectMsg(BrokerHandler.DownloadTxs(AVector((chainIndex, AVector(tx1.id)))))
+      txHandler.underlyingActor.fetching.states.contains(tx1.id) is true
+    }
+    txHandler ! TxHandler.TxAnnouncements(AVector((chainIndex, AVector(tx1.id))))
+    expectNoMessage()
+
+    val tx2 = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
+    val tx3 = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
+    memPool.contains(chainIndex, tx2.id) is false
+    memPool.addNewTx(chainIndex, tx2)
+    memPool.contains(chainIndex, tx2.id) is true
+    txHandler ! TxHandler.TxAnnouncements(
+      AVector((chainIndex, AVector(tx1.id, tx2.id, tx3.id)))
+    )
+    expectMsg(BrokerHandler.DownloadTxs(AVector((chainIndex, AVector(tx3.id)))))
+  }
+
   it should "clean tx pool regularly" in new FlowFixture {
     override val configValues = Map(("alephium.mempool.clean-frequency", "300 ms"))
 
@@ -90,7 +117,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate), dataOrigin)
 
-    val txHandler = system.actorOf(TxHandler.props(blockFlow))
+    val txHandler = TestActorRef[TxHandler](TxHandler.props(blockFlow))
 
     val broadcastTxProbe = TestProbe()
     system.eventStream.subscribe(broadcastTxProbe.ref, classOf[CliqueManager.BroadCastTx])

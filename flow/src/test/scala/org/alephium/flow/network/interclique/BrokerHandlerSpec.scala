@@ -219,6 +219,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val capacity = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
     brokerHandler.underlyingActor.maxBlockCapacity is capacity
     brokerHandler.underlyingActor.maxTxsCapacity is (capacity * 32)
+    setSynced()
     val txHash0 = Hash.generate
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, AVector(txHash0)))))
     brokerHandler.underlyingActor.seenTxs.contains(txHash0) is true
@@ -230,13 +231,13 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "mark tx seen when receive valid tx announcements" in new Fixture {
     val txHashes = AVector.fill(10)(Hash.generate)
-    blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.HandShaked(brokerHandler.underlyingActor.remoteBrokerInfo)
-    )
+    brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes))))
+    brokerHandler.underlyingActor.seenTxs.isEmpty is true
+    setSynced()
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes))))
     brokerHandler.underlyingActor.seenTxs.keys().toSet is txHashes.toSet
-    blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.TxsAnnouncement(AVector((chainIndex, txHashes)))
+    allHandlerProbes.txHandler.expectMsg(
+      TxHandler.TxAnnouncements(AVector((chainIndex, txHashes)))
     )
   }
 
@@ -256,6 +257,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txHashes = AVector.fill(10)(Hash.generate)
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     watch(brokerHandler)
+    setSynced()
     val remoteAddress = brokerHandler.underlyingActor.remoteAddress
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((invalidChainIndex, txHashes))))
     listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
@@ -266,18 +268,19 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txHashes1 = AVector.fill(6)(Hash.generate)
     val txHashes2 = AVector.fill(4)(Hash.generate)
 
-    blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.HandShaked(brokerHandler.underlyingActor.remoteBrokerInfo)
-    )
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes1))))
-    blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.TxsAnnouncement(AVector((chainIndex, txHashes1)))
+    brokerHandler.underlyingActor.seenTxs.isEmpty is true
+    allHandlerProbes.txHandler.expectNoMessage()
+    setSynced()
+    brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes1))))
+    allHandlerProbes.txHandler.expectMsg(
+      TxHandler.TxAnnouncements(AVector((chainIndex, txHashes1)))
     )
     brokerHandler ! BaseBrokerHandler.Received(
       NewTxHashes(AVector((chainIndex, txHashes1.take(2) ++ txHashes2)))
     )
-    blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.TxsAnnouncement(AVector((chainIndex, txHashes2)))
+    allHandlerProbes.txHandler.expectMsg(
+      TxHandler.TxAnnouncements(AVector((chainIndex, txHashes2)))
     )
     brokerHandler.underlyingActor.seenTxs.size is (txHashes1.length + txHashes2.length)
     brokerHandler.underlyingActor.seenTxs.keys().toSet is (txHashes1 ++ txHashes2).toSet
@@ -352,6 +355,11 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     lazy val chainIndex        = ChainIndex.unsafe(brokerGroup, brokerGroup)
     lazy val nonBrokerGroup    = (brokerGroup + 1) % brokerConfig.groups
     lazy val invalidChainIndex = ChainIndex.unsafe(nonBrokerGroup, nonBrokerGroup)
+
+    def setSynced(): Unit = {
+      brokerHandler.underlyingActor.selfSynced = true
+      brokerHandler.underlyingActor.remoteSynced = true
+    }
   }
 }
 

@@ -25,9 +25,9 @@ import org.alephium.flow.handler.{AllHandlers, FlowHandler, IOBaseActor}
 import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
 
@@ -39,13 +39,12 @@ object BlockFlowSynchronizer {
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
-  final case class HandShaked(brokerInfo: BrokerInfo)                            extends Command
-  case object Sync                                                               extends Command
-  final case class SyncInventories(hashes: AVector[AVector[BlockHash]])          extends Command
-  final case class BlockFinalized(hash: BlockHash)                               extends Command
-  case object CleanDownloading                                                   extends Command
-  final case class BlockAnnouncement(hash: BlockHash)                            extends Command
-  final case class TxsAnnouncement(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
+  final case class HandShaked(brokerInfo: BrokerInfo)                   extends Command
+  case object Sync                                                      extends Command
+  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
+  final case class BlockFinalized(hash: BlockHash)                      extends Command
+  case object CleanDownloading                                          extends Command
+  final case class BlockAnnouncement(hash: BlockHash)                   extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -54,7 +53,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
 ) extends IOBaseActor
     with Subscriber
     with DownloadTracker
-    with Fetcher
+    with BlockFetcher
     with BrokerStatusTracker
     with InterCliqueManager.NodeSyncStatus {
   import BlockFlowSynchronizer._
@@ -86,7 +85,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case BlockFinalized(hash)    => finalized(hash)
     case CleanDownloading        => cleanupSyncing(networkSetting.syncExpiryPeriod)
     case BlockAnnouncement(hash) => handleBlockAnnouncement(hash)
-    case TxsAnnouncement(hashes) => handleTxsAnnouncement(hashes)
     case Terminated(actor) =>
       val broker = ActorRefT[BrokerHandler.Command](actor)
       log.debug(s"Connection to ${remoteAddress(broker)} is closing")
