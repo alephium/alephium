@@ -46,7 +46,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(blockFlowSynchronizerActor.brokerInfos.isEmpty is true)
   }
 
-  it should "handle announcement" in new Fixture {
+  it should "handle block announcement" in new Fixture {
     val broker     = TestProbe()
     val brokerInfo = brokerInfoGen.sample.get
     val blockHash  = BlockHash.generate
@@ -55,6 +55,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(blockFlowSynchronizerActor.brokerInfos.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
-    eventually(blockFlowSynchronizerActor.fetchingBlocks.contains(blockHash) is true)
+    eventually(blockFlowSynchronizerActor.fetching.states.contains(blockHash) is true)
   }
 }

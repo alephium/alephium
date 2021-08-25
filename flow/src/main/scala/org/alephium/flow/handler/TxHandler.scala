@@ -22,20 +22,21 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
-import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.network.sync.FetchState
+import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, BaseActor, EventStream, Hex, TimeStamp}
 
 object TxHandler {
-  def props(
-      blockFlow: BlockFlow
-  )(implicit
-      groupConfig: GroupConfig,
-      memPoolSetting: MemPoolSetting
+  def props(blockFlow: BlockFlow)(implicit
+      brokerConfig: BrokerConfig,
+      memPoolSetting: MemPoolSetting,
+      networkSetting: NetworkSetting
   ): Props =
     Props(new TxHandler(blockFlow))
 
@@ -45,19 +46,26 @@ object TxHandler {
   final case class Broadcast(txs: AVector[TransactionTemplate]) extends Command
   final case class AddToGrandPool(txs: AVector[TransactionTemplate], origin: DataOrigin)
       extends Command
-  case object CleanMempool extends Command
+  case object CleanMempool                                                       extends Command
+  final case class TxAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: Hash) extends Event
   final case class AddFailed(txId: Hash)    extends Event
+
+  val MaxDownloadTimes: Int = 2
 }
 
 class TxHandler(blockFlow: BlockFlow)(implicit
-    groupConfig: GroupConfig,
-    memPoolSetting: MemPoolSetting
+    brokerConfig: BrokerConfig,
+    memPoolSetting: MemPoolSetting,
+    networkSetting: NetworkSetting
 ) extends BaseActor
     with EventStream.Publisher {
   private val nonCoinbaseValidation = TxValidation.build
+  val maxCapacity: Int              = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+  val fetching: FetchState[Hash] =
+    FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
 
   override def preStart(): Unit = {
     super.preStart()
@@ -73,12 +81,33 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       txs.groupBy(_.chainIndex).foreach { case (chainIndex, txs) =>
         broadCast(chainIndex, txs, DataOrigin.Local)
       }
+    case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
     case TxHandler.CleanMempool =>
       log.debug(s"Start to clean tx pools")
       blockFlow.grandPool.clean(
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanFrequency)
       )
+  }
+
+  private def handleAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
+    val timestamp = TimeStamp.now()
+    val invs = hashes.fold(AVector.empty[(ChainIndex, AVector[Hash])]) {
+      case (acc, (chainIndex, txHashes)) =>
+        val mempool = blockFlow.getMemPool(chainIndex)
+        val selected = txHashes.filter { hash =>
+          !mempool.contains(chainIndex, hash) &&
+          fetching.needToFetch(hash, timestamp)
+        }
+        if (selected.isEmpty) {
+          acc
+        } else {
+          acc :+ ((chainIndex, selected))
+        }
+    }
+    if (invs.nonEmpty) {
+      sender() ! BrokerHandler.DownloadTxs(invs)
+    }
   }
 
   private def hex(tx: TransactionTemplate): String = {

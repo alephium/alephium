@@ -140,26 +140,29 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
     log.debug(s"Received txs hashes ${showChainIndexedHashes(hashes)} from $remoteAddress")
-    val result = hashes.mapE { case (chainIndex, txHashes) =>
-      if (!brokerConfig.contains(chainIndex.from)) {
-        Left(())
-      } else {
-        val invs = txHashes.filter { hash =>
-          val duplicated = seenTxs.contains(hash)
-          if (!duplicated) {
-            seenTxs.put(hash, ())
+    // ignore the tx announcements before synced
+    if (selfSynced && remoteSynced) {
+      val result = hashes.mapE { case (chainIndex, txHashes) =>
+        if (!brokerConfig.contains(chainIndex.from)) {
+          Left(())
+        } else {
+          val invs = txHashes.filter { hash =>
+            val duplicated = seenTxs.contains(hash)
+            if (!duplicated) {
+              seenTxs.put(hash, ())
+            }
+            !duplicated
           }
-          !duplicated
+          Right((chainIndex, invs))
         }
-        Right((chainIndex, invs))
       }
-    }
-    result match {
-      case Right(announcements) =>
-        blockFlowSynchronizer ! BlockFlowSynchronizer.TxsAnnouncement(announcements)
-      case _ =>
-        log.debug(s"Received invalid tx hashes from $remoteAddress")
-        handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+      result match {
+        case Right(announcements) =>
+          allHandlers.txHandler ! TxHandler.TxAnnouncements(announcements)
+        case _ =>
+          log.debug(s"Received invalid tx hashes from $remoteAddress")
+          handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+      }
     }
   }
 
