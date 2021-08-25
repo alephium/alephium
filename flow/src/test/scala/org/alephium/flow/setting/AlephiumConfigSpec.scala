@@ -26,7 +26,7 @@ import com.typesafe.config.ConfigValueFactory
 import net.ceedubs.ficus.Ficus._
 
 import org.alephium.conf._
-import org.alephium.protocol.model.{Address, ChainId}
+import org.alephium.protocol.model.{Address, NetworkId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
 class AlephiumConfigSpec extends AlephiumSpec {
@@ -37,7 +37,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     config.broker.groups is 13
-    config.network.chainId is ChainId(2)
+    config.network.networkId is NetworkId(2)
     config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.network.connectionBufferCapacityInByte is 100000000L
   }

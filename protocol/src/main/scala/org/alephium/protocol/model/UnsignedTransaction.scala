@@ -26,7 +26,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 /** Up to one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
   *
-  * @param chainId the id of the chain which can accept the tx
+  * @param networkId the id of the chain which can accept the tx
   * @param scriptOpt optional script for invoking stateful contracts
   * @param gasAmount the amount of gas can be used for tx execution
   * @param inputs a vector of TxInput
@@ -34,7 +34,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
   */
 @HashSerde
 final case class UnsignedTransaction(
-    chainId: ChainId,
+    networkId: NetworkId,
     scriptOpt: Option[StatefulScript],
     gasAmount: GasBox,
     gasPrice: GasPrice,
@@ -70,7 +70,7 @@ object UnsignedTransaction {
   implicit val serde: Serde[UnsignedTransaction] = {
     val serde: Serde[UnsignedTransaction] = Serde.forProduct6(
       UnsignedTransaction.apply,
-      t => (t.chainId, t.scriptOpt, t.gasAmount, t.gasPrice, t.inputs, t.fixedOutputs)
+      t => (t.networkId, t.scriptOpt, t.gasAmount, t.gasPrice, t.inputs, t.fixedOutputs)
     )
     serde.validate(tx => if (GasBox.validate(tx.gasAmount)) Right(()) else Left("Invalid Gas"))
   }
@@ -83,7 +83,7 @@ object UnsignedTransaction {
       fixedOutputs: AVector[AssetOutput]
   )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
     new UnsignedTransaction(
-      networkConfig.chainId,
+      networkConfig.networkId,
       scriptOpt,
       startGas,
       gasPrice,
@@ -98,7 +98,7 @@ object UnsignedTransaction {
       fixedOutputs: AVector[AssetOutput]
   )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
     UnsignedTransaction(
-      networkConfig.chainId,
+      networkConfig.networkId,
       txScriptOpt,
       minimalGas,
       defaultGasPrice,
@@ -111,7 +111,7 @@ object UnsignedTransaction {
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
     UnsignedTransaction(
-      networkConfig.chainId,
+      networkConfig.networkId,
       None,
       minimalGas,
       defaultGasPrice,
@@ -124,7 +124,7 @@ object UnsignedTransaction {
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
     UnsignedTransaction(
-      networkConfig.chainId,
+      networkConfig.networkId,
       None,
       minimalGas,
       defaultGasPrice,
@@ -161,7 +161,7 @@ object UnsignedTransaction {
       }
 
       UnsignedTransaction(
-        networkConfig.chainId,
+        networkConfig.networkId,
         scriptOpt = None,
         gas,
         gasPrice,

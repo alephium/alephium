@@ -23,10 +23,10 @@ import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector, TimeStamp}
 
-final case class BlockEnv(chainId: ChainId, timeStamp: TimeStamp, target: Target)
+final case class BlockEnv(networkId: NetworkId, timeStamp: TimeStamp, target: Target)
 object BlockEnv {
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
-    BlockEnv(networkConfig.chainId, header.timestamp, header.target)
+    BlockEnv(networkConfig.networkId, header.timestamp, header.target)
 }
 
 final case class TxEnv(

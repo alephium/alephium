@@ -46,7 +46,7 @@ trait Server extends Service {
     val walletConfig: WalletConfig = WalletConfig(
       port = None,
       config.wallet.secretDir,
-      config.network.chainId,
+      config.network.networkId,
       config.wallet.lockingTimeout,
       apiConfig.apiKey,
       WalletConfig.BlockFlow(

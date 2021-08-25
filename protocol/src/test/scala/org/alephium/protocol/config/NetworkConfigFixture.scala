@@ -16,18 +16,18 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.model.ChainId
+import org.alephium.protocol.model.NetworkId
 
 trait NetworkConfigFixture { self =>
-  def chainId: ChainId
+  def networkId: NetworkId
 
   implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    override def chainId: ChainId = self.chainId
+    override def networkId: NetworkId = self.networkId
   }
 }
 
 object NetworkConfigFixture {
   trait Default extends NetworkConfigFixture {
-    val chainId: ChainId = ChainId(2)
+    val networkId: NetworkId = NetworkId(2)
   }
 }

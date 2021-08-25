@@ -126,12 +126,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val peerAddress =
       PeerAddress(inetAddress, 9001, 9002, 9003)
     val selfClique =
-      SelfClique(cliqueId, ChainId.AlephiumMainNet, 18, AVector(peerAddress), true, false, 1, 2)
+      SelfClique(cliqueId, NetworkId.AlephiumMainNet, 18, AVector(peerAddress), true, false, 1, 2)
     val jsonRaw =
       s"""
          |{
          |  "cliqueId": "${cliqueId.toHexString}",
-         |  "chainId": 0,
+         |  "networkId": 0,
          |  "numZerosAtLeastInHash": 18,
          |  "nodes": [{"address":"127.0.0.1","restPort":9001,"wsPort":9002,"minerApiPort":9003}],
          |  "selfReady": true,

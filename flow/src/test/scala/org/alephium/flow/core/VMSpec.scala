@@ -782,7 +782,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  pub fn main() -> () {
-         |    assert!(chainId!() == #02)
+         |    assert!(networkId!() == #02)
          |    assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
          |    assert!(blockTarget!() == ${latestHeader.target.value})
          |  }

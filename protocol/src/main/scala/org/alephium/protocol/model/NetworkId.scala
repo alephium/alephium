@@ -18,26 +18,26 @@ package org.alephium.protocol.model
 
 import org.alephium.serde._
 
-final case class ChainId(id: Byte) extends AnyVal {
+final case class NetworkId(id: Byte) extends AnyVal {
   // network type will only be used to load the correct config file
-  def networkType: ChainId.Type = (id % 3) match {
-    case 0 => ChainId.MainNet
-    case 1 => ChainId.TestNet
-    case 2 => ChainId.DevNet
+  def networkType: NetworkId.Type = (id % 3) match {
+    case 0 => NetworkId.MainNet
+    case 1 => NetworkId.TestNet
+    case 2 => NetworkId.DevNet
   }
 
   def verboseName: String = s"${networkType.name}-$id"
 }
 
-object ChainId {
-  val AlephiumMainNet: ChainId = ChainId(0)
-  val AlephiumTestNet: ChainId = ChainId(1)
-  val AlephiumDevNet: ChainId  = ChainId(2)
+object NetworkId {
+  val AlephiumMainNet: NetworkId = NetworkId(0)
+  val AlephiumTestNet: NetworkId = NetworkId(1)
+  val AlephiumDevNet: NetworkId  = NetworkId(2)
 
-  implicit val serde: Serde[ChainId] = byteSerde.xmap(ChainId.apply, _.id)
+  implicit val serde: Serde[NetworkId] = byteSerde.xmap(NetworkId.apply, _.id)
 
-  def from(id: Int): Option[ChainId] =
-    Option.when(id >= Byte.MinValue && id <= Byte.MaxValue)(ChainId(id.toByte))
+  def from(id: Int): Option[NetworkId] =
+    Option.when(id >= Byte.MinValue && id <= Byte.MaxValue)(NetworkId(id.toByte))
 
   sealed trait Type {
     def name: String

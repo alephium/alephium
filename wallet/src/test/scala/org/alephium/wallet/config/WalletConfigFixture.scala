@@ -46,7 +46,7 @@ trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
   lazy val config = WalletConfig(
     Some(walletPort),
     tempSecretDir,
-    chainId,
+    networkId,
     lockingTimeout,
     apiKey,
     WalletConfig.BlockFlow(

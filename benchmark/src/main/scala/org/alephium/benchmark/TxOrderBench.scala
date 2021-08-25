@@ -35,7 +35,7 @@ class TxOrderBench {
     override def groups: Int = 4
   }
   implicit val networkConfig: NetworkConfig = new NetworkConfig {
-    override def chainId: ChainId = ChainId(0)
+    override def networkId: NetworkId = NetworkId(0)
   }
   val txNum: Int = 2000
   val header: BlockHeader =

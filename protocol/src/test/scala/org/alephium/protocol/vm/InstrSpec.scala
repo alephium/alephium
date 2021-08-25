@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.Signature
-import org.alephium.protocol.model.ChainId.AlephiumMainNet
+import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.protocol.model.Target
 import org.alephium.util._
 
@@ -62,7 +62,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallLocal(byte), Return,
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-      ChainId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5
     )

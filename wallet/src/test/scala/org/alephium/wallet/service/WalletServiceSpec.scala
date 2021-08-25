@@ -70,7 +70,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     override lazy val walletService = WalletService(
       blockFlowClient,
       Paths.get(path),
-      config.chainId,
+      config.networkId,
       Duration.ofMinutesUnsafe(10)
     )
 
@@ -181,13 +181,13 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     lazy val blockFlowClient =
       BlockFlowClient.apply(
         config.blockflow.uri,
-        config.chainId,
+        config.networkId,
         config.blockflow.blockflowFetchMaxAge,
         config.blockflow.apiKey
       )
 
     lazy val walletService: WalletService =
-      WalletService.apply(blockFlowClient, tempSecretDir, config.chainId, config.lockingTimeout)
+      WalletService.apply(blockFlowClient, tempSecretDir, config.networkId, config.lockingTimeout)
   }
 }
 

@@ -46,20 +46,20 @@ class WalletApp(config: WalletConfig)(implicit
   val blockFlowClient: BlockFlowClient =
     BlockFlowClient.apply(
       config.blockflow.uri,
-      config.chainId,
+      config.networkId,
       config.blockflow.blockflowFetchMaxAge,
       config.blockflow.apiKey
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  private val secretDir = Paths.get(config.secretDir.toString, config.chainId.verboseName)
+  private val secretDir = Paths.get(config.secretDir.toString, config.networkId.verboseName)
   val walletService: WalletService =
-    WalletService.apply(blockFlowClient, secretDir, config.chainId, config.lockingTimeout)
+    WalletService.apply(blockFlowClient, secretDir, config.networkId, config.lockingTimeout)
 
   val walletServer: WalletServer =
     new WalletServer(
       walletService,
-      config.chainId,
+      config.networkId,
       config.blockflow.blockflowFetchMaxAge,
       config.apiKey
     )

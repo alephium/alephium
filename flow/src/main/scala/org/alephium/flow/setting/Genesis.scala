@@ -17,14 +17,14 @@
 package org.alephium.flow.setting
 
 import org.alephium.protocol.ALF
-import org.alephium.protocol.model.{Address, ChainId}
+import org.alephium.protocol.model.{Address, NetworkId}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Number, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object Genesis {
-  def apply(chainId: ChainId): AVector[(LockupScript.Asset, U256)] =
-    chainId.id match {
+  def apply(networkId: NetworkId): AVector[(LockupScript.Asset, U256)] =
+    networkId.id match {
       case 0 => mainnet
       case 1 => testnet
       case 2 => devnet

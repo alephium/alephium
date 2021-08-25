@@ -108,7 +108,7 @@ object Instr {
     CallLocal, Return,
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-    ChainId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+    NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
     Log1, Log2, Log3, Log4, Log5
   )
@@ -1192,10 +1192,10 @@ object ContractInitialStateHash extends ContractInstr with GasLow {
 
 sealed trait BlockInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
 
-object ChainId extends BlockInstr {
+object NetworkId extends BlockInstr {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack {
-      val id = frame.ctx.blockEnv.chainId.id
+      val id = frame.ctx.blockEnv.networkId.id
       Val.ByteVec(ByteString(id))
     }
   }
