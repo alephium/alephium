@@ -26,7 +26,8 @@ import com.typesafe.config.ConfigValueFactory
 import net.ceedubs.ficus.Ficus._
 
 import org.alephium.conf._
-import org.alephium.protocol.model.{Address, NetworkId}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.util.{AlephiumSpec, AVector, Duration}
 
 class AlephiumConfigSpec extends AlephiumSpec {
@@ -64,24 +65,6 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ) is ArraySeq.empty
   }
 
-  it should "load miner's addresses" in new AlephiumConfigFixture {
-    val minerAddresses = AVector(
-      "19zzHckZmX9Sjs6yERD15JBLa7HhVXfdrUAMRmLgKFpcr",
-      "15kHgMQX6ZMH3prxEFcFDkFBv4B7dcffCwVSRCr8nUe7N"
-    )
-
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.mining.miner-addresses",
-        ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava)
-      )
-    )
-
-    config.mining.minerAddresses is Some(
-      minerAddresses.map(str => Address.asset(str).get)
-    )
-  }
-
   it should "fail to load if miner's addresses are wrong" in new AlephiumConfigFixture {
     val minerAddresses = AVector(
       "49bUQbTo6tHa35U3QC1tsAkEDaryyQGJD2S8eomYfcZx",
@@ -96,5 +79,35 @@ class AlephiumConfigSpec extends AlephiumSpec {
     )
 
     assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))
+  }
+
+  class MinerFixture(groupIndexes: Seq[Int]) extends AlephiumConfigFixture {
+    val groupConfig1 = new GroupConfig {
+      override def groups: Int = 3
+    }
+    val minerAddresses = groupIndexes.map { g =>
+      val groupIndex  = GroupIndex.unsafe(g)(groupConfig1)
+      val (_, pubKey) = groupIndex.generateKey(groupConfig1)
+      Address.p2pkh(pubKey).toBase58
+    }
+
+    override val configValues: Map[String, Any] = Map(
+      (
+        "alephium.mining.miner-addresses",
+        ConfigValueFactory.fromIterable(minerAddresses.toSeq.asJava)
+      )
+    )
+  }
+
+  it should "fail to load if miner's addresses are of wrong indexes" in new MinerFixture(
+    Seq(0, 1, 1)
+  ) {
+    assertThrows[ConfigException](AlephiumConfig.load(newConfig, "alephium"))
+  }
+
+  it should "load if miner's addresses are of correct indexes" in new MinerFixture(
+    Seq(0, 1, 2)
+  ) {
+    config.mining.minerAddresses.get.toSeq is minerAddresses.map(str => Address.asset(str).get)
   }
 }

@@ -272,7 +272,7 @@ object AlephiumConfig {
       node: NodeSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
-      parseMiners(mining.minerAddresses).map { minerAddresses =>
+      parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
         val consensusExtracted = consensus.toConsensusSetting(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         AlephiumConfig(

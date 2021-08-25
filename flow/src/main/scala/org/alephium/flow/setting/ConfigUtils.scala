@@ -21,6 +21,8 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.crypto.Sha256
+import org.alephium.flow.mining.Miner
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkId}
 import org.alephium.util.{AVector, Hex}
 
@@ -36,15 +38,25 @@ object ConfigUtils {
 
   def parseMiners(
       minerAddressesOpt: Option[Seq[String]]
-  ): Either[ConfigException, Option[AVector[Address.Asset]]] = {
+  )(implicit groupConfig: GroupConfig): Either[ConfigException, Option[AVector[Address.Asset]]] = {
     minerAddressesOpt match {
-      case Some(minerAddresses) =>
-        AVector.from(minerAddresses).mapE(parseAddresses).map(Option.apply)
-      case None => Right(None)
+      case Some(minerAddresses) => parseAddresses(AVector.from(minerAddresses)).map(Option(_))
+      case None                 => Right(None)
     }
   }
 
-  private def parseAddresses(rawAddress: String): Either[ConfigException, Address.Asset] = {
+  private def parseAddresses(
+      rawAddresses: AVector[String]
+  )(implicit groupConfig: GroupConfig): Either[ConfigException, AVector[Address.Asset]] = {
+    rawAddresses.mapE(parseAddress).flatMap { addresses =>
+      Miner.validateAddresses(addresses) match {
+        case Right(_)    => Right(addresses)
+        case Left(error) => Left(new ConfigException.BadValue("minerAddresses", error))
+      }
+    }
+  }
+
+  private def parseAddress(rawAddress: String): Either[ConfigException, Address.Asset] = {
     Address.fromBase58(rawAddress) match {
       case Some(address: Address.Asset) => Right(address)
       case Some(_: Address.Contract) =>
