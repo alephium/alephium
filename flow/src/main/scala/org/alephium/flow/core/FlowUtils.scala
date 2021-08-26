@@ -193,10 +193,10 @@ trait FlowUtils
     assume(brokerConfig.contains(chainIndex.from))
     val bestDeps = getBestDeps(chainIndex.from)
     for {
-      target       <- getNextHashTarget(chainIndex, bestDeps)
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
+      target       <- getNextHashTarget(chainIndex, loosenDeps)
       groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
       template <- prepareBlockFlow(
