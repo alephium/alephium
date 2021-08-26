@@ -16,30 +16,55 @@
 
 package org.alephium.flow.network.broker
 
-import org.alephium.util.{AlephiumSpec, Duration}
+import org.scalatest.concurrent.Eventually
 
-class BackoffStrategySpec extends AlephiumSpec {
-  it should "calculate the correct delay" in {
-    val strategy = BackoffStrategy.default()
+import org.alephium.flow.setting.AlephiumConfigFixture
+import org.alephium.util.{discard, AlephiumSpec, Duration, Math}
 
-    var backoff = BackoffStrategy.baseDelay.divUnsafe(2)
+class BackoffStrategySpec extends AlephiumSpec with AlephiumConfigFixture {
+  implicit lazy val network                    = networkConfig
+  def createStrategy(): DefaultBackoffStrategy = DefaultBackoffStrategy()
+
+  it should "calculate the correct delay" in new DefaultFixture {
+    var backoff = strategy.baseDelay.divUnsafe(2)
     def test(expected: Duration) = {
       strategy.retry(backoff = _) is true
       backoff is expected
     }
 
-    (0 until BackoffStrategy.maxRetry).foreach { _ =>
-      val expected = org.alephium.util.Math.min(backoff.timesUnsafe(2), BackoffStrategy.maxBackOff)
+    (0 until strategy.maxRetry).foreach { _ =>
+      val expected =
+        Math.min(backoff.timesUnsafe(2), strategy.maxDelay)
       test(expected)
     }
   }
 
-  it should "not retry more than 1 minute" in {
-    val strategy = BackoffStrategy.default()
-    var total    = Duration.zero
-    (0 until BackoffStrategy.maxRetry).foreach { _ =>
+  it should "not retry more than 1 minute" in new DefaultFixture {
+    var total = Duration.zero
+    (0 until strategy.maxRetry).foreach { _ =>
       strategy.retry(backoff => total = total + backoff)
     }
     (total < Duration.ofMinutesUnsafe(1)) is true
+  }
+
+  trait DefaultFixture {
+    val strategy: DefaultBackoffStrategy = createStrategy()
+  }
+}
+
+class ResetBackoffStrategySpec extends BackoffStrategySpec {
+  override def createStrategy(): ResetBackoffStrategy = ResetBackoffStrategy()
+  override val configValues: Map[String, Any] = Map(
+    "alephium.network.backoff-reset-delay" -> "50 milli"
+  )
+
+  trait ResetFixture extends Eventually {
+    val strategy: ResetBackoffStrategy = createStrategy()
+  }
+
+  it should "correctly reset the counter" in new ResetFixture {
+    (0 until strategy.maxRetry).foreach { _ => strategy.retry(discard) is true }
+    strategy.retry(discard) is false
+    eventually(strategy.retry(discard) is true)
   }
 }

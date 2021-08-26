@@ -28,6 +28,10 @@ alephium {
     ban-duration = 1 day
     penalty-forgiveness = 1 hour
     penalty-frequency = 10 second
+    backoff-base-delay = 500 milli
+    backoff-max-delay = 8 second
+    backoff-reset-delay = 30 second
+
     connection-buffer-capacity-in-byte = 100000000
 
     fast-sync-frequency = 2 second

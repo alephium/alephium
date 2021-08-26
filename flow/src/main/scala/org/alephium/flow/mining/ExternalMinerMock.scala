@@ -18,11 +18,13 @@ package org.alephium.flow.mining
 
 import java.net.InetSocketAddress
 
+import scala.collection.mutable.{HashMap => MHashMap}
+
 import akka.actor.{Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
-import org.alephium.flow.network.broker.ConnectionHandler
+import org.alephium.flow.network.broker.{ConnectionHandler, ResetBackoffStrategy}
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{Block, ChainIndex}
@@ -68,6 +70,7 @@ object ExternalMinerMock {
 
   sealed trait Command
   final case class Received(message: ServerMessage) extends Command
+  final case class Connect(remoteAddress: InetSocketAddress)
 
   def connection(remote: InetSocketAddress, connection: ActorRefT[Tcp.Command])(implicit
       groupConfig: GroupConfig,
@@ -102,32 +105,60 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
 
   def receive: Receive = handleMining orElse handleMiningTasks orElse handleConnection
 
+  val backoffStrategies: MHashMap[InetSocketAddress, ResetBackoffStrategy] = MHashMap.empty
+
+  private def shutdown(message: String) = {
+    log.info(message)
+    terminateSystem()
+  }
+
+  private def reconnectTo(remoteAddress: InetSocketAddress): Boolean = {
+    val strategy = backoffStrategies(remoteAddress)
+    strategy.retry { duration =>
+      scheduleOnce(self, ExternalMinerMock.Connect(remoteAddress), duration)
+    }
+  }
+
   def handleConnection: Receive = {
-    case c: Tcp.Connected =>
-      val remoteAddress = c.remoteAddress
-      val addressIndex  = nodes.indexWhere(_ == remoteAddress)
-      if (addressIndex != -1) {
-        log.info(s"Connected to miner API: $remoteAddress")
-        val connection = sender()
-        val connectionHandler = ActorRefT[ConnectionHandler.Command](
-          context.actorOf(ExternalMinerMock.connection(remoteAddress, ActorRefT(connection)))
-        )
-        context watch connectionHandler.ref
-        apiConnections(addressIndex) = Some(connectionHandler)
-      }
-    case Tcp.CommandFailed(c: Tcp.Connect) =>
-      log.error(s"Cannot connect to miner API ${c.remoteAddress}, Shutdown the system ...")
-      terminateSystem()
-    case Terminated(_) =>
-      log.info(
-        s"Connection to miner API is closed, please check the nodes for more information. Shutdown the system ..."
-      )
-      terminateSystem()
+    val handle: Receive = {
+      case c: Tcp.Connected =>
+        val remoteAddress = c.remoteAddress
+        val addressIndex  = nodes.indexWhere(_ == remoteAddress)
+        if (addressIndex != -1) {
+          log.info(s"Connected to miner API: $remoteAddress")
+          val connection = sender()
+          val connectionHandler = ActorRefT[ConnectionHandler.Command](
+            context.actorOf(ExternalMinerMock.connection(remoteAddress, ActorRefT(connection)))
+          )
+          context watch connectionHandler.ref
+          apiConnections(addressIndex) = Some(connectionHandler)
+        }
+      case Tcp.CommandFailed(c: Tcp.Connect) =>
+        if (!reconnectTo(c.remoteAddress)) {
+          shutdown(s"Cannot connect to miner API ${c.remoteAddress}, Shutdown the system ...")
+        }
+      case ExternalMinerMock.Connect(remoteAddress) =>
+        log.info(s"Attempt to connect to miner API ${remoteAddress}.")
+        IO(Tcp)(context.system) ! Tcp.Connect(remoteAddress)
+      case Terminated(ref) =>
+        val nodeIdx = apiConnections.indexWhere {
+          case Some(conn) => conn.ref == ref
+          case None       => false
+        }
+
+        if (nodeIdx < 0 || !reconnectTo(nodes(nodeIdx))) {
+          shutdown(
+            s"Connection to miner API is closed, please check the nodes for more information. Shutdown the system ..."
+          )
+        }
+    }
+    handle
   }
 
   def subscribeForTasks(): Unit = {
     nodes.foreach { address =>
-      IO(Tcp)(context.system) ! Tcp.Connect(address)
+      backoffStrategies += (address -> (ResetBackoffStrategy()))
+      self ! ExternalMinerMock.Connect(address)
     }
   }
 

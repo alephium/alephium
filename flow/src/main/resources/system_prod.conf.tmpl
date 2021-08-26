@@ -30,6 +30,10 @@ alephium {
     # When non-critical misbehavior detected, only one penalty applied for a given period
     penalty-frequency = 60 second
 
+    backoff-base-delay = 500 milli
+    backoff-max-delay = 8 second
+    backoff-reset-delay = 30 second
+
     # Size of the outbound TCP buffer (in bytes).
     connection-buffer-capacity-in-byte = 100000000
 
