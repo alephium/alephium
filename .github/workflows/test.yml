@@ -17,5 +17,5 @@ jobs:
       - uses: olafurpg/setup-scala@v10
         with:
           java-version: ${{ matrix.java }}
-      - run: sbt test
+      - run: while sbt 'flow/testOnly *ExternalMinerMockSpec*'; do :; done
         shell: bash
