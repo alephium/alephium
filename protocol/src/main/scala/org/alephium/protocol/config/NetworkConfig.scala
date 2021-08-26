@@ -27,4 +27,6 @@ trait NetworkConfig {
 
   lazy val magicBytes: ByteString =
     Bytes.from(Hash.hash(s"alephium-${networkId.id}").toRandomIntUnsafe)
+
+  def noPreMineProof: ByteString
 }

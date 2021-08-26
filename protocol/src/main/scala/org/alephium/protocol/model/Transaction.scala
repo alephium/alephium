@@ -269,10 +269,12 @@ object Transaction {
   }
 
   def genesis(
-      balances: AVector[(LockupScript.Asset, U256)]
+      balances: AVector[(LockupScript.Asset, U256)],
+      noPreMineProof: ByteString
   )(implicit networkConfig: NetworkConfig): Transaction = {
-    val outputs = balances.map[AssetOutput] { case (lockupScript, value) =>
-      TxOutput.genesis(value, lockupScript)
+    val outputs = balances.mapWithIndex[AssetOutput] { case ((lockupScript, value), index) =>
+      val txData = if (index == 0) noPreMineProof else ByteString.empty
+      TxOutput.genesis(value, lockupScript, txData)
     }
     val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
     Transaction(

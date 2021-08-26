@@ -22,4 +22,11 @@ alephium {
     block-target-time = 64 seconds
     num-zeros-at-least-in-hash = 18
   }
+
+  network {
+    no-pre-mine-proof = [
+      "00000000000000000001b3a4df896d60492f0041a1cfe3b9dccd4e6b83ff57f3", # BTC 697677 block hash
+      "cf874fe2276967ab4d514a4e59b2d2a60b9fc810a3763b188f0b122368004deb"  # ETH 13100948 block hash
+    ]
+  }
 }

@@ -24,6 +24,7 @@ import scala.collection.immutable.ArraySeq
 
 import akka.actor.ActorRef
 import akka.io.Tcp
+import akka.util.ByteString
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -31,6 +32,7 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
 import org.alephium.flow.network.nat.Upnp
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
@@ -84,6 +86,7 @@ final case class MiningSetting(
 
 final case class NetworkSetting(
     networkId: NetworkId,
+    noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     pingFrequency: Duration,
@@ -195,6 +198,7 @@ object AlephiumConfig {
 
   final private case class TempNetworkSetting(
       networkId: NetworkId,
+      noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       pingFrequency: Duration,
@@ -219,10 +223,12 @@ object AlephiumConfig {
       restPort: Int,
       wsPort: Int,
       minerApiPort: Int
-  ) extends NetworkConfig {
+  ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
+      val proofInOne = Hash.doubleHash(ByteString.fromString(noPreMineProof.mkString(""))).bytes
       NetworkSetting(
         networkId,
+        proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         pingFrequency,

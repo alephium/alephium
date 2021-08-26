@@ -16,13 +16,16 @@
 
 package org.alephium.protocol.config
 
+import akka.util.ByteString
+
 import org.alephium.protocol.model.NetworkId
 
 trait NetworkConfigFixture { self =>
   def networkId: NetworkId
 
   implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    override def networkId: NetworkId = self.networkId
+    override def networkId: NetworkId       = self.networkId
+    override def noPreMineProof: ByteString = ByteString.empty
   }
 }
 
