@@ -43,6 +43,10 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val transferRW: RW[Transfer] = macroRW
 
+  implicit val signTransactionRW: RW[Sign] = macroRW
+
+  implicit val signTransactionResultRW: RW[Sign.Result] = macroRW
+
   implicit val sweepAllRW: RW[SweepAll] = macroRW
 
   implicit val transferResultRW: RW[Transfer.Result] = macroRW

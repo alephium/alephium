@@ -21,7 +21,7 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.ErrorExamples
 import org.alephium.api.model.{Destination, Token}
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Hex, U256}
@@ -46,6 +46,7 @@ trait WalletExamples extends ErrorExamples {
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
+
   private val walletName         = "wallet-super-name"
   private val mnemonicPassphrase = "optional-mnemonic-passphrase"
   private val fromGroup          = 2
@@ -55,6 +56,14 @@ trait WalletExamples extends ErrorExamples {
     Token(Hash.hash("token1"), U256.unsafe(42)),
     Token(Hash.hash("token2"), U256.unsafe(1000))
   )
+  private val hexString = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  private val signature = Signature
+    .from(
+      Hex.unsafe(
+        "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+      )
+    )
+    .get
 
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
@@ -112,6 +121,12 @@ trait WalletExamples extends ErrorExamples {
 
   implicit val transferExamples: List[Example[Transfer]] =
     simpleExample(Transfer(AVector(Destination(address, U256.Million, Some(tokens)))))
+
+  implicit val signTransactionExamples: List[Example[Sign]] =
+    simpleExample(Sign(hexString))
+
+  implicit val signTransactionResultExamples: List[Example[Sign.Result]] =
+    simpleExample(Sign.Result(signature))
 
   implicit val sweepAllExamples: List[Example[SweepAll]] =
     simpleExample(SweepAll(address))

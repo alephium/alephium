@@ -31,7 +31,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.{Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
 import org.alephium.serde.serialize
@@ -44,6 +44,7 @@ class WalletAppSpec
     extends AlephiumFutureSpec
     with ModelCodecs
     with WalletConfigFixture
+    with TxGenerators
     with HttpRouteFixture
     with IntegrationPatience {
 
@@ -100,6 +101,7 @@ class WalletAppSpec
   def getAddresses()        = Get(s"/wallets/$wallet/addresses")
   def revealMnemonic()      = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
+  def sign(data: String)    = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
   def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
   def getAddressInfo(address: Address) =
     Get(s"/wallets/$wallet/addresses/$address")
@@ -226,11 +228,6 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
-    getAddressInfo(address) check { response =>
-      response.as[model.AddressInfo].address is address
-      response.code is StatusCode.Ok
-    }
-
     revealMnemonic() check { response =>
       response.as[model.RevealMnemonic.Result].mnemonic is mnemonic
       response.code is StatusCode.Ok
@@ -302,6 +299,49 @@ class WalletAppSpec
 
     getAddresses() check { response =>
       response.as[model.Addresses].activeAddress is address
+    }
+
+    mnemonic = Mnemonic
+      .from(
+        "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
+      )
+      .get
+    address = Address.asset("14nYkUoqZTRYDqziNzjYQV1EHrnR328FS1Pnyy3ihrifu").get
+
+    restore(mnemonic) check { response =>
+      wallet = response.as[model.WalletRestore.Result].walletName
+      response.code is StatusCode.Ok
+    }
+
+    val publicKey = PublicKey
+      .from(Hex.unsafe("032d89ac4774e30a421c49674faf2a4992078f159fb3ebdf8e4e4a33df88666a2c"))
+      .get
+
+    val privateKey = PrivateKey
+      .from(Hex.unsafe("bfa8111c784c00fc284ffdf84fa2d83e44fc986b205c8bed83814e1128721403"))
+      .get
+
+    getAddressInfo(address) check { response =>
+      val addressInfo = response.as[model.AddressInfo]
+      addressInfo.address is address
+      addressInfo.publicKey is publicKey
+      response.code is StatusCode.Ok
+    }
+
+    val unsignedTx = transactionGen().sample.get.unsigned
+
+    sign(unsignedTx.hash.toHexString) check { response =>
+      response.as[model.Sign.Result].signature is SignatureSchema.sign(
+        unsignedTx.hash.bytes,
+        privateKey
+      )
+      response.code is StatusCode.Ok
+    }
+
+    sign("non-hex-data") check { response =>
+      val error = response.as[ApiError.BadRequest]
+      error.detail is "Invalid hex string"
+      response.code is StatusCode.BadRequest
     }
 
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())

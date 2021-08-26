@@ -106,6 +106,13 @@ trait WalletEndpoints
       .out(jsonBody[Transfer.Result])
       .summary("Transfer ALF")
 
+  val sign: BaseEndpoint[(String, Sign), Sign.Result] =
+    wallet.post
+      .in("sign")
+      .in(jsonBody[Sign])
+      .out(jsonBody[Sign.Result])
+      .summary("Sign the given data and return back the signature")
+
   val sweepAll: BaseEndpoint[(String, SweepAll), Transfer.Result] =
     wallet.post
       .in("sweep-all")

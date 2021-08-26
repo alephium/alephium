@@ -64,6 +64,7 @@ class WalletServer(
     getMinerAddressesLogic,
     transferLogic,
     sweepAllLogic,
+    signLogic,
     deriveNextAddressLogic,
     deriveNextMinerAddressesLogic,
     changeActiveAddressLogic,
@@ -90,6 +91,7 @@ object WalletServer {
       case InvalidWalletFile            => badRequest
       case UnexpectedError              => internalServerError
       case WalletNotFound(file)         => notFound(file.getName())
+      case _: OtherError                => badRequest
 
       case WalletLocked        => unauthorized
       case InvalidPassword     => unauthorized

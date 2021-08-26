@@ -167,6 +167,19 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         model.Transfer.Result(txId, fromGroup, toGroup)
       }.left.map(toApiError))
   }
+
+  val signLogic = serverLogic(sign) { case (wallet, sign) =>
+    Future.successful(
+      walletService
+        .sign(wallet, sign.data)
+        .map { signature =>
+          model.Sign.Result(signature)
+        }
+        .left
+        .map(toApiError)
+    )
+  }
+
   val deriveNextAddressLogic = serverLogic(deriveNextAddress) { wallet =>
     Future.successful(
       walletService
