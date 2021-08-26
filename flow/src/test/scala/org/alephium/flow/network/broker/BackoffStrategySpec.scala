@@ -55,7 +55,7 @@ class BackoffStrategySpec extends AlephiumSpec with AlephiumConfigFixture {
 class ResetBackoffStrategySpec extends BackoffStrategySpec {
   override def createStrategy(): ResetBackoffStrategy = ResetBackoffStrategy()
   override val configValues: Map[String, Any] = Map(
-    "alephium.network.backoff-reset-delay" -> "500 milli"
+    "alephium.network.backoff-reset-delay" -> "50 milli"
   )
 
   trait ResetFixture extends Eventually {
