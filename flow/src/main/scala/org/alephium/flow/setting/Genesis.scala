@@ -33,23 +33,24 @@ object Genesis {
 
   // scalastyle:off magic.number
   private val mainnet: AVector[(LockupScript.Asset, U256)] = AVector(
-    build("1532GfKdSQjmMN57o4Xt9v2ZnzVrphcjRpNu6ajknmY7B", ALF.alf(Number.million)),
-    build("1CAmPx4Wm5zJmCp9oMYy4HTEhqB8Vez2epF9FJxQN6YQz", ALF.alf(Number.million)),
-    build("1DxgAn21D1vk4mGA9uF3cY5qj3LK22PeA8WhJ4TaPkzqP", ALF.alf(Number.million)),
-    build("19GCch12jtsnXCSEapK8yUaC7keJa4eYpDoLNVmKpr78k", ALF.alf(Number.million))
+    build("15uBaW8WhKURyB4auu5HokdNd2CSUY6r1UHJcWe1u4dDN", ALF.alf(Number.million)),
+    build("1BLj6uPYbL9hmFza7gwgVyAhNmejFwEgEWYvNnrFo5LdM", ALF.alf(Number.million)),
+    build("14uZkwvBUhdCKgExc1Uj2TuH61d4kZPm2sQv98muamYq5", ALF.alf(Number.million)),
+    build("1HsLHhtw4PNicRVqWKHVdro7fvkbeDHtQyRjbVpSnNMmH", ALF.alf(Number.million))
   )
 
   private val testnet: AVector[(LockupScript.Asset, U256)] = AVector(
-    build("13CCnCmV1zgDj43FtDVGT7eCxtMuUeYU5T8moewy8c2bg", ALF.alf(Number.million)),
-    build("1C1wgFWXfHt5LzVRdXG962rSqahjR821VYewVp7jbDvzc", ALF.alf(Number.million)),
-    build("1DJa7LiwyNJosMWeDX6MejZQhwHHyh5yF4VYghMVoC2q", ALF.alf(Number.million)),
-    build("1GJRkJkhhfb1mnJaKZ2MVHRVqzrDdfk4wegCTQj5fDR9T", ALF.alf(Number.million))
+    build("17dReod9M5iLsf87ebJGLa4ybRZcFog1ewV6y2zUNHWu5", ALF.alf(Number.million)),
+    build("14FGvG61tqzXXYi6UKtzjozMjxCArF1beoU4ogUqM2pSG", ALF.alf(Number.million)),
+    build("15qNxou4d5AnPkTgS93xezWpSyZgqegNjjf41QoMqi5Bf", ALF.alf(Number.million)),
+    build("1BDwKf9SPzrzQ6wBeWfUNB9yi615MEM9zJeHfkvPnmVnW", ALF.alf(Number.million)),
+    build("1EEFFBGYac9ZbXKscqTdfbCd4siW1Yn8YYTo9CPGT811c", ALF.alf(Number.million))
   )
 
   private val devnet: AVector[(LockupScript.Asset, U256)] = AVector(
-    build("12Ffj2pjqghfzyoH6WPL6QEcjVD42g8DoE1JJu8TwLmzR", ALF.alf(Number.million)),
-    build("14AUQziA5Rsg9LZCcWzy6bLQdiEWojYG9y3GA93Jeavke", ALF.alf(Number.million)),
-    build("1BXVZ7TFvo6DUkoRdLirh5Zgfw6KkqM8b8KypfEacrQ6p", ALF.alf(Number.million))
+    build("151L7hsQgZKJaPeDSCCTMHRyjCrLAvjcwJMrxwbMCy62X", ALF.alf(Number.million)),
+    build("12po1BW4WJH81NGcZ3gsn5zP35PSuJq8okMq6ht6qJwyn", ALF.alf(Number.million)),
+    build("143jS8xaGNNRes4f1mxJWSpQcqj2xjsXUeu3xQqYgFm5h", ALF.alf(Number.million))
   )
   // scalastyle:on magic.number
 
