@@ -32,7 +32,7 @@ import org.alephium.api.ApiError
 import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
@@ -69,6 +69,7 @@ trait WalletService extends Service {
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address.Asset, U256)]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
+  def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
   def getMinerAddresses(
       wallet: String
   ): Either[WalletError, AVector[AVector[(GroupIndex, Address.Asset)]]]
@@ -306,6 +307,18 @@ object WalletService {
         wallet: String
     ): Either[WalletError, (Address.Asset, AVector[Address.Asset])] =
       withAddresses(wallet) { addresses => Right(addresses) }
+
+    override def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey] = {
+      withWallet(wallet) { secretStorage =>
+        withPrivateKeys(secretStorage) { case (_, privateKeys) =>
+          (for {
+            privateKey <- privateKeys.find(privateKey =>
+              Address.p2pkh(privateKey.publicKey) == address
+            )
+          } yield (privateKey.publicKey)).toRight(UnknownAddress(address): WalletError)
+        }
+      }
+    }
 
     override def getMinerAddresses(
         wallet: String

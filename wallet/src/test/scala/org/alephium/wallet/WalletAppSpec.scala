@@ -101,6 +101,8 @@ class WalletAppSpec
   def revealMnemonic()      = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
+  def getAddressInfo(address: Address) =
+    Get(s"/wallets/$wallet/addresses/$address")
   def changeActiveAddress(address: Address) =
     Post(s"/wallets/$wallet/change-active-address", changeActiveAddressJson(address))
   def listWallets() = Get("/wallets")
@@ -221,6 +223,11 @@ class WalletAppSpec
 
     getAddresses() check { response =>
       response.as[model.Addresses] is addresses
+      response.code is StatusCode.Ok
+    }
+
+    getAddressInfo(address) check { response =>
+      response.as[model.AddressInfo].address is address
       response.code is StatusCode.Ok
     }
 

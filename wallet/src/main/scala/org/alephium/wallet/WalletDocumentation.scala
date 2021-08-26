@@ -37,6 +37,7 @@ trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
     transfer,
     sweepAll,
     getAddresses,
+    getAddressInfo,
     getMinerAddresses,
     deriveNextAddress,
     deriveNextMinerAddresses,

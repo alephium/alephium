@@ -112,6 +112,19 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         .map(toApiError)
     )
   }
+
+  val getAddressInfoLogic = serverLogic(getAddressInfo) { case (wallet, address) =>
+    Future.successful(
+      walletService
+        .getPublicKey(wallet, address)
+        .map { publicKey =>
+          model.AddressInfo(address, publicKey)
+        }
+        .left
+        .map(toApiError)
+    )
+  }
+
   val getMinerAddressesLogic = serverLogic(getMinerAddresses) { wallet =>
     Future.successful(
       walletService

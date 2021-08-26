@@ -60,6 +60,7 @@ class WalletServer(
     deleteWalletLogic,
     getBalancesLogic,
     getAddressesLogic,
+    getAddressInfoLogic,
     getMinerAddressesLogic,
     transferLogic,
     sweepAllLogic,

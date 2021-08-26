@@ -21,7 +21,7 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.ErrorExamples
 import org.alephium.api.model.{Destination, Token}
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Hex, U256}
@@ -43,6 +43,9 @@ trait WalletExamples extends ErrorExamples {
   private val txId =
     Hash.from(Hex.from("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69").get).get
 
+  private val publicKey = PublicKey
+    .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
+    .get
   private val walletName         = "wallet-super-name"
   private val mnemonicPassphrase = "optional-mnemonic-passphrase"
   private val fromGroup          = 2
@@ -121,6 +124,9 @@ trait WalletExamples extends ErrorExamples {
 
   implicit val addressExamples: List[Example[Address]] =
     simpleExample(address)
+
+  implicit val addressInfoExamples: List[Example[AddressInfo]] =
+    simpleExample(AddressInfo(address, publicKey))
 
   implicit val minerAddressInfoExamples: List[Example[MinerAddressInfo]] =
     simpleExample(MinerAddressInfo(address, fromGroup))

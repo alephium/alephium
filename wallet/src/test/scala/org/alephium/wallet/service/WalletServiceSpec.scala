@@ -25,9 +25,10 @@ import akka.actor.ActorSystem
 
 import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, U256}
+import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -169,6 +170,24 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService
       .revealMnemonic(walletName, "wrongPassword")
       .leftValue is WalletService.InvalidPassword
+  }
+
+  it should "get publicKey" in new Fixure {
+    val mnemonic = Mnemonic
+      .from(
+        "huge number focus educate unveil pioneer elephant path combine lesson trap lesson vessel title column hunt expire page choose vague burger observe noble file"
+      )
+      .get
+    val address = Address.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
+    val publicKey = PublicKey
+      .from(Hex.from("02e8fc4ed5895720439debf5ad8eb0df4dce2594fe9751ddc917069652603e9dbe").get)
+      .get
+
+    val walletName =
+      walletService.restoreWallet(password, mnemonic, false, None, None).rightValue
+
+    walletService
+      .getPublicKey(walletName, address) isE publicKey
   }
 
   trait Fixure extends WalletConfigFixture {

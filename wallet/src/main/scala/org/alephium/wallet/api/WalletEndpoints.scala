@@ -22,6 +22,7 @@ import sttp.tapir.generic.auto._
 import org.alephium.api.{BaseEndpoint, TapirCodecs, TapirSchemasLike}
 import org.alephium.api.Endpoints.jsonBody
 import org.alephium.api.UtilJson._
+import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.json
@@ -117,6 +118,13 @@ trait WalletEndpoints
       .in("addresses")
       .out(jsonBody[Addresses])
       .summary("List all your wallet's addresses")
+
+  val getAddressInfo: BaseEndpoint[(String, Address.Asset), AddressInfo] =
+    wallet.get
+      .in("addresses")
+      .in(path[Address.Asset]("address"))
+      .out(jsonBody[AddressInfo])
+      .summary("Get address' info")
 
   val deriveNextAddress: BaseEndpoint[String, DeriveNextAddress.Result] =
     wallet.post
