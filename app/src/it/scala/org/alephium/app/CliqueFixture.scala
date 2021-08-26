@@ -52,6 +52,7 @@ import org.alephium.protocol.model.{Address, Block, ChainIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
+import org.alephium.wallet
 import org.alephium.wallet.api.model._
 
 // scalastyle:off method.length
@@ -61,6 +62,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with AlephiumConfigFixture
     with NumericHelpers
     with ApiModelCodec
+    with wallet.json.ModelCodecs
     with HttpFixture
     with ScalaFutures
     with Eventually { Fixture =>
@@ -219,10 +221,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     confirmed.fromGroupConfirmations > 1 is true
     confirmed.toGroupConfirmations > 1 is true
   }
-
-  implicit val walletResultResultReadWriter: ReadWriter[WalletRestore.Result] =
-    macroRW[WalletRestore.Result]
-  implicit val transferResultReadWriter: ReadWriter[Transfer.Result] = macroRW[Transfer.Result]
 
   def transferFromWallet(toAddress: String, amount: U256, restPort: Int): Transfer.Result =
     eventually {
@@ -453,6 +451,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def createWallet(password: String) =
+    httpPost(
+      s"/wallets",
+      Some(s"""{"password":"${password}"}""")
+    )
+
   def restoreWallet(password: String, mnemonic: String) =
     httpPut(
       s"/wallets",
@@ -465,6 +469,26 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}","tokens":[]}]}""")
     )
   }
+
+  def getAddresses(walletName: String) = {
+    httpGet(
+      s"/wallets/${walletName}/addresses"
+    )
+  }
+
+  def getAddressInfo(walletName: String, address: String) = {
+    httpGet(
+      s"/wallets/${walletName}/addresses/$address"
+    )
+  }
+
+  def sign(walletName: String, data: String) = {
+    httpPost(
+      s"/wallets/${walletName}/sign",
+      Some(s"""{"data":"$data"}""")
+    )
+  }
+
   def submitTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,
@@ -478,7 +502,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def submitMultisigTransaction(
+  def signAndSubmitMultisigTransaction(
       buildTransactionResult: BuildTransactionResult,
       privateKeys: AVector[String]
   ) = {
@@ -488,6 +512,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         PrivateKey.unsafe(Hex.unsafe(p))
       )
     }
+    submitMultisigTransaction(
+      buildTransactionResult,
+      signatures
+    )
+  }
+
+  def submitMultisigTransaction(
+      buildTransactionResult: BuildTransactionResult,
+      signatures: AVector[Signature]
+  ) = {
     val body =
       s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signatures":${write(
         signatures.map(_.toHexString)

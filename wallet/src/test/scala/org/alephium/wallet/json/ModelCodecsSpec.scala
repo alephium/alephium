@@ -53,13 +53,13 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   it should "AddressInfo" in {
     val json        = s"""{"address":"$address","group":$group}"""
-    val addressInfo = AddressInfo(address, group)
+    val addressInfo = MinerAddressInfo(address, group)
     check(addressInfo, json)
   }
 
   it should "MinerAddressesInfo" in {
     val json               = s"""{"addresses":[{"address":"$address","group":$group}]}"""
-    val minerAddressesInfo = MinerAddressesInfo(AVector(AddressInfo(address, group)))
+    val minerAddressesInfo = MinerAddressesInfo(AVector(MinerAddressInfo(address, group)))
     check(minerAddressesInfo, json)
   }
 

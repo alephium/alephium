@@ -1219,6 +1219,118 @@
         }
       }
     },
+    "/wallets/{wallet_name}/sign": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Sign the given data and return back the signature",
+        "operationId": "postWalletsWallet_nameSign",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sign"
+              },
+              "example": {
+                "data": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result4"
+                },
+                "example": {
+                  "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets/{wallet_name}/addresses": {
       "get": {
         "tags": [
@@ -1248,6 +1360,114 @@
                   "addresses": [
                     "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{wallet_name}/addresses/{address}": {
+      "get": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Get address' info",
+        "operationId": "getWalletsWallet_nameAddressesAddress",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressInfo"
+                },
+                "example": {
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                 }
               }
             }
@@ -1454,7 +1674,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result4"
+                  "$ref": "#/components/schemas/Result5"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
@@ -1556,7 +1776,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/AddressInfo"
+                    "$ref": "#/components/schemas/MinerAddressInfo"
                   }
                 },
                 "example": [
@@ -4367,7 +4587,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result5"
+                  "$ref": "#/components/schemas/Result6"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
@@ -4989,15 +5209,15 @@
       "AddressInfo": {
         "required": [
           "address",
-          "group"
+          "publicKey"
         ],
         "type": "object",
         "properties": {
           "address": {
             "$ref": "#/components/schemas/Asset"
           },
-          "group": {
-            "type": "integer"
+          "publicKey": {
+            "type": "string"
           }
         }
       },
@@ -5659,6 +5879,21 @@
       "MemPooled": {
         "type": "object"
       },
+      "MinerAddressInfo": {
+        "required": [
+          "address",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Asset"
+          },
+          "group": {
+            "type": "integer"
+          }
+        }
+      },
       "MinerAddresses": {
         "type": "object",
         "properties": {
@@ -5676,7 +5911,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AddressInfo"
+              "$ref": "#/components/schemas/MinerAddressInfo"
             }
           }
         }
@@ -5898,6 +6133,17 @@
       },
       "Result4": {
         "required": [
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "signature": {
+            "type": "string"
+          }
+        }
+      },
+      "Result5": {
+        "required": [
           "address"
         ],
         "type": "object",
@@ -5907,7 +6153,7 @@
           }
         }
       },
-      "Result5": {
+      "Result6": {
         "required": [
           "address"
         ],
@@ -5977,6 +6223,17 @@
         "type": "object",
         "properties": {
           "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "Sign": {
+        "required": [
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "data": {
             "type": "string"
           }
         }

@@ -19,9 +19,11 @@ package org.alephium.app
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.json.Json._
+import org.alephium.protocol.{PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{defaultGasFee, UnsignedTransaction}
 import org.alephium.serde.deserialize
 import org.alephium.util._
+import org.alephium.wallet.api.model._
 
 class MultisigTest extends AlephiumActorSpec {
 
@@ -84,20 +86,88 @@ class MultisigTest extends AlephiumActorSpec {
       restPort
     ).detail is "Failed in adding transaction"
 
-    val submitMultisigTx1sig = submitMultisigTransaction(buildTxResult, AVector(privateKey))
+    val submitMultisigTx1sig = signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey))
     request[ApiError.InternalServerError](
       submitMultisigTx1sig,
       restPort
     ).detail is "Failed in adding transaction"
 
     val submitMultisigTx =
-      submitMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
+      signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
     val multisigTx = request[TxResult](submitMultisigTx, restPort)
 
     confirmTx(multisigTx, restPort)
 
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
       Balance(transferAmount.mulUnsafe(2) - amount - defaultGasFee, 0, 1)
+
+    clique.stopMining()
+    clique.stop()
+  }
+
+  it should "handle multisig with the wallet" in new CliqueFixture {
+
+    val clique = bootClique(nbOfNodes = 1)
+    clique.start()
+
+    val selfClique = clique.selfClique()
+    val group      = request[Group](getGroup(address), clique.masterRestPort)
+    val index      = group.group / selfClique.groupNumPerBroker
+    val restPort   = selfClique.nodes(index).restPort
+
+    val walletName =
+      request[WalletCreation.Result](createWallet(password), restPort).walletName
+
+    val address2 =
+      request[Addresses](getAddresses(walletName), restPort).activeAddress
+
+    val publicKey2 =
+      request[AddressInfo](
+        getAddressInfo(walletName, address2.toBase58),
+        restPort
+      ).publicKey.toHexString
+
+    val multisigAddress =
+      request[BuildMultisigAddress.Result](
+        multisig(AVector(publicKey, publicKey2), 2),
+        restPort
+      )
+
+    val tx =
+      transfer(publicKey, multisigAddress.address.toBase58, transferAmount, privateKey, restPort)
+
+    clique.startMining()
+    confirmTx(tx, restPort)
+
+    val buildTx = buildMultisigTransaction(
+      multisigAddress.address.toBase58,
+      AVector(publicKey, publicKey2),
+      address,
+      transferAmount / 2
+    )
+
+    val buildTxResult = request[BuildTransactionResult](buildTx, restPort)
+
+    val unsignedTx =
+      deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
+
+    val signature1: Signature = SignatureSchema.sign(
+      unsignedTx.hash.bytes,
+      PrivateKey.unsafe(Hex.unsafe(privateKey))
+    )
+
+    val signature2: Signature =
+      request[Sign.Result](sign(walletName, buildTxResult.txId.toHexString), restPort).signature
+
+    val submitMultisigTx =
+      submitMultisigTransaction(buildTxResult, AVector(signature1, signature2))
+
+    val multisigTx = request[TxResult](submitMultisigTx, restPort)
+
+    confirmTx(multisigTx, restPort)
+
+    request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
+      Balance(transferAmount / 2 - defaultGasFee, 0, 1)
 
     clique.stopMining()
     clique.stop()

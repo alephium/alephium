@@ -16,6 +16,10 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.util.AVector
+import org.alephium.protocol.Signature
 
-final case class MinerAddressesInfo(addresses: AVector[MinerAddressInfo])
+final case class Sign(data: String)
+
+object Sign {
+  final case class Result(signature: Signature)
+}

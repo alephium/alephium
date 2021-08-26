@@ -25,15 +25,16 @@ import akka.actor.ActorSystem
 
 import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.{Hash, PrivateKey, PublicKey, SignatureSchema}
+import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, U256}
+import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
 class WalletServiceSpec extends AlephiumFutureSpec {
 
-  it should "handle a miner wallet" in new Fixure {
+  it should "handle a miner wallet" in new Fixture {
 
     val (walletName, _) =
       walletService.createWallet(password, mnemonicSize, true, None, None).rightValue
@@ -65,7 +66,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     minerAddresses2.foreach(address => newMinerAddresses.contains(address))
   }
 
-  it should "fail to start if secret dir path is invalid" in new Fixure {
+  it should "fail to start if secret dir path is invalid" in new Fixture {
     val path = s"/${Random.nextInt()}"
     override lazy val walletService = WalletService(
       blockFlowClient,
@@ -82,7 +83,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     }
   }
 
-  it should "lock the wallet if inactive" in new Fixure {
+  it should "lock the wallet if inactive" in new Fixture {
     override val lockingTimeout = Duration.ofSecondsUnsafe(1)
 
     val (walletName, _) =
@@ -99,7 +100,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.getAddresses(walletName).isRight is true
   }
 
-  it should "return Not Found if wallet doesn't exist" in new Fixure {
+  it should "return Not Found if wallet doesn't exist" in new Fixture {
     import WalletService.WalletNotFound
 
     val walletName = "wallet"
@@ -125,7 +126,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.lockWallet(walletName) isE ()
   }
 
-  it should "list all wallets even when locked" in new Fixure {
+  it should "list all wallets even when locked" in new Fixture {
 
     val (walletName1, _) =
       walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
@@ -143,7 +144,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .map(_.toSet) isE AVector((walletName1, true), (walletName2, false)).toSet
   }
 
-  it should "delete a wallet" in new Fixure {
+  it should "delete a wallet" in new Fixture {
 
     val (walletName, _) =
       walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
@@ -159,7 +160,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .map(_.toSet) isE AVector.empty[(String, Boolean)].toSet
   }
 
-  it should "get back mnemonic" in new Fixure {
+  it should "get back mnemonic" in new Fixture {
     val (walletName, mnemonic) =
       walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
 
@@ -171,8 +172,31 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .leftValue is WalletService.InvalidPassword
   }
 
-  trait Fixure extends WalletConfigFixture {
+  it should "get publicKey" in new UserWallet {
+    walletService
+      .getPublicKey(walletName, address) isE publicKey
+  }
 
+  it should "sign a transaction" in new UserWallet with TxGenerators {
+    val unsignedTx = transactionGen().sample.get.unsigned
+
+    val expected = SignatureSchema.sign(unsignedTx.hash.bytes, privateKey)
+
+    walletService
+      .sign(walletName, unsignedTx.hash.toHexString)
+      .rightValue is expected
+  }
+
+  it should "sign any data " in new UserWallet {
+    val data     = Hash.generate
+    val expected = SignatureSchema.sign(data.bytes, privateKey)
+
+    walletService
+      .sign(walletName, data.toHexString)
+      .rightValue is expected
+  }
+
+  trait Fixture extends WalletConfigFixture {
     val password     = "password"
     val mnemonicSize = Mnemonic.Size(12).get
     implicit val system: ActorSystem =
@@ -188,6 +212,26 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     lazy val walletService: WalletService =
       WalletService.apply(blockFlowClient, tempSecretDir, config.networkId, config.lockingTimeout)
+  }
+
+  trait UserWallet extends Fixture {
+    val mnemonic = Mnemonic
+      .from(
+        "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
+      )
+      .get
+    val address = Address.asset("14nYkUoqZTRYDqziNzjYQV1EHrnR328FS1Pnyy3ihrifu").get
+
+    val publicKey = PublicKey
+      .from(Hex.unsafe("032d89ac4774e30a421c49674faf2a4992078f159fb3ebdf8e4e4a33df88666a2c"))
+      .get
+
+    val privateKey = PrivateKey
+      .from(Hex.unsafe("bfa8111c784c00fc284ffdf84fa2d83e44fc986b205c8bed83814e1128721403"))
+      .get
+
+    val walletName =
+      walletService.restoreWallet(password, mnemonic, false, None, None).rightValue
   }
 }
 

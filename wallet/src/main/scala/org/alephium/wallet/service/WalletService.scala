@@ -32,11 +32,11 @@ import org.alephium.api.ApiError
 import org.alephium.api.model.Destination
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{discard, AVector, Duration, Service, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp, U256}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -69,6 +69,7 @@ trait WalletService extends Service {
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address.Asset, U256)]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
+  def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
   def getMinerAddresses(
       wallet: String
   ): Either[WalletError, AVector[AVector[(GroupIndex, Address.Asset)]]]
@@ -85,6 +86,10 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
+  def sign(
+      wallet: String,
+      data: String
+  ): Either[WalletError, Signature]
   def deriveNextAddress(wallet: String): Either[WalletError, Address.Asset]
   def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[Address.Asset]]
   def changeActiveAddress(wallet: String, address: Address.Asset): Either[WalletError, Unit]
@@ -153,6 +158,8 @@ object WalletService {
   final case class BlockFlowClientError(apiError: ApiError[_ <: StatusCode]) extends WalletError {
     val message: String = apiError.detail
   }
+
+  final case class OtherError(message: String) extends WalletError
 
   def apply(
       blockFlowClient: BlockFlowClient,
@@ -307,6 +314,18 @@ object WalletService {
     ): Either[WalletError, (Address.Asset, AVector[Address.Asset])] =
       withAddresses(wallet) { addresses => Right(addresses) }
 
+    override def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey] = {
+      withWallet(wallet) { secretStorage =>
+        withPrivateKeys(secretStorage) { case (_, privateKeys) =>
+          (for {
+            privateKey <- privateKeys.find(privateKey =>
+              Address.p2pkh(privateKey.publicKey) == address
+            )
+          } yield (privateKey.publicKey)).toRight(UnknownAddress(address): WalletError)
+        }
+      }
+    }
+
     override def getMinerAddresses(
         wallet: String
     ): Either[WalletError, AVector[AVector[(GroupIndex, Address.Asset)]]] = {
@@ -365,6 +384,19 @@ object WalletService {
                 .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
                 .map(_.left.map(BlockFlowClientError))
           }
+      }
+    }
+
+    def sign(
+        wallet: String,
+        data: String
+    ): Either[WalletError, Signature] = {
+      withPrivateKey(wallet) { privateKey =>
+        for {
+          bytes <- Hex.from(data).toRight(OtherError(s"Invalid hex string"))
+        } yield {
+          SignatureSchema.sign(bytes, privateKey.privateKey)
+        }
       }
     }
 
@@ -510,6 +542,14 @@ object WalletService {
     )(f: SecretStorage => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] = {
       withWalletM(wallet)(storage => f(storage))(error => Future.successful(Left(error)))
     }
+
+    private def withPrivateKey[A](
+        wallet: String
+    )(f: ExtendedPrivateKey => Either[WalletError, A]): Either[WalletError, A] =
+      withWallet(wallet)(_.getCurrentPrivateKey() match {
+        case Left(error)       => Left(WalletError.from(error))
+        case Right(privateKey) => f(privateKey)
+      })
 
     private def withPrivateKeyFut[A](
         wallet: String

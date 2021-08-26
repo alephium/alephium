@@ -112,6 +112,19 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         .map(toApiError)
     )
   }
+
+  val getAddressInfoLogic = serverLogic(getAddressInfo) { case (wallet, address) =>
+    Future.successful(
+      walletService
+        .getPublicKey(wallet, address)
+        .map { publicKey =>
+          model.AddressInfo(address, publicKey)
+        }
+        .left
+        .map(toApiError)
+    )
+  }
+
   val getMinerAddressesLogic = serverLogic(getMinerAddresses) { wallet =>
     Future.successful(
       walletService
@@ -120,7 +133,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
           addresses.map { p =>
             model.MinerAddressesInfo(
               p.map { case (group, ad) =>
-                model.AddressInfo(ad, group.value)
+                model.MinerAddressInfo(ad, group.value)
               }
             )
           }
@@ -154,6 +167,19 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         model.Transfer.Result(txId, fromGroup, toGroup)
       }.left.map(toApiError))
   }
+
+  val signLogic = serverLogic(sign) { case (wallet, sign) =>
+    Future.successful(
+      walletService
+        .sign(wallet, sign.data)
+        .map { signature =>
+          model.Sign.Result(signature)
+        }
+        .left
+        .map(toApiError)
+    )
+  }
+
   val deriveNextAddressLogic = serverLogic(deriveNextAddress) { wallet =>
     Future.successful(
       walletService
@@ -167,7 +193,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     Future.successful(
       walletService
         .deriveNextMinerAddresses(wallet)
-        .map(_.map(address => model.AddressInfo(address, address.groupIndex.value)))
+        .map(_.map(address => model.MinerAddressInfo(address, address.groupIndex.value)))
         .left
         .map(toApiError)
     )

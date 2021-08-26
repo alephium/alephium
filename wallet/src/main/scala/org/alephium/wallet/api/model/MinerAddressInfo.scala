@@ -16,6 +16,6 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.util.AVector
+import org.alephium.protocol.model.Address
 
-final case class MinerAddressesInfo(addresses: AVector[MinerAddressInfo])
+final case class MinerAddressInfo(address: Address.Asset, group: Int)
