@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.message
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.NetworkId
@@ -91,7 +93,8 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
   it should "fail to deserialize if magic number doesn't match" in {
     Message
       .deserialize(Message.serialize(message)(new NetworkConfig {
-        override def networkId: NetworkId = NetworkId.AlephiumMainNet
+        override def networkId: NetworkId       = NetworkId.AlephiumMainNet
+        override def noPreMineProof: ByteString = ByteString.empty
       }))
       .swap isE
       SerdeError.wrongFormat("Wrong magic bytes")

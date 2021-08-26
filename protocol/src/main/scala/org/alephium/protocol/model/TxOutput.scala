@@ -91,8 +91,8 @@ object TxOutput {
     ContractOutput(amount, lockupScript, AVector.empty)
   }
 
-  def genesis(amount: U256, lockupScript: LockupScript.Asset): AssetOutput = {
-    asset(amount, lockupScript)
+  def genesis(amount: U256, lockupScript: LockupScript.Asset, data: ByteString): AssetOutput = {
+    AssetOutput(amount, lockupScript, TimeStamp.zero, AVector.empty, data)
   }
 
   // TODO: improve this when vm is mature

@@ -18,6 +18,7 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import akka.util.ByteString
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -35,7 +36,8 @@ class TxOrderBench {
     override def groups: Int = 4
   }
   implicit val networkConfig: NetworkConfig = new NetworkConfig {
-    override def networkId: NetworkId = NetworkId(0)
+    override def networkId: NetworkId       = NetworkId(0)
+    override def noPreMineProof: ByteString = ByteString.empty
   }
   val txNum: Int = 2000
   val header: BlockHeader =

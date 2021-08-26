@@ -163,7 +163,7 @@ object Configs extends StrictLogging {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) { case (from, to) =>
       val transactions = if (from == to) {
         val balancesOI  = balances.filter(_._1.groupIndex.value == from)
-        val transaction = Transaction.genesis(balancesOI)
+        val transaction = Transaction.genesis(balancesOI, networkConfig.noPreMineProof)
         AVector(transaction)
       } else {
         AVector.empty[Transaction]
