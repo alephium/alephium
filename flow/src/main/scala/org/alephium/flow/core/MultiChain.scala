@@ -142,7 +142,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
       depTargets <- deps.deps.mapE(hash => getHeaderChain(hash).getTarget(hash))
     } yield {
       val weightedTarget = Target.average(newTarget, depTargets)
-      val maxTarget      = depTargets.fold(Target.Zero)(Math.max)
+      val maxTarget      = depTargets.fold(weightedTarget)(Math.max)
       Target.clipByTwoTimes(maxTarget, weightedTarget)
     }
   }
