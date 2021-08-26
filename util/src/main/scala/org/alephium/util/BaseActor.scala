@@ -71,9 +71,11 @@ trait BaseActor extends Actor with ActorLogging {
     Env.resolve() match {
       case Env.Prod =>
         sys.exit(1)
-      case _ =>
+      case Env.Integration =>
         context.system.terminate()
         ()
+      case _ =>
+        context.stop(self)
     }
   }
 }
