@@ -407,6 +407,80 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     }
   }
 
+  it should "call POST /multisig/address" in {
+    lazy val (_, dummyKey2, _) = addressStringGen(
+      GroupIndex.unsafe(1)
+    ).sample.get
+
+    lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+    Post(
+      s"/multisig/address",
+      body = s"""
+        |{
+        |  "keys": [
+        | "$dummyKeyHex",
+        | "$dummyKeyHex2"
+        |],
+        |  "mrequired": 1
+        |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+
+      val result   = response.as[BuildMultisigAddress.Result]
+      val expected = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+
+      result.address is expected
+    }
+  }
+
+  it should "call POST /multisig/build" in {
+    lazy val (_, dummyKey2, _) = addressStringGen(
+      GroupIndex.unsafe(1)
+    ).sample.get
+
+    lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+    val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+
+    Post(
+      s"/multisig/build",
+      body = s"""
+        |{
+        |  "fromAddress": "${address.toBase58}",
+        |  "fromPublicKeys": ["$dummyKeyHex"],
+        |  "destinations": [
+        |    {
+        |      "address": "$dummyToAddress",
+        |      "amount": "1",
+        |      "tokens": []
+        |    }
+        |  ]
+        |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+        ServerFixture.dummyTransferTx(
+          dummyTx,
+          AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+        )
+      )
+    }
+  }
+
+  it should "call POST /multisig/submit" in {
+    val tx =
+      s"""{"unsignedTx":"${Hex.toHexString(
+        serialize(dummyTx.unsigned)
+      )}","signatures":["${dummySignature.toHexString}"]}"""
+    Post(s"/multisig/submit", tx) check { response =>
+      response.code is StatusCode.Ok
+      response.as[TxResult] is dummyTransferResult
+    }
+  }
+
   it should "call POST /miners" in {
     val address      = Address.asset(dummyKeyAddress).get
     val lockupScript = address.lockupScript

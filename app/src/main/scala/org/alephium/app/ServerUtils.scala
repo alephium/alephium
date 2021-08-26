@@ -27,7 +27,7 @@ import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
-import org.alephium.protocol.{BlockHash, Hash, PublicKey}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -123,6 +123,58 @@ class ServerUtils(implicit
     }
   }
 
+  def buildMultisig(
+      blockFlow: BlockFlow,
+      query: BuildMultisig
+  ): Try[BuildTransactionResult] = {
+    val resultEither = for {
+      _            <- checkGroup(query.fromAddress.lockupScript)
+      unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
+      unsignedTx <- prepareUnsignedTransaction(
+        blockFlow,
+        query.fromAddress.lockupScript,
+        unlockScript,
+        query.destinations,
+        query.gas,
+        query.gasPrice.getOrElse(defaultGasPrice)
+      )
+    } yield {
+      BuildTransactionResult.from(unsignedTx)
+    }
+    resultEither match {
+      case Right(result) => Right(result)
+      case Left(error)   => Left(error)
+    }
+  }
+
+  private def buildUnlockScript(
+      lockupScript: LockupScript,
+      pubKeys: AVector[PublicKey]
+  ): Try[UnlockScript.P2MPKH] = {
+    lockupScript match {
+      case LockupScript.P2MPKH(pkHashes, m) =>
+        if (m == pubKeys.length) {
+          val indexes = pkHashes.zipWithIndex
+          pubKeys
+            .mapE { pub =>
+              val pubHash = Hash.hash(pub.bytes)
+              indexes.find { case (hash, _) => hash == pubHash } match {
+                case Some((_, index)) => Right((pub, index))
+                case None             => Left(ApiError.BadRequest(s"Invalid public key: ${pub.toHexString}"))
+
+              }
+            }
+            .map(UnlockScript.P2MPKH(_))
+        } else {
+          Left(
+            ApiError.BadRequest(s"Invalid public key number. Expected ${m}, got ${pubKeys.length}")
+          )
+        }
+      case _ =>
+        Left(ApiError.BadRequest(s"Invalid lockup script"))
+    }
+  }
+
   def buildSweepAllTransaction(
       blockFlow: BlockFlow,
       query: BuildSweepAllTransaction
@@ -157,12 +209,34 @@ class ServerUtils(implicit
       unsignedTx <- decodeUnsignedTransaction(query.unsignedTx)
       _          <- validateUnsignedTransaction(unsignedTx)
     } yield {
-      TransactionTemplate(
+      templateWithSignatures(
         unsignedTx,
-        AVector.fill(unsignedTx.inputs.length)(query.signature),
-        contractSignatures = AVector.empty
+        AVector.fill(unsignedTx.inputs.length)(query.signature)
       )
     }
+  }
+
+  def createMultisigTxTemplate(query: SubmitMultisig): Try[TransactionTemplate] = {
+    for {
+      unsignedTx <- decodeUnsignedTransaction(query.unsignedTx)
+      _          <- validateUnsignedTransaction(unsignedTx)
+    } yield {
+      templateWithSignatures(
+        unsignedTx,
+        AVector.fill(unsignedTx.inputs.length)(query.signatures).flatMap(identity)
+      )
+    }
+  }
+
+  private def templateWithSignatures(
+      unsignedTx: UnsignedTransaction,
+      signatures: AVector[Signature]
+  ): TransactionTemplate = {
+    TransactionTemplate(
+      unsignedTx,
+      signatures,
+      contractSignatures = AVector.empty
+    )
   }
 
   def convert(status: BlockFlowState.TxStatus): TxStatus =
@@ -193,6 +267,15 @@ class ServerUtils(implicit
   ): Try[UnsignedTransaction] = {
     Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex")).flatMap { txByteString =>
       deserialize[UnsignedTransaction](txByteString).left
+        .map(serdeError => badRequest(serdeError.getMessage))
+    }
+  }
+
+  def decodeUnlockScript(
+      unlockScript: String
+  ): Try[UnlockScript] = {
+    Hex.from(unlockScript).toRight(badRequest(s"Invalid hex")).flatMap { unlockScriptBytes =>
+      deserialize[UnlockScript](unlockScriptBytes).left
         .map(serdeError => badRequest(serdeError.getMessage))
     }
   }
@@ -330,6 +413,39 @@ class ServerUtils(implicit
     }
   }
 
+  def prepareUnsignedTransaction(
+      blockFlow: BlockFlow,
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      destinations: AVector[Destination],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Try[UnsignedTransaction] = {
+
+    val outputInfos = destinations.map { destination =>
+      val tokensInfo = destination.tokens match {
+        case Some(tokens) =>
+          tokens.map { token =>
+            (token.id -> token.amount)
+          }
+        case None =>
+          AVector.empty[(TokenId, U256)]
+      }
+      TxOutputInfo(
+        destination.address.lockupScript,
+        destination.amount,
+        tokensInfo,
+        destination.lockTime
+      )
+    }
+
+    blockFlow.transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice) match {
+      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Left(error))                => Left(failed(error))
+      case Left(error)                       => failed(error)
+    }
+  }
+
   def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
@@ -387,6 +503,21 @@ class ServerUtils(implicit
       case Some(state) =>
         val res = Compiler.compileState(state)
         res
+    }
+  }
+
+  def buildMultisigAddress(
+      keys: AVector[PublicKey],
+      mrequired: Int
+  ): Either[String, BuildMultisigAddress.Result] = {
+    LockupScript.p2mpkh(keys, mrequired) match {
+      case Some(lockupScript) =>
+        Right(
+          BuildMultisigAddress.Result(
+            Address.Asset(lockupScript)
+          )
+        )
+      case None => Left(s"Invalid m-of-n multisig")
     }
   }
 

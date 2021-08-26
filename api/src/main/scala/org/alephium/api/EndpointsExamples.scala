@@ -237,6 +237,35 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val submitTransactionExamples: List[Example[SubmitTransaction]] =
     simpleExample(SubmitTransaction(unsignedTx = hexString, signature))
 
+  implicit val buildMultisigAddressExample: List[Example[BuildMultisigAddress]] =
+    simpleExample(
+      BuildMultisigAddress(
+        AVector(publicKey, publicKey),
+        1
+      )
+    )
+
+  implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddress.Result]] =
+    simpleExample(
+      BuildMultisigAddress.Result(
+        address
+      )
+    )
+
+  implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] =
+    simpleExample(
+      BuildMultisig(
+        address,
+        AVector(publicKey),
+        AVector(Destination(address, U256.Two, Some(tokens), Some(ts))),
+        Some(GasBox.unsafe(1)),
+        Some(GasPrice(U256.One))
+      )
+    )
+
+  implicit val submitMultisigTransactionExamples: List[Example[SubmitMultisig]] =
+    simpleExample(SubmitMultisig(unsignedTx = hexString, AVector(signature)))
+
   implicit val decodeTransactionExamples: List[Example[DecodeTransaction]] =
     simpleExample(DecodeTransaction(unsignedTx = hexString))
 
@@ -277,6 +306,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))
+
+  implicit val addressExamples: List[Example[Address.Asset]] =
+    simpleExample(address)
 
   implicit val minerAddressesExamples: List[Example[MinerAddresses]] =
     simpleExample(MinerAddresses(AVector(address)))

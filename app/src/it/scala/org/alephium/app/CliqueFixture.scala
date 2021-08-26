@@ -39,6 +39,7 @@ import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
+import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.Miner
@@ -427,6 +428,31 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         """.stripMargin)
     )
 
+  def buildMultisigTransaction(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      toAddress: String,
+      amount: U256
+  ) = {
+    val body = s"""
+        |{
+        |  "fromAddress": "$fromAddress",
+        |  "fromPublicKeys": ${write(fromPublicKeys)},
+        |  "destinations": [
+        |    {
+        |      "address": "$toAddress",
+        |      "amount": "$amount"
+        |    }
+        |  ]
+        |}
+        """.stripMargin
+
+    httpPost(
+      "/multisig/build",
+      Some(body)
+    )
+  }
+
   def restoreWallet(password: String, mnemonic: String) =
     httpPut(
       s"/wallets",
@@ -451,6 +477,29 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       )
     )
   }
+
+  def submitMultisigTransaction(
+      buildTransactionResult: BuildTransactionResult,
+      privateKeys: AVector[String]
+  ) = {
+    val signatures: AVector[Signature] = privateKeys.map { p =>
+      SignatureSchema.sign(
+        buildTransactionResult.txId.bytes,
+        PrivateKey.unsafe(Hex.unsafe(p))
+      )
+    }
+    val body =
+      s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signatures":${write(
+        signatures.map(_.toHexString)
+      )}}"""
+    httpPost(
+      "/multisig/submit",
+      Some(
+        body
+      )
+    )
+  }
+
   def getTransactionStatus(tx: TxResult) = {
     httpGet(
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
@@ -464,6 +513,25 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def compileFilang(code: String) = {
     httpPost(s"/contracts/compile", Some(code))
+  }
+
+  def multisig(keys: AVector[String], mrequired: Int) = {
+    val body = s"""
+        |{
+        |  "keys": ${write(keys)},
+        |  "mrequired": $mrequired
+        |}
+        """.stripMargin
+    httpPost(s"/multisig/address", maybeBody = Some(body))
+  }
+
+  def decodeUnsignedTransaction(unsignedTx: String) = {
+    val body = s"""
+        |{
+        |  "unsignedTx": "$unsignedTx"
+        |}
+        """.stripMargin
+    httpPost(s"/transactions/decode", maybeBody = Some(body))
   }
 
   def buildContract(query: String) = {
