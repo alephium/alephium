@@ -58,21 +58,21 @@ class TransactionSpec
     val script = LockupScript.p2pkh(PublicKey.generate)
     val coinbase0 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),
-      gasFee = U256.Zero,
+      gasReward = U256.Zero,
       script,
       target = Target.Max,
       blockTs = ALF.LaunchTimestamp
     )
     val coinbase1 = Transaction.coinbase(
       ChainIndex.unsafe(0, 1),
-      gasFee = U256.Zero,
+      gasReward = U256.Zero,
       script,
       target = Target.Max,
       blockTs = ALF.LaunchTimestamp
     )
     val coinbase2 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),
-      gasFee = U256.Zero,
+      gasReward = U256.Zero,
       script,
       target = Target.Max,
       blockTs = TimeStamp.now()

@@ -205,6 +205,8 @@ object Transaction {
     )
   }
 
+  def rewardFromGasFee(gasFee: U256): U256 = gasFee.divUnsafe(U256.Two)
+
   def coinbase(
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
@@ -223,23 +225,24 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs)
+    val gasFee    = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+    val gasReward = rewardFromGasFee(gasFee)
+    coinbase(chainIndex, gasReward, lockupScript, minerData, target, blockTs)
   }
 
   def coinbase(
       chainIndex: ChainIndex,
-      gasFee: U256,
+      gasReward: U256,
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs)
+    coinbase(chainIndex, gasReward, lockupScript, ByteString.empty, target, blockTs)
   }
 
   def coinbase(
       chainIndex: ChainIndex,
-      gasFee: U256,
+      gasReward: U256,
       lockupScript: LockupScript.Asset,
       minerData: ByteString,
       target: Target,
@@ -252,7 +255,7 @@ object Transaction {
 
     val txOutput =
       AssetOutput(
-        reward.addUnsafe(gasFee).subUnsafe(defaultGasFee),
+        reward.addUnsafe(gasReward).subUnsafe(defaultGasFee),
         lockupScript,
         lockTime,
         tokens = AVector.empty,

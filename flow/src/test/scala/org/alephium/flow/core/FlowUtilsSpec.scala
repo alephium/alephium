@@ -140,6 +140,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     emptyBlock.coinbaseReward is consensusConfig.emission
       .miningReward(emptyBlock.header)
       .subUnsafe(defaultGasFee)
+    addAndCheck(blockFlow, emptyBlock)
 
     // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
     val transferBlock = {
@@ -150,6 +151,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
     transferBlock.coinbaseReward is consensusConfig.emission
       .miningReward(transferBlock.header)
+      .subUnsafe(defaultGasFee.divUnsafe(2)) // 50% is burnt
+    addAndCheck(blockFlow, transferBlock)
   }
 
   it should "prepare block template when txs are inter-dependent" in new FlowFixture {
