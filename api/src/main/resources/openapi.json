@@ -2864,6 +2864,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "utxosLimit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {

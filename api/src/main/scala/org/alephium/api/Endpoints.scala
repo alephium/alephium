@@ -155,10 +155,11 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
-  val getBalance: BaseEndpoint[Address.Asset, Balance] =
+  val getBalance: BaseEndpoint[(Address.Asset, Option[Int]), Balance] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("balance")
+      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBody[Balance])
       .summary("Get the balance of an address")
 

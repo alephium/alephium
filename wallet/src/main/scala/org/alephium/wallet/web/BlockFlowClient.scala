@@ -104,7 +104,7 @@ object BlockFlowClient {
     }
 
     def fetchBalance(address: Address.Asset): Future[Either[ApiError[_ <: StatusCode], U256]] =
-      requestFromGroup(address.groupIndex, getBalance, address).map(_.map(_.balance))
+      requestFromGroup(address.groupIndex, getBalance, (address, None)).map(_.map(_.balance))
 
     def prepareTransaction(
         fromPublicKey: String,

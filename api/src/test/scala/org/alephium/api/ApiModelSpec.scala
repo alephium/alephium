@@ -155,9 +155,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode GetBalance" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
-    val request    = GetBalance(address)
+    val request    = GetBalance(address, None)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
+
+    val request2 = GetBalance(address, Some(10))
+    val jsonRaw2 = s"""{"address":"$addressStr","utxosLimit":10}"""
+    checkData(request2, jsonRaw2)
   }
 
   it should "encode/decode Input" in {

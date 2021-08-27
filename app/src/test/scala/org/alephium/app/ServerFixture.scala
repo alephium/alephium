@@ -231,11 +231,15 @@ object ServerFixture {
       Right(AVector(AVector((block, 1))))
     }
 
-    override def getBalance(lockupScript: LockupScript.Asset): IOResult[(U256, U256, Int)] =
+    override def getBalance(
+        lockupScript: LockupScript.Asset,
+        utxosLimit: Int
+    ): IOResult[(U256, U256, Int)] =
       Right((U256.Zero, U256.Zero, 0))
 
     override def getUTXOsIncludePool(
-        lockupScript: LockupScript.Asset
+        lockupScript: LockupScript.Asset,
+        utxosLimit: Int
     ): IOResult[AVector[AssetOutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((Hash.hash("token1"), U256.One))

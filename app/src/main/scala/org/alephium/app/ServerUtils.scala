@@ -61,7 +61,10 @@ class ServerUtils(implicit
     for {
       _ <- checkGroup(balanceRequest.address.lockupScript)
       balance <- blockFlow
-        .getBalance(balanceRequest.address.lockupScript)
+        .getBalance(
+          balanceRequest.address.lockupScript,
+          balanceRequest.utxosLimit.getOrElse(Int.MaxValue)
+        )
         .map(Balance(_))
         .left
         .flatMap(failed)
@@ -71,7 +74,7 @@ class ServerUtils(implicit
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
-        .getUTXOsIncludePool(address.lockupScript)
+        .getUTXOsIncludePool(address.lockupScript, Int.MaxValue)
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
         .flatMap(failed)
