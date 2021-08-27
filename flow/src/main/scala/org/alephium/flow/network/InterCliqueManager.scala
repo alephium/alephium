@@ -25,6 +25,7 @@ import akka.event.LoggingAdapter
 import akka.io.Tcp
 import io.prometheus.client.Gauge
 
+import org.alephium.flow.{Utils => FlowUtils}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.network.broker._
@@ -127,6 +128,7 @@ class InterCliqueManager(
     schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
+    subscribeEvent(self, classOf[CliqueManager.BroadCastTx])
   }
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
@@ -168,12 +170,19 @@ class InterCliqueManager(
     case message: CliqueManager.BroadCastBlock =>
       handleBroadCastBlock(message)
 
-    case message: CliqueManager.BroadCastTx =>
-      log.debug(s"Broadcasting tx ${message.hashes.map(_.shortHex)} for ${message.chainIndex}")
+    case CliqueManager.BroadCastTx(hashes) =>
+      log.debug(s"Broadcasting txs ${FlowUtils.showChainIndexedDigest(hashes)}")
       randomIterBrokers { (peerId, brokerState) =>
-        if (!message.origin.isFrom(peerId.cliqueId) && brokerState.readyFor(message.chainIndex)) {
-          log.debug(s"Send tx announcements to broker $peerId")
-          brokerState.actor ! BrokerHandler.RelayTxs(AVector(message.chainIndex -> message.hashes))
+        if (brokerState.isSynced) {
+          val needToSend = hashes.filter { case (chainIndex, txHashes) =>
+            brokerState.info.contains(chainIndex.from) && txHashes.nonEmpty
+          }
+          if (needToSend.nonEmpty) {
+            log.debug(
+              s"Send tx announcements ${FlowUtils.showChainIndexedDigest(needToSend)} to broker $peerId"
+            )
+            brokerState.actor ! BrokerHandler.RelayTxs(needToSend)
+          }
         }
       }
 

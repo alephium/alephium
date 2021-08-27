@@ -80,4 +80,13 @@ class CacheSpec extends AlephiumSpec {
     cache.size is 1
     cache.keys().toSeq is Seq('d')
   }
+
+  it should "clear all elements" in {
+    val cache = Cache.fifo[Int, Unit](10)
+    (0 until 3).foreach(v => cache.put(v, ()))
+    cache.size is 3
+    cache.keys().toSeq is Seq(0, 1, 2)
+    cache.clear()
+    cache.size is 0
+  }
 }

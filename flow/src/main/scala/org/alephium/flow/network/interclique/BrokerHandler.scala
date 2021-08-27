@@ -97,12 +97,10 @@ trait BrokerHandler extends BaseBrokerHandler {
           seenBlocks.put(hash, ())
           send(NewBlockHash(hash))
         }
-      case BaseBrokerHandler.RelayTxs(hashes) =>
-        handleRelayTxs(hashes)
-      case BaseBrokerHandler.Received(NewTxHashes(hashes)) =>
-        handleNewTxHashes(hashes)
+      case BaseBrokerHandler.RelayTxs(hashes)              => handleRelayTxs(hashes)
+      case BaseBrokerHandler.Received(NewTxHashes(hashes)) => handleNewTxHashes(hashes)
       case BaseBrokerHandler.DownloadTxs(hashes) =>
-        log.debug(s"Download txs ${showChainIndexedHashes(hashes)} from $remoteAddress")
+        log.debug(s"Download txs ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
         send(TxsRequest(hashes))
       case BaseBrokerHandler.Received(TxsRequest(id, hashes)) =>
         handleTxsRequest(id, hashes)
@@ -111,10 +109,6 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
 
     receive
-  }
-
-  def showChainIndexedHashes(hashes: AVector[(ChainIndex, AVector[Hash])]): String = {
-    hashes.map(p => s"${p._1} -> ${Utils.showDigest(p._2)}").mkString(", ")
   }
 
   private def handleRelayTxs(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
@@ -135,11 +129,13 @@ trait BrokerHandler extends BaseBrokerHandler {
           acc :+ ((chainIndex, selected))
         }
     }
-    send(NewTxHashes(invs))
+    if (invs.nonEmpty) {
+      send(NewTxHashes(invs))
+    }
   }
 
   private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
-    log.debug(s"Received txs hashes ${showChainIndexedHashes(hashes)} from $remoteAddress")
+    log.debug(s"Received txs hashes ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
     // ignore the tx announcements before synced
     if (selfSynced && remoteSynced) {
       val result = hashes.mapE { case (chainIndex, txHashes) =>
@@ -171,7 +167,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       hashes: AVector[(ChainIndex, AVector[Hash])]
   ): Unit = {
     log.debug(
-      s"Received txs request ${showChainIndexedHashes(hashes)} from $remoteAddress with $id"
+      s"Received txs request ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress with $id"
     )
     val result = hashes.foldE(AVector.empty[TransactionTemplate]) {
       case (acc, (chainIndex, txHashes)) =>
@@ -199,7 +195,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
         handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
       } else {
-        allHandlers.txHandler ! TxHandler.AddToGrandPool(txs, dataOrigin)
+        allHandlers.txHandler ! TxHandler.AddToGrandPool(txs)
       }
     }
   }

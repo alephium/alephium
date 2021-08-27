@@ -21,7 +21,6 @@ import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
-import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.ALF
@@ -31,15 +30,44 @@ import org.alephium.util.{AlephiumActorSpec, AVector}
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "broadcast valid tx" in new Fixture {
-    val tx = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
-
-    txHandler ! addTx(tx)
-
-    expectMsg(TxHandler.AddSucceeded(tx.id))
-
-    broadcastTxProbe.expectMsg(
-      CliqueManager.BroadCastTx(AVector(tx.id), chainIndex, dataOrigin)
+    override val configValues = Map(
+      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"),
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.broker-id", 0)
     )
+
+    def createTx(chainIndex: ChainIndex): Transaction = {
+      transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
+    }
+
+    val txs =
+      AVector.tabulate(groupConfig.groups)(groupId => createTx(ChainIndex.unsafe(groupId, groupId)))
+    txs.length is 4
+    txHandler.underlyingActor.txsBuffer.isEmpty is true
+
+    val txs0 = txs.take(2)
+    txs0.foreach(txHandler ! addTx(_))
+    txs0.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
+    broadcastTxProbe.expectMsgPF() { case CliqueManager.BroadCastTx(hashes) =>
+      hashes.length is 2
+      hashes.contains((ChainIndex.unsafe(0, 0), AVector(txs0.head.id))) is true
+      hashes.contains((ChainIndex.unsafe(1, 1), AVector(txs0.last.id))) is true
+    }
+    txHandler.underlyingActor.txsBuffer.isEmpty is true
+
+    val txs1 = txs.drop(2)
+    txs1.foreach(txHandler ! addTx(_))
+    txs1.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
+    broadcastTxProbe.expectMsgPF() { case CliqueManager.BroadCastTx(hashes) =>
+      hashes.length is 2
+      hashes.contains((ChainIndex.unsafe(2, 2), AVector(txs1.head.id))) is true
+      hashes.contains((ChainIndex.unsafe(3, 3), AVector(txs1.last.id))) is true
+    }
+    txHandler.underlyingActor.txsBuffer.isEmpty is true
+
+    // won't broadcast when there are no txs in buffer
+    broadcastTxProbe.expectNoMessage()
   }
 
   it should "not broadcast invalid tx" in new Fixture {
@@ -51,27 +79,35 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "fail in case of duplicate txs" in new Fixture {
+    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
+
     val tx = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
 
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
+    broadcastTxProbe.expectMsg(CliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx.id)))))
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
       expectMsg(TxHandler.AddFailed(tx.id))
+      broadcastTxProbe.expectNoMessage()
     }
   }
 
   it should "fail in double-spending" in new Fixture {
+    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
+
     val tx0 = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
     val tx1 = transferTxs(blockFlow, chainIndex, ALF.alf(2), 1, None, true, None).head
 
     txHandler ! addTx(tx0)
     expectMsg(TxHandler.AddSucceeded(tx0.id))
+    broadcastTxProbe.expectMsg(CliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx0.id)))))
 
     EventFilter.warning(pattern = ".*double spending.*").intercept {
       txHandler ! addTx(tx1)
       expectMsg(TxHandler.AddFailed(tx1.id))
+      broadcastTxProbe.expectNoMessage()
     }
   }
 
@@ -101,6 +137,15 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     expectMsg(BrokerHandler.DownloadTxs(AVector((chainIndex, AVector(tx3.id)))))
   }
 
+  it should "broadcast txs regularly" in new FlowFixture {
+    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
+
+    implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.debugConfig))
+    EventFilter.debug("Start to broadcast txs", occurrences = 5).intercept {
+      system.actorOf(TxHandler.props(blockFlow))
+    }
+  }
+
   it should "clean tx pool regularly" in new FlowFixture {
     override val configValues = Map(("alephium.mempool.clean-frequency", "300 ms"))
 
@@ -112,12 +157,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   trait Fixture extends FlowFixture with TxGenerators {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val dataOrigin = DataOrigin.Local
+    // use lazy here because we want to override config values
+    lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val txHandler  = TestActorRef[TxHandler](TxHandler.props(blockFlow))
 
-    def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate), dataOrigin)
-
-    val txHandler = TestActorRef[TxHandler](TxHandler.props(blockFlow))
+    def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate))
 
     val broadcastTxProbe = TestProbe()
     system.eventStream.subscribe(broadcastTxProbe.ref, classOf[CliqueManager.BroadCastTx])
