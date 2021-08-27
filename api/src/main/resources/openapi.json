@@ -2881,10 +2881,24 @@
                 "schema": {
                   "$ref": "#/components/schemas/Balance"
                 },
-                "example": {
-                  "balance": "1000000000000000000",
-                  "lockedBalance": "500000000000000000",
-                  "utxoNum": 3
+                "examples": {
+                  "Example0": {
+                    "summary": "Default",
+                    "value": {
+                      "balance": "1000000000000000000",
+                      "lockedBalance": "500000000000000000",
+                      "utxoNum": 3
+                    }
+                  },
+                  "Example1": {
+                    "summary": "More settings",
+                    "value": {
+                      "balance": "1000000000000000000",
+                      "lockedBalance": "500000000000000000",
+                      "utxoNum": 3,
+                      "warning": "Result might not include all utxos and is maybe unprecise"
+                    }
+                  }
                 }
               }
             }
@@ -5323,6 +5337,9 @@
           },
           "utxoNum": {
             "type": "integer"
+          },
+          "warning": {
+            "type": "string"
           }
         }
       },

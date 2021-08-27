@@ -18,10 +18,26 @@ package org.alephium.api.model
 
 import org.alephium.util.U256
 
-final case class Balance(balance: U256, lockedBalance: U256, utxoNum: Int)
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class Balance(
+    balance: U256,
+    lockedBalance: U256,
+    utxoNum: Int,
+    warning: Option[String] = None
+)
 
 object Balance {
-  def apply(balance_locked_utxoNum: (U256, U256, Int)): Balance = {
-    Balance(balance_locked_utxoNum._1, balance_locked_utxoNum._2, balance_locked_utxoNum._3)
+  def apply(balance_locked_utxoNum: (U256, U256, Int), utxosLimit: Option[Int]): Balance = {
+    val warning = utxosLimit.flatMap { limit =>
+      Option.when(limit == balance_locked_utxoNum._3)(
+        "Result might not include all utxos and is maybe unprecise"
+      )
+    }
+    Balance(
+      balance_locked_utxoNum._1,
+      balance_locked_utxoNum._2,
+      balance_locked_utxoNum._3,
+      warning
+    )
   }
 }

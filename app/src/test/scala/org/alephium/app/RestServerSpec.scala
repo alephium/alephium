@@ -122,6 +122,13 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
       response.code is StatusCode.Ok
       response.as[Balance] is dummyBalance
     }
+    Get(s"/addresses/$dummyKeyAddress/balance?utxosLimit=0", getPort(group)) check { response =>
+      response.code is StatusCode.Ok
+      response
+        .as[Balance]
+        .warning
+        .get is "Result might not include all utxos and is maybe unprecise"
+    }
   }
 
   it should "call GET /addresses/<address>/group" in {
