@@ -19,6 +19,7 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
+import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.network.CliqueManager
@@ -54,7 +55,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       hashes.contains((ChainIndex.unsafe(0, 0), AVector(txs0.head.id))) is true
       hashes.contains((ChainIndex.unsafe(1, 1), AVector(txs0.last.id))) is true
     }
-    txHandler.underlyingActor.txsBuffer.isEmpty is true
+    // use eventually here to avoid test failure on windows
+    eventually(txHandler.underlyingActor.txsBuffer.isEmpty is true)
 
     val txs1 = txs.drop(2)
     txs1.foreach(txHandler ! addTx(_))
@@ -64,7 +66,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       hashes.contains((ChainIndex.unsafe(2, 2), AVector(txs1.head.id))) is true
       hashes.contains((ChainIndex.unsafe(3, 3), AVector(txs1.last.id))) is true
     }
-    txHandler.underlyingActor.txsBuffer.isEmpty is true
+    // use eventually here to avoid test failure on windows
+    eventually(txHandler.underlyingActor.txsBuffer.isEmpty is true)
 
     // won't broadcast when there are no txs in buffer
     broadcastTxProbe.expectNoMessage()
