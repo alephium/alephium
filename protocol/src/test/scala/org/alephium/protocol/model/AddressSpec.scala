@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey}
@@ -24,62 +25,26 @@ import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class AddressSpec extends AlephiumSpec {
 
-  case class AddressVerify(
-      address: String,
-      pubKeys: AVector[String] = AVector.empty,
-      m: Option[Int] = None
-  ) {
-    def threshold(threshold: Int): AddressVerify = {
-      copy(m = Some(threshold))
-    }
-
-    def publicKey(keys: String*): AddressVerify = {
-      copy(pubKeys = AVector.from(keys))
-    }
-
-    def ok() = {
-      m match {
-        case Some(threshold) =>
-          val keys   = pubKeys.map(key => PublicKey.unsafe(Hex.from(key).value))
-          val script = LockupScript.p2mpkh(keys, threshold).value
-          verifyScript(address, script)
-        case None =>
-          if (pubKeys.length != 1) {
-            fail("Verify p2pkh, but the length of public keys is not 1")
-          } else {
-            val script = LockupScript.p2pkh(PublicKey.unsafe(Hex.from(pubKeys.head).value))
-            verifyScript(address, script)
-          }
-      }
-    }
-
-    private def verifyScript(address: String, script: LockupScript): Assertion = {
-      Address.from(script).toBase58 is address
-      Address.fromBase58(address).value.lockupScript is script
-    }
-  }
-
   it should "encode and decode between p2pkh address and public key" in {
-    AddressVerify("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
+    AddressVerifyP2PKH("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
       .publicKey("02a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd10")
       .ok()
 
-    AddressVerify("1H7CmpbvGJwgyLzR91wzSJJSkiBC92WDPTWny4gmhQJQc")
+    AddressVerifyP2PKH("1H7CmpbvGJwgyLzR91wzSJJSkiBC92WDPTWny4gmhQJQc")
       .publicKey("03c83325bd2c0fe1464161c6d5f42699fc9dd799dda7f984f9fbf59b01b095be19")
       .ok()
 
-    AddressVerify("1DkrQMni2h8KYpvY8t7dECshL66gwnxiR5uD2Udxps6og")
+    AddressVerifyP2PKH("1DkrQMni2h8KYpvY8t7dECshL66gwnxiR5uD2Udxps6og")
       .publicKey("03c0a849d8ab8633b45b45ea7f3bb3229e1083a13fd73e027aac2bc55e7f622172")
       .ok()
 
-    AddressVerify("131R8ufDhcsu6SRztR9D3m8GUzkWFUPfT78aQ6jgtgzob")
+    AddressVerifyP2PKH("131R8ufDhcsu6SRztR9D3m8GUzkWFUPfT78aQ6jgtgzob")
       .publicKey("026a1552ddf754abbfed6784f709fc94b7fe96049939986ea31e46238849953d18")
       .ok()
   }
 
   it should "encode and decode between p2mpkh address and public keys" in {
-    info("1-of-2 p2mpkh")
-    AddressVerify(
+    AddressVerifyP2MPKH(
       "2jjvDdgGjC6X9HHMCMHohVfvp1uf3LHQrAGWaufR17P7AFwtxodTxSktqKc2urNEtaoUCy5xXpBUwpZ8QM8Q3e5BYCx"
     )
       .threshold(1)
@@ -89,8 +54,7 @@ class AddressSpec extends AlephiumSpec {
       )
       .ok()
 
-    info("2-of-2 p2mpkh")
-    AddressVerify(
+    AddressVerifyP2MPKH(
       "2jjvDdgGjC6X9HHMCMHohVfvp1uf3LHQrAGWaufR17P7AFwtxodTxSktqKc2urNEtaoUCy5xXpBUwpZ8QM8Q3e5BYCy"
     )
       .threshold(2)
@@ -100,8 +64,7 @@ class AddressSpec extends AlephiumSpec {
       )
       .ok()
 
-    info("2-of-3 p2mpkh")
-    AddressVerify(
+    AddressVerifyP2MPKH(
       "X3RMnvb8h3RFrrbBraEouAWU9Ufu4s2WTXUQfLCvDtcmqCWRwkVLc69q2NnwYW2EMwg4QBN2UopkEmYLLLgHP9TQ38FK15RnhhEwguRyY6qCuAoRfyjHRnqYnTvfypPgD7w1ku"
     )
       .threshold(2)
@@ -113,10 +76,104 @@ class AddressSpec extends AlephiumSpec {
       .ok()
   }
 
+  it should "encode and decode between p2c address and public key" in {
+    import Hex._
+    AddressVerifyP2C("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr")
+      .contractId(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef")
+      .ok()
+
+    AddressVerifyP2C("2AA91hkrsVv14QDZWgxMJXxDDKTRKzZMPyakCVUbZEGoS")
+      .contractId(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9")
+      .ok()
+  }
+
+  it should "encode and decode between p2sh address and public key" in {
+    import Hex._
+    AddressVerifyP2SH("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa")
+      .scriptHash(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef")
+      .ok()
+
+    AddressVerifyP2SH("rvpeCy7GhsGHq8n6TnB1LjQh4xn1FMHJVXnsdZAniKZA")
+      .scriptHash(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9")
+      .ok()
+  }
+
   "Address.asset" should "parse asset address only" in {
     val lock    = LockupScript.P2C(Hash.random)
     val address = Address.from(lock).toBase58
     Address.asset(address) is None
     Address.fromBase58(address).value.lockupScript is lock
+  }
+
+  sealed trait AddressVerify {
+    val address: String
+    def script(): LockupScript
+
+    def ok(): Assertion = {
+      verifyScript(address, script())
+    }
+  }
+
+  case class AddressVerifyP2PKH(
+      address: String,
+      pubKey: Option[String] = None
+  ) extends AddressVerify {
+    def publicKey(key: String) = {
+      copy(pubKey = Some(key))
+    }
+
+    def script() = {
+      LockupScript.p2pkh(PublicKey.unsafe(Hex.from(pubKey.value).value))
+    }
+  }
+
+  case class AddressVerifyP2MPKH(
+      address: String,
+      pubKeys: AVector[String] = AVector.empty,
+      m: Option[Int] = None
+  ) extends AddressVerify {
+    def threshold(threshold: Int) = {
+      copy(m = Some(threshold))
+    }
+
+    def publicKey(keys: String*) = {
+      copy(pubKeys = AVector.from(keys))
+    }
+
+    def script() = {
+      val keys = pubKeys.map(key => PublicKey.unsafe(Hex.from(key).value))
+      LockupScript.p2mpkh(keys, m.value).value
+    }
+  }
+
+  case class AddressVerifyP2C(
+      address: String,
+      contractId: Option[ByteString] = None
+  ) extends AddressVerify {
+    def contractId(id: ByteString) = {
+      copy(contractId = Some(id))
+    }
+
+    def script() = {
+      LockupScript.p2c(Hash.from(contractId.value).value)
+    }
+  }
+
+  case class AddressVerifyP2SH(
+      address: String,
+      scriptHash: Option[ByteString] = None
+  ) extends AddressVerify {
+    def scriptHash(hash: ByteString) = {
+      copy(scriptHash = Some(hash))
+    }
+
+    def script() = {
+      LockupScript.p2sh(Hash.from(scriptHash.value).value)
+    }
+  }
+
+  def verifyScript(address: String, script: LockupScript): Assertion = {
+    Address.from(script).toBase58 is address
+    Address.fromBase58(address).value.lockupScript is script
   }
 }
