@@ -70,7 +70,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     } yield ()
   }
 
-  private[validation] def checkBlockAfterHeader(
+  private[flow] def checkBlockAfterHeader(
       block: Block,
       flow: BlockFlow
   ): BlockValidationResult[Unit] = {

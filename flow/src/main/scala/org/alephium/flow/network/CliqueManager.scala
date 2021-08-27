@@ -18,18 +18,15 @@ package org.alephium.flow.network
 
 import akka.actor.{ActorRef, Props, Stash}
 import akka.io.Tcp
-import akka.util.ByteString
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker.ConnectionType
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
+import org.alephium.util.{ActorRefT, BaseActor}
 
 object CliqueManager {
   def props(
@@ -51,17 +48,6 @@ object CliqueManager {
 
   trait Command
   final case class Start(cliqueInfo: CliqueInfo) extends Command
-  final case class BroadCastBlock(
-      block: Block,
-      blockMsg: ByteString,
-      headerMsg: ByteString,
-      origin: DataOrigin,
-      broadcastInterClique: Boolean
-  ) extends Command
-      with EventStream.Event
-  final case class BroadCastTx(hashes: AVector[(ChainIndex, AVector[Hash])])
-      extends Command
-      with EventStream.Event
   final case class HandShaked(brokerInfo: BrokerInfo, connectionType: ConnectionType)
       extends Command
   final case class Synced(brokerInfo: BrokerInfo) extends Command
@@ -76,8 +62,7 @@ class CliqueManager(
     numBootstrapNodes: Int
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
-    with Stash
-    with EventStream.Subscriber {
+    with Stash {
   import CliqueManager._
 
   var selfCliqueReady: Boolean = false
@@ -114,23 +99,16 @@ class CliqueManager(
       )
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
-      subscribeEvent(self, classOf[BroadCastBlock])
 
       unstashAll()
-      context become (handleWith(intraCliqueManager, interCliqueManager) orElse isSelfCliqueSynced)
+      context become (handleWith(interCliqueManager) orElse isSelfCliqueSynced)
     case c: Tcp.Connected =>
       intraCliqueManager.forward(c)
 
     case _ => stash()
   }
 
-  def handleWith(intraCliqueManager: ActorRef, interCliqueManager: ActorRef): Receive = {
-    case message: CliqueManager.BroadCastBlock =>
-      intraCliqueManager ! message
-      if (message.broadcastInterClique) {
-        interCliqueManager ! message
-      }
-
+  def handleWith(interCliqueManager: ActorRef): Receive = {
     case message: InterCliqueManager.Command =>
       interCliqueManager.forward(message)
 

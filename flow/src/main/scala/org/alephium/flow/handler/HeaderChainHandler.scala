@@ -68,7 +68,7 @@ class HeaderChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex
 )(implicit brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
-    extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderChainHandler.Command](
+    extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderValidation](
       blockFlow,
       chainIndex,
       HeaderValidation.build
@@ -78,8 +78,6 @@ class HeaderChainHandler(
   override def receive: Receive = { case Validate(header, broker, origin) =>
     handleData(header, broker, origin)
   }
-
-  override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
 
   override def dataAddingFailed(): Event = HeaderAddingFailed
 

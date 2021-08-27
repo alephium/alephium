@@ -18,15 +18,17 @@ package org.alephium.flow.network
 
 import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
+import akka.util.ByteString
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
+import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.intraclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
+import org.alephium.protocol.model.{Block, BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object IntraCliqueManager {
@@ -49,6 +51,13 @@ object IntraCliqueManager {
 
   sealed trait Command    extends CliqueManager.Command
   final case object Ready extends Command
+  final case class BroadCastBlock(
+      block: Block,
+      blockMsg: ByteString,
+      headerMsg: ByteString,
+      origin: DataOrigin
+  ) extends Command
+      with EventStream.Event
 }
 
 class IntraCliqueManager(
@@ -59,7 +68,7 @@ class IntraCliqueManager(
     blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
-    with EventStream.Publisher {
+    with EventStream.Subscriber {
 
   override def preStart(): Unit = {
     cliqueInfo.intraBrokers.foreach { remoteBroker =>
@@ -126,6 +135,7 @@ class IntraCliqueManager(
     if (newBrokers.size == cliqueInfo.brokerNum - 1) {
       log.debug("All Brokers connected")
       cliqueManager ! IntraCliqueManager.Ready
+      subscribeEvent(self, classOf[IntraCliqueManager.BroadCastBlock])
       context become handle(newBrokers)
     } else {
       context become awaitBrokers(newBrokers)
@@ -133,7 +143,7 @@ class IntraCliqueManager(
   }
 
   def handle(brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]): Receive = {
-    case CliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin, _) =>
+    case IntraCliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin) =>
       assume(block.chainIndex.relateTo(brokerConfig))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       // TODO: optimize this without using iteration
