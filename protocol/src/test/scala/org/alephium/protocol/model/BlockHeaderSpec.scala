@@ -16,15 +16,19 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.{BlockHash, Hash, ModelSnapshotsHelper}
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
+import org.alephium.util.U256
 
 class BlockHeaderSpec
     extends AlephiumSpec
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture.Default {
+    with ConsensusConfigFixture.Default
+    with ModelSnapshotsHelper {
+  implicit val basePath = "src/test/resources/models/blockheader"
+
   it should "have correct data" in {
     for {
       i <- 0 until groups
@@ -83,12 +87,15 @@ class BlockHeaderSpec
     header.version is 0.toByte
   }
 
-  it should "serialize properly" in {
+  it should "serialize and deserialize properly" in {
     import Hex._
 
     groups is 3
 
-    val header = BlockHeader(
+    info("header1")
+
+    val nonce1 = Nonce.zero
+    val header1 = BlockHeader(
       version = defaultBlockVersion,
       blockDeps = BlockDeps.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero)),
       depStateHash =
@@ -96,28 +103,29 @@ class BlockHeaderSpec
       txsHash = Hash.unsafe(hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59"),
       timestamp = TimeStamp.unsafe(1),
       target = consensusConfig.maxMiningTarget,
-      nonce = Nonce.zero
+      nonce = nonce1
     )
 
-    val headerBlob =
-      // nonce
-      hex"000000000000000000000000000000000000000000000000" ++
-        // version
-        hex"00" ++
-        // deps
-        hex"05" ++ hex"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" ++
-        // state root hash
-        hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9" ++
-        // tx root hash
-        hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59" ++
-        // timestamp
-        hex"0000000000000001" ++
-        // target
-        hex"20ffffff"
-    serialize(header) is headerBlob
+    val header1Blob = header1.verify("header1")
 
-    val block     = Block(header, AVector.empty)
-    val blockBlob = headerBlob ++ hex"00"
+    val block     = Block(header1, AVector.empty)
+    val blockBlob = header1Blob ++ hex"00"
     serialize(block) is blockBlob
+
+    info("header2")
+
+    val nonce2 = Nonce.unsafe(U256.Two.toBytes.takeRight(Nonce.byteLength))
+    val header2 = BlockHeader(
+      version = defaultBlockVersion,
+      blockDeps = BlockDeps.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero)),
+      depStateHash =
+        Hash.unsafe(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"),
+      txsHash = Hash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
+      timestamp = TimeStamp.unsafe(102348),
+      target = consensusConfig.maxMiningTarget,
+      nonce = nonce2
+    )
+
+    header2.verify("header2")
   }
 }

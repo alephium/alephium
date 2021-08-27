@@ -23,7 +23,7 @@ import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
 import org.scalactic.source.Position
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, OptionValues}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.dsl.ResultOfATypeInvocation
@@ -33,6 +33,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 trait AlephiumSpec
     extends AnyFlatSpecLike
+    with OptionValues
     with ScalaCheckDrivenPropertyChecks
     with AlephiumFixture {
   @nowarn implicit protected def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
