@@ -134,6 +134,24 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
   }
 
+  it should "prepare block with correct coinbase reward" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
+    emptyBlock.coinbaseReward is consensusConfig.emission
+      .miningReward(emptyBlock.header)
+      .subUnsafe(defaultGasFee)
+
+    // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
+    val transferBlock = {
+      val tmpBlock = transfer(blockFlow, chainIndex)
+      val mempool  = blockFlow.getMemPool(chainIndex)
+      mempool.addNewTx(chainIndex, tmpBlock.nonCoinbase.head.toTemplate)
+      mineFromMemPool(blockFlow, chainIndex)
+    }
+    transferBlock.coinbaseReward is consensusConfig.emission
+      .miningReward(transferBlock.header)
+  }
+
   it should "prepare block template when txs are inter-dependent" in new FlowFixture {
     val blockFlow1 = isolatedBlockFlow()
     val index      = ChainIndex.unsafe(0, 0)
