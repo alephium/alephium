@@ -36,7 +36,10 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
   def coinbaseReward: U256 = coinbase.unsigned.fixedOutputs.head.amount
 
   // only use this after validation
-  def gasFee: U256 = nonCoinbase.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+  def gasReward: U256 = {
+    val gasFee = nonCoinbase.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+    Transaction.rewardFromGasFee(gasFee)
+  }
 
   def nonCoinbase: AVector[Transaction] = transactions.init
 
