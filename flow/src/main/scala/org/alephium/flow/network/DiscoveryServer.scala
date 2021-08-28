@@ -20,7 +20,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated, Timers}
+import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
@@ -61,8 +61,6 @@ object DiscoveryServer {
     }
   }
 
-  object Timer
-
   final case class AwaitReply(remote: InetSocketAddress, requestAt: TimeStamp)
 
   sealed trait Command
@@ -102,7 +100,6 @@ class DiscoveryServer(
     val networkConfig: NetworkConfig
 ) extends BaseActor
     with Stash
-    with Timers
     with DiscoveryServerState
     with EventStream {
 

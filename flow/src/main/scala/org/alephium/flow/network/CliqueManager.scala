@@ -59,11 +59,8 @@ object CliqueManager {
       broadcastInterClique: Boolean
   ) extends Command
       with EventStream.Event
-  final case class BroadCastTx(
-      hashes: AVector[Hash],
-      chainIndex: ChainIndex,
-      origin: DataOrigin
-  ) extends Command
+  final case class BroadCastTx(hashes: AVector[(ChainIndex, AVector[Hash])])
+      extends Command
       with EventStream.Event
   final case class HandShaked(brokerInfo: BrokerInfo, connectionType: ConnectionType)
       extends Command
@@ -117,7 +114,6 @@ class CliqueManager(
       )
       val interCliqueManager = context.actorOf(props, "InterCliqueManager")
       selfCliqueReady = true
-      subscribeEvent(self, classOf[BroadCastTx])
       subscribeEvent(self, classOf[BroadCastBlock])
 
       unstashAll()
@@ -134,8 +130,6 @@ class CliqueManager(
       if (message.broadcastInterClique) {
         interCliqueManager ! message
       }
-    case message: CliqueManager.BroadCastTx =>
-      interCliqueManager ! message
 
     case message: InterCliqueManager.Command =>
       interCliqueManager.forward(message)

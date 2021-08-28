@@ -124,4 +124,6 @@ class Cache[K, V](m: Cache.Inner[K, V]) extends SimpleMap[K, V] {
     m.entrySet().removeIf(entry => p(entry.getKey, entry.getValue))
     ()
   }
+
+  def clear(): Unit = m.clear()
 }

@@ -377,10 +377,9 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     val txHashes   = AVector.fill(4)(Hash.generate)
     val chainIndex = ChainIndex.unsafe(0, 1)
-    val message =
-      CliqueManager.BroadCastTx(txHashes, chainIndex, DataOrigin.InterClique(brokerInfo0))
+    val message    = CliqueManager.BroadCastTx(AVector((chainIndex, txHashes)))
     interCliqueManager ! message
-    broker0.expectNoMessage()
+    broker0.expectMsg(BrokerHandler.RelayTxs(AVector((chainIndex, txHashes))))
     broker1.expectNoMessage()
     broker2.expectMsg(BrokerHandler.RelayTxs(AVector((chainIndex, txHashes))))
     broker3.expectNoMessage()

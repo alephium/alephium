@@ -20,7 +20,6 @@ import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
@@ -30,7 +29,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, BaseActor, EventStream, Hex, TimeStamp}
+import org.alephium.util.{AVector, BaseActor, Cache, EventStream, Hex, TimeStamp}
 
 object TxHandler {
   def props(blockFlow: BlockFlow)(implicit
@@ -41,13 +40,12 @@ object TxHandler {
     Props(new TxHandler(blockFlow))
 
   sealed trait Command
-  final case class AddToSharedPool(txs: AVector[TransactionTemplate], origin: DataOrigin)
-      extends Command
-  final case class Broadcast(txs: AVector[TransactionTemplate]) extends Command
-  final case class AddToGrandPool(txs: AVector[TransactionTemplate], origin: DataOrigin)
-      extends Command
-  case object CleanMempool                                                       extends Command
+  final case class AddToSharedPool(txs: AVector[TransactionTemplate])            extends Command
+  final case class Broadcast(txs: AVector[TransactionTemplate])                  extends Command
+  final case class AddToGrandPool(txs: AVector[TransactionTemplate])             extends Command
   final case class TxAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
+  case object CleanMempool                                                       extends Command
+  private case object BroadcastTxs                                               extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: Hash) extends Event
@@ -66,24 +64,25 @@ class TxHandler(blockFlow: BlockFlow)(implicit
   val maxCapacity: Int              = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val fetching: FetchState[Hash] =
     FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
+  val txsBuffer: Cache[TransactionTemplate, Unit] =
+    Cache.fifo[TransactionTemplate, Unit](maxCapacity)
 
   override def preStart(): Unit = {
     super.preStart()
     schedule(self, TxHandler.CleanMempool, memPoolSetting.cleanFrequency)
+    scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
   }
 
   override def receive: Receive = {
-    case TxHandler.AddToSharedPool(txs, origin) =>
-      txs.foreach(handleTx(_, origin, nonCoinbaseValidation.validateMempoolTxTemplate))
-    case TxHandler.AddToGrandPool(txs, origin) =>
-      txs.foreach(handleTx(_, origin, nonCoinbaseValidation.validateGrandPoolTxTemplate))
-    case TxHandler.Broadcast(txs) =>
-      txs.groupBy(_.chainIndex).foreach { case (chainIndex, txs) =>
-        broadCast(chainIndex, txs, DataOrigin.Local)
-      }
+    case TxHandler.AddToSharedPool(txs) =>
+      txs.foreach(handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate))
+    case TxHandler.AddToGrandPool(txs) =>
+      txs.foreach(handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate))
+    case TxHandler.Broadcast(txs)          => txs.foreach(tx => txsBuffer.put(tx, ()))
     case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
+    case TxHandler.BroadcastTxs            => broadcastTxs()
     case TxHandler.CleanMempool =>
-      log.debug(s"Start to clean tx pools")
+      log.debug("Start to clean tx pools")
       blockFlow.grandPool.clean(
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanFrequency)
@@ -116,7 +115,6 @@ class TxHandler(blockFlow: BlockFlow)(implicit
 
   def handleTx(
       tx: TransactionTemplate,
-      origin: DataOrigin,
       validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit]
   ): Unit = {
     val chainIndex = tx.chainIndex
@@ -133,7 +131,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
           log.warning(s"failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
           addFailed(tx)
         case Right(_) =>
-          handleValidTx(chainIndex, tx, mempool, origin, acknowledge = true)
+          handleValidTx(chainIndex, tx, mempool, acknowledge = true)
         case Left(Left(e)) =>
           log.warning(s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
           addFailed(tx)
@@ -145,29 +143,35 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
       mempool: MemPool,
-      origin: DataOrigin,
       acknowledge: Boolean
   ): Unit = {
     val result = mempool.addNewTx(chainIndex, tx)
     log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToSharedPool =>
-        // We don't broadcast txs that are pending locally
-        broadCast(chainIndex, AVector(tx), origin)
-      case _ => ()
+      case MemPool.AddedToSharedPool => txsBuffer.put(tx, ())
+      case _                         => () // We don't broadcast txs that are pending locally
     }
     if (acknowledge) {
       addSucceeded(tx)
     }
   }
 
-  def broadCast(
-      chainIndex: ChainIndex,
-      txs: AVector[TransactionTemplate],
-      origin: DataOrigin
-  ): Unit = {
-    val event = CliqueManager.BroadCastTx(txs.map(_.id), chainIndex, origin)
-    publishEvent(event)
+  def broadcastTxs(): Unit = {
+    log.debug("Start to broadcast txs")
+    if (!txsBuffer.isEmpty) {
+      val hashes =
+        txsBuffer.keys().foldLeft(Map.empty[ChainIndex, AVector[Hash]]) { case (acc, tx) =>
+          val chainIndex = tx.chainIndex
+          acc.get(chainIndex) match {
+            case Some(hashes) => acc + (chainIndex -> (hashes :+ tx.id))
+            case None         => acc + (chainIndex -> AVector(tx.id))
+          }
+        }
+
+      publishEvent(CliqueManager.BroadCastTx(AVector.from(hashes)))
+      txsBuffer.clear()
+    }
+    scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
   }
 
   def addSucceeded(tx: TransactionTemplate): Unit = {

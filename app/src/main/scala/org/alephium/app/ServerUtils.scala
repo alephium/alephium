@@ -25,7 +25,6 @@ import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
-import org.alephium.flow.model.DataOrigin
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
@@ -343,7 +342,7 @@ class ServerUtils(implicit
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[TxResult] = {
-    val message = TxHandler.AddToGrandPool(AVector(tx), DataOrigin.Local)
+    val message = TxHandler.AddToGrandPool(AVector(tx))
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))

@@ -17,7 +17,7 @@
 package org.alephium.flow
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.model.FlowData
+import org.alephium.protocol.model.{ChainIndex, FlowData}
 import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
 
@@ -36,6 +36,10 @@ object Utils {
 
   def showDataFlow[T <: FlowData](elems: AVector[AVector[T]]): String = {
     elems.map(showDataDigest).mkString(", ")
+  }
+
+  def showChainIndexedDigest[T <: RandomBytes](elems: AVector[(ChainIndex, AVector[T])]): String = {
+    elems.map(p => s"${p._1} -> ${showDigest(p._2)}").mkString(", ")
   }
 
   def unsafe[T](e: IOResult[T]): T =

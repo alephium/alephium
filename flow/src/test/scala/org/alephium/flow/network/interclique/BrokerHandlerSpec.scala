@@ -177,7 +177,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     expectTerminated(brokerHandler.ref)
   }
 
-  it should "send announcement only if remote have not seen the block" in new Fixture {
+  it should "send announcements only if remote have not seen the block" in new Fixture {
     val blockHash1 = BlockHash.generate
     val blockHash2 = BlockHash.generate
 
@@ -246,7 +246,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val chainIndexGen = Gen.const(chainIndex)
     val txs           = AVector.fill(10)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.random(), txs))
-    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToGrandPool(txs, dataOrigin))
+    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToGrandPool(txs))
     txs.foreach { tx =>
       brokerHandler.underlyingActor.seenTxs.contains(tx.id) is false
     }
@@ -286,6 +286,21 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler.underlyingActor.seenTxs.keys().toSet is (txHashes1 ++ txHashes2).toSet
   }
 
+  it should "send announcements only if remote have not seen the tx" in new Fixture {
+    val txHash1 = Hash.generate
+    val txHash2 = Hash.generate
+
+    brokerHandler.underlyingActor.seenTxs.put(txHash1, ())
+    brokerHandler ! BaseBrokerHandler.RelayTxs(AVector((chainIndex, AVector(txHash1))))
+    connectionHandler.expectNoMessage()
+    brokerHandler.underlyingActor.seenTxs.keys().toSet is Set(txHash1)
+
+    brokerHandler ! BaseBrokerHandler.RelayTxs(AVector((chainIndex, AVector(txHash1, txHash2))))
+    val message = Message.serialize(NewTxHashes(AVector((chainIndex, AVector(txHash2)))))
+    connectionHandler.expectMsg(ConnectionHandler.Send(message))
+    brokerHandler.underlyingActor.seenTxs.keys().toSet is Set(txHash1, txHash2)
+  }
+
   it should "handle TxsRequest" in new Fixture with NoIndexModelGeneratorsLike {
     val chainIndexGen = Gen.const(chainIndex)
     val txs           = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
@@ -316,7 +331,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs           = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     val response      = TxsResponse(RequestId.random(), txs)
     brokerHandler ! BaseBrokerHandler.Received(response)
-    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToGrandPool(txs, dataOrigin))
+    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToGrandPool(txs))
 
     val invalidTx =
       transactionGen(chainIndexGen = Gen.const(invalidChainIndex)).sample.get.toTemplate
