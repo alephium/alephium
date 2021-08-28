@@ -61,4 +61,6 @@ object Dependencies {
     "io.prometheus" % "simpleclient_common" % Version.prometheus
   lazy val `prometheus-simple-client-hotspot` =
     "io.prometheus" % "simpleclient_hotspot" % Version.prometheus
+
+  lazy val pprint = "com.lihaoyi" %% "pprint" % "0.6.6",
 }

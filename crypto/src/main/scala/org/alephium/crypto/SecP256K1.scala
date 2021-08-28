@@ -61,6 +61,10 @@ object SecP256K1PrivateKey
       _.bytes
     ) {
   override def length: Int = 32
+
+  def apply(bytes: ByteString): SecP256K1PrivateKey = {
+    new SecP256K1PrivateKey(bytes)
+  }
 }
 
 // public key should be compressed, but the format is not checked until signature verification
@@ -77,6 +81,10 @@ object SecP256K1PublicKey
       _.bytes
     ) {
   override def length: Int = 33
+
+  def apply(bytes: ByteString): SecP256K1PublicKey = {
+    new SecP256K1PublicKey(bytes)
+  }
 }
 
 class SecP256K1Signature(val bytes: ByteString) extends Signature
@@ -105,6 +113,10 @@ object SecP256K1Signature
     val r = new BigInteger(1, signature.take(32))
     val s = new BigInteger(1, signature.takeRight(32))
     (r, s)
+  }
+
+  def apply(bytes: ByteString): SecP256K1Signature = {
+    new SecP256K1Signature(bytes)
   }
 }
 

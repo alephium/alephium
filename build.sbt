@@ -74,7 +74,8 @@ lazy val util = project("util")
       akka,
       `akka-slf4j`,
       bcprov,
-      `scala-reflect`(scalaVersion.value)
+      `scala-reflect`(scalaVersion.value),
+      pprint
     )
   )
 

@@ -391,7 +391,14 @@ trait BlockGenerators extends TxGenerators {
   lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
-    blockGenOf(chainIndex, AVector.fill(2 * groupConfig.groups - 1)(BlockHash.zero), Hash.zero)
+    for {
+      depStateHash <- hashGen
+      deps <- Gen
+        .listOfN(2 * groupConfig.groups - 1, blockHashGen)
+        .map(_.toArray)
+        .map(AVector.unsafe(_))
+      block <- blockGenOf(chainIndex, deps, depStateHash)
+    } yield block
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)
