@@ -102,32 +102,20 @@ class BlockChainHandler(
     handleData(block, broker, origin)
   }
 
-  override def handleData(
-      data: Block,
-      broker: ActorRefT[ChainHandler.Event],
+  def validateWithSideEffect(
+      block: Block,
       origin: DataOrigin
-  ): Unit = {
-    withValidation(data, origin) { (data, origin) =>
-      validator.headerValidation.validate(data.header, blockFlow).flatMap { _ =>
-        val blockMsgOpt = broadcast(data, origin)
-        validator.checkBlockAfterHeader(data, blockFlow).map(_ => blockMsgOpt)
-      }
-    } match {
-      case Left(Left(e))                 => handleIOError(data, broker, e)
-      case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
-      case Right(blockMsgOpt) =>
-        val broadcastIntraClique = brokerConfig.brokerNum != 1
-        if (brokerConfig.contains(data.chainIndex.from) && broadcastIntraClique) {
-          val blockMsg  = blockMsgOpt.getOrElse(Message.serialize(NewBlock(data)))
-          val headerMsg = Message.serialize(NewHeader(data.header))
-          val event     = IntraCliqueManager.BroadCastBlock(data, blockMsg, headerMsg, origin)
-          publishEvent(event)
-        }
-        handleValidData(data, broker, origin)
+  ): ValidationResult[InvalidBlockStatus, Unit] = {
+    for {
+      _ <- validator.headerValidation.validate(block.header, blockFlow)
+      blockMsgOpt = interCliqueBroadcast(block, origin)
+      _ <- validator.checkBlockAfterHeader(block, blockFlow)
+    } yield {
+      intraCliqueBroadCast(block, blockMsgOpt, origin)
     }
   }
 
-  private def broadcast(
+  private def interCliqueBroadcast(
       block: Block,
       origin: DataOrigin
   ): Option[ByteString] = {
@@ -136,6 +124,20 @@ class BlockChainHandler(
       val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, origin)
       publishEvent(event)
       blockMessage
+    }
+  }
+
+  private def intraCliqueBroadCast(
+      block: Block,
+      blockMsgOpt: Option[ByteString],
+      origin: DataOrigin
+  ): Unit = {
+    val broadcastIntraClique = brokerConfig.brokerNum != 1
+    if (brokerConfig.contains(block.chainIndex.from) && broadcastIntraClique) {
+      val blockMsg  = blockMsgOpt.getOrElse(Message.serialize(NewBlock(block)))
+      val headerMsg = Message.serialize(NewHeader(block.header))
+      val event     = IntraCliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin)
+      publishEvent(event)
     }
   }
 

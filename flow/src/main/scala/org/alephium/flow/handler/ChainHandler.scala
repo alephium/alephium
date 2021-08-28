@@ -94,28 +94,25 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
   def chainValidationTotalLabeled: Counter.Child
   def chainValidationDurationMilliSecondsLabeled: Histogram.Child
 
-  def withValidation[R](data: T, origin: DataOrigin)(
-      validate: (T, DataOrigin) => ValidationResult[S, R]
-  ): ValidationResult[S, R] = {
+  def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
 
     chainValidationTotalLabeled.inc()
 
     val startTime           = System.nanoTime()
-    val validationResult    = validate(data, origin)
+    val validationResult    = validateWithSideEffect(data, origin)
     val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
 
     chainValidationDurationMilliSecondsLabeled.observe(elapsedMilliSeconds)
-    validationResult
-  }
 
-  def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
-    withValidation[Unit](data, origin)((data, _) => validator.validate(data, blockFlow)) match {
+    validationResult match {
       case Left(Left(e))                 => handleIOError(data, broker, e)
       case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
       case Right(_)                      => handleValidData(data, broker, origin)
     }
   }
+
+  def validateWithSideEffect(data: T, origin: DataOrigin): ValidationResult[S, Unit]
 
   def handleIOError(
       data: T,

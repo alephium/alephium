@@ -79,6 +79,13 @@ class HeaderChainHandler(
     handleData(header, broker, origin)
   }
 
+  def validateWithSideEffect(
+      header: BlockHeader,
+      origin: DataOrigin
+  ): ValidationResult[InvalidHeaderStatus, Unit] = {
+    validator.validate(header, blockFlow)
+  }
+
   override def dataAddingFailed(): Event = HeaderAddingFailed
 
   override def dataInvalid(data: BlockHeader): Event = InvalidHeader(data.hash)
