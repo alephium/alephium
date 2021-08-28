@@ -260,7 +260,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val localUnsignedGen =
           for {
             toGroupNew      <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
-            lockupScriptNew <- p2pkhLockupGen(toGroupNew)
+            lockupScriptNew <- assetLockupGen(toGroupNew)
             selected        <- Gen.choose(0, outputs.length - 1)
           } yield {
             val outputNew  = outputs(selected).copy(lockupScript = lockupScriptNew)

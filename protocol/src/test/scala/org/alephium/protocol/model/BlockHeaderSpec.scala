@@ -19,15 +19,12 @@ package org.alephium.protocol.model
 import org.alephium.protocol.{BlockHash, Hash, ModelSnapshotsHelper}
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
-import org.alephium.util.U256
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class BlockHeaderSpec
     extends AlephiumSpec
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture.Default
-    with ModelSnapshotsHelper {
-  implicit val basePath = "src/test/resources/models/blockheader"
+    with ConsensusConfigFixture.Default {
 
   it should "have correct data" in {
     for {
@@ -87,7 +84,9 @@ class BlockHeaderSpec
     header.version is 0.toByte
   }
 
-  it should "serialize and deserialize properly" in {
+  it should "serde the snapshots properly" in new ModelSnapshotsHelper {
+    implicit val basePath = "src/test/resources/models/blockheader"
+
     import Hex._
 
     groups is 3

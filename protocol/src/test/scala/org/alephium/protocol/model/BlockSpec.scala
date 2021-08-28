@@ -21,11 +21,11 @@ import scala.util.Random
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
-import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{ALF, BlockHash, Hash, ModelSnapshotsHelper, PublicKey, Signature}
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.vm.{GasPrice, LockupScript, StatefulScript}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkConfigFixture.Default {
   it should "serde" in {

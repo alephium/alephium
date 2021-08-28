@@ -39,7 +39,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     for {
       groupIndex    <- groupIndexGen
       outputRef     <- contractOutputRefGen(groupIndex)
-      output        <- contractOutputGen()
+      output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
       contractState <- counterStateGen
     } yield (counterContract.toHalfDecoded(), contractState, outputRef, output)
   }

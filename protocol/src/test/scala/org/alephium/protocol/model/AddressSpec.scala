@@ -107,10 +107,11 @@ class AddressSpec extends AlephiumSpec {
 
   sealed trait AddressVerify {
     val address: String
-    def script(): LockupScript
+    def script: LockupScript
 
     def ok(): Assertion = {
-      verifyScript(address, script())
+      Address.from(script).toBase58 is address
+      Address.fromBase58(address).value.lockupScript is script
     }
   }
 
@@ -122,7 +123,7 @@ class AddressSpec extends AlephiumSpec {
       copy(pubKey = Some(key))
     }
 
-    def script() = {
+    def script = {
       LockupScript.p2pkh(PublicKey.unsafe(Hex.from(pubKey.value).value))
     }
   }
@@ -140,7 +141,7 @@ class AddressSpec extends AlephiumSpec {
       copy(pubKeys = AVector.from(keys))
     }
 
-    def script() = {
+    def script = {
       val keys = pubKeys.map(key => PublicKey.unsafe(Hex.from(key).value))
       LockupScript.p2mpkh(keys, m.value).value
     }
@@ -154,7 +155,7 @@ class AddressSpec extends AlephiumSpec {
       copy(contractId = Some(id))
     }
 
-    def script() = {
+    def script = {
       LockupScript.p2c(Hash.from(contractId.value).value)
     }
   }
@@ -167,13 +168,8 @@ class AddressSpec extends AlephiumSpec {
       copy(scriptHash = Some(hash))
     }
 
-    def script() = {
+    def script = {
       LockupScript.p2sh(Hash.from(scriptHash.value).value)
     }
-  }
-
-  def verifyScript(address: String, script: LockupScript): Assertion = {
-    Address.from(script).toBase58 is address
-    Address.fromBase58(address).value.lockupScript is script
   }
 }

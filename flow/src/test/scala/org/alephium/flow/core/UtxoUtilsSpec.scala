@@ -254,7 +254,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       AssetOutputInfo(ref, output, PersistedOutput)
     }
 
-    val defaultLockupScript = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.get
+    val defaultLockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
 
     def buildUtxos(amounts: Int*): AVector[AssetOutputInfo] = {
       AVector.from(amounts.map { amount =>

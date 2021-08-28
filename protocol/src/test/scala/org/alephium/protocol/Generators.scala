@@ -35,6 +35,9 @@ trait Generators extends NumericHelpers {
   lazy val hashGen: Gen[Hash] =
     Gen.const(()).map(_ => Hash.generate)
 
+  lazy val blockHashGen: Gen[BlockHash] =
+    Gen.const(()).map(_ => BlockHash.generate)
+
   def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
     Gen.choose(0, config.groups - 1).map(GroupIndex.unsafe)
 
