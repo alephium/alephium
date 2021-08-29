@@ -48,7 +48,7 @@ class AddressSpec extends AlephiumSpec {
       "2jjvDdgGjC6X9HHMCMHohVfvp1uf3LHQrAGWaufR17P7AFwtxodTxSktqKc2urNEtaoUCy5xXpBUwpZ8QM8Q3e5BYCx"
     )
       .threshold(1)
-      .publicKey(
+      .publicKeys(
         "02a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd10",
         "03c83325bd2c0fe1464161c6d5f42699fc9dd799dda7f984f9fbf59b01b095be19"
       )
@@ -58,7 +58,7 @@ class AddressSpec extends AlephiumSpec {
       "2jjvDdgGjC6X9HHMCMHohVfvp1uf3LHQrAGWaufR17P7AFwtxodTxSktqKc2urNEtaoUCy5xXpBUwpZ8QM8Q3e5BYCy"
     )
       .threshold(2)
-      .publicKey(
+      .publicKeys(
         "02a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd10",
         "03c83325bd2c0fe1464161c6d5f42699fc9dd799dda7f984f9fbf59b01b095be19"
       )
@@ -68,7 +68,7 @@ class AddressSpec extends AlephiumSpec {
       "X3RMnvb8h3RFrrbBraEouAWU9Ufu4s2WTXUQfLCvDtcmqCWRwkVLc69q2NnwYW2EMwg4QBN2UopkEmYLLLgHP9TQ38FK15RnhhEwguRyY6qCuAoRfyjHRnqYnTvfypPgD7w1ku"
     )
       .threshold(2)
-      .publicKey(
+      .publicKeys(
         "02a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd10",
         "03c83325bd2c0fe1464161c6d5f42699fc9dd799dda7f984f9fbf59b01b095be19",
         "026a1552ddf754abbfed6784f709fc94b7fe96049939986ea31e46238849953d18"
@@ -137,7 +137,7 @@ class AddressSpec extends AlephiumSpec {
       copy(m = Some(threshold))
     }
 
-    def publicKey(keys: String*) = {
+    def publicKeys(keys: String*) = {
       copy(pubKeys = AVector.from(keys))
     }
 

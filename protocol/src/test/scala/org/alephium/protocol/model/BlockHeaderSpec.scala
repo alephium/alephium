@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{BlockHash, Hash, ModelSnapshotsHelper}
+import org.alephium.protocol.{BlockHash, Hash, ModelSnapshots}
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
@@ -84,7 +84,7 @@ class BlockHeaderSpec
     header.version is 0.toByte
   }
 
-  it should "serde the snapshots properly" in new ModelSnapshotsHelper {
+  it should "serde the snapshots properly" in new ModelSnapshots {
     implicit val basePath = "src/test/resources/models/blockheader"
 
     import Hex._

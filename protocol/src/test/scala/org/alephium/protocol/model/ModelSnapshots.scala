@@ -19,18 +19,18 @@ package org.alephium.protocol
 import java.nio.file.{Files, Path, Paths}
 
 import akka.util.ByteString
+import org.scalatest.OptionValues
 
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, Hex}
+import org.alephium.util.{AlephiumFixture, Hex}
 
-trait ModelSnapshotsHelper extends AlephiumSpec {
+trait ModelSnapshots extends AlephiumFixture with OptionValues {
   implicit class SnapshotVerifier[T: Serde](model: T)(implicit
       baseDir: String
   ) {
     def verify(name: String): ByteString = {
       val filePath = Paths.get(s"$baseDir/$name.serialized.txt")
       if (!Files.exists(filePath)) {
-        info(s"New snapshot file ${filePath.toString} is created.")
         serializeAndWrite(filePath)
       }
 

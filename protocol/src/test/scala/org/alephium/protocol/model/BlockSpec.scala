@@ -152,7 +152,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
     }
   }
 
-  it should "seder the snapshots properly" in new ModelSnapshotsHelper {
+  it should "seder the snapshots properly" in new ModelSnapshots {
     implicit val basePath = "src/test/resources/models/block"
 
     import Hex._
