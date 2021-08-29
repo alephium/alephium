@@ -46,7 +46,6 @@ object WalletGen extends App {
     }
   }
 
-  // scalastyle:off regex
   Seq[(NetworkId, Int)](NetworkId(1) -> 4, NetworkId(2) -> 3).foreach {
     case (networkId, groupNum) =>
       printLine(networkId.networkType.name)
@@ -62,9 +61,5 @@ object WalletGen extends App {
         printLine(s"mnemonic: ${mnemonic.toLongString}")
       }
       printLine("")
-  }
-
-  def printLine(text: String): Unit = {
-    print(text + "\n")
   }
 }

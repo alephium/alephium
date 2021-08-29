@@ -21,10 +21,10 @@ import java.math.BigInteger
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
-import org.alephium.util.{Duration, TimeStamp, U256}
+import org.alephium.util.{Duration, Math, TimeStamp, U256}
 
 class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
-  import Emission.{yearsUntilStable, yearsUntilNoReward}
+  import Emission.{yearsUntilNoReward, yearsUntilStable}
 
   // scalastyle:off magic.number
   val blocksInAboutOneYearPerChain: Long =
@@ -35,13 +35,16 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   val durationToNoReward: Duration        = blockTargetTime.timesUnsafe(blocksToNoReward)
   // scalastyle:on magic.number
 
-  val initialMaxRewardPerChain: U256         = share(Emission.initialMaxReward)
-  val stableMaxRewardPerChain: U256          = share(Emission.stableMaxReward)
-  val lowHashRateInitialRewardPerChain: U256 = share(Emission.lowHashRateInitialReward)
+  val initialMaxRewardPerChain: U256         = shareReward(Emission.initialMaxReward)
+  val stableMaxRewardPerChain: U256          = shareReward(Emission.stableMaxReward)
+  val lowHashRateInitialRewardPerChain: U256 = shareReward(Emission.lowHashRateInitialReward)
 
-  val onePhPerSecondDivided: Target  = share(Target.from(HashRate.onePhPerSecond, blockTargetTime))
-  val oneEhPerSecondDivided: Target  = share(Target.from(HashRate.oneEhPerSecond, blockTargetTime))
-  val a128EhPerSecondDivided: Target = share(Target.from(HashRate.a128EhPerSecond, blockTargetTime))
+  val onePhPerSecondDivided: Target =
+    Target.from(shareHashRate(HashRate.onePhPerSecond), blockTargetTime)
+  val oneEhPerSecondDivided: Target =
+    Target.from(shareHashRate(HashRate.oneEhPerSecond), blockTargetTime)
+  val a128EhPerSecondDivided: Target =
+    Target.from(shareHashRate(HashRate.a128EhPerSecond), blockTargetTime)
 
   val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
     .subUnsafe(stableMaxRewardPerChain)
@@ -52,22 +55,23 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   val blocksToDropAboutOneCent: Long        = blocksInAboutOneYearPerChain / yearlyCentsDropUntilStable
   val durationToDropAboutOnceCent: Duration = blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
 
-  def share(amount: U256): U256 =
+  def shareReward(amount: U256): U256 =
     amount.divUnsafe(U256.unsafe(groupConfig.chainNum))
 
-  def share(target: Target): Target =
-    Target.unsafe(target.value.divide(BigInteger.valueOf(groupConfig.chainNum.toLong)))
+  def shareHashRate(hashRate: HashRate): HashRate =
+    HashRate.unsafe(hashRate.value.divide(BigInteger.valueOf(groupConfig.chainNum.toLong)))
 
   def miningReward(header: BlockHeader): U256 =
     reward(header.target, header.timestamp, ALF.LaunchTimestamp)
 
   def reward(target: Target, blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
-    val maxReward      = rewardMax(blockTs, launchTs)
-    val adjustedReward = rewardWrtTarget(target)
-    if (maxReward > adjustedReward) adjustedReward else maxReward
+    val timeBasedReward = rewardWrtTime(blockTs, launchTs)
+    val adjustedReward  = rewardWrtTarget(target)
+    Math.min(timeBasedReward, adjustedReward)
   }
 
-  def rewardMax(blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
+  // mining reward with respect to time
+  def rewardWrtTime(blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
     require(blockTs >= launchTs)
     val elapsed = blockTs.deltaUnsafe(launchTs)
     if (elapsed >= durationToNoReward) {
@@ -80,6 +84,7 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     }
   }
 
+  // mining reward with respect to target (or hash rate)
   def rewardWrtTarget(target: Target): U256 = {
     if (target >= onePhPerSecondDivided) {
       val rewardPlus =
@@ -137,6 +142,35 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     val powTarget = Target.from(HashRate.unsafe(powHashRate), blockTargetTime)
     powTarget
   }
+
+  private def calRewardsPerYear(rewardPerChain: U256) = {
+    val rewardAllChains = rewardPerChain.mulUnsafe(U256.unsafe(groupConfig.chainNum))
+    rewardAllChains.mulUnsafe(U256.unsafe(blocksInAboutOneYearPerChain))
+  }
+
+  // scalastyle:off magic.number
+  def rewardsWrtTime(): IndexedSeq[(Int, U256)] = {
+    (0 to yearsUntilNoReward).map { k =>
+      val time0          = ALF.LaunchTimestamp.plusHoursUnsafe((k * 24 * 365).toLong)
+      val time1          = ALF.LaunchTimestamp.plusHoursUnsafe(((k + 1) * 24 * 365).toLong)
+      val reward0        = rewardWrtTime(time0, ALF.LaunchTimestamp)
+      val reward1        = rewardWrtTime(time1, ALF.LaunchTimestamp)
+      val rewardPerChain = reward0.addUnsafe(reward1).divUnsafe(U256.Two)
+      val rewardsPerYear = calRewardsPerYear(rewardPerChain)
+      (k + 1) -> rewardsPerYear
+    }
+  }
+
+  def rewardsWrtTarget(): IndexedSeq[(HashRate, U256)] = {
+    (10 to 67).map { order =>
+      val hashRate       = HashRate.unsafe(BigInteger.ONE.shiftLeft(order))
+      val target         = Target.from(shareHashRate(hashRate), blockTargetTime)
+      val rewardPerChain = rewardWrtTarget(target)
+      val rewardsPerYear = calRewardsPerYear(rewardPerChain)
+      hashRate -> rewardsPerYear
+    }
+  }
+  // scalastyle:on magic.number
 }
 
 object Emission {
