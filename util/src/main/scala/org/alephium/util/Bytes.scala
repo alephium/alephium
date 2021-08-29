@@ -29,6 +29,15 @@ object Bytes {
     ByteString((value >> 24).toByte, (value >> 16).toByte, (value >> 8).toByte, value.toByte)
   }
 
+  def toBytes(value: Int): ByteString = {
+    ByteString(
+      (value >> 24).toByte,
+      (value >> 16).toByte,
+      (value >> 8).toByte,
+      value.toByte
+    )
+  }
+
   def toIntUnsafe(bytes: ByteString): Int = {
     assume(bytes.length == 4)
     bytes(0) << 24 | (bytes(1) & 0xff) << 16 | (bytes(2) & 0xff) << 8 | (bytes(3) & 0xff)

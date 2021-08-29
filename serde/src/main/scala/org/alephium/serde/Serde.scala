@@ -261,7 +261,7 @@ object Serde extends ProductSerde {
     }
   }
 
-  private[serde] class BatchDeserializer[T: ClassTag](deserializer: Deserializer[T]) {
+  class BatchDeserializer[T: ClassTag](deserializer: Deserializer[T]) {
     @tailrec
     private def __deserializeSeq[C <: IndexedSeq[T]](
         rest: ByteString,
@@ -326,7 +326,7 @@ object Serde extends ProductSerde {
 
   def bytesSerde(bytes: Int): Serde[ByteString] =
     new FixedSizeSerde[ByteString] {
-      override val serdeSize: Int = bytes
+      def serdeSize: Int = bytes
 
       override def serialize(bs: ByteString): ByteString = {
         assume(bs.length == serdeSize)
