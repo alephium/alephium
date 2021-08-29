@@ -20,13 +20,13 @@ import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
-import org.alephium.protocol.Hash
+import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Transaction}
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{ActorRefT, AVector, TimeStamp}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
+import org.alephium.util.ActorRefT
 
 class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   trait Fixture extends FlowFixture {
@@ -60,36 +60,18 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     def headerMsg(header: BlockHeader): ByteString = Message.serialize(NewHeader(header))
   }
 
-  it should "not broadcast block if the block comes from other broker groups" in new Fixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.groups", 4),
-      ("alephium.broker.broker-num", 2),
-      ("alephium.broker.broker-id", 0)
-    )
-
-    def createBlock(chainIndex: ChainIndex): Block = {
-      assume(brokerConfig.contains(chainIndex.to) && !brokerConfig.contains(chainIndex.from))
-      val mainGroup = chainIndex.from
-      val inDeps =
-        blockFlow.initialGenesisHashes.filter(hash => ChainIndex.from(hash).from != mainGroup)
-      val outDeps      = blockFlow.genesisHashes(mainGroup.value)
-      val blockTs      = TimeStamp.now()
-      val (_, pubKey)  = mainGroup.generateKey
-      val lockupScript = LockupScript.p2pkh(pubKey)
-      val coinbaseTx = Transaction.coinbase(
-        chainIndex,
-        AVector.empty[Transaction],
-        lockupScript,
-        consensusConfig.maxMiningTarget,
-        blockTs
+  it should "not broadcast block if the block comes from other broker groups" in new Fixture { F =>
+    val fixture = new AlephiumConfigFixture {
+      override val configValues = Map(
+        ("alephium.broker.broker-id", 1)
       )
-      val txs         = AVector(coinbaseTx)
-      val txsHash     = Block.calTxsHash(txs)
-      val blockHeader = mineHeader(chainIndex, inDeps ++ outDeps, Hash.generate, txsHash, blockTs)
-      Block(blockHeader, txs)
+      override lazy val genesisKeys = F.genesisKeys
     }
+    val blockFlow1 = BlockFlow.fromGenesisUnsafe(fixture.config, storages)
+    blockFlow.brokerConfig.brokerId is 0
+    blockFlow1.brokerConfig.brokerId is 1
 
-    val block = createBlock(ChainIndex.unsafe(1, 0))
+    val block = emptyBlock(blockFlow1, ChainIndex.unsafe(1, 0))
     validateBlock(block)
     interCliqueListener.expectNoMessage()
     intraCliqueListener.expectNoMessage()
