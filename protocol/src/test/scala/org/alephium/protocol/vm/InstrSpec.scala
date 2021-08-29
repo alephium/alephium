@@ -58,6 +58,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
       I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
       ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
+      IsAssetAddress, IsContractAddress,
       Jump(int), IfTrue(int), IfFalse(int),
       CallLocal(byte), Return,
       Assert,

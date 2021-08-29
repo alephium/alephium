@@ -554,6 +554,8 @@ class VMSpec extends AlephiumSpec {
          |    assert!(callerAddress!() == barAddress)
          |    assert!(callerInitialStateHash!() == barHash)
          |    assert!(isCalledFromTxScript!() == false)
+         |    assert!(isAssetAddress!(barAddress) == false)
+         |    assert!(isContractAddress!(barAddress) == true)
          |  }
          |}
          |""".stripMargin
@@ -570,6 +572,8 @@ class VMSpec extends AlephiumSpec {
          |    Foo(#$fooId).foo(fooId, fooHash, barId, barHash, barAddress)
          |    assert!(isCalledFromTxScript!() == true)
          |    assert!(isPaying!(@$genesisAddress) == false)
+         |    assert!(isAssetAddress!(@$genesisAddress) == true)
+         |    assert!(isContractAddress!(@$genesisAddress) == false)
          |  }
          |}
          |
