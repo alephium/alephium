@@ -400,7 +400,7 @@ object Serde extends ProductSerde {
     override val serdeSize: Int = 8
 
     override def serialize(input: TimeStamp): ByteString = {
-      Bytes.toBytes(input.millis)
+      Bytes.from(input.millis)
     }
 
     override def deserialize(input: ByteString): SerdeResult[TimeStamp] = {

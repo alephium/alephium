@@ -31,7 +31,7 @@ import org.alephium.util.{AVector, Bytes}
 sealed trait Message
 object Message {
   implicit val simpleIntSerde: Serde[Int] =
-    Serde.bytesSerde(4).xmap(Bytes.toIntUnsafe, Bytes.toBytes)
+    Serde.bytesSerde(4).xmap(Bytes.toIntUnsafe, Bytes.from)
   implicit val bytestringSerde: Serde[ByteString] = new Serde[ByteString] {
     def serialize(input: ByteString): ByteString =
       simpleIntSerde.serialize(input.length) ++ input
