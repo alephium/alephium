@@ -34,13 +34,22 @@ class SmartContractTest extends AlephiumActorSpec {
     val index      = group.group % selfClique.brokerNum
     val restPort   = selfClique.nodes(index).restPort
 
-    def contract(code: String, state: Option[String] = None): Hash = {
-      execute("contract", code, state)
+    def contract(
+        code: String,
+        state: Option[String] = None,
+        issueTokenAmount: Option[U256]
+    ): Hash = {
+      execute("contract", code, state, issueTokenAmount)
     }
     def script(code: String): Hash = {
-      execute("script", code, None)
+      execute("script", code, None, None)
     }
-    def execute(tpe: String, code: String, state: Option[String]): Hash = {
+    def execute(
+        tpe: String,
+        code: String,
+        state: Option[String],
+        issueTokenAmount: Option[U256]
+    ): Hash = {
       val compileResult = request[CompileResult](
         compileFilang(s"""
           {
@@ -48,6 +57,7 @@ class SmartContractTest extends AlephiumActorSpec {
             "address": "$address",
             "code": ${ujson.Str(code)}
             ${state.map(s => s""","state": "$s"""").getOrElse("")}
+            ${issueTokenAmount.map(v => s""","issueTokenAmount":"${v.v}"""").getOrElse("")}
           }"""),
         restPort
       )
@@ -85,9 +95,6 @@ class SmartContractTest extends AlephiumActorSpec {
 
     val tokenContract = s"""
       |TxContract Token(mut x: U256) {
-      |  pub payable fn issue(amount: U256) -> () {
-      |    issueToken!(amount)
-      |  }
       |
       | pub payable fn withdraw(address: Address, amount: U256) -> () {
       |   transferTokenFromSelf!(address, selfTokenId!(), amount)
@@ -95,18 +102,7 @@ class SmartContractTest extends AlephiumActorSpec {
       |}
       """.stripMargin
 
-    val tokenContractKey = contract(tokenContract)
-
-    script(s"""
-      |TxScript Main {
-      |  pub payable fn main() -> () {
-      |    let token = Token(#${tokenContractKey.toHexString})
-      |    token.issue(1024)
-      |  }
-      |}
-      |
-      |$tokenContract
-      |""".stripMargin)
+    val tokenContractKey = contract(tokenContract, issueTokenAmount = Some(1024))
 
     script(s"""
       |TxScript Main {
@@ -123,9 +119,6 @@ class SmartContractTest extends AlephiumActorSpec {
       |// Simple swap contract purely for testing
       |
       |TxContract Swap(tokenId: ByteVec, mut alfReserve: U256, mut tokenReserve: U256) {
-      |  pub payable fn setup() -> () {
-      |    issueToken!(10000)
-      |  }
       |
       |  pub payable fn addLiquidity(lp: Address, alfAmount: U256, tokenAmount: U256) -> () {
       |    transferAlfToSelf!(lp, alfAmount)
@@ -154,19 +147,9 @@ class SmartContractTest extends AlephiumActorSpec {
 
     val swapContractKey = contract(
       swapContract,
-      Some(s"[#${tokenContractKey.toHexString},0,0]")
+      Some(s"[#${tokenContractKey.toHexString},0,0]"),
+      issueTokenAmount = Some(10000)
     )
-
-    script(s"""
-      |TxScript Main {
-      |  pub payable fn main() -> () {
-      |    let swap = Swap(#${swapContractKey.toHexString})
-      |    swap.setup()
-      |  }
-      |}
-      |
-      |$swapContract
-      |""".stripMargin)
 
     script(s"""
       |TxScript Main {

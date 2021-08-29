@@ -116,7 +116,7 @@ object Instr {
     LoadField, StoreField, CallExternal,
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-    CreateContract, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress, IssueToken,
+    CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
   )
   // format: on
@@ -1058,11 +1058,21 @@ sealed trait ContractInstr
     with StatefulInstrCompanion0
     with GasSimple {}
 
-object CreateContract extends ContractInstr with GasCreate {
+sealed trait CreateContractAbstract extends ContractInstr with GasCreate {
+  @inline protected def getTokenAmount[C <: StatefulContext](
+      frame: Frame[C],
+      issueToken: Boolean
+  ): ExeResult[Option[Val.U256]] = {
+    if (issueToken) frame.popOpStackT[Val.U256]().map(Some(_)) else Right(None)
+  }
+}
+
+sealed trait CreateContractBase extends CreateContractAbstract {
   val fieldsSerde: Serde[AVector[Val]] = serdeImpl[AVector[Val]]
 
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
+      tokenAmount     <- getTokenAmount(frame, issueToken)
       fields          <- frame.popFields()
       contractCodeRaw <- frame.popOpStackT[Val.ByteVec]()
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
@@ -1072,15 +1082,28 @@ object CreateContract extends ContractInstr with GasCreate {
       _ <- {
         val initialStateHash =
           Hash.doubleHash(contractCodeRaw.bytes ++ fieldsSerde.serialize(fields))
-        frame.createContract(contractCode.toHalfDecoded(), initialStateHash, fields)
+        frame.createContract(contractCode.toHalfDecoded(), initialStateHash, fields, tokenAmount)
       }
     } yield ()
   }
 }
 
-object CopyCreateContract extends ContractInstr with GasCreate {
+object CreateContract extends CreateContractBase {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = false)
+  }
+}
+
+object CreateContractWithToken extends CreateContractBase {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = true)
+  }
+}
+
+sealed trait CopyCreateContractBase extends CreateContractAbstract {
+  def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
+      tokenAmount <- getTokenAmount(frame, issueToken)
       fields      <- frame.popFields()
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
@@ -1088,9 +1111,21 @@ object CopyCreateContract extends ContractInstr with GasCreate {
         val contractCodeBytes = encode(contractObj.code)
         val initialStateHash =
           Hash.doubleHash(contractCodeBytes ++ CreateContract.fieldsSerde.serialize(fields))
-        frame.createContract(contractObj.code, initialStateHash, fields)
+        frame.createContract(contractObj.code, initialStateHash, fields, tokenAmount)
       }
     } yield ()
+  }
+}
+
+object CopyCreateContract extends CopyCreateContractBase {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = false)
+  }
+}
+
+object CopyCreateContractWithToken extends CopyCreateContractBase {
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = true)
   }
 }
 
@@ -1119,20 +1154,6 @@ object SelfContractId extends ContractInstr with GasVeryLow {
     for {
       contractId <- frame.obj.getContractId()
       _          <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
-    } yield ()
-  }
-}
-
-object IssueToken extends ContractInstr with GasBalance {
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      _          <- Either.cond(frame.method.isPayable, (), Right(ExpectNonPayableMethod))
-      contractId <- frame.obj.getContractId()
-      amount     <- frame.popOpStackT[Val.U256]()
-      tokenId = contractId // tokenId is addressHash
-      _ <- frame.ctx.outputBalances
-        .addToken(LockupScript.p2c(contractId), tokenId, amount.v)
-        .toRight(Right(BalanceOverflow))
     } yield ()
   }
 }

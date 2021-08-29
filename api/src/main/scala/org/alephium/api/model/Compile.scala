@@ -17,11 +17,13 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.model.Address
+import org.alephium.util.U256
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Compile(
     address: Address,
     `type`: String,
     code: String,
-    state: Option[String] = None
+    state: Option[String] = None,
+    issueTokenAmount: Option[U256] = None
 )

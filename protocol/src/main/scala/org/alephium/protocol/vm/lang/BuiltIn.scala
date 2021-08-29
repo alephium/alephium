@@ -280,12 +280,28 @@ object BuiltIn {
       CreateContract
     )
 
+  val createContractWithToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "createContractWithToken",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+      Seq.empty,
+      CreateContractWithToken
+    )
+
   val copyCreateContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "copyCreateContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq.empty,
       CopyCreateContract
+    )
+
+  val copyCreateContractWithToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "copyCreateContractWithToken",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+      Seq.empty,
+      CopyCreateContractWithToken
     )
 
   val destroySelf: SimpleStatefulBuiltIn =
@@ -304,9 +320,6 @@ object BuiltIn {
 
   val selfTokenId: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfTokenId", Seq.empty, Seq(Type.ByteVec), SelfContractId)
-
-  val issueToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("issueToken", Seq(Type.U256), Seq.empty, IssueToken)
 
   val callerContractId: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("callerContractId", Seq.empty, Seq(Type.ByteVec), CallerContractId)
@@ -347,12 +360,13 @@ object BuiltIn {
       transferTokenFromSelf,
       transferTokenToSelf,
       createContract,
+      createContractWithToken,
       copyCreateContract,
+      copyCreateContractWithToken,
       destroySelf,
       selfAddress,
       selfContractId,
       selfTokenId,
-      issueToken,
       callerContractId,
       callerAddress,
       isCalledFromTxScript,

@@ -100,9 +100,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
       initialBalances: BalancesPerLockup,
-      initialFields: AVector[Val]
+      initialFields: AVector[Val],
+      tokenAmount: Option[Val.U256]
   ): ExeResult[Unit] = {
     val contractId = TxOutputRef.key(txId, nextOutputIndex)
+    tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
       initialBalances.alfAmount,
       LockupScript.p2c(contractId),
