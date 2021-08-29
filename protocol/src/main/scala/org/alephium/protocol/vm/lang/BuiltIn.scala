@@ -176,6 +176,22 @@ object BuiltIn {
   val size: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("size", Seq[Type](Type.ByteVec), Seq[Type](Type.U256), ByteVecSize)
 
+  val isAssetAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "isAssetAddress",
+      Seq[Type](Type.Address),
+      Seq[Type](Type.Bool),
+      IsAssetAddress
+    )
+
+  val isContractAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "isContractAddress",
+      Seq[Type](Type.Address),
+      Seq[Type](Type.Bool),
+      IsContractAddress
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -196,7 +212,9 @@ object BuiltIn {
     toI256,
     toU256,
     toByteVec,
-    size
+    size,
+    isAssetAddress,
+    isContractAddress
   ).map(f => f.name -> f).toMap
 
   val approveAlf: SimpleStatefulBuiltIn =

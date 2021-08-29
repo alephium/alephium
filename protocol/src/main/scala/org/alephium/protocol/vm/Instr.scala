@@ -104,6 +104,7 @@ object Instr {
     U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
     I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
     ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
+    IsAssetAddress, IsContractAddress,
     Jump, IfTrue, IfFalse,
     CallLocal, Return,
     Assert,
@@ -658,12 +659,29 @@ case object AddressEq        extends EqT[Val.Address]
 case object AddressNeq       extends NeT[Val.Address]
 case object AddressToByteVec extends ToByteVecInstr[Val.Address, Val.ByteVec]
 
-sealed trait ObjectInstr   extends StatelessInstr with GasSchedule {}
-sealed trait NewBooleanVec extends ObjectInstr with GasSchedule    {}
-sealed trait NewByteVec    extends ObjectInstr with GasSchedule    {}
-sealed trait NewI256Vec    extends ObjectInstr with GasSchedule    {}
-sealed trait NewU256Vec    extends ObjectInstr with GasSchedule    {}
-sealed trait NewByte256Vec extends ObjectInstr with GasSchedule    {}
+case object IsAssetAddress
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasLow {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.popOpStackT[Val.Address]()
+      _       <- frame.pushOpStack(Val.Bool(address.lockupScript.isAssetType))
+    } yield ()
+  }
+}
+
+case object IsContractAddress
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasLow {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.popOpStackT[Val.Address]()
+      _       <- frame.pushOpStack(Val.Bool(!address.lockupScript.isAssetType))
+    } yield ()
+  }
+}
 
 sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh {
   def code: Byte
