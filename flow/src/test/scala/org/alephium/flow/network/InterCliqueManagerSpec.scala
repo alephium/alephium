@@ -32,7 +32,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.SyncedResult
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, OutboundConnection}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
+import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
 import org.alephium.util._
 
@@ -316,6 +316,12 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     val message = genBroadCastBlock(ChainIndex.unsafe(0, 1), DataOrigin.Local)
     interCliqueManager ! message
+    broker0.expectNoMessage()
+    broker1.expectNoMessage()
+    broker2.expectNoMessage()
+
+    interCliqueManager.underlyingActor.lastNodeSyncedStatus = Some(true)
+    interCliqueManager ! message
     broker0.expectMsg(BrokerHandler.Send(message.blockMsg))
     broker1.expectNoMessage()
     broker2.expectNoMessage()
@@ -348,6 +354,13 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManager ! message
     broker0.expectNoMessage()
     broker1.expectNoMessage()
+    broker2.expectNoMessage()
+    broker3.expectNoMessage()
+
+    interCliqueManager.underlyingActor.lastNodeSyncedStatus = Some(true)
+    interCliqueManager ! message
+    broker0.expectNoMessage()
+    broker1.expectNoMessage()
     broker2.expectMsg(BrokerHandler.RelayBlock(message.block.hash))
     broker3.expectNoMessage()
   }
@@ -377,7 +390,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     val txHashes   = AVector.fill(4)(Hash.generate)
     val chainIndex = ChainIndex.unsafe(0, 1)
-    val message    = CliqueManager.BroadCastTx(AVector((chainIndex, txHashes)))
+    val message    = InterCliqueManager.BroadCastTx(AVector((chainIndex, txHashes)))
     interCliqueManager ! message
     broker0.expectMsg(BrokerHandler.RelayTxs(AVector((chainIndex, txHashes))))
     broker1.expectNoMessage()
@@ -404,14 +417,12 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     def genBroadCastBlock(
         chainIndex: ChainIndex,
         origin: DataOrigin
-    ): CliqueManager.BroadCastBlock = {
+    ): InterCliqueManager.BroadCastBlock = {
       val block = emptyBlock(blockFlow, chainIndex)
-      CliqueManager.BroadCastBlock(
+      InterCliqueManager.BroadCastBlock(
         block,
         Message.serialize(NewBlock(block)),
-        Message.serialize(NewHeader(block.header)),
-        origin,
-        broadcastInterClique = true
+        origin
       )
     }
   }

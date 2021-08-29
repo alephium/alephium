@@ -17,12 +17,13 @@
 package org.alephium.flow.handler
 
 import akka.actor.Props
+import akka.util.ByteString
 import io.prometheus.client.{Counter, Gauge, Histogram}
 
-import org.alephium.flow.core.{BlockFlow, BlockHashChain}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
+import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
@@ -86,7 +87,7 @@ class BlockChainHandler(
     brokerConfig: BrokerConfig,
     val consensusConfig: ConsensusConfig,
     networkSetting: NetworkSetting
-) extends ChainHandler[Block, InvalidBlockStatus, BlockChainHandler.Command](
+) extends ChainHandler[Block, InvalidBlockStatus, BlockValidation](
       blockFlow,
       chainIndex,
       BlockValidation.build
@@ -95,30 +96,48 @@ class BlockChainHandler(
     with InterCliqueManager.NodeSyncStatus {
   import BlockChainHandler._
 
-  val headerChain: BlockHashChain = blockFlow.getHashChain(chainIndex)
-
   override def receive: Receive = validate orElse updateNodeSyncStatus
 
   def validate: Receive = { case Validate(block, broker, origin) =>
     handleData(block, broker, origin)
   }
 
-  override def broadcast(block: Block, origin: DataOrigin): Unit = {
-    if (brokerConfig.contains(block.chainIndex.from)) {
-      val broadcastIntraClique = brokerConfig.brokerNum != 1
-      if (isNodeSynced || broadcastIntraClique) {
-        val blockMessage  = Message.serialize(NewBlock(block))
-        val headerMessage = Message.serialize(NewHeader(block.header))
-        val event =
-          CliqueManager.BroadCastBlock(
-            block,
-            blockMessage,
-            headerMessage,
-            origin,
-            isNodeSynced
-          )
-        publishEvent(event)
-      }
+  def validateWithSideEffect(
+      block: Block,
+      origin: DataOrigin
+  ): ValidationResult[InvalidBlockStatus, Unit] = {
+    for {
+      _ <- validator.headerValidation.validate(block.header, blockFlow)
+      blockMsgOpt = interCliqueBroadcast(block, origin)
+      _ <- validator.checkBlockAfterHeader(block, blockFlow)
+    } yield {
+      intraCliqueBroadCast(block, blockMsgOpt, origin)
+    }
+  }
+
+  private def interCliqueBroadcast(
+      block: Block,
+      origin: DataOrigin
+  ): Option[ByteString] = {
+    Option.when(brokerConfig.contains(block.chainIndex.from) && isNodeSynced) {
+      val blockMessage = Message.serialize(NewBlock(block))
+      val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, origin)
+      publishEvent(event)
+      blockMessage
+    }
+  }
+
+  private def intraCliqueBroadCast(
+      block: Block,
+      blockMsgOpt: Option[ByteString],
+      origin: DataOrigin
+  ): Unit = {
+    val broadcastIntraClique = brokerConfig.brokerNum != 1
+    if (brokerConfig.contains(block.chainIndex.from) && broadcastIntraClique) {
+      val blockMsg  = blockMsgOpt.getOrElse(Message.serialize(NewBlock(block)))
+      val headerMsg = Message.serialize(NewHeader(block.header))
+      val event     = IntraCliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin)
+      publishEvent(event)
     }
   }
 

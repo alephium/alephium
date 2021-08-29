@@ -68,7 +68,7 @@ class HeaderChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex
 )(implicit brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
-    extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderChainHandler.Command](
+    extends ChainHandler[BlockHeader, InvalidHeaderStatus, HeaderValidation](
       blockFlow,
       chainIndex,
       HeaderValidation.build
@@ -79,7 +79,12 @@ class HeaderChainHandler(
     handleData(header, broker, origin)
   }
 
-  override def broadcast(header: BlockHeader, origin: DataOrigin): Unit = ()
+  def validateWithSideEffect(
+      header: BlockHeader,
+      origin: DataOrigin
+  ): ValidationResult[InvalidHeaderStatus, Unit] = {
+    validator.validate(header, blockFlow)
+  }
 
   override def dataAddingFailed(): Event = HeaderAddingFailed
 

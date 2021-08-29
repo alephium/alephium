@@ -81,10 +81,10 @@ object ChainHandler {
     .register()
 }
 
-abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
+abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Validation[T, S]](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
-    validator: Validation[T, S]
+    val validator: V
 ) extends IOBaseActor
     with Publisher {
   import ChainHandler._
@@ -100,7 +100,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
     chainValidationTotalLabeled.inc()
 
     val startTime           = System.nanoTime()
-    val validationResult    = validator.validate(data, blockFlow)
+    val validationResult    = validateWithSideEffect(data, origin)
     val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
 
     chainValidationDurationMilliSecondsLabeled.observe(elapsedMilliSeconds)
@@ -111,6 +111,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
       case Right(_)                      => handleValidData(data, broker, origin)
     }
   }
+
+  def validateWithSideEffect(data: T, origin: DataOrigin): ValidationResult[S, Unit]
 
   def handleIOError(
       data: T,
@@ -144,7 +146,6 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
 
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.info(s"${data.shortHex} is validated")
-    broadcast(data, origin)
     blockFlow.contains(data.hash) match {
       case Right(true) =>
         log.debug(s"Block/Header ${data.shortHex} exists already")
@@ -162,8 +163,6 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, Command](
   }
 
   def addDataToBlockFlow(data: T): IOResult[Unit]
-
-  def broadcast(data: T, origin: DataOrigin): Unit
 
   def notifyBroker(broker: ActorRefT[ChainHandler.Event], data: T): Unit
 

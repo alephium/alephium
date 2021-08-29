@@ -23,15 +23,18 @@ import scala.util.Random
 import akka.actor.Props
 import akka.event.LoggingAdapter
 import akka.io.Tcp
+import akka.util.ByteString
 import io.prometheus.client.Gauge
 
 import org.alephium.flow.{Utils => FlowUtils}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
+import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker._
 import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -62,6 +65,15 @@ object InterCliqueManager {
   final case object GetSyncStatuses        extends Command
   final case object IsSynced               extends Command
   final case object UpdateNodeSyncedStatus extends Command
+  final case class BroadCastBlock(
+      block: Block,
+      blockMsg: ByteString,
+      origin: DataOrigin
+  ) extends Command
+      with EventStream.Event
+  final case class BroadCastTx(hashes: AVector[(ChainIndex, AVector[Hash])])
+      extends Command
+      with EventStream.Event
 
   sealed trait Event
   final case class SyncedResult(isSynced: Boolean) extends Event with EventStream.Event
@@ -128,7 +140,8 @@ class InterCliqueManager(
     schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
-    subscribeEvent(self, classOf[CliqueManager.BroadCastTx])
+    subscribeEvent(self, classOf[InterCliqueManager.BroadCastTx])
+    subscribeEvent(self, classOf[InterCliqueManager.BroadCastBlock])
   }
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
@@ -167,10 +180,10 @@ class InterCliqueManager(
   }
 
   def handleMessage: Receive = {
-    case message: CliqueManager.BroadCastBlock =>
+    case message: InterCliqueManager.BroadCastBlock =>
       handleBroadCastBlock(message)
 
-    case CliqueManager.BroadCastTx(hashes) =>
+    case InterCliqueManager.BroadCastTx(hashes) =>
       log.debug(s"Broadcasting txs ${FlowUtils.showChainIndexedDigest(hashes)}")
       randomIterBrokers { (peerId, brokerState) =>
         if (brokerState.isSynced) {
@@ -216,21 +229,23 @@ class InterCliqueManager(
         .foreach(connectUnsafe)
   }
 
-  def handleBroadCastBlock(message: CliqueManager.BroadCastBlock): Unit = {
-    val block = message.block
-    log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
-    if (message.origin.isLocal) {
-      randomIterBrokers { (peerId, brokerState) =>
-        if (brokerState.readyFor(block.chainIndex)) {
-          log.debug(s"Send block to broker $peerId")
-          brokerState.actor ! BrokerHandler.Send(message.blockMsg)
+  def handleBroadCastBlock(message: InterCliqueManager.BroadCastBlock): Unit = {
+    if (lastNodeSyncedStatus.getOrElse(false)) {
+      val block = message.block
+      log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
+      if (message.origin.isLocal) {
+        randomIterBrokers { (peerId, brokerState) =>
+          if (brokerState.readyFor(block.chainIndex)) {
+            log.debug(s"Send block to broker $peerId")
+            brokerState.actor ! BrokerHandler.Send(message.blockMsg)
+          }
         }
-      }
-    } else {
-      randomIterBrokers { (peerId, brokerState) =>
-        if (!message.origin.isFrom(brokerState.info) && brokerState.readyFor(block.chainIndex)) {
-          log.debug(s"Send announcement to broker $peerId")
-          brokerState.actor ! BrokerHandler.RelayBlock(block.hash)
+      } else {
+        randomIterBrokers { (peerId, brokerState) =>
+          if (!message.origin.isFrom(brokerState.info) && brokerState.readyFor(block.chainIndex)) {
+            log.debug(s"Send announcement to broker $peerId")
+            brokerState.actor ! BrokerHandler.RelayBlock(block.hash)
+          }
         }
       }
     }

@@ -22,7 +22,7 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model._
@@ -50,7 +50,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val txs0 = txs.take(2)
     txs0.foreach(txHandler ! addTx(_))
     txs0.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
-    broadcastTxProbe.expectMsgPF() { case CliqueManager.BroadCastTx(hashes) =>
+    broadcastTxProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(hashes) =>
       hashes.length is 2
       hashes.contains((ChainIndex.unsafe(0, 0), AVector(txs0.head.id))) is true
       hashes.contains((ChainIndex.unsafe(1, 1), AVector(txs0.last.id))) is true
@@ -61,7 +61,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val txs1 = txs.drop(2)
     txs1.foreach(txHandler ! addTx(_))
     txs1.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
-    broadcastTxProbe.expectMsgPF() { case CliqueManager.BroadCastTx(hashes) =>
+    broadcastTxProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(hashes) =>
       hashes.length is 2
       hashes.contains((ChainIndex.unsafe(2, 2), AVector(txs1.head.id))) is true
       hashes.contains((ChainIndex.unsafe(3, 3), AVector(txs1.last.id))) is true
@@ -88,7 +88,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
-    broadcastTxProbe.expectMsg(CliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx.id)))))
+    broadcastTxProbe.expectMsg(
+      InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx.id))))
+    )
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
@@ -105,7 +107,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     txHandler ! addTx(tx0)
     expectMsg(TxHandler.AddSucceeded(tx0.id))
-    broadcastTxProbe.expectMsg(CliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx0.id)))))
+    broadcastTxProbe.expectMsg(
+      InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx0.id))))
+    )
 
     EventFilter.warning(pattern = ".*double spending.*").intercept {
       txHandler ! addTx(tx1)
@@ -167,6 +171,6 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate))
 
     val broadcastTxProbe = TestProbe()
-    system.eventStream.subscribe(broadcastTxProbe.ref, classOf[CliqueManager.BroadCastTx])
+    system.eventStream.subscribe(broadcastTxProbe.ref, classOf[InterCliqueManager.BroadCastTx])
   }
 }

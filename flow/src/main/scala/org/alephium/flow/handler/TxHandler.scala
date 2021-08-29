@@ -20,7 +20,7 @@ import akka.actor.Props
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
@@ -168,7 +168,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
           }
         }
 
-      publishEvent(CliqueManager.BroadCastTx(AVector.from(hashes)))
+      publishEvent(InterCliqueManager.BroadCastTx(AVector.from(hashes)))
       txsBuffer.clear()
     }
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
