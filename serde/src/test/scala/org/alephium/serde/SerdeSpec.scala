@@ -241,7 +241,7 @@ class SerdeSpec extends AlephiumSpec {
         val ts = TimeStamp.from(millis).get
         deserialize[TimeStamp](serialize(ts)) isE ts
       } else {
-        deserialize[TimeStamp](Bytes.toBytes(millis)).leftValue is a[SerdeError.Validation]
+        deserialize[TimeStamp](Bytes.from(millis)).leftValue is a[SerdeError.Validation]
       }
     }
 
