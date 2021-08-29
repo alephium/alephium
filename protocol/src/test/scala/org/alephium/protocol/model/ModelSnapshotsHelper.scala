@@ -30,7 +30,7 @@ trait ModelSnapshotsHelper extends AlephiumSpec {
     def verify(name: String): ByteString = {
       val filePath = Paths.get(s"$baseDir/$name.serialized.txt")
       if (!Files.exists(filePath)) {
-        info(s"New file ${filePath.toString} is created.")
+        info(s"New snapshot file ${filePath.toString} is created.")
         serializeAndWrite(filePath)
       }
 

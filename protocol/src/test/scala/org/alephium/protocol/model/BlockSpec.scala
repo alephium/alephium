@@ -166,8 +166,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
     {
       info("empty block")
 
-      val blk = block()
-      blk.verify("empty-block")
+      block().verify("empty-block")
     }
 
     {
@@ -308,6 +307,63 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
       val blk = block(transaction)
       blk.verify("txs-with-script")
+    }
+
+    {
+      info("with contract inputs and outputs")
+
+      // Pay to pubKey2
+      val address = Address.p2pkh(pubKey2).toBase58
+      def script(address: String) =
+        s"""
+         |TxScript Main {
+         | pub payable fn main() -> () {
+         |   verifyTxSignature!(#${pubKey2.toHexString})
+         |   transferAlfFromSelf!(@$address, 5)
+         | }
+         |}
+         |""".stripMargin
+
+      val transaction = {
+        val unsignedTx = unsignedTransaction(
+          pubKey1,
+          Some(script(address)),
+          AssetOutput(
+            U256.unsafe(1000),
+            p2pkh(Hash(hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f")),
+            TimeStamp.unsafe(12345),
+            tokens = AVector.empty,
+            hex"15deff667f0096ffc024ff53d6017ff5"
+          )
+        )
+
+        val signature1 = SignatureSchema.sign(unsignedTx.hash.bytes, privKey1)
+        val signature2 = SignatureSchema.sign(unsignedTx.hash.bytes, privKey2)
+
+        Transaction(
+          unsignedTx,
+          contractInputs = AVector(
+            ContractOutputRef.unsafe(
+              Hint.unsafe(-1038667620),
+              Hash(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+            )
+          ),
+          generatedOutputs = AVector(
+            AssetOutput(
+              U256.unsafe(5),
+              LockupScript.p2pkh(pubKey2),
+              TimeStamp.unsafe(12345),
+              tokens = AVector.empty,
+              hex"ff66157f00de17ff596ffc53d024ff60"
+            )
+          ),
+          inputSignatures = AVector(signature1),
+          contractSignatures = AVector(signature2)
+        )
+      }
+
+      val blk = block(transaction)
+      blk.verify("txs-with-contract-inputs-outputs")
     }
   }
 
