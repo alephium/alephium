@@ -5669,6 +5669,10 @@
           },
           "state": {
             "type": "string"
+          },
+          "issueTokenAmount": {
+            "type": "integer",
+            "format": "uint256"
           }
         }
       },
