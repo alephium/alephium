@@ -18,6 +18,9 @@ package org.alephium.protocol.mining
 
 import java.math.BigInteger
 
+import scala.io.Source
+import scala.util.Using
+
 import org.scalatest.Assertion
 
 import org.alephium.protocol.ALF
@@ -68,13 +71,15 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   it should "compute max reward based on timestamp" in new Fixture {
     import emission._
 
-    rewardMax(TimeStamp.zero, TimeStamp.zero) is initialMaxRewardPerChain
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(1 * 365 * 24), TimeStamp.zero) is
+    rewardWrtTime(TimeStamp.zero, TimeStamp.zero) is initialMaxRewardPerChain
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(1 * 365 * 24), TimeStamp.zero) is
       ALF.cent(1250)
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(2 * 365 * 24), TimeStamp.zero) is ALF.alf(10)
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(3 * 365 * 24), TimeStamp.zero) is
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(2 * 365 * 24), TimeStamp.zero) is ALF
+      .alf(10)
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(3 * 365 * 24), TimeStamp.zero) is
       ALF.cent(750)
-    rewardMax(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is ALF.alf(5)
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is ALF
+      .alf(5)
   }
 
   def halfDifficulty(target: Target): Target = {
@@ -153,5 +158,38 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
 
     check(a128EhPerSecondDivided)
     check(Target.unsafe(a128EhPerSecondDivided.value.multiply(2)))
+  }
+
+  trait InflationFixture {
+    val groupConfig: GroupConfig = new GroupConfig {
+      override def groups: Int = 4
+    }
+    val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
+    val emission: Emission        = Emission(groupConfig, blockTargetTime)
+
+    def check[T](rewards: IndexedSeq[(T, U256)], file: String, tToString: T => String): Unit = {
+      Using(Source.fromResource(file)) { source =>
+        val lines = source.getLines().toSeq
+        lines.length is rewards.length
+        lines.zipWithIndex.foreach { case (line, k) =>
+          val row                   = line.split(",").map(_.filter(!_.isWhitespace))
+          val expectedIndex         = row(0)
+          val expectedYearlyReward  = row(2)
+          val (index, yearlyReward) = rewards(k)
+          tToString(index) is expectedIndex
+          yearlyReward.v is (new BigInteger(expectedYearlyReward))
+        }
+      }.get
+    }
+  }
+
+  it should "check the hashrate-based inflation" in new InflationFixture {
+    val rewards = emission.rewardsWrtTarget()
+    check[HashRate](rewards, "hashrate-inflation.csv", _.value.bitLength().toString)
+  }
+
+  it should "check the time-based inflation" in new InflationFixture {
+    val rewards = emission.rewardsWrtTime()
+    check[Int](rewards, "time-inflation.csv", _.toString)
   }
 }
