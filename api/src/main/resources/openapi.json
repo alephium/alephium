@@ -5201,7 +5201,7 @@
             "type": "string"
           },
           "balance": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           }
         }
@@ -5265,7 +5265,7 @@
         "type": "object",
         "properties": {
           "amount": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "address": {
@@ -5306,11 +5306,11 @@
         "type": "object",
         "properties": {
           "balance": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "lockedBalance": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "utxoNum": {
@@ -5326,7 +5326,7 @@
         "type": "object",
         "properties": {
           "totalBalance": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "balances": {
@@ -5657,7 +5657,7 @@
             "type": "string"
           },
           "issueTokenAmount": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           }
         }
@@ -5720,7 +5720,7 @@
         "type": "object",
         "properties": {
           "amount": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "address": {
@@ -5756,7 +5756,7 @@
             "type": "string"
           },
           "amount": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "tokens": {
@@ -5795,7 +5795,7 @@
         "type": "object",
         "properties": {
           "value": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           }
         }
@@ -6291,7 +6291,7 @@
             "type": "string"
           },
           "amount": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           }
         }
@@ -6345,7 +6345,7 @@
             "type": "integer"
           },
           "gasPrice": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           }
         }
@@ -6396,7 +6396,7 @@
             "$ref": "#/components/schemas/OutputRef"
           },
           "amount": {
-            "type": "integer",
+            "type": "string",
             "format": "uint256"
           },
           "tokens": {
