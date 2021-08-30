@@ -35,6 +35,8 @@ trait TapirSchemasLike {
   implicit def avectorSchema[T: Schema: ClassTag]: Schema[AVector[T]] =
     implicitly[Schema[T]].asArray.map(array => Some(AVector.from(array)))(_.toArray)
   implicit val addressSchema: Schema[Address]                     = Schema(SString())
+  implicit val addressAssetSchema: Schema[Address.Asset]          = Schema(SString())
+  implicit val addressContractSchema: Schema[Address.Contract]    = Schema(SString())
   implicit val byteStringSchema: Schema[ByteString]               = Schema(SString())
   implicit val pulblicKeySchema: Schema[PublicKey]                = Schema(SString())
   implicit val groupIndexSchema: Schema[GroupIndex]               = Schema(SInteger())

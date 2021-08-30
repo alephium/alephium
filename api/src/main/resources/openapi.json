@@ -5198,7 +5198,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "balance": {
             "type": "integer",
@@ -5214,7 +5214,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "publicKey": {
             "type": "string"
@@ -5228,41 +5228,17 @@
         "type": "object",
         "properties": {
           "activeAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset"
+              "type": "string"
             }
           }
         }
       },
       "Asset": {
-        "required": [
-          "lockupScript"
-        ],
-        "type": "object",
-        "properties": {
-          "lockupScript": {
-            "$ref": "#/components/schemas/Asset1"
-          }
-        }
-      },
-      "Asset1": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/P2MPKH"
-          },
-          {
-            "$ref": "#/components/schemas/P2PKH"
-          },
-          {
-            "$ref": "#/components/schemas/P2SH"
-          }
-        ]
-      },
-      "Asset2": {
         "required": [
           "outputRef",
           "unlockScript"
@@ -5277,7 +5253,7 @@
           }
         }
       },
-      "Asset3": {
+      "Asset1": {
         "required": [
           "amount",
           "address",
@@ -5512,7 +5488,7 @@
         "type": "object",
         "properties": {
           "fromAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "fromPublicKeys": {
             "type": "array",
@@ -5562,7 +5538,7 @@
             "type": "string"
           },
           "toAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "lockTime": {
             "type": "integer",
@@ -5646,7 +5622,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           }
         }
       },
@@ -5762,7 +5738,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "amount": {
             "type": "integer",
@@ -5831,7 +5807,7 @@
       "Input": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/Asset"
           },
           {
             "$ref": "#/components/schemas/Contract"
@@ -5887,7 +5863,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "group": {
             "type": "integer"
@@ -5900,7 +5876,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset"
+              "type": "string"
             }
           }
         }
@@ -5955,7 +5931,7 @@
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset3"
+            "$ref": "#/components/schemas/Asset1"
           },
           {
             "$ref": "#/components/schemas/Contract1"
@@ -5973,45 +5949,6 @@
             "type": "integer"
           },
           "key": {
-            "type": "string"
-          }
-        }
-      },
-      "P2MPKH": {
-        "required": [
-          "m"
-        ],
-        "type": "object",
-        "properties": {
-          "pkHashes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "m": {
-            "type": "integer"
-          }
-        }
-      },
-      "P2PKH": {
-        "required": [
-          "pkHash"
-        ],
-        "type": "object",
-        "properties": {
-          "pkHash": {
-            "type": "string"
-          }
-        }
-      },
-      "P2SH": {
-        "required": [
-          "scriptHash"
-        ],
-        "type": "object",
-        "properties": {
-          "scriptHash": {
             "type": "string"
           }
         }
@@ -6149,7 +6086,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           }
         }
       },
@@ -6300,7 +6237,7 @@
         "type": "object",
         "properties": {
           "toAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "lockTime": {
             "type": "integer",
