@@ -142,7 +142,9 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
     Get(s"/addresses/$dummyKeyAddress/utxos", getPort(group)) check { response =>
       response.code is StatusCode.Ok
-      response.as[AVector[UTXO]].length is 2
+      val utxos = response.as[UTXOs]
+      utxos.utxos.length is 2
+      utxos.warning is None
     }
   }
 

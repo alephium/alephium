@@ -164,11 +164,12 @@ trait Endpoints
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
-  val getUTXOs: BaseEndpoint[Address.Asset, AVector[UTXO]] =
+  val getUTXOs: BaseEndpoint[(Address.Asset, Option[Int]), UTXOs] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("utxos")
-      .out(jsonBody[AVector[UTXO]])
+      .in(query[Option[Int]]("utxosLimit"))
+      .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")
 
   val getGroup: BaseEndpoint[Address.Asset, Group] =

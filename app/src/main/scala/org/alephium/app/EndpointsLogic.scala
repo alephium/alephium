@@ -141,8 +141,8 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address, utxosLimit)))
   }
 
-  val getUTXOsLogic = serverLogic(getUTXOs) { address =>
-    Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address))
+  val getUTXOsLogic = serverLogic(getUTXOs) { case (address, utxosLimit) =>
+    Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address, utxosLimit))
   }
 
   val getGroupLogic = serverLogic(getGroup) { address =>

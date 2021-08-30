@@ -206,8 +206,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val utxosExamples: List[Example[AVector[UTXO]]] =
-    simpleExample(AVector(utxo))
+  implicit val utxosExamples: List[Example[UTXOs]] = List(
+    defaultExample(UTXOs(AVector(utxo), None)),
+    moreSettingsExample(UTXOs(AVector(utxo), Some("Result might not contains all utxos")))
+  )
 
   implicit val groupExamples: List[Example[Group]] =
     simpleExample(Group(group = 2))

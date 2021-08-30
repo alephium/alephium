@@ -2987,6 +2987,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "utxosLimit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -2994,32 +3002,63 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UTXO"
-                  }
+                  "$ref": "#/components/schemas/UTXOs"
                 },
-                "example": [
-                  {
-                    "ref": {
-                      "hint": 23412,
-                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                    },
-                    "amount": "1000000000000000000",
-                    "tokens": [
-                      {
-                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                        "amount": "42"
-                      },
-                      {
-                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                        "amount": "1000"
-                      }
-                    ],
-                    "lockTime": 1611041396892,
-                    "additionalData": ""
+                "examples": {
+                  "Example0": {
+                    "summary": "Default",
+                    "value": {
+                      "utxos": [
+                        {
+                          "ref": {
+                            "hint": 23412,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          },
+                          "amount": "1000000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000"
+                            }
+                          ],
+                          "lockTime": 1611041396892,
+                          "additionalData": ""
+                        }
+                      ]
+                    }
+                  },
+                  "Example1": {
+                    "summary": "More settings",
+                    "value": {
+                      "utxos": [
+                        {
+                          "ref": {
+                            "hint": 23412,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          },
+                          "amount": "1000000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000"
+                            }
+                          ],
+                          "lockTime": 1611041396892,
+                          "additionalData": ""
+                        }
+                      ],
+                      "warning": "Result might not contains all utxos"
+                    }
                   }
-                ]
+                }
               }
             }
           },
@@ -6435,6 +6474,23 @@
             "format": "int64"
           },
           "additionalData": {
+            "type": "string"
+          }
+        }
+      },
+      "UTXOs": {
+        "required": [
+          "utxos"
+        ],
+        "type": "object",
+        "properties": {
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UTXO"
+            }
+          },
+          "warning": {
             "type": "string"
           }
         }

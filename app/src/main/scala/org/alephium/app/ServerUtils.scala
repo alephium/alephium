@@ -70,15 +70,19 @@ class ServerUtils(implicit
         .flatMap(failed)
     } yield balance
 
-  def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address.Asset): Try[AVector[UTXO]] =
+  def getUTXOsIncludePool(
+      blockFlow: BlockFlow,
+      address: Address.Asset,
+      utxosLimit: Option[Int]
+  ): Try[UTXOs] =
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
-        .getUTXOsIncludePool(address.lockupScript, Int.MaxValue)
+        .getUTXOsIncludePool(address.lockupScript, utxosLimit.getOrElse(Int.MaxValue))
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
         .flatMap(failed)
-    } yield utxos
+    } yield UTXOs.from(utxos, utxosLimit)
 
   def getGroup(query: GetGroup): Try[Group] = {
     Right(Group(query.address.groupIndex(brokerConfig).value))
