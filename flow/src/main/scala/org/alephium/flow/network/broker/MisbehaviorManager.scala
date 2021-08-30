@@ -157,7 +157,7 @@ class MisbehaviorManager(
       }
 
     case misbehavior: Misbehavior =>
-      log.debug(s"Misbehavior: $misbehavior")
+      log.info(s"Misbehavior: $misbehavior")
       handleMisbehavior(misbehavior)
 
     case Unban(peers) =>
