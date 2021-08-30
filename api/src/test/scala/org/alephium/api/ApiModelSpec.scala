@@ -527,4 +527,21 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       ) is s"Api key must have at least 32 characters at index 0"
     }
   }
+
+  it should "encode/decode Compile" in {
+    val address = generateAddress()
+    val compile0 =
+      Compile(address, "contract", code = "0000", state = Some("0001"), issueTokenAmount = Some(51))
+    val jsonRaw =
+      s"""
+         |{
+         |  "address":"${address.toBase58}",
+         |  "type": "contract",
+         |  "code": "0000",
+         |  "state": "0001",
+         |  "issueTokenAmount": "51"
+         |}
+         |""".stripMargin
+    checkData(compile0, jsonRaw)
+  }
 }

@@ -43,11 +43,11 @@ class BytesSpec extends AlephiumSpec {
 
   it should "convert long to correct bytes" in {
     forAll { input: Long =>
-      val output   = Bytes.toBytes(input)
+      val output   = Bytes.from(input)
       val expected = ByteBuffer.allocate(8).putLong(input).array()
       output is ByteString.fromArrayUnsafe(expected)
 
-      Bytes.toLongUnsafe(Bytes.toBytes(input)) is input
+      Bytes.toLongUnsafe(Bytes.from(input)) is input
     }
   }
 

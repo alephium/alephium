@@ -111,7 +111,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def createContract(
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
-      fields: AVector[Val]
+      fields: AVector[Val],
+      tokenAmount: Option[Val.U256]
   ): ExeResult[Unit]
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
@@ -175,7 +176,8 @@ final class StatelessFrame(
   def createContract(
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
-      fields: AVector[Val]
+      fields: AVector[Val],
+      tokenAmount: Option[Val.U256]
   ): ExeResult[Unit]                                          = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
   def getCallerFrame(): ExeResult[Frame[StatelessContext]]    = StatelessFrame.notAllowed
@@ -232,12 +234,13 @@ final class StatefulFrame(
   def createContract(
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
-      fields: AVector[Val]
+      fields: AVector[Val],
+      tokenAmount: Option[Val.U256]
   ): ExeResult[Unit] = {
     for {
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- ctx.createContract(code, initialStateHash, balances, fields)
+      _            <- ctx.createContract(code, initialStateHash, balances, fields, tokenAmount)
     } yield ()
   }
 

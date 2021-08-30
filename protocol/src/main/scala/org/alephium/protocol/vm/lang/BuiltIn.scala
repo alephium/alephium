@@ -176,6 +176,22 @@ object BuiltIn {
   val size: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("size", Seq[Type](Type.ByteVec), Seq[Type](Type.U256), ByteVecSize)
 
+  val isAssetAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "isAssetAddress",
+      Seq[Type](Type.Address),
+      Seq[Type](Type.Bool),
+      IsAssetAddress
+    )
+
+  val isContractAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "isContractAddress",
+      Seq[Type](Type.Address),
+      Seq[Type](Type.Bool),
+      IsContractAddress
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -196,7 +212,9 @@ object BuiltIn {
     toI256,
     toU256,
     toByteVec,
-    size
+    size,
+    isAssetAddress,
+    isContractAddress
   ).map(f => f.name -> f).toMap
 
   val approveAlf: SimpleStatefulBuiltIn =
@@ -280,12 +298,28 @@ object BuiltIn {
       CreateContract
     )
 
+  val createContractWithToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "createContractWithToken",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+      Seq.empty,
+      CreateContractWithToken
+    )
+
   val copyCreateContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "copyCreateContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq.empty,
       CopyCreateContract
+    )
+
+  val copyCreateContractWithToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "copyCreateContractWithToken",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+      Seq.empty,
+      CopyCreateContractWithToken
     )
 
   val destroySelf: SimpleStatefulBuiltIn =
@@ -304,9 +338,6 @@ object BuiltIn {
 
   val selfTokenId: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfTokenId", Seq.empty, Seq(Type.ByteVec), SelfContractId)
-
-  val issueToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("issueToken", Seq(Type.U256), Seq.empty, IssueToken)
 
   val callerContractId: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("callerContractId", Seq.empty, Seq(Type.ByteVec), CallerContractId)
@@ -347,12 +378,13 @@ object BuiltIn {
       transferTokenFromSelf,
       transferTokenToSelf,
       createContract,
+      createContractWithToken,
       copyCreateContract,
+      copyCreateContractWithToken,
       destroySelf,
       selfAddress,
       selfContractId,
       selfTokenId,
-      issueToken,
       callerContractId,
       callerAddress,
       isCalledFromTxScript,

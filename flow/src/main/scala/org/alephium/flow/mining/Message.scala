@@ -18,33 +18,69 @@ package org.alephium.flow.mining
 
 import java.math.BigInteger
 
+import scala.reflect.ClassTag
+
 import akka.util.ByteString
 
 import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.network.bootstrap.SimpleSerde
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.serde.{intSerde => _, _}
+import org.alephium.util.{AVector, Bytes}
 
 sealed trait Message
+object Message {
+  implicit val simpleIntSerde: Serde[Int] =
+    Serde.bytesSerde(4).xmap(Bytes.toIntUnsafe, Bytes.from)
+  implicit val bytestringSerde: Serde[ByteString] = new Serde[ByteString] {
+    def serialize(input: ByteString): ByteString =
+      simpleIntSerde.serialize(input.length) ++ input
+
+    def _deserialize(input: ByteString): SerdeResult[Staging[ByteString]] = {
+      simpleIntSerde._deserialize(input).flatMap { case Staging(length, rest) =>
+        Serde.bytesSerde(length)._deserialize(rest)
+      }
+    }
+  }
+  implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
+    new Serde[AVector[T]] {
+      def serialize(input: AVector[T]): ByteString = {
+        val lengthBytes = simpleIntSerde.serialize(input.length)
+        input.map(serde.serialize).fold(lengthBytes)(_ ++ _)
+      }
+
+      def _deserialize(input: ByteString): SerdeResult[Staging[AVector[T]]] = {
+        simpleIntSerde._deserialize(input).flatMap { case Staging(length, rest) =>
+          (new Serde.BatchDeserializer(serde))._deserializeAVector(length, rest)
+        }
+      }
+    }
+}
 
 sealed trait ClientMessage
 final case class SubmitBlock(blockBlob: ByteString) extends ClientMessage
 object SubmitBlock {
+  import Message.bytestringSerde
   val serde: Serde[SubmitBlock] = Serde.forProduct1(SubmitBlock(_), t => t.blockBlob)
 }
 
 object ClientMessage extends SimpleSerde[ClientMessage] {
   override def serializeBody(message: ClientMessage): ByteString = {
     message match {
-      case m: SubmitBlock => SubmitBlock.serde.serialize(m)
+      case m: SubmitBlock => ByteString(0) ++ SubmitBlock.serde.serialize(m)
     }
   }
 
   override def deserializeBody(input: ByteString)(implicit
       groupConfig: GroupConfig
   ): SerdeResult[ClientMessage] = {
-    SubmitBlock.serde.deserialize(input)
+    byteSerde._deserialize(input).flatMap { case Staging(byte, rest) =>
+      if (byte == 0) {
+        SubmitBlock.serde.deserialize(rest)
+      } else {
+        Left(SerdeError.wrongFormat(s"Invalid client message code: $byte"))
+      }
+    }
   }
 }
 
@@ -59,11 +95,27 @@ final case class Job(
   def toMiningBlob: MiningBlob = MiningBlob(headerBlob, target, txsBlob)
 }
 object Job {
-  implicit val serde: Serde[Job] =
+  implicit val serde: Serde[Job] = {
+    import Message.{bytestringSerde, simpleIntSerde}
+    implicit val bigIntegerSerde: Serde[BigInteger] = new Serde[BigInteger] {
+      def serialize(input: BigInteger): ByteString = {
+        val bytes = input.toByteArray
+        simpleIntSerde.serialize(bytes.length) ++ ByteString.fromArrayUnsafe(bytes)
+      }
+      def _deserialize(input: ByteString): SerdeResult[Staging[BigInteger]] = {
+        simpleIntSerde._deserialize(input).flatMap { case Staging(length, rest) =>
+          Serde
+            .bytesSerde(length)
+            ._deserialize(rest)
+            .map(_.mapValue(bytes => new BigInteger(bytes.toArray)))
+        }
+      }
+    }
     Serde.forProduct5(
       Job.apply,
       t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target)
     )
+  }
 
   def from(template: BlockFlowTemplate): Job = {
     val blobs = MiningBlob.from(template)
@@ -79,10 +131,12 @@ object Job {
 
 final case class Jobs(jobs: AVector[Job]) extends ServerMessage
 object Jobs {
-  val serde: Serde[Jobs] = Serde.forProduct1(Jobs.apply, t => t.jobs)
+  implicit private val jobsSerde: Serde[AVector[Job]] = Message.avectorSerde
+  val serde: Serde[Jobs]                              = Serde.forProduct1(Jobs.apply, t => t.jobs)
 }
 final case class SubmitResult(fromGroup: Int, toGroup: Int, status: Boolean) extends ServerMessage
 object SubmitResult {
+  import Message.simpleIntSerde
   val serde: Serde[SubmitResult] =
     Serde.forProduct3(SubmitResult.apply, t => (t.fromGroup, t.toGroup, t.status))
 }

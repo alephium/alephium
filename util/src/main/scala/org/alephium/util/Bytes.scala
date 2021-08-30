@@ -34,7 +34,7 @@ object Bytes {
     bytes(0) << 24 | (bytes(1) & 0xff) << 16 | (bytes(2) & 0xff) << 8 | (bytes(3) & 0xff)
   }
 
-  def toBytes(value: Long): ByteString = {
+  def from(value: Long): ByteString = {
     ByteString(
       (value >> 56).toByte,
       (value >> 48).toByte,

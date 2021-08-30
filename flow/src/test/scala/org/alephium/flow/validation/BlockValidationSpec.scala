@@ -65,10 +65,10 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   def coinbase(
       chainIndex: ChainIndex,
-      gasFee: U256,
+      gasReward: U256,
       lockupScript: LockupScript.Asset
   ): Transaction = {
-    Transaction.coinbase(chainIndex, gasFee, lockupScript, Target.Max, TimeStamp.now())
+    Transaction.coinbase(chainIndex, gasReward, lockupScript, Target.Max, TimeStamp.now())
   }
 
   it should "validate coinbase transaction simple format" in new Fixture {

@@ -524,21 +524,25 @@ class ServerUtils(implicit
       contract: StatefulContract,
       address: Address,
       initialState: AVector[Val],
-      alfAmount: U256
+      alfAmount: U256,
+      newTokenAmount: Option[U256]
   ): Either[Compiler.Error, StatefulScript] = {
 
     val codeRaw  = Hex.toHexString(serialize(contract))
     val stateRaw = Hex.toHexString(serialize(initialState))
+    val creation = newTokenAmount match {
+      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
+      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
+    }
 
     val scriptRaw = s"""
       |TxScript Main {
       |  pub payable fn main() -> () {
       |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
-      |    createContract!(#$codeRaw, #$stateRaw)
+      |    $creation
       |  }
       |}
       |""".stripMargin
-
     Compiler.compileTxScript(scriptRaw)
   }
 
@@ -602,9 +606,15 @@ class ServerUtils(implicit
           Compiler.compileTxScript(query.code)
         case "contract" =>
           for {
-            code   <- Compiler.compileContract(query.code)
-            state  <- parseState(query.state)
-            script <- buildContract(code, query.address, state, dustUtxoAmount)
+            code  <- Compiler.compileContract(query.code)
+            state <- parseState(query.state)
+            script <- buildContract(
+              code,
+              query.address,
+              state,
+              dustUtxoAmount,
+              query.issueTokenAmount
+            )
           } yield script
         case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))
       }).map(script => CompileResult(Hex.toHexString(serialize(script))))

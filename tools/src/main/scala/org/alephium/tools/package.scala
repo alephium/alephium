@@ -14,16 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.U256
-
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Compile(
-    address: Address,
-    `type`: String,
-    code: String,
-    state: Option[String] = None,
-    issueTokenAmount: Option[U256] = None
-)
+package object tools {
+  def printLine(text: String): Unit = {
+    print(text + "\n")
+  }
+}

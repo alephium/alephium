@@ -36,6 +36,18 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
       Staging(message, serialized.init)
   }
 
+  it should "pass explicit hex string serialization examples" in {
+    val message    = SubmitBlock(hex"bbbb")
+    val serialized = ClientMessage.serialize(message)
+    serialized is
+      // message.length (4 bytes)
+      hex"00000007" ++
+      // message type (1 byte)
+      hex"00" ++
+      // blockBlob.length (4 bytes) ++ blockBlob
+      hex"00000002" ++ hex"bbbb"
+  }
+
   "ServerMessage" should "serde properly" in {
     val messages = Seq(
       Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ZERO))),
@@ -49,6 +61,46 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
       ServerMessage.tryDeserialize(serialized.init).rightValue is None
       ServerMessage.tryDeserialize(serialized ++ serialized.init).rightValue.get is
         Staging(message, serialized.init)
+    }
+  }
+
+  it should "pass explicit hex string serialization examples" in {
+    {
+      val message: ServerMessage = Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE)))
+      val serializedJobs         = ServerMessage.serialize(message)
+      serializedJobs is
+        // message.length (4 bytes)
+        hex"0000001c" ++
+        // message type (1 byte)
+        hex"00" ++
+        // jobs.length (4 bytes)
+        hex"00000001" ++
+        // fromGroup (4 bytes)
+        hex"00000000" ++
+        // toGroup (4 bytes)
+        hex"00000001" ++
+        // headerBlob.length (4 bytes) ++ blob bytes
+        hex"00000001" ++ hex"aa" ++
+        // txsBlob.length (4 bytes) ++ blob bytes
+        hex"00000001" ++ hex"bb" ++
+        // target.length (4 bytes) ++ target bytes
+        hex"00000001" ++ hex"01"
+    }
+
+    {
+      val message: ServerMessage = SubmitResult(0, 1, true)
+      val serialized             = ServerMessage.serialize(message)
+      serialized is
+        // message length (4 bytes)
+        hex"0000000a" ++
+        // message type (1 byte)
+        hex"01" ++
+        // fromGroup (4 bytes)
+        hex"00000000" ++
+        // toGroup (4 bytes)
+        hex"00000001" ++
+        // bool type (1 byte) indicating if the block submission succeeded
+        hex"01"
     }
   }
 }

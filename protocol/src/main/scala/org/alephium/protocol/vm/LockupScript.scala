@@ -28,6 +28,8 @@ sealed trait LockupScript {
   def scriptHint: ScriptHint
 
   def hintBytes: ByteString
+
+  def isAssetType: Boolean
 }
 
 object LockupScript {
@@ -87,6 +89,8 @@ object LockupScript {
     def hintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
 
     def groupIndex(implicit config: GroupConfig): GroupIndex = scriptHint.groupIndex
+
+    def isAssetType: Boolean = true
   }
   object Asset {
     implicit val serde: Serde[Asset] = LockupScript.serde.xfmap[Asset](
@@ -133,6 +137,8 @@ object LockupScript {
     lazy val scriptHint: ScriptHint = ScriptHint.fromHash(contractId)
 
     def hintBytes: ByteString = serialize(Hint.ofContract(scriptHint))
+
+    def isAssetType: Boolean = false
   }
   object P2C {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)

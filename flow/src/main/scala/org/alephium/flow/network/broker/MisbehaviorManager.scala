@@ -127,7 +127,7 @@ class MisbehaviorManager(
 
   private def handlePenalty(peer: InetAddress, penalty: Int) = {
     if (penalty >= misbehaviorThreshold) {
-      log.debug(s"Ban $peer")
+      log.info(s"Ban $peer")
       banAndPublish(peer)
     } else {
       log.debug(s"Punish $peer, new penalty: $penalty")
@@ -136,7 +136,6 @@ class MisbehaviorManager(
   }
 
   private def banAndPublish(peer: InetAddress) = {
-    log.info(s"Banning peer: $peer")
     misbehaviorStorage.ban(peer, TimeStamp.now().plusMillisUnsafe(banDuration.millis))
     publishEvent(PeerBanned(peer))
   }
@@ -157,7 +156,7 @@ class MisbehaviorManager(
       }
 
     case misbehavior: Misbehavior =>
-      log.debug(s"Misbehavior: $misbehavior")
+      log.info(s"Misbehavior: $misbehavior")
       handleMisbehavior(misbehavior)
 
     case Unban(peers) =>

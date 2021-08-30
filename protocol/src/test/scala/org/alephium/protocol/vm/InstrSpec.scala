@@ -58,6 +58,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
       I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
       ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
+      IsAssetAddress, IsContractAddress,
       Jump(int), IfTrue(int), IfFalse(int),
       CallLocal(byte), Return,
       Assert,
@@ -70,7 +71,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadField(byte), StoreField(byte), CallExternal(byte),
       ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
       TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-      CreateContract, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress, IssueToken,
+      CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
     )
     // format: on
