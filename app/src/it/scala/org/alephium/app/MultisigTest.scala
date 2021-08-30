@@ -18,10 +18,11 @@ package org.alephium.app
 
 import org.alephium.api.ApiError
 import org.alephium.api.model._
+import org.alephium.flow.validation.InvalidSignature
 import org.alephium.json.Json._
 import org.alephium.protocol.{PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{defaultGasFee, UnsignedTransaction}
-import org.alephium.serde.deserialize
+import org.alephium.protocol.model.{defaultGasFee, TransactionTemplate, UnsignedTransaction}
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
@@ -84,13 +85,15 @@ class MultisigTest extends AlephiumActorSpec {
     request[ApiError.InternalServerError](
       submitTx,
       restPort
-    ).detail is "Failed in adding transaction"
+    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
+      .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
     val submitMultisigTx1sig = signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey))
     request[ApiError.InternalServerError](
       submitMultisigTx1sig,
       restPort
-    ).detail is "Failed in adding transaction"
+    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
+      .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
     val submitMultisigTx =
       signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))

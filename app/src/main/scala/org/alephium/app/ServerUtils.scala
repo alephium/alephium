@@ -346,8 +346,8 @@ class ServerUtils(implicit
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
-      case _: TxHandler.AddFailed =>
-        Left(failed("Failed in adding transaction"))
+      case TxHandler.AddFailed(_, reason) =>
+        Left(failed(s"$reason"))
     }
   }
 
