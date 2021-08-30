@@ -18,6 +18,7 @@ package org.alephium.flow.handler
 
 import akka.actor.Props
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.network.InterCliqueManager
@@ -29,7 +30,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, BaseActor, Cache, EventStream, Hex, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, EventStream, Hex, TimeStamp}
 
 object TxHandler {
   def props(blockFlow: BlockFlow)(implicit
@@ -46,10 +47,17 @@ object TxHandler {
   final case class TxAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
   case object CleanMempool                                                       extends Command
   private case object BroadcastTxs                                               extends Command
+  private case object DownloadTxs                                                extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: Hash) extends Event
   final case class AddFailed(txId: Hash)    extends Event
+
+  final case class Announcement(
+      brokerHandler: ActorRefT[BrokerHandler.Command],
+      chainIndex: ChainIndex,
+      hash: Hash
+  )
 
   val MaxDownloadTimes: Int = 2
 }
@@ -66,11 +74,14 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
   val txsBuffer: Cache[TransactionTemplate, Unit] =
     Cache.fifo[TransactionTemplate, Unit](maxCapacity)
+  val announcements: Cache[TxHandler.Announcement, Unit] =
+    Cache.fifo[TxHandler.Announcement, Unit](maxCapacity)
 
   override def preStart(): Unit = {
     super.preStart()
     schedule(self, TxHandler.CleanMempool, memPoolSetting.cleanFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
+    scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
   }
 
   override def receive: Receive = {
@@ -81,6 +92,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     case TxHandler.Broadcast(txs)          => txs.foreach(tx => txsBuffer.put(tx, ()))
     case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
     case TxHandler.BroadcastTxs            => broadcastTxs()
+    case TxHandler.DownloadTxs             => downloadTxs()
     case TxHandler.CleanMempool =>
       log.debug("Start to clean tx pools")
       blockFlow.grandPool.clean(
@@ -89,23 +101,44 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       )
   }
 
-  private def handleAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
-    val timestamp = TimeStamp.now()
-    val invs = hashes.fold(AVector.empty[(ChainIndex, AVector[Hash])]) {
-      case (acc, (chainIndex, txHashes)) =>
-        val mempool = blockFlow.getMemPool(chainIndex)
-        val selected = txHashes.filter { hash =>
-          !mempool.contains(chainIndex, hash) &&
-          fetching.needToFetch(hash, timestamp)
+  def downloadTxs(): Unit = {
+    log.debug(s"Start to download txs")
+    if (!announcements.isEmpty) {
+      announcements
+        .keys()
+        .foldLeft(Map.empty[ActorRefT[BrokerHandler.Command], Map[ChainIndex, AVector[Hash]]]) {
+          case (acc, TxHandler.Announcement(brokerHandler, chainIndex, hash)) =>
+            val newAnns = acc.get(brokerHandler) match {
+              case Some(anns) => updateChainIndexedHash(anns, chainIndex, hash)
+              case None       => Map(chainIndex -> AVector(hash))
+            }
+            acc + (brokerHandler -> newAnns)
         }
-        if (selected.isEmpty) {
-          acc
-        } else {
-          acc :+ ((chainIndex, selected))
+        .foreach { case (brokerHandler, anns) =>
+          val txHashes = AVector.from(anns)
+          log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
+          brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
         }
+
+      announcements.clear()
     }
-    if (invs.nonEmpty) {
-      sender() ! BrokerHandler.DownloadTxs(invs)
+    scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
+  }
+
+  private def handleAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
+    val timestamp     = TimeStamp.now()
+    val brokerHandler = ActorRefT[BrokerHandler.Command](sender())
+    hashes.foreach { case (chainIndex, hashes) =>
+      val mempool = blockFlow.getMemPool(chainIndex)
+      hashes.foreach { hash =>
+        if (
+          fetching.needToFetch(hash, timestamp) &&
+          !mempool.contains(chainIndex, hash)
+        ) {
+          val announcement = TxHandler.Announcement(brokerHandler, chainIndex, hash)
+          announcements.put(announcement, ())
+        }
+      }
     }
   }
 
@@ -156,16 +189,23 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     }
   }
 
+  private def updateChainIndexedHash(
+      hashes: Map[ChainIndex, AVector[Hash]],
+      chainIndex: ChainIndex,
+      hash: Hash
+  ): Map[ChainIndex, AVector[Hash]] = {
+    hashes.get(chainIndex) match {
+      case Some(chainIndexedHashes) => hashes + (chainIndex -> (chainIndexedHashes :+ hash))
+      case None                     => hashes + (chainIndex -> AVector(hash))
+    }
+  }
+
   def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
     if (!txsBuffer.isEmpty) {
       val hashes =
         txsBuffer.keys().foldLeft(Map.empty[ChainIndex, AVector[Hash]]) { case (acc, tx) =>
-          val chainIndex = tx.chainIndex
-          acc.get(chainIndex) match {
-            case Some(hashes) => acc + (chainIndex -> (hashes :+ tx.id))
-            case None         => acc + (chainIndex -> AVector(tx.id))
-          }
+          updateChainIndexedHash(acc, tx.chainIndex, tx.id)
         }
 
       publishEvent(InterCliqueManager.BroadCastTx(AVector.from(hashes)))

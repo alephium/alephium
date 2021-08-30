@@ -24,9 +24,9 @@ import org.scalatest.concurrent.Eventually.eventually
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumActorSpec, AVector}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
@@ -118,49 +118,103 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
-  it should "fetch txs" in new Fixture {
-    val chainIndexGen = Gen.const(chainIndex)
-    val tx1           = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
-    val memPool       = blockFlow.getMemPool(chainIndex)
-    val maxCapacity   = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+  it should "download txs" in new Fixture {
+    override val configValues = Map(
+      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"),
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.broker-id", 0)
+    )
+
+    def sendAnnouncement(
+        chainIndex: ChainIndex,
+        hash: Hash,
+        haveAnnouncement: Boolean
+    ): (TestProbe, AVector[(ChainIndex, AVector[Hash])]) = {
+      val brokerHandler = TestProbe()
+      val announcement  = TxHandler.Announcement(ActorRefT(brokerHandler.ref), chainIndex, hash)
+      brokerHandler.send(txHandler, TxHandler.TxAnnouncements(AVector((chainIndex, AVector(hash)))))
+      txHandler.underlyingActor.fetching.states.contains(hash) is true
+      txHandler.underlyingActor.announcements.contains(announcement) is haveAnnouncement
+      brokerHandler -> AVector(chainIndex -> AVector(hash))
+    }
+
+    val chain01     = ChainIndex.unsafe(0, 1)
+    val txHash1     = Hash.generate
+    val maxCapacity = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
 
     txHandler.underlyingActor.maxCapacity is maxCapacity
-    (0 until TxHandler.MaxDownloadTimes).foreach { _ =>
-      txHandler ! TxHandler.TxAnnouncements(AVector((chainIndex, AVector(tx1.id))))
-      expectMsg(BrokerHandler.DownloadTxs(AVector((chainIndex, AVector(tx1.id)))))
-      txHandler.underlyingActor.fetching.states.contains(tx1.id) is true
-    }
-    txHandler ! TxHandler.TxAnnouncements(AVector((chainIndex, AVector(tx1.id))))
-    expectNoMessage()
+    txHandler.underlyingActor.announcements.isEmpty is true
 
-    val tx2 = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
-    val tx3 = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
-    memPool.contains(chainIndex, tx2.id) is false
-    memPool.addNewTx(chainIndex, tx2)
-    memPool.contains(chainIndex, tx2.id) is true
+    (0 until TxHandler.MaxDownloadTimes)
+      .map(_ => sendAnnouncement(chain01, txHash1, true))
+      .foreach { case (brokerHandler, hashes) =>
+        brokerHandler.expectMsg(BrokerHandler.DownloadTxs(hashes))
+      }
+    eventually(txHandler.underlyingActor.announcements.isEmpty is true)
+
+    val (brokerHandler, _) = sendAnnouncement(chain01, txHash1, false)
+    brokerHandler.expectNoMessage()
+    txHandler.underlyingActor.announcements.isEmpty is true
+
+    val chain02 = ChainIndex.unsafe(0, 2)
+    val chain03 = ChainIndex.unsafe(0, 3)
+    val tx2     = transactionGen(chainIndexGen = Gen.const(chain02)).sample.get.toTemplate
+    val txHash3 = Hash.generate
+    val txHash4 = Hash.generate
+    val mempool = blockFlow.getMemPool(chain02)
+    mempool.contains(chain02, tx2.id) is false
+    mempool.addNewTx(chain02, tx2)
+    mempool.contains(chain02, tx2.id) is true
+
     txHandler ! TxHandler.TxAnnouncements(
-      AVector((chainIndex, AVector(tx1.id, tx2.id, tx3.id)))
+      AVector(
+        (chain01, AVector(txHash1, txHash3)),
+        (chain02, AVector(tx2.id))
+      )
     )
-    expectMsg(BrokerHandler.DownloadTxs(AVector((chainIndex, AVector(tx3.id)))))
+    txHandler ! TxHandler.TxAnnouncements(
+      AVector(
+        (chain03, AVector(txHash4))
+      )
+    )
+    expectMsg(
+      BrokerHandler.DownloadTxs(
+        AVector(
+          (chain01, AVector(txHash3)),
+          (chain03, AVector(txHash4))
+        )
+      )
+    )
+    eventually(txHandler.underlyingActor.announcements.isEmpty is true)
   }
 
-  it should "broadcast txs regularly" in new FlowFixture {
+  trait PeriodicTaskFixture extends FlowFixture {
+    implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.debugConfig))
+
+    def test(message: String) = {
+      EventFilter.debug(message, occurrences = 5).intercept {
+        system.actorOf(TxHandler.props(blockFlow))
+      }
+    }
+  }
+
+  it should "broadcast txs regularly" in new PeriodicTaskFixture {
     override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
 
-    implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.debugConfig))
-    EventFilter.debug("Start to broadcast txs", occurrences = 5).intercept {
-      system.actorOf(TxHandler.props(blockFlow))
-    }
+    test("Start to broadcast txs")
   }
 
-  it should "clean tx pool regularly" in new FlowFixture {
+  it should "download txs regularly" in new PeriodicTaskFixture {
+    override val configValues = Map(("alephium.mempool.batch-download-txs-frequency", "200 ms"))
+
+    test("Start to download txs")
+  }
+
+  it should "clean tx pool regularly" in new PeriodicTaskFixture {
     override val configValues = Map(("alephium.mempool.clean-frequency", "300 ms"))
 
-    implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.debugConfig))
-
-    EventFilter.debug("Start to clean tx pools", occurrences = 5).intercept {
-      system.actorOf(TxHandler.props(blockFlow))
-    }
+    test("Start to clean tx pools")
   }
 
   trait Fixture extends FlowFixture with TxGenerators {
