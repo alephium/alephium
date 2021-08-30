@@ -5198,7 +5198,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "balance": {
             "type": "integer",
@@ -5214,7 +5214,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "publicKey": {
             "type": "string"
@@ -5223,46 +5223,23 @@
       },
       "Addresses": {
         "required": [
-          "activeAddress"
+          "activeAddress",
+          "addresses"
         ],
         "type": "object",
         "properties": {
           "activeAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset"
+              "type": "string"
             }
           }
         }
       },
       "Asset": {
-        "required": [
-          "lockupScript"
-        ],
-        "type": "object",
-        "properties": {
-          "lockupScript": {
-            "$ref": "#/components/schemas/Asset1"
-          }
-        }
-      },
-      "Asset1": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/P2MPKH"
-          },
-          {
-            "$ref": "#/components/schemas/P2PKH"
-          },
-          {
-            "$ref": "#/components/schemas/P2SH"
-          }
-        ]
-      },
-      "Asset2": {
         "required": [
           "outputRef",
           "unlockScript"
@@ -5277,10 +5254,11 @@
           }
         }
       },
-      "Asset3": {
+      "Asset1": {
         "required": [
           "amount",
           "address",
+          "tokens",
           "lockTime",
           "additionalData"
         ],
@@ -5342,7 +5320,8 @@
       },
       "Balances": {
         "required": [
-          "totalBalance"
+          "totalBalance",
+          "balances"
         ],
         "type": "object",
         "properties": {
@@ -5376,7 +5355,9 @@
           "timestamp",
           "chainFrom",
           "chainTo",
-          "height"
+          "height",
+          "deps",
+          "transactions"
         ],
         "type": "object",
         "properties": {
@@ -5416,7 +5397,8 @@
           "timestamp",
           "chainFrom",
           "chainTo",
-          "height"
+          "height",
+          "deps"
         ],
         "type": "object",
         "properties": {
@@ -5507,12 +5489,14 @@
       },
       "BuildMultisig": {
         "required": [
-          "fromAddress"
+          "fromAddress",
+          "fromPublicKeys",
+          "destinations"
         ],
         "type": "object",
         "properties": {
           "fromAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "fromPublicKeys": {
             "type": "array",
@@ -5536,6 +5520,7 @@
       },
       "BuildMultisigAddress": {
         "required": [
+          "keys",
           "mrequired"
         ],
         "type": "object",
@@ -5562,7 +5547,7 @@
             "type": "string"
           },
           "toAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "lockTime": {
             "type": "integer",
@@ -5578,7 +5563,8 @@
       },
       "BuildTransaction": {
         "required": [
-          "fromPublicKey"
+          "fromPublicKey",
+          "destinations"
         ],
         "type": "object",
         "properties": {
@@ -5646,7 +5632,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           }
         }
       },
@@ -5724,7 +5710,8 @@
       "Contract1": {
         "required": [
           "amount",
-          "address"
+          "address",
+          "tokens"
         ],
         "type": "object",
         "properties": {
@@ -5762,7 +5749,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "amount": {
             "type": "integer",
@@ -5781,6 +5768,9 @@
         }
       },
       "FetchResponse": {
+        "required": [
+          "blocks"
+        ],
         "type": "object",
         "properties": {
           "blocks": {
@@ -5818,6 +5808,9 @@
         }
       },
       "HashesAtHeight": {
+        "required": [
+          "headers"
+        ],
         "type": "object",
         "properties": {
           "headers": {
@@ -5831,7 +5824,7 @@
       "Input": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/Asset"
           },
           {
             "$ref": "#/components/schemas/Contract"
@@ -5887,7 +5880,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "group": {
             "type": "integer"
@@ -5895,17 +5888,23 @@
         }
       },
       "MinerAddresses": {
+        "required": [
+          "addresses"
+        ],
         "type": "object",
         "properties": {
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset"
+              "type": "string"
             }
           }
         }
       },
       "MinerAddressesInfo": {
+        "required": [
+          "addresses"
+        ],
         "type": "object",
         "properties": {
           "addresses": {
@@ -5955,7 +5954,7 @@
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset3"
+            "$ref": "#/components/schemas/Asset1"
           },
           {
             "$ref": "#/components/schemas/Contract1"
@@ -5973,45 +5972,6 @@
             "type": "integer"
           },
           "key": {
-            "type": "string"
-          }
-        }
-      },
-      "P2MPKH": {
-        "required": [
-          "m"
-        ],
-        "type": "object",
-        "properties": {
-          "pkHashes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "m": {
-            "type": "integer"
-          }
-        }
-      },
-      "P2PKH": {
-        "required": [
-          "pkHash"
-        ],
-        "type": "object",
-        "properties": {
-          "pkHash": {
-            "type": "string"
-          }
-        }
-      },
-      "P2SH": {
-        "required": [
-          "scriptHash"
-        ],
-        "type": "object",
-        "properties": {
-          "scriptHash": {
             "type": "string"
           }
         }
@@ -6149,7 +6109,7 @@
         "type": "object",
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           }
         }
       },
@@ -6180,6 +6140,7 @@
           "cliqueId",
           "networkId",
           "numZerosAtLeastInHash",
+          "nodes",
           "selfReady",
           "synced",
           "groupNumPerBroker",
@@ -6263,7 +6224,8 @@
       },
       "SubmitMultisig": {
         "required": [
-          "unsignedTx"
+          "unsignedTx",
+          "signatures"
         ],
         "type": "object",
         "properties": {
@@ -6300,7 +6262,7 @@
         "type": "object",
         "properties": {
           "toAddress": {
-            "$ref": "#/components/schemas/Asset"
+            "type": "string"
           },
           "lockTime": {
             "type": "integer",
@@ -6331,6 +6293,9 @@
         }
       },
       "Transfer": {
+        "required": [
+          "destinations"
+        ],
         "type": "object",
         "properties": {
           "destinations": {
@@ -6350,6 +6315,8 @@
       "Tx": {
         "required": [
           "id",
+          "inputs",
+          "outputs",
           "gasAmount",
           "gasPrice"
         ],
@@ -6415,6 +6382,7 @@
         "required": [
           "ref",
           "amount",
+          "tokens",
           "lockTime",
           "additionalData"
         ],
@@ -6454,6 +6422,9 @@
         }
       },
       "Unban": {
+        "required": [
+          "peers"
+        ],
         "type": "object",
         "properties": {
           "peers": {
@@ -6467,7 +6438,8 @@
       "UnconfirmedTransactions": {
         "required": [
           "fromGroup",
-          "toGroup"
+          "toGroup",
+          "unconfirmedTransactions"
         ],
         "type": "object",
         "properties": {
