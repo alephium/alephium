@@ -5223,7 +5223,8 @@
       },
       "Addresses": {
         "required": [
-          "activeAddress"
+          "activeAddress",
+          "addresses"
         ],
         "type": "object",
         "properties": {
@@ -5257,6 +5258,7 @@
         "required": [
           "amount",
           "address",
+          "tokens",
           "lockTime",
           "additionalData"
         ],
@@ -5318,7 +5320,8 @@
       },
       "Balances": {
         "required": [
-          "totalBalance"
+          "totalBalance",
+          "balances"
         ],
         "type": "object",
         "properties": {
@@ -5352,7 +5355,9 @@
           "timestamp",
           "chainFrom",
           "chainTo",
-          "height"
+          "height",
+          "deps",
+          "transactions"
         ],
         "type": "object",
         "properties": {
@@ -5392,7 +5397,8 @@
           "timestamp",
           "chainFrom",
           "chainTo",
-          "height"
+          "height",
+          "deps"
         ],
         "type": "object",
         "properties": {
@@ -5483,7 +5489,9 @@
       },
       "BuildMultisig": {
         "required": [
-          "fromAddress"
+          "fromAddress",
+          "fromPublicKeys",
+          "destinations"
         ],
         "type": "object",
         "properties": {
@@ -5512,6 +5520,7 @@
       },
       "BuildMultisigAddress": {
         "required": [
+          "keys",
           "mrequired"
         ],
         "type": "object",
@@ -5554,7 +5563,8 @@
       },
       "BuildTransaction": {
         "required": [
-          "fromPublicKey"
+          "fromPublicKey",
+          "destinations"
         ],
         "type": "object",
         "properties": {
@@ -5700,7 +5710,8 @@
       "Contract1": {
         "required": [
           "amount",
-          "address"
+          "address",
+          "tokens"
         ],
         "type": "object",
         "properties": {
@@ -5757,6 +5768,9 @@
         }
       },
       "FetchResponse": {
+        "required": [
+          "blocks"
+        ],
         "type": "object",
         "properties": {
           "blocks": {
@@ -5794,6 +5808,9 @@
         }
       },
       "HashesAtHeight": {
+        "required": [
+          "headers"
+        ],
         "type": "object",
         "properties": {
           "headers": {
@@ -5871,6 +5888,9 @@
         }
       },
       "MinerAddresses": {
+        "required": [
+          "addresses"
+        ],
         "type": "object",
         "properties": {
           "addresses": {
@@ -5882,6 +5902,9 @@
         }
       },
       "MinerAddressesInfo": {
+        "required": [
+          "addresses"
+        ],
         "type": "object",
         "properties": {
           "addresses": {
@@ -6117,6 +6140,7 @@
           "cliqueId",
           "networkId",
           "numZerosAtLeastInHash",
+          "nodes",
           "selfReady",
           "synced",
           "groupNumPerBroker",
@@ -6200,7 +6224,8 @@
       },
       "SubmitMultisig": {
         "required": [
-          "unsignedTx"
+          "unsignedTx",
+          "signatures"
         ],
         "type": "object",
         "properties": {
@@ -6268,6 +6293,9 @@
         }
       },
       "Transfer": {
+        "required": [
+          "destinations"
+        ],
         "type": "object",
         "properties": {
           "destinations": {
@@ -6287,6 +6315,8 @@
       "Tx": {
         "required": [
           "id",
+          "inputs",
+          "outputs",
           "gasAmount",
           "gasPrice"
         ],
@@ -6352,6 +6382,7 @@
         "required": [
           "ref",
           "amount",
+          "tokens",
           "lockTime",
           "additionalData"
         ],
@@ -6391,6 +6422,9 @@
         }
       },
       "Unban": {
+        "required": [
+          "peers"
+        ],
         "type": "object",
         "properties": {
           "peers": {
@@ -6404,7 +6438,8 @@
       "UnconfirmedTransactions": {
         "required": [
           "fromGroup",
-          "toGroup"
+          "toGroup",
+          "unconfirmedTransactions"
         ],
         "type": "object",
         "properties": {

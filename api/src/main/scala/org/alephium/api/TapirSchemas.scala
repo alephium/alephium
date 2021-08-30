@@ -19,11 +19,9 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
-import scala.reflect.ClassTag
-
 import akka.util.ByteString
 import sttp.tapir.Schema
-import sttp.tapir.SchemaType.{SInteger, SString}
+import sttp.tapir.SchemaType.{SArray, SInteger, SString}
 
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
@@ -32,8 +30,9 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TapirSchemasLike {
-  implicit def avectorSchema[T: Schema: ClassTag]: Schema[AVector[T]] =
-    implicitly[Schema[T]].asArray.map(array => Some(AVector.from(array)))(_.toArray)
+  implicit def avectorSchema[T: Schema]: Schema[AVector[T]] = Schema(
+    SArray(implicitly[Schema[T]])(_.toIterable)
+  )
   implicit val addressSchema: Schema[Address]                     = Schema(SString())
   implicit val addressAssetSchema: Schema[Address.Asset]          = Schema(SString())
   implicit val addressContractSchema: Schema[Address.Contract]    = Schema(SString())
