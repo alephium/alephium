@@ -399,11 +399,6 @@ object BlockFlowState {
         val outputRef = TxOutputRef.unsafe(transaction, index)
         outputs.update(outputRef, output)
       }
-      AVector.tabulate(transaction.outputsLength) { index =>
-        val output    = transaction.getOutput(index)
-        val outputRef = TxOutputRef.unsafe(transaction, index)
-        (outputRef, output)
-      }
     }
     outputs.toMap
   }
