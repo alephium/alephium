@@ -149,7 +149,8 @@ final case class MemPoolSetting(
     pendingPoolCapacity: Int,
     txMaxNumberPerBlock: Int,
     cleanFrequency: Duration,
-    batchBroadcastTxsFrequency: Duration
+    batchBroadcastTxsFrequency: Duration,
+    batchDownloadTxsFrequency: Duration
 )
 
 final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
