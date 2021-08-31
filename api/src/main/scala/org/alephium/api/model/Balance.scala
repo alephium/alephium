@@ -27,12 +27,12 @@ final case class Balance(
 )
 
 object Balance {
-  def apply(balance_locked_utxoNum: (U256, U256, Int), utxosLimit: Option[Int]): Balance = {
-    val warning = utxosLimit.flatMap { limit =>
-      Option.when(limit == balance_locked_utxoNum._3)(
+  def apply(balance_locked_utxoNum: (U256, U256, Int), utxosLimit: Int): Balance = {
+    val warning =
+      Option.when(utxosLimit == balance_locked_utxoNum._3)(
         "Result might not include all utxos and is maybe unprecise"
       )
-    }
+
     Balance(
       balance_locked_utxoNum._1,
       balance_locked_utxoNum._2,

@@ -25,12 +25,12 @@ final case class UTXOs(
 )
 
 object UTXOs {
-  def from(utxos: AVector[UTXO], utxosLimit: Option[Int]): UTXOs = {
-    val warning = utxosLimit.flatMap { limit =>
-      Option.when(limit == utxos.length)(
+  def from(utxos: AVector[UTXO], utxosLimit: Int): UTXOs = {
+    val warning =
+      Option.when(utxosLimit == utxos.length)(
         "Result might not contains all utxos"
       )
-    }
+
     UTXOs(utxos, warning)
   }
 }

@@ -44,6 +44,8 @@ class ServerUtils(implicit
 ) extends StrictLogging {
   import ServerUtils._
 
+  private val defaultUtxosLimit: Int = 5000
+
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
     val entriesEither = for {
       blocks <- blockFlow.getHeightedBlocks(fetchRequest.fromTs, fetchRequest.toTs)
@@ -57,32 +59,36 @@ class ServerUtils(implicit
     }
   }
 
-  def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] =
+  def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] = {
+    val utxosLimit = balanceRequest.utxosLimit.getOrElse(defaultUtxosLimit)
     for {
       _ <- checkGroup(balanceRequest.address.lockupScript)
       balance <- blockFlow
         .getBalance(
           balanceRequest.address.lockupScript,
-          balanceRequest.utxosLimit.getOrElse(Int.MaxValue)
+          utxosLimit
         )
-        .map(Balance(_, balanceRequest.utxosLimit))
+        .map(Balance(_, utxosLimit))
         .left
         .flatMap(failed)
     } yield balance
+  }
 
   def getUTXOsIncludePool(
       blockFlow: BlockFlow,
       address: Address.Asset,
-      utxosLimit: Option[Int]
-  ): Try[UTXOs] =
+      utxosLimitOpt: Option[Int]
+  ): Try[UTXOs] = {
+    val utxosLimit = utxosLimitOpt.getOrElse(defaultUtxosLimit)
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
-        .getUTXOsIncludePool(address.lockupScript, utxosLimit.getOrElse(Int.MaxValue))
+        .getUTXOsIncludePool(address.lockupScript, utxosLimit)
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
         .flatMap(failed)
     } yield UTXOs.from(utxos, utxosLimit)
+  }
 
   def getGroup(query: GetGroup): Try[Group] = {
     Right(Group(query.address.groupIndex(brokerConfig).value))
