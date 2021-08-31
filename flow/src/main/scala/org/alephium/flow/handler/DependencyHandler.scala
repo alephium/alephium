@@ -132,24 +132,26 @@ trait DependencyHandlerState extends IOBaseActor {
       broker: ActorRefT[ChainHandler.Event],
       origin: DataOrigin
   ): Unit = {
-    escapeIOError(blockFlow.contains(data.hash)) { existing =>
-      if (!existing && !pending.contains(data.hash)) {
-        escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
-          if (missingDeps.nonEmpty) {
-            missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
-          }
-
-          missingDeps.foreach { dep =>
-            missingIndex.get(dep) match {
-              case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
-              case None           => missingIndex(dep) = ArrayBuffer(data.hash)
+    if (!pending.contains(data.hash)) {
+      escapeIOError(blockFlow.contains(data.hash)) { existing =>
+        if (!existing) {
+          escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
+            if (missingDeps.nonEmpty) {
+              missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
             }
-          }
 
-          if (missingDeps.isEmpty) readies.addOne(data.hash)
+            missingDeps.foreach { dep =>
+              missingIndex.get(dep) match {
+                case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
+                case None           => missingIndex(dep) = ArrayBuffer(data.hash)
+              }
+            }
+
+            if (missingDeps.isEmpty) readies.addOne(data.hash)
+          }
+          // update this at the end of this function to avoid cache invalidation issues
+          pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
         }
-        // update this at the end of this function to avoid cache invalidation issues
-        pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
       }
     }
   }
