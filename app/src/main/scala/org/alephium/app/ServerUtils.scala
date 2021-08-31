@@ -19,6 +19,7 @@ package org.alephium.app
 import scala.concurrent._
 
 import akka.util.Timeout
+import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
@@ -40,7 +41,7 @@ class ServerUtils(implicit
     brokerConfig: BrokerConfig,
     networkConfig: NetworkConfig,
     executionContext: ExecutionContext
-) {
+) extends StrictLogging {
   import ServerUtils._
 
   def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
@@ -347,7 +348,8 @@ class ServerUtils(implicit
       case _: TxHandler.AddSucceeded =>
         Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case TxHandler.AddFailed(_, reason) =>
-        Left(failed(s"$reason"))
+        logger.warn(s"Failed in adding tx: $reason")
+        Left(failed(reason))
     }
   }
 
