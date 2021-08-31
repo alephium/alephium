@@ -24,9 +24,12 @@ import org.scalatest.concurrent.Eventually.eventually
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
+import org.alephium.serde.{serialize}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
+import org.alephium.util.Hex
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
@@ -76,8 +79,12 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "not broadcast invalid tx" in new Fixture {
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx)
-
-    expectMsg(TxHandler.AddFailed(tx.id))
+    expectMsg(
+      TxHandler.AddFailed(
+        tx.id,
+        s"Failed in validating tx ${tx.id.toHexString} due to ${NonExistInput}: ${hex(tx)}"
+      )
+    )
     broadcastTxProbe.expectNoMessage()
   }
 
@@ -94,7 +101,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
-      expectMsg(TxHandler.AddFailed(tx.id))
+      expectMsg(TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included"))
       broadcastTxProbe.expectNoMessage()
     }
   }
@@ -113,7 +120,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*double spending.*").intercept {
       txHandler ! addTx(tx1)
-      expectMsg(TxHandler.AddFailed(tx1.id))
+      expectMsg(
+        TxHandler.AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
+      )
       broadcastTxProbe.expectNoMessage()
     }
   }
@@ -223,6 +232,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     lazy val txHandler  = TestActorRef[TxHandler](TxHandler.props(blockFlow))
 
     def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate))
+    def hex(tx: Transaction)   = Hex.toHexString(serialize(tx.toTemplate))
 
     val broadcastTxProbe = TestProbe()
     system.eventStream.subscribe(broadcastTxProbe.ref, classOf[InterCliqueManager.BroadCastTx])

@@ -175,8 +175,8 @@ trait BrokerHandler extends FlowDataHandler {
       handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
-    case TxHandler.AddFailed(hash) =>
-      log.debug(s"Tx ${hash.shortHex} failed in adding")
+    case TxHandler.AddFailed(hash, reason) =>
+      log.debug(s"Tx ${hash.shortHex} failed in adding. Reason: ${reason}")
   }
 
   def dataOrigin: DataOrigin

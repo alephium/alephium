@@ -50,8 +50,8 @@ object TxHandler {
   private case object DownloadTxs                                                extends Command
 
   sealed trait Event
-  final case class AddSucceeded(txId: Hash) extends Event
-  final case class AddFailed(txId: Hash)    extends Event
+  final case class AddSucceeded(txId: Hash)              extends Event
+  final case class AddFailed(txId: Hash, reason: String) extends Event
 
   final case class Announcement(
       brokerHandler: ActorRefT[BrokerHandler.Command],
@@ -153,21 +153,17 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     val chainIndex = tx.chainIndex
     val mempool    = blockFlow.getMemPool(chainIndex)
     if (mempool.contains(chainIndex, tx)) {
-      log.debug(s"tx ${tx.id.toHexString} is already included")
-      addFailed(tx)
+      addFailed(tx, s"tx ${tx.id.toHexString} is already included")
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      log.warning(s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
-      addFailed(tx)
+      addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
     } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          log.warning(s"failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
-          addFailed(tx)
+          addFailed(tx, s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
         case Right(_) =>
           handleValidTx(chainIndex, tx, mempool, acknowledge = true)
         case Left(Left(e)) =>
-          log.warning(s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
-          addFailed(tx)
+          addFailed(tx, s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
       }
     }
   }
@@ -218,7 +214,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     sender() ! TxHandler.AddSucceeded(tx.id)
   }
 
-  def addFailed(tx: TransactionTemplate): Unit = {
-    sender() ! TxHandler.AddFailed(tx.id)
+  def addFailed(tx: TransactionTemplate, reason: String): Unit = {
+    sender() ! TxHandler.AddFailed(tx.id, reason: String)
   }
 }
