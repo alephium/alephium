@@ -111,7 +111,9 @@ trait WalletExamples extends ErrorExamples {
     simpleExample(WalletDeletion(password))
 
   implicit val balancesExamples: List[Example[Balances]] =
-    simpleExample(Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million))))
+    simpleExample(
+      Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million, None)))
+    )
 
   implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =
     simpleExample(RevealMnemonic(password))

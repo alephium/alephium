@@ -774,6 +774,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "utxosLimit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -5264,6 +5272,9 @@
           "balance": {
             "type": "string",
             "format": "uint256"
+          },
+          "warning": {
+            "type": "string"
           }
         }
       },

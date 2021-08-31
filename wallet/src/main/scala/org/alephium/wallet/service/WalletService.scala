@@ -67,7 +67,10 @@ trait WalletService extends Service {
       mnemonicPassphrase: Option[String]
   ): Either[WalletError, Unit]
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
-  def getBalances(wallet: String): Future[Either[WalletError, AVector[(Address.Asset, U256)]]]
+  def getBalances(
+      wallet: String,
+      utxosLimit: Option[Int]
+  ): Future[Either[WalletError, AVector[(Address.Asset, U256, Option[String])]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
   def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
   def getMinerAddresses(
@@ -299,12 +302,13 @@ object WalletService {
       }(Left.apply)
 
     override def getBalances(
-        wallet: String
-    ): Future[Either[WalletError, AVector[(Address.Asset, U256)]]] =
+        wallet: String,
+        utxosLimit: Option[Int]
+    ): Future[Either[WalletError, AVector[(Address.Asset, U256, Option[String])]]] =
       withAddressesFut(wallet) { case (_, addresses) =>
         Future
           .sequence(
-            addresses.toSeq.map(getBalance)
+            addresses.toSeq.map(getBalance(_, utxosLimit))
           )
           .map(AVector.from(_).mapE(identity))
       }
@@ -476,11 +480,16 @@ object WalletService {
     }
 
     private def getBalance(
-        address: Address.Asset
-    ): Future[Either[WalletError, (Address.Asset, U256)]] = {
+        address: Address.Asset,
+        utxosLimit: Option[Int]
+    ): Future[Either[WalletError, (Address.Asset, U256, Option[String])]] = {
       blockFlowClient
-        .fetchBalance(address)
-        .map(_.map(amount => (address, amount)).left.map(error => BlockFlowClientError(error)))
+        .fetchBalance(address, utxosLimit)
+        .map(
+          _.map { case (amount, warning) => (address, amount, warning) }.left.map(error =>
+            BlockFlowClientError(error)
+          )
+        )
     }
 
     private def withWalletM[A, M[_]](

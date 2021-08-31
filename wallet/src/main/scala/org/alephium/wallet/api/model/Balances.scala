@@ -22,5 +22,10 @@ import org.alephium.util.{AVector, U256}
 final case class Balances(totalBalance: U256, balances: AVector[Balances.AddressBalance])
 
 object Balances {
-  final case class AddressBalance(address: Address.Asset, balance: U256)
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  final case class AddressBalance(
+      address: Address.Asset,
+      balance: U256,
+      warning: Option[String] = None
+  )
 }
