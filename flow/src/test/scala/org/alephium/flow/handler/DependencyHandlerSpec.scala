@@ -224,7 +224,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       ("alephium.broker.groups", 1)
     )
 
-    val cacheSize = maxSyncBlocksPerChain * 11 / 10
+    val cacheSize = maxSyncBlocksPerChain * 2
     state.cacheSize is cacheSize
     val block0 = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
     state.addPendingData(block0, broker, origin)
@@ -245,7 +245,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
-      ("alephium.network.sync-cleanup-frequency", "2s")
+      ("alephium.network.sync-expiry-frequency", "2s")
     )
 
     val block0 = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))

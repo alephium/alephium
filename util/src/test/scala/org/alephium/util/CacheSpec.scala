@@ -68,17 +68,21 @@ class CacheSpec extends AlephiumSpec {
   }
 
   it should "remove elements based on capacity and timestamp" in {
-    val cache = Cache.fifo[Char, TimeStamp](2, identity[TimeStamp], Duration.ofSecondsUnsafe(2))
+    val cache = Cache.fifo[Char, TimeStamp](3, identity[TimeStamp], Duration.ofSecondsUnsafe(2))
 
     cache.put('a', TimeStamp.now())
     cache.put('b', TimeStamp.now())
     cache.put('c', TimeStamp.now())
-    cache.size is 2
-    cache.keys().toSeq is Seq('b', 'c')
-    Thread.sleep(2000)
+    cache.size is 3
+    cache.keys().toSeq is Seq('a', 'b', 'c')
+    Thread.sleep(1000)
     cache.put('d', TimeStamp.now())
-    cache.size is 1
-    cache.keys().toSeq is Seq('d')
+    cache.size is 3
+    cache.keys().toSeq is Seq('b', 'c', 'd')
+    Thread.sleep(1000)
+    cache.put('f', TimeStamp.now())
+    cache.size is 2
+    cache.keys().toSeq is Seq('d', 'f')
   }
 
   it should "clear all elements" in {
