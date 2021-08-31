@@ -143,8 +143,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): BlockValidationResult[Unit] = {
-    val reward    = consensusConfig.emission.miningReward(block.header)
-    val netReward = reward.addUnsafe(block.gasReward)
+    val miningReward = consensusConfig.emission.miningReward(block.header)
+    val netReward    = Transaction.totalReward(block.gasFee, miningReward)
     checkCoinbase(block, groupView, 0, 1, netReward)
   }
 
@@ -152,9 +152,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): BlockValidationResult[Unit] = {
-    val reward      = consensusConfig.emission.miningReward(block.header)
-    val burntAmount = consensusConfig.emission.burntAmountUnsafe(block.target, reward)
-    val netReward   = reward.addUnsafe(block.gasReward).subUnsafe(burntAmount)
+    val miningReward = consensusConfig.emission.miningReward(block.header)
+    val normalReward = Transaction.totalReward(block.gasFee, miningReward)
+    val burntAmount  = consensusConfig.emission.burntAmountUnsafe(block.target, miningReward)
+    val netReward    = normalReward.subUnsafe(burntAmount)
     checkCoinbase(block, groupView, 1, 2, netReward)
   }
 

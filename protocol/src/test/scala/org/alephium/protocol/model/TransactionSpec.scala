@@ -58,21 +58,21 @@ class TransactionSpec
     val script = LockupScript.p2pkh(PublicKey.generate)
     val coinbase0 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),
-      gasReward = U256.Zero,
+      gasFee = U256.Zero,
       script,
       target = Target.Max,
       blockTs = ALF.LaunchTimestamp
     )
     val coinbase1 = Transaction.coinbase(
       ChainIndex.unsafe(0, 1),
-      gasReward = U256.Zero,
+      gasFee = U256.Zero,
       script,
       target = Target.Max,
       blockTs = ALF.LaunchTimestamp
     )
     val coinbase2 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),
-      gasReward = U256.Zero,
+      gasFee = U256.Zero,
       script,
       target = Target.Max,
       blockTs = TimeStamp.now()
@@ -92,6 +92,15 @@ class TransactionSpec
       txSerialized.drop(unsignedSerialized.length) is merkelTxSerialized.drop(idSerialized.length)
 
       tx.merkleHash is Hash.hash(merkelTxSerialized)
+    }
+  }
+
+  it should "cap the gas reward" in {
+    Transaction.totalReward(1, 100) is U256.unsafe(100)
+    Transaction.totalReward(2, 100) is U256.unsafe(101)
+    Transaction.totalReward(200, 100) is U256.unsafe(200)
+    (201 until 300).foreach { k =>
+      Transaction.totalReward(k, 100) is U256.unsafe(200)
     }
   }
 }

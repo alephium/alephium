@@ -23,7 +23,7 @@ import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -132,18 +132,59 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     coinbaseData.startsWith(expected) is true
   }
 
-  it should "check coinbase reward" in new Fixture {
-    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
-    passCheck(checkCoinbase(block, blockFlow))
+  trait RewardFixture extends Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 1)
+    implicit class RichBlock(block: Block) {
+      def replaceCoinbaseReward(reward: U256): Block = {
+        val coinbaseOutputNew =
+          block.coinbase.unsigned.fixedOutputs.head.copy(amount = reward)
+        val coinbaseNew = block.coinbase.copy(
+          unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew))
+        )
+        val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
+        val blockNew = block.copy(transactions = txsNew)
+        blockNew.coinbaseReward is reward
+        blockNew
+      }
 
-    val miningReward      = consensusConfig.emission.miningReward(block.header)
-    val coinbaseOutputNew = block.coinbase.unsigned.fixedOutputs.head.copy(amount = miningReward)
-    val coinbaseNew = block.coinbase.copy(
-      unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew))
-    )
-    val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
-    val blockNew = block.copy(transactions = txsNew)
-    failCheck(checkCoinbase(blockNew, blockFlow), InvalidCoinbaseReward)
+      def replaceTxGas(reward: U256): Block = {
+        val tx       = block.nonCoinbase.head
+        val gas      = tx.unsigned.gasAmount
+        val gasPrice = reward.divUnsafe(gas.value)
+        val newTx    = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(gasPrice)))
+        val newBlock = block.copy(transactions = AVector(newTx, block.coinbase))
+        reMine(blockFlow, chainIndex, newBlock)
+      }
+
+      def fail(): Block = {
+        failCheck(checkCoinbase(block, blockFlow), InvalidCoinbaseReward)
+        block
+      }
+
+      def pass(): Block = {
+        passCheck(checkCoinbase(block, blockFlow))
+        block
+      }
+    }
+  }
+
+  it should "check coinbase reward" in new RewardFixture {
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)).pass()
+
+    val miningReward = consensusConfig.emission.miningReward(block.header)
+    block.replaceCoinbaseReward(miningReward).fail()
+    block.replaceCoinbaseReward(miningReward.subUnsafe(defaultGasFee)).pass()
+  }
+
+  it should "check gas reward cap" in new RewardFixture {
+    val block = transfer(blockFlow, ChainIndex.unsafe(0, 1)).pass()
+
+    val miningReward = consensusConfig.emission.miningReward(block.header)
+    val block1       = block.replaceTxGas(miningReward).fail()
+    block1.replaceCoinbaseReward(miningReward + (block1.gasFee / 2) - defaultGasFee).pass()
+
+    val block2 = block.replaceTxGas(miningReward * 3).fail()
+    block2.replaceCoinbaseReward(miningReward * 2 - defaultGasFee).pass()
   }
 
   it should "check non-empty txs" in new Fixture {
