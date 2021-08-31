@@ -99,13 +99,13 @@ trait DependencyHandlerState extends IOBaseActor {
   def networkSetting: NetworkSetting
 
   val cacheSize =
-    maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 11 / 10 // slightly larger than maxSyncBlocks
+    maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 2 // slightly larger than maxSyncBlocks
   val pending = Cache.fifo[BlockHash, PendingStatus] {
     (map: LinkedHashMap[BlockHash, PendingStatus], eldest: JMap.Entry[BlockHash, PendingStatus]) =>
       if (map.size > cacheSize) {
         removePending(eldest.getKey())
       }
-      val threshold = TimeStamp.now().minusUnsafe(networkSetting.syncCleanupFrequency)
+      val threshold = TimeStamp.now().minusUnsafe(networkSetting.syncExpiryPeriod)
       if (eldest.getValue().timestamp <= threshold) {
         val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
         val iterator = map.entrySet().iterator()
@@ -134,8 +134,6 @@ trait DependencyHandlerState extends IOBaseActor {
   ): Unit = {
     escapeIOError(blockFlow.contains(data.hash)) { existing =>
       if (!existing && !pending.contains(data.hash)) {
-        pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
-
         escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
           if (missingDeps.nonEmpty) {
             missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
@@ -150,6 +148,8 @@ trait DependencyHandlerState extends IOBaseActor {
 
           if (missingDeps.isEmpty) readies.addOne(data.hash)
         }
+        // update this at the end of this function to avoid cache invalidation issues
+        pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
       }
     }
   }
