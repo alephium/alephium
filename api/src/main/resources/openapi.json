@@ -981,7 +981,7 @@
         "tags": [
           "Wallets"
         ],
-        "summary": "Transfer ALF",
+        "summary": "Transfer ALPH",
         "operationId": "postWalletsWallet_nameTransfer",
         "parameters": [
           {
@@ -1110,7 +1110,7 @@
         "tags": [
           "Wallets"
         ],
-        "summary": "Transfer all ALF to an address",
+        "summary": "Transfer all ALPH to an address",
         "operationId": "postWalletsWallet_nameSweep-all",
         "parameters": [
           {
