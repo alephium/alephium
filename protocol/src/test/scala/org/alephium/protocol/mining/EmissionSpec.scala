@@ -48,6 +48,11 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     (BigDecimal(amount.toBigInt) / BigDecimal(ALF.MaxALFValue.toBigInt)).doubleValue
   }
 
+  implicit class RichTarget(target: Target) {
+    def *(n: Int): Target = Target.unsafe(target.value * n)
+    def /(n: Int): Target = Target.unsafe(target.value / n)
+  }
+
   trait Fixture {
     val groupConfig = new GroupConfig {
       override def groups: Int = 2
@@ -59,11 +64,11 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     emission.blocksInAboutOneYearPerChain is 492750
     emission.durationToStableMaxReward is Duration.ofHoursUnsafe(4 * 365 * 24)
 
-    val maxRewards = emission.blocksInAboutOneYearPerChain.mulUnsafe(Emission.initialMaxReward)
+    val maxRewards = Emission.initialMaxReward * emission.blocksInAboutOneYearPerChain
     val maxRate    = getInflationRate(maxRewards)
     (maxRate > 0.029 && maxRate < 0.03) is true
 
-    val stableRewards = emission.blocksInAboutOneYearPerChain.mulUnsafe(Emission.stableMaxReward)
+    val stableRewards = Emission.stableMaxReward * emission.blocksInAboutOneYearPerChain
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
   }
@@ -82,9 +87,7 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       .alf(5)
   }
 
-  def halfDifficulty(target: Target): Target = {
-    Target.unsafe(target.value.multiply(BigInteger.valueOf(2)))
-  }
+  def halfDifficulty(target: Target): Target = target * 2
 
   def average(reward0: U256, reward1: U256): U256 = {
     reward0.addUnsafe(reward1).divUnsafe(U256.Two)
@@ -111,12 +114,15 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   it should "take the least reward" in new Fixture {
     import emission._
 
-    equalU256(reward(Target.Max, TimeStamp.zero, TimeStamp.zero), lowHashRateInitialRewardPerChain)
+    equalU256(
+      reward(Target.Max, TimeStamp.zero, TimeStamp.zero).miningReward,
+      lowHashRateInitialRewardPerChain
+    )
     reward(
       onePhPerSecondDivided,
       TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
       TimeStamp.zero
-    ) is stableMaxRewardPerChain
+    ).miningReward is stableMaxRewardPerChain
   }
 
   behavior of "PoLW"
@@ -126,19 +132,16 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
 
     assertThrows[AssertionError](burntAmountUnsafe(oneEhPerSecondDivided, U256.One))
     assertThrows[AssertionError](burntAmountUnsafe(onePhPerSecondDivided, U256.One))
-    assertThrows[AssertionError](poLWTargetUnsafe(oneEhPerSecondDivided))
-    assertThrows[AssertionError](poLWTargetUnsafe(onePhPerSecondDivided))
+    assertThrows[AssertionError](polwTargetUnsafe(oneEhPerSecondDivided))
+    assertThrows[AssertionError](polwTargetUnsafe(onePhPerSecondDivided))
   }
 
   it should "calculate correct poLW target" in new Fixture {
     import emission._
 
+    // the polw hashrate should be ~8 time higher and the polw target should be ~8 times smaller
     def check(target: Target): Assertion = {
-      equalBigInt(
-        poLWTargetUnsafe(target).value,
-        target.value.multiply(BigInteger.valueOf(8)),
-        1
-      )
+      equalBigInt(polwTargetUnsafe(target).value, target.value / 8, 1)
     }
 
     check(a128EhPerSecondDivided)
@@ -151,7 +154,7 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     def check(target: Target): Assertion = {
       equalU256(
         emission.burntAmountUnsafe(target, U256.Billion),
-        U256.Billion * 3 / 4,
+        U256.Billion * 7 / 8,
         1
       )
     }
@@ -159,6 +162,18 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     check(a128EhPerSecondDivided)
     check(Target.unsafe(a128EhPerSecondDivided.value.multiply(2)))
   }
+
+  it should "calculate correct reward" in new Fixture {
+    import emission._
+
+    val now = TimeStamp.now()
+    reward(Target.Max, now, now) is Emission.PoW(rewardWrtTarget(Target.Max))
+    val polwReward = reward(oneEhPerSecondDivided / 2, now, now).asInstanceOf[Emission.PoLW]
+    polwReward.miningReward is rewardWrtTarget(oneEhPerSecondDivided / 9)
+    polwReward.burntAmount is burntAmountUnsafe(oneEhPerSecondDivided / 9, polwReward.miningReward)
+  }
+
+  behavior of "Inflation"
 
   trait InflationFixture {
     val groupConfig: GroupConfig = new GroupConfig {

@@ -61,13 +61,22 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   def shareHashRate(hashRate: HashRate): HashRate =
     HashRate.unsafe(hashRate.value.divide(BigInteger.valueOf(groupConfig.chainNum.toLong)))
 
-  def miningReward(header: BlockHeader): U256 =
+  def reward(header: BlockHeader): Emission.RewardType =
     reward(header.target, header.timestamp, ALF.LaunchTimestamp)
 
-  def reward(target: Target, blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
+  def reward(powTarget: Target, blockTs: TimeStamp, launchTs: TimeStamp): Emission.RewardType = {
     val timeBasedReward = rewardWrtTime(blockTs, launchTs)
-    val adjustedReward  = rewardWrtTarget(target)
-    Math.min(timeBasedReward, adjustedReward)
+    if (shouldEnablePoLW(powTarget)) {
+      val polwTarget        = polwTargetUnsafe(powTarget)
+      val targetBasedReward = rewardWrtTarget(polwTarget)
+      val miningReward      = Math.min(timeBasedReward, targetBasedReward)
+      val burntAmount       = burntAmountUnsafe(polwTarget, miningReward)
+      Emission.PoLW(miningReward, burntAmount)
+    } else {
+      val targetBasedReward = rewardWrtTarget(powTarget)
+      val miningReward      = Math.min(timeBasedReward, targetBasedReward)
+      Emission.PoW(miningReward)
+    }
   }
 
   // mining reward with respect to time
@@ -111,36 +120,33 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     }
   }
 
-  def canEnablePoLW(target: Target): Boolean = {
+  def shouldEnablePoLW(target: Target): Boolean = {
     target < oneEhPerSecondDivided
   }
 
   // the amount to burn is reward * 7/8 (1 - 1Eh/s / HR)
-  // to encourage burning, we reduce the ratio from 7/8 to 3/4
   def burntAmountUnsafe(target: Target, miningReward: U256): U256 = {
-    assume(canEnablePoLW(target))
+    assume(shouldEnablePoLW(target))
     val amount = miningReward.toBigInt
       .multiply(oneEhPerSecondDivided.value.subtract(target.value))
       .divide(oneEhPerSecondDivided.value)
-      .multiply(BigInteger.valueOf(3))
-      .divide(BigInteger.valueOf(4))
+      .multiply(BigInteger.valueOf(7))
+      .divide(BigInteger.valueOf(8))
     U256.unsafe(amount)
   }
 
-  val oneEhPerSecondDividedHashRate: HashRate =
-    HashRate.from(oneEhPerSecondDivided, blockTargetTime)
+  private val polwWeight: BigInteger = BigInteger.valueOf(8)
+  private val sevenEhPerSecondDivided: BigInteger =
+    HashRate.from(oneEhPerSecondDivided, blockTargetTime).value.multiply(BigInteger.valueOf(7))
 
   // the true hash rate for energy-based mining is (HR * 1/8 + 1Eh/s * 7/8)
-  // we could reduce energy consumption by ~1/8 when hash rate is significantly high
-  def poLWTargetUnsafe(target: Target): Target = {
-    assume(canEnablePoLW(target))
-    val hashRate = HashRate.from(target, blockTargetTime)
-    val powHashRate =
-      hashRate.value
-        .add(oneEhPerSecondDividedHashRate.value.multiply(BigInteger.valueOf(7)))
-        .divide(BigInteger.valueOf(8))
-    val powTarget = Target.from(HashRate.unsafe(powHashRate), blockTargetTime)
-    powTarget
+  // we could reduce energy consumption by ~7/8 when hash rate is significantly high
+  def polwTargetUnsafe(powTarget: Target): Target = {
+    assume(shouldEnablePoLW(powTarget))
+    val powHashRate  = HashRate.from(powTarget, blockTargetTime)
+    val polwHashRate = powHashRate.value.multiply(polwWeight).subtract(sevenEhPerSecondDivided)
+    val polwTarget   = Target.from(HashRate.unsafe(polwHashRate), blockTargetTime)
+    polwTarget
   }
 
   private def calRewardsPerYear(rewardPerChain: U256) = {
@@ -185,4 +191,10 @@ object Emission {
   val yearsUntilStable: Int   = 4
   val yearsUntilNoReward: Int = 82
   //scalastyle:on magic.number
+
+  sealed trait RewardType {
+    def miningReward: U256
+  }
+  final case class PoW(miningReward: U256)                     extends RewardType
+  final case class PoLW(miningReward: U256, burntAmount: U256) extends RewardType
 }

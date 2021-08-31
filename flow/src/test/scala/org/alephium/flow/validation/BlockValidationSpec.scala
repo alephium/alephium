@@ -21,9 +21,9 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALF, BlockHash, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -63,73 +63,145 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
   }
 
-  def coinbase(
-      chainIndex: ChainIndex,
-      gasReward: U256,
-      lockupScript: LockupScript.Asset
-  ): Transaction = {
-    Transaction.coinbase(chainIndex, gasReward, lockupScript, Target.Max, TimeStamp.now())
+  trait CoinbaseFixture extends Fixture {
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
+
+    def newCoinbase(chainIndex: ChainIndex): Transaction = {
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block.coinbase
+    }
   }
 
-  it should "validate coinbase transaction simple format" in new Fixture {
-    val (privateKey, publicKey) = SignatureSchema.generatePriPub()
-    val lockupScript            = LockupScript.p2pkh(publicKey)
-    val block0 =
-      Block.from(
-        AVector.fill(groupConfig.depsNum)(BlockHash.zero),
-        Hash.zero,
-        AVector.empty,
-        consensusConfig.maxMiningTarget,
-        TimeStamp.zero,
-        Nonce.zero
-      )
-
-    val input0          = txInputGen.sample.get
+  it should "validate coinbase transaction simple format" in new CoinbaseFixture {
+    val (privateKey, _) = SignatureSchema.generatePriPub()
+    val block0          = emptyBlock(blockFlow, chainIndex)
     val output0         = assetOutputGen.sample.get
-    val emptyInputs     = AVector.empty[TxInput]
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
+    val script          = StatefulScript.alwaysFail
+    val coinbase        = newCoinbase(block0.chainIndex).pass()
+    val testSignatures =
+      AVector[Signature](SignatureSchema.sign(coinbase.unsigned.hash.bytes, privateKey))
 
-    val coinbase1     = coinbase(block0.chainIndex, 0, lockupScript)
-    val testSignature = AVector(SignatureSchema.sign(coinbase1.unsigned.hash.bytes, privateKey))
-    val block1        = block0.copy(transactions = AVector(coinbase1))
-    passCheck(checkCoinbaseEasy(block1, 0, 1))
+    implicit class RichCoinbase(coinbase: Transaction) {
+      def update(f: UnsignedTransaction => UnsignedTransaction): Transaction = {
+        coinbase.copy(unsigned = f(coinbase.unsigned))
+      }
 
-    val coinbase2 = Transaction.from(AVector(input0), AVector(output0), emptySignatures)
-    val block2    = block0.copy(transactions = AVector(coinbase2))
-    failCheck(checkCoinbaseEasy(block2, 0, 1), InvalidCoinbaseFormat)
+      def pass() = {
+        val block = block0.copy(transactions = AVector(coinbase))
+        passCheck(checkCoinbaseEasy(block, 1))
+        coinbase
+      }
 
-    val coinbase3 = Transaction.from(emptyInputs, emptyOutputs, testSignature)
-    val block3    = block0.copy(transactions = AVector(coinbase3))
-    failCheck(checkCoinbaseEasy(block3, 0, 1), InvalidCoinbaseFormat)
+      def fail() = {
+        val block = block0.copy(transactions = AVector(coinbase))
+        failCheck(checkCoinbaseEasy(block, 1), InvalidCoinbaseFormat)
+        coinbase
+      }
 
-    val coinbase4 = Transaction.from(emptyInputs, AVector(output0), testSignature)
-    val block4    = block0.copy(transactions = AVector(coinbase4))
-    failCheck(checkCoinbaseEasy(block4, 0, 1), InvalidCoinbaseFormat)
+      def testNegPos(
+          negative: UnsignedTransaction => UnsignedTransaction,
+          positive: UnsignedTransaction => UnsignedTransaction
+      ) = {
+        update(negative).fail()
+        update(positive).pass()
+      }
 
-    val coinbase5 = Transaction.from(AVector(input0), AVector(output0), emptySignatures)
-    val block5    = block0.copy(transactions = AVector(coinbase5))
-    failCheck(checkCoinbaseEasy(block5, 0, 1), InvalidCoinbaseFormat)
+      def testTxNegPos(
+          negative: Transaction => Transaction,
+          positive: Transaction => Transaction
+      ) = {
+        negative(coinbase).fail()
+        positive(coinbase).pass()
+      }
+    }
 
-    val coinbase6 = Transaction.from(emptyInputs, emptyOutputs, emptySignatures)
-    val block6    = block0.copy(transactions = AVector(coinbase6))
-    failCheck(checkCoinbaseEasy(block6, 0, 1), InvalidCoinbaseFormat)
+    info("script")
+    coinbase.testNegPos(
+      _.copy(scriptOpt = Some(script)),
+      _.copy(scriptOpt = None)
+    )
 
-    val coinbase7 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), testSignature)
-    val block7    = block0.copy(transactions = AVector(coinbase7))
-    failCheck(checkCoinbaseEasy(block7, 0, 1), InvalidCoinbaseFormat)
+    info("gasAmount")
+    coinbase.testNegPos(
+      _.copy(gasAmount = GasBox.from(0).get),
+      _.copy(gasAmount = minimalGas)
+    )
 
-    val coinbase8 = Transaction.from(emptyInputs, emptyOutputs, AVector(output0), emptySignatures)
-    val block8    = block0.copy(transactions = AVector(coinbase8))
-    failCheck(checkCoinbaseEasy(block8, 0, 1), InvalidCoinbaseFormat)
+    info("gasPrice")
+    coinbase.testNegPos(
+      _.copy(gasPrice = GasPrice(U256.Zero)),
+      _.copy(gasPrice = defaultGasPrice)
+    )
+
+    info("output length")
+    coinbase.testNegPos(
+      _.copy(fixedOutputs = emptyOutputs),
+      _.copy(fixedOutputs = AVector(output0))
+    )
+
+    info("output token")
+    coinbase.testNegPos(
+      _.copy(fixedOutputs = AVector(output0.copy(tokens = AVector(Hash.zero -> 10)))),
+      _.copy(fixedOutputs = AVector(output0))
+    )
+
+    info("contract input")
+    coinbase.testTxNegPos(
+      _.copy(contractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)),
+      _.copy(contractInputs = AVector.empty)
+    )
+
+    info("generated output")
+    coinbase.testTxNegPos(
+      _.copy(generatedOutputs = AVector(output0)),
+      _.copy(generatedOutputs = emptyOutputs.as[TxOutput])
+    )
+
+    info("input signature")
+    coinbase.testTxNegPos(
+      _.copy(inputSignatures = testSignatures),
+      _.copy(inputSignatures = emptySignatures)
+    )
+
+    info("contract signature")
+    coinbase.testTxNegPos(
+      _.copy(contractSignatures = testSignatures),
+      _.copy(contractSignatures = emptySignatures)
+    )
   }
 
-  it should "check coinbase data" in new Fixture {
-    val block        = blockGenOf(brokerConfig).sample.get
-    val chainIndex   = block.chainIndex
+  it should "check coinbase data" in new CoinbaseFixture {
+    val block = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
     val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
     val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
     coinbaseData.startsWith(expected) is true
+  }
+
+  it should "check coinbase locked amount" in new CoinbaseFixture {
+    val block = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    val coinbase     = block.coinbase
+    val outputs      = coinbase.unsigned.fixedOutputs
+    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    val lockedAmount = miningReward - defaultGasFee
+    passCheck(checkLockedReward(block, lockedAmount))
+
+    def replace(f: AssetOutput => AssetOutput): Block = {
+      val coinbase1 = coinbase.copy(unsigned =
+        coinbase.unsigned.copy(fixedOutputs = outputs.replace(0, f(outputs.head)))
+      )
+      block.copy(transactions = AVector(coinbase1))
+    }
+
+    val block1 = replace(_.copy(amount = U256.One))
+    failCheck(checkLockedReward(block1, lockedAmount), InvalidCoinbaseLockedAmount)
+
+    val block2 = replace(_.copy(lockTime = TimeStamp.now()))
+    failCheck(checkLockedReward(block2, lockedAmount), InvalidCoinbaseLockupPeriod)
   }
 
   trait RewardFixture extends Fixture {
@@ -171,7 +243,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   it should "check coinbase reward" in new RewardFixture {
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)).pass()
 
-    val miningReward = consensusConfig.emission.miningReward(block.header)
+    val miningReward = consensusConfig.emission.reward(block.header).miningReward
     block.replaceCoinbaseReward(miningReward).fail()
     block.replaceCoinbaseReward(miningReward.subUnsafe(defaultGasFee)).pass()
   }
@@ -179,7 +251,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   it should "check gas reward cap" in new RewardFixture {
     val block = transfer(blockFlow, ChainIndex.unsafe(0, 1)).pass()
 
-    val miningReward = consensusConfig.emission.miningReward(block.header)
+    val miningReward = consensusConfig.emission.reward(block.header).miningReward
     val block1       = block.replaceTxGas(miningReward).fail()
     block1.replaceCoinbaseReward(miningReward + (block1.gasFee / 2) - defaultGasFee).pass()
 

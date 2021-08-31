@@ -35,10 +35,6 @@ final case class BlockHeader(
 ) extends FlowData {
   lazy val hash: BlockHash = PoW.hash(this)
 
-  def isPoLWEnabled: Boolean = (version & 0x80) != 0
-
-  def unmaskedVersion: Byte = (version & 0x7f).toByte
-
   lazy val chainIndex: ChainIndex = {
     val groups = (blockDeps.length + 1) / 2
     ChainIndex.from(hash, groups)

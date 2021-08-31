@@ -21,6 +21,7 @@ import akka.util.ByteString
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
 import org.alephium.protocol.config.{EmissionConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -255,11 +256,14 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
-    val netReward    = totalReward(gasFee, miningReward).subUnsafe(defaultGasFee)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
     val lockTime     = blockTs + coinbaseLockupPeriod
+    val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
+    val netReward = miningReward match {
+      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward).subUnsafe(defaultGasFee)
+      case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
+    }
 
     val txOutput =
       AssetOutput(

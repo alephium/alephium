@@ -60,6 +60,8 @@ final case object TooManyGasUsed                         extends InvalidBlockSta
 final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus
 final case object InvalidCoinbaseData                    extends InvalidBlockStatus
 final case object InvalidCoinbaseReward                  extends InvalidBlockStatus
+final case object InvalidCoinbaseLockedAmount            extends InvalidBlockStatus
+final case object InvalidCoinbaseLockupPeriod            extends InvalidBlockStatus
 final case object InvalidTxsMerkleRoot                   extends InvalidBlockStatus
 final case object BlockDoubleSpending                    extends InvalidBlockStatus
 final case class ExistInvalidTx(e: InvalidTxStatus)      extends InvalidBlockStatus
