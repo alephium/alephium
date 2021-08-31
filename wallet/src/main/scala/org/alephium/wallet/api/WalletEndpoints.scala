@@ -104,7 +104,7 @@ trait WalletEndpoints
       .in("transfer")
       .in(jsonBody[Transfer])
       .out(jsonBody[Transfer.Result])
-      .summary("Transfer ALF")
+      .summary("Transfer ALPH")
 
   val sign: BaseEndpoint[(String, Sign), Sign.Result] =
     wallet.post
@@ -118,7 +118,7 @@ trait WalletEndpoints
       .in("sweep-all")
       .in(jsonBody[SweepAll])
       .out(jsonBody[Transfer.Result])
-      .summary("Transfer all ALF to an address")
+      .summary("Transfer all ALPH to an address")
 
   val getAddresses: BaseEndpoint[String, Addresses] =
     wallet.get
