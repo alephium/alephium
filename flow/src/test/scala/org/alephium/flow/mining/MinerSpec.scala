@@ -25,6 +25,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.MiningBlob
+import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, Duration}
@@ -92,7 +93,7 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
 
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     miner.underlyingActor.isRunning(0, 0) is true
-    miner ! BlockChainHandler.InvalidBlock(block.hash)
+    miner ! BlockChainHandler.InvalidBlock(block.hash, InvalidBlockVersion)
     miner.underlyingActor.isRunning(0, 0) is false
     awaitForBlocks(3)
   }

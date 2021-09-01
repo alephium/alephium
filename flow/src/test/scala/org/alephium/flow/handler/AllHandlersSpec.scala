@@ -20,6 +20,7 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.validation.InvalidWorkAmount
 import org.alephium.protocol.{BlockHash, Generators}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.util.AVector
@@ -75,7 +76,7 @@ class AllHandlersSpec extends AlephiumFlowActorSpec {
         DataOrigin.InterClique(brokerInfoGen.sample.get)
       )
 
-    expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash))
+    expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidWorkAmount))
     blockFlow.contains(invalidBlock) isE false
 
     allHandlers.dependencyHandler ! DependencyHandler.GetPendings
@@ -93,7 +94,7 @@ class AllHandlersSpec extends AlephiumFlowActorSpec {
       testActor,
       DataOrigin.Local
     )
-    expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash))
+    expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidWorkAmount))
     blockFlow.contains(invalidBlock) isE false
   }
 }

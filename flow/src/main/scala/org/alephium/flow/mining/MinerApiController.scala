@@ -131,9 +131,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     case ViewHandler.NewTemplates(templates)                 => publishTemplates(templates)
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash)                  => handleSubmittedBlock(hash, succeeded = true)
-    case BlockChainHandler.InvalidBlock(hash) =>
+    case BlockChainHandler.InvalidBlock(hash, reason) =>
       handleSubmittedBlock(hash, succeeded = false)
-      log.error(s"Mined an invalid block ${hash.shortHex}")
+      log.error(s"Mined an invalid block ${hash.shortHex} due to: $reason")
   }
 
   def publishTemplates(templatess: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {

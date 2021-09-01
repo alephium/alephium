@@ -24,6 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.setting.AlephiumConfigFixture
+import org.alephium.flow.validation.{InvalidBlockVersion, InvalidTxsMerkleRoot}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
@@ -162,7 +163,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     )
     interCliqueListener.expectMsg(interCliqueMessage)
     intraCliqueListener.expectNoMessage()
-    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash))
+    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidTxsMerkleRoot))
   }
 
   it should "not broadcast block if the block header is invalid" in new Fixture {
@@ -175,6 +176,6 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     validateBlock(invalidBlock)
     interCliqueListener.expectNoMessage()
     intraCliqueListener.expectNoMessage()
-    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash))
+    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidBlockVersion))
   }
 }

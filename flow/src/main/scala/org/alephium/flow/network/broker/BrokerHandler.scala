@@ -27,7 +27,7 @@ import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.Validation
+import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
@@ -158,14 +158,17 @@ trait BrokerHandler extends FlowDataHandler {
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def flowEvents: Receive = {
     case BlockChainHandler.BlockAdded(hash) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
     case BlockChainHandler.BlockAddingFailed =>
       log.debug(s"Failed in adding new block")
-    case BlockChainHandler.InvalidBlock(hash) =>
+    case BlockChainHandler.InvalidBlock(hash, reason) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
-      handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
+      if (reason.isInstanceOf[InvalidHeaderStatus]) {
+        handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
+      }
     case HeaderChainHandler.HeaderAdded(_) =>
       ()
     case HeaderChainHandler.HeaderAddingFailed =>

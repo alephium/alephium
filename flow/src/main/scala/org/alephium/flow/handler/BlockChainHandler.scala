@@ -49,10 +49,10 @@ object BlockChainHandler {
   final case class Validate(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
 
-  sealed trait Event                             extends ChainHandler.Event
-  final case class BlockAdded(hash: BlockHash)   extends Event
-  case object BlockAddingFailed                  extends Event
-  final case class InvalidBlock(hash: BlockHash) extends Event
+  sealed trait Event                                                         extends ChainHandler.Event
+  final case class BlockAdded(hash: BlockHash)                               extends Event
+  case object BlockAddingFailed                                              extends Event
+  final case class InvalidBlock(hash: BlockHash, reason: InvalidBlockStatus) extends Event
 
   val blocksTotal: Gauge = Gauge
     .build(
@@ -143,7 +143,8 @@ class BlockChainHandler(
 
   override def dataAddingFailed(): Event = BlockAddingFailed
 
-  override def dataInvalid(data: Block): Event = InvalidBlock(data.hash)
+  override def dataInvalid(data: Block, reason: InvalidBlockStatus): Event =
+    InvalidBlock(data.hash, reason)
 
   override def addDataToBlockFlow(block: Block): IOResult[Unit] = {
     blockFlow.add(block)

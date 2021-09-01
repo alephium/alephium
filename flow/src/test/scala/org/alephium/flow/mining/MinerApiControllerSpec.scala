@@ -25,6 +25,7 @@ import org.scalatest.concurrent.Eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
+import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, SocketUtil}
@@ -108,7 +109,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val feedback = if (succeeded) {
       BlockChainHandler.BlockAdded(block.hash)
     } else {
-      BlockChainHandler.InvalidBlock(block.hash)
+      BlockChainHandler.InvalidBlock(block.hash, InvalidBlockVersion)
     }
     minerApiController ! feedback
     probe0.expectMsgPF() { case Tcp.Received(data) =>

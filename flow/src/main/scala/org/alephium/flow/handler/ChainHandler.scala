@@ -106,9 +106,9 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     chainValidationDurationMilliSecondsLabeled.observe(elapsedMilliSeconds)
 
     validationResult match {
-      case Left(Left(e))                 => handleIOError(data, broker, e)
-      case Left(Right(x: InvalidStatus)) => handleInvalidData(data, broker, origin, x)
-      case Right(_)                      => handleValidData(data, broker, origin)
+      case Left(Left(e))  => handleIOError(data, broker, e)
+      case Left(Right(x)) => handleInvalidData(data, broker, origin, x)
+      case Right(_)       => handleValidData(data, broker, origin)
     }
   }
 
@@ -132,7 +132,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
       data: T,
       broker: ActorRefT[ChainHandler.Event],
       origin: DataOrigin,
-      status: InvalidStatus
+      status: S
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.warning(s"Invalid block/header ${data.hash.toHexString}: $status : $blockHex")
@@ -141,7 +141,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     if (!origin.isLocal) {
       sender() ! DependencyHandler.Invalid(data.hash)
     }
-    broker ! dataInvalid(data)
+    broker ! dataInvalid(data, status)
   }
 
   def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
@@ -168,7 +168,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
 
   def dataAddingFailed(): Event
 
-  def dataInvalid(data: T): Event
+  def dataInvalid(data: T, reason: S): Event
 
   def show(data: T): String
 
