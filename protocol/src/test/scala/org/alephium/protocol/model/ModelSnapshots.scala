@@ -42,6 +42,16 @@ trait ModelSnapshots extends AlephiumFixture with OptionValues {
       serialized
     }
 
+    def fail(name: String): ByteString = {
+      val filePath   = Paths.get(s"$baseDir/$name.serialized.txt")
+      val serialized = Hex.from(Files.readString(filePath)).value
+
+      serialize(model) isnot serialized
+      deserialize[T](serialized) isnotE model
+
+      serialized
+    }
+
     // Use this when the serialized format on disk *should* be updated.
     def update(name: String): Path = {
       val filePath = Paths.get(s"$baseDir/$name.serialized.txt")
