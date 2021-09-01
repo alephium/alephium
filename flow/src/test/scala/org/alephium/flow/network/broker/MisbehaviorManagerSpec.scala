@@ -87,7 +87,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
   it should "unban after a given amount of time" in new Fixture {
     override val banDuration = Duration.zero
 
-    misbehaviorManager ! InvalidMessage(peer)
+    misbehaviorManager ! InvalidFlowData(peer)
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 
     eventually {
@@ -97,7 +97,7 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "manually unban" in new Fixture {
-    misbehaviorManager ! InvalidMessage(peer)
+    misbehaviorManager ! InvalidFlowData(peer)
 
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 

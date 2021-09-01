@@ -71,13 +71,15 @@ object MisbehaviorManager {
     val penalty: Int = 10
   }
 
-  final case class InvalidMessage(remoteAddress: InetSocketAddress)          extends Critical
+  final case class InvalidFlowData(remoteAddress: InetSocketAddress)         extends Critical
   final case class InvalidPoW(remoteAddress: InetSocketAddress)              extends Critical
   final case class InvalidGroup(remoteAddress: InetSocketAddress)            extends Critical
   final case class InvalidPingPongCritical(remoteAddress: InetSocketAddress) extends Critical
 
   final case class Spamming(remoteAddress: InetSocketAddress)              extends Warning
   final case class InvalidFlowChainIndex(remoteAddress: InetSocketAddress) extends Warning
+  final case class DeepForkBlock(remoteAddress: InetSocketAddress)         extends Warning
+  final case class SerdeError(remoteAddress: InetSocketAddress)            extends Warning
 
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Uncertain

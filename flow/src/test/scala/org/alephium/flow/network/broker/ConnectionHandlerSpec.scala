@@ -56,7 +56,7 @@ class ConnectionHandlerSpec extends AlephiumActorSpec with AlephiumConfigFixture
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     connectionHandler ! Tcp.Received(handshakeMessageBytes)
-    listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
+    listener.expectMsg(MisbehaviorManager.SerdeError(remoteAddress))
   }
 
   it should "read data from connection" in new Fixture {

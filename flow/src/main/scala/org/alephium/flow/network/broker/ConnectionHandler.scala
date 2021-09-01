@@ -266,11 +266,11 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
       case Right(None) => ()
       case Left(error) =>
         log.debug(s"Message deserialization error: $error")
-        handleInvalidMessage(MisbehaviorManager.InvalidMessage(remoteAddress))
+        handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
     }
   }
 
-  def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
+  def handleInvalidMessage(message: MisbehaviorManager.SerdeError): Unit = {
     publishEvent(message)
   }
 }
