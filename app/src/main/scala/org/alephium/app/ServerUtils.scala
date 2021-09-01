@@ -68,7 +68,7 @@ class ServerUtils(implicit
           balanceRequest.address.lockupScript,
           utxosLimit
         )
-        .map(Balance(_, utxosLimit))
+        .map(Balance.from(_, utxosLimit))
         .left
         .flatMap(failed)
     } yield balance
