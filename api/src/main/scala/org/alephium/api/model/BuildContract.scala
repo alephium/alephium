@@ -17,5 +17,12 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 
-final case class BuildContract(fromPublicKey: PublicKey, code: String)
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildContract(
+    fromPublicKey: PublicKey,
+    code: String,
+    gas: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None
+)

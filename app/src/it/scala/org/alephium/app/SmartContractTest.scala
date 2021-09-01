@@ -66,7 +66,8 @@ class SmartContractTest extends AlephiumActorSpec {
         buildContract(s"""
         {
           "fromPublicKey": "$publicKey",
-          "code": "${compileResult.code}"
+          "code": "${compileResult.code}",
+          "gas": 100000
         }"""),
         restPort
       )
