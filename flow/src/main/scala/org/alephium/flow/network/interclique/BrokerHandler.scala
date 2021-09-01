@@ -54,9 +54,11 @@ trait BrokerHandler extends BaseBrokerHandler {
           seenBlocks.put(block.hash, ())
           val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
           allHandlers.dependencyHandler ! message
-        case _ =>
+        case Right(false) =>
           log.debug(s"Receive new block ${block.shortHex} which have invalid height")
           handleMisbehavior(MisbehaviorManager.DeepForkBlock(remoteAddress))
+        case Left(error) =>
+          log.debug(s"IO error in validating block height: $error")
       }
     }
   }
