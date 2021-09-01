@@ -165,14 +165,14 @@ trait BrokerHandler extends FlowDataHandler {
       log.debug(s"Failed in adding new block")
     case BlockChainHandler.InvalidBlock(hash) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
-      handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+      handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
     case HeaderChainHandler.HeaderAdded(_) =>
       ()
     case HeaderChainHandler.HeaderAddingFailed =>
       log.debug(s"Failed in adding new header")
     case HeaderChainHandler.InvalidHeader(hash) =>
       log.debug(s"Invalid header received ${hash.shortHex}")
-      handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+      handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
     case TxHandler.AddFailed(hash, reason) =>

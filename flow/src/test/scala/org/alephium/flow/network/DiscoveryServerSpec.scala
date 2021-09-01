@@ -184,7 +184,7 @@ class DiscoveryServerSpec
       peers.map(_.address).contains(address0) is true
     }
 
-    misbehaviorManager0.ref ! MisbehaviorManager.InvalidMessage(address1)
+    misbehaviorManager0.ref ! MisbehaviorManager.InvalidFlowData(address1)
 
     withPeers(server0) { peers =>
       // self clique peers might get removed as server0 and server1 have the same host address
@@ -241,7 +241,7 @@ class DiscoveryServerSpec
       )(system1)
 
     val misbehaviorProbe = TestProbe()
-    system.eventStream.subscribe(misbehaviorProbe.ref, classOf[MisbehaviorManager.InvalidMessage])
+    system.eventStream.subscribe(misbehaviorProbe.ref, classOf[MisbehaviorManager.InvalidFlowData])
   }
 
   def withPeers[T](
