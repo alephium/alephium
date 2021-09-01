@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.crypto.Blake3
 import org.alephium.protocol.{BlockHash, Hash, ModelSnapshots}
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
@@ -116,7 +117,15 @@ class BlockHeaderSpec
     val nonce2 = Nonce.unsafe(U256.Two.toBytes.takeRight(Nonce.byteLength))
     val header2 = BlockHeader(
       version = defaultBlockVersion,
-      blockDeps = BlockDeps.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero)),
+      blockDeps = BlockDeps.build(
+        deps = AVector(
+          Blake3.unsafe(hex"1b08f56d011b4d1ad498064e21cdcb07ac6a28bc3831be97d96034708de50e07"),
+          Blake3.unsafe(hex"6a5ab35f69b467512c90d53f9f06f5697f4fad672da15576fa76003ee748e212"),
+          Blake3.unsafe(hex"aedb5ceabb1e2d2f001096c59726408b86bbde953fe67eb27973cc8056517c93"),
+          Blake3.unsafe(hex"c2a55cd706725874ab1ffe46eeafc51be5352582f2ff02afb098a127e052135d"),
+          Blake3.unsafe(hex"4325372753815ecfd0410812a28473824d88e58c8e5686dccfd7a3d1c3a1f405")
+        )
+      ),
       depStateHash =
         Hash.unsafe(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"),
       txsHash = Hash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),

@@ -30,6 +30,4 @@ object Blake2b extends BCHashSchema[Blake2b](HashSchema.unsafeBlake2b, _.bytes) 
   def length: Int = 32
 
   def provider(): Digest = new Blake2bDigest(length * 8)
-
-  def apply(bytes: ByteString): Blake2b = new Blake2b(bytes)
 }
