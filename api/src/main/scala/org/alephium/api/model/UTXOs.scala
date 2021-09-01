@@ -14,18 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api.model
+package org.alephium.api.model
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.AVector
 
-final case class Balances(totalBalance: U256, balances: AVector[Balances.AddressBalance])
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class UTXOs(
+    utxos: AVector[UTXO],
+    warning: Option[String] = None
+)
 
-object Balances {
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class AddressBalance(
-      address: Address.Asset,
-      balance: U256,
-      warning: Option[String] = None
-  )
+object UTXOs {
+  def from(utxos: AVector[UTXO], utxosLimit: Int): UTXOs = {
+    val warning =
+      Option.when(utxosLimit == utxos.length)(
+        "Result might not contains all utxos"
+      )
+
+    UTXOs(utxos, warning)
+  }
 }

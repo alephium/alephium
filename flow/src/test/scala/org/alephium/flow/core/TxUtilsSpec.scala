@@ -455,7 +455,8 @@ class TxUtilsSpec extends AlephiumSpec {
     val newBlock = block.copy(transactions = AVector(newTx))
     blockFlow.addAndUpdateView(newBlock).isRight is true
 
-    val (balance, lockedBalance, utxos) = blockFlow.getBalance(output.lockupScript).rightValue
+    val (balance, lockedBalance, utxos) =
+      blockFlow.getBalance(output.lockupScript, Int.MaxValue).rightValue
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
     utxos is n

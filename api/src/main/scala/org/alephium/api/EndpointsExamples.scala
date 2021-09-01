@@ -194,11 +194,22 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val blockSolutionExamples: List[Example[BlockSolution]] =
     simpleExample(blockSolution)
 
-  implicit val balanceExamples: List[Example[Balance]] =
-    simpleExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3))
+  implicit val balanceExamples: List[Example[Balance]] = List(
+    defaultExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3, None)),
+    moreSettingsExample(
+      Balance(
+        balance,
+        balance.divUnsafe(U256.Two),
+        utxoNum = 3,
+        Some("Result might not include all utxos and is maybe unprecise")
+      )
+    )
+  )
 
-  implicit val utxosExamples: List[Example[AVector[UTXO]]] =
-    simpleExample(AVector(utxo))
+  implicit val utxosExamples: List[Example[UTXOs]] = List(
+    defaultExample(UTXOs(AVector(utxo), None)),
+    moreSettingsExample(UTXOs(AVector(utxo), Some("Result might not contains all utxos")))
+  )
 
   implicit val groupExamples: List[Example[Group]] =
     simpleExample(Group(group = 2))

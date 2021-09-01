@@ -63,13 +63,13 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   // return the total balance, the locked balance, and the number of all utxos
-  def getBalance(lockupScript: LockupScript.Asset): IOResult[(U256, U256, Int)] = {
+  def getBalance(lockupScript: LockupScript.Asset, utxosLimit: Int): IOResult[(U256, U256, Int)] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
     val currentTs = TimeStamp.now()
 
-    getUTXOsIncludePool(lockupScript).map { utxos =>
+    getUTXOsIncludePool(lockupScript, utxosLimit).map { utxos =>
       val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
       val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
         if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
@@ -78,12 +78,15 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getUTXOsIncludePool(lockupScript: LockupScript.Asset): IOResult[AVector[AssetOutputInfo]] = {
+  def getUTXOsIncludePool(
+      lockupScript: LockupScript.Asset,
+      utxosLimit: Int
+  ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
     getImmutableGroupViewIncludePool(groupIndex)
-      .flatMap(_.getRelevantUtxos(lockupScript, Int.MaxValue))
+      .flatMap(_.getRelevantUtxos(lockupScript, utxosLimit))
   }
 
   def transfer(

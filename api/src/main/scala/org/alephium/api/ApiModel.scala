@@ -160,6 +160,8 @@ trait ApiModelCodec {
 
   implicit val utxoRW: RW[UTXO] = macroRW
 
+  implicit val utxosRW: RW[UTXOs] = macroRW
+
   implicit val destinationRW: RW[Destination] = macroRW
 
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW

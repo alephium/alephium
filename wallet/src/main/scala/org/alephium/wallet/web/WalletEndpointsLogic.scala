@@ -87,16 +87,16 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       walletService.deleteWallet(wallet, walletDeletion.password).left.map(toApiError)
     )
   }
-  val getBalancesLogic = serverLogic(getBalances) { wallet =>
+  val getBalancesLogic = serverLogic(getBalances) { case (wallet, utxosLimit) =>
     walletService
-      .getBalances(wallet)
+      .getBalances(wallet, utxosLimit)
       .map(_.map { balances =>
         val totalBalance =
-          balances.map { case (_, amount) => amount }.fold(U256.Zero) { case (acc, u256) =>
+          balances.map { case (_, amount, _) => amount }.fold(U256.Zero) { case (acc, u256) =>
             acc.addUnsafe(u256)
           }
-        val balancesPerAddress = balances.map { case (address, amount) =>
-          model.Balances.AddressBalance(address, amount)
+        val balancesPerAddress = balances.map { case (address, amount, warning) =>
+          model.Balances.AddressBalance(address, amount, warning)
         }
         model.Balances(totalBalance, balancesPerAddress)
       }.left.map(toApiError))

@@ -155,19 +155,21 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
-  val getBalance: BaseEndpoint[Address.Asset, Balance] =
+  val getBalance: BaseEndpoint[(Address.Asset, Option[Int]), Balance] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("balance")
+      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBody[Balance])
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
-  val getUTXOs: BaseEndpoint[Address.Asset, AVector[UTXO]] =
+  val getUTXOs: BaseEndpoint[(Address.Asset, Option[Int]), UTXOs] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("utxos")
-      .out(jsonBody[AVector[UTXO]])
+      .in(query[Option[Int]]("utxosLimit"))
+      .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")
 
   val getGroup: BaseEndpoint[Address.Asset, Group] =

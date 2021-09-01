@@ -375,7 +375,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fromAddressBalance = genesisBalance - txTemplate.gasFeeUnsafe
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
-    val utxos        = serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue
+    val utxos =
+      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress, Some(Int.MaxValue)).rightValue.utxos
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -624,7 +625,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, GetBalance(address)) isE Balance(
+    serverUtils.getBalance(blockFlow, GetBalance(address, None)) isE Balance(
       amount,
       U256.unsafe(0),
       utxoNum

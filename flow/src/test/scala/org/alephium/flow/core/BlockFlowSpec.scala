@@ -558,7 +558,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     addAndCheck(blockFlow, block)
     val lockedBalance = ALF.alf(1) - defaultGasFee
-    blockFlow.getBalance(toLockupScript) is Right((lockedBalance, lockedBalance, 1))
+    blockFlow.getBalance(toLockupScript, Int.MaxValue) is Right((lockedBalance, lockedBalance, 1))
 
     blockFlow
       .transfer(
@@ -613,7 +613,7 @@ class BlockFlowSpec extends AlephiumSpec {
       theMemPool.contains(tx.chainIndex, tx.id) is true
 
       val balance = initialAmount - (ALF.oneAlf + defaultGasFee).mulUnsafe(txCount)
-      blockFlow.getBalance(fromLockup).rightValue is ((balance, U256.Zero, 1))
+      blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is ((balance, U256.Zero, 1))
 
       tx
     }
@@ -621,7 +621,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val tx0         = transfer()
     val tx1         = transfer()
     val tx2         = transfer()
-    val fromBalance = blockFlow.getBalance(fromLockup).rightValue
+    val fromBalance = blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue
     theMemPool.pendingPool.contains(tx0.id) is false
     theMemPool.pendingPool.contains(tx1.id) is true
     theMemPool.pendingPool.contains(tx2.id) is true
@@ -633,7 +633,7 @@ class BlockFlowSpec extends AlephiumSpec {
     theMemPool.pendingPool.contains(tx1.id) is false
     theMemPool.pendingPool.contains(tx2.id) is true
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block0.hash) is true
-    blockFlow.getBalance(fromLockup).rightValue is fromBalance
+    blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
@@ -641,13 +641,13 @@ class BlockFlowSpec extends AlephiumSpec {
     theMemPool.contains(tx2.chainIndex, tx2.id) is true
     theMemPool.pendingPool.contains(tx2.id) is false
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block1.hash) is true
-    blockFlow.getBalance(fromLockup).rightValue is fromBalance
+    blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
     theMemPool.contains(tx2.chainIndex, tx2.id) is false
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block2.hash) is true
-    blockFlow.getBalance(fromLockup).rightValue is fromBalance
+    blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
   }
 
   it should "fetch bocks for the corresponding groups" in {
