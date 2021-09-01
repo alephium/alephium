@@ -18,21 +18,16 @@ package org.alephium.wallet.api
 
 import sttp.tapir.EndpointIO.Example
 
-import org.alephium.api.ErrorExamples
-import org.alephium.api.model.{Destination, Token}
+import org.alephium.api.EndpointsExamples
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, PublicKey, Signature}
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{AVector, Hex, U256}
 import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-trait WalletExamples extends ErrorExamples {
+trait WalletExamples extends EndpointsExamples {
 
-  private val lockupScript =
-    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
-  private val address  = Address.Asset(lockupScript)
   private val password = "my-secret-password"
   private val mnemonic =
     Mnemonic
@@ -40,31 +35,14 @@ trait WalletExamples extends ErrorExamples {
         "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
       )
       .get
-  private val txId =
-    Hash.from(Hex.from("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69").get).get
-
-  private val publicKey = PublicKey
-    .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
-    .get
 
   private val walletName         = "wallet-super-name"
   private val mnemonicPassphrase = "optional-mnemonic-passphrase"
   private val fromGroup          = 2
   private val toGroup            = 1
-  // scalastyle:off magic.number
-  private val tokens = AVector(
-    Token(Hash.hash("token1"), U256.unsafe(42)),
-    Token(Hash.hash("token2"), U256.unsafe(1000))
-  )
-  private val hexString = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
-  private val signature = Signature
-    .from(
-      Hex.unsafe(
-        "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
-      )
-    )
+  private val publicKey = PublicKey
+    .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
-
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
@@ -121,8 +99,12 @@ trait WalletExamples extends ErrorExamples {
   implicit val revealMnemonicResultExamples: List[Example[RevealMnemonic.Result]] =
     simpleExample(RevealMnemonic.Result(mnemonic))
 
-  implicit val transferExamples: List[Example[Transfer]] =
-    simpleExample(Transfer(AVector(Destination(address, U256.Million, Some(tokens)))))
+  implicit val transferExamples: List[Example[Transfer]] = List(
+    defaultExample(Transfer(defaultDestinations)),
+    moreSettingsExample(
+      Transfer(moreSettingsDestinations, Some(GasBox.unsafe(1)), Some(GasPrice(U256.One)))
+    )
+  )
 
   implicit val signTransactionExamples: List[Example[Sign]] =
     simpleExample(Sign(hexString))
@@ -138,9 +120,6 @@ trait WalletExamples extends ErrorExamples {
 
   implicit val addressesExamples: List[Example[Addresses]] =
     simpleExample(Addresses(address, AVector(address)))
-
-  implicit val addressExamples: List[Example[Address]] =
-    simpleExample(address)
 
   implicit val addressInfoExamples: List[Example[AddressInfo]] =
     simpleExample(AddressInfo(address, publicKey))
