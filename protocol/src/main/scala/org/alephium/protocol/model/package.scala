@@ -30,10 +30,10 @@ package object model {
   val coinbaseLockupPeriod: Duration = Duration.ofMinutesUnsafe(10)
 
   //scalastyle:off magic.number
-  // TODO: improve gas mechanism
-  val minimalGas: GasBox          = GasBox.unsafe(100000)
-  val defaultGasPerInput: GasBox  = GasBox.unsafe(10100)
-  val defaultGasPerOutput: GasBox = GasBox.unsafe(10100)
+  val minimalGas: GasBox = GasBox.unsafe(20000)
+
+  val defaultGasPerInput: GasBox  = GasBox.unsafe(6000)
+  val defaultGasPerOutput: GasBox = GasBox.unsafe(6000)
 
   val defaultGasPrice: GasPrice    = GasPrice(ALF.nanoAlf(1))
   val defaultGasFee: U256          = defaultGasPrice * minimalGas

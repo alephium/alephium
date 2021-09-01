@@ -482,7 +482,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         defaultGasPrice
       )
       .leftValue
-      .detail is "Invalid gas GasBox(100), minimal GasBox(100000)"
+      .detail is "Invalid gas GasBox(100), minimal GasBox(20000)"
   }
 
   it should "not create transaction when not all utxos are of asset type" in new MultipleUtxos {

@@ -252,7 +252,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         def blockEnv: BlockEnv             = ???
         def txEnv: TxEnv                   = ???
         override def txId: Hash            = Hash.zero
-        var gasRemaining                   = minimalGas
+        var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
 
         def getInitialBalances(): ExeResult[Balances] = {

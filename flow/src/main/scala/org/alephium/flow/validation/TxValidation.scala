@@ -218,7 +218,7 @@ trait TxValidation {
       _            <- checkLockTime(preOutputs, blockEnv.timeStamp)
       _            <- checkAlfBalance(tx, preOutputs, coinbaseNetReward)
       _            <- checkTokenBalance(tx, preOutputs)
-      gasRemaining <- checkWitnesses(tx, preOutputs, blockEnv)
+      gasRemaining <- checkGasAndWitnesses(tx, preOutputs, blockEnv)
     } yield gasRemaining
   }
 
@@ -248,7 +248,7 @@ trait TxValidation {
   protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  protected[validation] def checkWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv): TxValidationResult[GasBox]
+  def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
       chainIndex: ChainIndex,
       tx: Transaction,
@@ -515,26 +515,48 @@ object TxValidation {
         case _: NoSuchElementException => Left(Right(BalanceOverFlow))
       }
 
-    protected[validation] def checkWitnesses(
+    def checkGasAndWitnesses(
         tx: Transaction,
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv
+    ): TxValidationResult[GasBox] = {
+      for {
+        gasRemaining0 <- checkBasicGas(tx, preOutputs, tx.unsigned.gasAmount)
+        gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0)
+      } yield gasRemaining1
+    }
+
+    protected[validation] def checkBasicGas(
+        tx: Transaction,
+        preOutputs: AVector[TxOutput],
+        gasRemaining: GasBox
+    ): TxValidationResult[GasBox] = {
+      val inputGas      = GasSchedule.txInputBaseGas.mulUnsafe(preOutputs.length)
+      val outputGas     = GasSchedule.txOutputBaseGas.mulUnsafe(tx.outputsLength)
+      val totalBasicGas = GasSchedule.txBaseGas.addUnsafe(inputGas).addUnsafe(outputGas)
+      fromExeResult(gasRemaining.use(totalBasicGas))
+    }
+
+    protected[validation] def checkWitnesses(
+        tx: Transaction,
+        preOutputs: AVector[TxOutput],
+        blockEnv: BlockEnv,
+        gasRemaining: GasBox
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
       val txEnv =
         TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
-      EitherF.foldTry(tx.unsigned.inputs.indices, tx.unsigned.gasAmount) {
-        case (gasRemaining, idx) =>
-          val unlockScript = tx.unsigned.inputs(idx).unlockScript
-          checkLockupScript(
-            tx,
-            gasRemaining,
-            preOutputs(idx).lockupScript,
-            unlockScript,
-            blockEnv,
-            txEnv
-          )
+      EitherF.foldTry(tx.unsigned.inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
+        val unlockScript = tx.unsigned.inputs(idx).unlockScript
+        checkLockupScript(
+          tx,
+          gasRemaining,
+          preOutputs(idx).lockupScript,
+          unlockScript,
+          blockEnv,
+          txEnv
+        )
       }
     }
 

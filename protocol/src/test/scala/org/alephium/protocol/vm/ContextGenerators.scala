@@ -85,7 +85,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareContract(
       contract: StatefulContract,
       fields: AVector[Val],
-      gasLimit: GasBox = minimalGas
+      gasLimit: GasBox = GasBox.unsafe(100000)
   ): (StatefulContractObject, StatefulContext) = {
     val groupIndex        = GroupIndex.unsafe(0)
     val contractOutputRef = contractOutputRefGen(groupIndex).sample.get

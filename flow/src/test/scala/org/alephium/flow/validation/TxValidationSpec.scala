@@ -369,7 +369,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[GasBox] = {
-      checkWitnesses(
+      checkGasAndWitnesses(
         tx,
         preOutputs,
         BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.onePhPerBlock)
@@ -436,6 +436,25 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
       failCheck(checkBlockTx(txNew, preOutputs), InvalidTokenBalance)
     }
+  }
+
+  it should "check the exact gas cost" in new StatefulFixture {
+    import GasSchedule._
+
+    val chainIndex  = chainIndexGenForBroker(brokerConfig).sample.get
+    val block       = transfer(blockFlow, chainIndex)
+    val tx          = block.nonCoinbase.head
+    val blockEnv    = BlockEnv.from(block.header)
+    val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val prevOutputs = worldState.getPreOutputs(tx).rightValue
+
+    val initialGas = tx.unsigned.gasAmount
+    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv).rightValue
+    val gasUsed    = initialGas.use(gasLeft).rightValue
+    gasUsed is GasBox.unsafe(14054)
+    gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas.mulUnsafe(
+      2
+    ) addUnsafe GasSchedule.p2pkUnlockGas)
   }
 
   it should "validate witnesses" in new StatefulFixture {
