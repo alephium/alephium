@@ -28,7 +28,6 @@ import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model.ApiKey
 import org.alephium.http.ServerOptions
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.NetworkId
 import org.alephium.util.{AVector, Duration}
 import org.alephium.wallet.WalletDocumentation
 import org.alephium.wallet.service.WalletService
@@ -37,7 +36,6 @@ import org.alephium.wallet.service.WalletService._
 @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 class WalletServer(
     val walletService: WalletService,
-    val networkId: NetworkId,
     val blockflowFetchMaxAge: Duration,
     override val maybeApiKey: Option[ApiKey]
 )(implicit val groupConfig: GroupConfig, val executionContext: ExecutionContext)

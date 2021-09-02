@@ -26,7 +26,7 @@ import org.alephium.api.model._
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, Duration, Hex, TimeStamp, U256}
 
@@ -58,18 +58,16 @@ trait BlockFlowClient {
 object BlockFlowClient {
   def apply(
       defaultUri: Uri,
-      networkId: NetworkId,
       blockflowFetchMaxAge: Duration,
       maybeApiKey: Option[ApiKey]
   )(implicit
       groupConfig: GroupConfig,
       executionContext: ExecutionContext
   ): BlockFlowClient =
-    new Impl(defaultUri, networkId, blockflowFetchMaxAge, maybeApiKey)
+    new Impl(defaultUri, blockflowFetchMaxAge, maybeApiKey)
 
   private class Impl(
       defaultUri: Uri,
-      val networkId: NetworkId,
       val blockflowFetchMaxAge: Duration,
       val maybeApiKey: Option[ApiKey]
   )(implicit
