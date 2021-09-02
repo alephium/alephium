@@ -786,17 +786,18 @@
         ],
         "responses": {
           "200": {
+            "description": "1 ALPH = 1000000000000000000",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Balances"
                 },
                 "example": {
-                  "totalBalance": "1000000",
+                  "totalBalance": "10000000000000000000",
                   "balances": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                      "balance": "1000000"
+                      "balance": "10000000000000000000"
                     }
                   ]
                 }
@@ -1002,28 +1003,48 @@
           }
         ],
         "requestBody": {
+          "description": "1 ALPH = 1000000000000000000",
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Transfer"
               },
-              "example": {
-                "destinations": [
-                  {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "amount": "1000000",
-                    "tokens": [
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "destinations": [
                       {
-                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                        "amount": "42"
-                      },
-                      {
-                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                        "amount": "1000"
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "amount": "2000000000000000000"
                       }
                     ]
                   }
-                ]
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "destinations": [
+                      {
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "amount": "2000000000000000000",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42000000000000000000"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000000000000000000000"
+                          }
+                        ],
+                        "lockTime": 1611041396892
+                      }
+                    ],
+                    "gas": 20000,
+                    "gasPrice": "1000000000"
+                  }
+                }
               }
             }
           },
@@ -2618,24 +2639,24 @@
                             "outputs": [
                               {
                                 "type": "asset",
-                                "amount": "1000000000000000000",
+                                "amount": "10000000000000000000",
                                 "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                                 "tokens": [
                                   {
                                     "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                                    "amount": "42"
+                                    "amount": "42000000000000000000"
                                   },
                                   {
                                     "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                                    "amount": "1000"
+                                    "amount": "1000000000000000000000"
                                   }
                                 ],
                                 "lockTime": 1611041396892,
                                 "additionalData": ""
                               }
                             ],
-                            "gasAmount": 1,
-                            "gasPrice": "1000"
+                            "gasAmount": 20000,
+                            "gasPrice": "1000000000"
                           }
                         ]
                       }
@@ -2764,24 +2785,24 @@
                       "outputs": [
                         {
                           "type": "asset",
-                          "amount": "1000000000000000000",
+                          "amount": "10000000000000000000",
                           "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                              "amount": "42"
+                              "amount": "42000000000000000000"
                             },
                             {
                               "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                              "amount": "1000"
+                              "amount": "1000000000000000000000"
                             }
                           ],
                           "lockTime": 1611041396892,
                           "additionalData": ""
                         }
                       ],
-                      "gasAmount": 1,
-                      "gasPrice": "1000"
+                      "gasAmount": 20000,
+                      "gasPrice": "1000000000"
                     }
                   ]
                 }
@@ -2884,6 +2905,7 @@
         ],
         "responses": {
           "200": {
+            "description": "1 ALPH = 1000000000000000000",
             "content": {
               "application/json": {
                 "schema": {
@@ -2893,16 +2915,16 @@
                   "Example0": {
                     "summary": "Default",
                     "value": {
-                      "balance": "1000000000000000000",
-                      "lockedBalance": "500000000000000000",
+                      "balance": "10000000000000000000",
+                      "lockedBalance": "5000000000000000000",
                       "utxoNum": 3
                     }
                   },
                   "Example1": {
                     "summary": "More settings",
                     "value": {
-                      "balance": "1000000000000000000",
-                      "lockedBalance": "500000000000000000",
+                      "balance": "10000000000000000000",
+                      "lockedBalance": "5000000000000000000",
                       "utxoNum": 3,
                       "warning": "Result might not include all utxos and is maybe unprecise"
                     }
@@ -3022,15 +3044,15 @@
                             "hint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                           },
-                          "amount": "1000000000000000000",
+                          "amount": "10000000000000000000",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                              "amount": "42"
+                              "amount": "42000000000000000000"
                             },
                             {
                               "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                              "amount": "1000"
+                              "amount": "1000000000000000000000"
                             }
                           ],
                           "lockTime": 1611041396892,
@@ -3048,15 +3070,15 @@
                             "hint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                           },
-                          "amount": "1000000000000000000",
+                          "amount": "10000000000000000000",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                              "amount": "42"
+                              "amount": "42000000000000000000"
                             },
                             {
                               "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                              "amount": "1000"
+                              "amount": "1000000000000000000000"
                             }
                           ],
                           "lockTime": 1611041396892,
@@ -3608,24 +3630,24 @@
                         "outputs": [
                           {
                             "type": "asset",
-                            "amount": "1000000000000000000",
+                            "amount": "10000000000000000000",
                             "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                             "tokens": [
                               {
                                 "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                                "amount": "42"
+                                "amount": "42000000000000000000"
                               },
                               {
                                 "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                                "amount": "1000"
+                                "amount": "1000000000000000000000"
                               }
                             ],
                             "lockTime": 1611041396892,
                             "additionalData": ""
                           }
                         ],
-                        "gasAmount": 1,
-                        "gasPrice": "1000"
+                        "gasAmount": 20000,
+                        "gasPrice": "1000000000"
                       }
                     ]
                   }
@@ -3710,32 +3732,56 @@
         "summary": "Build an unsigned transaction to a number of recipients",
         "operationId": "postTransactionsBuild",
         "requestBody": {
+          "description": "1 ALPH = 1000000000000000000",
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BuildTransaction"
               },
-              "example": {
-                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                "destinations": [
-                  {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "amount": "2",
-                    "tokens": [
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "destinations": [
                       {
-                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                        "amount": "42"
-                      },
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "amount": "2000000000000000000"
+                      }
+                    ]
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "destinations": [
                       {
-                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                        "amount": "1000"
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "amount": "2000000000000000000",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42000000000000000000"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000000000000000000000"
+                          }
+                        ],
+                        "lockTime": 1611041396892
                       }
                     ],
-                    "lockTime": 1611041396892
+                    "utxos": [
+                      {
+                        "hint": 23412,
+                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                      }
+                    ],
+                    "gas": 20000,
+                    "gasPrice": "1000000000"
                   }
-                ],
-                "gas": 1,
-                "gasPrice": "1"
+                }
               }
             }
           },
@@ -3839,12 +3885,24 @@
               "schema": {
                 "$ref": "#/components/schemas/BuildSweepAllTransaction"
               },
-              "example": {
-                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                "lockTime": 1611041396892,
-                "gas": 1,
-                "gasPrice": "1"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "lockTime": 1611041396892,
+                    "gas": 20000,
+                    "gasPrice": "1000000000"
+                  }
+                }
               }
             }
           },
@@ -4082,24 +4140,24 @@
                   "outputs": [
                     {
                       "type": "asset",
-                      "amount": "1000000000000000000",
+                      "amount": "10000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                       "tokens": [
                         {
                           "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                          "amount": "42"
+                          "amount": "42000000000000000000"
                         },
                         {
                           "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                          "amount": "1000"
+                          "amount": "1000000000000000000000"
                         }
                       ],
                       "lockTime": 1611041396892,
                       "additionalData": ""
                     }
                   ],
-                  "gasAmount": 1,
-                  "gasPrice": "1000"
+                  "gasAmount": 20000,
+                  "gasPrice": "1000000000"
                 }
               }
             }
@@ -4429,11 +4487,25 @@
               "schema": {
                 "$ref": "#/components/schemas/Compile"
               },
-              "example": {
-                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                "type": "contract",
-                "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
-                "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "type": "contract",
+                    "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "type": "contract",
+                    "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
+                    "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
+                    "issueTokenAmount": "2000000000000000000"
+                  }
+                }
               }
             }
           },
@@ -4635,6 +4707,7 @@
         "summary": "Create the multisig address and unlock script",
         "operationId": "postMultisigAddress",
         "requestBody": {
+          "description": "1 ALPH = 1000000000000000000",
           "content": {
             "application/json": {
               "schema": {
@@ -4746,30 +4819,50 @@
               "schema": {
                 "$ref": "#/components/schemas/BuildMultisig"
               },
-              "example": {
-                "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                "fromPublicKeys": [
-                  "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
-                ],
-                "destinations": [
-                  {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "amount": "2",
-                    "tokens": [
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromPublicKeys": [
+                      "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                    ],
+                    "destinations": [
                       {
-                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                        "amount": "42"
-                      },
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "amount": "2000000000000000000"
+                      }
+                    ]
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromPublicKeys": [
+                      "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                    ],
+                    "destinations": [
                       {
-                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                        "amount": "1000"
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "amount": "2000000000000000000",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42000000000000000000"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000000000000000000000"
+                          }
+                        ],
+                        "lockTime": 1611041396892
                       }
                     ],
-                    "lockTime": 1611041396892
+                    "gas": 20000,
+                    "gasPrice": "1000000000"
                   }
-                ],
-                "gas": 1,
-                "gasPrice": "1"
+                }
               }
             }
           },

@@ -20,7 +20,7 @@ import sttp.tapir._
 import sttp.tapir.generic.auto._
 
 import org.alephium.api.{BaseEndpoint, TapirCodecs, TapirSchemasLike}
-import org.alephium.api.Endpoints.jsonBody
+import org.alephium.api.Endpoints.{jsonBody, jsonBodyWithAlph}
 import org.alephium.api.UtilJson._
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
@@ -97,13 +97,13 @@ trait WalletEndpoints
     wallet.get
       .in("balances")
       .in(query[Option[Int]]("utxosLimit"))
-      .out(jsonBody[Balances])
+      .out(jsonBodyWithAlph[Balances])
       .summary("Get your total balance")
 
   val transfer: BaseEndpoint[(String, Transfer), Transfer.Result] =
     wallet.post
       .in("transfer")
-      .in(jsonBody[Transfer])
+      .in(jsonBodyWithAlph[Transfer])
       .out(jsonBody[Transfer.Result])
       .summary("Transfer ALPH")
 
