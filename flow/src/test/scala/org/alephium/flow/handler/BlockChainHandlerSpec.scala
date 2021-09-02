@@ -161,6 +161,8 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
       blockMsg(invalidBlock),
       DataOrigin.Local
     )
+    blockFlow.getHeaderVerifiedBlock(invalidBlock.hash) isE invalidBlock
+    blockFlow.getBlock(invalidBlock.hash).isLeft is true
     interCliqueListener.expectMsg(interCliqueMessage)
     intraCliqueListener.expectNoMessage()
     brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidTxsMerkleRoot))

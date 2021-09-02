@@ -137,7 +137,7 @@ trait BrokerHandler extends FlowDataHandler {
       )
       handleFlowData(blocks, dataOrigin, isBlock = true)
     case Received(BlocksRequest(requestId, hashes)) =>
-      escapeIOError(hashes.mapE(blockflow.getBlock), "load blocks") { blocks =>
+      escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlock), "load blocks") { blocks =>
         send(BlocksResponse(requestId, blocks))
       }
     case Received(NewHeader(header)) =>

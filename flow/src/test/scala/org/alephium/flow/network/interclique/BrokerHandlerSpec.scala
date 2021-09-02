@@ -128,6 +128,22 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash)) is false
   }
 
+  it should "query header verified blocks" in new Fixture {
+    val requestId = RequestId.random()
+    val block     = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    def requestBlocks() = {
+      brokerHandler ! BaseBrokerHandler.Received(BlocksRequest(requestId, AVector(block.hash)))
+    }
+
+    EventFilter.error(start = "IO error in load block").intercept(requestBlocks())
+    blockFlow.cacheHeaderVerifiedBlock(block)
+    requestBlocks()
+    connectionHandler.expectMsg {
+      val payload = BlocksResponse(requestId, AVector(block))
+      ConnectionHandler.Send(Message.serialize(payload))
+    }
+  }
+
   it should "publish misbehavior when receive invalid hash/block/header" in new Fixture
     with NoIndexModelGeneratorsLike {
     @tailrec

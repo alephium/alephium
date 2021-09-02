@@ -108,7 +108,10 @@ class BlockChainHandler(
   ): ValidationResult[InvalidBlockStatus, Unit] = {
     for {
       _ <- validator.headerValidation.validate(block.header, blockFlow)
-      blockMsgOpt = interCliqueBroadcast(block, origin)
+      blockMsgOpt = {
+        blockFlow.cacheHeaderVerifiedBlock(block)
+        interCliqueBroadcast(block, origin)
+      }
       _ <- validator.checkBlockAfterHeader(block, blockFlow)
     } yield {
       intraCliqueBroadCast(block, blockMsgOpt, origin)
