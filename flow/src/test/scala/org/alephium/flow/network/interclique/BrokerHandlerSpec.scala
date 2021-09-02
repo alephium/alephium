@@ -128,6 +128,22 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     eventually(brokerHandler.underlyingActor.seenBlocks.contains(blockHash)) is false
   }
 
+  it should "query header verified blocks" in new Fixture {
+    val requestId = RequestId.random()
+    val block     = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    def requestBlocks() = {
+      brokerHandler ! BaseBrokerHandler.Received(BlocksRequest(requestId, AVector(block.hash)))
+    }
+
+    EventFilter.error(start = "IO error in load block").intercept(requestBlocks())
+    blockFlow.cacheHeaderVerifiedBlock(block)
+    requestBlocks()
+    connectionHandler.expectMsg {
+      val payload = BlocksResponse(requestId, AVector(block))
+      ConnectionHandler.Send(Message.serialize(payload))
+    }
+  }
+
   it should "publish misbehavior when receive invalid hash/block/header" in new Fixture
     with NoIndexModelGeneratorsLike {
     @tailrec
@@ -211,8 +227,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val remoteAddress = brokerHandler.underlyingActor.remoteAddress
     watch(brokerHandler)
     brokerHandler ! BaseBrokerHandler.Received(NewBlock(invalidForkedBlock))
-    listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
-    expectTerminated(brokerHandler.ref)
+    listener.expectMsg(MisbehaviorManager.DeepForkBlock(remoteAddress))
   }
 
   it should "cleanup cache based on capacity" in new Fixture {
@@ -260,8 +275,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     setSynced()
     val remoteAddress = brokerHandler.underlyingActor.remoteAddress
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((invalidChainIndex, txHashes))))
-    listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
-    expectTerminated(brokerHandler.ref)
+    listener.expectMsg(MisbehaviorManager.InvalidGroup(remoteAddress))
   }
 
   it should "ignore the duplicated tx announcements" in new Fixture {
@@ -322,8 +336,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     watch(brokerHandler)
     brokerHandler ! BaseBrokerHandler.Received(invalidRequest)
-    listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
-    expectTerminated(brokerHandler.ref)
+    listener.expectMsg(MisbehaviorManager.InvalidGroup(remoteAddress))
   }
 
   it should "handle TxsResponse" in new Fixture with NoIndexModelGeneratorsLike {
@@ -341,8 +354,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     watch(brokerHandler)
     brokerHandler ! BaseBrokerHandler.Received(invalidResponse)
-    listener.expectMsg(MisbehaviorManager.InvalidMessage(remoteAddress))
-    expectTerminated(brokerHandler.ref)
+    listener.expectMsg(MisbehaviorManager.InvalidGroup(remoteAddress))
   }
 
   trait Fixture extends FlowFixture {

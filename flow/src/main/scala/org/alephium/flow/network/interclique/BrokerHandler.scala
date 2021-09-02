@@ -54,9 +54,11 @@ trait BrokerHandler extends BaseBrokerHandler {
           seenBlocks.put(block.hash, ())
           val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
           allHandlers.dependencyHandler ! message
-        case _ =>
+        case Right(false) =>
           log.debug(s"Receive new block ${block.shortHex} which have invalid height")
-          handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+          handleMisbehavior(MisbehaviorManager.DeepForkBlock(remoteAddress))
+        case Left(error) =>
+          log.debug(s"IO error in validating block height: $error")
       }
     }
   }
@@ -157,7 +159,7 @@ trait BrokerHandler extends BaseBrokerHandler {
           allHandlers.txHandler ! TxHandler.TxAnnouncements(announcements)
         case _ =>
           log.debug(s"Received invalid tx hashes from $remoteAddress")
-          handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+          handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
       }
     }
   }
@@ -183,7 +185,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       case Right(txs) => send(TxsResponse(id, txs))
       case _ =>
         log.debug(s"Received invalid txs request from $remoteAddress")
-        handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+        handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
     }
   }
 
@@ -193,7 +195,7 @@ trait BrokerHandler extends BaseBrokerHandler {
     )
     if (txs.nonEmpty) {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
-        handleMisbehavior(MisbehaviorManager.InvalidMessage(remoteAddress))
+        handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
       } else {
         allHandlers.txHandler ! TxHandler.AddToGrandPool(txs)
       }

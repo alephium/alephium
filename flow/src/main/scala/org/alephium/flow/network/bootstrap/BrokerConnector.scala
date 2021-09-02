@@ -59,7 +59,7 @@ object BrokerConnector {
       context.parent ! Received(message)
     }
 
-    override def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
+    override def handleInvalidMessage(message: MisbehaviorManager.SerdeError): Unit = {
       log.warning("Might be unexpected message during bootstrap phase, ignoring it")
       context.stop(self)
     }

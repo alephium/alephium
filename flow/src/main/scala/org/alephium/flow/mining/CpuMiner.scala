@@ -67,8 +67,8 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
       }
     case BlockChainHandler.BlockAdded(hash) =>
       setIdle(ChainIndex.from(hash))
-    case BlockChainHandler.InvalidBlock(hash) =>
-      log.error(s"Mined an invalid block ${hash.shortHex}")
+    case BlockChainHandler.InvalidBlock(hash, reason) =>
+      log.error(s"Mined an invalid block ${hash.shortHex} due to: $reason")
       setIdle(ChainIndex.from(hash))
     case ViewHandler.SubscribeResult(succeeded) =>
       if (succeeded) {

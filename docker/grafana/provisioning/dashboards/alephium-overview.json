@@ -1059,7 +1059,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(alephium_download_bytes_total{app=\"alephium\"}[2m])) by (remote_address)",
+          "expr": "sum(irate(alephium_download_bytes_total{app=\"alephium\"}[2m])) by (remote_address) != 0",
           "interval": "",
           "legendFormat": "remote_address: {{remote_address}}",
           "refId": "A"
@@ -1257,7 +1257,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(alephium_upload_bytes_total{app=\"alephium\"}[1m])) by (remote_address)",
+          "expr": "sum(irate(alephium_upload_bytes_total{app=\"alephium\"}[1m])) by (remote_address) != 0",
           "interval": "",
           "legendFormat": "{{remote_address}}",
           "refId": "A"

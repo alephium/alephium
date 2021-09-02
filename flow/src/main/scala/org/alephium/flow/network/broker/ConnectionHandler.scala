@@ -111,7 +111,8 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   def bufferedCommunicating: Receive = reading orElse bufferedWriting orElse closed
 
-  private val downloadBytesTotalLabeled = downloadBytesTotal.labels(remoteAddress.toString)
+  private val downloadBytesTotalLabeled =
+    downloadBytesTotal.labels(remoteAddress.getAddress.getHostAddress)
   def reading: Receive = { case Tcp.Received(data) =>
     downloadBytesTotalLabeled.inc(data.length.toDouble)
     bufferInMessage(data)
@@ -241,7 +242,8 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     }
   }
 
-  private val uploadBytesTotalLabeled = uploadBytesTotal.labels(remoteAddress.toString)
+  private val uploadBytesTotalLabeled =
+    uploadBytesTotal.labels(remoteAddress.getAddress.getHostAddress)
   private def sendData(data: ByteString, ack: Long): Unit = {
     connection ! Tcp.Write(data, Ack(ack))
     uploadBytesTotalLabeled.inc(data.length.toDouble)
@@ -266,11 +268,11 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
       case Right(None) => ()
       case Left(error) =>
         log.debug(s"Message deserialization error: $error")
-        handleInvalidMessage(MisbehaviorManager.InvalidMessage(remoteAddress))
+        handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
     }
   }
 
-  def handleInvalidMessage(message: MisbehaviorManager.InvalidMessage): Unit = {
+  def handleInvalidMessage(message: MisbehaviorManager.SerdeError): Unit = {
     publishEvent(message)
   }
 }

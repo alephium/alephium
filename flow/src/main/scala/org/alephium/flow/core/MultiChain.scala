@@ -24,7 +24,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.BlockEnv
-import org.alephium.util.{AVector, Math, TimeStamp}
+import org.alephium.util.{AVector, Cache, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {
@@ -170,6 +170,18 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getBlock(hash: BlockHash): IOResult[Block] = {
     getBlockChain(hash).getBlock(hash)
+  }
+
+  val bodyVerifyingBlocks = Cache.fifo[BlockHash, Block](brokerConfig.chainNum * 2)
+  def getHeaderVerifiedBlock(hash: BlockHash): IOResult[Block] = {
+    bodyVerifyingBlocks.get(hash) match {
+      case Some(block) => Right(block)
+      case None        => getBlock(hash)
+    }
+  }
+
+  def cacheHeaderVerifiedBlock(block: Block): Unit = {
+    bodyVerifyingBlocks.put(block.hash, block)
   }
 
   def add(block: Block): IOResult[Unit]

@@ -88,7 +88,8 @@ class HeaderChainHandler(
 
   override def dataAddingFailed(): Event = HeaderAddingFailed
 
-  override def dataInvalid(data: BlockHeader): Event = InvalidHeader(data.hash)
+  override def dataInvalid(data: BlockHeader, reason: InvalidHeaderStatus): Event =
+    InvalidHeader(data.hash)
 
   override def addDataToBlockFlow(header: BlockHeader): IOResult[Unit] = {
     blockFlow.add(header)
