@@ -54,7 +54,7 @@ class WalletApp(config: WalletConfig)(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private val secretDir = Paths.get(config.secretDir.toString, config.networkId.verboseName)
   val walletService: WalletService =
-    WalletService.apply(blockFlowClient, secretDir, config.networkId, config.lockingTimeout)
+    WalletService.apply(blockFlowClient, secretDir, config.lockingTimeout)
 
   val walletServer: WalletServer =
     new WalletServer(
