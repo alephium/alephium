@@ -28,7 +28,7 @@ import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -160,7 +160,7 @@ trait Endpoints
       .in(path[Address.Asset]("address"))
       .in("balance")
       .in(query[Option[Int]]("utxosLimit"))
-      .out(jsonBody[Balance])
+      .out(jsonBodyWithAlph[Balance])
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
@@ -206,7 +206,7 @@ trait Endpoints
   val buildTransaction: BaseEndpoint[BuildTransaction, BuildTransactionResult] =
     transactionsEndpoint.post
       .in("build")
-      .in(jsonBody[BuildTransaction])
+      .in(jsonBodyWithAlph[BuildTransaction])
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
@@ -228,7 +228,7 @@ trait Endpoints
   val buildMultisigAddress: BaseEndpoint[BuildMultisigAddress, BuildMultisigAddress.Result] =
     multisigEndpoint.post
       .in("address")
-      .in(jsonBody[BuildMultisigAddress])
+      .in(jsonBodyWithAlph[BuildMultisigAddress])
       .out(jsonBody[BuildMultisigAddress.Result])
       .summary("Create the multisig address and unlock script")
 
@@ -340,5 +340,13 @@ object Endpoints {
       examples: List[Example[T]]
   ): EndpointIO.Body[String, T] = {
     alfJsonBody[T].examples(examples)
+  }
+
+  def jsonBodyWithAlph[T: ReadWriter: Schema](implicit
+      examples: List[Example[T]]
+  ): EndpointIO.Body[String, T] = {
+    alfJsonBody[T]
+      .examples(examples)
+      .description(s"1 ALPH = ${ALF.oneAlf}")
   }
 }

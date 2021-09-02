@@ -25,7 +25,7 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -50,8 +50,10 @@ trait EndpointsExamples extends ErrorExamples {
   private val inetAddress                = inetSocketAddress.getAddress
   private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers                      = AVector(peerAddress)
-  private val balance                    = ALF.alf(U256.unsafe(1)).get
+  private val twoAlf                     = ALF.oneAlf.mulUnsafe(U256.Two)
+  private def alf(value: Int)            = ALF.oneAlf.mulUnsafe(U256.unsafe(value))
   private val height                     = 42
+  val balance                            = alf(10)
   val signature = Signature
     .from(
       Hex.unsafe(
@@ -69,12 +71,12 @@ trait EndpointsExamples extends ErrorExamples {
   val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
   private val tokens = AVector(
-    Token(Hash.hash("token1"), U256.unsafe(42)),
-    Token(Hash.hash("token2"), U256.unsafe(1000))
+    Token(Hash.hash("token1"), alf(42)),
+    Token(Hash.hash("token2"), alf(1000))
   )
-  val defaultDestinations = AVector(Destination(address, U256.Two, None, None))
+  val defaultDestinations = AVector(Destination(address, twoAlf, None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, U256.Two, Some(tokens), Some(ts))
+    Destination(address, twoAlf, Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
@@ -82,8 +84,8 @@ trait EndpointsExamples extends ErrorExamples {
     txId,
     AVector(Input.Asset(outputRef, serialize(unlockScript))),
     AVector(Output.Asset(amount = balance, address, tokens, ts, ByteString.empty)),
-    1,
-    U256.unsafe(1000)
+    minimalGas.value,
+    defaultGasPrice.value
   )
 
   private val utxo = UTXO(
@@ -237,8 +239,8 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         moreSettingsDestinations,
         Some(AVector(outputRef)),
-        Some(GasBox.unsafe(1)),
-        Some(GasPrice(U256.One))
+        Some(minimalGas),
+        Some(defaultGasPrice)
       )
     )
   )
@@ -258,8 +260,8 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         address,
         Some(ts),
-        Some(GasBox.unsafe(1)),
-        Some(GasPrice(U256.One))
+        Some(minimalGas),
+        Some(defaultGasPrice)
       )
     )
   )
@@ -300,8 +302,8 @@ trait EndpointsExamples extends ErrorExamples {
         address,
         AVector(publicKey),
         moreSettingsDestinations,
-        Some(GasBox.unsafe(1)),
-        Some(GasPrice(U256.One))
+        Some(minimalGas),
+        Some(defaultGasPrice)
       )
     )
   )
@@ -338,7 +340,7 @@ trait EndpointsExamples extends ErrorExamples {
         code =
           "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
         state = Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
-        issueTokenAmount = Some(U256.Two)
+        issueTokenAmount = Some(twoAlf)
       )
     )
   )

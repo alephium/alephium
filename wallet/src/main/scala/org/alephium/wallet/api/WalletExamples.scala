@@ -21,8 +21,8 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.EndpointsExamples
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{AVector, Hex, U256}
+import org.alephium.protocol.model.{defaultGasPrice, minimalGas}
+import org.alephium.util.{AVector, Hex}
 import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -90,7 +90,7 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(
-      Balances(U256.Million, AVector(Balances.AddressBalance(address, U256.Million, None)))
+      Balances(balance, AVector(Balances.AddressBalance(address, balance, None)))
     )
 
   implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =
@@ -102,7 +102,7 @@ trait WalletExamples extends EndpointsExamples {
   implicit val transferExamples: List[Example[Transfer]] = List(
     defaultExample(Transfer(defaultDestinations)),
     moreSettingsExample(
-      Transfer(moreSettingsDestinations, Some(GasBox.unsafe(1)), Some(GasPrice(U256.One)))
+      Transfer(moreSettingsDestinations, Some(minimalGas), Some(defaultGasPrice))
     )
   )
 
