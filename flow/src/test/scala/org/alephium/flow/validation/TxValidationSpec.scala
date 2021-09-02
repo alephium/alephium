@@ -28,7 +28,7 @@ import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, Signa
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{InvalidSignature => _, _}
+import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -120,6 +120,16 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           tx.unsigned.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew))
       )
     }
+  }
+
+  it should "check network Id" in new StatelessFixture {
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
+    val block      = transfer(blockFlow, chainIndex)
+    val tx         = block.nonCoinbase.head
+    passValidation(validateTxOnlyForTest(tx, blockFlow))
+    tx.unsigned.networkId isnot NetworkId.AlephiumMainNet
+    val invalidTx = tx.copy(unsigned = tx.unsigned.copy(networkId = NetworkId.AlephiumMainNet))
+    failValidation(validateTxOnlyForTest(invalidTx, blockFlow), InvalidNetworkId)
   }
 
   it should "check empty outputs" in new StatelessFixture {

@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{ALF, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => _, _}
 import org.alephium.serde.serialize
@@ -185,6 +185,7 @@ trait TxValidation {
       checkDoubleSpending: Boolean
   ): TxValidationResult[Unit] = {
     for {
+      _ <- checkNetworkId(tx)
       _ <- checkInputNum(tx)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
@@ -236,6 +237,7 @@ trait TxValidation {
 
   // format off for the sake of reading and checking rules
   // format: off
+  protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
@@ -263,10 +265,20 @@ trait TxValidation {
 object TxValidation {
   import ValidationStatus._
 
-  def build(implicit groupConfig: GroupConfig): TxValidation = new Impl()
+  def build(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): TxValidation =
+    new Impl()
 
   // scalastyle:off number.of.methods
-  class Impl(implicit val groupConfig: GroupConfig) extends TxValidation {
+  class Impl(implicit val groupConfig: GroupConfig, networkConfig: NetworkConfig)
+      extends TxValidation {
+    protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit] = {
+      if (tx.unsigned.networkId == networkConfig.networkId) {
+        validTx(())
+      } else {
+        invalidTx(InvalidNetworkId)
+      }
+    }
+
     protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
       val inputNum = tx.unsigned.inputs.length
       // inputNum can be 0 due to coinbase tx
