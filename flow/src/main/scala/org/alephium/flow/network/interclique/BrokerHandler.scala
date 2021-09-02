@@ -197,7 +197,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
         handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
       } else {
-        allHandlers.txHandler ! TxHandler.AddToGrandPool(txs)
+        allHandlers.txHandler ! TxHandler.AddToSharedPool(txs)
       }
     }
   }
