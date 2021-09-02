@@ -34,7 +34,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp, U256}
 import org.alephium.wallet.Constants
@@ -167,11 +167,10 @@ object WalletService {
   def apply(
       blockFlowClient: BlockFlowClient,
       secretDir: Path,
-      networkId: NetworkId,
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, executionContext: ExecutionContext): WalletService = {
 
-    new Impl(blockFlowClient, secretDir, networkId, lockingTimeout)
+    new Impl(blockFlowClient, secretDir, lockingTimeout)
   }
 
   final private case class StorageState(secretStorage: SecretStorage, lastAccess: TimeStamp)
@@ -212,14 +211,13 @@ object WalletService {
   private class Impl(
       blockFlowClient: BlockFlowClient,
       secretDir: Path,
-      networkId: NetworkId,
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
       extends WalletService {
 
     private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
 
-    private val path: AVector[Int] = Constants.path(networkId)
+    private val path: AVector[Int] = Constants.path
 
     protected def startSelfOnce(): Future[Unit] = {
       Future.fromTry(Try(discard(Files.createDirectories(secretDir))))

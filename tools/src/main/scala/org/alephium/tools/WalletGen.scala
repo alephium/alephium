@@ -27,7 +27,7 @@ import org.alephium.wallet.Constants
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 object WalletGen extends App {
   @tailrec
-  def gen(networkId: NetworkId, groupIndex: GroupIndex)(implicit
+  def gen(groupIndex: GroupIndex)(implicit
       config: GroupConfig
   ): (Address, SecP256K1PublicKey, SecP256K1PrivateKey, Mnemonic) = {
     // scalastyle:off magic.number
@@ -35,14 +35,14 @@ object WalletGen extends App {
     // scalastyle:on magic.number
 
     val seed        = mnemonic.toSeed(None)
-    val extendedKey = BIP32.btcMasterKey(seed).derive(Constants.path(networkId)).get
+    val extendedKey = BIP32.btcMasterKey(seed).derive(Constants.path).get
     val priKey      = extendedKey.privateKey
     val pubKey      = extendedKey.publicKey
     val address     = Address.p2pkh(pubKey)
     if (address.groupIndex == groupIndex) {
       (address, pubKey, priKey, mnemonic)
     } else {
-      gen(networkId, groupIndex)
+      gen(groupIndex)
     }
   }
 
@@ -54,7 +54,7 @@ object WalletGen extends App {
       }
       (0 until groupNum).foreach { g =>
         printLine(s"group: $g")
-        val (address, pubKey, priKey, mnemonic) = gen(networkId, GroupIndex.unsafe(g))
+        val (address, pubKey, priKey, mnemonic) = gen(GroupIndex.unsafe(g))
         printLine(s"address: ${address.toBase58}")
         printLine(s"pubKey: ${pubKey.toHexString}")
         printLine(s"priKey: ${priKey.toHexString}")

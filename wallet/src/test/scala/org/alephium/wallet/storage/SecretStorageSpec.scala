@@ -21,7 +21,6 @@ import java.nio.file.Files
 
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.model.NetworkId
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 import org.alephium.wallet.Constants
 
@@ -32,7 +31,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   val mnemonicGen = Mnemonic.generate(24).get
   val passwordGen = hashGen.map(_.toHexString)
-  val path        = Constants.path(NetworkId.AlephiumMainNet)
+  val path        = Constants.path
 
   it should "create/lock/unlock/delete the secret storage" in {
     forAll(mnemonicGen, passwordGen, passwordGen) { case (mnemonic, password, wrongPassword) =>
@@ -113,7 +112,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     )
 
     val rawFile =
-      """{"encrypted":"47216dec548143e584a97c32fc0d2019b28dd39e44221ed7306ce1d6072e7b5e9e334d4ae389848619b345ded3eddbeb9b863f60aa4968d41baf556d9937cbb70d88740feb04c8c30b756201b2a14a9c9cbe77fd20af9d91ad1346995fbab28312ee2857749d27453938031a04ef3773756239fedefcedec549b1b095a7710a639745440406592acfd22224cc7a2db81600acbc6a0f244ff0dcf863f79a58f22f3df303713741fb8209c","salt":"ab9426ea499680ebd7a84eaade6bdfe5ecdad8b25d0dd92277bae845fd11c1ad58766311b02ca41fa509d06ef5afa2e8bf817b6febcb78fc9d831b71a1de8138","iv":"1eb45e5397e7f7edfa5f699c8c4966c7ca07a32f2c77bd730fa71e5746fdf09895b309aba2da5e0a24a00529ccb4c18839dd4cb5f34083672b1f3364f86524c1","version":1}"""
+      """{"encrypted":"267cdaf3f8a740c6fb70ec0413d90dd7389c0898a09cc08b476f66c232572ff2590a40bd1d6e560596880de981939fb6a7a7300a390bcf6c762dae0a36d8188c6cc1b2214c6e459aa2cbf2df1c6cdf16703748ae3e386879e6fd03927c24b85a633e79f71abf432fea719a622ed68b6beda79b509f8b3e1c3a192466f6cd21a9ce09f935e27f32c6083dd1e8cb80fdd8fc67b2a70f22df0468a735d42e5c83d5dc95f8a0a9ac228a57b8","salt":"c2eeb77b1d46fa53db20130cd9c0a6f281459274d06e3e597c83d0db4e3d1dd503eb86b6b2e1cb18b5563b02150ee02e11c262b024e6e7787f8de48cabb2d56b","iv":"d6a57f8ecf1df03b1dd1095a66608c3a580feb539a0dc8094f2c3de07a516cc1aacf0acd00de5a79dd6f4b3802640da78088f52e810b40739e04e8c30d0104f8","version":1}"""
 
     val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 

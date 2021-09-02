@@ -792,7 +792,6 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture with SocketU
   val walletConfig: WalletConfig = WalletConfig(
     None,
     (new java.io.File("")).toPath,
-    networkConfig.networkId,
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
     WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey)

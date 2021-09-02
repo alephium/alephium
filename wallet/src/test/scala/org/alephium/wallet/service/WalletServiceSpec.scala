@@ -71,7 +71,6 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     override lazy val walletService = WalletService(
       blockFlowClient,
       Paths.get(path),
-      config.networkId,
       Duration.ofMinutesUnsafe(10)
     )
 
@@ -205,13 +204,12 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     lazy val blockFlowClient =
       BlockFlowClient.apply(
         config.blockflow.uri,
-        config.networkId,
         config.blockflow.blockflowFetchMaxAge,
         config.blockflow.apiKey
       )
 
     lazy val walletService: WalletService =
-      WalletService.apply(blockFlowClient, tempSecretDir, config.networkId, config.lockingTimeout)
+      WalletService.apply(blockFlowClient, tempSecretDir, config.lockingTimeout)
   }
 
   trait UserWallet extends Fixture {
@@ -220,14 +218,14 @@ class WalletServiceSpec extends AlephiumFutureSpec {
         "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
       )
       .get
-    val address = Address.asset("14nYkUoqZTRYDqziNzjYQV1EHrnR328FS1Pnyy3ihrifu").get
+    val address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").get
 
     val publicKey = PublicKey
-      .from(Hex.unsafe("032d89ac4774e30a421c49674faf2a4992078f159fb3ebdf8e4e4a33df88666a2c"))
+      .from(Hex.unsafe("0362a56b41565582ec52c78f6adf76d7afdcf4b7584682011b0caa6846c3f44819"))
       .get
 
     val privateKey = PrivateKey
-      .from(Hex.unsafe("bfa8111c784c00fc284ffdf84fa2d83e44fc986b205c8bed83814e1128721403"))
+      .from(Hex.unsafe("18d3d0d2f72db3675db48cd38efd334eb10241c73b5df80b716f2905ff340d33"))
       .get
 
     val walletName =

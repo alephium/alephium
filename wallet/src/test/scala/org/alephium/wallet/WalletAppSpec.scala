@@ -306,7 +306,7 @@ class WalletAppSpec
         "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
       )
       .get
-    address = Address.asset("14nYkUoqZTRYDqziNzjYQV1EHrnR328FS1Pnyy3ihrifu").get
+    address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").get
 
     restore(mnemonic) check { response =>
       wallet = response.as[model.WalletRestore.Result].walletName
@@ -314,11 +314,11 @@ class WalletAppSpec
     }
 
     val publicKey = PublicKey
-      .from(Hex.unsafe("032d89ac4774e30a421c49674faf2a4992078f159fb3ebdf8e4e4a33df88666a2c"))
+      .from(Hex.unsafe("0362a56b41565582ec52c78f6adf76d7afdcf4b7584682011b0caa6846c3f44819"))
       .get
 
     val privateKey = PrivateKey
-      .from(Hex.unsafe("bfa8111c784c00fc284ffdf84fa2d83e44fc986b205c8bed83814e1128721403"))
+      .from(Hex.unsafe("18d3d0d2f72db3675db48cd38efd334eb10241c73b5df80b716f2905ff340d33"))
       .get
 
     getAddressInfo(address) check { response =>
