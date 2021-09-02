@@ -21,6 +21,7 @@ import akka.util.ByteString
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
 import org.alephium.protocol.config.{EmissionConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -205,7 +206,15 @@ object Transaction {
     )
   }
 
-  def rewardFromGasFee(gasFee: U256): U256 = gasFee.divUnsafe(U256.Two)
+  // PoLW burning is not considered
+  def totalReward(gasFee: U256, miningReward: U256): U256 = {
+    val gasReward = gasFee.divUnsafe(U256.Two)
+    if (gasReward >= miningReward) {
+      miningReward.mulUnsafe(U256.Two)
+    } else {
+      miningReward.addUnsafe(gasReward)
+    }
+  }
 
   def coinbase(
       chainIndex: ChainIndex,
@@ -225,37 +234,40 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val gasFee    = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    val gasReward = rewardFromGasFee(gasFee)
-    coinbase(chainIndex, gasReward, lockupScript, minerData, target, blockTs)
+    val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+    coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs)
   }
 
   def coinbase(
       chainIndex: ChainIndex,
-      gasReward: U256,
+      gasFee: U256,
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    coinbase(chainIndex, gasReward, lockupScript, ByteString.empty, target, blockTs)
+    coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs)
   }
 
   def coinbase(
       chainIndex: ChainIndex,
-      gasReward: U256,
+      gasFee: U256,
       lockupScript: LockupScript.Asset,
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val reward       = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
     val lockTime     = blockTs + coinbaseLockupPeriod
+    val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
+    val netReward = miningReward match {
+      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward).subUnsafe(defaultGasFee)
+      case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
+    }
 
     val txOutput =
       AssetOutput(
-        reward.addUnsafe(gasReward).subUnsafe(defaultGasFee),
+        netReward,
         lockupScript,
         lockTime,
         tokens = AVector.empty,

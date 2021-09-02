@@ -188,16 +188,6 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   it should "check header version" in new HeaderFixture {
     val modified0 = updateNonce(header.copy(version = defaultBlockVersion))
     passValidation(modified0)
-
-    val modified1 = updateNonce(header.copy(version = defaultBlockVersionWithPoLW))
-    assertThrows[AssertionError](passValidation(modified1))
-
-    forAll { byte: Byte =>
-      whenever(byte != defaultBlockVersion && byte != defaultBlockVersionWithPoLW) {
-        val modified = updateNonce(header.copy(version = byte))
-        failValidation(modified, InvalidBlockVersion)
-      }
-    }
   }
 
   it should "check header timestamp increasing" in new HeaderFixture {
@@ -249,11 +239,6 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
       .sample
       .get
     failValidation(modified, InvalidWorkAmount)
-  }
-
-  it should "check PoLW work amount" in new HeaderFixture {
-    val modified = updateNonce(header.copy(version = defaultBlockVersionWithPoLW))
-    assertThrows[AssertionError](headerValidator.validate(modified, blockFlow))
   }
 
   it should "check PoW work target" in new HeaderFixture {

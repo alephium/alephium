@@ -561,17 +561,20 @@ class ServerUtils(implicit
     Compiler.compileTxScript(scriptRaw)
   }
 
-  private def unignedTxFromScript(
+  private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
-      lockupScript: LockupScript.Asset,
-      publicKey: PublicKey
+      query: BuildContract
   ): ExeResult[UnsignedTransaction] = {
-    val unlockScript = UnlockScript.p2pkh(publicKey)
+    val lockupScript = LockupScript.p2pkh(query.fromPublicKey)
+    val unlockScript = UnlockScript.p2pkh(query.fromPublicKey)
     for {
       balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => Left(IOErrorLoadOutputs(e)))
       inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
-    } yield UnsignedTransaction(Some(script), inputs, AVector.empty)
+    } yield UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
+      gasAmount = query.gas.getOrElse(minimalGas),
+      gasPrice = query.gasPrice.getOrElse(defaultGasPrice)
+    )
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -583,11 +586,10 @@ class ServerUtils(implicit
       script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      utx <- unignedTxFromScript(
+      utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        LockupScript.p2pkh(query.fromPublicKey),
-        query.fromPublicKey
+        query
       ).left.map(error => badRequest(error.toString))
     } yield utx).map(BuildContractResult.from))
   }

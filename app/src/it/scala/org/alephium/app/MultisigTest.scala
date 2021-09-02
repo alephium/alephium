@@ -21,7 +21,8 @@ import org.alephium.api.model._
 import org.alephium.flow.validation.InvalidSignature
 import org.alephium.json.Json._
 import org.alephium.protocol.{PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{defaultGasFee, TransactionTemplate, UnsignedTransaction}
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasBox
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -33,10 +34,10 @@ class MultisigTest extends AlephiumActorSpec {
     val clique = bootClique(nbOfNodes = 1)
     clique.start()
 
-    val selfClique = clique.selfClique()
-    val group      = request[Group](getGroup(address), clique.masterRestPort)
-    val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.nodes(index).restPort
+    val group    = clique.getGroup(address)
+    val restPort = clique.getRestPort(group.group)
+
+    request[Balance](getBalance(address), restPort) is initialBalance
 
     val (_, publicKey2, _)           = generateAccount
     val (_, publicKey3, privateKey3) = generateAccount
@@ -101,8 +102,9 @@ class MultisigTest extends AlephiumActorSpec {
 
     confirmTx(multisigTx, restPort)
 
+    val gasFee = defaultGasPrice * GasBox.unsafe(6000 * 4) // 2 inputs and 2 outputs
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
-      Balance(transferAmount.mulUnsafe(2) - amount - defaultGasFee, 0, 1)
+      Balance(transferAmount.mulUnsafe(2) - amount - gasFee, 0, 1)
 
     clique.stopMining()
     clique.stop()
@@ -113,10 +115,8 @@ class MultisigTest extends AlephiumActorSpec {
     val clique = bootClique(nbOfNodes = 1)
     clique.start()
 
-    val selfClique = clique.selfClique()
-    val group      = request[Group](getGroup(address), clique.masterRestPort)
-    val index      = group.group / selfClique.groupNumPerBroker
-    val restPort   = selfClique.nodes(index).restPort
+    val group    = request[Group](getGroup(address), clique.masterRestPort)
+    val restPort = clique.getRestPort(group.group)
 
     val walletName =
       request[WalletCreation.Result](createWallet(password), restPort).walletName

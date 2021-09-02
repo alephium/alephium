@@ -138,7 +138,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
     emptyBlock.coinbaseReward is consensusConfig.emission
-      .miningReward(emptyBlock.header)
+      .reward(emptyBlock.header)
+      .miningReward
       .subUnsafe(defaultGasFee)
     addAndCheck(blockFlow, emptyBlock)
 
@@ -150,7 +151,8 @@ class FlowUtilsSpec extends AlephiumSpec {
       mineFromMemPool(blockFlow, chainIndex)
     }
     transferBlock.coinbaseReward is consensusConfig.emission
-      .miningReward(transferBlock.header)
+      .reward(transferBlock.header)
+      .miningReward
       .subUnsafe(defaultGasFee.divUnsafe(2)) // 50% is burnt
     addAndCheck(blockFlow, transferBlock)
   }

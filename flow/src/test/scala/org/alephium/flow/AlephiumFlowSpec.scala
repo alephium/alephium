@@ -143,8 +143,18 @@ trait FlowFixture
   ): AVector[Transaction] = {
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val gasAmount = txScriptOpt match {
+      case None =>
+        if (numReceivers > 1) {
+          minimalGas addUnsafe defaultGasPerOutput.mulUnsafe(numReceivers)
+        } else {
+          minimalGas
+        }
+      case Some(_) => GasBox.unsafe(100000)
+    }
+    val gasFee = defaultGasPrice * gasAmount
     val outputAmount =
-      if (gasFeeInTheAmount) amount - defaultGasFee.divUnsafe(numReceivers) else amount
+      if (gasFeeInTheAmount) amount - gasFee.divUnsafe(numReceivers) else amount
     val outputInfos = AVector.fill(numReceivers) {
       val (toPrivateKey, toPublicKey)      = chainIndex.to.generateKey
       val lockupScript: LockupScript.Asset = LockupScript.p2pkh(toPublicKey)
@@ -152,8 +162,12 @@ trait FlowFixture
       TxOutputInfo(lockupScript, outputAmount, AVector.empty, lockTimeOpt)
     }
     val unsignedTx =
-      blockFlow.transfer(publicKey, outputInfos, None, defaultGasPrice).rightValue.rightValue
-    AVector(Transaction.from(unsignedTx.copy(scriptOpt = txScriptOpt), privateKey))
+      blockFlow
+        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice)
+        .rightValue
+        .rightValue
+    val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)
+    AVector(Transaction.from(newUnsignedTx, privateKey))
   }
 
   def transferTxsMulti(
@@ -181,13 +195,18 @@ trait FlowFixture
     val lockupScript                = LockupScript.p2pkh(toPublicKey)
     keyManager += lockupScript -> toPrivateKey
 
+    val gasAmount = txScriptOpt match {
+      case None    => minimalGas
+      case Some(_) => GasBox.unsafe(100000)
+    }
+
     val unsignedTx = blockFlow
       .transfer(
         publicKey,
         lockupScript,
         None,
         amount - defaultGasFee,
-        None,
+        Some(gasAmount),
         defaultGasPrice
       )
       .rightValue
@@ -237,7 +256,9 @@ trait FlowFixture
     val balances                   = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
     val inputs                     = balances.map(_.ref).map(TxInput(_, unlockScript))
 
-    val unsignedTx = UnsignedTransaction(Some(script), inputs, AVector.empty)
+    val unsignedTx =
+      UnsignedTransaction(Some(script), inputs, AVector.empty)
+        .copy(gasAmount = GasBox.unsafe(200000))
     val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
 
     val txValidation = TxValidation.build
@@ -498,6 +519,25 @@ trait FlowFixture
         }
       }
     }
+  }
+
+  def debugTxGas(blockFlow: BlockFlow, chainIndex: ChainIndex, tx0: Transaction): Unit = {
+    val initialGas  = tx0.unsigned.gasAmount
+    val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val prevOutputs = worldState.getPreOutputs(tx0).rightValue
+    val blockEnv =
+      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget)
+    val txValidation = TxValidation.build
+    val gasLeft      = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv).rightValue
+    val gasUsed      = initialGas.use(gasLeft).rightValue
+    print(s"length: ${tx0.unsigned.inputs.length}\n")
+    print(s"gasUsed $gasUsed\n")
+    import org.alephium.protocol.vm.GasSchedule._
+    val estimate = txBaseGas addUnsafe
+      txInputBaseGas.mulUnsafe(tx0.unsigned.inputs.length) addUnsafe
+      txOutputBaseGas.mulUnsafe(tx0.outputsLength) addUnsafe
+      GasBox.unsafe(2054 * tx0.unsigned.inputs.length)
+    print(s"estimate: $estimate\n")
   }
 }
 

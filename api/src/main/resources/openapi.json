@@ -5536,6 +5536,12 @@
           },
           "code": {
             "type": "string"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
           }
         }
       },

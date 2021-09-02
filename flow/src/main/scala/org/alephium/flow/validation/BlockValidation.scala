@@ -18,6 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, WorldState}
 import org.alephium.serde._
@@ -127,10 +128,14 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): BlockValidationResult[Unit] = {
-    val result = if (block.header.isPoLWEnabled) {
-      checkCoinbaseWithPoLW(block, groupView)
-    } else {
-      checkCoinbaseWithoutPoLW(block, groupView)
+    val result = consensusConfig.emission.reward(block.header) match {
+      case Emission.PoW(miningReward) =>
+        val netReward = Transaction.totalReward(block.gasFee, miningReward)
+        checkCoinbase(block, groupView, 1, netReward, netReward)
+      case Emission.PoLW(miningReward, burntAmount) =>
+        val lockedReward = Transaction.totalReward(block.gasFee, miningReward)
+        val netReward    = lockedReward.subUnsafe(burntAmount)
+        checkCoinbase(block, groupView, 2, netReward, lockedReward)
     }
 
     result match {
@@ -139,36 +144,18 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
-  private[validation] def checkCoinbaseWithoutPoLW(
-      block: Block,
-      groupView: BlockFlowGroupView[WorldState.Cached]
-  ): BlockValidationResult[Unit] = {
-    val reward    = consensusConfig.emission.miningReward(block.header)
-    val netReward = reward.addUnsafe(block.gasReward)
-    checkCoinbase(block, groupView, 0, 1, netReward)
-  }
-
-  private[validation] def checkCoinbaseWithPoLW(
-      block: Block,
-      groupView: BlockFlowGroupView[WorldState.Cached]
-  ): BlockValidationResult[Unit] = {
-    val reward      = consensusConfig.emission.miningReward(block.header)
-    val burntAmount = consensusConfig.emission.burntAmountUnsafe(block.target, reward)
-    val netReward   = reward.addUnsafe(block.gasReward).subUnsafe(burntAmount)
-    checkCoinbase(block, groupView, 1, 2, netReward)
-  }
-
   private[validation] def checkCoinbase(
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      inputNum: Int,
       outputNum: Int,
-      netReward: U256
+      netReward: U256,
+      lockedReward: U256
   ): BlockValidationResult[Unit] = {
     for {
-      _ <- checkCoinbaseEasy(block, inputNum, outputNum)
+      _ <- checkCoinbaseEasy(block, outputNum)
       _ <- checkCoinbaseData(block)
       _ <- checkCoinbaseAsTx(block, groupView, netReward)
+      _ <- checkLockedReward(block, lockedReward.subUnsafe(block.coinbase.gasFeeUnsafe))
     } yield ()
   }
 
@@ -195,7 +182,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   private[validation] def checkCoinbaseEasy(
       block: Block,
-      inputsNum: Int,
       outputsNum: Int
   ): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
@@ -204,7 +190,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       unsigned.scriptOpt.isEmpty &&
       unsigned.gasAmount == minimalGas &&
       unsigned.gasPrice == defaultGasPrice &&
-      unsigned.inputs.length == inputsNum &&
       unsigned.fixedOutputs.length == outputsNum &&
       unsigned.fixedOutputs(0).tokens.isEmpty &&
       coinbase.contractInputs.isEmpty &&
@@ -234,6 +219,20 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
           invalidBlock(InvalidCoinbaseData)
         }
       case Left(_) => invalidBlock(InvalidCoinbaseData)
+    }
+  }
+
+  private[validation] def checkLockedReward(
+      block: Block,
+      lockedAmount: U256
+  ): BlockValidationResult[Unit] = {
+    val output = block.coinbase.unsigned.fixedOutputs.head
+    if (output.amount != lockedAmount) {
+      invalidBlock(InvalidCoinbaseLockedAmount)
+    } else if (output.lockTime != block.timestamp.plusUnsafe(coinbaseLockupPeriod)) {
+      invalidBlock(InvalidCoinbaseLockupPeriod)
+    } else {
+      validBlock(())
     }
   }
 
