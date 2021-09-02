@@ -261,7 +261,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val chainIndexGen = Gen.const(chainIndex)
     val txs           = AVector.fill(10)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.random(), txs))
-    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToGrandPool(txs))
+    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToSharedPool(txs))
     txs.foreach { tx =>
       brokerHandler.underlyingActor.seenTxs.contains(tx.id) is false
     }
@@ -344,7 +344,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs           = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     val response      = TxsResponse(RequestId.random(), txs)
     brokerHandler ! BaseBrokerHandler.Received(response)
-    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToGrandPool(txs))
+    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToSharedPool(txs))
 
     val invalidTx =
       transactionGen(chainIndexGen = Gen.const(invalidChainIndex)).sample.get.toTemplate
