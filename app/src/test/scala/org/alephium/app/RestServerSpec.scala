@@ -39,6 +39,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
@@ -706,7 +707,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   it should "correctly use the api-key" in {
     val newApiKey = apiKey match {
       case Some(_) => None
-      case None    => Some(Random.nextString(32))
+      case None    => Some(Hash.random.toHexString)
     }
 
     Get(blockflowFromTo(0, 0), apiKey = newApiKey) check { response =>
@@ -722,7 +723,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   }
 
   it should "validate the api-key" in {
-    val newApiKey = apiKey.map(_ => Random.nextString(32))
+    val newApiKey = apiKey.map(_ => Hash.random.toHexString)
 
     Get(blockflowFromTo(0, 0), apiKey = newApiKey) check { response =>
       if (apiKey.isDefined) {
