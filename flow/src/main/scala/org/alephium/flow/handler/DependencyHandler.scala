@@ -99,13 +99,13 @@ trait DependencyHandlerState extends IOBaseActor {
   def networkSetting: NetworkSetting
 
   val cacheSize =
-    maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 2 // slightly larger than maxSyncBlocks
+    maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 2
   val pending = Cache.fifo[BlockHash, PendingStatus] {
     (map: LinkedHashMap[BlockHash, PendingStatus], eldest: JMap.Entry[BlockHash, PendingStatus]) =>
       if (map.size > cacheSize) {
         removePending(eldest.getKey())
       }
-      val threshold = TimeStamp.now().minusUnsafe(networkSetting.syncExpiryPeriod)
+      val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
       if (eldest.getValue().timestamp <= threshold) {
         val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
         val iterator = map.entrySet().iterator()
@@ -186,16 +186,28 @@ trait DependencyHandlerState extends IOBaseActor {
     removePending(hash)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def removePending(hash: BlockHash): Unit = {
-    pending.remove(hash)
-    missing -= hash
-    missingIndex.get(hash).foreach { children =>
-      missingIndex -= hash
-      children.foreach(removePending)
-    }
-
+  def removePending(hash: BlockHash): Unit = {
+    _removePending(hash)
     readies -= hash
     processing -= hash
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def _removePending(hash: BlockHash): Unit = {
+    pending.remove(hash)
+
+    missingIndex.get(hash).foreach { children =>
+      children.foreach(_removePending)
+    }
+    missing.get(hash).foreach { deps =>
+      missing -= hash
+      deps.foreach { dep =>
+        val pending = missingIndex(dep)
+        pending -= hash
+        if (pending.isEmpty) {
+          missingIndex.remove(dep)
+        }
+      }
+    }
   }
 }
