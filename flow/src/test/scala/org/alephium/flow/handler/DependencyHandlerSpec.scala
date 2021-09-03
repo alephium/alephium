@@ -28,7 +28,7 @@ import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model.{ChainIndex, FlowData, Nonce}
-import org.alephium.util.{ActorRefT, AlephiumActorSpec}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration}
 
 class DependencyHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture { Self =>
@@ -245,9 +245,10 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
-      ("alephium.network.sync-expiry-frequency", "2s")
+      ("alephium.network.dependency-expiry-period", "2s")
     )
 
+    config.network.dependencyExpiryPeriod is Duration.ofSecondsUnsafe(2)
     val block0 = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
     val blocks = (0 until 10).map { _ =>
       val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.unsecureRandom()))
@@ -263,5 +264,40 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       state.pending.contains(block1.hash) is true
       blocks.foreach(block => state.pending.contains(block.hash) is false)
     }
+  }
+
+  it should "update dependencies when remove pending flow data" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val blockFlow1 = isolatedBlockFlow()
+    val blocks = (0 until 3).map { _ =>
+      val block = emptyBlock(blockFlow1, chainIndex)
+      addAndCheck(blockFlow1, block)
+      block
+    }
+    blocks.foreach { block =>
+      state.addPendingData(block, broker, origin)
+      state.pending.contains(block.hash)
+    }
+    state.missing.contains(blocks(0).hash) is false
+    state.missing(blocks(1).hash).toSeq is Seq(blocks(0).hash)
+    state.missing(blocks(2).hash).toSeq is Seq(blocks(1).hash)
+    state.missingIndex(blocks(0).hash).toSeq is Seq(blocks(1).hash)
+    state.missingIndex(blocks(1).hash).toSeq is Seq(blocks(2).hash)
+    state.missingIndex.contains(blocks(2).hash) is false
+    state.readies.toSet is Set(blocks(0).hash)
+    state.processing.isEmpty is true
+
+    state.removePending(blocks(1).hash)
+    state.pending.contains(blocks(0).hash) is true
+    state.pending.contains(blocks(1).hash) is false
+    state.pending.contains(blocks(2).hash) is false
+    state.missing.contains(blocks(0).hash) is false
+    state.missing.contains(blocks(1).hash) is false
+    state.missing.contains(blocks(2).hash) is false
+    state.missingIndex.contains(blocks(0).hash) is false
+    state.missingIndex.contains(blocks(1).hash) is false
+    state.missingIndex.contains(blocks(2).hash) is false
+    state.readies.toSet is Set(blocks(0).hash)
+    state.processing.isEmpty is true
   }
 }
