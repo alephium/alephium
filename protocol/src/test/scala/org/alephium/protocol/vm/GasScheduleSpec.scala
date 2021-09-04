@@ -25,7 +25,7 @@ class GasScheduleSpec extends AlephiumSpec {
   }
 
   it should "charge gas for hash" in {
-    GasHash.gas(32) is GasBox.unsafe(54)
-    GasSchedule.p2pkUnlockGas is GasBox.unsafe(54 + 2000)
+    GasHash.gas(33) is GasBox.unsafe(60)
+    GasSchedule.p2pkUnlockGas is GasBox.unsafe(60 + 2000)
   }
 }

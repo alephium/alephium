@@ -461,7 +461,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val initialGas = tx.unsigned.gasAmount
     val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv).rightValue
     val gasUsed    = initialGas.use(gasLeft).rightValue
-    gasUsed is GasBox.unsafe(14054)
+    gasUsed is GasBox.unsafe(14060)
     gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas.mulUnsafe(
       2
     ) addUnsafe GasSchedule.p2pkUnlockGas)
