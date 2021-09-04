@@ -126,6 +126,11 @@ object GasBalance {
 trait GasCall extends GasFormula {
   def gas(size: Int): GasBox = ??? // should call the companion object instead
 }
+object GasCall {
+  val gasPerScriptByte: Int = 1
+  def scriptBaseGas(byteLength: Int): GasBox =
+    GasBox.unsafe(gasPerScriptByte * byteLength + GasSchedule.callGas.value)
+}
 
 trait GasLog extends GasFormula {
   def gas(n: Int): GasBox = GasLog.gas(n)

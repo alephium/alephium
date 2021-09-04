@@ -634,9 +634,78 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     passValidation(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
-    failValidation(validateTxOnlyForTest(tx1, blockFlow), InvalidUnlockScript(AssertionFailed))
+    failValidation(validateTxOnlyForTest(tx1, blockFlow), TxScriptExeFailed(AssertionFailed))
     val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
     val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
     failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidScriptHash)
+  }
+
+  trait GasFixture extends LockupFixture {
+    def groupIndex: GroupIndex
+    def tx: Transaction
+    lazy val initialGas = minimalGas
+    lazy val blockEnv =
+      BlockEnv(NetworkId.AlephiumMainNet, TimeStamp.now(), consensusConfig.maxMiningTarget)
+    lazy val prevOutputs = blockFlow
+      .getBestPersistedWorldState(groupIndex)
+      .rightValue
+      .getPreOutputs(tx)
+      .rightValue
+      .asUnsafe[AssetOutput]
+    lazy val txEnv = TxEnv(tx, prevOutputs, Stack.ofCapacity[Signature](0))
+  }
+
+  it should "charge gas for asset script size" in new GasFixture {
+    val rawScript =
+      s"""
+         |AssetScript P2sh {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val script   = Compiler.compileAssetScript(rawScript).rightValue
+    val lockup   = LockupScript.p2sh(script)
+    val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
+    val unsigned = prepareOutput(lockup, unlock)
+    val tx       = Transaction.from(unsigned, AVector.empty[Signature])
+
+    val groupIndex = lockup.groupIndex
+    val gasRemaining =
+      checkScript(initialGas, script.hash, script, AVector.empty, blockEnv, txEnv).rightValue
+    initialGas is gasRemaining.addUnsafe(
+      script.bytes.size + GasHash.gas(script.bytes.size).value + 200 /* 200 is the call gas */
+    )
+  }
+
+  it should "charge gas for tx script size" in new GasFixture {
+    val rawScript =
+      s"""
+         |TxScript P2sh {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val script     = Compiler.compileTxScript(rawScript).rightValue
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = simpleScript(blockFlow, chainIndex, script)
+    val tx         = block.nonCoinbase.head
+    val groupIndex = GroupIndex.unsafe(0)
+
+    val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
+    val gasRemaining =
+      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv).rightValue
+    initialGas is gasRemaining.addUnsafe(script.bytes.size + 200 /* 200 is the call gas */ )
+    val noScriptTx = tx.copy(unsigned = tx.unsigned.copy(scriptOpt = None))
+    checkTxScript(
+      chainIndex,
+      noScriptTx,
+      initialGas,
+      worldState,
+      prevOutputs,
+      blockEnv
+    ).rightValue is initialGas
   }
 }
