@@ -24,11 +24,13 @@ import scala.jdk.CollectionConverters._
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import com.typesafe.config.ConfigValueFactory
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
-import org.alephium.util.{AlephiumSpec, AVector, Duration}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
 
 class AlephiumConfigSpec extends AlephiumSpec {
   it should "load alephium config" in new AlephiumConfigFixture {
@@ -63,6 +65,45 @@ class AlephiumConfigSpec extends AlephiumSpec {
       .as[ArraySeq[InetSocketAddress]]("addresses")(
         inetSocketAddressesReader
       ) is ArraySeq.empty
+  }
+
+  it should "load genesis config" in {
+    val amount = U256.unsafe(1000000L)
+    val addresses = AVector(
+      "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",
+      "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA"
+    )
+    val genesisSetting = GenesisSetting(addresses.map { address =>
+      Allocation(Address.asset(address).get, amount, Duration.ofSecondsUnsafe(2))
+    })
+
+    val configs =
+      s"""
+         |{
+         |  genesis {
+         |    allocations = [
+         |      {
+         |        address = "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",
+         |        amount = "1000000",
+         |        lock-duration = 2 seconds
+         |      },
+         |      {
+         |        address = "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA",
+         |        amount = "1000000",
+         |        lock-duration = 2 seconds
+         |      }
+         |    ]
+         |  }
+         |}
+         |""".stripMargin
+
+    ConfigFactory
+      .parseString(configs)
+      .as[GenesisSetting]("genesis")(ValueReader[GenesisSetting]) is genesisSetting
+
+    ConfigFactory
+      .parseString("""{ genesis { allocations = [] } }""")
+      .as[GenesisSetting]("genesis")(ValueReader[GenesisSetting]) is GenesisSetting(AVector.empty)
   }
 
   it should "fail to load if miner's addresses are wrong" in new AlephiumConfigFixture {

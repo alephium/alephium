@@ -23,6 +23,7 @@ import java.nio.file.Path
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.MILLISECONDS
 import scala.jdk.CollectionConverters._
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 import com.typesafe.config.{Config, ConfigException}
@@ -31,7 +32,8 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import net.ceedubs.ficus.readers.CollectionReaders.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 
-import org.alephium.util.{Duration, U256}
+import org.alephium.protocol.model.Address
+import org.alephium.util.{AVector, Duration, U256}
 
 package object conf {
 
@@ -56,6 +58,23 @@ package object conf {
         throw new ConfigException.BadValue("U256", s"$bigInt")
       )
   }
+
+  implicit val assetAddressValueReader: ValueReader[Address.Asset] = stringValueReader.map { str =>
+    Address.asset(str).getOrElse(throw new RuntimeException(s"Invalid address $str"))
+  }
+
+  implicit def avectorValueReader[T: ValueReader: ClassTag]: ValueReader[AVector[T]] =
+    new ValueReader[AVector[T]] {
+      override def read(config: Config, path: String): AVector[T] = {
+        // from `traversableReader`
+        val dummyPath = "collection-path"
+        val reader    = ValueReader[T]
+        config.getList(path).asScala.foldLeft(AVector.empty[T]) { case (acc, entry) =>
+          val entryConfig = entry.atPath(dummyPath)
+          acc :+ reader.read(entryConfig, dummyPath)
+        }
+      }
+    }
 
   implicit val durationValueReader: ValueReader[Duration] = new ValueReader[Duration] {
     def read(config: Config, path: String): Duration = {

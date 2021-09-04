@@ -216,7 +216,7 @@ lazy val json = project("json")
   )
 
 lazy val conf = project("conf")
-  .dependsOn(util)
+  .dependsOn(protocol, util)
   .settings(
     libraryDependencies ++= Seq(
       ficus

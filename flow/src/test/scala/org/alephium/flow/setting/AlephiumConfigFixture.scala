@@ -22,9 +22,8 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.protocol.{ALF, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.GroupIndex
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, Env, Number, U256}
+import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.util.{AVector, Duration, Env, Number, U256}
 
 trait AlephiumConfigFixture {
   val configValues: Map[String, Any] = Map.empty
@@ -53,9 +52,10 @@ trait AlephiumConfigFixture {
     val tmp = AlephiumConfig
       .load(newConfig)
 
-    tmp.copy(genesisBalances = genesisKeys.map { case (_, pubKey, amount) =>
-      (LockupScript.p2pkh(pubKey), amount)
-    })
+    val allocations = genesisKeys.map { case (_, pubKey, amount) =>
+      Allocation(Address.p2pkh(pubKey), amount, Duration.zero)
+    }
+    tmp.copy(genesis = GenesisSetting(allocations))
   }
   implicit lazy val brokerConfig     = config.broker
   implicit lazy val consensusConfig  = config.consensus
