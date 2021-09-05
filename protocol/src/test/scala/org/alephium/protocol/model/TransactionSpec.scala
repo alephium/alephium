@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.protocol._
@@ -113,7 +114,6 @@ class TransactionSpec
     }
   }
 
-
   it should "cap the gas reward" in {
     val hardReward = ALF.oneAlf
     Transaction.totalReward(1, 100) is U256.unsafe(100)
@@ -131,8 +131,15 @@ class TransactionSpec
 
     import Hex._
 
+    val pubKey1 =
+      PublicKey.unsafe(hex"03d7b2d064a1cf0f55266314dfcd50926ba032069b5c3dda7fd7c83c3ea8055249")
     val privKey1 =
       PrivateKey.unsafe(hex"d803bda2a7b5e2110d1302fe6f9fef18d6b4c38bc4f5e1c31b5830dfb73be216")
+
+    val pubKey2 =
+      PublicKey.unsafe(hex"0298d66776af8012ca087214c10f242db3d220f1181ca0cc9f4f6172371f8fae15")
+    val privKey2 =
+      PrivateKey.unsafe(hex"227cd87dfdbc7e82073d3e05a511ee5c3af2bbd716a498c44e84c098b82be986")
 
     {
       info("no inputs and outputs")
@@ -155,6 +162,134 @@ class TransactionSpec
 
       val tx = coinbaseTransaction()
       tx.verify("coinbase")
+    }
+
+    {
+      info("multiple fixed inputs and outputs")
+
+      val unsignedTx = UnsignedTransaction(
+        networkId,
+        scriptOpt = None,
+        GasBox.unsafe(100000),
+        GasPrice(U256.unsafe(1000000000)),
+        inputs = AVector(
+          TxInput(
+            AssetOutputRef.unsafe(
+              Hint.unsafe(-1038667625),
+              Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
+            ),
+            p2pkh(pubKey1)
+          ),
+          TxInput(
+            AssetOutputRef.unsafe(
+              Hint.unsafe(12347),
+              Hash.unsafe(hex"0fa5fd6aecca7b21a167b3aad9a4e27762509b8c3ce68611353aef60196086dc")
+            ),
+            p2pkh(pubKey2)
+          ),
+          TxInput(
+            AssetOutputRef.unsafe(
+              Hint.unsafe(-1038667625),
+              Hash.unsafe(hex"ce6fd6a868621a167b62509b8c3dc7a5ecc0fa7b3aad9a4e2711353aef601960")
+            ),
+            p2pkh(pubKey1)
+          )
+        ),
+        fixedOutputs = AVector(
+          p2shOutput(
+            200,
+            hex"2ac11ec0a41ac91a309da23092fdca9c407f99a05a2c66c179f10d51050b8dfe",
+            additionalData = hex"7fa5c3fd66ff751c"
+          ),
+          p2pkhOutput(
+            1000,
+            hex"c03ce271334db24f37313bbbf2d4aced9c6223d1378b1f472ec56f0b30aaac04",
+            additionalData = hex"55deff667f0096ffc024ff53d6017ff5"
+          ),
+          p2pkhOutput(
+            100,
+            hex"d2d3f28a281a7029fa8442f2e5d7a9962c9ad8680bba8fa9df62fbfbe01f6efd",
+            TimeStamp.unsafe(1630168595025L),
+            additionalData = hex"00010000017b8d959291"
+          )
+        )
+      )
+
+      val tx = inputSign(unsignedTx, privKey1, privKey2, privKey1)
+      tx.verify("multiple-fixed-inputs-and-outputs")
+    }
+
+    {
+      info("multiple contract inputs and outputs")
+
+      val address1 = Address.p2pkh(pubKey1).toBase58
+      val address2 = Address.p2pkh(pubKey2).toBase58
+      val tokenId =
+        Hash.unsafe(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822")
+
+      val script =
+        s"""
+         |TxScript Main {
+         | pub payable fn main() -> () {
+         |   verifyTxSignature!(#${pubKey1.toHexString})
+         |   transferAlfFromSelf!(@$address1, 1)
+         |   transferTokenToSelf!(@$address1, #${tokenId.toHexString}, 42)
+         |
+         |   verifyTxSignature!(#${pubKey2.toHexString})
+         |   transferAlfFromSelf!(@$address2, 5)
+         | }
+         |}
+         |""".stripMargin
+
+      val tx = {
+        val unsignedTx = unsignedTransaction(
+          pubKey1,
+          Some(script),
+          p2pkhOutput(
+            55,
+            hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f"
+          ),
+          p2shOutput(
+            95,
+            hex"f2d430aaac0fb03ce271334d1378b1f472ec56f0bb24f37313cccaced9c6223d"
+          )
+        )
+
+        val transaction = inputSign(unsignedTx, privKey1)
+
+        val updatedTransaction = transaction.copy(
+          contractInputs = AVector(
+            ContractOutputRef.unsafe(
+              Hint.unsafe(-1038667620),
+              Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+            ),
+            ContractOutputRef.unsafe(
+              Hint.unsafe(-1038667620),
+              Hash.unsafe(hex"45ace4fb7430a1f72ec6f0bc622d981334b03ce27313db23d13aac0f37cccf2d")
+            )
+          ),
+          generatedOutputs = AVector(
+            AssetOutput(
+              1,
+              LockupScript.p2pkh(pubKey1),
+              TimeStamp.unsafe(12345),
+              tokens = AVector((tokenId, U256.unsafe(42))),
+              ByteString.empty
+            ),
+            AssetOutput(
+              5,
+              LockupScript.p2pkh(pubKey2),
+              TimeStamp.unsafe(12345),
+              tokens = AVector.empty,
+              ByteString.empty
+            )
+          )
+        )
+
+        contractSign(updatedTransaction, privKey1, privKey2)
+      }
+
+      tx.verify("multiple-contract-inputs-and-outputs")
     }
   }
 }
