@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{ALF, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => _, _}
@@ -562,12 +562,11 @@ object TxValidation {
             validTx(gasRemaining)
           } else {
             checkLockupScript(
-              tx,
+              blockEnv,
+              txEnv,
               gasRemaining,
               preOutputs(idx).lockupScript,
-              unlockScript,
-              blockEnv,
-              txEnv
+              unlockScript
             )
           }
         }
@@ -576,48 +575,45 @@ object TxValidation {
     }
 
     protected[validation] def checkLockupScript(
-        tx: Transaction,
+        blockEnv: BlockEnv,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lockupScript: LockupScript,
-        unlockScript: UnlockScript,
-        blockEnv: BlockEnv,
-        txEnv: TxEnv
+        unlockScript: UnlockScript
     ): TxValidationResult[GasBox] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-          checkP2pkh(tx, gasRemaining, lock, unlock, txEnv.signatures)
+          checkP2pkh(txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2MPKH, unlock: UnlockScript.P2MPKH) =>
-          checkP2mpkh(tx, gasRemaining, lock, unlock, txEnv.signatures)
+          checkP2mpkh(txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-          checkP2SH(gasRemaining, lock, unlock, blockEnv, txEnv)
+          checkP2SH(blockEnv, txEnv, gasRemaining, lock, unlock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
     }
 
     protected[validation] def checkP2pkh(
-        tx: Transaction,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lock: LockupScript.P2PKH,
-        unlock: UnlockScript.P2PKH,
-        signatures: Stack[Signature]
+        unlock: UnlockScript.P2PKH
     ): TxValidationResult[GasBox] = {
       if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        checkSignature(tx, gasRemaining, unlock.publicKey, signatures)
+        checkSignature(txEnv, gasRemaining, unlock.publicKey)
       }
     }
 
     private def checkSignature(
-        tx: Transaction,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
-        publicKey: PublicKey,
-        signatures: Stack[Signature]
+        publicKey: PublicKey
     ): TxValidationResult[GasBox] = {
-      signatures.pop() match {
+      txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(tx.id.bytes, signature, publicKey)) {
+          if (!SignatureSchema.verify(txEnv.tx.id.bytes, signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
             gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
@@ -627,11 +623,10 @@ object TxValidation {
     }
 
     protected[validation] def checkP2mpkh(
-        tx: Transaction,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lock: LockupScript.P2MPKH,
-        unlock: UnlockScript.P2MPKH,
-        signatures: Stack[Signature]
+        unlock: UnlockScript.P2MPKH
     ): TxValidationResult[GasBox] = {
       if (unlock.indexedPublicKeys.length != lock.m) {
         invalidTx(InvalidNumberOfPublicKey)
@@ -641,36 +636,36 @@ object TxValidation {
             if (!lock.pkHashes.get(index).contains(Hash.hash(publicKey.bytes))) {
               invalidTx(InvalidPublicKeyHash)
             } else {
-              checkSignature(tx, gasBox, publicKey, signatures)
+              checkSignature(txEnv, gasBox, publicKey)
             }
           }
       }
     }
 
-    protected[validation] def checkP2SH(
+    @inline protected[validation] def checkP2SH(
+        blockEnv: BlockEnv,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lock: LockupScript.P2SH,
-        unlock: UnlockScript.P2SH,
-        blockEnv: BlockEnv,
-        txEnv: TxEnv
+        unlock: UnlockScript.P2SH
     ): TxValidationResult[GasBox] = {
       checkScript(
+        blockEnv,
+        txEnv,
         gasRemaining,
         lock.scriptHash,
         unlock.script,
-        unlock.params,
-        blockEnv,
-        txEnv
+        unlock.params
       )
     }
 
     protected[validation] def checkScript(
+        blockEnv: BlockEnv,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         expectedScriptHash: Hash,
         script: StatelessScript,
-        params: AVector[Val],
-        blockEnv: BlockEnv,
-        txEnv: TxEnv
+        params: AVector[Val]
     ): TxValidationResult[GasBox] = {
       if (script.hash != expectedScriptHash) {
         invalidTx(InvalidScriptHash)
