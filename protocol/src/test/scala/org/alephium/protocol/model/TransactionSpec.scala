@@ -18,11 +18,11 @@ package org.alephium.protocol.model
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{ALF, Hash, PublicKey}
+import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class TransactionSpec
     extends AlephiumSpec
@@ -40,8 +40,8 @@ class TransactionSpec
     info("merkle transation")
     forAll(transactionGen()) { transaction =>
       val merkleTx = transaction.toMerkleTx
-      val bytes  = serialize[Transaction.MerkelTx](merkleTx)
-      val output = deserialize[Transaction.MerkelTx](bytes).toOption.value
+      val bytes    = serialize[Transaction.MerkelTx](merkleTx)
+      val output   = deserialize[Transaction.MerkelTx](bytes).toOption.value
       output is merkleTx
     }
   }
@@ -113,6 +113,7 @@ class TransactionSpec
     }
   }
 
+
   it should "cap the gas reward" in {
     val hardReward = ALF.oneAlf
     Transaction.totalReward(1, 100) is U256.unsafe(100)
@@ -123,5 +124,37 @@ class TransactionSpec
     Transaction.totalReward(hardReward * 2 + 2, hardReward) is (hardReward * 2)
     Transaction.totalReward(hardReward * 2, 0) is hardReward
     Transaction.totalReward(hardReward * 2 + 2, 0) is hardReward
+  }
+
+  it should "seder the snapshots properly" in new TransactionSnapshotsFixture {
+    implicit val basePath = "src/test/resources/models/transaction"
+
+    import Hex._
+
+    val privKey1 =
+      PrivateKey.unsafe(hex"d803bda2a7b5e2110d1302fe6f9fef18d6b4c38bc4f5e1c31b5830dfb73be216")
+
+    {
+      info("no inputs and outputs")
+
+      val unsignedTx = UnsignedTransaction(
+        networkId,
+        scriptOpt = None,
+        GasBox.unsafe(100000),
+        GasPrice(1000000000),
+        AVector.empty,
+        AVector.empty
+      )
+
+      val tx = inputSign(unsignedTx, privKey1)
+      tx.verify("no-input-and-output")
+    }
+
+    {
+      info("coinbase transaction")
+
+      val tx = coinbaseTransaction()
+      tx.verify("coinbase")
+    }
   }
 }
