@@ -77,7 +77,9 @@ trait WorldState[T] {
 
   def persist(): IOResult[WorldState.Persisted]
 
-  def getPreOutputsForVM(tx: TransactionAbstract): IOResult[Option[AVector[AssetOutput]]] = {
+  def getPreOutputsForAssetInputs(
+      tx: TransactionAbstract
+  ): IOResult[Option[AVector[AssetOutput]]] = {
     val inputs = tx.unsigned.inputs
     inputs.foldE[IOError, Option[AVector[AssetOutput]]](Some(AVector.ofSize(inputs.length))) {
       case (Some(outputs), input) =>

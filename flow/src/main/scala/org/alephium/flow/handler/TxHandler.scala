@@ -28,9 +28,9 @@ import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{AssetOutput, ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, EventStream, Hex, TimeStamp}
+import org.alephium.util._
 
 object TxHandler {
   def props(blockFlow: BlockFlow)(implicit
@@ -60,13 +60,16 @@ object TxHandler {
   )
 
   val MaxDownloadTimes: Int = 2
+  // scalastyle:off magic.number
+  val PersistenceDuration: Duration = Duration.ofSecondsUnsafe(30)
+  // scalastyle:on magic.number
 }
 
 class TxHandler(blockFlow: BlockFlow)(implicit
     brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
     networkSetting: NetworkSetting
-) extends BaseActor
+) extends IOBaseActor
     with EventStream.Publisher {
   private val nonCoinbaseValidation = TxValidation.build
   val maxCapacity: Int              = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
@@ -74,6 +77,8 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
   val txsBuffer: Cache[TransactionTemplate, Unit] =
     Cache.fifo[TransactionTemplate, Unit](maxCapacity)
+  val delayedTxs: Cache[TransactionTemplate, TimeStamp] =
+    Cache.fifo[TransactionTemplate, TimeStamp](maxCapacity)
   val announcements: Cache[TxHandler.Announcement, Unit] =
     Cache.fifo[TxHandler.Announcement, Unit](maxCapacity)
 
@@ -168,6 +173,22 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     }
   }
 
+  private def needToDelay(chainIndex: ChainIndex, tx: TransactionTemplate): Boolean = {
+    val outputOpt =
+      blockFlow.getBestPersistedWorldState(chainIndex.from).flatMap { persistedWS =>
+        persistedWS.getPreOutputsForAssetInputs(tx).map(_.map(_.maxBy(_.lockTime)))
+      }
+
+    escapeIOError[Option[AssetOutput], Boolean](
+      outputOpt,
+      {
+        case Some(output) =>
+          output.lockTime.plusUnsafe(TxHandler.PersistenceDuration) > TimeStamp.now()
+        case None => true // some of the inputs are from block caches outputs
+      }
+    )(false)
+  }
+
   def handleValidTx(
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
@@ -177,8 +198,13 @@ class TxHandler(blockFlow: BlockFlow)(implicit
     val result = mempool.addNewTx(chainIndex, tx)
     log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToSharedPool => txsBuffer.put(tx, ())
-      case _                         => () // We don't broadcast txs that are pending locally
+      case MemPool.AddedToSharedPool =>
+        if (needToDelay(chainIndex, tx)) {
+          delayedTxs.put(tx, TimeStamp.now().plusUnsafe(networkSetting.txsBroadcastDelay))
+        } else {
+          txsBuffer.put(tx, ())
+        }
+      case _ => () // We don't broadcast txs that are pending locally
     }
     if (acknowledge) {
       addSucceeded(tx)
@@ -198,14 +224,34 @@ class TxHandler(blockFlow: BlockFlow)(implicit
 
   def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
-    if (!txsBuffer.isEmpty) {
+    val hashes1 = if (!txsBuffer.isEmpty) {
       val hashes =
         txsBuffer.keys().foldLeft(Map.empty[ChainIndex, AVector[Hash]]) { case (acc, tx) =>
           updateChainIndexedHash(acc, tx.chainIndex, tx.id)
         }
-
-      publishEvent(InterCliqueManager.BroadCastTx(AVector.from(hashes)))
       txsBuffer.clear()
+      hashes
+    } else {
+      Map.empty[ChainIndex, AVector[Hash]]
+    }
+
+    val hashes2 = if (delayedTxs.isEmpty) {
+      hashes1
+    } else {
+      val currentTs = TimeStamp.now()
+      val (hashes, removed) = delayedTxs
+        .entries()
+        .takeWhile(_.getValue <= currentTs)
+        .foldLeft((hashes1, AVector.empty[TransactionTemplate])) {
+          case ((hashes, removed), entry) =>
+            val tx = entry.getKey
+            (updateChainIndexedHash(hashes, tx.chainIndex, tx.id), removed :+ tx)
+        }
+      removed.foreach(delayedTxs.remove)
+      hashes
+    }
+    if (hashes2.nonEmpty) {
+      publishEvent(InterCliqueManager.BroadCastTx(AVector.from(hashes2)))
     }
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
   }

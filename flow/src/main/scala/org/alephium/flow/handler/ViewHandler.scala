@@ -24,7 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.InterCliqueManager
-import org.alephium.flow.setting.MiningSetting
+import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Address, ChainIndex, TransactionTemplate}
@@ -36,7 +36,11 @@ object ViewHandler {
   def props(
       blockFlow: BlockFlow,
       txHandler: ActorRefT[TxHandler.Command]
-  )(implicit brokerConfig: BrokerConfig, miningSetting: MiningSetting): Props = Props(
+  )(implicit
+      brokerConfig: BrokerConfig,
+      miningSetting: MiningSetting,
+      networkSetting: NetworkSetting
+  ): Props = Props(
     new ViewHandler(blockFlow, txHandler, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
   )
 
@@ -78,7 +82,8 @@ class ViewHandler(
     var minerAddressesOpt: Option[AVector[LockupScript.Asset]]
 )(implicit
     val brokerConfig: BrokerConfig,
-    val miningSetting: MiningSetting
+    val miningSetting: MiningSetting,
+    val networkSetting: NetworkSetting
 ) extends ViewHandlerState
     with Subscriber
     with Publisher
@@ -113,7 +118,12 @@ class ViewHandler(
 
   def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
     if (txs.nonEmpty) {
-      txHandler.ref ! TxHandler.Broadcast(txs)
+      // delay this broadcast so that peers have download this block
+      scheduleOnce(
+        txHandler.ref,
+        TxHandler.Broadcast(txs),
+        networkSetting.txsBroadcastDelay
+      )
     }
   }
 }

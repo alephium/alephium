@@ -188,7 +188,7 @@ object StatefulContext {
     preOutputsOpt match {
       case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
-        worldState.getPreOutputsForVM(tx) match {
+        worldState.getPreOutputsForAssetInputs(tx) match {
           case Right(Some(outputs)) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
           case Right(None)          => failed(NonExistTxInput)
           case Left(error)          => ioFailed(IOErrorLoadOutputs(error))

@@ -27,9 +27,8 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
-import org.alephium.serde.{serialize}
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
-import org.alephium.util.Hex
+import org.alephium.serde.serialize
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Hex}
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
@@ -86,6 +85,75 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       )
     )
     broadcastTxProbe.expectNoMessage()
+  }
+
+  it should "delay txs broadcast if the dependent outputs persisted a short time ago" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.txs-broadcast-delay", "1 s"),
+      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms")
+    )
+
+    val (privKey0, pubKey0)    = GroupIndex.unsafe(0).generateKey
+    val (privKey1, pubKey1, _) = genesisKeys(0)
+    val block0                 = transfer(blockFlow, privKey1, pubKey0, ALF.alf(3))
+    val tx0                    = block0.nonCoinbase.head.toTemplate
+    val mempool                = blockFlow.getMemPool(tx0.chainIndex)
+
+    txHandler ! TxHandler.AddToSharedPool(AVector(tx0))
+    expectMsg(TxHandler.AddSucceeded(tx0.id))
+    mempool.getSharedPool(tx0.chainIndex).contains(tx0.id) is true
+    txHandler.underlyingActor.txsBuffer.contains(tx0) is true
+    txHandler.underlyingActor.delayedTxs.contains(tx0) is false
+
+    addAndCheck(blockFlow, block0)
+    val block1     = transfer(blockFlow, privKey0, pubKey1, ALF.alf(1))
+    val tx1        = block1.nonCoinbase.head.toTemplate
+    val worldState = blockFlow.getBestPersistedWorldState(tx1.chainIndex.from).rightValue
+
+    worldState.existOutput(tx1.unsigned.inputs.head.outputRef) isE true
+    txHandler ! TxHandler.AddToSharedPool(AVector(tx1))
+    expectMsg(TxHandler.AddSucceeded(tx1.id))
+    mempool.getSharedPool(tx1.chainIndex).contains(tx1.id) is true
+    txHandler.underlyingActor.txsBuffer.contains(tx1) is false
+    txHandler.underlyingActor.delayedTxs.contains(tx1) is true
+
+    broadcastTxProbe.expectMsg(
+      InterCliqueManager.BroadCastTx(AVector(tx0.chainIndex -> AVector(tx0.id)))
+    )
+    txHandler.underlyingActor.txsBuffer.isEmpty is true
+    txHandler.underlyingActor.delayedTxs.contains(tx1) is true
+    broadcastTxProbe.expectMsg(
+      InterCliqueManager.BroadCastTx(AVector(tx1.chainIndex -> AVector(tx1.id)))
+    )
+    txHandler.underlyingActor.delayedTxs.isEmpty is true
+  }
+
+  it should "delay txs broadcast if the dependent outputs in block cache" in new Fixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.txs-broadcast-delay", "1 s"),
+      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms")
+    )
+
+    val (privKey0, pubKey0, _) = genesisKeys(0)
+    val (privKey1, pubKey1)    = GroupIndex.unsafe(1).generateKey
+    val block0                 = transfer(blockFlow, privKey0, pubKey1, ALF.alf(3))
+    addAndCheck(blockFlow, block0)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+
+    val block1     = transfer(blockFlow, privKey1, pubKey0, ALF.alf(2))
+    val tx         = block1.nonCoinbase.head.toTemplate
+    val worldState = blockFlow.getBestPersistedWorldState(block0.chainIndex.from).rightValue
+
+    worldState.existOutput(tx.unsigned.inputs.head.outputRef) isE false
+    txHandler ! TxHandler.AddToSharedPool(AVector(tx))
+    expectMsg(TxHandler.AddSucceeded(tx.id))
+    txHandler.underlyingActor.txsBuffer.contains(tx) is false
+    txHandler.underlyingActor.delayedTxs.contains(tx) is true
+    broadcastTxProbe.expectMsg(
+      InterCliqueManager.BroadCastTx(AVector(tx.chainIndex -> AVector(tx.id)))
+    )
+    txHandler.underlyingActor.delayedTxs.isEmpty is true
   }
 
   it should "fail in case of duplicate txs" in new Fixture {

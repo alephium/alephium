@@ -30,4 +30,12 @@ trait IOBaseActor extends BaseActor {
       case Left(e)  => handleIOError(e)
     }
   }
+  def escapeIOError[T, R](result: IOResult[T], f: T => R)(default: => R): R = {
+    result match {
+      case Right(t) => f(t)
+      case Left(e) =>
+        handleIOError(e)
+        default
+    }
+  }
 }
