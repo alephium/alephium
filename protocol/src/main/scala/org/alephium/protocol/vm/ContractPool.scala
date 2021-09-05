@@ -17,8 +17,9 @@
 package org.alephium.protocol.vm
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, ContractOutputRef}
 import org.alephium.util.{AVector, EitherF}
 
 trait ContractPool extends CostStrategy {
@@ -26,8 +27,10 @@ trait ContractPool extends CostStrategy {
 
   def worldState: WorldState.Staging
 
-  val contractPool = mutable.Map.empty[ContractId, StatefulContractObject]
-  val assetStatus  = mutable.Map.empty[ContractId, ContractAssetStatus]
+  lazy val contractPool = mutable.Map.empty[ContractId, StatefulContractObject]
+  lazy val assetStatus  = mutable.Map.empty[ContractId, ContractAssetStatus]
+
+  lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
 
   def loadContractObj(contractKey: ContractId): ExeResult[StatefulContractObject] = {
     contractPool.get(contractKey) match {
@@ -84,6 +87,21 @@ trait ContractPool extends CostStrategy {
 
   private def updateState(contractKey: ContractId, state: AVector[Val]): ExeResult[Unit] = {
     worldState.updateContractUnsafe(contractKey, state).left.map(e => Left(IOErrorUpdateState(e)))
+  }
+
+  // note: we don't charge gas here as it's charged by tx input already
+  def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {
+    for {
+      balances <- worldState
+        .useContractAsset(contractId)
+        .map { case (contractOutputRef, contractAsset) =>
+          contractInputs.addOne(contractOutputRef)
+          BalancesPerLockup.from(contractAsset)
+        }
+        .left
+        .map(e => Left(IOErrorLoadContract(e)))
+      _ <- markAssetInUsing(contractId)
+    } yield balances
   }
 
   def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {

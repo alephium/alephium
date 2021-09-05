@@ -75,8 +75,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def outputBalances: Balances
 
-  lazy val generatedOutputs: ArrayBuffer[TxOutput]        = ArrayBuffer.empty
-  lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
+  lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
   def nextOutputIndex: Int
 
@@ -120,20 +119,6 @@ trait StatefulContext extends StatelessContext with ContractPool {
           .left
           .map(e => Left(IOErrorUpdateState(e)))
     } yield ()
-  }
-
-  def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {
-    for {
-      balances <- worldState
-        .useContractAsset(contractId)
-        .map { case (contractOutputRef, contractAsset) =>
-          contractInputs.addOne(contractOutputRef)
-          BalancesPerLockup.from(contractAsset)
-        }
-        .left
-        .map(e => Left(IOErrorLoadContract(e)))
-      _ <- markAssetInUsing(contractId)
-    } yield balances
   }
 
   def destroyContract(
