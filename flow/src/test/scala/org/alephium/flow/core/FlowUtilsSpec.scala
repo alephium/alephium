@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import scala.util.Random
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.{Normal, Reorg}
@@ -32,7 +33,8 @@ class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val groupIndex = chainIndex.from
-    forAll(assetsToSpendGen(2, 2, 0, 1, p2pkScriptGen(groupIndex))) { assets =>
+
+    forAll(assetsToSpendGen(scriptGen = p2pkScriptGen(groupIndex))) { assets =>
       val inputs     = assets.map(_.txInput)
       val script     = StatefulScript.alwaysFail
       val unsignedTx = UnsignedTransaction(txScriptOpt = Some(script), inputs, AVector.empty)
@@ -93,9 +95,9 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "filter double spending txs" in new NoIndexModelGenerators {
-    val tx0 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
-    val tx1 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
-    val tx2 = transactionGen(minInputs = 2, maxInputs = 2).sample.get
+    val tx0 = transactionGen(Gen.const(2)).sample.get
+    val tx1 = transactionGen(Gen.const(2)).sample.get
+    val tx2 = transactionGen(Gen.const(2)).sample.get
     FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx2)) is AVector(tx0, tx1, tx2)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
     FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)

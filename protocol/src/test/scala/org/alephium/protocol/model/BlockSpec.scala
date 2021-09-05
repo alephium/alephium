@@ -32,10 +32,11 @@ import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkConfigFixture.Default {
+
   it should "serde" in {
     forAll(blockGen) { block =>
       val bytes  = serialize[Block](block)
-      val output = deserialize[Block](bytes).toOption.get
+      val output = deserialize[Block](bytes).toOption.value
       output is block
     }
   }
@@ -104,7 +105,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
     }
   }
 
-  it should "put non-script txs in the last" in {
+  it should "put non-script txs at the last" in {
     forAll(posLongGen, posLongGen) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
         BlockHeader.unsafeWithRawDeps(

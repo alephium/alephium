@@ -163,9 +163,9 @@ trait TokenGenerators extends Generators with NumericHelpers {
       amount  <- amountGen(inputNum)
     } yield (tokenId, amount)
 
-  def tokensGen(inputNum: Int, minTokens: Int, maxTokens: Int): Gen[Map[TokenId, U256]] =
+  def tokensGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Map[TokenId, U256]] =
     for {
-      tokenNum <- Gen.choose(minTokens, maxTokens)
+      tokenNum <- tokensNumGen
       tokens   <- Gen.listOfN(tokenNum, tokenGen(inputNum))
     } yield tokens.toMap
 
@@ -209,7 +209,7 @@ trait TxGenerators
 
   def assetOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256] = amountGen(1),
-      _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
+      _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, Gen.choose(1, 5)),
       scriptGen: Gen[LockupScript.Asset] = assetLockupGen(groupIndex),
       dataGen: Gen[ByteString] = dataGen
   ): Gen[AssetOutput] = {
@@ -223,7 +223,7 @@ trait TxGenerators
 
   def contractOutputGen(
       _amountGen: Gen[U256] = amountGen(1),
-      _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
+      _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, Gen.choose(1, 5)),
       scriptGen: Gen[LockupScript.P2C]
   ): Gen[ContractOutput] = {
     for {
@@ -311,23 +311,21 @@ trait TxGenerators
       UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)(networkConfig)
     }
 
-  def balancesGen(inputNum: Int, minTokens: Int, maxTokens: Int): Gen[Balances] =
+  def balancesGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Balances] =
     for {
       alfAmount <- amountGen(inputNum)
-      tokens    <- tokensGen(inputNum, minTokens, maxTokens)
+      tokens    <- tokensGen(inputNum, tokensNumGen)
     } yield Balances(alfAmount, tokens)
 
   def assetsToSpendGen(
-      minInputs: Int,
-      maxInputs: Int,
-      minTokens: Int,
-      maxTokens: Int,
+      inputsNumGen: Gen[Int] = Gen.choose(1, 10),
+      tokensNumGen: Gen[Int] = Gen.choose(0, 10),
       scriptGen: Gen[ScriptPair],
       lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)
   ): Gen[AVector[AssetInputInfo]] =
     for {
-      inputNum      <- Gen.choose(minInputs, maxInputs)
-      totalBalances <- balancesGen(inputNum, minTokens, maxTokens)
+      inputNum      <- inputsNumGen
+      totalBalances <- balancesGen(inputNum, tokensNumGen)
       inputs <- {
         val inputBalances = split(totalBalances, inputNum)
         val gens          = inputBalances.toSeq.map(assetInputInfoGen(_, scriptGen, lockTimeGen))
@@ -336,10 +334,8 @@ trait TxGenerators
     } yield AVector.from(inputs)
 
   def transactionGenWithPreOutputs(
-      minInputs: Int = 1,
-      maxInputs: Int = 10,
-      minTokens: Int = 1,
-      maxTokens: Int = 3,
+      inputsNumGen: Gen[Int] = Gen.choose(1, 10),
+      tokensNumGen: Gen[Int] = Gen.choose(0, 10),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen,
@@ -348,10 +344,8 @@ trait TxGenerators
     for {
       chainIndex <- chainIndexGen
       assetInfos <- assetsToSpendGen(
-        minInputs,
-        maxInputs,
-        minTokens,
-        maxTokens,
+        inputsNumGen,
+        tokensNumGen,
         scriptGen(chainIndex.from),
         lockTimeGen
       )
@@ -364,19 +358,15 @@ trait TxGenerators
     }
 
   def transactionGen(
-      minInputs: Int = 1,
-      maxInputs: Int = 10,
-      minTokens: Int = 1,
-      maxTokens: Int = 3,
+      numInputsGen: Gen[Int] = Gen.choose(1, 10),
+      numTokensGen: Gen[Int] = Gen.choose(0, 10),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen
   ): Gen[Transaction] =
     transactionGenWithPreOutputs(
-      minInputs,
-      maxInputs,
-      minTokens,
-      maxTokens,
+      numInputsGen,
+      numTokensGen,
       chainIndexGen,
       scriptGen,
       lockupGen

@@ -28,6 +28,24 @@ class TransactionSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
     with NetworkConfigFixture.Default {
+
+  it should "serde successfully" in {
+    info("transation")
+    forAll(transactionGen()) { transaction =>
+      val bytes  = serialize[Transaction](transaction)
+      val output = deserialize[Transaction](bytes).toOption.value
+      output is transaction
+    }
+
+    info("merkle transation")
+    forAll(transactionGen()) { transaction =>
+      val merkleTx = transaction.toMerkleTx
+      val bytes  = serialize[Transaction.MerkelTx](merkleTx)
+      val output = deserialize[Transaction.MerkelTx](bytes).toOption.value
+      output is merkleTx
+    }
+  }
+
   it should "generate distinct coinbase transactions" in {
     val (_, key) = GroupIndex.unsafe(0).generateKey
     val script   = LockupScript.p2pkh(key)
@@ -82,7 +100,7 @@ class TransactionSpec
   }
 
   it should "calculate the merkle hash" in {
-    forAll(transactionGen(chainIndexGen = chainIndexGen)) { tx =>
+    forAll(transactionGen()) { tx =>
       val txSerialized       = serialize(tx)
       val merkelTxSerialized = serialize(tx.toMerkleTx)
       val idSerialized       = serialize(tx.id)
