@@ -18,21 +18,15 @@ package org.alephium.protocol.model
 
 import scala.util.Random
 
-import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
 import org.alephium.protocol._
-import org.alephium.protocol.SignatureSchema
-import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.vm.{GasPrice, LockupScript, StatefulScript}
-import org.alephium.protocol.vm.{GasBox, UnlockScript}
-import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
-class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkConfigFixture.Default {
-
+class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde" in {
     forAll(blockGen) { block =>
       val bytes  = serialize[Block](block)
@@ -88,7 +82,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
             UnsignedTransaction(
               Some(StatefulScript.unsafe(AVector.empty)),
               minimalGas,
-              GasPrice(U256.unsafe(Random.nextLong(Long.MaxValue))),
+              GasPrice(Random.nextLong(Long.MaxValue)),
               AVector.empty,
               AVector.empty
             ),
@@ -120,7 +114,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         UnsignedTransaction(
           Some(StatefulScript.unsafe(AVector.empty)),
           minimalGas,
-          GasPrice(U256.unsafe(gasPrice0)),
+          GasPrice(gasPrice0),
           AVector.empty,
           AVector.empty
         ),
@@ -130,7 +124,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         UnsignedTransaction(
           None,
           minimalGas,
-          GasPrice(U256.unsafe(gasPrice1)),
+          GasPrice(gasPrice1),
           AVector.empty,
           AVector.empty
         ),
@@ -153,7 +147,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
     }
   }
 
-  it should "seder the snapshots properly" in new ModelSnapshots {
+  it should "seder the snapshots properly" in new TransactionSnapshotsFixture {
     implicit val basePath = "src/test/resources/models/block"
 
     import Hex._
@@ -180,62 +174,35 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
       val transaction1 = {
         val unsignedTx = unsignedTransaction(
           pubKey1,
-          None,
-          AssetOutput(
-            U256.unsafe(1000),
-            p2pkh(
-              Hash.unsafe(hex"c03ce271334db24f37313bbbf2d4aced9c6223d1378b1f472ec56f0b30aaac04")
-            ),
-            TimeStamp.unsafe(0),
-            tokens = AVector.empty,
-            hex"55deff667f0096ffc024ff53d6017ff5"
+          scriptOpt = None,
+          p2pkhOutput(
+            1000,
+            hex"c03ce271334db24f37313bbbf2d4aced9c6223d1378b1f472ec56f0b30aaac04",
+            additionalData = hex"55deff667f0096ffc024ff53d6017ff5"
           ),
-          AssetOutput(
-            U256.unsafe(200),
-            p2sh(hex"2ac11ec0a41ac91a309da23092fdca9c407f99a05a2c66c179f10d51050b8dfe"),
-            TimeStamp.unsafe(0),
-            tokens = AVector.empty,
-            hex"7fa5c3fd66ff751c"
+          p2shOutput(
+            200,
+            hex"2ac11ec0a41ac91a309da23092fdca9c407f99a05a2c66c179f10d51050b8dfe",
+            additionalData = hex"7fa5c3fd66ff751c"
           )
         )
 
-        val signature = SignatureSchema.sign(unsignedTx.hash.bytes, privKey1)
-
-        Transaction(
-          unsignedTx,
-          scriptExecutionOk = true,
-          contractInputs = AVector.empty,
-          generatedOutputs = AVector.empty,
-          inputSignatures = AVector(signature),
-          contractSignatures = AVector.empty
-        )
+        inputSign(unsignedTx, privKey1)
       }
 
       val transaction2 = {
         val unsignedTx = unsignedTransaction(
           pubKey2,
-          None,
-          AssetOutput(
+          scriptOpt = None,
+          p2pkhOutput(
             100,
-            p2pkh(
-              Hash.unsafe(hex"d2d3f28a281a7029fa8442f2e5d7a9962c9ad8680bba8fa9df62fbfbe01f6efd")
-            ),
+            hex"d2d3f28a281a7029fa8442f2e5d7a9962c9ad8680bba8fa9df62fbfbe01f6efd",
             TimeStamp.unsafe(1630168595025L),
-            AVector.empty,
-            hex"00010000017b8d959291"
+            additionalData = hex"00010000017b8d959291"
           )
         )
 
-        val signature = SignatureSchema.sign(unsignedTx.hash.bytes, privKey2)
-
-        Transaction(
-          unsignedTx,
-          scriptExecutionOk = true,
-          contractInputs = AVector.empty,
-          generatedOutputs = AVector.empty,
-          inputSignatures = AVector(signature),
-          contractSignatures = AVector.empty
-        )
+        inputSign(unsignedTx, privKey2)
       }
 
       val blk = block(transaction1, transaction2)
@@ -257,28 +224,17 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
       val transaction = {
         val unsignedTx = unsignedTransaction(
           pubKey1,
-          None,
-          AssetOutput(
-            U256.unsafe(1000),
-            p2pkh(
-              Hash.unsafe(hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f")
-            ),
+          scriptOpt = None,
+          p2pkhOutput(
+            1000,
+            hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f",
             TimeStamp.unsafe(12345),
-            tokens,
-            hex"15deff667f0096ffc024ff53d6017ff5"
+            additionalData = hex"15deff667f0096ffc024ff53d6017ff5",
+            tokens
           )
         )
 
-        val signature = SignatureSchema.sign(unsignedTx.hash.bytes, privKey1)
-
-        Transaction(
-          unsignedTx,
-          scriptExecutionOk = true,
-          contractInputs = AVector.empty,
-          generatedOutputs = AVector.empty,
-          inputSignatures = AVector(signature),
-          contractSignatures = AVector.empty
-        )
+        inputSign(unsignedTx, privKey1)
       }
 
       val blk = block(transaction)
@@ -301,27 +257,15 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         val unsignedTx = unsignedTransaction(
           pubKey1,
           Some(script),
-          AssetOutput(
-            U256.unsafe(1000),
-            p2pkh(
-              Hash.unsafe(hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f")
-            ),
+          p2pkhOutput(
+            1000,
+            hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f",
             TimeStamp.unsafe(12345),
-            tokens = AVector.empty,
-            hex"15deff667f0096ffc024ff53d6017ff5"
+            additionalData = hex"15deff667f0096ffc024ff53d6017ff5"
           )
         )
 
-        val signature = SignatureSchema.sign(unsignedTx.hash.bytes, privKey1)
-
-        Transaction(
-          unsignedTx,
-          scriptExecutionOk = true,
-          contractInputs = AVector.empty,
-          generatedOutputs = AVector.empty,
-          inputSignatures = AVector(signature),
-          contractSignatures = AVector.empty
-        )
+        inputSign(unsignedTx, privKey1)
       }
 
       val blk = block(transaction)
@@ -347,23 +291,17 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         val unsignedTx = unsignedTransaction(
           pubKey1,
           Some(script(address)),
-          AssetOutput(
-            U256.unsafe(1000),
-            p2pkh(
-              Hash.unsafe(hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f")
-            ),
+          p2pkhOutput(
+            1000,
+            hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f",
             TimeStamp.unsafe(12345),
-            tokens = AVector.empty,
-            hex"15deff667f0096ffc024ff53d6017ff5"
+            additionalData = hex"15deff667f0096ffc024ff53d6017ff5"
           )
         )
 
-        val signature1 = SignatureSchema.sign(unsignedTx.hash.bytes, privKey1)
-        val signature2 = SignatureSchema.sign(unsignedTx.hash.bytes, privKey2)
+        val transaction = inputSign(unsignedTx, privKey1)
 
-        Transaction(
-          unsignedTx,
-          scriptExecutionOk = true,
+        val updatedTransaction = transaction.copy(
           contractInputs = AVector(
             ContractOutputRef.unsafe(
               Hint.unsafe(-1038667620),
@@ -372,29 +310,21 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
           ),
           generatedOutputs = AVector(
             AssetOutput(
-              U256.unsafe(5),
+              5,
               LockupScript.p2pkh(pubKey2),
               TimeStamp.unsafe(12345),
               tokens = AVector.empty,
               hex"ff66157f00de17ff596ffc53d024ff60"
             )
-          ),
-          inputSignatures = AVector(signature1),
-          contractSignatures = AVector(signature2)
+          )
         )
+
+        contractSign(updatedTransaction, privKey2)
       }
 
       val blk = block(transaction)
       blk.verify("txs-with-contract-inputs-outputs")
     }
-  }
-
-  def unsignedTransaction(
-      publicKey: PublicKey,
-      scriptOpt: Option[String],
-      outputs: AssetOutput*
-  ) = {
-    import Hex._
 
     UnsignedTransaction(
       NetworkId(2),
@@ -411,18 +341,6 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         )
       ),
       AVector.from(outputs)
-    )
-  }
-
-  def coinbaseTransaction(transactions: Transaction*) = {
-    import Hex._
-
-    Transaction.coinbase(
-      ChainIndex.unsafe(0),
-      AVector.from(transactions),
-      p2pkh(Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")),
-      consensusConfig.maxMiningTarget,
-      TimeStamp.unsafe(1633438948000L)
     )
   }
 
@@ -445,7 +363,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
       txsHash = txsHash,
       // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
-      timestamp = TimeStamp.unsafe(1630879601000L),
+      timestamp = TimeStamp.unsafe(1630167995025L),
       target = Target(hex"20ffffff")
     )
   }
@@ -456,17 +374,5 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
     val header = blockHeader(Block.calTxsHash(allTxs))
     Block(header, allTxs)
-  }
-
-  def p2sh(bs: ByteString) = {
-    LockupScript.P2SH(Hash.unsafe(bs))
-  }
-
-  def p2pkh(keyHash: Hash) = {
-    LockupScript.P2PKH(keyHash)
-  }
-
-  def p2pkh(key: PublicKey) = {
-    UnlockScript.P2PKH(key)
   }
 }
