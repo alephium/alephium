@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.{Random, Sorting}
+import scala.util.Sorting
 
 import akka.util.ByteString
 import org.scalacheck.Arbitrary._
@@ -42,16 +42,45 @@ trait LockupScriptGenerators extends Generators {
       publicKey <- publicKeyGen(groupIndex)
     } yield LockupScript.p2pkh(publicKey)
 
-  def multiSigLockGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
+  def p2mpkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
     for {
       publicKey0 <- publicKeyGen(groupIndex)
-      moreKeys   <- Gen.nonEmptyListOf(Gen.const(PublicKey.generate)).map(AVector.from)
-    } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, Random.nextInt(moreKeys.length) + 1).get
+      moreKeys   <- Gen.nonEmptyListOf(publicKeyGen(groupIndex)).map(AVector.from)
+      threshold  <- Gen.choose(1, moreKeys.length + 1)
+    } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, threshold).get
 
-  def contractLockupGen(): Gen[LockupScript.P2C] =
-    for {
-      contractId <- hashGen
-    } yield LockupScript.P2C(contractId)
+  def p2shLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
+    hashGen
+      .retryUntil { hash =>
+        ScriptHint.fromHash(hash).groupIndex.equals(groupIndex)
+      }
+      .map(LockupScript.p2sh)
+  }
+
+  def assetLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
+    Gen.oneOf(
+      p2pkhLockupGen(groupIndex),
+      p2mpkhLockupGen(groupIndex),
+      p2shLockupGen(groupIndex)
+    )
+  }
+
+  def p2cLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2C] = {
+    hashGen
+      .retryUntil { hash =>
+        ScriptHint.fromHash(hash).groupIndex.equals(groupIndex)
+      }
+      .map(LockupScript.p2c)
+  }
+
+  def lockupGen(groupIndex: GroupIndex): Gen[LockupScript] = {
+    Gen.oneOf(
+      p2pkhLockupGen(groupIndex),
+      p2mpkhLockupGen(groupIndex),
+      p2shLockupGen(groupIndex),
+      p2cLockupGen(groupIndex)
+    )
+  }
 
   def p2pkScriptGen(groupIndex: GroupIndex): Gen[ScriptPair] =
     for {
@@ -181,7 +210,7 @@ trait TxGenerators
   def assetOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256] = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
-      scriptGen: Gen[LockupScript.Asset] = p2pkhLockupGen(groupIndex),
+      scriptGen: Gen[LockupScript.Asset] = assetLockupGen(groupIndex),
       dataGen: Gen[ByteString] = dataGen
   ): Gen[AssetOutput] = {
     for {
@@ -195,7 +224,7 @@ trait TxGenerators
   def contractOutputGen(
       _amountGen: Gen[U256] = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, 1, 5),
-      scriptGen: Gen[LockupScript.P2C] = contractLockupGen()
+      scriptGen: Gen[LockupScript.P2C]
   ): Gen[ContractOutput] = {
     for {
       amount       <- _amountGen
@@ -243,7 +272,7 @@ trait TxGenerators
 
   def unsignedTxGen(chainIndex: ChainIndex)(
       assetsToSpend: Gen[AVector[AssetInputInfo]],
-      lockupScriptGen: IndexLockupScriptGen = p2pkhLockupGen,
+      lockupScriptGen: IndexLockupScriptGen = assetLockupGen,
       lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero),
       dataGen: Gen[ByteString] = dataGen
   ): Gen[UnsignedTransaction] =
@@ -313,7 +342,7 @@ trait TxGenerators
       maxTokens: Int = 3,
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
-      lockupGen: IndexLockupScriptGen = p2pkhLockupGen,
+      lockupGen: IndexLockupScriptGen = assetLockupGen,
       lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)
   ): Gen[(Transaction, AVector[AssetInputInfo])] =
     for {
@@ -341,7 +370,7 @@ trait TxGenerators
       maxTokens: Int = 3,
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
-      lockupGen: IndexLockupScriptGen = p2pkhLockupGen
+      lockupGen: IndexLockupScriptGen = assetLockupGen
   ): Gen[Transaction] =
     transactionGenWithPreOutputs(
       minInputs,
@@ -362,7 +391,14 @@ trait BlockGenerators extends TxGenerators {
   lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] =
-    blockGenOf(chainIndex, AVector.fill(2 * groupConfig.groups - 1)(BlockHash.zero), Hash.zero)
+    for {
+      depStateHash <- hashGen
+      deps <- Gen
+        .listOfN(2 * groupConfig.groups - 1, blockHashGen)
+        .map(_.toArray)
+        .map(AVector.unsafe(_))
+      block <- blockGenOf(chainIndex, deps, depStateHash)
+    } yield block
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)

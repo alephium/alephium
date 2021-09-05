@@ -30,7 +30,7 @@ class CliqueInfoSpec extends AlephiumSpec with Generators {
       implicit val groupConfig = new GroupConfig {
         override def groups: Int = g
       }
-      val cliqueInfo = cliqueInfoGen.sample.get
+      val cliqueInfo = cliqueInfoGen.sample.value
       implicit val brokerConfig = new BrokerConfig {
         val groups: Int    = g
         val brokerNum: Int = cliqueInfo.brokerNum
@@ -50,18 +50,18 @@ class CliqueInfoSpec extends AlephiumSpec with Generators {
       selfInterBrokerInfo.brokerId is brokerConfig.brokerId
       selfInterBrokerInfo.brokerNum is brokerConfig.brokerNum
 
-      val selfBrokerInfo = cliqueInfo.selfBrokerInfo.get
+      val selfBrokerInfo = cliqueInfo.selfBrokerInfo.value
       selfBrokerInfo.cliqueId is cliqueInfo.id
       selfBrokerInfo.brokerId is brokerConfig.brokerId
       selfBrokerInfo.brokerNum is brokerConfig.brokerNum
-      selfBrokerInfo.address is cliqueInfo.externalAddresses(brokerConfig.brokerId).get
+      selfBrokerInfo.address is cliqueInfo.externalAddresses(brokerConfig.brokerId).value
 
-      val brokerInfos = cliqueInfo.interBrokers.get
+      val brokerInfos = cliqueInfo.interBrokers.value
       brokerInfos.foreachWithIndex { case (brokerInfo, index) =>
         brokerInfo.cliqueId is cliqueInfo.id
         brokerInfo.brokerId is index
         brokerInfo.brokerNum is brokerConfig.brokerNum
-        brokerInfo.address is cliqueInfo.externalAddresses(index).get
+        brokerInfo.address is cliqueInfo.externalAddresses(index).value
       }
     }
   }

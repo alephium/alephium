@@ -89,7 +89,8 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   ): (StatefulContractObject, StatefulContext) = {
     val groupIndex        = GroupIndex.unsafe(0)
     val contractOutputRef = contractOutputRefGen(groupIndex).sample.get
-    val contractOutput    = contractOutputGen().sample.get
+    val p2cLockup         = p2cLockupGen(groupIndex)
+    val contractOutput    = contractOutputGen(scriptGen = p2cLockup).sample.get
     val halfDecoded       = contract.toHalfDecoded()
 
     cachedWorldState.createContractUnsafe(

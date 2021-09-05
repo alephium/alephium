@@ -23,19 +23,13 @@ import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
-    forAll(groupIndexGen.flatMap(p2pkhLockupGen)) { lock =>
+    forAll(groupIndexGen.flatMap(assetLockupGen)) { lock =>
       serialize[LockupScript](lock) is serialize[LockupScript.Asset](lock)
       deserialize[LockupScript](serialize[LockupScript](lock)) isE lock
       deserialize[LockupScript.Asset](serialize[LockupScript.Asset](lock)) isE lock
     }
 
-    forAll(groupIndexGen.flatMap(multiSigLockGen)) { lock =>
-      serialize[LockupScript](lock) is serialize[LockupScript.Asset](lock)
-      deserialize[LockupScript](serialize[LockupScript](lock)) isE lock
-      deserialize[LockupScript.Asset](serialize[LockupScript.Asset](lock)) isE lock
-    }
-
-    forAll(contractLockupGen()) { lock =>
+    forAll(groupIndexGen.flatMap(p2cLockupGen)) { lock =>
       deserialize[LockupScript](serialize[LockupScript](lock)) isE lock
       deserialize[LockupScript.Asset](serialize[LockupScript](lock)).leftValue is
         a[SerdeError.Validation]
