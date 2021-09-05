@@ -176,19 +176,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
   private def needToDelay(chainIndex: ChainIndex, tx: TransactionTemplate): Boolean = {
     val maxLockTimeOpt =
       blockFlow.getBestPersistedWorldState(chainIndex.from).flatMap { persistedWS =>
-        tx.unsigned.inputs.foldE(Option(TimeStamp.zero)) {
-          case (Some(ts), input) =>
-            persistedWS
-              .getAssetOpt(input.outputRef)
-              .map(_.map { output =>
-                if (output.lockTime < ts) {
-                  ts
-                } else {
-                  output.lockTime
-                }
-              })
-          case (None, _) => Right(None)
-        }
+        persistedWS.getPreOutputsForAssetInputs(tx).map(_.map(_.maxBy(_.lockTime)))
       }
 
     escapeIOError[Option[TimeStamp], Boolean](
@@ -196,7 +184,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       {
         case Some(maxLockTime) =>
           maxLockTime.plusUnsafe(TxHandler.PersistenceDuration) > TimeStamp.now()
-        case None => true
+        case None => true // some of the inputs are from block caches outputs
       }
     )(false)
   }
