@@ -28,7 +28,7 @@ import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{AssetOutput, ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -174,16 +174,16 @@ class TxHandler(blockFlow: BlockFlow)(implicit
   }
 
   private def needToDelay(chainIndex: ChainIndex, tx: TransactionTemplate): Boolean = {
-    val maxLockTimeOpt =
+    val outputOpt =
       blockFlow.getBestPersistedWorldState(chainIndex.from).flatMap { persistedWS =>
         persistedWS.getPreOutputsForAssetInputs(tx).map(_.map(_.maxBy(_.lockTime)))
       }
 
-    escapeIOError[Option[TimeStamp], Boolean](
-      maxLockTimeOpt,
+    escapeIOError[Option[AssetOutput], Boolean](
+      outputOpt,
       {
-        case Some(maxLockTime) =>
-          maxLockTime.plusUnsafe(TxHandler.PersistenceDuration) > TimeStamp.now()
+        case Some(output) =>
+          output.lockTime.plusUnsafe(TxHandler.PersistenceDuration) > TimeStamp.now()
         case None => true // some of the inputs are from block caches outputs
       }
     )(false)
