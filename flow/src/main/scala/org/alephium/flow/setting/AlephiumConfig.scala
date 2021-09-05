@@ -36,7 +36,6 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{ActorRefT, AVector, Duration, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
@@ -162,6 +161,9 @@ object WalletSetting {
 
 final case class NodeSetting(dbSyncWrite: Boolean)
 
+final case class Allocation(address: Address.Asset, amount: U256, lockDuration: Duration)
+final case class GenesisSetting(allocations: AVector[Allocation])
+
 final case class AlephiumConfig(
     broker: BrokerSetting,
     consensus: ConsensusSetting,
@@ -171,11 +173,19 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     node: NodeSetting,
-    genesisBalances: AVector[(LockupScript.Asset, U256)]
+    genesis: GenesisSetting
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
-    Configs.loadBlockFlow(genesisBalances)(broker, consensus, network)
+    Configs.loadBlockFlow(
+      genesis.allocations
+        .map(a => (a.address.lockupScript, a.amount))
+    )(
+      broker,
+      consensus,
+      network
+    )
 }
+
 object AlephiumConfig {
   import ConfigUtils._
 
@@ -289,7 +299,8 @@ object AlephiumConfig {
       discovery: DiscoverySetting,
       mempool: MemPoolSetting,
       wallet: WalletSetting,
-      node: NodeSetting
+      node: NodeSetting,
+      genesis: GenesisSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
@@ -304,7 +315,7 @@ object AlephiumConfig {
           mempool,
           wallet,
           node,
-          Genesis(network.networkId)
+          genesis
         )
       } match {
         case Right(value) => value
@@ -323,7 +334,8 @@ object AlephiumConfig {
         as[DiscoverySetting]("discovery"),
         as[MemPoolSetting]("mempool"),
         as[WalletSetting]("wallet"),
-        as[NodeSetting]("node")
+        as[NodeSetting]("node"),
+        as[GenesisSetting]("genesis")
       ).toAlephiumConfig
     }
 
