@@ -25,7 +25,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, Math, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
@@ -206,9 +206,10 @@ object Transaction {
 
   // PoLW burning is not considered
   def totalReward(gasFee: U256, miningReward: U256): U256 = {
+    val threshold = Math.max(miningReward, ALF.oneAlf)
     val gasReward = gasFee.divUnsafe(U256.Two)
-    if (gasReward >= miningReward) {
-      miningReward.mulUnsafe(U256.Two)
+    if (gasReward >= threshold) {
+      miningReward.addUnsafe(threshold)
     } else {
       miningReward.addUnsafe(gasReward)
     }
