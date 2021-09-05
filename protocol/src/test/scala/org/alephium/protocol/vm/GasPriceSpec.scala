@@ -18,22 +18,13 @@ package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALF
 import org.alephium.protocol.model.minimalGasPrice
-import org.alephium.serde.Serde
-import org.alephium.util.U256
+import org.alephium.util.{AlephiumSpec, NumericHelpers}
 
-final case class GasPrice(value: U256) extends Ordered[GasPrice] {
-  // this is safe as value <= ALF.MaxALFValue
-  def *(gas: GasBox): U256 = {
-    value.mulUnsafe(gas.toU256)
-  }
-
-  override def compare(that: GasPrice): Int = this.value.compare(that.value)
-}
-
-object GasPrice {
-  implicit val serde: Serde[GasPrice] = Serde.forProduct1(GasPrice.apply, _.value)
-
-  def validate(gasPrice: GasPrice): Boolean = {
-    gasPrice >= minimalGasPrice && gasPrice.value < ALF.MaxALFValue
+class GasPriceSpec extends AlephiumSpec with NumericHelpers {
+  it should "validate gas price bounds" in {
+    GasPrice.validate(minimalGasPrice) is true
+    GasPrice.validate(GasPrice(minimalGasPrice.value - 1)) is false
+    GasPrice.validate(GasPrice(ALF.MaxALFValue)) is false
+    GasPrice.validate(GasPrice(ALF.MaxALFValue - 1)) is true
   }
 }

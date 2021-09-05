@@ -56,6 +56,7 @@ final case object InvalidDepStateHash                    extends InvalidHeaderSt
 final case class HeaderIOError(e: IOError)               extends InvalidHeaderStatus
 final case object EmptyTransactionList                   extends InvalidBlockStatus
 final case object TooManyTransactions                    extends InvalidBlockStatus
+final case object TxGasPriceNonDecreasing                extends InvalidBlockStatus
 final case object TooManyGasUsed                         extends InvalidBlockStatus
 final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus
 final case object InvalidCoinbaseData                    extends InvalidBlockStatus

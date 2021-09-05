@@ -323,15 +323,11 @@ object TxValidation {
     protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit] = {
       if (!GasBox.validate(tx.unsigned.gasAmount)) {
         invalidTx(InvalidStartGas)
-      } else if (!checkGasPrice(tx.unsigned.gasPrice)) {
+      } else if (!GasPrice.validate(tx.unsigned.gasPrice)) {
         invalidTx(InvalidGasPrice)
       } else {
         validTx(())
       }
-    }
-
-    private def checkGasPrice(gasPrice: GasPrice): Boolean = {
-      gasPrice.value > U256.Zero && gasPrice.value < ALF.MaxALFValue
     }
 
     protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {

@@ -17,10 +17,11 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{BlockEnv, WorldState}
+import org.alephium.protocol.vm.{BlockEnv, GasPrice, WorldState}
 import org.alephium.serde._
 import org.alephium.util.U256
 
@@ -79,6 +80,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       _ <- checkGroup(block)
       _ <- checkNonEmptyTransactions(block)
       _ <- checkTxNumber(block)
+      _ <- checkGasPriceDecreasing(block)
       _ <- checkTotalGas(block)
       _ <- checkMerkleRoot(block)
       _ <- checkFlow(block, flow)
@@ -119,9 +121,19 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
+  private[validation] def checkGasPriceDecreasing(block: Block): BlockValidationResult[Unit] = {
+    val result = block.transactions.foldE[Unit, GasPrice](GasPrice(ALF.MaxALFValue)) {
+      case (lastGasPrice, tx) =>
+        val txGasPrice = tx.unsigned.gasPrice
+        if (txGasPrice > lastGasPrice) Left(()) else Right(txGasPrice)
+    }
+    if (result.isRight) validBlock(()) else invalidBlock(TxGasPriceNonDecreasing)
+  }
+
+  // Let's check the gas is decreasing as well
   private[validation] def checkTotalGas(block: Block): BlockValidationResult[Unit] = {
     val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
-    if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooManyGasUsed)
+    if (totalGas <= maximalGasPerBlock.value) validBlock(()) else invalidBlock(TooManyGasUsed)
   }
 
   private[validation] def checkCoinbase(

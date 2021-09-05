@@ -30,18 +30,21 @@ package object model {
   val coinbaseLockupPeriod: Duration = Duration.ofMinutesUnsafe(10)
 
   //scalastyle:off magic.number
-  val minimalGas: GasBox = GasBox.unsafe(20000)
+  val minimalGas: GasBox        = GasBox.unsafe(20000)
+  val minimalGasPrice: GasPrice = GasPrice(ALF.nanoAlf(1))
 
   val defaultGasPerInput: GasBox  = GasBox.unsafe(6000)
   val defaultGasPerOutput: GasBox = GasBox.unsafe(6000)
 
+  val defaultGas: GasBox           = minimalGas
   val defaultGasPrice: GasPrice    = GasPrice(ALF.nanoAlf(1))
-  val defaultGasFee: U256          = defaultGasPrice * minimalGas
+  val defaultGasFee: U256          = defaultGasPrice * defaultGas
   val defaultGasFeePerInput: U256  = defaultGasPrice * defaultGasPerInput
   val defaultGasFeePerOutput: U256 = defaultGasPrice * defaultGasPerOutput
 
-  val maximalTxsInOneBlock: Int = 2000
-  val maximalGas: GasBox        = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
+  val maximalTxsInOneBlock: Int  = 2000
+  val maximalGasPerBlock: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
+  val maximalGasPerTx: GasBox    = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock / 10)
 
   val dustUtxoAmount: U256 = ALF.nanoAlf(1000)
 

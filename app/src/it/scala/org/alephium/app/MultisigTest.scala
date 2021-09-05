@@ -29,7 +29,7 @@ import org.alephium.wallet.api.model._
 
 class MultisigTest extends AlephiumActorSpec {
 
-  it should "handle multisig" in new CliqueFixture {
+  it should "handle multisig with private keys" in new CliqueFixture {
 
     val clique = bootClique(nbOfNodes = 1)
     clique.start()
