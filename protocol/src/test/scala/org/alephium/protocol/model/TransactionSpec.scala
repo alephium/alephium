@@ -291,5 +291,52 @@ class TransactionSpec
 
       tx.verify("multiple-contract-inputs-and-outputs")
     }
+
+    {
+      info("transfer multiple tokens")
+      val tokenId1 =
+        Hash.unsafe(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822")
+      val tokenId2 =
+        Hash.unsafe(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056")
+      val tokenId3 =
+        Hash.unsafe(hex"825bd2b5d6fafc1b628d3f01c4ee87c9ebf4a85a877ca00c017fca0562d257df")
+
+      val tx = {
+        val unsignedTx = unsignedTransaction(
+          pubKey1,
+          scriptOpt = None,
+          p2pkhOutput(
+            55,
+            hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f",
+            TimeStamp.unsafe(12345),
+            additionalData = hex"15deff667f0096ffc024ff53d6017ff5",
+            tokens = AVector((tokenId1, U256.unsafe(10)), (tokenId2, U256.unsafe(20)))
+          ),
+          p2shOutput(
+            95,
+            hex"2ac11ec0a41ac91a309da23092fdca9c407f99a05a2c66c179f10d51050b8dfe",
+            TimeStamp.unsafe(12345),
+            additionalData = hex"7fa5c3fd66ff751c",
+            tokens = AVector((tokenId1, U256.unsafe(500)), (tokenId3, U256.unsafe(211)))
+          ),
+          p2pkhOutput(
+            42,
+            hex"c03ce271334db24f37313bbbf2d4aced9c6223d1378b1f472ec56f0b30aaac04",
+            TimeStamp.unsafe(12345),
+            additionalData = hex"55deff667f0096ffc024ff53d6017ff5",
+            tokens = AVector((tokenId1, U256.unsafe(2)))
+          ),
+          p2pkhOutput(
+            100,
+            hex"c6223d72ec56f13781334db24f37313fb03ce27cccf2d4aced9b1f40b30aaac0",
+            tokens = AVector((tokenId3, U256.unsafe(8)))
+          )
+        )
+
+        inputSign(unsignedTx, privKey1)
+      }
+
+      tx.verify("multiple-tokens")
+    }
   }
 }
