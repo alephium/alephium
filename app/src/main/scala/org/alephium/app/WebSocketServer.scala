@@ -25,7 +25,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{EventBus => VertxEventBus}
-import io.vertx.core.http.HttpServer
+import io.vertx.core.http.{HttpServer, HttpServerOptions}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
@@ -54,7 +54,10 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
 
   private val vertx         = Vertx.vertx()
   private val vertxEventBus = vertx.eventBus()
-  private val server        = vertx.createHttpServer()
+  private val server = {
+    val options = new HttpServerOptions().setMaxWebSocketFrameSize(1024 * 1024)
+    vertx.createHttpServer(options)
+  }
 
   val eventHandler: ActorRef = system.actorOf(EventHandler.props(vertxEventBus))
 
