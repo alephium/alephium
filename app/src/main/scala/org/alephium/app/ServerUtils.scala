@@ -224,7 +224,7 @@ class ServerUtils(implicit
     } yield {
       templateWithSignatures(
         unsignedTx,
-        AVector.fill(unsignedTx.inputs.length)(query.signature)
+        AVector(query.signature)
       )
     }
   }
@@ -236,7 +236,7 @@ class ServerUtils(implicit
     } yield {
       templateWithSignatures(
         unsignedTx,
-        AVector.fill(unsignedTx.inputs.length)(query.signatures).flatMap(identity)
+        query.signatures
       )
     }
   }
@@ -606,7 +606,7 @@ class ServerUtils(implicit
     } yield {
       TransactionTemplate(
         unsignedTx,
-        AVector.fill(unsignedTx.inputs.length)(query.signature),
+        AVector(query.signature),
         AVector.empty
       )
     }) match {

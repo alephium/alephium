@@ -168,13 +168,12 @@ object Transaction {
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
-    val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(
       unsigned,
       contractInputs = AVector.empty,
       generatedOutputs,
-      AVector.fill(inputCnt)(signature),
+      AVector(signature),
       contractSignatures = AVector.empty
     )
   }
@@ -185,13 +184,12 @@ object Transaction {
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
-    val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(
       unsigned,
       contractInputs,
       generatedOutputs,
-      AVector.fill(inputCnt)(signature),
+      AVector(signature),
       contractSignatures = AVector.empty
     )
   }
@@ -333,11 +331,10 @@ object TransactionTemplate {
   )
 
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
-    val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     TransactionTemplate(
       unsigned,
-      AVector.fill(inputCnt)(signature),
+      AVector(signature),
       contractSignatures = AVector.empty
     )
   }

@@ -476,6 +476,8 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
+    tx0.unsigned.inputs.length is n - 1
+    tx0.inputSignatures.length is 1
     txValidation.validateTxOnlyForTest(tx0, blockFlow) isE ()
 
     blockFlow

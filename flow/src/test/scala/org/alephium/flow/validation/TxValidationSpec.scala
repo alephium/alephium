@@ -53,6 +53,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   class Fixture extends TxValidation.Impl with VMFactory {
+
     // TODO: prepare blockflow to test checkMempool
     def prepareWorldState(inputInfos: AVector[AssetInputInfo]): Unit = {
       inputInfos.foreach { inputInfo =>
@@ -498,7 +499,32 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         failCheck(checkWitnesses(txNew, inputsState.as[TxOutput]), InvalidSignature)
         failCheck(checkBlockTx(txNew, preparedWorldState), InvalidSignature)
       }
+
+      {
+        val txNew = tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures)
+        failCheck(checkWitnesses(txNew, inputsState.as[TxOutput]), TooManySignature)
+      }
     }
+  }
+
+  it should "compress signatures" in new StatefulFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
+    val unsigned1  = tx.unsigned.copy(inputs = tx.unsigned.inputs ++ tx.unsigned.inputs)
+    val tx1        = Transaction.from(unsigned1, genesisKeys(0)._1)
+    val preOutputs =
+      blockFlow
+        .getBestPersistedWorldState(chainIndex.from)
+        .rightValue
+        .getPreOutputs(tx1)
+        .rightValue
+    tx1.unsigned.inputs.length is 2
+    tx1.inputSignatures.length is 1
+    passCheck(checkWitnesses(tx1, preOutputs))
+    val tx2 = tx1.copy(inputSignatures = tx1.inputSignatures ++ tx1.inputSignatures)
+    tx2.unsigned.inputs.length is 2
+    tx2.inputSignatures.length is 2
+    failCheck(checkWitnesses(tx2, preOutputs), TooManySignature)
   }
 
   behavior of "lockup script"

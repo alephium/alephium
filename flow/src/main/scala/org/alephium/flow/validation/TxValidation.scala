@@ -554,17 +554,25 @@ object TxValidation {
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
       val txEnv =
         TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
-      EitherF.foldTry(tx.unsigned.inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
-        val unlockScript = tx.unsigned.inputs(idx).unlockScript
-        checkLockupScript(
-          tx,
-          gasRemaining,
-          preOutputs(idx).lockupScript,
-          unlockScript,
-          blockEnv,
-          txEnv
-        )
-      }
+      val inputs = tx.unsigned.inputs
+      for {
+        remaining <- EitherF.foldTry(inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
+          val unlockScript = inputs(idx).unlockScript
+          if (idx > 0 && unlockScript == inputs(idx - 1).unlockScript) {
+            validTx(gasRemaining)
+          } else {
+            checkLockupScript(
+              tx,
+              gasRemaining,
+              preOutputs(idx).lockupScript,
+              unlockScript,
+              blockEnv,
+              txEnv
+            )
+          }
+        }
+        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignature)
+      } yield remaining
     }
 
     protected[validation] def checkLockupScript(
