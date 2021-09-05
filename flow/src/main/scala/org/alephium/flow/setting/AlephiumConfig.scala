@@ -177,10 +177,7 @@ final case class AlephiumConfig(
     genesis: GenesisSetting
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
-    Configs.loadBlockFlow(
-      genesis.allocations
-        .map(a => (a.address.lockupScript, a.amount))
-    )(
+    Configs.loadBlockFlow(genesis.allocations)(
       broker,
       consensus,
       network

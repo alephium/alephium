@@ -18,11 +18,11 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, TimeStamp, U256}
 
 sealed trait TxOutput {
   def amount: U256
@@ -91,8 +91,14 @@ object TxOutput {
     ContractOutput(amount, lockupScript, AVector.empty)
   }
 
-  def genesis(amount: U256, lockupScript: LockupScript.Asset, data: ByteString): AssetOutput = {
-    AssetOutput(amount, lockupScript, TimeStamp.zero, AVector.empty, data)
+  def genesis(
+      amount: U256,
+      lockupScript: LockupScript.Asset,
+      lockupDuration: Duration,
+      data: ByteString
+  ): AssetOutput = {
+    val lockTime = ALF.LaunchTimestamp.plusUnsafe(lockupDuration)
+    AssetOutput(amount, lockupScript, lockTime, AVector.empty, data)
   }
 
   // TODO: improve this when vm is mature

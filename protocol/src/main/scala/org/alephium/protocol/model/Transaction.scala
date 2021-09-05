@@ -25,7 +25,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, Math, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Math, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
@@ -283,12 +283,13 @@ object Transaction {
   }
 
   def genesis(
-      balances: AVector[(LockupScript.Asset, U256)],
+      balances: AVector[(LockupScript.Asset, U256, Duration)],
       noPreMineProof: ByteString
   )(implicit networkConfig: NetworkConfig): Transaction = {
-    val outputs = balances.mapWithIndex[AssetOutput] { case ((lockupScript, value), index) =>
-      val txData = if (index == 0) noPreMineProof else ByteString.empty
-      TxOutput.genesis(value, lockupScript, txData)
+    val outputs = balances.mapWithIndex[AssetOutput] {
+      case ((lockupScript, value, lockupDuration), index) =>
+        val txData = if (index == 0) noPreMineProof else ByteString.empty
+        TxOutput.genesis(value, lockupScript, lockupDuration, txData)
     }
     val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
     Transaction(

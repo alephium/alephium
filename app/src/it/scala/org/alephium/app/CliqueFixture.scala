@@ -82,11 +82,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  val address    = "13mUTuGxGQdeiHrzcmgr4VfMwb6chkxzTLpcAV6C4n19T"
-  val publicKey  = "0378299dcc53fecf2a50b690a6ddf45a3b74284af44cc05dced3860b5f3f558c6e"
-  val privateKey = "7349274c8fe309a569f79142dd4db5640d6ce8a6c7b68bdc3b75f45290d54906"
+  val address    = "14PqtYSSbwpUi2RJKUvv9yUwGafd6yHbEcke7ionuiE7w"
+  val publicKey  = "03e75902fa24caff042b2b4c350e8f2ffeb3cb95f4263f0e109a2c2d7aa3dcae5c"
+  val privateKey = "d24967efb7f1b558ad40a4d71593ceb5b3cecf46d17f0e68ef53def6b391c33d"
   val mnemonic =
-    "library board idle local radar nature raccoon capable father today tube ankle coconut cherry one open waste note ticket process spawn expire delay pyramid"
+    "toward outdoor daughter deny mansion bench water alien crumble mother exchange screen salute antenna abuse key hair crisp debate goose great market core screen"
   val (transferAddress, _, _) = generateAccount
 
   val password = "password"
