@@ -421,6 +421,15 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       vc.toIterable.toSeq is vc.toArray.toIterable.toSeq
     }
   }
+
+  it should "append empty vector efficiently" in new Fixture {
+    (Array.empty[Int] eq Array.empty[Int]) is false // eq checks reference equality
+    forAll(vectorGen) { vc =>
+      val vc1 = vc ++ AVector.empty[A]
+      vc1.toSeq is vc.toSeq
+      (vc1.elems eq vc.elems) is true
+    }
+  }
 }
 
 class BooleanAVectorSpec extends AVectorSpec[Boolean]
@@ -637,7 +646,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
   }
 }
 
-class RefAVectorSpec extends AlephiumSpec {
+class SpecialAVectorSpec extends AlephiumSpec {
   it should "convert covariantly" in {
     sealed trait Foo
     final case class Bar(n: Int) extends Foo

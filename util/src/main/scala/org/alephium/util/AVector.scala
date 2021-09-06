@@ -130,17 +130,21 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def ++[B <: A](that: AVector[B]): AVector[A] = {
-    val newLength = length + that.length
-    if (appendable) {
-      ensureSize(newLength)
-      System.arraycopy(that.elems, that.start, elems, end, that.length)
-      appendable = false
-      AVector.unsafe(elems, start, start + newLength, true)
+    if (that.isEmpty) {
+      this
     } else {
-      val arr = new Array[A](newLength)
-      System.arraycopy(elems, start, arr, 0, length)
-      System.arraycopy(that.elems, that.start, arr, length, that.length)
-      AVector.unsafe(arr)
+      val newLength = length + that.length
+      if (appendable) {
+        ensureSize(newLength)
+        System.arraycopy(that.elems, that.start, elems, end, that.length)
+        appendable = false
+        AVector.unsafe(elems, start, start + newLength, true)
+      } else {
+        val arr = new Array[A](newLength)
+        System.arraycopy(elems, start, arr, 0, length)
+        System.arraycopy(that.elems, that.start, arr, length, that.length)
+        AVector.unsafe(arr)
+      }
     }
   }
 
