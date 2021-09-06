@@ -127,7 +127,7 @@ object UnsignedTransaction {
       networkConfig.networkId,
       None,
       minimalGas,
-      defaultGasPrice,
+      minimalGasPrice,
       inputs,
       fixedOutputs
     )
