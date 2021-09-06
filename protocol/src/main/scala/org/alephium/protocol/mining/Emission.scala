@@ -39,12 +39,13 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   val stableMaxRewardPerChain: U256          = shareReward(Emission.stableMaxReward)
   val lowHashRateInitialRewardPerChain: U256 = shareReward(Emission.lowHashRateInitialReward)
 
-  val onePhPerSecondDivided: Target =
-    Target.from(shareHashRate(HashRate.onePhPerSecond), blockTargetTime)
-  val oneEhPerSecondDivided: Target =
-    Target.from(shareHashRate(HashRate.oneEhPerSecond), blockTargetTime)
-  val a128EhPerSecondDivided: Target =
-    Target.from(shareHashRate(HashRate.a128EhPerSecond), blockTargetTime)
+  val onePhPerSecondDivided: HashRate  = shareHashRate(HashRate.onePhPerSecond)
+  val oneEhPerSecondDivided: HashRate  = shareHashRate(HashRate.oneEhPerSecond)
+  val a128EhPerSecondDivided: HashRate = shareHashRate(HashRate.a128EhPerSecond)
+
+  val onePhPerSecondDividedTarget: Target  = Target.from(onePhPerSecondDivided, blockTargetTime)
+  val oneEhPerSecondDividedTarget: Target  = Target.from(oneEhPerSecondDivided, blockTargetTime)
+  val a128EhPerSecondDividedTarget: Target = Target.from(a128EhPerSecondDivided, blockTargetTime)
 
   val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
     .subUnsafe(stableMaxRewardPerChain)
@@ -93,59 +94,86 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
     }
   }
 
-  // mining reward with respect to target (or hash rate)
-  def rewardWrtTarget(target: Target): U256 = {
-    if (target >= onePhPerSecondDivided) {
-      val rewardPlus =
-        (initialMaxRewardPerChain subUnsafe lowHashRateInitialRewardPerChain).toBigInt
-          .multiply(onePhPerSecondDivided.value)
-          .divide(target.value)
-      lowHashRateInitialRewardPerChain addUnsafe U256.unsafe(rewardPlus)
-    } else if (target >= oneEhPerSecondDivided) {
-      val rewardReduce = (initialMaxRewardPerChain subUnsafe stableMaxRewardPerChain).toBigInt
-        .multiply(
-          oneEhPerSecondDivided.value
-        ) // we don't subtract onePhPerSecond for simplification
-        .divide(target.value)
-      initialMaxRewardPerChain subUnsafe U256.unsafe(rewardReduce)
-    } else if (target >= a128EhPerSecondDivided) {
-      val rewardReduce = stableMaxRewardPerChain.toBigInt
-        .multiply(
-          a128EhPerSecondDivided.value
-        ) // we don't subtract oneEhPerSecond for simplification
-        .divide(target.value)
-      stableMaxRewardPerChain subUnsafe U256.unsafe(rewardReduce)
+  val onePhPerSecondDividedRank: Int  = onePhPerSecondDivided.value.bitLength() - 1
+  val oneEhPerSecondDividedRank: Int  = oneEhPerSecondDivided.value.bitLength() - 1
+  val a128EhPerSecondDividedRank: Int = a128EhPerSecondDivided.value.bitLength() - 1
+
+  val onePhPhaseRewardGap: BigInteger = initialMaxRewardPerChain.v
+  val oneEhPhaseRewardGap: BigInteger =
+    stableMaxRewardPerChain.v.subtract(initialMaxRewardPerChain.v)
+  val a128EHPhaseRewardGap: BigInteger = BigInteger.ZERO.subtract(stableMaxRewardPerChain.v)
+
+  val onePhPerSecondStepReward: BigInteger = onePhPhaseRewardGap
+    .divide(BigInteger.valueOf(onePhPerSecondDividedRank.toLong))
+  val oneEhPerSecondStepReward: BigInteger = oneEhPhaseRewardGap
+    .divide(BigInteger.valueOf((oneEhPerSecondDividedRank - onePhPerSecondDividedRank).toLong))
+  val a128EHPerSecondStepReward: BigInteger = a128EHPhaseRewardGap
+    .divide(BigInteger.valueOf((a128EhPerSecondDividedRank - oneEhPerSecondDividedRank).toLong))
+
+  // mining reward with respect to hashrate
+  def rewardWrtHashRate(hashRate: HashRate): U256 = {
+    if (hashRate < onePhPerSecondDivided) {
+      val reward = Emission.rewardWrtHashRate(
+        hashRate,
+        0,
+        onePhPerSecondDividedRank,
+        BigInteger.ZERO,
+        onePhPhaseRewardGap,
+        onePhPerSecondStepReward
+      )
+      Math.max(lowHashRateInitialRewardPerChain, reward)
+    } else if (hashRate < oneEhPerSecondDivided) {
+      Emission.rewardWrtHashRate(
+        hashRate,
+        onePhPerSecondDividedRank,
+        oneEhPerSecondDividedRank,
+        initialMaxRewardPerChain.v,
+        oneEhPhaseRewardGap,
+        oneEhPerSecondStepReward
+      )
+    } else if (hashRate < a128EhPerSecondDivided) {
+      Emission.rewardWrtHashRate(
+        hashRate,
+        oneEhPerSecondDividedRank,
+        a128EhPerSecondDividedRank,
+        stableMaxRewardPerChain.v,
+        a128EHPhaseRewardGap,
+        a128EHPerSecondStepReward
+      )
     } else {
       U256.Zero
     }
   }
 
+  // mining reward with respect to target
+  def rewardWrtTarget(target: Target): U256 = {
+    rewardWrtHashRate(HashRate.from(target, blockTargetTime))
+  }
+
   def shouldEnablePoLW(target: Target): Boolean = {
-    target < oneEhPerSecondDivided
+    target < oneEhPerSecondDividedTarget
   }
 
   // the amount to burn is reward * 7/8 (1 - 1Eh/s / HR)
   def burntAmountUnsafe(target: Target, miningReward: U256): U256 = {
     assume(shouldEnablePoLW(target))
     val amount = miningReward.toBigInt
-      .multiply(oneEhPerSecondDivided.value.subtract(target.value))
-      .divide(oneEhPerSecondDivided.value)
+      .multiply(oneEhPerSecondDividedTarget.value.subtract(target.value))
+      .divide(oneEhPerSecondDividedTarget.value)
       .multiply(BigInteger.valueOf(7))
       .divide(BigInteger.valueOf(8))
     U256.unsafe(amount)
   }
 
-  private val polwWeight: BigInteger = BigInteger.valueOf(8)
-  private val sevenEhPerSecondDivided: BigInteger =
-    HashRate.from(oneEhPerSecondDivided, blockTargetTime).value.multiply(BigInteger.valueOf(7))
+  private val sevenEhPerSecondDivided: HashRate = oneEhPerSecondDivided.multiply(7)
 
   // the true hash rate for energy-based mining is (HR * 1/8 + 1Eh/s * 7/8)
   // we could reduce energy consumption by ~7/8 when hash rate is significantly high
   def polwTargetUnsafe(powTarget: Target): Target = {
     assume(shouldEnablePoLW(powTarget))
     val powHashRate  = HashRate.from(powTarget, blockTargetTime)
-    val polwHashRate = powHashRate.value.multiply(polwWeight).subtract(sevenEhPerSecondDivided)
-    val polwTarget   = Target.from(HashRate.unsafe(polwHashRate), blockTargetTime)
+    val polwHashRate = powHashRate.multiply(8).subtractUnsafe(sevenEhPerSecondDivided)
+    val polwTarget   = Target.from(polwHashRate, blockTargetTime)
     polwTarget
   }
 
@@ -168,7 +196,7 @@ class Emission(groupConfig: GroupConfig, blockTargetTime: Duration) {
   }
 
   def rewardsWrtTarget(): IndexedSeq[(HashRate, U256)] = {
-    (10 to 67).map { order =>
+    (4 to 67).map { order =>
       val hashRate       = HashRate.unsafe(BigInteger.ONE.shiftLeft(order))
       val target         = Target.from(shareHashRate(hashRate), blockTargetTime)
       val rewardPerChain = rewardWrtTarget(target)
@@ -197,4 +225,48 @@ object Emission {
   }
   final case class PoW(miningReward: U256)                     extends RewardType
   final case class PoLW(miningReward: U256, burntAmount: U256) extends RewardType
+
+  @inline def rank(hashRate: HashRate): Int = {
+    hashRate.value.bitLength() - 1
+  }
+
+  @inline def baseReward(
+      rank: Int,
+      startRank: Int,
+      endRank: Int,
+      startReward: BigInteger,
+      phaseRewardGap: BigInteger
+  ): BigInteger = {
+    startReward.add(
+      phaseRewardGap
+        .multiply(BigInteger.valueOf((rank - startRank).toLong))
+        .divide(BigInteger.valueOf((endRank - startRank).toLong))
+    )
+  }
+
+  @inline def deltaReward(
+      hashRate: BigInteger,
+      stepHashRate: BigInteger,
+      stepReward: BigInteger
+  ): BigInteger = {
+    stepReward.multiply(hashRate.mod(stepHashRate)).divide(stepHashRate)
+  }
+
+  @inline def stepHashRate(stepRank: Int): BigInteger = BigInteger.ONE.shiftLeft(stepRank)
+
+  def rewardWrtHashRate(
+      hashRate: HashRate,
+      startRank: Int,
+      endRank: Int,
+      startReward: BigInteger,
+      phaseRewardGap: BigInteger,
+      stepReward: BigInteger
+  ): U256 = {
+    val stepRank     = Emission.rank(hashRate)
+    val stepHashRate = Emission.stepHashRate(stepRank)
+    val baseReward   = Emission.baseReward(stepRank, startRank, endRank, startReward, phaseRewardGap)
+    val deltaReward  = Emission.deltaReward(hashRate.value, stepHashRate, stepReward)
+    assume(stepRank >= startRank && stepRank < endRank)
+    U256.unsafe(baseReward.add(deltaReward))
+  }
 }

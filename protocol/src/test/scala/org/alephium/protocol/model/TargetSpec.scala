@@ -42,6 +42,23 @@ class TargetSpec extends AlephiumSpec {
     Target.a128EhPerBlock.value is Target.maxBigInt.divide(
       BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
     )
+
+    val blockTime = Duration.ofSecondsUnsafe(64)
+    Target.from(HashRate.onePhPerSecond, blockTime).value is Target.maxBigInt
+      .divide(
+        BigInteger.valueOf(1024).pow(5)
+      )
+      .divide(64)
+    Target.from(HashRate.oneEhPerSecond, blockTime).value is Target.maxBigInt
+      .divide(
+        BigInteger.valueOf(1024).pow(6)
+      )
+      .divide(64)
+    Target.from(HashRate.a128EhPerSecond, blockTime).value is Target.maxBigInt
+      .divide(
+        BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
+      )
+      .divide(64)
   }
 
   it should "convert between big integer and compact bits" in {

@@ -37,7 +37,7 @@ object MiningRewards extends App {
   printLine("--- Inflation according to hashrate ---")
   emission.rewardsWrtTarget().foreach { case (hashRate, yearlyReward) =>
     val inflation = calInflation(yearlyReward)
-    printLine(s"${hashRate.value.bitLength()}, ${inflation.toDouble}, $yearlyReward")
+    printLine(s"${hashRate.value.bitLength() - 1}, ${inflation.toDouble}, $yearlyReward")
   }
 
   printLine("--- Inflation according to years ---")
