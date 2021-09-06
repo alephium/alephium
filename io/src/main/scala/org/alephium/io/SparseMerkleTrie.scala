@@ -176,7 +176,14 @@ object SparseMerkleTrie {
   }
 
   def bytes2Nibbles(bytes: ByteString): ByteString = {
-    ByteString(bytes.flatMap { byte => ByteString(getHighNibble(byte), getLowNibble(byte)) })
+    val nibbles = Array.ofDim[Byte](bytes.length * 2)
+    var index   = 0
+    bytes.foreach { byte =>
+      nibbles(2 * index) = getHighNibble(byte)
+      nibbles(2 * index + 1) = getLowNibble(byte)
+      index += 1
+    }
+    ByteString.fromArrayUnsafe(nibbles)
   }
 
   def nibbles2Bytes(nibbles: ByteString): ByteString = {
