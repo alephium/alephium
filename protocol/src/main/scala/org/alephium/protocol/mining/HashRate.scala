@@ -24,15 +24,23 @@ import org.alephium.util.Duration
 // unit: hash per second
 final case class HashRate private (value: BigInteger) extends AnyVal with Ordered[HashRate] {
   override def compare(that: HashRate): Int = this.value.compareTo(that.value)
+
+  def multiply(n: Long): HashRate = HashRate.unsafe(value.multiply(BigInteger.valueOf(n)))
+
+  def subtractUnsafe(another: HashRate): HashRate = HashRate.unsafe(value.subtract(another.value))
 }
 
 object HashRate {
   def unsafe(value: BigInteger): HashRate = new HashRate(value)
 
+  def Min: HashRate = HashRate.unsafe(BigInteger.ONE)
+
   // scalastyle:off magic.number
   def from(target: Target, blockTime: Duration): HashRate = {
     val hashDone = Target.maxBigInt.divide(target.value)
-    unsafe(hashDone.multiply(BigInteger.valueOf(1000)).divide(BigInteger.valueOf(blockTime.millis)))
+    val rate =
+      hashDone.multiply(BigInteger.valueOf(1000)).divide(BigInteger.valueOf(blockTime.millis))
+    if (rate == BigInteger.ZERO) Min else unsafe(rate)
   }
 
   val onePhPerSecond: HashRate  = unsafe(BigInteger.ONE.shiftLeft(50))
