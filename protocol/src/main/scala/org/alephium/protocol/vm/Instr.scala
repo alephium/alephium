@@ -199,7 +199,7 @@ sealed trait StatefulInstrCompanion0
 
 sealed trait OperandStackInstr extends StatelessInstrSimpleGas with GasSimple {}
 
-sealed trait ConstInstr extends OperandStackInstr with GasVeryLow
+sealed trait ConstInstr extends OperandStackInstr with GasBase
 object ConstInstr {
   def i256(v: Val.I256): ConstInstr = {
     val bi = v.v.v
@@ -346,7 +346,7 @@ final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
 }
 object StoreField extends StatefulInstrCompanion1[Byte]
 
-sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0 with GasVeryLow
+sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0 with GasBase
 
 case object Pop extends PureStackInstr {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -473,15 +473,15 @@ object U256Mod extends BinaryArithmeticInstr[Val.U256] with GasLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.mod(_))(x, y)
 }
-object U256ModAdd extends BinaryArithmeticInstr[Val.U256] with GasLow {
+object U256ModAdd extends BinaryArithmeticInstr[Val.U256] with GasMid {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.modAdd(_))(x, y)
 }
-object U256ModSub extends BinaryArithmeticInstr[Val.U256] with GasLow {
+object U256ModSub extends BinaryArithmeticInstr[Val.U256] with GasMid {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.modSub(_))(x, y)
 }
-object U256ModMul extends BinaryArithmeticInstr[Val.U256] with GasLow {
+object U256ModMul extends BinaryArithmeticInstr[Val.U256] with GasMid {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.modMul(_))(x, y)
 }
@@ -630,12 +630,29 @@ sealed trait EqT[T <: Val] extends ComparisonInstr[T] {
 sealed trait NeT[T <: Val] extends ComparisonInstr[T] {
   def op(x: T, y: T): Val.Bool = Val.Bool(x != y)
 }
-case object ByteVecEq  extends EqT[Val.ByteVec]
-case object ByteVecNeq extends NeT[Val.ByteVec]
-case object ByteVecSize
-    extends StatelessInstrSimpleGas
+
+sealed trait ByteVecComparison
+    extends StatelessInstr
     with StatelessInstrCompanion0
-    with GasVeryLow {
+    with GasBytesEq {
+  def op(x: Val.ByteVec, y: Val.ByteVec): Val.Bool
+
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      x <- frame.popOpStackT[Val.ByteVec]()
+      y <- frame.popOpStackT[Val.ByteVec]()
+      _ <- frame.ctx.chargeGasWithSize(this, x.bytes.size)
+      _ <- frame.pushOpStack(op(x, y))
+    } yield ()
+  }
+}
+case object ByteVecEq extends ByteVecComparison {
+  def op(x: Val.ByteVec, y: Val.ByteVec): Val.Bool = Val.Bool(x == y)
+}
+case object ByteVecNeq extends ByteVecComparison {
+  def op(x: Val.ByteVec, y: Val.ByteVec): Val.Bool = Val.Bool(x != y)
+}
+case object ByteVecSize extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasBase {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.popOpStackT[Val.ByteVec]()
@@ -646,7 +663,7 @@ case object ByteVecSize
 case object ByteVecConcat
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
-    with GasLow {
+    with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v2 <- frame.popOpStackT[Val.ByteVec]()
@@ -662,7 +679,7 @@ case object AddressToByteVec extends ToByteVecInstr[Val.Address, Val.ByteVec]
 case object IsAssetAddress
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
-    with GasLow {
+    with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.popOpStackT[Val.Address]()
@@ -674,7 +691,7 @@ case object IsAssetAddress
 case object IsContractAddress
     extends StatelessInstrSimpleGas
     with StatelessInstrCompanion0
-    with GasLow {
+    with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.popOpStackT[Val.Address]()
@@ -683,7 +700,7 @@ case object IsContractAddress
   }
 }
 
-sealed trait ControlInstr extends StatelessInstrSimpleGas with GasHigh {
+sealed trait ControlInstr extends StatelessInstrSimpleGas with GasMid {
   def code: Byte
   def offset: Int
 
@@ -1229,7 +1246,10 @@ object ContractInitialStateHash extends ContractInstr with GasLow {
   }
 }
 
-sealed trait BlockInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasLow
+sealed trait BlockInstr
+    extends StatelessInstrSimpleGas
+    with StatelessInstrCompanion0
+    with GasVeryLow
 
 object NetworkId extends BlockInstr {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -1266,13 +1286,13 @@ object BlockTarget extends BlockInstr {
 
 sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0
 
-object TxId extends TxInstr with GasLow {
+object TxId extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.ByteVec(frame.ctx.txId.bytes))
   }
 }
 
-object TxCaller extends TxInstr with GasLow {
+object TxCaller extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       callerIndex <- frame.popOpStackT[Val.U256]()
@@ -1282,7 +1302,7 @@ object TxCaller extends TxInstr with GasLow {
   }
 }
 
-object TxCallerSize extends TxInstr with GasLow {
+object TxCallerSize extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
   }
@@ -1304,7 +1324,7 @@ sealed trait LockTimeInstr extends TxInstr {
   }
 }
 
-object VerifyAbsoluteLocktime extends LockTimeInstr with GasMid {
+object VerifyAbsoluteLocktime extends LockTimeInstr with GasLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       lockUntil <- popTimeStamp(frame)
@@ -1318,7 +1338,7 @@ object VerifyAbsoluteLocktime extends LockTimeInstr with GasMid {
   }
 }
 
-object VerifyRelativeLocktime extends LockTimeInstr with GasHigh {
+object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
   def getLockUntil(output: AssetOutput, lockDuration: Duration): ExeResult[TimeStamp] = {
     val lockTime = output.lockTime
     if (lockTime.isZero()) {
@@ -1345,15 +1365,18 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasHigh {
   }
 }
 
-sealed trait Log extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasHigh {
+sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
   def n: Int
 
-  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.opStack.pop(n).map(_ => ()) // TODO: send the log to an event bus
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.chargeGasWithSize(this, n)
+      _ <- frame.opStack.pop(n) // TODO: send the log to an event bus
+    } yield ()
   }
 }
-object Log1 extends Log { val n: Int = 1 }
-object Log2 extends Log { val n: Int = 2 }
-object Log3 extends Log { val n: Int = 3 }
-object Log4 extends Log { val n: Int = 4 }
-object Log5 extends Log { val n: Int = 5 }
+object Log1 extends LogInstr { val n: Int = 1 }
+object Log2 extends LogInstr { val n: Int = 2 }
+object Log3 extends LogInstr { val n: Int = 3 }
+object Log4 extends LogInstr { val n: Int = 4 }
+object Log5 extends LogInstr { val n: Int = 5 }

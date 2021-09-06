@@ -148,7 +148,7 @@ trait FlowUtils
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView)
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
-      FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, maximalGas)
+      FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, maximalGasPerBlock)
     }
   }
 

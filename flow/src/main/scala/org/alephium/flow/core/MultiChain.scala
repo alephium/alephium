@@ -24,7 +24,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.BlockEnv
-import org.alephium.util.{AVector, Cache, Math, TimeStamp}
+import org.alephium.util.{AVector, Cache, Math, RWLock, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait MultiChain extends BlockPool with BlockHeaderPool {
@@ -172,7 +172,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     getBlockChain(hash).getBlock(hash)
   }
 
-  val bodyVerifyingBlocks = Cache.fifo[BlockHash, Block](brokerConfig.chainNum * 2)
+  val bodyVerifyingBlocks = MultiChain.bodyVerifyingBlocks(brokerConfig.chainNum * 2)
   def getHeaderVerifiedBlock(hash: BlockHash): IOResult[Block] = {
     bodyVerifyingBlocks.get(hash) match {
       case Some(block) => Right(block)
@@ -181,8 +181,18 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   }
 
   def cacheHeaderVerifiedBlock(block: Block): Unit = {
-    bodyVerifyingBlocks.put(block.hash, block)
+    bodyVerifyingBlocks.put(block)
   }
 
   def add(block: Block): IOResult[Unit]
+}
+
+object MultiChain {
+  def bodyVerifyingBlocks(capacity: Int): BodyVerifyingBlocks =
+    BodyVerifyingBlocks(Cache.fifo[BlockHash, Block](capacity))
+
+  final case class BodyVerifyingBlocks(cache: Cache[BlockHash, Block]) extends RWLock {
+    def put(block: Block): Unit             = writeOnly(cache.put(block.hash, block))
+    def get(hash: BlockHash): Option[Block] = readOnly(cache.get(hash))
+  }
 }

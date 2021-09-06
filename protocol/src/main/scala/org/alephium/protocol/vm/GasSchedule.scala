@@ -21,26 +21,29 @@ import org.alephium.protocol.PublicKey
 
 //scalastyle:off magic.number
 
-trait GasSchedule {
-  protected def typeHint(): Unit // for type safety
-}
+trait GasSchedule
 
 trait GasSimple extends GasSchedule {
-  protected def typeHint(): Unit = ()
-
   def gas(): GasBox
 }
 
 trait GasFormula extends GasSchedule {
-  protected def typeHint(): Unit = ()
-
   def gas(size: Int): GasBox
+}
+object GasFormula {
+  def wordLength(byteLength: Int): Int = (byteLength + 7) / 8
 }
 
 @Gas
 trait GasZero extends GasSimple
 object GasZero {
   val gas: GasBox = GasBox.unsafe(0)
+}
+
+@Gas
+trait GasBase extends GasSimple
+object GasBase {
+  val gas: GasBox = GasBox.unsafe(2)
 }
 
 @Gas
@@ -68,25 +71,32 @@ object GasHigh {
 }
 
 trait GasToByte extends GasFormula {
-  def gas(inputLength: Int): GasBox = GasToByte.gas(inputLength)
+  def gas(byteLength: Int): GasBox = GasToByte.gas(byteLength)
 }
 object GasToByte {
-  val baseGas: Int         = 3
-  val extraGasPerWord: Int = 2
+  val gasPerByte: Int = 1
 
-  def gas(inputLength: Int): GasBox =
-    GasBox.unsafe(baseGas + extraGasPerWord * ((inputLength + 3) / 8))
+  def gas(byteLength: Int): GasBox =
+    GasBox.unsafe(gasPerByte * GasFormula.wordLength(byteLength))
 }
 
 trait GasHash extends GasFormula {
-  def gas(inputLength: Int): GasBox = GasHash.gas(inputLength)
+  def gas(byteLength: Int): GasBox = GasHash.gas(byteLength)
 }
 object GasHash {
   val baseGas: Int         = 30
   val extraGasPerWord: Int = 6
 
-  def gas(inputLength: Int): GasBox =
-    GasBox.unsafe(GasHash.baseGas + GasHash.extraGasPerWord * ((inputLength + 3) / 8))
+  def gas(byteLength: Int): GasBox =
+    GasBox.unsafe(GasHash.baseGas + GasHash.extraGasPerWord * GasFormula.wordLength(byteLength))
+}
+
+trait GasBytesEq extends GasFormula {
+  def gas(byteLength: Int): GasBox = GasBytesEq.gas(byteLength)
+}
+object GasBytesEq {
+  val gasPerWord: Int              = 1
+  def gas(byteLength: Int): GasBox = GasBox.unsafe(gasPerWord * GasFormula.wordLength(byteLength))
 }
 
 @Gas
@@ -104,22 +114,37 @@ object GasCreate {
 @Gas
 trait GasDestroy extends GasSimple
 object GasDestroy {
-  val gas: GasBox = GasBox.unsafe(10000)
+  val gas: GasBox = GasBox.unsafe(5000)
 }
 
 @Gas
 trait GasBalance extends GasSimple
 object GasBalance {
-  val gas: GasBox = GasBox.unsafe(50)
+  val gas: GasBox = GasBox.unsafe(30)
 }
 
 trait GasCall extends GasFormula {
   def gas(size: Int): GasBox = ??? // should call the companion object instead
 }
+object GasCall {
+  val gasPerScriptByte: Int = 1
+  def scriptBaseGas(byteLength: Int): GasBox =
+    GasBox.unsafe(gasPerScriptByte * byteLength + GasSchedule.callGas.value)
+}
+
+trait GasLog extends GasFormula {
+  def gas(n: Int): GasBox = GasLog.gas(n)
+}
+object GasLog {
+  val gasBase: Int    = 3
+  val gasPerData: Int = 1
+
+  def gas(n: Int): GasBox = GasBox.unsafe(gasBase + gasPerData * n)
+}
 
 object GasSchedule {
   val callGas: GasBox           = GasBox.unsafe(200)
-  val contractLoadGas: GasBox   = GasBox.unsafe(1000)
+  val contractLoadGas: GasBox   = GasBox.unsafe(800)
   val contractUpdateGas: GasBox = GasBox.unsafe(5000)
 
   /*

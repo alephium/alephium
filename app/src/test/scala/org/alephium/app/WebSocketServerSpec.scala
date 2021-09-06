@@ -23,6 +23,7 @@ import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
+import io.vertx.core.http.HttpClientOptions
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -106,10 +107,13 @@ class WebSocketServerSpec
 
   trait RouteWS extends WebSocketServerFixture {
 
-    private val vertx      = Vertx.vertx()
-    private val httpClient = vertx.createHttpClient()
-    val port               = node.config.network.wsPort
-    val blockNotifyProbe   = TestProbe()
+    private val vertx = Vertx.vertx()
+    private val httpClient = {
+      val options = new HttpClientOptions().setMaxWebSocketFrameSize(1024 * 1024)
+      vertx.createHttpClient(options)
+    }
+    val port             = node.config.network.wsPort
+    val blockNotifyProbe = TestProbe()
 
     val blockNotify = BlockNotify(blockGen.sample.get, height = 0)
     def sendEventAndCheck: Assertion = {

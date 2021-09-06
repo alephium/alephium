@@ -25,7 +25,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Math, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
@@ -168,13 +168,12 @@ object Transaction {
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
-    val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(
       unsigned,
       contractInputs = AVector.empty,
       generatedOutputs,
-      AVector.fill(inputCnt)(signature),
+      AVector(signature),
       contractSignatures = AVector.empty
     )
   }
@@ -185,13 +184,12 @@ object Transaction {
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
-    val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(
       unsigned,
       contractInputs,
       generatedOutputs,
-      AVector.fill(inputCnt)(signature),
+      AVector(signature),
       contractSignatures = AVector.empty
     )
   }
@@ -208,9 +206,10 @@ object Transaction {
 
   // PoLW burning is not considered
   def totalReward(gasFee: U256, miningReward: U256): U256 = {
+    val threshold = Math.max(miningReward, ALF.oneAlf)
     val gasReward = gasFee.divUnsafe(U256.Two)
-    if (gasReward >= miningReward) {
-      miningReward.mulUnsafe(U256.Two)
+    if (gasReward >= threshold) {
+      miningReward.addUnsafe(threshold)
     } else {
       miningReward.addUnsafe(gasReward)
     }
@@ -284,12 +283,13 @@ object Transaction {
   }
 
   def genesis(
-      balances: AVector[(LockupScript.Asset, U256)],
+      balances: AVector[(LockupScript.Asset, U256, Duration)],
       noPreMineProof: ByteString
   )(implicit networkConfig: NetworkConfig): Transaction = {
-    val outputs = balances.mapWithIndex[AssetOutput] { case ((lockupScript, value), index) =>
-      val txData = if (index == 0) noPreMineProof else ByteString.empty
-      TxOutput.genesis(value, lockupScript, txData)
+    val outputs = balances.mapWithIndex[AssetOutput] {
+      case ((lockupScript, value, lockupDuration), index) =>
+        val txData = if (index == 0) noPreMineProof else ByteString.empty
+        TxOutput.genesis(value, lockupScript, lockupDuration, txData)
     }
     val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
     Transaction(
@@ -333,11 +333,10 @@ object TransactionTemplate {
   )
 
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
-    val inputCnt  = unsigned.inputs.length
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     TransactionTemplate(
       unsigned,
-      AVector.fill(inputCnt)(signature),
+      AVector(signature),
       contractSignatures = AVector.empty
     )
   }

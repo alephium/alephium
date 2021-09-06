@@ -155,14 +155,18 @@ object Configs extends StrictLogging {
     }
   }
 
-  def loadBlockFlow(balances: AVector[(LockupScript.Asset, U256)])(implicit
+  def loadBlockFlow(balances: AVector[Allocation])(implicit
       groupConfig: GroupConfig,
       consensusConfig: ConsensusConfig,
       networkConfig: NetworkConfig
   ): AVector[AVector[Block]] = {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) { case (from, to) =>
       val transactions = if (from == to) {
-        val balancesOI  = balances.filter(_._1.groupIndex.value == from)
+        val balancesOI = balances
+          .filter(_.address.lockupScript.groupIndex.value == from)
+          .map(allocation =>
+            (allocation.address.lockupScript, allocation.amount, allocation.lockDuration)
+          )
         val transaction = Transaction.genesis(balancesOI, networkConfig.noPreMineProof)
         AVector(transaction)
       } else {

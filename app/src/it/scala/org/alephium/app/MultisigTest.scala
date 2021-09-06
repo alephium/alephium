@@ -18,7 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.ApiError
 import org.alephium.api.model._
-import org.alephium.flow.validation.InvalidSignature
+import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
 import org.alephium.protocol.{PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -29,7 +29,7 @@ import org.alephium.wallet.api.model._
 
 class MultisigTest extends AlephiumActorSpec {
 
-  it should "handle multisig" in new CliqueFixture {
+  it should "handle multisig with private keys" in new CliqueFixture {
 
     val clique = bootClique(nbOfNodes = 1)
     clique.start()
@@ -86,15 +86,23 @@ class MultisigTest extends AlephiumActorSpec {
     request[ApiError.InternalServerError](
       submitTx,
       restPort
-    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
+    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
       .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
     val submitMultisigTx1sig = signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey))
     request[ApiError.InternalServerError](
       submitMultisigTx1sig,
       restPort
-    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
+    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
       .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
+
+    val submitMultisigTxWrongSig =
+      signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey3))
+    request[ApiError.InternalServerError](
+      submitMultisigTxWrongSig,
+      restPort
+    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
+      .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey3)))))}"
 
     val submitMultisigTx =
       signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))

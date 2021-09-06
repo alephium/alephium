@@ -16,16 +16,23 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.model.defaultGasPerInput
+import org.alephium.protocol.model.minimalGas
 import org.alephium.util.AlephiumSpec
 
-class GasScheduleSpec extends AlephiumSpec {
-  it should "validate default gases" in {
-    (defaultGasPerInput >= GasSchedule.p2pkUnlockGas) is true
-  }
+class CostStrategySpec extends AlephiumSpec {
+  it should "charge gas" in {
+    def test(charge: CostStrategy => ExeResult[Unit], cost: Int) = {
+      val strategy = new CostStrategy {
+        override var gasRemaining: GasBox = minimalGas
+      }
+      charge(strategy)
+      strategy.gasRemaining.addUnsafe(GasBox.unsafe(cost)) is minimalGas
+    }
 
-  it should "charge gas for hash" in {
-    GasHash.gas(33) is GasBox.unsafe(60)
-    GasSchedule.p2pkUnlockGas is GasBox.unsafe(60 + 2000)
+    test(_.chargeGas(Pop), 2)
+    test(_.chargeGasWithSize(Blake2b, 33), 60)
+    test(_.chargeContractLoad(), 800)
+    test(_.chargeContractUpdate(), 5000)
+    test(_.chargeGas(GasBox.unsafe(100)), 100)
   }
 }

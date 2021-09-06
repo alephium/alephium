@@ -55,7 +55,7 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
 
   trait Fixture {
     val groupConfig = new GroupConfig {
-      override def groups: Int = 2
+      override def groups: Int = 4
     }
     val emission = Emission(groupConfig, Duration.ofSecondsUnsafe(64))
   }
@@ -76,15 +76,15 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   it should "compute max reward based on timestamp" in new Fixture {
     import emission._
 
-    rewardWrtTime(TimeStamp.zero, TimeStamp.zero) is initialMaxRewardPerChain
+    rewardWrtTime(TimeStamp.zero, TimeStamp.zero) is ALF.cent(375)
     rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(1 * 365 * 24), TimeStamp.zero) is
-      ALF.cent(1250)
-    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(2 * 365 * 24), TimeStamp.zero) is ALF
-      .alf(10)
+      ALF.cent(313)
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(2 * 365 * 24), TimeStamp.zero) is
+      ALF.cent(251)
     rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(3 * 365 * 24), TimeStamp.zero) is
-      ALF.cent(750)
-    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is ALF
-      .alf(5)
+      ALF.cent(189)
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is
+      ALF.cent(125)
   }
 
   def halfDifficulty(target: Target): Target = target * 2

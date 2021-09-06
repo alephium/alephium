@@ -17,7 +17,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.crypto.Blake3
-import org.alephium.protocol.{BlockHash, Hash, ModelSnapshots}
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}

@@ -96,11 +96,14 @@ class TransactionSpec
   }
 
   it should "cap the gas reward" in {
+    val hardReward = ALF.oneAlf
     Transaction.totalReward(1, 100) is U256.unsafe(100)
     Transaction.totalReward(2, 100) is U256.unsafe(101)
     Transaction.totalReward(200, 100) is U256.unsafe(200)
-    (201 until 300).foreach { k =>
-      Transaction.totalReward(k, 100) is U256.unsafe(200)
-    }
+    Transaction.totalReward(202, 100) is U256.unsafe(201)
+    Transaction.totalReward(hardReward * 2, hardReward) is (hardReward * 2)
+    Transaction.totalReward(hardReward * 2 + 2, hardReward) is (hardReward * 2)
+    Transaction.totalReward(hardReward * 2, 0) is hardReward
+    Transaction.totalReward(hardReward * 2 + 2, 0) is hardReward
   }
 }

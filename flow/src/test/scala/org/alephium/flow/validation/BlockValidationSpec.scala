@@ -49,6 +49,12 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       val groupView = flow.getMutableGroupView(block).rightValue
       checkCoinbase(block, groupView)
     }
+
+    implicit class RichTx(tx: Transaction) {
+      def update(f: UnsignedTransaction => UnsignedTransaction): Transaction = {
+        tx.copy(unsigned = f(tx.unsigned))
+      }
+    }
   }
 
   it should "validate group for block" in new Fixture {
@@ -275,6 +281,19 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       block.copy(transactions = AVector.fill(maximalTxsInOneBlock + 1)(block.nonCoinbase.head))
     failCheck(checkTxNumber(modified1), TooManyTransactions)
     failCheck(checkBlock(modified1, blockFlow), TooManyTransactions)
+  }
+
+  it should "check the gas price decreasing" in new Fixture {
+    val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    val tx    = block.nonCoinbase.head
+    tx.unsigned.gasPrice is defaultGasPrice
+
+    val tx1    = tx.update(_.copy(gasPrice = GasPrice(defaultGasPrice.value + 1)))
+    val block1 = block.copy(transactions = AVector(tx1, tx))
+    passValidation(checkGasPriceDecreasing(block1))
+
+    val block2 = block.copy(transactions = AVector(tx, tx1))
+    failValidation(checkBlock(block2, blockFlow), TxGasPriceNonDecreasing)
   }
 
   it should "check the amount of gas" in new Fixture {

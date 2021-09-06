@@ -416,7 +416,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
       AVector.from(transactions),
       p2pkh(Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")),
       consensusConfig.maxMiningTarget,
-      TimeStamp.unsafe(1629980707001L)
+      TimeStamp.unsafe(1630879601000L)
     )
   }
 
@@ -439,7 +439,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
         Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
       txsHash = txsHash,
       // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
-      timestamp = TimeStamp.unsafe(1630167995025L),
+      timestamp = TimeStamp.unsafe(1630879601000L),
       target = Target(hex"20ffffff")
     )
   }

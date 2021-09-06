@@ -20,11 +20,10 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{ALF, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => _, _}
-import org.alephium.serde.serialize
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 trait TxValidation {
@@ -257,7 +256,7 @@ trait TxValidation {
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputs: AVector[AssetOutput],
-      blockEnv: BlockEnv): TxValidationResult[Unit]
+      blockEnv: BlockEnv): TxValidationResult[GasBox]
   // format: on
 }
 
@@ -324,15 +323,11 @@ object TxValidation {
     protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit] = {
       if (!GasBox.validate(tx.unsigned.gasAmount)) {
         invalidTx(InvalidStartGas)
-      } else if (!checkGasPrice(tx.unsigned.gasPrice)) {
+      } else if (!GasPrice.validate(tx.unsigned.gasPrice)) {
         invalidTx(InvalidGasPrice)
       } else {
         validTx(())
       }
-    }
-
-    private def checkGasPrice(gasPrice: GasPrice): Boolean = {
-      gasPrice.value > U256.Zero && gasPrice.value < ALF.MaxALFValue
     }
 
     protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {
@@ -559,62 +554,66 @@ object TxValidation {
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
       val txEnv =
         TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
-      EitherF.foldTry(tx.unsigned.inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
-        val unlockScript = tx.unsigned.inputs(idx).unlockScript
-        checkLockupScript(
-          tx,
-          gasRemaining,
-          preOutputs(idx).lockupScript,
-          unlockScript,
-          blockEnv,
-          txEnv
-        )
-      }
+      val inputs = tx.unsigned.inputs
+      for {
+        remaining <- EitherF.foldTry(inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
+          val unlockScript = inputs(idx).unlockScript
+          if (idx > 0 && unlockScript == inputs(idx - 1).unlockScript) {
+            validTx(gasRemaining)
+          } else {
+            checkLockupScript(
+              blockEnv,
+              txEnv,
+              gasRemaining,
+              preOutputs(idx).lockupScript,
+              unlockScript
+            )
+          }
+        }
+        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignature)
+      } yield remaining
     }
 
     protected[validation] def checkLockupScript(
-        tx: Transaction,
+        blockEnv: BlockEnv,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lockupScript: LockupScript,
-        unlockScript: UnlockScript,
-        blockEnv: BlockEnv,
-        txEnv: TxEnv
+        unlockScript: UnlockScript
     ): TxValidationResult[GasBox] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-          checkP2pkh(tx, gasRemaining, lock, unlock, txEnv.signatures)
+          checkP2pkh(txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2MPKH, unlock: UnlockScript.P2MPKH) =>
-          checkP2mpkh(tx, gasRemaining, lock, unlock, txEnv.signatures)
+          checkP2mpkh(txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
-          checkP2SH(gasRemaining, lock, unlock, blockEnv, txEnv)
+          checkP2SH(blockEnv, txEnv, gasRemaining, lock, unlock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
     }
 
     protected[validation] def checkP2pkh(
-        tx: Transaction,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lock: LockupScript.P2PKH,
-        unlock: UnlockScript.P2PKH,
-        signatures: Stack[Signature]
+        unlock: UnlockScript.P2PKH
     ): TxValidationResult[GasBox] = {
       if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        checkSignature(tx, gasRemaining, unlock.publicKey, signatures)
+        checkSignature(txEnv, gasRemaining, unlock.publicKey)
       }
     }
 
     private def checkSignature(
-        tx: Transaction,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
-        publicKey: PublicKey,
-        signatures: Stack[Signature]
+        publicKey: PublicKey
     ): TxValidationResult[GasBox] = {
-      signatures.pop() match {
+      txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(tx.id.bytes, signature, publicKey)) {
+          if (!SignatureSchema.verify(txEnv.tx.id.bytes, signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
             gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
@@ -624,11 +623,10 @@ object TxValidation {
     }
 
     protected[validation] def checkP2mpkh(
-        tx: Transaction,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lock: LockupScript.P2MPKH,
-        unlock: UnlockScript.P2MPKH,
-        signatures: Stack[Signature]
+        unlock: UnlockScript.P2MPKH
     ): TxValidationResult[GasBox] = {
       if (unlock.indexedPublicKeys.length != lock.m) {
         invalidTx(InvalidNumberOfPublicKey)
@@ -638,51 +636,45 @@ object TxValidation {
             if (!lock.pkHashes.get(index).contains(Hash.hash(publicKey.bytes))) {
               invalidTx(InvalidPublicKeyHash)
             } else {
-              checkSignature(tx, gasBox, publicKey, signatures)
+              checkSignature(txEnv, gasBox, publicKey)
             }
           }
       }
     }
 
-    protected[validation] def checkP2SH(
+    @inline protected[validation] def checkP2SH(
+        blockEnv: BlockEnv,
+        txEnv: TxEnv,
         gasRemaining: GasBox,
         lock: LockupScript.P2SH,
-        unlock: UnlockScript.P2SH,
-        blockEnv: BlockEnv,
-        txEnv: TxEnv
+        unlock: UnlockScript.P2SH
     ): TxValidationResult[GasBox] = {
       checkScript(
+        blockEnv,
+        txEnv,
         gasRemaining,
         lock.scriptHash,
         unlock.script,
-        unlock.params,
-        blockEnv,
-        txEnv
+        unlock.params
       )
     }
 
     protected[validation] def checkScript(
-        gasRemaining: GasBox,
-        scriptHash: Hash,
-        script: StatelessScript,
-        params: AVector[Val],
         blockEnv: BlockEnv,
-        txEnv: TxEnv
+        txEnv: TxEnv,
+        gasRemaining: GasBox,
+        expectedScriptHash: Hash,
+        script: StatelessScript,
+        params: AVector[Val]
     ): TxValidationResult[GasBox] = {
-      if (Hash.hash(serialize(script)) != scriptHash) {
+      if (script.hash != expectedScriptHash) {
         invalidTx(InvalidScriptHash)
       } else {
-        StatelessVM.runAssetScript(
-          blockEnv,
-          txEnv,
-          gasRemaining,
-          script,
-          params
-        ) match {
-          case Right(result)  => validTx(result.gasRemaining)
-          case Left(Right(e)) => invalidTx(InvalidUnlockScript(e))
-          case Left(Left(e))  => Left(Left(e.error))
-        }
+        fromExeResult(for {
+          remaining0 <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
+          remaining1 <- remaining0.use(GasHash.gas(script.bytes.length))
+          result     <- StatelessVM.runAssetScript(blockEnv, txEnv, remaining1, script, params)
+        } yield result.gasRemaining)
       }
     }
 
@@ -693,33 +685,36 @@ object TxValidation {
         worldState: WorldState.Cached,
         preAssetOutputs: AVector[AssetOutput],
         blockEnv: BlockEnv
-    ): TxValidationResult[Unit] = {
+    ): TxValidationResult[GasBox] = {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
-            fromExeResult(
-              StatefulVM.runTxScript(
-                worldState,
-                blockEnv,
-                tx,
-                preAssetOutputs,
-                script,
-                gasRemaining
-              )
-            )
-              .flatMap { case StatefulVM.TxScriptExecution(_, contractInputs, generatedOutputs) =>
-                if (contractInputs != tx.contractInputs) {
-                  invalidTx(InvalidContractInputs)
-                } else if (generatedOutputs != tx.generatedOutputs) {
-                  invalidTx(InvalidGeneratedOutputs)
-                } else {
-                  validTx(())
-                }
+            fromExeResult(for {
+              remaining <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
+              result <-
+                StatefulVM.runTxScript(
+                  worldState,
+                  blockEnv,
+                  tx,
+                  preAssetOutputs,
+                  script,
+                  remaining
+                )
+            } yield result)
+              .flatMap {
+                case StatefulVM.TxScriptExecution(remaining, contractInputs, generatedOutputs) =>
+                  if (contractInputs != tx.contractInputs) {
+                    invalidTx(InvalidContractInputs)
+                  } else if (generatedOutputs != tx.generatedOutputs) {
+                    invalidTx(InvalidGeneratedOutputs)
+                  } else {
+                    validTx(remaining)
+                  }
               }
-          case None => validTx(())
+          case None => validTx(gasRemaining)
         }
       } else {
-        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(())
+        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(gasRemaining)
       }
     }
   }

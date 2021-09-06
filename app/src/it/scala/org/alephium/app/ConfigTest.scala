@@ -14,26 +14,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium.app
 
 import org.alephium.protocol.ALF
-import org.alephium.protocol.model.minimalGasPrice
-import org.alephium.serde.Serde
-import org.alephium.util.U256
+import org.alephium.util.AlephiumActorSpec
 
-final case class GasPrice(value: U256) extends Ordered[GasPrice] {
-  // this is safe as value <= ALF.MaxALFValue
-  def *(gas: GasBox): U256 = {
-    value.mulUnsafe(gas.toU256)
-  }
+class ConfigTest extends AlephiumActorSpec {
+  it should "load testnet genesis" in new CliqueFixture {
+    val clique    = bootClique(nbOfNodes = 1)
+    val theConfig = clique.servers.head.config
+    theConfig.genesisBlocks(0)(0).coinbase.outputsLength is 1
+    theConfig.genesisBlocks(1)(1).coinbase.outputsLength is 2
+    theConfig.genesisBlocks(2)(2).coinbase.outputsLength is 1
+    theConfig.genesisBlocks(3)(3).coinbase.outputsLength is 2
 
-  override def compare(that: GasPrice): Int = this.value.compare(that.value)
-}
-
-object GasPrice {
-  implicit val serde: Serde[GasPrice] = Serde.forProduct1(GasPrice.apply, _.value)
-
-  def validate(gasPrice: GasPrice): Boolean = {
-    gasPrice >= minimalGasPrice && gasPrice.value < ALF.MaxALFValue
+    val specialTx = theConfig.genesisBlocks(3)(3).coinbase
+    specialTx.unsigned.fixedOutputs.head.lockTime is ALF.LaunchTimestamp
+    specialTx.unsigned.fixedOutputs.last.lockTime is ALF.LaunchTimestamp.plusHoursUnsafe(3 * 24)
   }
 }

@@ -16,16 +16,15 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.model.defaultGasPerInput
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.ALF
+import org.alephium.protocol.model.minimalGasPrice
+import org.alephium.util.{AlephiumSpec, NumericHelpers}
 
-class GasScheduleSpec extends AlephiumSpec {
-  it should "validate default gases" in {
-    (defaultGasPerInput >= GasSchedule.p2pkUnlockGas) is true
-  }
-
-  it should "charge gas for hash" in {
-    GasHash.gas(33) is GasBox.unsafe(60)
-    GasSchedule.p2pkUnlockGas is GasBox.unsafe(60 + 2000)
+class GasPriceSpec extends AlephiumSpec with NumericHelpers {
+  it should "validate gas price bounds" in {
+    GasPrice.validate(minimalGasPrice) is true
+    GasPrice.validate(GasPrice(minimalGasPrice.value - 1)) is false
+    GasPrice.validate(GasPrice(ALF.MaxALFValue)) is false
+    GasPrice.validate(GasPrice(ALF.MaxALFValue - 1)) is true
   }
 }

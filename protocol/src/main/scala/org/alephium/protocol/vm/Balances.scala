@@ -54,7 +54,7 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
   }
 
   def isPaying(lockupScript: LockupScript): Boolean = {
-    remaining.all.exists(_._1 == lockupScript) || approved.all.exists(_._1 == lockupScript)
+    remaining.all.exists(_._1 == lockupScript)
   }
 
   def useApproved(): BalanceState = {
