@@ -194,6 +194,24 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     }
   }
 
+  it should "close the double connections when they are of the same type" in new Fixture {
+    val broker = relevantBrokerInfo()
+
+    val probe0 = TestProbe()
+    watch(probe0.ref)
+    probe0.send(interCliqueManager, CliqueManager.HandShaked(broker, InboundConnection))
+    interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
+
+    val probe1 = TestProbe()
+    EventFilter.debug(start = "Invalid double connection").intercept {
+      watch(probe1.ref)
+      probe1.send(interCliqueManager, CliqueManager.HandShaked(broker, InboundConnection))
+    }
+
+    expectTerminated(probe0.ref)
+    expectTerminated(probe1.ref)
+  }
+
   behavior of "Extract peers"
 
   it should "not return self clique" in new Fixture {
