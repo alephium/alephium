@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 
 import akka.util.ByteString
@@ -25,6 +26,10 @@ import org.alephium.serde._
 import org.alephium.util.{AlephiumFixture, Hex}
 
 trait ModelSnapshots extends AlephiumFixture with OptionValues {
+  def readFile(path: Path): String = {
+    new String(Files.readAllBytes(path), StandardCharsets.UTF_8)
+  }
+
   implicit class SnapshotVerifier[T: Serde](model: T)(implicit
       baseDir: String
   ) {
@@ -34,7 +39,7 @@ trait ModelSnapshots extends AlephiumFixture with OptionValues {
         serializeAndWrite(filePath)
       }
 
-      val serialized = Hex.from(Files.readString(filePath)).value
+      val serialized = Hex.from(readFile(filePath)).value
 
       serialize(model) is serialized
       deserialize[T](serialized) isE model
@@ -44,7 +49,7 @@ trait ModelSnapshots extends AlephiumFixture with OptionValues {
 
     def fail(name: String): ByteString = {
       val filePath   = Paths.get(s"$baseDir/$name.serialized.txt")
-      val serialized = Hex.from(Files.readString(filePath)).value
+      val serialized = Hex.from(readFile(filePath)).value
 
       serialize(model) isnot serialized
       deserialize[T](serialized) isnotE model
