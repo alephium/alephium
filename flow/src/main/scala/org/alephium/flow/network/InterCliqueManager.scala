@@ -549,6 +549,9 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       }
     } else {
       log.debug(s"Invalid double connection from ${brokerInfo.peerId}")
+      brokers.remove(existedBroker.info.peerId)
+      context.stop(existedBroker.actor.ref)
+      context.stop(sender())
     }
   }
 }
