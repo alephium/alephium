@@ -45,6 +45,13 @@ final case class AssetOutputRef private (hint: Hint, key: Hash) extends TxOutput
   override def isContractType: Boolean = false
 
   def fromGroup(implicit config: GroupConfig): GroupIndex = hint.scriptHint.groupIndex
+
+  override def hashCode(): Int = key.hashCode()
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case that: AssetOutputRef => hint == that.hint && key == that.key
+      case _                    => false
+    }
 }
 object AssetOutputRef {
   implicit val serde: Serde[AssetOutputRef] =
