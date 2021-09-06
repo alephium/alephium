@@ -24,6 +24,6 @@ jobs:
       - name: Build and push Docker image
         uses: olafurpg/setup-scala@v10
         with:
-          java-version: 8
+          java-version: 11
       - run: sbt app/docker app/dockerPush
         shell: bash
