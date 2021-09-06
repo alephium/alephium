@@ -353,7 +353,7 @@ object WalletService {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareTransaction(pubKey.toHexString, destinations, gas, gasPrice)
+          .prepareTransaction(pubKey, destinations, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>
@@ -376,7 +376,7 @@ object WalletService {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareSweepAllTransaction(pubKey.toHexString, address, lockTime, gas, gasPrice)
+          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>

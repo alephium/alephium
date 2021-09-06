@@ -195,6 +195,15 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .rightValue is expected
   }
 
+  it should "correctly convert secret storage erro" in new UserWallet {
+    val data     = Hash.generate
+    val expected = SignatureSchema.sign(data.bytes, privateKey)
+
+    walletService
+      .sign(walletName, data.toHexString)
+      .rightValue is expected
+  }
+
   trait Fixture extends WalletConfigFixture {
     val password     = "password"
     val mnemonicSize = Mnemonic.Size(12).get

@@ -71,7 +71,9 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       secretStorage.revealMnemonic(wrongPassword).isLeft is true
 
       secretStorage.delete(password) is Right(())
+      secretStorage.delete(password) is Left(SecretStorage.SecretFileError)
       secretStorage.unlock(password, None) is Left(SecretStorage.SecretFileError)
+
     }
   }
 
@@ -128,6 +130,24 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     secretStorage.getCurrentPrivateKey() isE privateKey
   }
 
+  it should "fail to create twice the same file" in {
+    val file = new File(s"$secretDir/secret.json")
+
+    forAll(mnemonicGen) { mnemonic =>
+      SecretStorage
+        .create(mnemonic, None, "password", false, file, path)
+        .leftValue is SecretStorage.SecretFileAlreadyExists
+    }
+  }
+
+  it should "load an existing file" in {
+    val file = new File(s"$secretDir/secret.json")
+
+    val secretStorage = SecretStorage.load(file, path).rightValue
+
+    secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
+  }
+
   it should "fail to load an non existing file" in {
     val fileName        = scala.util.Random.nextString(10)
     val nonExistingFile = new File(fileName)
@@ -137,5 +157,17 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       .toOption
       .get is SecretStorage.SecretFileError
   }
+
+  it should "fail to load a file with invalid state" in {
+    val rawFile = """invalid-state"""
+
+    val file      = new File(s"$secretDir/invalid-state.json")
+    val outWriter = new PrintWriter(file)
+    outWriter.write(rawFile)
+    outWriter.close()
+
+    SecretStorage.load(file, path).leftValue is SecretStorage.CannotParseFile
+  }
+
   secretDir.toFile.listFiles.foreach(_.deleteOnExit())
 }
