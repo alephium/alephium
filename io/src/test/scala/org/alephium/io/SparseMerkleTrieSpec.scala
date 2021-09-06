@@ -42,7 +42,9 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     test(0xff.toByte, 0x0f.toByte, 0x0f.toByte)
   }
 
-  it should "convert" in {
+  it should "convert between bytes and nibbles" in {
+    bytes2Nibbles(ByteString(1, 2)) is ByteString(0, 1, 0, 2)
+    nibbles2Bytes(ByteString(0, 1, 0, 2)) is ByteString(1, 2)
     forAll { bytes: AVector[Byte] =>
       val bs = ByteString.fromArrayUnsafe(bytes.toArray)
       nibbles2Bytes(bytes2Nibbles(bs)) is bs
