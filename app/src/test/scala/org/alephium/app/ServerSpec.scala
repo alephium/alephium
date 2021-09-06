@@ -29,13 +29,12 @@ class ServerSpec extends AlephiumSpec with ScalaFutures {
   implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   it should "start and stop correctly" in {
-    val rootPath                        = Platform.getRootPath()
-    val rawConfig                       = Configs.parseConfig(rootPath, overwrite = true)
-    implicit val config: AlephiumConfig = AlephiumConfig.load(rawConfig)
-    implicit val apiConfig: ApiConfig   = ApiConfig.load(rawConfig)
-    val flowSystem: ActorSystem         = ActorSystem("flow", rawConfig)
-    implicit val executionContext: ExecutionContext =
-      scala.concurrent.ExecutionContext.Implicits.global
+    val rootPath                                    = Platform.getRootPath()
+    val rawConfig                                   = Configs.parseConfig(rootPath, overwrite = true)
+    implicit val config: AlephiumConfig             = AlephiumConfig.load(rawConfig)
+    implicit val apiConfig: ApiConfig               = ApiConfig.load(rawConfig)
+    val flowSystem: ActorSystem                     = ActorSystem("flow", rawConfig)
+    implicit val executionContext: ExecutionContext = flowSystem.dispatcher
 
     val server = Server(rootPath, flowSystem)
 

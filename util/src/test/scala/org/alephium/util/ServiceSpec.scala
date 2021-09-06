@@ -18,11 +18,11 @@ package org.alephium.util
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.ExecutionContext.Implicits
 
 class ServiceSpec extends AlephiumFutureSpec {
   trait Test extends Service {
-    implicit override protected def executionContext: ExecutionContext = Implicits.global
+    implicit override protected def executionContext: ExecutionContext =
+      ExecutionContext.fromExecutorService(new java.util.concurrent.ForkJoinPool)
 
     var startNum: Int = 0
     var stopNum: Int  = 0

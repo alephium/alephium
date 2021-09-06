@@ -18,6 +18,8 @@ package org.alephium.wallet
 
 import java.net.InetAddress
 
+import scala.concurrent.ExecutionContext
+
 import io.vertx.core.Vertx
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.BodyHandler
@@ -48,7 +50,8 @@ class WalletAppSpec
     with HttpRouteFixture
     with IntegrationPatience {
 
-  implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit val ec: ExecutionContext =
+    ExecutionContext.fromExecutorService(new java.util.concurrent.ForkJoinPool)
 
   val blockFlowMock =
     new WalletAppSpec.BlockFlowServerMock(host, blockFlowPort)

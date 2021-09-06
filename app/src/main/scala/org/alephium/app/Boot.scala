@@ -56,9 +56,7 @@ class BootUp extends StrictLogging {
   implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
 
-  @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
-  implicit val executionContext: ExecutionContext =
-    scala.concurrent.ExecutionContext.Implicits.global
+  implicit val executionContext: ExecutionContext = flowSystem.dispatcher
 
   val server: Server = Server(rootPath, flowSystem)
 

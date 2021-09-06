@@ -23,7 +23,6 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.Duration
 import org.alephium.wallet.WalletDocumentation
 
-@SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
 object OpenApiUpdate extends App {
 
   val wallet: WalletDocumentation = new WalletDocumentation {

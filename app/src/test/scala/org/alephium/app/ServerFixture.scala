@@ -169,7 +169,7 @@ object ServerFixture {
   )(implicit val config: AlephiumConfig)
       extends Node {
     implicit val system: ActorSystem       = ActorSystem("NodeDummy")
-    val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    val executionContext: ExecutionContext = system.dispatcher
     val blockFlow: BlockFlow               = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
 
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =

@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import scala.concurrent.ExecutionContext
+
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
@@ -27,7 +29,8 @@ import org.alephium.protocol.vm.GasBox
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
-  implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit val executionContext: ExecutionContext =
+    ExecutionContext.fromExecutorService(new java.util.concurrent.ForkJoinPool)
 
   trait Fixture extends FlowFixture {
     implicit def flowImplicit: BlockFlow = blockFlow

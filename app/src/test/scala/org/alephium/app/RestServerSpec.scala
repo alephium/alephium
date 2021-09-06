@@ -864,7 +864,7 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture with SocketU
       )(
         serverConfig.broker,
         peerConf,
-        scala.concurrent.ExecutionContext.Implicits.global
+        ExecutionContext.fromExecutorService(new java.util.concurrent.ForkJoinPool)
       )
     })
   }
