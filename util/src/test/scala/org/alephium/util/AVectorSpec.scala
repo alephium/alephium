@@ -644,6 +644,20 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       checkEq(vc.sortBy(-_), vc.toArray.sortBy(-_))
     }
   }
+
+  it should "update appendable" in {
+    val vc0 = AVector.empty[Int]
+    vc0.appendable is true
+    val vc1 = vc0 :+ 1
+    vc0.appendable is false
+    vc1.appendable is true
+    (vc1.elems eq vc0.elems) is true
+
+    val vc2 = vc1 ++ AVector(2, 3)
+    vc1.appendable is false
+    vc2.appendable is true
+    (vc2.elems eq vc1.elems) is true
+  }
 }
 
 class SpecialAVectorSpec extends AlephiumSpec {
