@@ -20,10 +20,10 @@ import scala.util.Random
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.{Normal, Reorg}
-import org.alephium.protocol.SignatureSchema
+import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, StatefulScript}
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp}
+import org.alephium.util._
 
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
@@ -140,7 +140,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     emptyBlock.coinbaseReward is consensusConfig.emission
       .reward(emptyBlock.header)
       .miningReward
-      .subUnsafe(minimalGasFee)
+    emptyBlock.coinbaseReward is ALF.alf(30) / 9
     addAndCheck(blockFlow, emptyBlock)
 
     // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
@@ -153,7 +153,6 @@ class FlowUtilsSpec extends AlephiumSpec {
     transferBlock.coinbaseReward is consensusConfig.emission
       .reward(transferBlock.header)
       .miningReward
-      .subUnsafe(minimalGasFee)
       .addUnsafe(defaultGasFee / 2) // 50% is burnt
     addAndCheck(blockFlow, transferBlock)
   }
