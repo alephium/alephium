@@ -166,8 +166,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     for {
       _ <- checkCoinbaseEasy(block, outputNum)
       _ <- checkCoinbaseData(block)
-      _ <- checkCoinbaseAsTx(block, groupView, netReward)
-      _ <- checkLockedReward(block, lockedReward.subUnsafe(block.coinbase.gasFeeUnsafe))
+      _ <- checkCoinbaseAsTx(block, groupView, netReward.addUnsafe(minimalGasFee))
+      _ <- checkLockedReward(block, lockedReward)
     } yield ()
   }
 
