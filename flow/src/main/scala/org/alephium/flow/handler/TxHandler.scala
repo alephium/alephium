@@ -26,9 +26,9 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{AssetOutput, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{defaultGasPrice, AssetOutput, ChainIndex, TransactionTemplate}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -63,6 +63,20 @@ object TxHandler {
   // scalastyle:off magic.number
   val PersistenceDuration: Duration = Duration.ofSecondsUnsafe(30)
   // scalastyle:on magic.number
+
+  // scalastyle:off magic.number
+  private val highPriceUntil: TimeStamp = ALF.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(365))
+  // scalastyle:off magic.number
+  def checkHighGasPrice(tx: TransactionTemplate): Boolean = {
+    checkHighGasPrice(TimeStamp.now(), tx)
+  }
+  @inline def checkHighGasPrice(currentTs: TimeStamp, tx: TransactionTemplate): Boolean = {
+    if (currentTs <= highPriceUntil) {
+      tx.unsigned.gasPrice >= defaultGasPrice
+    } else {
+      true
+    }
+  }
 }
 
 class TxHandler(blockFlow: BlockFlow)(implicit
@@ -157,7 +171,9 @@ class TxHandler(blockFlow: BlockFlow)(implicit
   ): Unit = {
     val chainIndex = tx.chainIndex
     val mempool    = blockFlow.getMemPool(chainIndex)
-    if (mempool.contains(chainIndex, tx)) {
+    if (!TxHandler.checkHighGasPrice(tx)) {
+      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}")
+    } else if (mempool.contains(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.toHexString} is already included")
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
