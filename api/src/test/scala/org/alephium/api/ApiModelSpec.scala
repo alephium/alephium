@@ -83,6 +83,17 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
   }
 
+  it should "encode/decode Amount" in {
+    checkData(Amount(ALF.oneAlf), """"1000000000000000000"""")
+    read[Amount](""""1 ALPH"""") is Amount(ALF.oneAlf)
+
+    val alph = U256.unsafe(1234).mulUnsafe(ALF.oneAlf).divUnsafe(U256.unsafe(1000))
+    read[Amount](""""1.234ALPH"""") is Amount(alph)
+    checkData(Amount(alph), """"1234000000000000000"""")
+
+    parseFail[Amount](""""1 alph"""")
+  }
+
   it should "encode/decode FetchRequest" in {
     val request =
       FetchRequest(TimeStamp.unsafe(1L), TimeStamp.unsafe(42L))

@@ -18,6 +18,8 @@ package org.alephium.api
 
 import java.net.InetSocketAddress
 
+import scala.util.{Failure, Success, Try}
+
 import akka.util.ByteString
 import upickle.core.Abort
 
@@ -70,6 +72,16 @@ trait ApiModelCodec {
 
   implicit val gasPriceWriter: Writer[GasPrice] = u256Writer.comap(_.value)
   implicit val gasPriceReader: Reader[GasPrice] = u256Reader.map(GasPrice.apply)
+
+  implicit val amountWriter: Writer[Amount] = javaBigIntegerWriter.comap[Amount](_.value.toBigInt)
+  implicit val amountReader: Reader[Amount] = StringReader.map { input =>
+    Try(new java.math.BigInteger(input)) match {
+      case Success(bigInt) =>
+        Amount(U256.from(bigInt).getOrElse(throw new Abort(s"Invalid amount: $bigInt")))
+      case Failure(_) =>
+        Amount.from(input).getOrElse(throw new Abort(s"Invalid amount: $input"))
+    }
+  }
 
   implicit val publicKeyWriter: Writer[PublicKey] = bytesWriter
   implicit val publicKeyReader: Reader[PublicKey] = bytesReader(PublicKey.from)
