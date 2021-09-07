@@ -260,7 +260,7 @@ object Transaction {
     val lockTime     = blockTs + coinbaseLockupPeriod
     val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
     val netReward = miningReward match {
-      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward).subUnsafe(minimalGasFee)
+      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward)
       case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
     }
 

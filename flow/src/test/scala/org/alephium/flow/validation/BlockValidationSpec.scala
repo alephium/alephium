@@ -193,7 +193,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val coinbase     = block.coinbase
     val outputs      = coinbase.unsigned.fixedOutputs
     val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    val lockedAmount = miningReward - minimalGasFee
+    val lockedAmount = miningReward
     passCheck(checkLockedReward(block, lockedAmount))
 
     def replace(f: AssetOutput => AssetOutput): Block = {
@@ -250,8 +250,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)).pass()
 
     val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    block.replaceCoinbaseReward(miningReward).fail()
-    block.replaceCoinbaseReward(miningReward.subUnsafe(minimalGasFee)).pass()
+    block.replaceCoinbaseReward(miningReward).pass()
+    block.replaceCoinbaseReward(miningReward.subUnsafe(minimalGasFee)).fail()
   }
 
   it should "check gas reward cap" in new RewardFixture {
@@ -259,10 +259,10 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
     val miningReward = consensusConfig.emission.reward(block.header).miningReward
     val block1       = block.replaceTxGas(miningReward).fail()
-    block1.replaceCoinbaseReward(miningReward + (block1.gasFee / 2) - minimalGasFee).pass()
+    block1.replaceCoinbaseReward(miningReward + (block1.gasFee / 2)).pass()
 
     val block2 = block.replaceTxGas(miningReward * 3).fail()
-    block2.replaceCoinbaseReward(miningReward * 2 - minimalGasFee).pass()
+    block2.replaceCoinbaseReward(miningReward * 2).pass()
   }
 
   it should "check non-empty txs" in new Fixture {
