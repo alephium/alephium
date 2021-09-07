@@ -28,7 +28,7 @@ import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Hex}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, Hex}
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
@@ -292,6 +292,27 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     override val configValues = Map(("alephium.mempool.clean-frequency", "300 ms"))
 
     test("Start to clean tx pools")
+  }
+
+  it should "reject tx with low gas price" in new Fixture {
+    val tx            = transactionGen().sample.get
+    val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = minimalGasPrice))
+
+    txHandler ! addTx(lowGasPriceTx)
+    expectMsg(
+      TxHandler.AddFailed(lowGasPriceTx.id, s"tx has lower gas price than ${defaultGasPrice}")
+    )
+  }
+
+  it should "check gas price" in new Fixture {
+    val tx            = transactionGen().sample.get.toTemplate
+    val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = minimalGasPrice))
+    TxHandler.checkHighGasPrice(tx) is true
+    TxHandler.checkHighGasPrice(lowGasPriceTx) is false
+    TxHandler.checkHighGasPrice(
+      ALF.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(366)),
+      lowGasPriceTx
+    ) is true
   }
 
   trait Fixture extends FlowFixture with TxGenerators {
