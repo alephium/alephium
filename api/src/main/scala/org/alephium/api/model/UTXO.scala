@@ -20,11 +20,11 @@ import akka.util.ByteString
 
 import org.alephium.api.model.Token
 import org.alephium.protocol.model.{AssetOutput, AssetOutputRef}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp}
 
 final case class UTXO(
     ref: OutputRef,
-    amount: U256,
+    amount: Amount,
     tokens: AVector[Token],
     lockTime: TimeStamp,
     additionalData: ByteString
@@ -34,6 +34,12 @@ object UTXO {
   def from(ref: AssetOutputRef, output: AssetOutput): UTXO = {
     import output._
 
-    UTXO(OutputRef.from(ref), amount, tokens.map((Token.apply).tupled), lockTime, additionalData)
+    UTXO(
+      OutputRef.from(ref),
+      Amount(amount),
+      tokens.map((Token.from).tupled),
+      lockTime,
+      additionalData
+    )
   }
 }

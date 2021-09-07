@@ -20,7 +20,7 @@ import org.scalatest.Inside
 import sttp.client3._
 
 import org.alephium.api.Endpoints
-import org.alephium.api.model.{BuildTransaction, Destination}
+import org.alephium.api.model.{Amount, BuildTransaction, Destination}
 import org.alephium.http.EndpointSender
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
@@ -44,7 +44,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val groupIndex                        = GroupIndex.unsafe(0)
     val (script, publicKey, _)            = addressGen(groupIndex).sample.get
     val toAddress                         = Address.Asset(script)
-    val value                             = U256.from(1000).get
+    val value                             = Amount(U256.unsafe(1000))
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
     val maybeApiKey                       = None
   }

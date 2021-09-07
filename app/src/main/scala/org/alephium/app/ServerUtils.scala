@@ -378,7 +378,7 @@ class ServerUtils(implicit
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
           tokens.map { token =>
-            (token.id -> token.amount)
+            (token.id -> token.amount.value)
           }
         case None =>
           AVector.empty[(TokenId, U256)]
@@ -386,7 +386,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.amount,
+        destination.amount.value,
         tokensInfo,
         destination.lockTime
       )
@@ -440,14 +440,14 @@ class ServerUtils(implicit
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
           tokens.map { token =>
-            (token.id -> token.amount)
+            (token.id -> token.amount.value)
           }
         case None =>
           AVector.empty[(TokenId, U256)]
       }
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.amount,
+        destination.amount.value,
         tokensInfo,
         destination.lockTime
       )
@@ -630,7 +630,7 @@ class ServerUtils(implicit
               query.address,
               state,
               dustUtxoAmount,
-              query.issueTokenAmount
+              query.issueTokenAmount.map(_.value)
             )
           } yield script
         case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))

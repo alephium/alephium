@@ -39,14 +39,22 @@ class MiningTest extends AlephiumActorSpec {
     confirmTx(tx, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - transferAmount - defaultGasFee, 0, 1)
+        Balance(
+          Amount(initialBalance.balance.value - transferAmount - defaultGasFee),
+          Amount.Zero,
+          1
+        )
     }
 
     val tx2 = transferFromWallet(transferAddress, transferAmount, clique.masterRestPort)
     confirmTx(tx2, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - (transferAmount + defaultGasFee) * 2, 0, 1)
+        Balance(
+          Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * 2),
+          Amount.Zero,
+          1
+        )
     }
 
     clique.stopMining()
@@ -88,7 +96,11 @@ class MiningTest extends AlephiumActorSpec {
 
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(initialBalance.balance - (transferAmount + defaultGasFee) * n, 0, 1)
+        Balance(
+          Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * n),
+          Amount.Zero,
+          1
+        )
     }
 
     clique.stopMining()

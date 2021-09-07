@@ -16,16 +16,17 @@
 
 package org.alephium.wallet.api.model
 
+import org.alephium.api.model.Amount
 import org.alephium.protocol.model.Address
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.AVector
 
-final case class Balances(totalBalance: U256, balances: AVector[Balances.AddressBalance])
+final case class Balances(totalBalance: Amount, balances: AVector[Balances.AddressBalance])
 
 object Balances {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class AddressBalance(
       address: Address.Asset,
-      balance: U256,
+      balance: Amount,
       warning: Option[String] = None
   )
 }

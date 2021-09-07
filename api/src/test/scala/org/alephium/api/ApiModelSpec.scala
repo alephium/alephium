@@ -87,7 +87,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(Amount(ALF.oneAlf), """"1000000000000000000"""")
     read[Amount](""""1 ALPH"""") is Amount(ALF.oneAlf)
 
-    val alph = U256.unsafe(1234).mulUnsafe(ALF.oneAlf).divUnsafe(U256.unsafe(1000))
+    val alph = ALF.alf(1234) / 1000
     read[Amount](""""1.234ALPH"""") is Amount(alph)
     checkData(Amount(alph), """"1234000000000000000"""")
 
@@ -197,11 +197,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode Output with big amount" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
-    val amount     = U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion))
+    val amount     = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
     val amountStr  = "15000000000000000000"
     val tokenId1   = Hash.hash("token1")
     val tokenId2   = Hash.hash("token2")
-    val tokens     = AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
+    val tokens =
+      AVector(Token(tokenId1, Amount(U256.unsafe(42))), Token(tokenId2, Amount(U256.unsafe(1000))))
 
     {
       val request: Output = Output.Contract(amount, address, tokens)
@@ -259,7 +260,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Balance" in {
-    val response = Balance(100, 50, 1)
+    val response = Balance(Amount(100), Amount(50), 1)
     val jsonRaw  = """{"balance":"100","lockedBalance":"50","utxoNum":1}"""
     checkData(response, jsonRaw)
   }
@@ -284,7 +285,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
     {
       val transfer =
-        BuildTransaction(fromPublicKey, AVector(Destination(toAddress, 1)))
+        BuildTransaction(fromPublicKey, AVector(Destination(toAddress, Amount(1))))
       val jsonRaw = s"""
         |{
         |  "fromPublicKey": "${fromPublicKey.toHexString}",
@@ -302,7 +303,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     {
       val transfer = BuildTransaction(
         fromPublicKey,
-        AVector(Destination(toAddress, 1, None, Some(TimeStamp.unsafe(1234)))),
+        AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
@@ -332,8 +333,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         AVector(
           Destination(
             toAddress,
-            1,
-            Some(AVector(Token(tokenId1, U256.unsafe(10)))),
+            Amount(1),
+            Some(AVector(Token(tokenId1, Amount(U256.Ten)))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -372,8 +373,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         AVector(
           Destination(
             toAddress,
-            1,
-            Some(AVector(Token(tokenId1, U256.unsafe(10)))),
+            Amount(1),
+            Some(AVector(Token(tokenId1, Amount(U256.Ten)))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -413,8 +414,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         AVector(
           Destination(
             toAddress,
-            1,
-            Some(AVector(Token(tokenId1, U256.unsafe(10)))),
+            Amount(1),
+            Some(AVector(Token(tokenId1, Amount(U256.Ten)))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -546,7 +547,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode Compile" in {
     val address = generateAddress()
     val compile0 =
-      Compile(address, "contract", code = "0000", state = Some("0001"), issueTokenAmount = Some(51))
+      Compile(
+        address,
+        "contract",
+        code = "0000",
+        state = Some("0001"),
+        issueTokenAmount = Some(Amount(51))
+      )
     val jsonRaw =
       s"""
          |{

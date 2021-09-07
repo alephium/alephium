@@ -50,10 +50,11 @@ trait EndpointsExamples extends ErrorExamples {
   private val inetAddress                = inetSocketAddress.getAddress
   private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers                      = AVector(peerAddress)
-  private val twoAlf                     = ALF.oneAlf.mulUnsafe(U256.Two)
-  private def alf(value: Int)            = ALF.oneAlf.mulUnsafe(U256.unsafe(value))
+  private val twoAlf                     = Amount(ALF.oneAlf.mulUnsafe(U256.Two))
+  private def alf(value: Int)            = Amount(ALF.oneAlf.mulUnsafe(U256.unsafe(value)))
   private val height                     = 42
   val balance                            = alf(10)
+  val halfBalance                        = alf(5)
   val signature = Signature
     .from(
       Hex.unsafe(
@@ -199,11 +200,11 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(blockSolution)
 
   implicit val balanceExamples: List[Example[Balance]] = List(
-    defaultExample(Balance(balance, balance.divUnsafe(U256.Two), utxoNum = 3, None)),
+    defaultExample(Balance(balance, halfBalance, utxoNum = 3, None)),
     moreSettingsExample(
       Balance(
         balance,
-        balance.divUnsafe(U256.Two),
+        halfBalance,
         utxoNum = 3,
         Some("Result might not include all utxos and is maybe unprecise")
       )

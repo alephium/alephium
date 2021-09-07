@@ -29,14 +29,14 @@ import scala.util.Try
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
-import org.alephium.api.model.Destination
+import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
@@ -70,7 +70,7 @@ trait WalletService extends Service {
   def getBalances(
       wallet: String,
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, AVector[(Address.Asset, U256, Option[String])]]]
+  ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Option[String])]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
   def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
   def getMinerAddresses(
@@ -302,7 +302,7 @@ object WalletService {
     override def getBalances(
         wallet: String,
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(Address.Asset, U256, Option[String])]]] =
+    ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Option[String])]]] =
       withAddressesFut(wallet) { case (_, addresses) =>
         Future
           .sequence(
@@ -480,7 +480,7 @@ object WalletService {
     private def getBalance(
         address: Address.Asset,
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Address.Asset, U256, Option[String])]] = {
+    ): Future[Either[WalletError, (Address.Asset, Amount, Option[String])]] = {
       blockFlowClient
         .fetchBalance(address, utxosLimit)
         .map(
