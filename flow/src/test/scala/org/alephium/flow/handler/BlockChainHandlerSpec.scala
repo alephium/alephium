@@ -152,7 +152,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   it should "broadcast block if the block header is valid" in new Fixture {
     // block header is valid, but block is invalid
     val block        = transfer(blockFlow, chainIndex)
-    val invalidBlock = Block(block.header, block.transactions ++ block.transactions)
+    val invalidBlock = Block(block.header, block.nonCoinbase ++ block.transactions)
 
     blockChainHandler ! InterCliqueManager.SyncedResult(true)
     validateBlock(invalidBlock)
