@@ -22,7 +22,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.NetworkId
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, Bytes, Hex}
+import org.alephium.util.{AlephiumSpec, Bytes, DjbHash, Hex}
 
 class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
 
@@ -41,7 +41,7 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
   val payload        = Payload.serialize(pong)
   val data           = header ++ payload
   val messageLength  = Bytes.from(data.length)
-  val checksum       = Hash.hash(data).bytes.take(checksumLength)
+  val checksum       = Bytes.from(DjbHash.intHash(data))
 
   val additionalLength = magicLength + lengthField + checksumLength
 
@@ -65,7 +65,7 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
 
     Seq(-1, 0, 1, data.length - 1, data.length + 1).foreach { newDataLength =>
       val newData     = data.take(newDataLength)
-      val newCheckSum = Hash.hash(newData).bytes.take(checksumLength)
+      val newCheckSum = Bytes.from(DjbHash.intHash(newData))
       val message     = magic ++ newCheckSum ++ Bytes.from(newDataLength) ++ newData
       val result      = Message.deserialize(message).swap
       if (newDataLength < 0) {

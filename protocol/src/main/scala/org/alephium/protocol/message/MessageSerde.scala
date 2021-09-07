@@ -18,16 +18,15 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde._
-import org.alephium.util.{Bytes, Hex}
+import org.alephium.util.{Bytes, DjbHash, Hex}
 
 object MessageSerde {
   private val checksumLength: Int = 4
 
   def checksum(data: ByteString): ByteString =
-    Hash.hash(data).bytes.take(checksumLength)
+    Bytes.from(DjbHash.intHash(data))
 
   def length(data: ByteString): ByteString =
     Bytes.from(data.length)
