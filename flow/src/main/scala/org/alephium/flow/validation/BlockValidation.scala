@@ -201,7 +201,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (
       unsigned.scriptOpt.isEmpty &&
       unsigned.gasAmount == minimalGas &&
-      unsigned.gasPrice == defaultGasPrice &&
+      unsigned.gasPrice == minimalGasPrice &&
       unsigned.fixedOutputs.length == outputsNum &&
       unsigned.fixedOutputs(0).tokens.isEmpty &&
       coinbase.contractInputs.isEmpty &&
