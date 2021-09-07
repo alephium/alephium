@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{BlockHeader, Target, Weight}
@@ -33,13 +33,16 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   def headerStorage: BlockHeaderStorage
 
-  private lazy val headerCache =
-    LruCacheE.threadSafe[BlockHash, BlockHeader, IOError](
-      consensusConfig.blockCacheCapacityPerChain
-    )
+  lazy val headerCache = FlowCache.headers(consensusConfig.blockCacheCapacityPerChain * 2)
+
+  def cacheHeader(header: BlockHeader): Unit = {
+    headerCache.put(header.hash, header)
+  }
 
   def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = {
-    headerCache.get(hash)(headerStorage.get(hash))
+    headerCache.getE(hash) {
+      headerStorage.get(hash)
+    }
   }
 
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader = {
@@ -69,6 +72,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       assertion.getOrElse(false)
     }
 
+    cacheHeader(header)
     for {
       parentState <- getState(parentHash)
       height = parentState.height + 1

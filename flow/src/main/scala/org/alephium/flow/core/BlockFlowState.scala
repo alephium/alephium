@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOResult
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -59,7 +59,7 @@ trait BlockFlowState extends FlowTipsUtil {
   def blockchainBuilder: Block => BlockChain
   def blockheaderChainBuilder: BlockHeader => BlockHeaderChain
 
-  protected val intraGroupChains: AVector[BlockChainWithState] = {
+  protected[core] val intraGroupChains: AVector[BlockChainWithState] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker) { groupShift =>
       val group        = brokerConfig.groupRange(groupShift)
       val genesisBlock = genesisBlocks(group)(group)
@@ -67,7 +67,7 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  private val outBlockChains: AVector[AVector[BlockChain]] =
+  protected[core] val outBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(brokerConfig.groupNumPerBroker, groups) { (fromShift, to) =>
       val mainGroup = brokerConfig.groupRange(fromShift)
       if (mainGroup == to) {
@@ -77,7 +77,7 @@ trait BlockFlowState extends FlowTipsUtil {
         blockchainBuilder(genesisBlock)
       }
     }
-  private val inBlockChains: AVector[AVector[BlockChain]] =
+  protected[core] val inBlockChains: AVector[AVector[BlockChain]] =
     AVector.tabulate(groups, brokerConfig.groupNumPerBroker) { (from, toShift) =>
       val mainGroup = brokerConfig.groupRange(toShift)
       if (brokerConfig.groupRange.contains(from)) {
@@ -89,7 +89,7 @@ trait BlockFlowState extends FlowTipsUtil {
       }
     }
 
-  private val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
+  protected[core] val blockHeaderChains: AVector[AVector[BlockHeaderChain]] =
     AVector.tabulate(groups, groups) { case (from, to) =>
       if (brokerConfig.containsRaw(from)) {
         val fromShift = brokerConfig.groupIndexOfBrokerUnsafe(from)
@@ -129,14 +129,12 @@ trait BlockFlowState extends FlowTipsUtil {
     })
   }
 
-  // Cache latest blocks for assisting merkle trie
-  private val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
-    LruCacheE.threadSafe[BlockHash, BlockCache, IOError](
-      consensusConfig.blockCacheCapacityPerChain * brokerConfig.depsNum
-    )
+  // Cache latest blocks for trie update, UTXO indexing
+  lazy val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
+    FlowCache.blocks(consensusConfig.blockCacheCapacityPerChain)
   }
 
-  def getGroupCache(groupIndex: GroupIndex): LruCacheE[BlockHash, BlockCache, IOError] = {
+  def getGroupCache(groupIndex: GroupIndex): FlowCache[BlockHash, BlockCache] = {
     assume(brokerConfig.contains(groupIndex))
     groupCaches(brokerConfig.groupIndexOfBroker(groupIndex))
   }
@@ -147,14 +145,14 @@ trait BlockFlowState extends FlowTipsUtil {
       val groupIndex = GroupIndex.unsafe(group)
       val groupCache = getGroupCache(groupIndex)
       if (index.relateTo(groupIndex)) {
-        groupCache.putInCache(block.hash, convertBlock(block, groupIndex))
+        groupCache.put(block.hash, convertBlock(block, groupIndex))
       }
     }
   }
 
   def getBlockCache(groupIndex: GroupIndex, hash: BlockHash): IOResult[BlockCache] = {
     assume(ChainIndex.from(hash).relateTo(groupIndex))
-    getGroupCache(groupIndex).get(hash) {
+    getGroupCache(groupIndex).getE(hash) {
       getBlockChain(hash).getBlock(hash).map(convertBlock(_, groupIndex))
     }
   }
@@ -368,20 +366,26 @@ trait BlockFlowState extends FlowTipsUtil {
 
 object BlockFlowState {
   sealed trait BlockCache {
+    def blockTime: TimeStamp
     def inputs: Set[TxOutputRef]
     def relatedOutputs: Map[TxOutputRef, TxOutput]
   }
 
-  final case class InBlockCache(outputs: Map[TxOutputRef, TxOutput]) extends BlockCache {
+  final case class InBlockCache(blockTime: TimeStamp, outputs: Map[TxOutputRef, TxOutput])
+      extends BlockCache {
     def inputs: Set[TxOutputRef]                   = Set.empty
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
   }
   final case class OutBlockCache(
+      blockTime: TimeStamp,
       inputs: Set[TxOutputRef],
       relatedOutputs: Map[TxOutputRef, TxOutput]
   ) extends BlockCache
-  final case class InOutBlockCache(outputs: Map[TxOutputRef, TxOutput], inputs: Set[TxOutputRef])
-      extends BlockCache { // For blocks on intra-group chain
+  final case class InOutBlockCache(
+      blockTime: TimeStamp,
+      outputs: Map[TxOutputRef, TxOutput],
+      inputs: Set[TxOutputRef]
+  ) extends BlockCache { // For blocks on intra-group chain
     def relatedOutputs: Map[TxOutputRef, TxOutput] = outputs
   }
 
@@ -420,11 +424,11 @@ object BlockFlowState {
     assume(index.relateTo(groupIndex))
     if (index.isIntraGroup) {
       val outputs = convertOutputs(block)
-      InOutBlockCache(outputs, convertInputs(block))
+      InOutBlockCache(block.timestamp, outputs, convertInputs(block))
     } else if (index.from == groupIndex) {
-      OutBlockCache(convertInputs(block), convertRelatedOutputs(block, groupIndex))
+      OutBlockCache(block.timestamp, convertInputs(block), convertRelatedOutputs(block, groupIndex))
     } else {
-      InBlockCache(convertOutputs(block))
+      InBlockCache(block.timestamp, convertOutputs(block))
     }
   }
 

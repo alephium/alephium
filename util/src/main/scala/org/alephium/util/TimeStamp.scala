@@ -76,6 +76,8 @@ class TimeStamp(val millis: Long) extends AnyVal with Ordered[TimeStamp] {
 }
 
 object TimeStamp {
+  implicit val ordering: Ordering[TimeStamp] = (x: TimeStamp, y: TimeStamp) => x.compare(y)
+
   def unsafe(millis: Long): TimeStamp = {
     assume(millis >= 0, "timestamp should be non-negative")
     new TimeStamp(millis)
