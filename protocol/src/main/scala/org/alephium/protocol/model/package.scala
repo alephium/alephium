@@ -38,7 +38,7 @@ package object model {
   val defaultGasPerOutput: GasBox = GasBox.unsafe(6000)
 
   val defaultGas: GasBox           = minimalGas
-  val defaultGasPrice: GasPrice    = GasPrice(ALF.nanoAlf(1))
+  val defaultGasPrice: GasPrice    = GasPrice(ALF.nanoAlf(100))
   val defaultGasFee: U256          = defaultGasPrice * defaultGas
   val defaultGasFeePerInput: U256  = defaultGasPrice * defaultGasPerInput
   val defaultGasFeePerOutput: U256 = defaultGasPrice * defaultGasPerOutput

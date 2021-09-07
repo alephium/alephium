@@ -140,7 +140,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     emptyBlock.coinbaseReward is consensusConfig.emission
       .reward(emptyBlock.header)
       .miningReward
-      .subUnsafe(defaultGasFee)
+      .subUnsafe(minimalGasFee)
     addAndCheck(blockFlow, emptyBlock)
 
     // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
@@ -153,7 +153,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     transferBlock.coinbaseReward is consensusConfig.emission
       .reward(transferBlock.header)
       .miningReward
-      .subUnsafe(defaultGasFee.divUnsafe(2)) // 50% is burnt
+      .subUnsafe(minimalGasFee)
+      .addUnsafe(defaultGasFee / 2) // 50% is burnt
     addAndCheck(blockFlow, transferBlock)
   }
 

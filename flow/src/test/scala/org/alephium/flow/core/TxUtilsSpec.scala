@@ -27,13 +27,13 @@ import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class TxUtilsSpec extends AlephiumSpec {
-  it should "consider minimal gas fee" in new FlowFixture {
+  it should "consider use minimal gas fee" in new FlowFixture {
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block0                = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = defaultGasFee)
+    val block0                = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = defaultGasFee)
+    val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
     addAndCheck(blockFlow, block1)
 
     blockFlow
@@ -41,12 +41,22 @@ class TxUtilsSpec extends AlephiumSpec {
         toPriKey.publicKey,
         getGenesisLockupScript(chainIndex),
         None,
-        defaultGasFee / 2,
+        minimalGasFee / 2,
         None,
-        defaultGasPrice
+        minimalGasPrice
       )
       .rightValue
       .isRight is true
+  }
+
+  it should "use default gas price" in new FlowFixture {
+    val chainIndex            = ChainIndex.unsafe(0, 1)
+    val (genesisPriKey, _, _) = genesisKeys(0)
+    val (toPriKey, _)         = chainIndex.from.generateKey
+    val block                 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val tx                    = block.nonCoinbase.head
+    tx.gasFeeUnsafe is defaultGasFee
+    defaultGasFee is ALF.nanoAlf(20000 * 100)
   }
 
   it should "consider outputs for inter-group blocks" in new FlowFixture {
