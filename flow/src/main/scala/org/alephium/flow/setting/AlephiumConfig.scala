@@ -70,8 +70,9 @@ final case class ConsensusSetting(
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
 
-  val tipsPruneDuration: Duration         = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
-  val conflictCacheKeepDuration: Duration = expectedTimeSpan timesUnsafe 20
+  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
+  val conflictCacheKeepDuration: Duration =
+    expectedTimeSpan timesUnsafe blockCacheCapacityPerChain.toLong
 }
 //scalastyle:on
 
@@ -198,7 +199,7 @@ object AlephiumConfig {
       val emission = Emission(groupConfig, blockTargetTime)
       ConsensusSetting(
         blockTargetTime,
-        uncleDependencyGapTime.getOrElse(blockTargetTime),
+        uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
         numZerosAtLeastInHash,
         tipsPruneInterval,
         blockCacheCapacityPerChain,

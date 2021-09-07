@@ -26,7 +26,7 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Weight
-import org.alephium.util.{AVector, EitherF, LruCacheE, Math, TimeStamp}
+import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
@@ -48,8 +48,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       timestamp: TimeStamp,
       isCanonical: Boolean
   ): IOResult[Unit] = {
+    val blockState = BlockState(height, weight)
+    cacheState(hash, blockState)
     for {
-      _ <- blockStateStorage.put(hash, BlockState(height, weight))
+      _ <- blockStateStorage.put(hash, blockState)
       // updateHeightIndex should go after block state update to ensure that
       // all the hashes at height are contained in the chain
       _ <- updateHeightIndex(hash, height, isCanonical)
@@ -123,14 +125,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
   }
 
-  private lazy val stateCache =
-    LruCacheE.threadSafe[BlockHash, BlockState, IOError](consensusConfig.blockCacheCapacityPerChain)
+  protected[core] lazy val stateCache =
+    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 2)
+
+  def cacheState(hash: BlockHash, state: BlockState): Unit = stateCache.put(hash, state)
   def contains(hash: BlockHash): IOResult[Boolean] =
-    stateCache.exists(hash)(blockStateStorage.exists(hash))
+    stateCache.existsE(hash)(blockStateStorage.exists(hash))
   def containsUnsafe(hash: BlockHash): Boolean =
     stateCache.existsUnsafe(hash)(blockStateStorage.existsUnsafe(hash))
   def getState(hash: BlockHash): IOResult[BlockState] =
-    stateCache.get(hash)(blockStateStorage.get(hash))
+    stateCache.getE(hash)(blockStateStorage.get(hash))
   def getStateUnsafe(hash: BlockHash): BlockState =
     stateCache.getUnsafe(hash)(blockStateStorage.getUnsafe(hash))
   def getHeight(hash: BlockHash): IOResult[Int]    = getState(hash).map(_.height)

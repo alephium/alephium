@@ -132,12 +132,14 @@ object BlockFlow extends StrictLogging {
       memPoolSetting: MemPoolSetting
   ): BlockFlow = {
     Env.forProd(logger.info(s"Initialize storage for BlockFlow"))
-    new BlockFlowImpl(
+    val blockFlow = new BlockFlowImpl(
       genesisBlocks,
       BlockChainWithState.fromGenesisUnsafe(storages),
       BlockChain.fromGenesisUnsafe(storages),
       BlockHeaderChain.fromGenesisUnsafe(storages)
     )
+    cacheBlockFlow(blockFlow)
+    blockFlow
   }
 
   def fromStorageUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
@@ -147,6 +149,43 @@ object BlockFlow extends StrictLogging {
       config.consensus,
       config.mempool
     )
+  }
+
+  private def cacheBlockFlow(
+      blockflow: BlockFlow
+  )(implicit consensusSetting: ConsensusSetting): Unit = {
+    blockflow.inBlockChains.foreach(_.foreach { chain =>
+      cacheBlockChain(blockflow, chain)
+    })
+    blockflow.outBlockChains.foreach(_.foreach { chain =>
+      cacheBlockChain(blockflow, chain)
+    })
+    blockflow.blockHeaderChains.foreach(_.foreach(cacheHeaderChain))
+  }
+
+  private def cacheBlockChain(blockflow: BlockFlow, chain: BlockChain)(implicit
+      consensusSetting: ConsensusSetting
+  ): Unit = {
+    val maxHeight = chain.maxHeightUnsafe
+    val startHeight =
+      Math.max(ALF.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain)
+    (startHeight to maxHeight).foreach { height =>
+      val block = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head)
+      blockflow.cacheBlock(block)
+    }
+  }
+
+  private def cacheHeaderChain(chain: BlockHeaderChain)(implicit
+      consensusSetting: ConsensusSetting
+  ): Unit = {
+    val maxHeight = chain.maxHeightUnsafe
+    val startHeight =
+      Math.max(ALF.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain * 2)
+    (startHeight to maxHeight).foreach { height =>
+      val header = chain.getBlockHeaderUnsafe(chain.getHashesUnsafe(height).head)
+      chain.cacheHeader(header)
+      chain.cacheState(header.hash, chain.getStateUnsafe(header.hash))
+    }
   }
 
   def fromStorageUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
@@ -164,6 +203,7 @@ object BlockFlow extends StrictLogging {
     blockflow.sanityCheckUnsafe()
     Env.forProd(logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers"))
     blockflow.updateBestDepsAfterLoadingUnsafe()
+    cacheBlockFlow(blockflow)
     blockflow
   }
 

@@ -519,6 +519,29 @@ class BlockFlowSpec extends AlephiumSpec {
 
   behavior of "Utilities"
 
+  it should "cache blocks & headers during initialization" in new FlowFixture {
+    blockFlow.getGroupCache(GroupIndex.unsafe(0)).size is 5
+
+    val blockFlow1 = storageBlockFlow()
+    blockFlow1.getGroupCache(GroupIndex.unsafe(0)).size is 5
+    blockFlow1.blockHeaderChains.foreach(_.foreach { chain =>
+      chain.headerCache.size is 1
+      chain.stateCache.size is 1
+    })
+
+    (0 until consensusConfig.blockCacheCapacityPerChain).foreach { _ =>
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)))
+    }
+
+    val blockFlow2 = storageBlockFlow()
+    blockFlow2.getGroupCache(GroupIndex.unsafe(0)).size is
+      consensusConfig.blockCacheCapacityPerChain + 4
+    blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).headerCache.size is
+      consensusConfig.blockCacheCapacityPerChain + 1
+    blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).stateCache.size is
+      consensusConfig.blockCacheCapacityPerChain + 1
+  }
+
   it should "generate random group orders" in new GroupConfigFixture {
     override def groups: Int = 3
     Seq(0, 1, 2).permutations.foreach { orders =>
