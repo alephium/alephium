@@ -44,7 +44,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
             Hint.unsafe(-1038667625),
             Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
           ),
-          p2pkh(publicKey)
+          UnlockScript.P2PKH(publicKey)
         )
       ),
       AVector.from(outputs)
@@ -55,7 +55,9 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
     Transaction.coinbase(
       ChainIndex.unsafe(0),
       AVector.from(transactions),
-      p2pkh(Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")),
+      LockupScript.P2PKH(
+        Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
+      ),
       consensusConfig.maxMiningTarget,
       TimeStamp.unsafe(1640879601000L)
     )
@@ -70,7 +72,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
   ) = {
     AssetOutput(
       alfAmount,
-      p2sh(hash),
+      LockupScript.P2SH(Hash.unsafe(hash)),
       timeStamp,
       tokens,
       additionalData
@@ -86,7 +88,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
   ) = {
     AssetOutput(
       alfAmount,
-      p2pkh(Hash.unsafe(hash)),
+      LockupScript.P2PKH(Hash.unsafe(hash)),
       timeStamp,
       tokens,
       additionalData
@@ -114,17 +116,5 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
     }
 
     tx.copy(contractSignatures = tx.contractSignatures ++ signatures)
-  }
-
-  def p2sh(bs: ByteString) = {
-    LockupScript.P2SH(Hash.unsafe(bs))
-  }
-
-  def p2pkh(keyHash: Hash) = {
-    LockupScript.P2PKH(keyHash)
-  }
-
-  def p2pkh(key: PublicKey) = {
-    UnlockScript.P2PKH(key)
   }
 }

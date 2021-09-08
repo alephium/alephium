@@ -21,7 +21,8 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
@@ -178,21 +179,21 @@ class TransactionSpec
               Hint.unsafe(-1038667625),
               Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
             ),
-            p2pkh(pubKey1)
+            UnlockScript.P2PKH(pubKey1)
           ),
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(12347),
               Hash.unsafe(hex"0fa5fd6aecca7b21a167b3aad9a4e27762509b8c3ce68611353aef60196086dc")
             ),
-            p2pkh(pubKey2)
+            UnlockScript.P2PKH(pubKey2)
           ),
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(-1038667625),
               Hash.unsafe(hex"ce6fd6a868621a167b62509b8c3dc7a5ecc0fa7b3aad9a4e2711353aef601960")
             ),
-            p2pkh(pubKey1)
+            UnlockScript.P2PKH(pubKey1)
           )
         ),
         fixedOutputs = AVector(
@@ -337,6 +338,60 @@ class TransactionSpec
       }
 
       tx.verify("multiple-tokens")
+    }
+
+    {
+      info("with p2sh and p2mpkh transaction inputs")
+
+      val script = {
+        val raw =
+          s"""
+           |// comment
+           |AssetScript P2sh {
+           |  pub fn main(pubKey1: ByteVec, pubKey2: ByteVec) -> () {
+           |    verifyAbsoluteLocktime!(1630879601000)
+           |    verifyTxSignature!(pubKey1)
+           |    verifyTxSignature!(pubKey2)
+           |  }
+           |}
+           |""".stripMargin
+
+        Compiler.compileAssetScript(raw).rightValue
+      }
+
+      val unsignedTx = UnsignedTransaction(
+        networkId,
+        scriptOpt = None,
+        GasBox.unsafe(100000),
+        GasPrice(U256.unsafe(1000000000)),
+        inputs = AVector(
+          TxInput(
+            AssetOutputRef.unsafe(
+              Hint.unsafe(-1038667625),
+              Hash.unsafe(hex"fda5eaacc0fa7bcf60196062509b8167b3d9a4e2711353aec3dc7e66a868621a")
+            ),
+            UnlockScript.p2mpkh(AVector((pubKey1, 1), (pubKey2, 3)))
+          ),
+          TxInput(
+            AssetOutputRef.unsafe(
+              Hint.unsafe(-1038667625),
+              Hash.unsafe(hex"b62509167b8c3dc7a5ecc0fa7b3afd6a868621aad9a4e2711353aef601960ce6")
+            ),
+            UnlockScript
+              .p2sh(script, AVector(Val.ByteVec(pubKey1.bytes), Val.ByteVec(pubKey2.bytes)))
+          )
+        ),
+        fixedOutputs = AVector(
+          p2shOutput(
+            42,
+            hex"241ac999a05a2c66c179f1a309dca9c407fa2310d51050b8dfeac11ec0a092fd",
+            additionalData = hex"5f7516fc7fac3fd6"
+          )
+        )
+      )
+
+      val tx = inputSign(unsignedTx, privKey1, privKey2, privKey1, privKey2)
+      tx.verify("p2sh-and-p2mpkh-inputs")
     }
   }
 }
