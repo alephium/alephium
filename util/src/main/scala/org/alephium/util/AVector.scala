@@ -27,7 +27,7 @@ import org.alephium.macros.HPC
 /*
  * Immutable vector that is optimized for appending
  */
-// scalastyle:off number.of.methods return
+// scalastyle:off number.of.methods return file.size.limit
 @SuppressWarnings(Array("org.wartremover.warts.While"))
 abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>
   import HPC.cfor
@@ -200,6 +200,18 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
       if (!f(a, i)) { return false }
     }
     true
+  }
+
+  def forallWithIndexE[L](f: (A, Int) => Either[L, Boolean]): Either[L, Boolean] = {
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      f(a, i) match {
+        case Left(l)      => return Left(l)
+        case Right(false) => return Right(false)
+        case Right(true)  => ()
+      }
+    }
+    Right(true)
   }
 
   def slice(from: Int, until: Int): AVector[A] = {
