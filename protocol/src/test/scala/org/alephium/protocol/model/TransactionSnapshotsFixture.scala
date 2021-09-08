@@ -57,7 +57,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       AVector.from(transactions),
       p2pkh(Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")),
       consensusConfig.maxMiningTarget,
-      TimeStamp.unsafe(1629980707001L)
+      TimeStamp.unsafe(1640879601000L)
     )
   }
 

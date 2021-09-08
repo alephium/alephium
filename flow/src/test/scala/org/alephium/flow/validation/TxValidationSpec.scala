@@ -250,10 +250,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "check the number of tokens for outputs" in new StatelessFixture {
     val tx0 =
-      transactionGen(minTokens = maxTokenPerUtxo + 1, maxTokens = maxTokenPerUtxo + 1).sample.get
+      transactionGen(numTokensGen = Gen.const(maxTokenPerUtxo + 1)).sample.get
     failCheck(checkOutputStats(tx0), InvalidOutputStats)
     val tx1 =
-      transactionGen(minTokens = maxTokenPerUtxo, maxTokens = maxTokenPerUtxo).sample.get
+      transactionGen(numTokensGen = Gen.const(maxTokenPerUtxo)).sample.get
     passCheck(checkOutputStats(tx1))
   }
 

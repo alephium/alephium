@@ -326,53 +326,36 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       blk.verify("txs-with-contract-inputs-outputs")
     }
 
-    UnsignedTransaction(
-      NetworkId(2),
-      scriptOpt.map(script => Compiler.compileTxScript(script).toOption.value),
-      GasBox.unsafe(100000),
-      GasPrice(U256.unsafe(1000000000)),
-      AVector(
-        TxInput(
-          AssetOutputRef.unsafe(
-            Hint.unsafe(-1038667625),
-            Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
-          ),
-          p2pkh(publicKey)
-        )
-      ),
-      AVector.from(outputs)
-    )
-  }
+    def blockHeader(txsHash: Hash) = {
+      import Hex._
 
-  def blockHeader(txsHash: Hash) = {
-    import Hex._
+      BlockHeader(
+        nonce = Nonce.unsafe(hex"bb557f744763ca4f5ef8079b4b76c2dbb26a4cd845fbc84d"),
+        version = defaultBlockVersion,
+        blockDeps = BlockDeps.build(
+          deps = AVector(
+            Blake3.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
+            Blake3.unsafe(hex"abb46756a535f6912c90f9f06f503eed53748697f4fad672da1557e2126fa760"),
+            Blake3.unsafe(hex"aecea2ddb52f00109726408bb1eb86bbde953fe696c57e6517c93b27973cc805"),
+            Blake3.unsafe(hex"6725874ac2a55cd70b1ffec51b2afb46eeaf098052e5352582f2ff0135da127e"),
+            Blake3.unsafe(hex"4325ecfd044d88e58c3537275381d1c3a1f410812a2847382058e5686dccfd7a")
+          )
+        ),
+        depStateHash =
+          Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
+        txsHash = txsHash,
+        // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
+        timestamp = TimeStamp.unsafe(1630167995025L),
+        target = Target(hex"20ffffff")
+      )
+    }
 
-    BlockHeader(
-      nonce = Nonce.unsafe(hex"bb557f744763ca4f5ef8079b4b76c2dbb26a4cd845fbc84d"),
-      version = defaultBlockVersion,
-      blockDeps = BlockDeps.build(
-        deps = AVector(
-          Blake3.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
-          Blake3.unsafe(hex"abb46756a535f6912c90f9f06f503eed53748697f4fad672da1557e2126fa760"),
-          Blake3.unsafe(hex"aecea2ddb52f00109726408bb1eb86bbde953fe696c57e6517c93b27973cc805"),
-          Blake3.unsafe(hex"6725874ac2a55cd70b1ffec51b2afb46eeaf098052e5352582f2ff0135da127e"),
-          Blake3.unsafe(hex"4325ecfd044d88e58c3537275381d1c3a1f410812a2847382058e5686dccfd7a")
-        )
-      ),
-      depStateHash =
-        Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
-      txsHash = txsHash,
-      // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
-      timestamp = TimeStamp.unsafe(1630167995025L),
-      target = Target(hex"20ffffff")
-    )
-  }
+    def block(transactions: Transaction*): Block = {
+      val coinbaseTx = coinbaseTransaction(transactions: _*)
+      val allTxs     = AVector.from(transactions) :+ coinbaseTx
 
-  def block(transactions: Transaction*): Block = {
-    val coinbaseTx = coinbaseTransaction(transactions: _*)
-    val allTxs     = AVector.from(transactions) :+ coinbaseTx
-
-    val header = blockHeader(Block.calTxsHash(allTxs))
-    Block(header, allTxs)
+      val header = blockHeader(Block.calTxsHash(allTxs))
+      Block(header, allTxs)
+    }
   }
 }
