@@ -786,7 +786,7 @@
         ],
         "responses": {
           "200": {
-            "description": "1 ALPH = 1000000000000000000",
+            "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1003,7 +1003,7 @@
           }
         ],
         "requestBody": {
-          "description": "1 ALPH = 1000000000000000000",
+          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
           "content": {
             "application/json": {
               "schema": {
@@ -2905,7 +2905,7 @@
         ],
         "responses": {
           "200": {
-            "description": "1 ALPH = 1000000000000000000",
+            "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
             "content": {
               "application/json": {
                 "schema": {
@@ -3732,7 +3732,7 @@
         "summary": "Build an unsigned transaction to a number of recipients",
         "operationId": "postTransactionsBuild",
         "requestBody": {
-          "description": "1 ALPH = 1000000000000000000",
+          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
           "content": {
             "application/json": {
               "schema": {
@@ -4707,7 +4707,7 @@
         "summary": "Create the multisig address and unlock script",
         "operationId": "postMultisigAddress",
         "requestBody": {
-          "description": "1 ALPH = 1000000000000000000",
+          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
           "content": {
             "application/json": {
               "schema": {
