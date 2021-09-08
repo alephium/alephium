@@ -17,7 +17,7 @@
 package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.maxSyncBlocksPerChain
+import org.alephium.flow.core.{maxForkDepth => systemMaxForkDepth}
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
@@ -34,7 +34,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   val maxTxsCapacity: Int                = maxBlockCapacity * 32
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
   val seenTxs: Cache[Hash, Unit]         = Cache.fifo[Hash, Unit](maxTxsCapacity)
-  val maxForkDepth: Int                  = maxSyncBlocksPerChain
+  val maxForkDepth: Int                  = systemMaxForkDepth
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
