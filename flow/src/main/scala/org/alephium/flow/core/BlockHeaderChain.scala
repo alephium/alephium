@@ -33,7 +33,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
 
   def headerStorage: BlockHeaderStorage
 
-  lazy val headerCache = FlowCache.headers(consensusConfig.blockCacheCapacityPerChain * 2)
+  lazy val headerCache = FlowCache.headers(consensusConfig.blockCacheCapacityPerChain * 3)
 
   def cacheHeader(header: BlockHeader): Unit = {
     headerCache.put(header.hash, header)
