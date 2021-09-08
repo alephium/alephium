@@ -23,6 +23,7 @@ import akka.util.ByteString
 import sttp.tapir.Schema
 import sttp.tapir.SchemaType.{SArray, SInteger, SString}
 
+import org.alephium.api.model.Amount
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
@@ -45,6 +46,7 @@ trait TapirSchemasLike {
   implicit val signatureSchema: Schema[Signature]                 = Schema(SString())
   implicit val timestampSchema: Schema[TimeStamp]                 = Schema(SInteger()).format("int64")
   implicit val u256Schema: Schema[U256]                           = Schema(SString()).format("uint256")
+  implicit val amountSchema: Schema[Amount]                       = Schema(SString()).format("uint256")
   implicit val bigIntegerSchema: Schema[BigInteger]               = Schema(SString()).format("bigint")
   implicit val inetAddressSchema: Schema[InetAddress]             = Schema(SString())
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(SString())

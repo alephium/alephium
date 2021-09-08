@@ -49,7 +49,7 @@ class MultisigTest extends AlephiumActorSpec {
       )
 
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
-      Balance(U256.Zero, 0, 0)
+      Balance(Amount.Zero, Amount.Zero, 0)
 
     val tx =
       transfer(publicKey, multisigAddress.address.toBase58, transferAmount, privateKey, restPort)
@@ -112,7 +112,7 @@ class MultisigTest extends AlephiumActorSpec {
 
     val gasFee = defaultGasPrice * GasBox.unsafe(6000 * 4) // 2 inputs and 2 outputs
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
-      Balance(transferAmount.mulUnsafe(2) - amount - gasFee, 0, 1)
+      Balance(Amount(transferAmount.mulUnsafe(2) - amount - gasFee), Amount.Zero, 1)
 
     clique.stopMining()
     clique.stop()
@@ -178,7 +178,7 @@ class MultisigTest extends AlephiumActorSpec {
     confirmTx(multisigTx, restPort)
 
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
-      Balance(transferAmount / 2 - defaultGasFee, 0, 1)
+      Balance(Amount(transferAmount / 2 - defaultGasFee), Amount.Zero, 1)
 
     clique.stopMining()
     clique.stop()

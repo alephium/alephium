@@ -347,6 +347,8 @@ object Endpoints {
   ): EndpointIO.Body[String, T] = {
     alfJsonBody[T]
       .examples(examples)
-      .description(s"1 ALPH = ${ALF.oneAlf}")
+      .description(
+        s"""Format 1: `${ALF.oneAlf}`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = ${ALF.oneAlf}`"""
+      )
   }
 }

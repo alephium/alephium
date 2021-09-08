@@ -70,7 +70,7 @@ class WalletAppSpec
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(transferPublicKey).toBase58
   val transferAmount             = 10
-  val balanceAmount              = U256.unsafe(42)
+  val balanceAmount              = Amount(U256.unsafe(42))
 
   def creationJson(size: Int, maybeName: Option[String]) =
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
@@ -194,7 +194,7 @@ class WalletAppSpec
     val negAmount = -10
     transfer(negAmount) check { response =>
       val error = response.as[ApiError.BadRequest]
-      error.detail.contains(s"""Invalid value for: body (Invalid U256: $negAmount""") is true
+      error.detail.contains(s"""Invalid value for: body (Invalid amount: $negAmount""") is true
       response.code is StatusCode.BadRequest
     }
 
@@ -379,7 +379,7 @@ object WalletAppSpec extends {
     router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
       val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
       val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
-        acc.addUnsafe(destination.amount)
+        acc.addUnsafe(destination.amount.value)
       }
       val unsignedTx = transactionGen().sample.get.unsigned
 
@@ -415,7 +415,7 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      complete(ctx, Balance(42, 21, 1))
+      complete(ctx, Balance(Amount(42), Amount(21), 1))
     }
 
     private val server = vertx.createHttpServer().requestHandler(router)

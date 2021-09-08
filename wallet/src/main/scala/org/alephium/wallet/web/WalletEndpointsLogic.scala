@@ -18,7 +18,7 @@ package org.alephium.wallet.web
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import org.alephium.api.model.ApiKey
+import org.alephium.api.model.{Amount, ApiKey}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{Duration, U256}
@@ -90,13 +90,13 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       .getBalances(wallet, utxosLimit)
       .map(_.map { balances =>
         val totalBalance =
-          balances.map { case (_, amount, _) => amount }.fold(U256.Zero) { case (acc, u256) =>
-            acc.addUnsafe(u256)
+          balances.map { case (_, amount, _) => amount }.fold(U256.Zero) { case (acc, amount) =>
+            acc.addUnsafe(amount.value)
           }
         val balancesPerAddress = balances.map { case (address, amount, warning) =>
           model.Balances.AddressBalance(address, amount, warning)
         }
-        model.Balances(totalBalance, balancesPerAddress)
+        model.Balances(Amount(totalBalance), balancesPerAddress)
       }.left.map(toApiError))
   }
   val getAddressesLogic = serverLogic(getAddresses) { wallet =>

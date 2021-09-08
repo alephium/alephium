@@ -19,4 +19,8 @@ package org.alephium.api.model
 import org.alephium.protocol.Hash
 import org.alephium.util.U256
 
-final case class Token(id: Hash, amount: U256)
+final case class Token(id: Hash, amount: Amount)
+
+object Token {
+  def from(id: Hash, amount: U256): Token = Token(id, Amount(amount))
+}

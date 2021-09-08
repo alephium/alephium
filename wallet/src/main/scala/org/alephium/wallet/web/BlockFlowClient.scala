@@ -28,13 +28,13 @@ import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.{AVector, Duration, Hex, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Hex, TimeStamp}
 
 trait BlockFlowClient {
   def fetchBalance(
       address: Address.Asset,
       utxosLimit: Option[Int]
-  ): Future[Either[ApiError[_ <: StatusCode], (U256, Option[String])]]
+  ): Future[Either[ApiError[_ <: StatusCode], (Amount, Option[String])]]
   def prepareTransaction(
       fromPublicKey: String,
       destinations: AVector[Destination],
@@ -107,7 +107,7 @@ object BlockFlowClient {
     def fetchBalance(
         address: Address.Asset,
         utxosLimit: Option[Int]
-    ): Future[Either[ApiError[_ <: StatusCode], (U256, Option[String])]] =
+    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Option[String])]] =
       requestFromGroup(address.groupIndex, getBalance, (address, utxosLimit)).map(
         _.map(res => (res.balance, res.warning))
       )

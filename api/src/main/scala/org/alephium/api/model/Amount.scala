@@ -16,30 +16,28 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+import org.alephium.protocol.ALF
+import org.alephium.util.U256
 
-import org.alephium.api.model.Token
-import org.alephium.protocol.model.{AssetOutput, AssetOutputRef}
-import org.alephium.util.{AVector, TimeStamp}
+final case class Amount(value: U256) {
+  override def toString: String = value.toString
+}
 
-final case class UTXO(
-    ref: OutputRef,
-    amount: Amount,
-    tokens: AVector[Token],
-    lockTime: TimeStamp,
-    additionalData: ByteString
-)
-
-object UTXO {
-  def from(ref: AssetOutputRef, output: AssetOutput): UTXO = {
-    import output._
-
-    UTXO(
-      OutputRef.from(ref),
-      Amount(amount),
-      tokens.map((Token.from).tupled),
-      lockTime,
-      additionalData
-    )
+object Amount {
+  // x.x ALPH format
+  def from(string: String): Option[Amount] = {
+    val regex = """([0-9]*\.?[0-9]+) *ALPH""".r
+    string match {
+      case regex(v) =>
+        val bigDecimal = new java.math.BigDecimal(v)
+        val scaling    = java.math.BigDecimal.valueOf(10).pow(bigDecimal.scale)
+        U256
+          .from(bigDecimal.multiply(scaling).toBigInteger)
+          .map(_.mulUnsafe(ALF.oneAlf).divUnsafe(U256.unsafe(scaling.toBigInteger)))
+          .map(Amount(_))
+      case _ => None
+    }
   }
+
+  val Zero: Amount = Amount(U256.Zero)
 }

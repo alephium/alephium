@@ -20,8 +20,8 @@ import org.alephium.util.U256
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Balance(
-    balance: U256,
-    lockedBalance: U256,
+    balance: Amount,
+    lockedBalance: Amount,
     utxoNum: Int,
     warning: Option[String] = None
 )
@@ -34,8 +34,8 @@ object Balance {
       )
 
     Balance(
-      balance_locked_utxoNum._1,
-      balance_locked_utxoNum._2,
+      Amount(balance_locked_utxoNum._1),
+      Amount(balance_locked_utxoNum._2),
       balance_locked_utxoNum._3,
       warning
     )

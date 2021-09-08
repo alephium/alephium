@@ -23,12 +23,12 @@ import scala.util.Random
 
 import akka.actor.ActorSystem
 
-import org.alephium.api.model.Destination
+import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex, U256}
+import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -114,7 +114,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.getAddresses(walletName).leftValue is notFound
     walletService.getMinerAddresses(walletName).leftValue is notFound
     walletService
-      .transfer(walletName, AVector(Destination(address, U256.Zero)), None, None)
+      .transfer(walletName, AVector(Destination(address, Amount.Zero)), None, None)
       .futureValue
       .leftValue is notFound
     walletService.deriveNextAddress(walletName).leftValue is notFound

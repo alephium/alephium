@@ -20,10 +20,10 @@ import akka.util.ByteString
 
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Address, TxOutput}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp}
 
 sealed trait Output {
-  def amount: U256
+  def amount: Amount
   def address: Address
   def tokens: AVector[Token]
 }
@@ -32,7 +32,7 @@ object Output {
 
   @upickle.implicits.key("asset")
   final case class Asset(
-      amount: U256,
+      amount: Amount,
       address: Address,
       tokens: AVector[Token],
       lockTime: TimeStamp,
@@ -41,7 +41,7 @@ object Output {
 
   @upickle.implicits.key("contract")
   final case class Contract(
-      amount: U256,
+      amount: Amount,
       address: Address,
       tokens: AVector[Token]
   ) extends Output
@@ -50,17 +50,17 @@ object Output {
     output match {
       case o: model.AssetOutput =>
         Asset(
-          o.amount,
+          Amount(o.amount),
           Address.Asset(o.lockupScript),
-          o.tokens.map((Token.apply).tupled),
+          o.tokens.map((Token.from).tupled),
           o.lockTime,
           o.additionalData
         )
       case o: model.ContractOutput =>
         Contract(
-          o.amount,
+          Amount(o.amount),
           Address.Contract(o.lockupScript),
-          o.tokens.map((Token.apply).tupled)
+          o.tokens.map((Token.from).tupled)
         )
     }
   }

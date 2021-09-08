@@ -366,6 +366,26 @@ class ServerUtils(implicit
     }
   }
 
+  private def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
+    destinations.map { destination =>
+      val tokensInfo = destination.tokens match {
+        case Some(tokens) =>
+          tokens.map { token =>
+            (token.id -> token.amount.value)
+          }
+        case None =>
+          AVector.empty[(TokenId, U256)]
+      }
+
+      TxOutputInfo(
+        destination.address.lockupScript,
+        destination.amount.value,
+        tokensInfo,
+        destination.lockTime
+      )
+    }
+  }
+
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
@@ -374,23 +394,7 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-    val outputInfos = destinations.map { destination =>
-      val tokensInfo = destination.tokens match {
-        case Some(tokens) =>
-          tokens.map { token =>
-            (token.id -> token.amount)
-          }
-        case None =>
-          AVector.empty[(TokenId, U256)]
-      }
-
-      TxOutputInfo(
-        destination.address.lockupScript,
-        destination.amount,
-        tokensInfo,
-        destination.lockTime
-      )
-    }
+    val outputInfos = prepareOutputInfos(destinations)
 
     val transferResult = outputRefsOpt match {
       case Some(outputRefs) =>
@@ -435,23 +439,7 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
-
-    val outputInfos = destinations.map { destination =>
-      val tokensInfo = destination.tokens match {
-        case Some(tokens) =>
-          tokens.map { token =>
-            (token.id -> token.amount)
-          }
-        case None =>
-          AVector.empty[(TokenId, U256)]
-      }
-      TxOutputInfo(
-        destination.address.lockupScript,
-        destination.amount,
-        tokensInfo,
-        destination.lockTime
-      )
-    }
+    val outputInfos = prepareOutputInfos(destinations)
 
     blockFlow.transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice) match {
       case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
@@ -630,7 +618,7 @@ class ServerUtils(implicit
               query.address,
               state,
               dustUtxoAmount,
-              query.issueTokenAmount
+              query.issueTokenAmount.map(_.value)
             )
           } yield script
         case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))

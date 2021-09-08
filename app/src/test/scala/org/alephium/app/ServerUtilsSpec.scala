@@ -64,7 +64,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         fromPrivateKey
       )
 
-      val senderBalanceWithGas = genesisBalance - destination1.amount - destination2.amount
+      val senderBalanceWithGas =
+        genesisBalance - destination1.amount.value - destination2.amount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkDestinationBalance(destination1)
@@ -121,7 +122,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         fromPrivateKey
       )
 
-      val senderBalanceWithGas = genesisBalance - destination1.amount - destination2.amount
+      val senderBalanceWithGas =
+        genesisBalance - destination1.amount.value - destination2.amount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkAddressBalance(destination1.address, U256.unsafe(0), 0)
@@ -165,7 +167,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(fromPublicKey)
-      val selfDestination                    = Destination(fromAddress, ALF.oneAlf, None)
+      val selfDestination                    = Destination(fromAddress, Amount(ALF.oneAlf), None)
 
       info("Sending some coins to itself twice, creating 3 UTXOs in total for the same public key")
       val destinations = AVector(selfDestination, selfDestination)
@@ -243,7 +245,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toGroup                            = chainIndex.to
       val (toPrivateKey, toPublicKey, _)     = genesisKeys(toGroup.value)
       val toAddress                          = Address.p2pkh(toPublicKey)
-      val destination                        = Destination(toAddress, ALF.oneAlf)
+      val destination                        = Destination(toAddress, Amount(ALF.oneAlf))
 
       info("Sending some coins to an address, resulting 3 UTXOs for its corresponding public key")
       val destinations = AVector(destination, destination)
@@ -356,7 +358,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex                         = ChainIndex.unsafe(0, 0)
     val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
     val fromAddress                        = Address.p2pkh(fromPublicKey)
-    val selfDestination                    = Destination(fromAddress, ALF.cent(50))
+    val selfDestination                    = Destination(fromAddress, Amount(ALF.cent(50)))
 
     info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
     val selfDestinations = AVector(selfDestination)
@@ -434,7 +436,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "not create transaction with provided UTXOs, if Alf amount isn't enough" in new MultipleUtxos {
     val outputRefs = utxos.collect {
-      case utxo if utxo.amount.equals(ALF.cent(50)) =>
+      case utxo if utxo.amount.value.equals(ALF.cent(50)) =>
         OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
@@ -587,8 +589,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       groupConfig: GroupConfig
   ): Destination = {
     val address = generateAddress(chainIndex)
-    val amount  = ALF.oneAlf
-    Destination(address, amount, Some(AVector.from(tokens).map(Token.apply.tupled)))
+    val amount  = Amount(ALF.oneAlf)
+    Destination(address, amount, Some(AVector.from(tokens).map(Token.from.tupled)))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit
@@ -626,8 +628,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       blockFlow: BlockFlow
   ) = {
     serverUtils.getBalance(blockFlow, GetBalance(address, None)) isE Balance(
-      amount,
-      U256.unsafe(0),
+      Amount(amount),
+      Amount.Zero,
       utxoNum
     )
   }
@@ -636,6 +638,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    checkAddressBalance(destination.address, destination.amount, utxoNum)
+    checkAddressBalance(destination.address, destination.amount.value, utxoNum)
   }
 }
