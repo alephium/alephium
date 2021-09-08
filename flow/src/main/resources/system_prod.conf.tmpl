@@ -1,12 +1,12 @@
 alephium {
   consensus {
-    tips-prune-interval = 100
+    tips-prune-interval = 10
     block-cache-capacity-per-chain = 8
   }
 
   mining {
     api-interface = "127.0.0.1"
-    nonce-step = 10000
+    nonce-step = 20000
     batch-delay = 0 milli
 
     # the polling interval for block templates, when there is no new blocks generated

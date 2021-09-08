@@ -49,11 +49,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       isCanonical: Boolean
   ): IOResult[Unit] = {
     val blockState = BlockState(height, weight)
-    cacheState(hash, blockState)
     for {
       _ <- blockStateStorage.put(hash, blockState)
       // updateHeightIndex should go after block state update to ensure that
       // all the hashes at height are contained in the chain
+      _ = cacheState(hash, blockState) // cache should be updated after db
       _ <- updateHeightIndex(hash, height, isCanonical)
       _ <- updateState(hash, timestamp, parentHash)
     } yield ()
@@ -126,7 +126,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   protected[core] lazy val stateCache =
-    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 2)
+    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 3)
 
   def cacheState(hash: BlockHash, state: BlockState): Unit = stateCache.put(hash, state)
   def contains(hash: BlockHash): IOResult[Boolean] =
