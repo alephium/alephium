@@ -31,7 +31,8 @@ object ConsensusConfigFixture {
     implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
       override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
 
-      def uncleDependencyGapTime: Duration = blockTargetTime
+      def intraGroupDependencyGapPeriod: Duration = blockTargetTime
+      def interGroupDependencyGapPeriod: Duration = blockTargetTime
 
       override val maxMiningTarget: Target = Target.Max
 

@@ -88,7 +88,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
       flow: BlockFlow
   ): HeaderValidationResult[Unit] = {
     for {
-      _ <- checkUncleDepsTimeStamp(header, flow)
+      _ <- checkDepsTimeStamp(header, flow)
       _ <- checkFlow(header, flow)
     } yield ()
   }
@@ -118,7 +118,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
   protected[validation] def checkDepsMissing(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkDepStateHash(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
   protected[validation] def checkWorkTarget(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit]
-  protected[validation] def checkUncleDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
+  protected[validation] def checkDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   protected[validation] def checkFlow(header: BlockHeader, flow: BlockFlow)(implicit brokerConfig: BrokerConfig): HeaderValidationResult[Unit]
   // format: on
 }
@@ -284,21 +284,26 @@ object HeaderValidation {
         }
     }
 
-    protected[validation] def checkUncleDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit
+    protected[validation] def checkDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit
         brokerConfig: BrokerConfig
     ): HeaderValidationResult[Unit] = {
-      val thresholdTs = header.timestamp.minusUnsafe(consensusConfig.uncleDependencyGapTime)
+      val intraGroupThresholdTs =
+        header.timestamp.minusUnsafe(consensusConfig.intraGroupDependencyGapPeriod)
+      val interGroupThresholdTs =
+        header.timestamp.minusUnsafe(consensusConfig.interGroupDependencyGapPeriod)
       val headerIndex = header.chainIndex
-      val resultEither = header.blockDeps.deps.forallE { dep =>
+      val resultEither = header.blockDeps.deps.forallWithIndexE { (dep, idx) =>
         val depIndex = ChainIndex.from(dep)
         if (depIndex != headerIndex) {
+          val thresholdTs =
+            if (idx < brokerConfig.groups - 1) interGroupThresholdTs else intraGroupThresholdTs
           flow.getBlockHeader(dep).map(_.timestamp <= thresholdTs)
         } else {
           Right(true)
         }
       }
       ValidationStatus.from(resultEither).flatMap { ok =>
-        if (ok) validHeader(()) else invalidHeader(InvalidUncleTimeStamp)
+        if (ok) validHeader(()) else invalidHeader(InvalidDepTimeStamp)
       }
     }
 

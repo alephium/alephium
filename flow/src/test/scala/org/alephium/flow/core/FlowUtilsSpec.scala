@@ -96,7 +96,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   it should "detect tx conflicts using bestDeps" in new FlowFixture {
     override val configValues =
       Map(
-        ("alephium.consensus.uncle-dependency-gap-time", "10 seconds"),
+        ("alephium.consensus.intra-group-dependency-gap-period", "10 seconds"),
         ("alephium.broker.broker-num", 1)
       )
 
