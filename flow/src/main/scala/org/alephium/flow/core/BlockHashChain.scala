@@ -126,7 +126,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   protected[core] lazy val stateCache =
-    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 3)
+    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 4)
 
   def cacheState(hash: BlockHash, state: BlockState): Unit = stateCache.put(hash, state)
   def contains(hash: BlockHash): IOResult[Boolean] =
