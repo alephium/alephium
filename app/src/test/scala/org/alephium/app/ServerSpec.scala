@@ -22,18 +22,18 @@ import akka.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 
-import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.util.AlephiumSpec
+import org.alephium.flow.setting.AlephiumConfigFixture
+import org.alephium.util.{AlephiumSpec, SocketUtil}
 
-class ServerSpec extends AlephiumSpec with ScalaFutures {
+class ServerSpec extends AlephiumSpec with ScalaFutures with SocketUtil {
   implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
-  it should "start and stop correctly" in {
-    val rootPath                        = Platform.getRootPath()
-    val rawConfig                       = Configs.parseConfig(rootPath, overwrite = true)
-    implicit val config: AlephiumConfig = AlephiumConfig.load(rawConfig)
-    implicit val apiConfig: ApiConfig   = ApiConfig.load(rawConfig)
-    val flowSystem: ActorSystem         = ActorSystem("flow", rawConfig)
+  it should "start and stop correctly" in new AlephiumConfigFixture with RandomPortsConfigFixture {
+    override val configValues = configPortsValues
+
+    implicit val apiConfig: ApiConfig = ApiConfig.load(newConfig)
+
+    val flowSystem: ActorSystem = ActorSystem("flow", newConfig)
     implicit val executionContext: ExecutionContext =
       scala.concurrent.ExecutionContext.Implicits.global
 

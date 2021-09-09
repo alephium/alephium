@@ -82,7 +82,10 @@ class WebSocketServerSpec
     }
   }
 
-  trait Fixture extends ServerFixture {
+  trait Fixture extends ServerFixture with RandomPortsConfigFixture {
+
+    override val configValues = configPortsValues
+
     implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
     lazy val blockflowFetchMaxAge          = apiConfig.blockflowFetchMaxAge
   }
