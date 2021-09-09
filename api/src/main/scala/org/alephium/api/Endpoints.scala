@@ -191,7 +191,7 @@ trait Endpoints
   //have to be lazy to let `groupConfig` being initialized
   lazy val getChainInfo: BaseEndpoint[ChainIndex, ChainInfo] =
     blockflowEndpoint.get
-      .in("chains")
+      .in("chain-info")
       .in(chainIndexQuery)
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")

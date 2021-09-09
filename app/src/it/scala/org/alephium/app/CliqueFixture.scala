@@ -407,7 +407,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/addresses/$address/balance")
 
   def getChainInfo(fromGroup: Int, toGroup: Int) =
-    httpGet(s"/blockflow/chains?fromGroup=$fromGroup&toGroup=$toGroup")
+    httpGet(s"/blockflow/chain-info?fromGroup=$fromGroup&toGroup=$toGroup")
 
   def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
     httpPost(

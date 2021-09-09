@@ -181,24 +181,24 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     }
   }
 
-  it should "call GET /blockflow/chains" in {
-    Get(s"/blockflow/chains?fromGroup=1&toGroup=1") check { response =>
+  it should "call GET /blockflow/chain-info" in {
+    Get(s"/blockflow/chain-info?fromGroup=1&toGroup=1") check { response =>
       response.code is StatusCode.Ok
       response.as[ChainInfo] is dummyChainInfo
     }
-    Get(s"/blockflow/chains?toGroup=1") check { response =>
+    Get(s"/blockflow/chain-info?toGroup=1") check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
         s"Invalid value for: query parameter fromGroup"
       )
     }
-    Get(s"/blockflow/chains?fromGroup=1") check { response =>
+    Get(s"/blockflow/chain-info?fromGroup=1") check { response =>
       response.code is StatusCode.BadRequest
     }
-    Get(s"/blockflow/chains?fromGroup=10&toGroup=1") check { response =>
+    Get(s"/blockflow/chain-info?fromGroup=10&toGroup=1") check { response =>
       response.code is StatusCode.BadRequest
     }
-    Get(s"/blockflow/chains?fromGroup=1&toGroup=10") check { response =>
+    Get(s"/blockflow/chain-info?fromGroup=1&toGroup=10") check { response =>
       response.code is StatusCode.BadRequest
     }
   }
