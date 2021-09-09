@@ -24,11 +24,10 @@ import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, OptionValues}
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.dsl.ResultOfATypeInvocation
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.{Millis, Span}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 trait AlephiumSpec
@@ -39,10 +38,11 @@ trait AlephiumSpec
   @nowarn implicit protected def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 }
 
-trait AlephiumFutureSpec extends AlephiumSpec with ScalaFutures with Eventually {
-  implicit override val patienceConfig =
-    PatienceConfig(timeout = Span(1000, Millis), interval = Span(50, Millis))
-}
+trait AlephiumFutureSpec
+    extends AlephiumSpec
+    with ScalaFutures
+    with Eventually
+    with IntegrationPatience
 
 trait AlephiumFixture extends Matchers {
 
