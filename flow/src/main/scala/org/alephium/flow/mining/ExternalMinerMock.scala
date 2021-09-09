@@ -100,8 +100,8 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
     val networkSetting: NetworkSetting,
     val miningConfig: MiningSetting
 ) extends Miner {
-  private val apiConnections =
-    Array.ofDim[Option[ActorRefT[ConnectionHandler.Command]]](nodes.length)
+  val apiConnections: Array[Option[ActorRefT[ConnectionHandler.Command]]] =
+    Array.fill(nodes.length)(None)
 
   def receive: Receive = handleMining orElse handleMiningTasks orElse handleConnection
 

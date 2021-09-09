@@ -30,6 +30,10 @@ import org.alephium.util.{AlephiumActorSpec, AVector, Duration, SocketUtil}
 class ExternalMinerMockSpec extends AlephiumActorSpec with Eventually with IntegrationPatience {
   override def actorSystemConfig = AlephiumActorSpec.infoConfig
 
+  it should "initialize connections as None" in new ExternalMinerMockFixture {
+    miner.underlyingActor.apiConnections.foreach(_ is None)
+  }
+
   it should "fail to reconnect to multiple nodes immediately" in new ExternalMinerMockFixture {
     override val configValues: Map[String, Any] = Map(
       "alephium.network.backoff-base-delay" -> "10 s"
@@ -123,7 +127,7 @@ class ExternalMinerMockSpec extends AlephiumActorSpec with Eventually with Integ
       }
 
     lazy val minerProbe = TestProbe()
-    lazy val miner = newTestActorRef[Miner](
+    lazy val miner = newTestActorRef[ExternalMinerMock](
       ExternalMinerMock.props(AVector.from(controllersAddresses))
     )
   }
