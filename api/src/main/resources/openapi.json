@@ -3379,13 +3379,13 @@
         }
       }
     },
-    "/blockflow/chains": {
+    "/blockflow/chain-info": {
       "get": {
         "tags": [
           "Blockflow"
         ],
         "summary": "Get infos about the chain from the given groups",
-        "operationId": "getBlockflowChains",
+        "operationId": "getBlockflowChain-info",
         "parameters": [
           {
             "name": "fromGroup",
