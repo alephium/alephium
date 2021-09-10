@@ -16,15 +16,12 @@
 
 package org.alephium.app
 
-import java.net.{DatagramSocket, InetSocketAddress, ServerSocket}
-import java.nio.channels.{DatagramChannel, ServerSocketChannel}
+import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
-import scala.util.control.NonFatal
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
@@ -44,7 +41,7 @@ import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.MiningBlob
-import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
+import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
@@ -59,7 +56,7 @@ import org.alephium.wallet.api.model._
 // scalastyle:off number.of.methods
 class CliqueFixture(implicit spec: AlephiumActorSpec)
     extends AlephiumSpec
-    with AlephiumConfigFixture
+    with ItConfigFixture
     with NumericHelpers
     with ApiModelCodec
     with wallet.json.ModelCodecs
@@ -94,51 +91,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   val initialBalance = Balance(Amount(genesisBalance), Amount.Zero, 1)
   val transferAmount = ALF.alf(1)
 
-  val usedPort = mutable.Set.empty[Int]
-  def generatePort: Int = {
-    val tcpPort = 40000 + Random.nextInt(5000) * 4
-
-    if (usedPort.contains(tcpPort)) {
-      generatePort
-    } else {
-      val tcp: ServerSocket      = ServerSocketChannel.open().socket()
-      val udp: DatagramSocket    = DatagramChannel.open().socket()
-      val rest: ServerSocket     = ServerSocketChannel.open().socket()
-      val ws: ServerSocket       = ServerSocketChannel.open().socket()
-      val minerApi: ServerSocket = ServerSocketChannel.open().socket()
-      try {
-        tcp.setReuseAddress(true)
-        tcp.bind(new InetSocketAddress("127.0.0.1", tcpPort))
-        udp.setReuseAddress(true)
-        udp.bind(new InetSocketAddress("127.0.0.1", tcpPort))
-        rest.setReuseAddress(true)
-        rest.bind(new InetSocketAddress("127.0.0.1", restPort(tcpPort)))
-        ws.setReuseAddress(true)
-        ws.bind(new InetSocketAddress("127.0.0.1", wsPort(tcpPort)))
-        minerApi.setReuseAddress(true)
-        minerApi.bind(new InetSocketAddress("127.0.0.1", minerPort(tcpPort)))
-        usedPort.add(tcpPort)
-        tcpPort
-      } catch {
-        case NonFatal(_) => generatePort
-      } finally {
-        tcp.close()
-        udp.close()
-        rest.close()
-        ws.close()
-        minerApi.close()
-      }
-    }
-  }
-
-  def wsPort(port: Int)    = port - 1
-  def restPort(port: Int)  = port - 2
-  def minerPort(port: Int) = port - 3
-
-  val defaultMasterPort     = generatePort
+  val defaultMasterPort     = generatePort()
   val defaultRestMasterPort = restPort(defaultMasterPort)
   val defaultWsMasterPort   = wsPort(defaultMasterPort)
-  val defaultWalletPort     = generatePort
+  val defaultWalletPort     = generatePort()
 
   val blockNotifyProbe = TestProbe()
 
@@ -272,7 +228,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       bootstrap: Option[InetSocketAddress],
       configOverrides: Map[String, Any]
   ) = {
-    new AlephiumConfigFixture with StoragesFixture {
+    new ItConfigFixture with StoragesFixture {
       override val configValues = Map(
         ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
@@ -312,15 +268,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       connectionBuild: ActorRef => ActorRefT[Tcp.Command] = ActorRefT.apply,
       configOverrides: Map[String, Any] = Map.empty
   ): Clique = {
-    val masterPort = generatePort
+    val masterPort = generatePort()
 
     val servers: Seq[Server] = (0 until nbOfNodes).map { brokerId =>
-      val publicPort = if (brokerId equals 0) masterPort else generatePort
+      val publicPort = if (brokerId equals 0) masterPort else generatePort()
       bootNode(
         publicPort = publicPort,
         masterPort = masterPort,
         brokerId = brokerId,
-        walletPort = generatePort,
+        walletPort = generatePort(),
         bootstrap = bootstrap,
         brokerNum = nbOfNodes,
         connectionBuild = connectionBuild,

@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.flow.setting
 
 import org.alephium.util.SocketUtil
 
 trait RandomPortsConfigFixture extends SocketUtil {
-  val publicPort   = generatePort()
-  val masterPort   = generatePort()
-  val restPort     = generatePort()
-  val wsPort       = generatePort()
-  val minerApiPort = generatePort()
+  private val publicPort   = generatePort()
+  private val masterPort   = generatePort()
+  private val restPort     = generatePort()
+  private val wsPort       = generatePort()
+  private val minerApiPort = generatePort()
 
-  val configPortsValues: Map[String, Any] = Map(
+  lazy val configPortsValues: Map[String, Any] = Map(
     ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
     ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
     ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),

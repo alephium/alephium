@@ -82,7 +82,7 @@ class WebSocketServerSpec
     }
   }
 
-  trait Fixture extends ServerFixture with RandomPortsConfigFixture {
+  trait Fixture extends ServerFixture {
 
     override val configValues = configPortsValues
 
