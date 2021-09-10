@@ -24,6 +24,8 @@ import akka.event.LoggingAdapter
 import akka.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
+import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.Generators
@@ -36,13 +38,14 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
   import DiscoveryMessage._
   import DiscoveryServerSpec._
 
-  trait Fixture extends NetworkConfigFixture.Default { self =>
+  trait Fixture extends NetworkConfigFixture.Default with Eventually { self =>
     def groupSize: Int           = 4
     val udpPort: Int             = SocketUtil.temporaryLocalPort(udp = true)
     def peersPerGroup: Int       = 1
     def scanFrequency: Duration  = Duration.unsafe(500)
     def expireDuration: Duration = Duration.ofHoursUnsafe(1)
     def peersTimeout: Duration   = Duration.ofSecondsUnsafe(5)
+    def scanFastPeriod: Duration = Duration.ofMinutesUnsafe(1)
     val socketProbe              = TestProbe()
 
     implicit lazy val config: DiscoveryConfig with BrokerConfig =
@@ -52,8 +55,12 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
         peersPerGroup,
         scanFrequency,
         expireDuration,
-        peersTimeout
+        peersTimeout,
+        scanFastPeriod
       )._2
+
+    implicit override val patienceConfig =
+      PatienceConfig(timeout = Span(10, Seconds))
 
     lazy val state = new DiscoveryServerState {
       implicit def brokerConfig: BrokerConfig       = self.config
@@ -106,6 +113,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     state.tryPing(peerInfo)
     val ping = expectPayload[Ping]
     state.isInTable(peerInfo.peerId) is false
+    state.isPending(peerInfo.peerId) is true
     state.handlePong(ping.sessionId, peerInfo)
   }
 
@@ -204,6 +212,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
   }
 
   it should "detect when to scan fast" in new Fixture {
+    override def scanFastPeriod: Duration = Duration.ofSecondsUnsafe(2)
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
       brokers.foreach(state.addSelfCliquePeer)
     }
@@ -221,6 +230,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     clique0.interBrokers.get.foreach(state.appendPeer)
     state.shouldScanFast() is true
     state.atLeastOnePeerPerGroup() is true
+    eventually(state.shouldScanFast() is false)
   }
 
   it should "ping discovered bootstrap nodes once" in new Fixture {
@@ -263,4 +273,25 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     state.cleanUnreachables(TimeStamp.now().plusHoursUnsafe(1))
     state.mightReachable(peerInfo.address) is true
   }
+
+  it should "correctly replace furthest peer when table is full" in new Fixture {
+    while (
+      state.getPeersWeight < state.brokerConfig.groups * state.discoveryConfig.neighborsPerGroup
+    ) {
+      addToTable(Generators.brokerInfoGen.sample.get)
+    }
+    val furthestPeer = state.getNeighbors(state.selfCliqueId).last
+    val peer = Generators.brokerInfoGen
+      .retryUntil(
+        _.cliqueId.hammingDist(state.selfCliqueId) < state.selfCliqueId.hammingDist(
+          furthestPeer.cliqueId
+        )
+      )
+      .sample
+      .get
+    addToTable(peer)
+    state.getNeighbors(state.selfCliqueId).contains(furthestPeer) is false
+    state.getNeighbors(state.selfCliqueId).contains(peer) is true
+  }
+
 }

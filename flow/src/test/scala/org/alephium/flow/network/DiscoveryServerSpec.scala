@@ -24,6 +24,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
+import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol._
@@ -39,6 +40,8 @@ class DiscoveryServerSpec
     with IntegrationPatience {
   import DiscoveryServerSpec._
 
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = Span(10, Seconds))
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {
     ActorRefT.build(
       system,
@@ -96,7 +99,6 @@ class DiscoveryServerSpec
 
     val cliqueNum = 16
     val cliques   = AVector.fill(cliqueNum)(generateClique())
-
     val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
       infos.map { case (brokerInfo, config) =>
         val misbehaviorManager = buildMisbehaviorManager(system)
@@ -123,7 +125,6 @@ class DiscoveryServerSpec
         server
       }
     }
-
     servers.foreach { server =>
       withPeers(server) { peers =>
         (peers.sumBy(peer => groups / peer.brokerNum) >= 5 * groups) is true
@@ -199,6 +200,34 @@ class DiscoveryServerSpec
     }
   }
 
+  it should "stash messages before receiving cliqueInfo" in new Fixture {
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    val misbehaviorManager = buildMisbehaviorManager(system)
+    lazy val server2 =
+      newTestActorRef[DiscoveryServer](
+        DiscoveryServer
+          .props(address1, misbehaviorManager)(brokerConfig, config1, networkConfig)
+      )
+
+    server2 ! DiscoveryServer.PeerConfirmed(cliqueInfo0.selfBrokerInfo.get)
+    server2 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
+
+    withPeers(server0) { peers =>
+      peers.length is groups + 1 // self clique peers + server1
+      peers.filter(_.cliqueId equals cliqueInfo0.id).toSet is cliqueInfo0.interBrokers.get.toSet
+      peers.filterNot(_.cliqueId equals cliqueInfo0.id) is AVector(
+        cliqueInfo1.interBrokers.get.head
+      )
+    }
+    withPeers(server2) { peers =>
+      peers.length is groups + 1 // 3 self clique peers + server0
+      peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
+      peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
+        cliqueInfo0.interBrokers.get.head
+      )
+    }
+  }
+
   trait UnreachableFixture extends Fixture {
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
   }
@@ -266,14 +295,15 @@ object DiscoveryServerSpec {
       _peersPerGroup: Int,
       _scanFrequency: Duration = Duration.unsafe(200),
       _expireDuration: Duration = Duration.ofHoursUnsafe(1),
-      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5)
+      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5),
+      _scanFastPeriod: Duration = Duration.ofMinutesUnsafe(1)
   ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
       val scanFrequency: Duration     = _scanFrequency
       val scanFastFrequency: Duration = _scanFrequency
-      val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
+      val fastScanPeriod: Duration    = _scanFastPeriod
       val neighborsPerGroup: Int      = _peersPerGroup
 
       override lazy val expireDuration: Duration = _expireDuration
