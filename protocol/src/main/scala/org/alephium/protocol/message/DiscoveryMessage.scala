@@ -102,7 +102,7 @@ object DiscoveryMessage {
     def senderCliqueId: Option[CliqueId] = senderInfo.map(_.cliqueId)
   }
   object Ping extends Code[Ping] {
-    private val senderInfoSerde: Serde[Option[BrokerInfo]] = optionSerde(BrokerInfo._serde)
+    private val senderInfoSerde: Serde[Option[BrokerInfo]] = optionSerde(BrokerInfo.serde)
     private val serde: Serde[Ping] = {
       Serde.forProduct2[Id, Option[BrokerInfo], Ping](
         Ping.apply,
@@ -138,7 +138,7 @@ object DiscoveryMessage {
     private val serde: Serde[Pong] =
       Serde.forProduct2[Id, BrokerInfo, Pong](Pong.apply, t => (t.sessionId, t.brokerInfo))(
         Id.serde,
-        BrokerInfo._serde
+        BrokerInfo.serde
       )
 
     def serialize(pong: Pong): ByteString = serde.serialize(pong)
@@ -177,7 +177,7 @@ object DiscoveryMessage {
   object Neighbors extends Code[Neighbors] {
     val serde: Serde[Neighbors] = {
       val brokersSerde: Serde[AVector[BrokerInfo]] =
-        avectorSerde(implicitly[ClassTag[BrokerInfo]], BrokerInfo._serde)
+        avectorSerde(implicitly[ClassTag[BrokerInfo]], BrokerInfo.serde)
       Serde.forProduct1[AVector[BrokerInfo], Neighbors](
         Neighbors.apply,
         t => (t.peers)

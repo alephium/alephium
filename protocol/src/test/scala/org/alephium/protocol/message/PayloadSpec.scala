@@ -43,15 +43,28 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val address            = new InetSocketAddress("127.0.0.1", 0)
     val (priKey1, pubKey1) = SignatureSchema.secureGeneratePriPub()
     val (priKey2, _)       = SignatureSchema.secureGeneratePriPub()
-    val brokerInfo         = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
+    val validBrokerInfo    = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
 
-    val validInput  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey1)
+    val validInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey1)
     val validOutput = Hello._deserialize(Hello.serde.serialize(validInput))
     validOutput.map(_.value) isE validInput
 
-    val invalidInput  = Hello.unsafe(brokerInfo.interBrokerInfo, priKey2)
+    val invalidInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey2)
     val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
     invalidOutput.leftValue is a[SerdeError]
+
+    info("invalid broker info")
+    groupConfig.groups
+    AVector(
+      BrokerInfo.unsafe(CliqueId(pubKey1), -1, 1, address),
+      BrokerInfo.unsafe(CliqueId(pubKey1), 2, 1, address),
+      BrokerInfo.unsafe(CliqueId(pubKey1), 1, groupConfig.groups + 1, address),
+      BrokerInfo.unsafe(CliqueId(pubKey1), 1, 2, address)
+    ).foreach { invalidBrokerInfo =>
+      val invalidInput  = Hello.unsafe(invalidBrokerInfo.interBrokerInfo, priKey1)
+      val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
+      invalidOutput.leftValue is a[SerdeError]
+    }
   }
 
   it should "serialize/deserialize the Hello payload" in {
