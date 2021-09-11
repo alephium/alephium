@@ -24,11 +24,10 @@ import org.scalatest.compatible.Assertion
 
 import org.alephium.crypto.SecP256K1Signature
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.{PublicKey, SignatureSchema}
+import org.alephium.protocol.{PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId, NoIndexModelGenerators}
-import org.alephium.serde.SerdeError
-import org.alephium.serde.serialize
+import org.alephium.protocol.model._
+import org.alephium.serde.{serialize, Serde, SerdeError}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
 
 class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
@@ -350,6 +349,36 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           serialize(txTemplate2.id)
       )
       .leftValue is SerdeError.validation("Invalid ChainIndex in Tx payload")
+  }
+
+  it should "seder the snapshots properly" in new ModelSnapshots {
+    implicit val basePath = "src/test/resources/message/payloads"
+
+    implicit val serde = new Serde[Payload] {
+      override def serialize(input: Payload)       = Payload.serialize(input)
+      override def _deserialize(input: ByteString) = Payload._deserialize(input)
+    }
+
+    import Hex._
+
+    {
+      info("Hello")
+
+      implicit val interBrokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.serde
+
+      val pubKey  = hex"03d7b2d064a1cf0f55266314dfcd50926ba032069b5c3dda7fd7c83c3ea8055249"
+      val privKey = hex"d803bda2a7b5e2110d1302fe6f9fef18d6b4c38bc4f5e1c31b5830dfb73be216"
+      val interBrokerInfo = BrokerInfo
+        .unsafe(CliqueId(PublicKey.unsafe(pubKey)), 0, 1, new InetSocketAddress("127.0.0.1", 0))
+        .interBrokerInfo
+
+      val clientId  = "scala-alephium/v9.0.0/Linux"
+      val timestamp = TimeStamp.unsafe(1627484789657L)
+      val signature = SignatureSchema.sign(interBrokerInfo.hash.bytes, PrivateKey.unsafe(privKey))
+      val hello     = Hello.unsafe(clientId, timestamp, interBrokerInfo, signature)
+
+      hello.asInstanceOf[Payload].verify("hello")
+    }
   }
 
   private def verifySerde(payload: Payload)(blob: ByteString): Assertion = {
