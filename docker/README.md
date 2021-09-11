@@ -5,22 +5,12 @@ This folder container all the necessary material to build and run Alephium via d
 
 # Prerequisites
 
-We're using [docker](https://docs.docker.com/engine/) and [docker-compose](https://docs.docker.com/compose/) to build and run Alephium here.
-Make sure you installed both before proceeding further.
-
-# Build
-
-From this `docker` folder, run:
-
-```
-docker-compose build alephium
-```
-
-A container called `alephium/alephium:latest` will be created from an official [Release](https://github.com/alephium/alephium/releases).
+We're using [docker-compose](https://docs.docker.com/compose/) to run Alephium here.
+Make sure you installed `docker` and `docker-compose` before proceeding further.
 
 # Run
 
-The provided [docker-compose.yml](./docker-compose.yml] file can also be used to run Alephium:
+The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
 
 ```
 docker-compose up -d
