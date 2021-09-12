@@ -809,36 +809,27 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  trait DepGapTimeFixture extends FlowFixture {
-    def prepare(): (IndexedSeq[Block], IndexedSeq[Block]) = {
-      val blocks0 = for {
-        from <- 0 until groups0
-        to   <- 0 until groups0
-      } yield mineFromMemPool(blockFlow, ChainIndex.unsafe(from, to))
-      blocks0.foreach(addAndCheck(blockFlow, _, 1))
-
-      val blocks1 = for {
-        from <- 0 until groups0
-        to   <- 0 until groups0
-      } yield mineFromMemPool(blockFlow, ChainIndex.unsafe(from, to))
-      blocks1.foreach(addAndCheck(blockFlow, _, 4))
-      blocks0 -> blocks1
-    }
-  }
-
-  it should "not include new block as dependency when intragroup dependency gap time is large" in new DepGapTimeFixture {
+  it should "not include new block as dependency when dependency gap time is large" in new FlowFixture {
     override val configValues =
       Map(
-        ("alephium.consensus.intra-group-dependency-gap-period", "5 seconds"),
+        ("alephium.consensus.uncle-dependency-gap-time", "5 seconds"),
         ("alephium.broker.broker-num", 1)
       )
 
-    val (blocks0, blocks1) = prepare()
+    val blocks0 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks0.foreach(addAndCheck(blockFlow, _, 1))
+
+    val blocks1 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks1.foreach(addAndCheck(blockFlow, _, 2))
     blocks0.zip(blocks1).foreach { case (block0, block1) =>
       val chainIndex = block0.chainIndex
-      block1.blockDeps.inDeps.toSeq
-        .zip(block0.blockDeps.inDeps.toSeq)
-        .foreach(pair => pair._1 isnot pair._2)
+      block1.blockDeps.inDeps is block0.blockDeps.inDeps
       block1.blockDeps.outDeps(chainIndex.to.value) is block0.hash
       block1.blockDeps.outDeps.take(chainIndex.to.value) is
         block0.blockDeps.outDeps.take(chainIndex.to.value)
@@ -847,26 +838,10 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  it should "not include new block as dependency when intergroup dependency gap time is large" in new DepGapTimeFixture {
-    override val configValues =
-      Map(
-        ("alephium.consensus.inter-group-dependency-gap-period", "5 seconds"),
-        ("alephium.broker.broker-num", 1)
-      )
-
-    val (blocks0, blocks1) = prepare()
-    blocks0.zip(blocks1).foreach { case (block0, block1) =>
-      block1.blockDeps.inDeps is block0.blockDeps.inDeps
-      block1.blockDeps.outDeps.toSeq
-        .zip(block0.blockDeps.outDeps.toSeq)
-        .foreach(pair => pair._1 isnot pair._2)
-    }
-  }
-
   it should "include new block as dependency when gap time is past" in new FlowFixture {
     override val configValues =
       Map(
-        ("alephium.consensus.intra-group-dependency-gap-period", "5 seconds"),
+        ("alephium.consensus.uncle-dependency-gap-time", "5 seconds"),
         ("alephium.broker.broker-num", 1)
       )
 

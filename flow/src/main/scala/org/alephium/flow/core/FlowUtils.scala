@@ -243,16 +243,12 @@ trait FlowUtils
       chainIndex: ChainIndex,
       currentTs: TimeStamp
   ): IOResult[BlockDeps] = {
-    val intraGroupThresholdTs =
-      currentTs.minusUnsafe(consensusConfig.intraGroupDependencyGapPeriod)
-    val interGroupThresholdTs =
-      currentTs.minusUnsafe(consensusConfig.interGroupDependencyGapPeriod)
+    val thresholdTs = currentTs.minusUnsafe(consensusConfig.uncleDependencyGapTime)
     bestDeps.deps
       .mapWithIndexE {
         case (hash, k) if k != (groups - 1 + chainIndex.to.value) =>
-          val hashIndex   = ChainIndex.from(hash)
-          val chain       = getHeaderChain(hashIndex)
-          val thresholdTs = if (k < groups - 1) interGroupThresholdTs else intraGroupThresholdTs
+          val hashIndex = ChainIndex.from(hash)
+          val chain     = getHeaderChain(hashIndex)
           looseDependency(hash, chain, thresholdTs)
         case (hash, _) => Right(hash)
       }
