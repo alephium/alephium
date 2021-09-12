@@ -24,11 +24,11 @@ import org.scalatest.compatible.Assertion
 
 import org.alephium.crypto.SecP256K1Signature
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.{PublicKey, SignatureSchema}
+import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model._
 import org.alephium.serde.{serialize, Serde, SerdeError}
-import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   implicit val ordering: Ordering[Code] = Ordering.by(Code.toInt(_))
@@ -361,60 +361,119 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     import Hex._
 
-    {
-      info("Hello")
+    info("Hello")
 
-      implicit val interBrokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.serde
+    implicit val interBrokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.serde
 
-      val interBrokerInfo = BrokerInfo
-        .unsafe(CliqueId(pubKey1), 0, 1, new InetSocketAddress("127.0.0.1", 0))
-        .interBrokerInfo
+    val interBrokerInfo = BrokerInfo
+      .unsafe(CliqueId(pubKey1), 0, 1, new InetSocketAddress("127.0.0.1", 0))
+      .interBrokerInfo
 
-      val clientId  = "scala-alephium/v9.0.0/Linux"
-      val timestamp = TimeStamp.unsafe(1627484789657L)
-      val signature = SignatureSchema.sign(interBrokerInfo.hash.bytes, privKey1)
-      val hello     = Hello.unsafe(clientId, timestamp, interBrokerInfo, signature)
+    val clientId  = "scala-alephium/v9.0.0/Linux"
+    val timestamp = TimeStamp.unsafe(1627484789657L)
+    val signature = SignatureSchema.sign(interBrokerInfo.hash.bytes, privKey1)
+    val hello     = Hello.unsafe(clientId, timestamp, interBrokerInfo, signature)
 
-      hello.asInstanceOf[Payload].verify("hello")
-    }
+    hello.asInstanceOf[Payload].verify("hello")
 
-    {
-      info("ping / pong")
+    info("ping / pong")
 
-      val requestId = RequestId.unsafe(100)
-      val ping      = Ping(requestId, TimeStamp.unsafe(1627484789657L))
-      val pong      = Pong(requestId)
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val requestId  = RequestId.unsafe(100)
+    val ping       = Ping(requestId, TimeStamp.unsafe(1627484789657L))
+    val pong       = Pong(requestId)
 
-      ping.asInstanceOf[Payload].verify("ping")
-      pong.asInstanceOf[Payload].verify("pong")
-    }
+    ping.asInstanceOf[Payload].verify("ping")
+    pong.asInstanceOf[Payload].verify("pong")
 
-    {
-      info("block request / block response")
+    info("blocks request / blocks response")
 
-      val requestId = RequestId.unsafe(100)
+    val block1 = block()
 
-      val block1 = block()
-      val block2 = {
-        val unsignedTx = unsignedTransaction(
-          pubKey1,
-          None,
-          p2pkhOutput(
-            55,
-            hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f"
-          )
+    val tx1 = {
+      val unsignedTx = unsignedTransaction(
+        pubKey1,
+        None,
+        p2pkhOutput(
+          55,
+          hex"b03ce271334db24f37313cccf2d4aced9c6223d1378b1f472ec56f0b30aaac0f"
         )
+      )
 
-        val tx = inputSign(unsignedTx, privKey1)
-        block(tx)
-      }
-
-      val blockRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
-      blockRequest.asInstanceOf[Payload].verify("block-request")
-
-      val blockResponse = BlocksResponse(requestId, AVector(block1, block2))
-      blockResponse.asInstanceOf[Payload].verify("block-response")
+      inputSign(unsignedTx, privKey1)
     }
+
+    val tx2 = {
+      val tokenId1 = hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822"
+      val unsignedTx = unsignedTransaction(
+        pubKey2,
+        scriptOpt = None,
+        p2pkhOutput(
+          42,
+          hex"c03ce271334db24f37313bbbf2d4aced9c6223d1378b1f472ec56f0b30aaac04",
+          TimeStamp.unsafe(12345),
+          additionalData = hex"55deff667f0096ffc024ff53d6017ff5",
+          tokens = AVector((Hash.unsafe(tokenId1), U256.unsafe(2)))
+        ),
+        p2pkhOutput(
+          100,
+          hex"c6223d72ec56f13781334db24f37313fb03ce27cccf2d4aced9b1f40b30aaac0",
+          tokens = AVector((Hash.unsafe(tokenId1), U256.unsafe(8)))
+        )
+      )
+
+      inputSign(unsignedTx, privKey2)
+    }
+
+    val block2 = block(tx1, tx2)
+
+    val blockRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
+    blockRequest.asInstanceOf[Payload].verify("block-request")
+
+    val blockResponse = BlocksResponse(requestId, AVector(block1, block2))
+    blockResponse.asInstanceOf[Payload].verify("block-response")
+
+    info("headers request / headers response")
+
+    val headersRequest = HeadersRequest(requestId, AVector(block1.hash, block2.hash))
+    headersRequest.asInstanceOf[Payload].verify("header-request")
+
+    val headersResponse = HeadersResponse(requestId, AVector(block1.header, block2.header))
+    headersResponse.asInstanceOf[Payload].verify("header-response")
+
+    info("inventory request / inventory response")
+    val invRequest = InvRequest(requestId, AVector(AVector(block1.hash, block2.hash)))
+    invRequest.asInstanceOf[Payload].verify("inv-request")
+
+    val invResponse = InvResponse(requestId, AVector(AVector(block1.hash, block2.hash)))
+    invResponse.asInstanceOf[Payload].verify("inv-response")
+
+    info("txs request / txs response")
+    val txsRequest = TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
+    txsRequest.asInstanceOf[Payload].verify("txs-request")
+
+    val txsResponse = TxsResponse(requestId, AVector(tx1.toTemplate, tx2.toTemplate))
+    txsResponse.asInstanceOf[Payload].verify("txs-response")
+
+    info("new block")
+    val newBlock = NewBlock(block2)
+    newBlock.asInstanceOf[Payload].verify("new-block")
+
+    info("new header")
+    val newHeader = NewHeader(block2.header)
+    newHeader.asInstanceOf[Payload].verify("new-header")
+
+    info("new inventory")
+    val newInv = NewInv(AVector(AVector(block1.hash, block2.hash)))
+    newInv.asInstanceOf[Payload].verify("new-inv")
+
+    info("new block hash")
+    val newBlockHash = NewBlockHash(block2.hash)
+    newBlockHash.asInstanceOf[Payload].verify("new-block-hash")
+
+    info("new tx hashes")
+    val newTxHashes = NewTxHashes(AVector((chainIndex, AVector(tx1.id, tx2.id))))
+    newTxHashes.asInstanceOf[Payload].verify("new-tx-hashes")
   }
 
   private def verifySerde(payload: Payload)(blob: ByteString): Assertion = {
