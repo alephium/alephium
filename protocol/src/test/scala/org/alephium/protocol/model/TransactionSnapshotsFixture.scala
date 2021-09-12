@@ -45,7 +45,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
 
     UnsignedTransaction(
       networkId,
-      scriptOpt.map(script => Compiler.compileTxScript(script).toOption.value),
+      scriptOpt.map(script => Compiler.compileTxScript(script).rightValue),
       GasBox.unsafe(100000),
       GasPrice(U256.unsafe(1000000000)),
       AVector(

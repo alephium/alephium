@@ -211,7 +211,7 @@ class TransactionSpec
     }
 
     {
-      info("multiple contract inputs and outputs")
+      info("multiple contract inputs and generated outputs")
 
       val address1 = Address.p2pkh(pubKey1).toBase58
       val address2 = Address.p2pkh(pubKey2).toBase58
@@ -280,7 +280,7 @@ class TransactionSpec
         contractSign(updatedTransaction, privKey1, privKey2)
       }
 
-      tx.verify("multiple-contract-inputs-and-outputs")
+      tx.verify("multiple-contract-inputs-and-generated-outputs")
     }
 
     {
@@ -382,6 +382,51 @@ class TransactionSpec
 
       val tx = inputSign(unsignedTx, privKey1, privKey2, privKey1, privKey2)
       tx.verify("p2sh-and-p2mpkh-inputs")
+    }
+
+    {
+      info("with contract output")
+
+      val contractLockupScript = LockupScript.P2C(
+        Hash.unsafe(hex"0fa5e21a53aef6019606167b3aad9acca7bce6fd6a868642509b8c3dc7e27113")
+      )
+      val contractAddress = Address.Contract(contractLockupScript).toBase58
+      val script = {
+        val raw =
+          s"""
+           |TxScript Main {
+           |  pub payable fn main() -> () {
+           |    verifyTxSignature!(#${pubKey1.toHexString})
+           |    transferAlfFromSelf!(@$contractAddress, 1000)
+           |  }
+           |}
+           |""".stripMargin
+
+        Compiler.compileTxScript(raw).rightValue
+      }
+
+      val unsignedTx = UnsignedTransaction(
+        networkId,
+        scriptOpt = Some(script),
+        GasBox.unsafe(100000),
+        GasPrice(U256.unsafe(1000000000)),
+        inputs = AVector(
+          TxInput(
+            AssetOutputRef.unsafe(
+              Hint.unsafe(-1038667625),
+              Hash.unsafe(hex"ad9a4e2711353aef6d6a868621a167b3a0196062509b8c3dc7a5ecc0fa7bce6f")
+            ),
+            UnlockScript.P2PKH(pubKey1)
+          )
+        ),
+        fixedOutputs = AVector.empty
+      )
+
+      val transaction        = inputSign(unsignedTx, privKey1)
+      val txOutput           = TxOutput.contract(999, contractLockupScript).payGasUnsafe(10)
+      val updatedTransaction = transaction.copy(generatedOutputs = AVector(txOutput))
+
+      updatedTransaction.verify("with-contract-output")
     }
   }
 }
