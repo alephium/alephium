@@ -34,7 +34,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val groupIndex = chainIndex.from
 
-    forAll(assetsToSpendGen(scriptGen = p2pkScriptGen(groupIndex))) { assets =>
+    forAll(
+      assetsToSpendGen(tokensNumGen = Gen.choose(0, 1), scriptGen = p2pkScriptGen(groupIndex))
+    ) { assets =>
       val inputs     = assets.map(_.txInput)
       val script     = StatefulScript.alwaysFail
       val unsignedTx = UnsignedTransaction(txScriptOpt = Some(script), inputs, AVector.empty)
