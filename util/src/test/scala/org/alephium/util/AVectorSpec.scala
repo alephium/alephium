@@ -531,15 +531,6 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     }
   }
 
-  it should "forallWithIndexE" in new FixtureF {
-    forAll(vectorGen) { vc =>
-      vc.forallWithIndexE[Unit]((e, i) => Right((e equals e) && i >= 0)) isE true
-      vc.forallWithIndexE[Unit]((_, i) => Right(i != vc.length - 1)) isE false
-      vc.forallWithIndexE[Unit]((_, i) => if (i equals vc.length - 1) Left(()) else Right(true))
-        .isLeft is true
-    }
-  }
-
   it should "scalaLeft" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr  = vc.toArray

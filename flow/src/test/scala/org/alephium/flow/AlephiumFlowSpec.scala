@@ -25,8 +25,6 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
-import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValidation}
 import org.alephium.protocol._
@@ -58,10 +56,7 @@ trait FlowFixture
   }
 
   def getGenesisLockupScript(chainIndex: ChainIndex): LockupScript.Asset = {
-    getGenesisLockupScript(chainIndex.from)
-  }
-
-  def getGenesisLockupScript(mainGroup: GroupIndex): LockupScript.Asset = {
+    val mainGroup         = chainIndex.from
     val (_, publicKey, _) = genesisKeys(mainGroup.value)
     LockupScript.p2pkh(publicKey)
   }
@@ -276,22 +271,13 @@ trait FlowFixture
   }
 
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val miner         = LockupScript.p2pkh(chainIndex.to.generateKey._2)
+    val miner         = getGenesisLockupScript(chainIndex)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    val block         = mine(blockTemplate)
+    val block         = mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
 
     block.chainIndex is chainIndex
 
     block
-  }
-
-  @tailrec
-  final def mine(template: BlockFlowTemplate): Block = {
-    val miningBlob = MiningBlob.from(template)
-    Miner.mine(template.index, miningBlob) match {
-      case Some((block, _)) => block
-      case None             => mine(template)
-    }
   }
 
   def mineWithTxs(
