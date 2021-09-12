@@ -147,20 +147,10 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "seder the snapshots properly" in new TransactionSnapshotsFixture {
+  it should "seder the snapshots properly" in new BlockSnapshotsFixture {
     implicit val basePath = "src/test/resources/models/block"
 
     import Hex._
-
-    val pubKey1 =
-      PublicKey.unsafe(hex"03d7b2d064a1cf0f55266314dfcd50926ba032069b5c3dda7fd7c83c3ea8055249")
-    val privKey1 =
-      PrivateKey.unsafe(hex"d803bda2a7b5e2110d1302fe6f9fef18d6b4c38bc4f5e1c31b5830dfb73be216")
-
-    val pubKey2 =
-      PublicKey.unsafe(hex"0298d66776af8012ca087214c10f242db3d220f1181ca0cc9f4f6172371f8fae15")
-    val privKey2 =
-      PrivateKey.unsafe(hex"227cd87dfdbc7e82073d3e05a511ee5c3af2bbd716a498c44e84c098b82be986")
 
     {
       info("empty block")
@@ -324,38 +314,6 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
       val blk = block(transaction)
       blk.verify("txs-with-contract-inputs-outputs")
-    }
-
-    def blockHeader(txsHash: Hash) = {
-      import Hex._
-
-      BlockHeader(
-        nonce = Nonce.unsafe(hex"bb557f744763ca4f5ef8079b4b76c2dbb26a4cd845fbc84d"),
-        version = defaultBlockVersion,
-        blockDeps = BlockDeps.build(
-          deps = AVector(
-            Blake3.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
-            Blake3.unsafe(hex"abb46756a535f6912c90f9f06f503eed53748697f4fad672da1557e2126fa760"),
-            Blake3.unsafe(hex"aecea2ddb52f00109726408bb1eb86bbde953fe696c57e6517c93b27973cc805"),
-            Blake3.unsafe(hex"6725874ac2a55cd70b1ffec51b2afb46eeaf098052e5352582f2ff0135da127e"),
-            Blake3.unsafe(hex"4325ecfd044d88e58c3537275381d1c3a1f410812a2847382058e5686dccfd7a")
-          )
-        ),
-        depStateHash =
-          Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
-        txsHash = txsHash,
-        // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
-        timestamp = TimeStamp.unsafe(1630167995025L),
-        target = Target(hex"20ffffff")
-      )
-    }
-
-    def block(transactions: Transaction*): Block = {
-      val coinbaseTx = coinbaseTransaction(transactions: _*)
-      val allTxs     = AVector.from(transactions) :+ coinbaseTx
-
-      val header = blockHeader(Block.calTxsHash(allTxs))
-      Block(header, allTxs)
     }
   }
 }

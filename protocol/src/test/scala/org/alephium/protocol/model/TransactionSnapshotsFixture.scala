@@ -26,6 +26,16 @@ import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenerators {
   import Hex._
 
+  val pubKey1 =
+    PublicKey.unsafe(hex"03d7b2d064a1cf0f55266314dfcd50926ba032069b5c3dda7fd7c83c3ea8055249")
+  val privKey1 =
+    PrivateKey.unsafe(hex"d803bda2a7b5e2110d1302fe6f9fef18d6b4c38bc4f5e1c31b5830dfb73be216")
+
+  val pubKey2 =
+    PublicKey.unsafe(hex"0298d66776af8012ca087214c10f242db3d220f1181ca0cc9f4f6172371f8fae15")
+  val privKey2 =
+    PrivateKey.unsafe(hex"227cd87dfdbc7e82073d3e05a511ee5c3af2bbd716a498c44e84c098b82be986")
+
   def unsignedTransaction(
       publicKey: PublicKey,
       scriptOpt: Option[String],
