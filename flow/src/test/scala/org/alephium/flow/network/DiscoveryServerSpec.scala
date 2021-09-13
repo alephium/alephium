@@ -24,7 +24,6 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol._
@@ -40,8 +39,6 @@ class DiscoveryServerSpec
     with IntegrationPatience {
   import DiscoveryServerSpec._
 
-  implicit override val patienceConfig =
-    PatienceConfig(timeout = Span(10, Seconds))
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {
     ActorRefT.build(
       system,
@@ -210,6 +207,13 @@ class DiscoveryServerSpec
       )
 
     server2 ! DiscoveryServer.PeerConfirmed(cliqueInfo0.selfBrokerInfo.get)
+
+    withPeers(server0) { peers =>
+      peers.length is groups
+      peers.map(_.address).contains(address1) is false
+    }
+    server2.underlyingActor.getPeersNum is 0
+
     server2 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
 
     withPeers(server0) { peers =>
