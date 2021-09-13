@@ -44,7 +44,7 @@ class IntraCliqueSyncTest extends AlephiumActorSpec {
       eventually(server0.node.blockFlow.containsUnsafe(block.hash) is true)
     }
 
-    val server1 = bootNode(publicPort = generatePort, brokerId = 1)
+    val server1 = bootNode(publicPort = generatePort(), brokerId = 1)
     server1.start().futureValue is ()
 
     eventually(request[SelfClique](getSelfClique, defaultRestMasterPort).selfReady is true)
