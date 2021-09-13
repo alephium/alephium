@@ -584,10 +584,29 @@ object WalletService {
           }
       }
 
+    private def withAllMinerPrivateKeysM[A, M[_]](storage: SecretStorage)(
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => M[A]
+    )(errorWrapper: WalletError => M[A]): M[A] =
+      (for {
+        _           <- checkIsMiner(storage, true)
+        privateKeys <- storage.getAllPrivateKeys().left.map(WalletError.from)
+      } yield {
+        privateKeys
+      }) match {
+        case Left(error) => errorWrapper(error)
+        case Right(privateKeys) =>
+          f(privateKeys)
+      }
+
     private def withPrivateKeys[A](storage: SecretStorage)(
         f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Either[WalletError, A]
     ): Either[WalletError, A] =
       withPrivateKeysM(storage)(f)(Left.apply)
+
+    private def withAllMinerPrivateKeys[A](storage: SecretStorage)(
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Either[WalletError, A]
+    ): Either[WalletError, A] =
+      withAllMinerPrivateKeysM(storage)(f)(Left.apply)
 
     private def withAddressesM[A, M[_]](
         wallet: String
@@ -673,7 +692,7 @@ object WalletService {
     private def computeNextMinerAddresses(
         storage: SecretStorage
     ): Either[WalletError, AVector[Address.Asset]] = {
-      withPrivateKeys(storage) { case (_, keys) =>
+      withAllMinerPrivateKeys(storage) { case (_, keys) =>
         val addressByGroup = keys.toSeq
           .map { privateKey =>
             Address.p2pkh(privateKey.extendedPublicKey.publicKey)
