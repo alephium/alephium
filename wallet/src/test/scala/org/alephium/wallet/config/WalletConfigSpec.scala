@@ -16,9 +16,14 @@
 
 package org.alephium.wallet.config
 
-import com.typesafe.config.{Config, ConfigFactory}
+import scala.jdk.CollectionConverters._
+import scala.util.Try
+
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import net.ceedubs.ficus.Ficus._
 
+import org.alephium.api.model.ApiKey
+import org.alephium.protocol.Hash
 import org.alephium.util.AlephiumSpec
 
 class WalletConfigSpec() extends AlephiumSpec {
@@ -27,5 +32,46 @@ class WalletConfigSpec() extends AlephiumSpec {
     val typesafeConfig: Config = ConfigFactory.load()
 
     typesafeConfig.as[WalletConfig]("wallet")
+  }
+
+  it should "load with api-key" in new Fixture {
+    val walletApiKey    = Hash.generate.toHexString
+    val blockflowApiKey = Hash.generate.toHexString
+
+    override val configValues =
+      Map(("wallet.api-key", walletApiKey), ("wallet.blockflow.api-key", blockflowApiKey))
+
+    val config = typesafeConfig.as[WalletConfig]("wallet")
+
+    config.apiKey.value is ApiKey.unsafe(walletApiKey)
+    config.blockflow.apiKey.value is ApiKey.unsafe(blockflowApiKey)
+  }
+
+  it should "load without api-key" in new Fixture {
+    // scalastyle:off null
+    override val configValues = Map(("wallet.api-key", null), ("wallet.blockflow.api-key", null))
+    // scalastyle:on null
+
+    val config = typesafeConfig.as[WalletConfig]("wallet")
+
+    config.apiKey is None
+    config.blockflow.apiKey is None
+  }
+
+  it should "fail to load invalid api-key" in new Fixture {
+    override val configValues = Map(("wallet.api-key", "to-short"))
+
+    Try(
+      typesafeConfig.as[WalletConfig]("wallet")
+    ).toEither.leftValue.getMessage is "Invalid value at 'ApiKey': Api key must have at least 32 characters"
+  }
+
+  trait Fixture {
+
+    val configValues: Map[String, Any] = Map.empty
+
+    lazy val typesafeConfig = ConfigFactory
+      .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)
+      .withFallback(ConfigFactory.load)
   }
 }

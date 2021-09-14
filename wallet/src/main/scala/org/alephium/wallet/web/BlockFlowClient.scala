@@ -28,7 +28,7 @@ import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.{AVector, Duration, Hex, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait BlockFlowClient {
   def fetchBalance(
@@ -36,13 +36,13 @@ trait BlockFlowClient {
       utxosLimit: Option[Int]
   ): Future[Either[ApiError[_ <: StatusCode], (Amount, Option[String])]]
   def prepareTransaction(
-      fromPublicKey: String,
+      fromPublicKey: PublicKey,
       destinations: AVector[Destination],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def prepareSweepAllTransaction(
-      fromPublicKey: String,
+      fromPublicKey: PublicKey,
       address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
@@ -113,54 +113,44 @@ object BlockFlowClient {
       )
 
     def prepareTransaction(
-        fromPublicKey: String,
+        fromPublicKey: PublicKey,
         destinations: AVector[Destination],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
-      Hex.from(fromPublicKey).flatMap(PublicKey.from) match {
-        case None =>
-          Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromPublicKey")))
-        case Some(publicKey) =>
-          val lockupScript = LockupScript.p2pkh(publicKey)
-          requestFromGroup(
-            lockupScript.groupIndex,
-            buildTransaction,
-            BuildTransaction(
-              publicKey,
-              destinations,
-              None,
-              gas,
-              gasPrice
-            )
-          )
-      }
+      val lockupScript = LockupScript.p2pkh(fromPublicKey)
+      requestFromGroup(
+        lockupScript.groupIndex,
+        buildTransaction,
+        BuildTransaction(
+          fromPublicKey,
+          destinations,
+          None,
+          gas,
+          gasPrice
+        )
+      )
     }
 
     def prepareSweepAllTransaction(
-        fromPublicKey: String,
+        fromPublicKey: PublicKey,
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
-      Hex.from(fromPublicKey).flatMap(PublicKey.from) match {
-        case None =>
-          Future.successful(Left(ApiError.BadRequest(s"Cannot decode key $fromPublicKey")))
-        case Some(publicKey) =>
-          val lockupScript = LockupScript.p2pkh(publicKey)
-          requestFromGroup(
-            lockupScript.groupIndex,
-            buildSweepAllTransaction,
-            BuildSweepAllTransaction(
-              publicKey,
-              address,
-              lockTime,
-              gas,
-              gasPrice
-            )
-          )
-      }
+      val lockupScript = LockupScript.p2pkh(fromPublicKey)
+      requestFromGroup(
+        lockupScript.groupIndex,
+        buildSweepAllTransaction,
+        BuildSweepAllTransaction(
+          fromPublicKey,
+          address,
+          lockTime,
+          gas,
+          gasPrice
+        )
+      )
     }
 
     def postTransaction(

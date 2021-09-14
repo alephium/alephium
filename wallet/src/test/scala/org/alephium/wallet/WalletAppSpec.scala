@@ -67,6 +67,7 @@ class WalletAppSpec
   var addresses: model.Addresses = _
   var address: Address.Asset     = _
   var wallet: String             = "wallet-name"
+  var minerWallet: String        = "miner-wallet-name"
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(transferPublicKey).toBase58
   val transferAmount             = 10
@@ -76,7 +77,8 @@ class WalletAppSpec
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
       .map(name => s""","walletName":"$name"""")
       .getOrElse("")}}"""
-  val passwordJson = s"""{"password":"$password"}"""
+  val minerCreationJson = s"""{"password":"$password","isMiner":true}"""
+  val passwordJson      = s"""{"password":"$password"}"""
   def passwordWithPassphraseJson(mnemonicPassphrase: String) =
     s"""{"password":"$password", "mnemonicPassphrase":"$mnemonicPassphrase"}"""
   def unlockJson(mnemonicPassphrase: Option[String]) =
@@ -86,23 +88,30 @@ class WalletAppSpec
     }
   def transferJson(amount: Int) =
     s"""{"destinations":[{"address":"$transferAddress","amount":"$amount","tokens":[]}]}"""
+  val sweepAllJson =
+    s"""{"toAddress":"$transferAddress"}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic) =
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)}}"""
 
   def create(size: Int, maybeName: Option[String] = None) =
     Post("/wallets", creationJson(size, maybeName))
+  def minerCreate() =
+    Post("/wallets", minerCreationJson)
   def restore(mnemonic: Mnemonic) = Put("/wallets", restoreJson(mnemonic))
   def unlock(mnemonicPassphrase: Option[String] = None) =
     Post(s"/wallets/$wallet/unlock", unlockJson(mnemonicPassphrase))
-  def lock()                = Post(s"/wallets/$wallet/lock")
-  def delete()              = Delete(s"/wallets/$wallet", passwordJson)
-  def getBalance()          = Get(s"/wallets/$wallet/balances")
-  def getAddresses()        = Get(s"/wallets/$wallet/addresses")
-  def revealMnemonic()      = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
-  def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def sign(data: String)    = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
-  def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
+  def lock()                   = Post(s"/wallets/$wallet/lock")
+  def delete()                 = Delete(s"/wallets/$wallet", passwordJson)
+  def getBalance()             = Get(s"/wallets/$wallet/balances")
+  def getAddresses()           = Get(s"/wallets/$wallet/addresses")
+  def getMinerAddresses()      = Get(s"/wallets/$minerWallet/miner-addresses")
+  def revealMnemonic()         = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
+  def transfer(amount: Int)    = Post(s"/wallets/$wallet/transfer", transferJson(amount))
+  def sweepAll()               = Post(s"/wallets/$wallet/sweep-all", sweepAllJson)
+  def sign(data: String)       = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
+  def deriveNextAddress()      = Post(s"/wallets/$wallet/derive-next-address")
+  def deriveNextMinerAddress() = Post(s"/wallets/$minerWallet/derive-next-miner-addresses")
   def getAddressInfo(address: Address) =
     Get(s"/wallets/$wallet/addresses/$address")
   def changeActiveAddress(address: Address) =
@@ -203,6 +212,11 @@ class WalletAppSpec
       val error = response.as[ApiError.BadRequest]
       error.detail.contains(s"""Not enough balance""") is true
       response.code is StatusCode.BadRequest
+    }
+
+    sweepAll() check { response =>
+      response.as[model.Transfer.Result]
+      response.code is StatusCode.Ok
     }
 
     deriveNextAddress() check { response =>
@@ -344,6 +358,32 @@ class WalletAppSpec
       response.code is StatusCode.BadRequest
     }
 
+    minerCreate() check { response =>
+      val result = response.as[model.WalletCreation.Result]
+      mnemonic = result.mnemonic
+      minerWallet = result.walletName
+      response.code is StatusCode.Ok
+    }
+
+    getMinerAddresses() check { response =>
+      val result = response.as[AVector[model.MinerAddressesInfo]]
+      result.length is 1
+      result.head.addresses.length is groupConfig.groups
+      response.code is StatusCode.Ok
+    }
+
+    deriveNextMinerAddress() check { response =>
+      val result = response.as[AVector[model.MinerAddressInfo]]
+      result.length is groupConfig.groups
+      response.code is StatusCode.Ok
+    }
+
+    getMinerAddresses() check { response =>
+      val result = response.as[AVector[model.MinerAddressesInfo]]
+      result.length is 2
+      response.code is StatusCode.Ok
+    }
+
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())
     walletApp.stop().futureValue is ()
   }
@@ -400,6 +440,21 @@ object WalletAppSpec extends {
           )
         )
       }
+    }
+
+    router.route().path("/transactions/sweep-all/build").handler(BodyHandler.create()).handler {
+      ctx =>
+        val _          = read[BuildSweepAllTransaction](ctx.getBodyAsString())
+        val unsignedTx = transactionGen().sample.get.unsigned
+        complete(
+          ctx,
+          BuildTransactionResult(
+            Hex.toHexString(serialize(unsignedTx)),
+            unsignedTx.hash,
+            unsignedTx.fromGroup.value,
+            unsignedTx.toGroup.value
+          )
+        )
     }
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>

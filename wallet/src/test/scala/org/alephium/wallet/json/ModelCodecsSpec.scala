@@ -45,6 +45,10 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     read[T](rawJson) is input
   }
 
+  def parseFail[A: Reader](jsonRaw: String): String = {
+    scala.util.Try(read[A](jsonRaw)).toEither.swap.toOption.get.getMessage
+  }
+
   it should "Addresses" in {
     val json      = s"""{"activeAddress":"$address","addresses":["$address"]}"""
     val addresses = Addresses(address, AVector(address))
@@ -103,6 +107,11 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   it should "Mnemonic" in {
     val json = s""""${mnemonic.toLongString}""""
     check(mnemonic, json)
+
+    val wrongMnemonic = "two words"
+    parseFail[Mnemonic](
+      s""""$wrongMnemonic""""
+    ) is s"Cannot validate mnemonic: $wrongMnemonic at index 0"
   }
 
   it should "WalletUnlock" in {

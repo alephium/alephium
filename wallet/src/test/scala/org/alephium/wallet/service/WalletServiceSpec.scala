@@ -66,6 +66,23 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     minerAddresses2.foreach(address => newMinerAddresses.contains(address))
   }
 
+  //Regression test as we had one bug with this mnemonic and the way we were getting the private keys from the secret storage
+  it should "correctly derive miner addresses" in new Fixture {
+    val mnemonic = Mnemonic
+      .from(
+        "hedgehog elephant seven tired orient fragile vehicle category frame foster wall muscle surround slight original candy pyramid face bamboo like language sunny present praise"
+      )
+      .get
+    val walletName =
+      walletService.restoreWallet(password, mnemonic, true, None, None).rightValue
+
+    walletService.deriveNextMinerAddresses(walletName).rightValue
+
+    val minerAddresses = walletService.getMinerAddresses(walletName).rightValue
+
+    minerAddresses.length is 2 //was equal to 4 before the fix
+  }
+
   it should "fail to start if secret dir path is invalid" in new Fixture {
     val path = s"/${Random.nextInt()}"
     override lazy val walletService = WalletService(
@@ -187,6 +204,15 @@ class WalletServiceSpec extends AlephiumFutureSpec {
   }
 
   it should "sign any data " in new UserWallet {
+    val data     = Hash.generate
+    val expected = SignatureSchema.sign(data.bytes, privateKey)
+
+    walletService
+      .sign(walletName, data.toHexString)
+      .rightValue is expected
+  }
+
+  it should "correctly convert secret storage erro" in new UserWallet {
     val data     = Hash.generate
     val expected = SignatureSchema.sign(data.bytes, privateKey)
 
