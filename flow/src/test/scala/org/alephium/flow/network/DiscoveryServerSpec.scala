@@ -90,47 +90,6 @@ class DiscoveryServerSpec
     }
   }
 
-  it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
-    self =>
-    val groups = 4
-
-    val cliqueNum = 16
-    val cliques   = AVector.fill(cliqueNum)(generateClique())
-
-    val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
-      infos.map { case (brokerInfo, config) =>
-        val misbehaviorManager = buildMisbehaviorManager(system)
-        val server = {
-          if (index equals 0) {
-            TestActorRef[DiscoveryServer](
-              DiscoveryServer
-                .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig)
-            )
-          } else {
-            val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
-            TestActorRef[DiscoveryServer](
-              DiscoveryServer
-                .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(
-                  config,
-                  config,
-                  networkConfig
-                )
-            )
-          }
-        }
-        server ! DiscoveryServer.SendCliqueInfo(clique)
-
-        server
-      }
-    }
-
-    servers.foreach { server =>
-      withPeers(server) { peers =>
-        (peers.sumBy(peer => groups / peer.brokerNum) >= 5 * groups) is true
-      }
-    }
-  }
-
   def generateCliqueInfo(master: InetSocketAddress, groupConfig: GroupConfig): CliqueInfo = {
     val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
     val newInfo = CliqueInfo.unsafe(
@@ -199,19 +158,99 @@ class DiscoveryServerSpec
     }
   }
 
-  trait UnreachableFixture extends Fixture {
+  it should "stash messages before receiving cliqueInfo" in new Fixture {
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    val misbehaviorManager = buildMisbehaviorManager(system)
+    lazy val server2 =
+      newTestActorRef[DiscoveryServer](
+        DiscoveryServer
+          .props(address1, misbehaviorManager)(brokerConfig, config1, networkConfig)
+      )
+
+    server2 ! DiscoveryServer.PeerConfirmed(cliqueInfo0.selfBrokerInfo.get)
+
+    withPeers(server0) { peers =>
+      peers.length is groups
+      peers.map(_.address).contains(address1) is false
+    }
+    server2.underlyingActor.getPeersNum is 0
+
+    server2 ! DiscoveryServer.SendCliqueInfo(cliqueInfo1)
+
+    withPeers(server0) { peers =>
+      peers.length is groups + 1 // self clique peers + server1
+      peers.filter(_.cliqueId equals cliqueInfo0.id).toSet is cliqueInfo0.interBrokers.get.toSet
+      peers.filterNot(_.cliqueId equals cliqueInfo0.id) is AVector(
+        cliqueInfo1.interBrokers.get.head
+      )
+    }
+    withPeers(server2) { peers =>
+      peers.length is groups + 1 // 3 self clique peers + server0
+      peers.filter(_.cliqueId equals cliqueInfo1.id).toSet is cliqueInfo1.interBrokers.get.toSet
+      peers.filterNot(_.cliqueId equals cliqueInfo1.id) is AVector(
+        cliqueInfo0.interBrokers.get.head
+      )
+    }
+  }
+
+  trait UnreachableFixture extends Fixture {
+    val misbehaviorManager = buildMisbehaviorManager(system)
+    lazy val server2 =
+      newTestActorRef[DiscoveryServer](
+        DiscoveryServer
+          .props(address1, misbehaviorManager)(brokerConfig, config1, networkConfig)
+      )
+    server2 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
   }
 
   it should "mark address as unreachable" in new UnreachableFixture {
     val remote = Generators.socketAddressGen.sample.get
-    server0 ! InterCliqueManager.Unreachable(remote)
+    server2 ! InterCliqueManager.Unreachable(remote)
     eventually {
-      server0.underlyingActor.mightReachable(remote) is false
+      server2.underlyingActor.mightReachable(remote) is false
     }
-    server0 ! DiscoveryServer.Unban(AVector(remote.getAddress))
+    server2 ! DiscoveryServer.Unban(AVector(remote.getAddress))
     eventually {
-      server0.underlyingActor.mightReachable(remote) is true
+      server2.underlyingActor.mightReachable(remote) is true
+    }
+  }
+
+  it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
+    self =>
+    val groups = 4
+
+    val cliqueNum = 16
+    val cliques   = AVector.fill(cliqueNum)(generateClique())
+    val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
+      infos.map { case (brokerInfo, config) =>
+        val misbehaviorManager = buildMisbehaviorManager(system)
+        val server = {
+          if (index equals 0) {
+            TestActorRef[DiscoveryServer](
+              DiscoveryServer
+                .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig)
+            )
+          } else {
+            val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
+            TestActorRef[DiscoveryServer](
+              DiscoveryServer
+                .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(
+                  config,
+                  config,
+                  networkConfig
+                )
+            )
+          }
+        }
+        server ! DiscoveryServer.SendCliqueInfo(clique)
+
+        server
+      }
+    }
+    servers.foreach { server =>
+      withPeers(server) { peers =>
+        (peers.sumBy(peer => groups / peer.brokerNum) >= 5 * groups) is true
+      }
     }
   }
 
@@ -266,14 +305,15 @@ object DiscoveryServerSpec {
       _peersPerGroup: Int,
       _scanFrequency: Duration = Duration.unsafe(200),
       _expireDuration: Duration = Duration.ofHoursUnsafe(1),
-      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5)
+      _peersTimeout: Duration = Duration.ofSecondsUnsafe(5),
+      _scanFastPeriod: Duration = Duration.ofMinutesUnsafe(1)
   ): (InetSocketAddress, DiscoveryConfig with BrokerConfig) = {
     val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
       val scanFrequency: Duration     = _scanFrequency
       val scanFastFrequency: Duration = _scanFrequency
-      val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
+      val fastScanPeriod: Duration    = _scanFastPeriod
       val neighborsPerGroup: Int      = _peersPerGroup
 
       override lazy val expireDuration: Duration = _expireDuration
