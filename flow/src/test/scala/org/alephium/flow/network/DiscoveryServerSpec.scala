@@ -22,6 +22,7 @@ import scala.util.Random
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
+import com.typesafe.config.Config
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
@@ -49,6 +50,8 @@ class DiscoveryServerSpec
       )
     )
   }
+
+  override def actorSystemConfig: Config = AlephiumActorSpec.debugConfig
 
   trait SimulationFixture { fixture =>
 
@@ -87,45 +90,6 @@ class DiscoveryServerSpec
       }
 
       (clique, infos)
-    }
-  }
-
-  it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
-    self =>
-    val groups = 4
-
-    val cliqueNum = 16
-    val cliques   = AVector.fill(cliqueNum)(generateClique())
-    val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
-      infos.map { case (brokerInfo, config) =>
-        val misbehaviorManager = buildMisbehaviorManager(system)
-        val server = {
-          if (index equals 0) {
-            TestActorRef[DiscoveryServer](
-              DiscoveryServer
-                .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig)
-            )
-          } else {
-            val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
-            TestActorRef[DiscoveryServer](
-              DiscoveryServer
-                .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(
-                  config,
-                  config,
-                  networkConfig
-                )
-            )
-          }
-        }
-        server ! DiscoveryServer.SendCliqueInfo(clique)
-
-        server
-      }
-    }
-    servers.foreach { server =>
-      withPeers(server) { peers =>
-        (peers.sumBy(peer => groups / peer.brokerNum) >= 5 * groups) is true
-      }
     }
   }
 
@@ -233,18 +197,63 @@ class DiscoveryServerSpec
   }
 
   trait UnreachableFixture extends Fixture {
-    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    val misbehaviorManager = buildMisbehaviorManager(system)
+    lazy val server2 =
+      newTestActorRef[DiscoveryServer](
+        DiscoveryServer
+          .props(address1, misbehaviorManager)(brokerConfig, config1, networkConfig)
+      )
+    server2 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
   }
 
   it should "mark address as unreachable" in new UnreachableFixture {
     val remote = Generators.socketAddressGen.sample.get
-    server0 ! InterCliqueManager.Unreachable(remote)
+    server2 ! InterCliqueManager.Unreachable(remote)
     eventually {
-      server0.underlyingActor.mightReachable(remote) is false
+      server2.underlyingActor.mightReachable(remote) is false
     }
-    server0 ! DiscoveryServer.Unban(AVector(remote.getAddress))
+    server2 ! DiscoveryServer.Unban(AVector(remote.getAddress))
     eventually {
-      server0.underlyingActor.mightReachable(remote) is true
+      server2.underlyingActor.mightReachable(remote) is true
+    }
+  }
+
+  it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
+    self =>
+    val groups = 4
+
+    val cliqueNum = 16
+    val cliques   = AVector.fill(cliqueNum)(generateClique())
+    val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
+      infos.map { case (brokerInfo, config) =>
+        val misbehaviorManager = buildMisbehaviorManager(system)
+        val server = {
+          if (index equals 0) {
+            TestActorRef[DiscoveryServer](
+              DiscoveryServer
+                .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig)
+            )
+          } else {
+            val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
+            TestActorRef[DiscoveryServer](
+              DiscoveryServer
+                .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(
+                  config,
+                  config,
+                  networkConfig
+                )
+            )
+          }
+        }
+        server ! DiscoveryServer.SendCliqueInfo(clique)
+
+        server
+      }
+    }
+    servers.foreach { server =>
+      withPeers(server) { peers =>
+        (peers.sumBy(peer => groups / peer.brokerNum) >= 5 * groups) is true
+      }
     }
   }
 
