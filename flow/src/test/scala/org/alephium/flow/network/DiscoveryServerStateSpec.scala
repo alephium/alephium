@@ -280,7 +280,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     ) {
       addToTable(Generators.brokerInfoGen.sample.get)
     }
-    val furthestPeer = state.getNeighbors(state.selfCliqueId).last
+    val furthestPeer =
+      state.getNeighbors(state.selfCliqueId).maxBy(_.cliqueId.hammingDist(state.selfCliqueId))
     val peer = Generators.brokerInfoGen
       .retryUntil(
         _.cliqueId.hammingDist(state.selfCliqueId) < state.selfCliqueId.hammingDist(

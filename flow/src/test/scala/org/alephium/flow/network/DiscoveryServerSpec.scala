@@ -22,7 +22,6 @@ import scala.util.Random
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import com.typesafe.config.Config
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
@@ -50,8 +49,6 @@ class DiscoveryServerSpec
       )
     )
   }
-
-  override def actorSystemConfig: Config = AlephiumActorSpec.debugConfig
 
   trait SimulationFixture { fixture =>
 

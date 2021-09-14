@@ -143,14 +143,12 @@ trait DiscoveryServerState extends SessionManager {
       case Some(until) => unreachables.put(remote, until + Duration.ofMinutesUnsafe(1))
       case None        => unreachables.put(remote, TimeStamp.now().plusMinutesUnsafe(1))
     }
-    log.debug(s"Set $remote as unreachable")
     remove(remote)
   }
 
   def unsetUnreachable(remote: InetAddress): Unit = {
     val toRemove = AVector.from(unreachables.keys().filter(_.getAddress == remote))
     toRemove.foreach(unreachables.remove)
-    log.debug(s"Unset unreachable $remote")
   }
 
   def mightReachable(remote: InetSocketAddress): Boolean = {
