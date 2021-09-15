@@ -146,7 +146,7 @@ class MemPoolSpec
     pool.addNewTx(index2, tx2, currentTs)
     pool.addNewTx(index2, tx3, currentTs)
     pool.size is 4
-    pool.clean(blockFlow, TimeStamp.now().plusMinutesUnsafe(1))
+    pool.cleanAndExtractReadyTxs(blockFlow, TimeStamp.now().plusMinutesUnsafe(1))
     pool.size is 1
     pool.contains(index2, tx2) is true
   }

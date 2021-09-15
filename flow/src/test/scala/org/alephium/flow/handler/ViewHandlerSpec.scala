@@ -93,10 +93,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "update deps and txs" in new Fixture {
-    override val configValues = Map(("alephium.network.txs-broadcast-delay", "200 milli"))
-    viewHandler ! InterCliqueManager.SyncedResult(true)
-
+  it should "update deps and txs" in new SyncedFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val blockFlow1 = isolatedBlockFlow()
     val block0     = transfer(blockFlow1, chainIndex)

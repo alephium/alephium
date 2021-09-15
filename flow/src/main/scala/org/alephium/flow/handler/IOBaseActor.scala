@@ -24,6 +24,12 @@ trait IOBaseActor extends BaseActor {
   def handleIOError(error: IOError): Unit = {
     log.error(s"IO failed: ${error.toString}")
   }
+  def escapeIOError(result: IOResult[Unit]): Unit = {
+    result match {
+      case Left(e) => handleIOError(e)
+      case _       => ()
+    }
+  }
   def escapeIOError[T](result: IOResult[T])(f: T => Unit): Unit = {
     result match {
       case Right(t) => f(t)
@@ -38,4 +44,6 @@ trait IOBaseActor extends BaseActor {
         default
     }
   }
+  def escapeIOError[T](result: IOResult[T], default: => T): T =
+    escapeIOError[T, T](result, identity)(default)
 }

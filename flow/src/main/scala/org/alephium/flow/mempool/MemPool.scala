@@ -20,6 +20,7 @@ import io.prometheus.client.Gauge
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.flow.mempool.MemPool.CleanupResult
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -172,10 +173,13 @@ class MemPool private (
     sharedPools.foreach(_.clear())
   }
 
-  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
-    sharedPools.foreach(_.clean(blockFlow, timeStampThreshold))
-    updatePendingPool()
-    ()
+  def cleanAndExtractReadyTxs(
+      blockFlow: BlockFlow,
+      timeStampThreshold: TimeStamp
+  ): MemPool.CleanupResult = {
+    val invalidTxss = sharedPools.map(_.clean(blockFlow, timeStampThreshold))
+    val readyTxs    = updatePendingPool()
+    CleanupResult(invalidTxss, readyTxs)
   }
 }
 
@@ -192,6 +196,11 @@ object MemPool {
     val pendingPool = PendingPool.empty(mainGroup, memPoolSetting.pendingPoolCapacity)
     new MemPool(mainGroup, sharedPools, sharedTxIndex, pendingPool)
   }
+
+  final case class CleanupResult(
+      invalidTxss: AVector[IOResult[AVector[TransactionTemplate]]],
+      readyTxs: AVector[(TransactionTemplate, TimeStamp)]
+  )
 
   sealed trait NewTxCategory
   case object AddedToSharedPool  extends NewTxCategory

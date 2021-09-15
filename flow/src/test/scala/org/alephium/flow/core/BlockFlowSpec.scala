@@ -163,7 +163,10 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
-      blockFlow.grandPool.clean(blockFlow, TimeStamp.now()) // remove double spending tx
+      blockFlow.grandPool.cleanAndExtractReadyTxs(
+        blockFlow,
+        TimeStamp.now()
+      ) // remove double spending tx
       checkBalance(blockFlow, 0, genesisBalance - ALF.alf(1))
 
       val block13 = transfer(blockFlow, chainIndex1)
