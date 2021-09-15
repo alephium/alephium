@@ -211,12 +211,13 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       mempool: MemPool,
       acknowledge: Boolean
   ): Unit = {
-    val result = mempool.addNewTx(chainIndex, tx)
+    val currentTs = TimeStamp.now()
+    val result    = mempool.addNewTx(chainIndex, tx, currentTs)
     log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
       case MemPool.AddedToSharedPool =>
         if (needToDelay(chainIndex, tx)) {
-          delayedTxs.put(tx, TimeStamp.now().plusUnsafe(networkSetting.txsBroadcastDelay))
+          delayedTxs.put(tx, currentTs.plusUnsafe(networkSetting.txsBroadcastDelay))
         } else {
           txsBuffer.put(tx, ())
         }

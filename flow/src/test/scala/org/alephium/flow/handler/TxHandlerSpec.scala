@@ -28,7 +28,7 @@ import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, Hex}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, Hex, TimeStamp}
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
@@ -241,7 +241,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val txHash4 = Hash.generate
     val mempool = blockFlow.getMemPool(chain02)
     mempool.contains(chain02, tx2.id) is false
-    mempool.addNewTx(chain02, tx2)
+    mempool.addNewTx(chain02, tx2, TimeStamp.now())
     mempool.contains(chain02, tx2.id) is true
 
     txHandler ! TxHandler.TxAnnouncements(

@@ -39,7 +39,7 @@ import org.alephium.protocol.{BlockHash, Generators, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGeneratorsLike}
-import org.alephium.util.{ActorRefT, AVector, UnsecureRandom}
+import org.alephium.util.{ActorRefT, AVector, TimeStamp, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "set remote synced" in new Fixture {
@@ -320,7 +320,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs           = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     txs.foreach { tx =>
       val mempool = blockFlow.getMemPool(chainIndex)
-      mempool.addNewTx(chainIndex, tx)
+      mempool.addNewTx(chainIndex, tx, TimeStamp.now())
       mempool.getSharedPool(chainIndex).contains(tx.id) is true
     }
 

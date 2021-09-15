@@ -632,7 +632,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
 
       tx.chainIndex is chainIndex
-      theMemPool.addNewTx(chainIndex, tx)
+      theMemPool.addNewTx(chainIndex, tx, TimeStamp.now())
       theMemPool.contains(tx.chainIndex, tx.id) is true
 
       val balance = initialAmount - (ALF.oneAlf + defaultGasFee).mulUnsafe(txCount)

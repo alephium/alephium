@@ -80,15 +80,19 @@ class MemPool private (
     tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
   }
 
-  def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
+  def addNewTx(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      currentTs: TimeStamp
+  ): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
-      if (pendingPool.add(tx, TimeStamp.now())) {
+      if (pendingPool.add(tx, currentTs)) {
         MemPool.AddedToPendingPool
       } else {
         MemPool.PendingPoolIsFull
       }
     } else {
-      if (getSharedPool(index).add(tx, TimeStamp.now())) {
+      if (getSharedPool(index).add(tx, currentTs)) {
         MemPool.AddedToSharedPool
       } else {
         MemPool.SharedPoolIsFull
