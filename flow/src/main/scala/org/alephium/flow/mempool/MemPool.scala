@@ -22,6 +22,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.mempool.MemPool.CleanupResult
 import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -171,6 +172,12 @@ class MemPool private (
 
   def clear(): Unit = {
     sharedPools.foreach(_.clear())
+  }
+
+  def cleanPendingPool(
+      blockFlow: BlockFlow
+  ): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
+    pendingPool.clean(blockFlow, txIndexes)
   }
 
   def cleanAndExtractReadyTxs(

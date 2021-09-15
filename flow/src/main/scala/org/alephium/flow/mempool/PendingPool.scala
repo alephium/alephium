@@ -18,7 +18,9 @@ package org.alephium.flow.mempool
 
 import scala.collection.mutable
 
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -107,13 +109,34 @@ class PendingPool(
     indexes.getOutput(outputRef)
   }
 
-  def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {
-    AVector.from(
-      timestamps
-        .entries()
-        .takeWhile(_.getValue < timeStampThreshold)
-        .map(entry => txs(entry.getKey))
-    )
+  def clean(
+      blockFlow: BlockFlow,
+      sharedPoolIndexes: TxIndexes
+  ): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
+    blockFlow.getImmutableGroupView(groupIndex).map { groupView =>
+      val removed = mutable.ArrayBuffer.empty[(TransactionTemplate, TimeStamp)]
+      takeTxs().foreach { case (tx, timestamp) =>
+        val remainInputs = tx.unsigned.inputs.filter { input =>
+          val inPendingPool = indexes.outputIndex.contains(input.outputRef)
+          val inSharedPool  = sharedPoolIndexes.outputIndex.contains(input.outputRef)
+          !(inPendingPool || inSharedPool)
+        }
+        if (remainInputs.nonEmpty) {
+          groupView.getPreOutputs(remainInputs).map {
+            case Some(_) => ()
+            case None =>
+              remove(tx)
+              removed += (tx -> timestamp)
+          }
+          ()
+        }
+      }
+      AVector.from(removed)
+    }
+  }
+
+  def takeTxs(): AVector[(TransactionTemplate, TimeStamp)] = readOnly {
+    AVector.from(timestamps.entries().map(entry => (txs(entry.getKey), entry.getValue)))
   }
 
   private val transactionTotalLabeled =

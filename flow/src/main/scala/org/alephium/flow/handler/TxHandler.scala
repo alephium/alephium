@@ -139,6 +139,14 @@ class TxHandler(
       }
     case TxHandler.CleanPendingPool =>
       log.debug("Start to clean pending pools")
+      blockFlow.grandPool.cleanPendingPool(blockFlow).foreach { result =>
+        escapeIOError(result) { invalidPendingTxs =>
+          invalidPendingTxs.foreach { case (tx, timestamp) =>
+            val persistedTxId = PersistedTxId(timestamp, tx.id)
+            escapeIOError(pendingTxStorage.delete(persistedTxId))
+          }
+        }
+      }
       removeConfirmedTxsFromStorage()
   }
 

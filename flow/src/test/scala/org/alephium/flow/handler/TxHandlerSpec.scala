@@ -190,6 +190,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val pendingTxStorage       = storages.pendingTxStorage
     val readyTxStorage         = storages.readyTxStorage
 
+    lazy val block0 = transfer(blockFlow, privKey0, pubKey1, ALF.alf(4))
+    lazy val tx0    = block0.firstTx
+    lazy val block1 = transfer(blockFlow, privKey1, pubKey0, ALF.alf(1))
+    lazy val tx1    = block1.firstTx
+    lazy val block2 = transfer(blockFlow, privKey1, pubKey0, ALF.alf(1))
+    lazy val tx2    = block2.firstTx
+
     implicit class FirstTxOfBlock(block: Block) {
       def firstTx: TransactionTemplate = block.nonCoinbase.head.toTemplate
     }
@@ -221,18 +228,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       pendingPool.remove(txs)
       txs.foreach(tx => pendingPool.contains(tx.id) is false)
     }
+
+    setSynced()
   }
 
   it should "persist pending txs" in new PersistenceFixture {
-    val block0 = transfer(blockFlow, privKey0, pubKey1, ALF.alf(4))
-    val tx0    = block0.firstTx
-    setSynced()
     addReadyTx(tx0)
-
-    val block1        = transfer(blockFlow, privKey0, pubKey1, ALF.alf(1))
-    val tx1           = block1.firstTx
     val persistedTxId = addPendingTx(tx1)
-
     info("Pending tx becomes ready")
     readyTxStorage.exists(tx1.id) isE false
     txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId.timestamp))
@@ -243,8 +245,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     info("Remove pending tx from storage when confirmed")
     addAndCheck(blockFlow, block0)
     blockFlow.isTxConfirmed(tx1.id, tx1.chainIndex) isE false
-    val block2 = mineWithoutCoinbase(blockFlow, chainIndex, block1.nonCoinbase, block1.timestamp)
-    addAndCheck(blockFlow, block2)
+    val newBlock = mineWithoutCoinbase(blockFlow, chainIndex, block1.nonCoinbase, block1.timestamp)
+    addAndCheck(blockFlow, newBlock)
     blockFlow.isTxConfirmed(tx1.id, tx1.chainIndex) isE true
     txHandler ! TxHandler.CleanPendingPool
     pendingTxStorage.exists(persistedTxId) isE false
@@ -252,16 +254,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "load persisted pending txs" in new PersistenceFixture {
-    val block0 = transfer(blockFlow, privKey0, pubKey1, ALF.alf(4))
-    val tx0    = block0.firstTx
-    setSynced()
     addReadyTx(tx0)
-
-    val tx1            = transfer(blockFlow, privKey1, pubKey0, ALF.alf(1)).firstTx
     val persistedTxId1 = addPendingTx(tx1)
-    val tx2            = transfer(blockFlow, privKey1, pubKey0, ALF.alf(1)).firstTx
     val persistedTxId2 = addPendingTx(tx2)
-
     removeReadyTxs(AVector(tx0))
     removePendingTxs(AVector(tx1, tx2))
     sharedPool.txs.isEmpty is true
@@ -324,6 +319,39 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler ! TxHandler.CleanSharedPool
     readyTxStorage.exists(tx1.id) isE false
     pendingTxStorage.exists(persistedTxId1) isE false
+  }
+
+  it should "remove invalid txs from storage when clean up pending pool" in new PersistenceFixture {
+    addReadyTx(tx0)
+
+    {
+      info("Pending txs are valid")
+      val persistedTxId1 = addPendingTx(tx1)
+      val persistedTxId2 = addPendingTx(tx2)
+      txHandler ! TxHandler.CleanPendingPool
+      pendingTxStorage.get(persistedTxId1) isE tx1
+      pendingTxStorage.get(persistedTxId2) isE tx2
+      pendingPool.contains(tx1.id) is true
+      pendingPool.contains(tx2.id) is true
+
+      info("Remove invalid tx(tx2)")
+      removePendingTxs(AVector(tx1))
+      txHandler ! TxHandler.CleanPendingPool
+      pendingTxStorage.exists(persistedTxId2) isE false
+      pendingPool.contains(tx2.id) is false
+    }
+
+    {
+      info("Remove invalid txs(tx1 & tx2)")
+      val persistedTxId1 = addPendingTx(tx1)
+      val persistedTxId2 = addPendingTx(tx2)
+      removeReadyTxs(AVector(tx0))
+      txHandler ! TxHandler.CleanPendingPool
+      pendingTxStorage.exists(persistedTxId1) isE false
+      pendingTxStorage.exists(persistedTxId2) isE false
+      pendingPool.contains(tx1.id) is false
+      pendingPool.contains(tx2.id) is false
+    }
   }
 
   it should "fail in case of duplicate txs" in new Fixture {

@@ -18,6 +18,7 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionTemplate}
 import org.alephium.util.{AVector, TimeStamp}
@@ -38,6 +39,12 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
       timeStampThreshold: TimeStamp
   ): AVector[MemPool.CleanupResult] = {
     mempools.map(_.cleanAndExtractReadyTxs(blockFlow, timeStampThreshold))
+  }
+
+  def cleanPendingPool(
+      blockFlow: BlockFlow
+  ): AVector[IOResult[AVector[(TransactionTemplate, TimeStamp)]]] = {
+    mempools.map(_.cleanPendingPool(blockFlow))
   }
 }
 
