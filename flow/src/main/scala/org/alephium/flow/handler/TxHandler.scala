@@ -16,6 +16,8 @@
 
 package org.alephium.flow.handler
 
+import scala.collection.mutable
+
 import akka.actor.Props
 
 import org.alephium.flow.Utils
@@ -214,23 +216,24 @@ class TxHandler(
 
   private def downloadTxs(): Unit = {
     log.debug("Start to download txs")
-    if (!announcements.isEmpty) {
-      announcements
-        .keys()
-        .foldLeft(Map.empty[ActorRefT[BrokerHandler.Command], Map[ChainIndex, AVector[Hash]]]) {
-          case (acc, TxHandler.Announcement(brokerHandler, chainIndex, hash)) =>
-            val newAnns = acc.get(brokerHandler) match {
-              case Some(anns) => updateChainIndexedHash(anns, chainIndex, hash)
-              case None       => Map(chainIndex -> AVector(hash))
-            }
-            acc + (brokerHandler -> newAnns)
+    if (announcements.nonEmpty) {
+      val downloads = mutable.Map
+        .empty[ActorRefT[BrokerHandler.Command], mutable.Map[ChainIndex, mutable.ArrayBuffer[Hash]]]
+      announcements.keys().foreach { announcement =>
+        downloads.get(announcement.brokerHandler) match {
+          case Some(chainIndexedHashes) =>
+            updateChainIndexHashes(announcement.hash, announcement.chainIndex, chainIndexedHashes)
+          case None =>
+            val hashes             = mutable.ArrayBuffer(announcement.hash)
+            val chainIndexedHashes = mutable.Map(announcement.chainIndex -> hashes)
+            downloads(announcement.brokerHandler) = chainIndexedHashes
         }
-        .foreach { case (brokerHandler, anns) =>
-          val txHashes = AVector.from(anns)
-          log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
-          brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
-        }
-
+      }
+      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
+        val txHashes = chainIndexedHashesToAVector(chainIndexedHashes)
+        log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
+        brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
+      }
       announcements.clear()
     }
     scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
@@ -333,47 +336,55 @@ class TxHandler(
     }
   }
 
-  private def updateChainIndexedHash(
-      hashes: Map[ChainIndex, AVector[Hash]],
+  private def updateChainIndexHashes(
+      hash: Hash,
       chainIndex: ChainIndex,
-      hash: Hash
-  ): Map[ChainIndex, AVector[Hash]] = {
+      hashes: mutable.Map[ChainIndex, mutable.ArrayBuffer[Hash]]
+  ): Unit = {
     hashes.get(chainIndex) match {
-      case Some(chainIndexedHashes) => hashes + (chainIndex -> (chainIndexedHashes :+ hash))
-      case None                     => hashes + (chainIndex -> AVector(hash))
+      case Some(chainIndexHashes) => chainIndexHashes += hash
+      case None =>
+        val chainIndexedHashes = mutable.ArrayBuffer(hash)
+        hashes(chainIndex) = chainIndexedHashes
     }
   }
 
-  def broadcastTxs(): Unit = {
+  private def chainIndexedHashesToAVector(
+      hashes: mutable.Map[ChainIndex, mutable.ArrayBuffer[Hash]]
+  ): AVector[(ChainIndex, AVector[Hash])] = {
+    hashes.foldLeft(AVector.empty[(ChainIndex, AVector[Hash])]) {
+      case (acc, (chainIndex, hashes)) =>
+        acc :+ (chainIndex -> AVector.from(hashes))
+    }
+  }
+
+  private def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
-    val hashes1 = if (!txsBuffer.isEmpty) {
-      val hashes =
-        txsBuffer.keys().foldLeft(Map.empty[ChainIndex, AVector[Hash]]) { case (acc, tx) =>
-          updateChainIndexedHash(acc, tx.chainIndex, tx.id)
-        }
+    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[Hash]]
+    if (txsBuffer.nonEmpty) {
+      txsBuffer.keys().foreach { tx =>
+        updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
+      }
       txsBuffer.clear()
-      hashes
-    } else {
-      Map.empty[ChainIndex, AVector[Hash]]
     }
 
-    val hashes2 = if (delayedTxs.isEmpty) {
-      hashes1
-    } else {
+    if (delayedTxs.nonEmpty) {
       val currentTs = TimeStamp.now()
-      val (hashes, removed) = delayedTxs
+      val removed   = mutable.ArrayBuffer.empty[TransactionTemplate]
+      delayedTxs
         .entries()
         .takeWhile(_.getValue <= currentTs)
-        .foldLeft((hashes1, AVector.empty[TransactionTemplate])) {
-          case ((hashes, removed), entry) =>
-            val tx = entry.getKey
-            (updateChainIndexedHash(hashes, tx.chainIndex, tx.id), removed :+ tx)
+        .foreach { entry =>
+          val tx = entry.getKey
+          removed += tx
+          updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
         }
       removed.foreach(delayedTxs.remove)
-      hashes
     }
-    if (hashes2.nonEmpty) {
-      publishEvent(InterCliqueManager.BroadCastTx(AVector.from(hashes2)))
+
+    if (broadcasts.nonEmpty) {
+      val txHashes = chainIndexedHashesToAVector(broadcasts)
+      publishEvent(InterCliqueManager.BroadCastTx(txHashes))
     }
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
   }
