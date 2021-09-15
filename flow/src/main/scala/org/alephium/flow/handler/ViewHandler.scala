@@ -116,7 +116,7 @@ class ViewHandler(
       }
   }
 
-  def broadcastReadyTxs(txs: AVector[TransactionTemplate]): Unit = {
+  def broadcastReadyTxs(txs: AVector[(TransactionTemplate, TimeStamp)]): Unit = {
     if (txs.nonEmpty) {
       // delay this broadcast so that peers have download this block
       scheduleOnce(

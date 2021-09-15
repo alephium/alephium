@@ -42,7 +42,7 @@ object TxHandler {
 
   sealed trait Command
   final case class AddToSharedPool(txs: AVector[TransactionTemplate])            extends Command
-  final case class Broadcast(txs: AVector[TransactionTemplate])                  extends Command
+  final case class Broadcast(txs: AVector[(TransactionTemplate, TimeStamp)])     extends Command
   final case class AddToGrandPool(txs: AVector[TransactionTemplate])             extends Command
   final case class TxAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
   case object CleanMempool                                                       extends Command
@@ -108,7 +108,7 @@ class TxHandler(blockFlow: BlockFlow)(implicit
       txs.foreach(handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate))
     case TxHandler.AddToGrandPool(txs) =>
       txs.foreach(handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate))
-    case TxHandler.Broadcast(txs)          => txs.foreach(tx => txsBuffer.put(tx, ()))
+    case TxHandler.Broadcast(txs)          => txs.foreach(tx => txsBuffer.put(tx._1, ()))
     case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
     case TxHandler.BroadcastTxs            => broadcastTxs()
     case TxHandler.DownloadTxs             => downloadTxs()

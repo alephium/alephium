@@ -85,9 +85,9 @@ class PendingPool(
     indexes.getRelevantUtxos(lockupScript)
   }
 
-  def extractReadyTxs(sharedPoolIndexes: TxIndexes): AVector[TransactionTemplate] =
+  def extractReadyTxs(sharedPoolIndexes: TxIndexes): AVector[(TransactionTemplate, TimeStamp)] =
     readOnly {
-      txs.values.foldLeft(AVector.empty[TransactionTemplate]) { case (acc, tx) =>
+      txs.values.foldLeft(AVector.empty[(TransactionTemplate, TimeStamp)]) { case (acc, tx) =>
         if (
           tx.unsigned.inputs
             .exists(input =>
@@ -97,7 +97,7 @@ class PendingPool(
         ) {
           acc
         } else {
-          acc :+ tx
+          acc :+ (tx -> timestamps.unsafe(tx.id))
         }
       }
     }

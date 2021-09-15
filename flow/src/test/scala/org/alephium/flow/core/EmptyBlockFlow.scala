@@ -22,7 +22,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 trait EmptyBlockFlow extends BlockFlow {
   def storages: Storages
@@ -42,13 +42,13 @@ trait EmptyBlockFlow extends BlockFlow {
   lazy val blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
     BlockHeaderChain.fromGenesisUnsafe(storages)
 
-  def getAllTips: AVector[BlockHash]                           = ???
-  def getBestTipUnsafe(): BlockHash                            = ???
-  def calBestDepsUnsafe(group: GroupIndex): BlockDeps          = ???
-  def updateBestDeps(): IOResult[AVector[TransactionTemplate]] = ???
-  def updateBestDepsUnsafe(): AVector[TransactionTemplate]     = ???
-  def add(block: Block): IOResult[Unit]                        = ???
-  def add(header: BlockHeader): IOResult[Unit]                 = ???
-  def addAndUpdateView(block: Block): IOResult[Unit]           = ???
-  def addAndUpdateView(header: BlockHeader): IOResult[Unit]    = ???
+  def getAllTips: AVector[BlockHash]                                        = ???
+  def getBestTipUnsafe(): BlockHash                                         = ???
+  def calBestDepsUnsafe(group: GroupIndex): BlockDeps                       = ???
+  def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = ???
+  def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)]     = ???
+  def add(block: Block): IOResult[Unit]                                     = ???
+  def add(header: BlockHeader): IOResult[Unit]                              = ???
+  def addAndUpdateView(block: Block): IOResult[Unit]                        = ???
+  def addAndUpdateView(header: BlockHeader): IOResult[Unit]                 = ???
 }

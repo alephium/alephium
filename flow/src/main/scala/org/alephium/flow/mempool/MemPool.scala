@@ -143,15 +143,16 @@ class MemPool private (
     )
   }
 
-  def updatePendingPool(): AVector[TransactionTemplate] = {
-    val now = TimeStamp.now()
-    val txs = pendingPool.extractReadyTxs(txIndexes)
+  def updatePendingPool(): AVector[(TransactionTemplate, TimeStamp)] = {
+    val now              = TimeStamp.now()
+    val txsWithTimestamp = pendingPool.extractReadyTxs(txIndexes)
+    val txs              = txsWithTimestamp.map(_._1)
     txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
       addToTxPool(chainIndex, txss, now)
     }
     pendingPool.remove(txs)
     pendingPool.measureTransactionsTotal()
-    txs
+    txsWithTimestamp
   }
 
   def getOutput(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
