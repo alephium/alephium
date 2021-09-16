@@ -33,7 +33,7 @@ jobs:
           body: Some solid code
           draft: false
           prerelease: false
-      - name: Upload Release Asset
+      - name: Upload Alephium App Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,4 +41,13 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar
           asset_name: alephium-${{ steps.get_version.outputs.VERSION }}.jar
+          asset_content_type: application/java-archive
+      - name: Upload Alephium Wallet Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
+          asset_name: alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
           asset_content_type: application/java-archive

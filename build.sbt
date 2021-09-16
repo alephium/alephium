@@ -296,7 +296,19 @@ lazy val wallet = project("wallet")
       `scala-logging`,
       logback
     ),
-    publish / skip := true
+    publish / skip := true,
+    mainClass in assembly := Some("org.alephium.wallet.Main"),
+    assemblyJarName in assembly := s"alephium-wallet-${version.value}.jar",
+    test in assembly := {},
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", "maven", "org.webjars", "swagger-ui", xs @ _*) =>
+        MergeStrategy.first
+      case PathList("META-INF", "io.netty.versions.properties", xs @ _*) =>
+        MergeStrategy.first
+      case "module-info.class" =>
+        MergeStrategy.discard
+      case other => (assemblyMergeStrategy in assembly).value(other)
+    }
   )
 
 val publishSettings = Seq(
