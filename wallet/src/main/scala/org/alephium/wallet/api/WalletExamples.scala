@@ -54,7 +54,7 @@ trait WalletExamples extends EndpointsExamples {
         Some(walletName),
         Some(true),
         Some(mnemonicPassphrase),
-        Some(Mnemonic.Size.list.head)
+        Some(Mnemonic.Size.list.last)
       )
     )
   )
