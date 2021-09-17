@@ -796,11 +796,14 @@
                 },
                 "example": {
                   "totalBalance": "10000000000000000000",
+                  "totalBalanceHint": "10 ALPH",
                   "balances": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                       "balance": "10000000000000000000",
-                      "lockedBalance": "0"
+                      "balanceHint": "10 ALPH",
+                      "lockedBalance": "0",
+                      "lockedBalanceHint": "0 ALPH"
                     }
                   ]
                 }
@@ -2919,7 +2922,9 @@
                     "summary": "Default",
                     "value": {
                       "balance": "10000000000000000000",
+                      "balanceHint": "10 ALPH",
                       "lockedBalance": "5000000000000000000",
+                      "lockedBalanceHint": "5 ALPH",
                       "utxoNum": 3
                     }
                   },
@@ -2927,7 +2932,9 @@
                     "summary": "More settings",
                     "value": {
                       "balance": "10000000000000000000",
+                      "balanceHint": "10 ALPH",
                       "lockedBalance": "5000000000000000000",
+                      "lockedBalanceHint": "5 ALPH",
                       "utxoNum": 3,
                       "warning": "Result might not include all utxos and is maybe unprecise"
                     }
@@ -5359,7 +5366,9 @@
         "required": [
           "address",
           "balance",
-          "lockedBalance"
+          "balanceHint",
+          "lockedBalance",
+          "lockedBalanceHint"
         ],
         "type": "object",
         "properties": {
@@ -5370,9 +5379,15 @@
             "type": "string",
             "format": "uint256"
           },
+          "balanceHint": {
+            "$ref": "#/components/schemas/Hint"
+          },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
+          },
+          "lockedBalanceHint": {
+            "$ref": "#/components/schemas/Hint"
           },
           "warning": {
             "type": "string"
@@ -5473,7 +5488,9 @@
       "Balance": {
         "required": [
           "balance",
+          "balanceHint",
           "lockedBalance",
+          "lockedBalanceHint",
           "utxoNum"
         ],
         "type": "object",
@@ -5482,9 +5499,15 @@
             "type": "string",
             "format": "uint256"
           },
+          "balanceHint": {
+            "$ref": "#/components/schemas/Hint"
+          },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
+          },
+          "lockedBalanceHint": {
+            "$ref": "#/components/schemas/Hint"
           },
           "utxoNum": {
             "type": "integer"
@@ -5497,6 +5520,7 @@
       "Balances": {
         "required": [
           "totalBalance",
+          "totalBalanceHint",
           "balances"
         ],
         "type": "object",
@@ -5504,6 +5528,9 @@
           "totalBalance": {
             "type": "string",
             "format": "uint256"
+          },
+          "totalBalanceHint": {
+            "$ref": "#/components/schemas/Hint"
           },
           "balances": {
             "type": "array",
@@ -6004,6 +6031,18 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "Hint": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },

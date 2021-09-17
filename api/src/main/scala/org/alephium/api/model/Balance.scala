@@ -21,21 +21,41 @@ import org.alephium.util.U256
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Balance(
     balance: Amount,
+    balanceHint: Amount.Hint,
     lockedBalance: Amount,
+    lockedBalanceHint: Amount.Hint,
     utxoNum: Int,
     warning: Option[String] = None
 )
 
 object Balance {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def from(
+      balance: Amount,
+      lockedBalance: Amount,
+      utxoNum: Int,
+      warning: Option[String] = None
+  ): Balance = Balance(
+    balance,
+    balance.hint,
+    lockedBalance,
+    lockedBalance.hint,
+    utxoNum,
+    warning
+  )
+
   def from(balance_locked_utxoNum: (U256, U256, Int), utxosLimit: Int): Balance = {
     val warning =
       Option.when(utxosLimit == balance_locked_utxoNum._3)(
         "Result might not include all utxos and is maybe unprecise"
       )
 
-    Balance(
-      Amount(balance_locked_utxoNum._1),
-      Amount(balance_locked_utxoNum._2),
+    val balance       = Amount(balance_locked_utxoNum._1)
+    val lockedBalance = Amount(balance_locked_utxoNum._2)
+
+    Balance.from(
+      balance,
+      lockedBalance,
       balance_locked_utxoNum._3,
       warning
     )

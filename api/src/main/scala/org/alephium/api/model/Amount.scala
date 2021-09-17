@@ -22,6 +22,7 @@ import org.alephium.util.U256
 
 final case class Amount(value: U256) {
   override def toString: String = value.toString
+  lazy val hint: Amount.Hint    = Amount.Hint(value)
 }
 
 object Amount {
@@ -44,4 +45,6 @@ object Amount {
   }
 
   val Zero: Amount = Amount(U256.Zero)
+
+  final case class Hint(value: U256)
 }

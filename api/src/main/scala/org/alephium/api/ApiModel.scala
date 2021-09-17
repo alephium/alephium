@@ -28,7 +28,7 @@ import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.RandomBytes
@@ -81,6 +81,13 @@ trait ApiModelCodec {
       case Failure(_) =>
         Amount.from(input).getOrElse(throw new Abort(s"Invalid amount: $input"))
     }
+  }
+
+  implicit val amountHintReader: Reader[Amount.Hint] = amountReader.map(_.hint)
+  implicit val amountHintWriter: Writer[Amount.Hint] = StringWriter.comap[Amount.Hint] { amount =>
+    val dec =
+      new java.math.BigDecimal(amount.value.v).divide(new java.math.BigDecimal(ALF.oneAlf.v))
+    s"${dec} ALPH"
   }
 
   implicit val publicKeyWriter: Writer[PublicKey] = bytesWriter

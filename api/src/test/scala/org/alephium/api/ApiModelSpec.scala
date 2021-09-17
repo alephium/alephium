@@ -64,8 +64,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
 
-  def checkData[T: Reader: Writer](data: T, jsonRaw: String): Assertion = {
-    write(data) is jsonRaw.filterNot(_.isWhitespace)
+  def checkData[T: Reader: Writer](
+      data: T,
+      jsonRaw: String,
+      dropWhiteSpace: Boolean = true
+  ): Assertion = {
+    write(data) is jsonRaw.filterNot(v => dropWhiteSpace && v.isWhitespace)
     read[T](jsonRaw) is data
   }
 
@@ -83,15 +87,19 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
   }
 
-  it should "encode/decode Amount" in {
-    checkData(Amount(ALF.oneAlf), """"1000000000000000000"""")
-    read[Amount](""""1 ALPH"""") is Amount(ALF.oneAlf)
+  it should "encode/decode Amount.Hint" in {
+    checkData(Amount.Hint(ALF.oneAlf), """"1 ALPH"""", dropWhiteSpace = false)
+    read[Amount.Hint](""""1000000000000000000"""") is Amount.Hint(ALF.oneAlf)
 
     val alph = ALF.alf(1234) / 1000
-    read[Amount](""""1.234ALPH"""") is Amount(alph)
-    checkData(Amount(alph), """"1234000000000000000"""")
+    checkData(Amount.Hint(alph), """"1.234 ALPH"""", dropWhiteSpace = false)
+    read[Amount.Hint](""""1234000000000000000"""") is Amount.Hint(alph)
 
-    parseFail[Amount](""""1 alph"""")
+    val small = ALF.alf(1234) / 1000000000
+    checkData(Amount.Hint(small), """"0.000001234 ALPH"""", dropWhiteSpace = false)
+    read[Amount.Hint](""""1234000000000"""") is Amount.Hint(small)
+
+    parseFail[Amount.Hint](""""1 alph"""")
   }
 
   it should "encode/decode FetchRequest" in {
@@ -260,9 +268,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Balance" in {
-    val response = Balance(Amount(100), Amount(50), 1)
-    val jsonRaw  = """{"balance":"100","lockedBalance":"50","utxoNum":1}"""
-    checkData(response, jsonRaw)
+    val amount   = Amount(ALF.alf(100))
+    val locked   = Amount(ALF.alf(50))
+    val response = Balance(amount, amount.hint, locked, locked.hint, 1)
+    val jsonRaw =
+      """{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","utxoNum":1}"""
+    checkData(response, jsonRaw, dropWhiteSpace = false)
   }
 
   it should "encode/decode Group" in {

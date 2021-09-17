@@ -91,7 +91,20 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(
-      Balances(balance, AVector(Balances.AddressBalance(address, balance, Amount.Zero, None)))
+      Balances(
+        balance,
+        balance.hint,
+        AVector(
+          Balances.AddressBalance(
+            address,
+            balance,
+            balance.hint,
+            Amount.Zero,
+            Amount.Zero.hint,
+            None
+          )
+        )
+      )
     )
 
   implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =
