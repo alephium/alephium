@@ -90,11 +90,11 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       .getBalances(wallet, utxosLimit)
       .map(_.map { balances =>
         val totalBalance =
-          balances.map { case (_, amount, _) => amount }.fold(U256.Zero) { case (acc, amount) =>
+          balances.map { case (_, amount, _, _) => amount }.fold(U256.Zero) { case (acc, amount) =>
             acc.addUnsafe(amount.value)
           }
-        val balancesPerAddress = balances.map { case (address, amount, warning) =>
-          model.Balances.AddressBalance(address, amount, warning)
+        val balancesPerAddress = balances.map { case (address, amount, lockedAmount, warning) =>
+          model.Balances.AddressBalance(address, amount, lockedAmount, warning)
         }
         model.Balances(Amount(totalBalance), balancesPerAddress)
       }.left.map(toApiError))

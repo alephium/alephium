@@ -34,7 +34,7 @@ trait BlockFlowClient {
   def fetchBalance(
       address: Address.Asset,
       utxosLimit: Option[Int]
-  ): Future[Either[ApiError[_ <: StatusCode], (Amount, Option[String])]]
+  ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount, Option[String])]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
       destinations: AVector[Destination],
@@ -107,9 +107,9 @@ object BlockFlowClient {
     def fetchBalance(
         address: Address.Asset,
         utxosLimit: Option[Int]
-    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Option[String])]] =
+    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount, Option[String])]] =
       requestFromGroup(address.groupIndex, getBalance, (address, utxosLimit)).map(
-        _.map(res => (res.balance, res.warning))
+        _.map(res => (res.balance, res.lockedBalance, res.warning))
       )
 
     def prepareTransaction(

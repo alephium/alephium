@@ -27,6 +27,7 @@ object Balances {
   final case class AddressBalance(
       address: Address.Asset,
       balance: Amount,
+      lockedBalance: Amount,
       warning: Option[String] = None
   )
 }

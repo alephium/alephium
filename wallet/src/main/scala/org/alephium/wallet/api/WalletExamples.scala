@@ -19,6 +19,7 @@ package org.alephium.wallet.api
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.EndpointsExamples
+import org.alephium.api.model.Amount
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{defaultGasPrice, minimalGas}
@@ -90,7 +91,7 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(
-      Balances(balance, AVector(Balances.AddressBalance(address, balance, None)))
+      Balances(balance, AVector(Balances.AddressBalance(address, balance, Amount.Zero, None)))
     )
 
   implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =

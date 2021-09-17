@@ -797,7 +797,8 @@
                   "balances": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                      "balance": "10000000000000000000"
+                      "balance": "10000000000000000000",
+                      "lockedBalance": "0"
                     }
                   ]
                 }
@@ -5355,7 +5356,8 @@
       "AddressBalance": {
         "required": [
           "address",
-          "balance"
+          "balance",
+          "lockedBalance"
         ],
         "type": "object",
         "properties": {
@@ -5363,6 +5365,10 @@
             "type": "string"
           },
           "balance": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },

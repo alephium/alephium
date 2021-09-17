@@ -32,6 +32,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val address              = Address.p2pkh(PublicKey.generate)
   val group                = 1
   val balance              = Amount(U256.One)
+  val lockedBalance        = Amount(U256.Two)
   val hash                 = Hash.generate
   val password             = "password"
   val walletName           = "wallet-name"
@@ -68,15 +69,16 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Balances.AddressBalance" in {
-    val json           = s"""{"address":"$address","balance":"$balance"}"""
-    val addressBalance = Balances.AddressBalance(address, balance)
+    val json           = s"""{"address":"$address","balance":"$balance","lockedBalance":"$lockedBalance"}"""
+    val addressBalance = Balances.AddressBalance(address, balance, lockedBalance)
     check(addressBalance, json)
   }
 
   it should "Balances" in {
     val json =
-      s"""{"totalBalance":"$balance","balances":[{"address":"$address","balance":"$balance"}]}"""
-    val balances = Balances(balance, AVector(Balances.AddressBalance(address, balance)))
+      s"""{"totalBalance":"$balance","balances":[{"address":"$address","balance":"$balance","lockedBalance":"$lockedBalance"}]}"""
+    val balances =
+      Balances(balance, AVector(Balances.AddressBalance(address, balance, lockedBalance)))
     check(balances, json)
   }
 

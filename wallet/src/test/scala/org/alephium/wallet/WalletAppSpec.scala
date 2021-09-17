@@ -72,6 +72,7 @@ class WalletAppSpec
   val transferAddress            = Address.p2pkh(transferPublicKey).toBase58
   val transferAmount             = 10
   val balanceAmount              = Amount(U256.unsafe(42))
+  val lockdeAmount               = Amount(U256.unsafe(21))
 
   def creationJson(size: Int, maybeName: Option[String]) =
     s"""{"password":"$password","mnemonicSize":${size}${maybeName
@@ -190,7 +191,7 @@ class WalletAppSpec
     getBalance() check { response =>
       response.as[model.Balances] is model.Balances(
         balanceAmount,
-        AVector(model.Balances.AddressBalance(address, balanceAmount))
+        AVector(model.Balances.AddressBalance(address, balanceAmount, lockdeAmount))
       )
       response.code is StatusCode.Ok
     }

@@ -70,7 +70,7 @@ trait WalletService extends Service {
   def getBalances(
       wallet: String,
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Option[String])]]]
+  ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
   def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
   def getMinerAddresses(
@@ -302,7 +302,7 @@ object WalletService {
     override def getBalances(
         wallet: String,
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Option[String])]]] =
+    ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]] =
       withAddressesFut(wallet) { case (_, addresses) =>
         Future
           .sequence(
@@ -480,13 +480,13 @@ object WalletService {
     private def getBalance(
         address: Address.Asset,
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Address.Asset, Amount, Option[String])]] = {
+    ): Future[Either[WalletError, (Address.Asset, Amount, Amount, Option[String])]] = {
       blockFlowClient
         .fetchBalance(address, utxosLimit)
         .map(
-          _.map { case (amount, warning) => (address, amount, warning) }.left.map(error =>
-            BlockFlowClientError(error)
-          )
+          _.map { case (amount, lockedAmount, warning) =>
+            (address, amount, lockedAmount, warning)
+          }.left.map(error => BlockFlowClientError(error))
         )
     }
 
