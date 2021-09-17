@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
-import io.vertx.core.http.HttpServer
+import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -80,6 +80,24 @@ class WalletApp(config: WalletConfig)(implicit
             "META-INF/resources/webjars/swagger-ui/"
           ) // Fix swagger ui being not found on the first call
         val server: HttpServer = vertx.createHttpServer().requestHandler(router)
+
+        // scalastyle:off magic.number
+        router
+          .route()
+          .handler(
+            CorsHandler
+              .create(".*.")
+              .allowedMethod(HttpMethod.GET)
+              .allowedMethod(HttpMethod.POST)
+              .allowedMethod(HttpMethod.PUT)
+              .allowedMethod(HttpMethod.HEAD)
+              .allowedMethod(HttpMethod.OPTIONS)
+              .allowedHeader("*")
+              .allowCredentials(true)
+              .maxAgeSeconds(1800)
+          )
+        // scalastyle:on magic.number
+
         routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
         for {
           binding <- server.listen(port, "127.0.0.1").asScala

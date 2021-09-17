@@ -262,7 +262,7 @@
                     "walletName": "wallet-super-name",
                     "isMiner": true,
                     "mnemonicPassphrase": "optional-mnemonic-passphrase",
-                    "mnemonicSize": 12
+                    "mnemonicSize": 24
                   }
                 }
               }
