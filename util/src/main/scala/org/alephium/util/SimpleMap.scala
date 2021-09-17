@@ -27,6 +27,8 @@ trait SimpleMap[K, V] {
 
   def isEmpty: Boolean = underlying.isEmpty
 
+  def nonEmpty: Boolean = !isEmpty
+
   def contains(key: K): Boolean
 
   def unsafe(key: K): V

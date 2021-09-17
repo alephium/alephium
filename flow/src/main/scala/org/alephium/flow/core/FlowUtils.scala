@@ -78,7 +78,7 @@ trait FlowUtils
       newDeps: BlockDeps,
       oldDeps: BlockDeps,
       maxHeightGap: Int
-  ): AVector[TransactionTemplate] = {
+  ): AVector[(TransactionTemplate, TimeStamp)] = {
     val newHeight = getHeightUnsafe(newDeps.uncleHash(mainGroup))
     val oldHeight = getHeightUnsafe(oldDeps.uncleHash(mainGroup))
     if (newHeight <= oldHeight + maxHeightGap) {
@@ -93,7 +93,7 @@ trait FlowUtils
       mainGroup: GroupIndex,
       newDeps: BlockDeps,
       oldDeps: BlockDeps
-  ): AVector[TransactionTemplate] = {
+  ): AVector[(TransactionTemplate, TimeStamp)] = {
     updateGrandPoolUnsafe(mainGroup, newDeps, oldDeps, maxSyncBlocksPerChain)
   }
 
@@ -116,9 +116,9 @@ trait FlowUtils
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
-  def updateBestDeps(): IOResult[AVector[TransactionTemplate]]
+  def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]]
 
-  def updateBestDepsUnsafe(): AVector[TransactionTemplate]
+  def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)]
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 

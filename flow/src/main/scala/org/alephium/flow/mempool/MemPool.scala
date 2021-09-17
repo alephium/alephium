@@ -20,7 +20,9 @@ import io.prometheus.client.Gauge
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.flow.mempool.MemPool.CleanupResult
 import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -80,15 +82,19 @@ class MemPool private (
     tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
   }
 
-  def addNewTx(index: ChainIndex, tx: TransactionTemplate): MemPool.NewTxCategory = {
+  def addNewTx(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      currentTs: TimeStamp
+  ): MemPool.NewTxCategory = {
     if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
-      if (pendingPool.add(tx, TimeStamp.now())) {
+      if (pendingPool.add(tx, currentTs)) {
         MemPool.AddedToPendingPool
       } else {
         MemPool.PendingPoolIsFull
       }
     } else {
-      if (getSharedPool(index).add(tx, TimeStamp.now())) {
+      if (getSharedPool(index).add(tx, currentTs)) {
         MemPool.AddedToSharedPool
       } else {
         MemPool.SharedPoolIsFull
@@ -139,15 +145,16 @@ class MemPool private (
     )
   }
 
-  def updatePendingPool(): AVector[TransactionTemplate] = {
-    val now = TimeStamp.now()
-    val txs = pendingPool.extractReadyTxs(txIndexes)
+  def updatePendingPool(): AVector[(TransactionTemplate, TimeStamp)] = {
+    val now              = TimeStamp.now()
+    val txsWithTimestamp = pendingPool.extractReadyTxs(txIndexes)
+    val txs              = txsWithTimestamp.map(_._1)
     txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
       addToTxPool(chainIndex, txss, now)
     }
     pendingPool.remove(txs)
     pendingPool.measureTransactionsTotal()
-    txs
+    txsWithTimestamp
   }
 
   def getOutput(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
@@ -167,10 +174,19 @@ class MemPool private (
     sharedPools.foreach(_.clear())
   }
 
-  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
-    sharedPools.foreach(_.clean(blockFlow, timeStampThreshold))
-    updatePendingPool()
-    ()
+  def cleanPendingPool(
+      blockFlow: BlockFlow
+  ): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
+    pendingPool.clean(blockFlow, txIndexes)
+  }
+
+  def cleanAndExtractReadyTxs(
+      blockFlow: BlockFlow,
+      timeStampThreshold: TimeStamp
+  ): MemPool.CleanupResult = {
+    val invalidTxss = sharedPools.map(_.clean(blockFlow, timeStampThreshold))
+    val readyTxs    = updatePendingPool()
+    CleanupResult(invalidTxss, readyTxs)
   }
 }
 
@@ -187,6 +203,11 @@ object MemPool {
     val pendingPool = PendingPool.empty(mainGroup, memPoolSetting.pendingPoolCapacity)
     new MemPool(mainGroup, sharedPools, sharedTxIndex, pendingPool)
   }
+
+  final case class CleanupResult(
+      invalidTxss: AVector[IOResult[AVector[TransactionTemplate]]],
+      readyTxs: AVector[(TransactionTemplate, TimeStamp)]
+  )
 
   sealed trait NewTxCategory
   case object AddedToSharedPool  extends NewTxCategory

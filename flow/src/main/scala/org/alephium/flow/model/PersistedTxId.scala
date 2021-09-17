@@ -14,26 +14,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.flow.model
 
-import org.scalatest.Assertion
-
-import org.alephium.crypto.Keccak256
-import org.alephium.io.RocksDBSource.ColumnFamily
+import org.alephium.protocol.Hash
 import org.alephium.serde.Serde
-import org.alephium.util.{AlephiumFixture, Files}
+import org.alephium.util.TimeStamp
 
-trait StorageFixture extends AlephiumFixture {
-  private lazy val tmpdir = Files.tmpDir
-  private lazy val dbname = s"test-db-${Keccak256.generate.toHexString}"
-  private lazy val dbPath = tmpdir.resolve(dbname)
+final case class PersistedTxId(timestamp: TimeStamp, hash: Hash)
 
-  private lazy val storage = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-
-  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] =
-    RocksDBKeyValueStorage[K, V](storage, ColumnFamily.All)
-
-  protected def postTest(): Assertion = {
-    storage.dESTROY().isRight is true
-  }
+object PersistedTxId {
+  implicit val serde: Serde[PersistedTxId] = Serde.forProduct2[TimeStamp, Hash, PersistedTxId](
+    (ts, hash) => PersistedTxId(ts, hash),
+    id => (id.timestamp, id.hash)
+  )
 }

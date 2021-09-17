@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, TimeStamp}
 
 class BlockFlowGroupViewSpec extends AlephiumSpec {
   it should "fetch preOutputs" in new FlowFixture {
@@ -45,7 +45,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView1.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
-    mempool.addNewTx(block1.chainIndex, tx1)
+    mempool.addNewTx(block1.chainIndex, tx1, TimeStamp.now())
     mempool.contains(block1.chainIndex, tx1) is true
     mempool.pendingPool.contains(tx1.id) is false
 
@@ -56,7 +56,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView2.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
-    mempool.addNewTx(block2.chainIndex, tx2)
+    mempool.addNewTx(block2.chainIndex, tx2, TimeStamp.now())
     mempool.contains(block1.chainIndex, tx2) is true
     mempool.pendingPool.contains(tx2.id) is true
 

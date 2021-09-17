@@ -346,9 +346,9 @@ object BlockFlow extends StrictLogging {
       flowTips2.toBlockDeps
     }
 
-    def updateBestDepsUnsafe(): AVector[TransactionTemplate] =
+    def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)] =
       brokerConfig.groupRange.foldLeft(
-        AVector.empty[TransactionTemplate]
+        AVector.empty[(TransactionTemplate, TimeStamp)]
       ) { case (acc, mainGroup) =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
         val oldDeps        = getBestDeps(mainGroupIndex)
@@ -364,7 +364,7 @@ object BlockFlow extends StrictLogging {
         updateBestDeps(mainGroup, deps)
       }
 
-    def updateBestDeps(): IOResult[AVector[TransactionTemplate]] = {
+    def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
   }

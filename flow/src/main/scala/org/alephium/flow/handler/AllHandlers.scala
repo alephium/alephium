@@ -19,6 +19,7 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
@@ -56,10 +57,12 @@ final case class AllHandlers(
 }
 
 object AllHandlers {
+  // scalastyle:off parameter.number
   def build(
       system: ActorSystem,
       blockFlow: BlockFlow,
-      eventBus: ActorRefT[EventBus.Message]
+      eventBus: ActorRefT[EventBus.Message],
+      storages: Storages
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
@@ -67,15 +70,17 @@ object AllHandlers {
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting
   ): AllHandlers = {
-    build(system, blockFlow, eventBus, "")
+    build(system, blockFlow, eventBus, "", storages)
   }
+  // scalastyle:on parameter.number
 
   // scalastyle:off parameter.number
   def build(
       system: ActorSystem,
       blockFlow: BlockFlow,
       eventBus: ActorRefT[EventBus.Message],
-      namePostfix: String
+      namePostfix: String,
+      storages: Storages
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
@@ -86,7 +91,7 @@ object AllHandlers {
     val flowProps = FlowHandler.props(blockFlow)
     val flowHandler =
       ActorRefT.build[FlowHandler.Command](system, flowProps, s"FlowHandler$namePostfix")
-    buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, namePostfix)
+    buildWithFlowHandler(system, blockFlow, flowHandler, eventBus, namePostfix, storages)
   }
   // scalastyle:on parameter.number
 
@@ -96,7 +101,8 @@ object AllHandlers {
       blockFlow: BlockFlow,
       flowHandler: ActorRefT[FlowHandler.Command],
       eventBus: ActorRefT[EventBus.Message],
-      namePostfix: String
+      namePostfix: String,
+      storages: Storages
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
@@ -104,7 +110,7 @@ object AllHandlers {
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting
   ): AllHandlers = {
-    val txProps        = TxHandler.props(blockFlow)
+    val txProps        = TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
     val txHandler      = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)

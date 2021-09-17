@@ -93,25 +93,23 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "update deps and txs" in new Fixture {
-    override val configValues = Map(("alephium.network.txs-broadcast-delay", "200 milli"))
-    viewHandler ! InterCliqueManager.SyncedResult(true)
-
+  it should "update deps and txs" in new SyncedFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val blockFlow1 = isolatedBlockFlow()
     val block0     = transfer(blockFlow1, chainIndex)
     addAndCheck(blockFlow1, block0)
     val block1 = transfer(blockFlow1, chainIndex)
 
-    val tx1 = block1.nonCoinbase.head.toTemplate
-    blockFlow.getMemPool(chainIndex).pendingPool.add(tx1, TimeStamp.now())
+    val tx1       = block1.nonCoinbase.head.toTemplate
+    val currentTs = TimeStamp.now()
+    blockFlow.getMemPool(chainIndex).pendingPool.add(tx1, currentTs)
     blockFlow.add(block0).isRight is true
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ViewHandler.Subscribe
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
     eventually(expectMsg(ViewHandler.SubscribeResult(succeeded = true)))
-    eventually(txProbe.expectMsg(TxHandler.Broadcast(AVector(tx1))))
+    eventually(txProbe.expectMsg(TxHandler.Broadcast(AVector(tx1 -> currentTs))))
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())

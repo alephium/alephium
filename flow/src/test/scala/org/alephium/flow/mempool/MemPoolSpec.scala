@@ -59,7 +59,7 @@ class MemPoolSpec
   it should "calculate the size of mempool" in {
     val pool = MemPool.empty(mainGroup)
     val tx0  = transactionGen().sample.get.toTemplate
-    pool.addNewTx(ChainIndex.unsafe(0, 0), tx0)
+    pool.addNewTx(ChainIndex.unsafe(0, 0), tx0, TimeStamp.now())
     pool.size is 1
     val tx1 = transactionGen().sample.get.toTemplate
     pool.pendingPool.add(tx1, now)
@@ -72,7 +72,7 @@ class MemPoolSpec
     val index1 = ChainIndex.unsafe(0, 1)
     val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
     val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
-    pool.addNewTx(index0, tx0)
+    pool.addNewTx(index0, tx0, TimeStamp.now())
     pool.pendingPool.add(tx1, now)
   }
 
@@ -114,7 +114,7 @@ class MemPoolSpec
     val tx3    = block1.nonCoinbase.head.toTemplate
     addAndCheck(blockFlow, block1)
 
-    pool.addNewTx(chainIndex, tx2)
+    pool.addNewTx(chainIndex, tx2, TimeStamp.now())
     pool.pendingPool.add(tx3, now)
     val tx2Outputs = tx2.assetOutputRefs
     tx2Outputs.length is 2
@@ -140,12 +140,13 @@ class MemPoolSpec
 
     blockFlow.recheckInputs(index2.from, AVector(tx2, tx3)) isE AVector(tx3)
 
-    pool.addNewTx(index0, tx0)
-    pool.addNewTx(index1, tx1)
-    pool.addNewTx(index2, tx2)
-    pool.addNewTx(index2, tx3)
+    val currentTs = TimeStamp.now()
+    pool.addNewTx(index0, tx0, currentTs)
+    pool.addNewTx(index1, tx1, currentTs)
+    pool.addNewTx(index2, tx2, currentTs)
+    pool.addNewTx(index2, tx3, currentTs)
     pool.size is 4
-    pool.clean(blockFlow, TimeStamp.now().plusMinutesUnsafe(1))
+    pool.cleanAndExtractReadyTxs(blockFlow, TimeStamp.now().plusMinutesUnsafe(1))
     pool.size is 1
     pool.contains(index2, tx2) is true
   }

@@ -222,6 +222,8 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
+  def isTxConfirmed(txId: Hash): IOResult[Boolean] = txStorage.exists(txId)
+
   def getTxStatus(txId: Hash): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute(getTxStatusUnsafe(txId))
 

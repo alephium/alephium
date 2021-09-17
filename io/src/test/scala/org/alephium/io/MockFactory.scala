@@ -18,13 +18,13 @@ package org.alephium.io
 
 import akka.util.ByteString
 
-import org.alephium.serde.{Serde, Serializer}
+import org.alephium.serde.Serde
 
 trait MockFactory {
   def unimplementedStorage[K, V]: KeyValueStorage[K, V] =
     new KeyValueStorage[K, V] {
-      implicit override def keySerializer: Serializer[K] = ???
-      implicit override def valueSerde: Serde[V]         = ???
+      implicit override def keySerde: Serde[K]   = ???
+      implicit override def valueSerde: Serde[V] = ???
 
       override def getRawUnsafe(key: ByteString): ByteString              = ???
       override def getOptRawUnsafe(key: ByteString): Option[ByteString]   = ???

@@ -14,26 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.flow.model
 
-import org.scalatest.Assertion
+import org.alephium.protocol.model.{ChainIndex, GroupIndex}
+import org.alephium.serde._
+import org.alephium.util.TimeStamp
 
-import org.alephium.crypto.Keccak256
-import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.serde.Serde
-import org.alephium.util.{AlephiumFixture, Files}
+final case class ReadyTxInfo(chainIndex: ChainIndex, timestamp: TimeStamp)
 
-trait StorageFixture extends AlephiumFixture {
-  private lazy val tmpdir = Files.tmpDir
-  private lazy val dbname = s"test-db-${Keccak256.generate.toHexString}"
-  private lazy val dbPath = tmpdir.resolve(dbname)
+object ReadyTxInfo {
+  private val chainIndexSerde: Serde[ChainIndex] =
+    Serde.forProduct2[Int, Int, ChainIndex](
+      (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
+      chainIndex => (chainIndex.from.value, chainIndex.to.value)
+    )
 
-  private lazy val storage = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-
-  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] =
-    RocksDBKeyValueStorage[K, V](storage, ColumnFamily.All)
-
-  protected def postTest(): Assertion = {
-    storage.dESTROY().isRight is true
-  }
+  implicit val serde: Serde[ReadyTxInfo] = Serde.forProduct2[ChainIndex, TimeStamp, ReadyTxInfo](
+    ReadyTxInfo.apply,
+    info => (info.chainIndex, info.timestamp)
+  )(chainIndexSerde, serdeImpl[TimeStamp])
 }
