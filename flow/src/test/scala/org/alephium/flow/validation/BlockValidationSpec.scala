@@ -21,7 +21,6 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
-import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript}
@@ -37,33 +36,66 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     result.left.value isE error
   }
 
-  def passValidation(result: BlockValidationResult[Unit]): Assertion = {
-    result.isRight is true
-  }
+  trait CoinbaseFixture extends BlockValidation.Impl() {
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
 
-  def failValidation[R](result: BlockValidationResult[R], error: InvalidBlockStatus): Assertion = {
-    result.left.value isE error
-  }
+    val block = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
 
-  class Fixture extends BlockValidation.Impl() {
-    def checkCoinbase(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
-      val groupView = flow.getMutableGroupView(block).rightValue
+    def checkCoinbase(block: Block): BlockValidationResult[Unit] = {
+      val groupView = blockFlow.getMutableGroupView(block).rightValue
       checkCoinbase(block.chainIndex, block, groupView)
     }
 
-    implicit class RichTx(tx: Transaction) {
-      def update(f: UnsignedTransaction => UnsignedTransaction): Transaction = {
-        tx.copy(unsigned = f(tx.unsigned))
+    implicit class RichBlock(block: Block) {
+      def updateUnsignedTx(f: UnsignedTransaction => UnsignedTransaction): Block = {
+        val updated = block.coinbase.copy(unsigned = f(block.coinbase.unsigned))
+        block.copy(transactions = block.nonCoinbase :+ updated)
+      }
+
+      def updateTx(f: Transaction => Transaction): Block = {
+        block.copy(transactions = block.nonCoinbase :+ f(block.coinbase))
+      }
+
+      def updateOutput(f: AssetOutput => AssetOutput): Block = {
+        val outputs = block.coinbase.unsigned.fixedOutputs
+        updateUnsignedTx(_.copy(fixedOutputs = outputs.replace(0, f(outputs.head))))
+      }
+
+      def pass()(implicit validator: (Block) => BlockValidationResult[Unit]) = {
+        passCheck(validator(block))
+      }
+
+      def replaceTxGas(gas: U256): Block = {
+        assert(block.transactions.length >= 2) // at least 1 non-coinbase tx
+        val tx        = block.nonCoinbase.head
+        val gasAmount = tx.unsigned.gasAmount
+        val gasPrice  = gas.divUnsafe(gasAmount.value)
+        val newTx     = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(gasPrice)))
+        block.copy(transactions = newTx +: block.transactions.tail)
+      }
+
+      def fail(error: InvalidBlockStatus)(implicit
+          validator: (Block) => BlockValidationResult[Unit]
+      ): Assertion = {
+        failCheck(validator(block), error)
+      }
+
+      def fail()(implicit
+          validator: (Block) => BlockValidationResult[Unit],
+          error: InvalidBlockStatus
+      ): Assertion = {
+        fail(error)
       }
     }
   }
 
-  it should "validate group for block" in new Fixture {
+  it should "validate group for block" in new BlockValidation.Impl() {
     forAll(blockGenOf(brokerConfig)) { block => passCheck(checkGroup(block)) }
     forAll(blockGenNotOf(brokerConfig)) { block => failCheck(checkGroup(block), InvalidGroup) }
   }
 
-  it should "validate nonEmpty transaction list" in new Fixture {
+  it should "validate nonEmpty transaction list" in new BlockValidation.Impl() {
     forAll(blockGen) { block =>
       if (block.transactions.nonEmpty) {
         passCheck(checkNonEmptyTransactions(block))
@@ -74,47 +106,6 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     }
   }
 
-  trait CoinbaseFixture extends Fixture {
-    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
-
-    val block = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
-    val coinbase = block.coinbase
-
-    implicit class RichBlock(block: Block) {
-      def updateUnsignedTx(f: UnsignedTransaction => UnsignedTransaction): Block = {
-        val updated = block.coinbase.copy(unsigned = f(coinbase.unsigned))
-        block.copy(transactions = AVector(updated))
-      }
-
-      def updateTx(f: Transaction => Transaction): Block = {
-        block.copy(transactions = AVector(f(block.coinbase)))
-      }
-
-      def updateOutput(f: AssetOutput => AssetOutput): Block = {
-        val outputs = coinbase.unsigned.fixedOutputs
-        updateUnsignedTx(_.copy(fixedOutputs = outputs.replace(0, f(outputs.head))))
-      }
-
-      def pass()(implicit validator: (Block) => BlockValidationResult[Unit]) = {
-        passCheck(validator(block))
-      }
-
-      def fail(error: InvalidBlockStatus)(implicit
-          validator: (Block) => BlockValidationResult[Unit]
-      ): Assertion = {
-        failCheck(validator(block), error)
-      }
-
-      def fail()(implicit
-         validator: (Block) => BlockValidationResult[Unit],
-         error: InvalidBlockStatus
-      ): Assertion = {
-        fail(error)
-      }
-    }
-  }
-
   it should "validate coinbase transaction simple format" in new CoinbaseFixture {
     val (privateKey, _) = SignatureSchema.generatePriPub()
     val output0         = assetOutputGen.sample.get
@@ -122,7 +113,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val emptySignatures = AVector.empty[Signature]
     val script          = StatefulScript.alwaysFail
     val testSignatures =
-      AVector[Signature](SignatureSchema.sign(coinbase.unsigned.hash.bytes, privateKey))
+      AVector[Signature](SignatureSchema.sign(block.coinbase.unsigned.hash.bytes, privateKey))
 
     implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 1)
     implicit val error: InvalidBlockStatus = InvalidCoinbaseFormat
@@ -167,11 +158,11 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   }
 
   it should "check coinbase data" in new CoinbaseFixture {
-    val coinbaseData = coinbase.unsigned.fixedOutputs.head.additionalData
+    val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
     val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
     coinbaseData.startsWith(expected) is true
 
-    implicit val validator = checkCoinbaseData _
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
 
     info("wrong block timestamp")
     val wrongTimestamp = serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now()))
@@ -204,72 +195,49 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     block.updateOutput(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
   }
 
-  trait RewardFixture extends Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 1)
-    implicit class RichBlock(block: Block) {
-      def replaceCoinbaseReward(reward: U256): Block = {
-        val coinbaseOutputNew =
-          block.coinbase.unsigned.fixedOutputs.head.copy(amount = reward)
-        val coinbaseNew = block.coinbase.copy(
-          unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew))
-        )
-        val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
-        val blockNew = block.copy(transactions = txsNew)
-        blockNew.coinbaseReward is reward
-        blockNew
-      }
-
-      def replaceTxGas(reward: U256): Block = {
-        val tx       = block.nonCoinbase.head
-        val gas      = tx.unsigned.gasAmount
-        val gasPrice = reward.divUnsafe(gas.value)
-        val newTx    = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(gasPrice)))
-        val newBlock = block.copy(transactions = AVector(newTx, block.coinbase))
-        reMine(blockFlow, chainIndex, newBlock)
-      }
-
-      def fail(): Block = {
-        failCheck(checkCoinbase(block, blockFlow), InvalidCoinbaseReward)
-        block
-      }
-
-      def pass(): Block = {
-        passCheck(checkCoinbase(block, blockFlow))
-        block
-      }
-    }
-  }
-
-  it should "check coinbase reward" in new RewardFixture {
-    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)).pass()
+  it should "check coinbase reward" in new CoinbaseFixture {
+    implicit val validator = checkCoinbase _
 
     val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    block.replaceCoinbaseReward(miningReward).pass()
-    block.replaceCoinbaseReward(miningReward.subUnsafe(minimalGasFee)).fail()
+    block.updateOutput(_.copy(amount = miningReward)).pass()
+
+    val invalidMiningReward = miningReward.subUnsafe(1)
+    block.updateOutput(_.copy(amount = invalidMiningReward)).fail(InvalidCoinbaseReward)
   }
 
-  it should "check gas reward cap" in new RewardFixture {
-    val block = transfer(blockFlow, ChainIndex.unsafe(0, 1)).pass()
+  it should "check gas reward cap" in new CoinbaseFixture {
+    implicit val validator = checkCoinbase _
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    val block1       = block.replaceTxGas(miningReward).fail()
-    block1.replaceCoinbaseReward(miningReward + (block1.gasFee / 2)).pass()
+    val block0 = transfer(blockFlow, chainIndex)
+    block0.pass()
 
-    val block2 = block.replaceTxGas(miningReward * 3).fail()
-    block2.replaceCoinbaseReward(miningReward * 2).pass()
+    info("gas reward is set to 1/2 of miningReward, miningReward not enough")
+    val miningReward = consensusConfig.emission.reward(block0.header).miningReward
+    val block1       = block0.replaceTxGas(miningReward)
+    block1.fail(InvalidCoinbaseReward)
+
+    info("adjust the miningReward to account for the adjusted gas reward")
+    block1.updateOutput(_.copy(amount = miningReward + (block1.gasFee / 2))).pass()
+
+    info("gas reward is set to the max: the same as miningReward, miningReward not enough")
+    val block2 = block0.replaceTxGas(miningReward * 3)
+    block2.fail(InvalidCoinbaseReward)
+
+    info("adjust the miningReward to account for the adjusted gas reward")
+    block2.updateOutput(_.copy(amount = miningReward * 2)).pass()
   }
 
-  it should "check non-empty txs" in new Fixture {
+  it should "check non-empty txs" in new BlockValidation.Impl() {
     val block    = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     val modified = block.copy(transactions = AVector.empty)
     failCheck(checkBlock(modified, blockFlow), EmptyTransactionList)
   }
 
-  it should "check the number of txs" in new Fixture {
+  it should "check the number of txs" in new BlockValidation.Impl() {
     val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val modified0 =
       block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(block.nonCoinbase.head))
-    passValidation(checkTxNumber(modified0))
+    passCheck(checkTxNumber(modified0))
 
     val modified1 =
       block.copy(transactions = AVector.fill(maximalTxsInOneBlock + 1)(block.nonCoinbase.head))
@@ -277,31 +245,33 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     failCheck(checkBlock(modified1, blockFlow), TooManyTransactions)
   }
 
-  it should "check the gas price decreasing" in new Fixture {
+  it should "check the gas price decreasing" in new BlockValidation.Impl() {
     val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val tx    = block.nonCoinbase.head
     tx.unsigned.gasPrice is defaultGasPrice
 
-    val tx1    = tx.update(_.copy(gasPrice = GasPrice(defaultGasPrice.value + 1)))
+    val tx1 = tx.copy(
+      unsigned = tx.unsigned.copy(gasPrice = GasPrice(defaultGasPrice.value + 1))
+    )
     val block1 = block.copy(transactions = AVector(tx1, tx))
-    passValidation(checkGasPriceDecreasing(block1))
+    passCheck(checkGasPriceDecreasing(block1))
 
     val block2 = block.copy(transactions = AVector(tx, tx1))
-    failValidation(checkBlock(block2, blockFlow), TxGasPriceNonDecreasing)
+    failCheck(checkBlock(block2, blockFlow), TxGasPriceNonDecreasing)
   }
 
-  it should "check the amount of gas" in new Fixture {
+  it should "check the amount of gas" in new BlockValidation.Impl() {
     val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val tx    = block.nonCoinbase.head
     tx.unsigned.gasAmount is minimalGas
 
     val modified0 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(tx))
-    passValidation(checkTotalGas(modified0))
+    passCheck(checkTotalGas(modified0))
 
     val tx1       = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafe(minimalGas.value + 1)))
     val modified1 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock - 1)(tx) :+ tx1)
-    failValidation(checkTotalGas(modified1), TooManyGasUsed)
-    failValidation(checkBlock(modified1, blockFlow), TooManyGasUsed)
+    failCheck(checkTotalGas(modified1), TooManyGasUsed)
+    failCheck(checkBlock(modified1, blockFlow), TooManyGasUsed)
   }
 
   trait DoubleSpendingFixture extends FlowFixture {
