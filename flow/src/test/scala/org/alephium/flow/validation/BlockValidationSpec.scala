@@ -16,6 +16,7 @@
 
 package org.alephium.flow.validation
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
@@ -63,151 +64,144 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   }
 
   it should "validate nonEmpty transaction list" in new Fixture {
-    val block0 = blockGen.retryUntil(_.transactions.nonEmpty).sample.get
-    val block1 = block0.copy(transactions = AVector.empty)
-    passCheck(checkNonEmptyTransactions(block0))
-    failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
+    forAll(blockGen) { block =>
+      if (block.transactions.nonEmpty) {
+        passCheck(checkNonEmptyTransactions(block))
+      }
+
+      val withoutTx = block.copy(transactions = AVector.empty)
+      failCheck(checkNonEmptyTransactions(withoutTx), EmptyTransactionList)
+    }
   }
 
   trait CoinbaseFixture extends Fixture {
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
 
-    def newCoinbase(chainIndex: ChainIndex): Transaction = {
-      val block = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block)
-      block.coinbase
+    val block = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    val coinbase = block.coinbase
+
+    implicit class RichBlock(block: Block) {
+      def updateUnsignedTx(f: UnsignedTransaction => UnsignedTransaction): Block = {
+        val updated = block.coinbase.copy(unsigned = f(coinbase.unsigned))
+        block.copy(transactions = AVector(updated))
+      }
+
+      def updateTx(f: Transaction => Transaction): Block = {
+        block.copy(transactions = AVector(f(block.coinbase)))
+      }
+
+      def updateOutput(f: AssetOutput => AssetOutput): Block = {
+        val outputs = coinbase.unsigned.fixedOutputs
+        updateUnsignedTx(_.copy(fixedOutputs = outputs.replace(0, f(outputs.head))))
+      }
+
+      def pass()(implicit validator: (Block) => BlockValidationResult[Unit]) = {
+        passCheck(validator(block))
+      }
+
+      def fail(error: InvalidBlockStatus)(implicit
+          validator: (Block) => BlockValidationResult[Unit]
+      ): Assertion = {
+        failCheck(validator(block), error)
+      }
+
+      def fail()(implicit
+         validator: (Block) => BlockValidationResult[Unit],
+         error: InvalidBlockStatus
+      ): Assertion = {
+        fail(error)
+      }
     }
   }
 
   it should "validate coinbase transaction simple format" in new CoinbaseFixture {
     val (privateKey, _) = SignatureSchema.generatePriPub()
-    val block0          = emptyBlock(blockFlow, chainIndex)
     val output0         = assetOutputGen.sample.get
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
     val script          = StatefulScript.alwaysFail
-    val coinbase        = newCoinbase(block0.chainIndex).pass()
     val testSignatures =
       AVector[Signature](SignatureSchema.sign(coinbase.unsigned.hash.bytes, privateKey))
 
-    implicit class RichCoinbase(coinbase: Transaction) {
-      def update(f: UnsignedTransaction => UnsignedTransaction): Transaction = {
-        coinbase.copy(unsigned = f(coinbase.unsigned))
-      }
-
-      def pass() = {
-        val block = block0.copy(transactions = AVector(coinbase))
-        passCheck(checkCoinbaseEasy(block, 1))
-        coinbase
-      }
-
-      def fail() = {
-        val block = block0.copy(transactions = AVector(coinbase))
-        failCheck(checkCoinbaseEasy(block, 1), InvalidCoinbaseFormat)
-        coinbase
-      }
-
-      def testNegPos(
-          negative: UnsignedTransaction => UnsignedTransaction,
-          positive: UnsignedTransaction => UnsignedTransaction
-      ) = {
-        update(negative).fail()
-        update(positive).pass()
-      }
-
-      def testTxNegPos(
-          negative: Transaction => Transaction,
-          positive: Transaction => Transaction
-      ) = {
-        negative(coinbase).fail()
-        positive(coinbase).pass()
-      }
-    }
+    implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 1)
+    implicit val error: InvalidBlockStatus = InvalidCoinbaseFormat
 
     info("script")
-    coinbase.testNegPos(
-      _.copy(scriptOpt = Some(script)),
-      _.copy(scriptOpt = None)
-    )
+    block.updateUnsignedTx(_.copy(scriptOpt = None)).pass()
+    block.updateUnsignedTx(_.copy(scriptOpt = Some(script))).fail()
 
     info("gasAmount")
-    coinbase.testNegPos(
-      _.copy(gasAmount = GasBox.from(0).get),
-      _.copy(gasAmount = minimalGas)
-    )
+    block.updateUnsignedTx(_.copy(gasAmount = minimalGas)).pass()
+    block.updateUnsignedTx(_.copy(gasAmount = GasBox.from(0).value)).fail()
 
     info("gasPrice")
-    coinbase.testNegPos(
-      _.copy(gasPrice = GasPrice(U256.Zero)),
-      _.copy(gasPrice = minimalGasPrice)
-    )
+    block.updateUnsignedTx(_.copy(gasPrice = minimalGasPrice)).pass()
+    block.updateUnsignedTx(_.copy(gasPrice = GasPrice(U256.Zero))).fail()
 
     info("output length")
-    coinbase.testNegPos(
-      _.copy(fixedOutputs = emptyOutputs),
-      _.copy(fixedOutputs = AVector(output0))
-    )
+    block.updateUnsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
+    block.updateUnsignedTx(_.copy(fixedOutputs = emptyOutputs)).fail()
 
     info("output token")
-    coinbase.testNegPos(
-      _.copy(fixedOutputs = AVector(output0.copy(tokens = AVector(Hash.zero -> 10)))),
-      _.copy(fixedOutputs = AVector(output0))
-    )
+    block.updateUnsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
+    val outputsWithTokens = AVector(output0.copy(tokens = AVector(Hash.zero -> 10)))
+    block.updateUnsignedTx(_.copy(fixedOutputs = outputsWithTokens)).fail()
 
     info("contract input")
-    coinbase.testTxNegPos(
-      _.copy(contractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)),
-      _.copy(contractInputs = AVector.empty)
-    )
+    block.updateTx(_.copy(contractInputs = AVector.empty)).pass()
+    val invalidContractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)
+    block.updateTx(_.copy(contractInputs = invalidContractInputs)).fail()
 
     info("generated output")
-    coinbase.testTxNegPos(
-      _.copy(generatedOutputs = AVector(output0)),
-      _.copy(generatedOutputs = emptyOutputs.as[TxOutput])
-    )
+    block.updateTx(_.copy(generatedOutputs = emptyOutputs.as[TxOutput])).pass()
+    block.updateTx(_.copy(generatedOutputs = AVector(output0))).fail()
 
     info("input signature")
-    coinbase.testTxNegPos(
-      _.copy(inputSignatures = testSignatures),
-      _.copy(inputSignatures = emptySignatures)
-    )
+    block.updateTx(_.copy(inputSignatures = emptySignatures)).pass()
+    block.updateTx(_.copy(inputSignatures = testSignatures)).fail()
 
     info("contract signature")
-    coinbase.testTxNegPos(
-      _.copy(contractSignatures = testSignatures),
-      _.copy(contractSignatures = emptySignatures)
-    )
+    block.updateTx(_.copy(contractSignatures = emptySignatures)).pass()
+    block.updateTx(_.copy(contractSignatures = testSignatures)).fail()
   }
 
   it should "check coinbase data" in new CoinbaseFixture {
-    val block = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
-    val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
+    val coinbaseData = coinbase.unsigned.fixedOutputs.head.additionalData
     val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
     coinbaseData.startsWith(expected) is true
+
+    implicit val validator = checkCoinbaseData _
+
+    info("wrong block timestamp")
+    val wrongTimestamp = serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now()))
+    block.updateOutput(_.copy(additionalData = wrongTimestamp)).fail(InvalidCoinbaseData)
+
+    info("wrong chain index")
+    val wrongChainIndex = {
+      val index = chainIndexGen.retryUntil(_ != chainIndex).sample.get
+      serialize(CoinbaseFixedData.from(index, block.header.timestamp))
+    }
+    block.updateOutput(_.copy(additionalData = wrongChainIndex)).fail(InvalidCoinbaseData)
+
+    info("wrong format")
+    val wrongFormat = ByteString("wrong-coinbase-data-format")
+    block.updateOutput(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
   }
 
   it should "check coinbase locked amount" in new CoinbaseFixture {
-    val block = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
-    val coinbase     = block.coinbase
-    val outputs      = coinbase.unsigned.fixedOutputs
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    val lockedAmount = miningReward
-    passCheck(checkLockedReward(block, lockedAmount))
+    val miningReward       = consensusConfig.emission.reward(block.header).miningReward
+    val lockedAmount       = miningReward
+    implicit val validator = (blk: Block) => checkLockedReward(blk, lockedAmount)
 
-    def replace(f: AssetOutput => AssetOutput): Block = {
-      val coinbase1 = coinbase.copy(unsigned =
-        coinbase.unsigned.copy(fixedOutputs = outputs.replace(0, f(outputs.head)))
-      )
-      block.copy(transactions = AVector(coinbase1))
-    }
+    info("valid")
+    block.pass()
 
-    val block1 = replace(_.copy(amount = U256.One))
-    failCheck(checkLockedReward(block1, lockedAmount), InvalidCoinbaseLockedAmount)
+    info("invalid locked amount")
+    block.updateOutput(_.copy(amount = U256.One)).fail(InvalidCoinbaseLockedAmount)
 
-    val block2 = replace(_.copy(lockTime = TimeStamp.now()))
-    failCheck(checkLockedReward(block2, lockedAmount), InvalidCoinbaseLockupPeriod)
+    info("invalid lockup period")
+    block.updateOutput(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
   }
 
   trait RewardFixture extends Fixture {
