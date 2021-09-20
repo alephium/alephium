@@ -282,8 +282,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
     val tx1       = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafe(minimalGas.value + 1)))
     val modified1 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock - 1)(tx) :+ tx1)
-    failCheck(checkTotalGas(modified1), TooManyGasUsed)
-    failCheck(checkBlock(modified1, blockFlow), TooManyGasUsed)
+    failCheck(checkTotalGas(modified1), TooMuchGasUsed)
+    failCheck(checkBlock(modified1, blockFlow), TooMuchGasUsed)
   }
 
   trait DoubleSpendingFixture extends FlowFixture {

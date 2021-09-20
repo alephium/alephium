@@ -183,7 +183,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   // Let's check the gas is decreasing as well
   private[validation] def checkTotalGas(block: Block): BlockValidationResult[Unit] = {
     val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
-    if (totalGas <= maximalGasPerBlock.value) validBlock(()) else invalidBlock(TooManyGasUsed)
+    if (totalGas <= maximalGasPerBlock.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
   }
 
   private[validation] def checkCoinbase(
