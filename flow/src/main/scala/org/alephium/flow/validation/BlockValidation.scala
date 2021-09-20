@@ -16,9 +16,11 @@
 
 package org.alephium.flow.validation
 
+import scala.annotation.tailrec
+
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.ALF
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
@@ -38,20 +40,25 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     checkBlock(block, flow)
   }
 
+  @tailrec
+  private def dummyHeader(chainIndex: ChainIndex, template: BlockFlowTemplate): BlockHeader = {
+    val header = BlockHeader.unsafe(
+      BlockDeps.unsafe(template.deps),
+      template.depStateHash,
+      template.txsHash,
+      template.templateTs,
+      template.target,
+      Nonce.unsecureRandom()
+    )
+    if (header.chainIndex == chainIndex) header else dummyHeader(chainIndex, template)
+  }
+
   def validateTemplate(
+      chainIndex: ChainIndex,
       template: BlockFlowTemplate,
       blockFlow: BlockFlow
   ): BlockValidationResult[Unit] = {
-    val dummyHeader =
-      BlockHeader.unsafe(
-        BlockDeps.unsafe(template.deps),
-        template.depStateHash,
-        Hash.zero,
-        template.templateTs,
-        template.target,
-        Nonce.zero
-      )
-    val dummyBlock = Block(dummyHeader, template.transactions)
+    val dummyBlock = Block(dummyHeader(chainIndex, template), template.transactions)
     checkBlockAfterHeader(dummyBlock, blockFlow)
   }
 

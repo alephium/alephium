@@ -58,7 +58,10 @@ trait FlowFixture
   }
 
   def getGenesisLockupScript(chainIndex: ChainIndex): LockupScript.Asset = {
-    val mainGroup         = chainIndex.from
+    getGenesisLockupScript(chainIndex.from)
+  }
+
+  def getGenesisLockupScript(mainGroup: GroupIndex): LockupScript.Asset = {
     val (_, publicKey, _) = genesisKeys(mainGroup.value)
     LockupScript.p2pkh(publicKey)
   }
@@ -296,7 +299,7 @@ trait FlowFixture
   }
 
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val miner         = getGenesisLockupScript(chainIndex)
+    val miner         = getGenesisLockupScript(chainIndex.to)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     val block         = mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
 

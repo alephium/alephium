@@ -209,7 +209,7 @@ trait FlowUtils
         templateTs,
         miner
       )
-      validated <- validateTemplate(template)
+      validated <- validateTemplate(chainIndex, template)
     } yield {
       if (validated) {
         template
@@ -250,8 +250,11 @@ trait FlowUtils
   }
 
   lazy val templateValidator = BlockValidation.build(brokerConfig, networkConfig, consensusConfig)
-  private def validateTemplate(template: BlockFlowTemplate): IOResult[Boolean] = {
-    templateValidator.validateTemplate(template, this) match {
+  private def validateTemplate(
+      chainIndex: ChainIndex,
+      template: BlockFlowTemplate
+  ): IOResult[Boolean] = {
+    templateValidator.validateTemplate(chainIndex, template, this) match {
       case Left(Left(error)) => Left(error)
       case Left(Right(_))    => Right(false)
       case Right(_)          => Right(true)
