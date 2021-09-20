@@ -19,12 +19,13 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
-import com.typesafe.scalalogging.StrictLogging
+import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.mempool._
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
+import org.alephium.flow.validation.BlockValidation
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.NetworkConfig
@@ -39,7 +40,7 @@ trait FlowUtils
     with SyncUtils
     with TxUtils
     with ConflictedBlocks
-    with StrictLogging {
+    with LazyLogging { Self: BlockFlow =>
   implicit def mempoolSetting: MemPoolSetting
   implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
@@ -208,10 +209,20 @@ trait FlowUtils
         templateTs,
         miner
       )
-    } yield template
+      validated <- validateTemplate(template)
+    } yield {
+      if (validated) {
+        template
+      } else {
+        logger.warn("Assemble empty block due to invalid txs")
+        val coinbaseTx =
+          Transaction.coinbase(chainIndex, AVector.empty[Transaction], miner, target, templateTs)
+        template.copy(transactions = AVector(coinbaseTx)) // fall back to empty block
+      }
+    }
   }
 
-  def prepareBlockFlow(
+  private def prepareBlockFlow(
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -235,6 +246,15 @@ trait FlowUtils
         templateTs,
         fullTxs :+ coinbaseTx
       )
+    }
+  }
+
+  lazy val templateValidator = BlockValidation.build(brokerConfig, networkConfig, consensusConfig)
+  private def validateTemplate(template: BlockFlowTemplate): IOResult[Boolean] = {
+    templateValidator.validateTemplate(template, this) match {
+      case Left(Left(error)) => Left(error)
+      case Left(Right(_))    => Right(false)
+      case Right(_)          => Right(true)
     }
   }
 

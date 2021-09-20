@@ -173,6 +173,16 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
   }
 
+  it should "exclude invalid tx template in block assembly" in new FlowFixture {
+    val index = ChainIndex.unsafe(0, 0)
+    val pool  = blockFlow.getMemPool(index)
+    pool.getSharedPool(index).add(outOfGasTxTemplate, TimeStamp.now())
+    val miner    = getGenesisLockupScript(index)
+    val template = blockFlow.prepareBlockFlowUnsafe(index, miner)
+    template.transactions.length is 1 // only coinbase tx
+    template.transactions.map(_.id).contains(outOfGasTxTemplate.id) is false
+  }
+
   it should "reorg" in new FlowFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 

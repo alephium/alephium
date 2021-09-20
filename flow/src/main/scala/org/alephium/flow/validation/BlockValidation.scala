@@ -17,7 +17,8 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
-import org.alephium.protocol.ALF
+import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
@@ -35,6 +36,23 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   override def validate(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
     checkBlock(block, flow)
+  }
+
+  def validateTemplate(
+      template: BlockFlowTemplate,
+      blockFlow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    val dummyHeader =
+      BlockHeader.unsafe(
+        BlockDeps.unsafe(template.deps),
+        template.depStateHash,
+        Hash.zero,
+        template.templateTs,
+        template.target,
+        Nonce.zero
+      )
+    val dummyBlock = Block(dummyHeader, template.transactions)
+    checkBlockAfterHeader(dummyBlock, blockFlow)
   }
 
   override def validateUntilDependencies(
