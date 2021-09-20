@@ -68,7 +68,7 @@ trait BaseActor extends Actor with ActorLogging {
   }
 
   def terminateSystem(): Unit = {
-    Env.resolve() match {
+    Env.currentEnv match {
       case Env.Prod =>
         sys.exit(1)
       case Env.Integration =>
@@ -102,7 +102,7 @@ final class DefaultStrategy extends SupervisorStrategyConfigurator {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   override def create(): SupervisorStrategy = {
-    Env.resolve() match {
+    Env.currentEnv match {
       case Env.Test => stopStrategy
       case _        => resumeStrategy
     }

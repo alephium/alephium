@@ -26,6 +26,8 @@ object Env {
   case object Test        extends Env { override def name: String = "test"  }
   case object Integration extends Env { override def name: String = "it"    }
 
+  lazy val currentEnv = this.resolve()
+
   def resolve(): Env =
     resolve(sys.env.getOrElse("ALEPHIUM_ENV", "prod"))
 
@@ -39,7 +41,7 @@ object Env {
   }
 
   def forProd(f: => Unit): Unit = {
-    resolve() match {
+    currentEnv match {
       case Prod => f
       case _    => ()
     }
