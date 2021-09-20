@@ -390,15 +390,19 @@ trait BlockGenerators extends TxGenerators {
 
   lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
 
-  def blockGen(chainIndex: ChainIndex): Gen[Block] =
+  def blockGen(chainIndex: ChainIndex, txNumGen: Gen[Int]): Gen[Block] =
     for {
       depStateHash <- hashGen
       deps <- Gen
         .listOfN(2 * groupConfig.groups - 1, blockHashGen)
         .map(_.toArray)
         .map(AVector.unsafe(_))
-      block <- blockGenOf(chainIndex, deps, depStateHash)
+      block <- blockGenOf(chainIndex, deps, depStateHash, txNumGen)
     } yield block
+
+  def blockGen(chainIndex: ChainIndex): Gen[Block] = {
+    blockGen(chainIndex, Gen.choose(1, 5))
+  }
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
     chainIndexGenRelatedTo(broker).flatMap(blockGen)
@@ -440,9 +444,14 @@ trait BlockGenerators extends TxGenerators {
     iter(0L)
   }
 
-  def blockGenOf(chainIndex: ChainIndex, deps: AVector[BlockHash], depStateHash: Hash): Gen[Block] =
+  def blockGenOf(
+      chainIndex: ChainIndex,
+      deps: AVector[BlockHash],
+      depStateHash: Hash,
+      txNumGen: Gen[Int]
+  ): Gen[Block] =
     for {
-      txNum <- Gen.choose(1, 5)
+      txNum <- txNumGen
       txs   <- Gen.listOfN(txNum, transactionGen(chainIndexGen = Gen.const(chainIndex)))
     } yield gen(chainIndex, deps, depStateHash, AVector.from(txs))
 
@@ -473,8 +482,11 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
   lazy val blockGen: Gen[Block] =
     chainIndexGen.flatMap(blockGen(_))
 
+  def blockGenOf(txNumGen: Gen[Int]): Gen[Block] =
+    chainIndexGen.flatMap(blockGen(_, txNumGen))
+
   def blockGenOf(deps: AVector[BlockHash], depStateHash: Hash): Gen[Block] =
-    chainIndexGen.flatMap(blockGenOf(_, deps, depStateHash))
+    chainIndexGen.flatMap(blockGenOf(_, deps, depStateHash, Gen.choose(1, 5)))
 
   def chainGenOf(length: Int, block: Block): Gen[AVector[Block]] =
     chainIndexGen.flatMap(chainGenOf(_, length, block))
