@@ -76,7 +76,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(networkConfig.networkId, headerTs, Target.onePhPerBlock)
+          BlockEnv(networkConfig.networkId, headerTs, Target.Max)
         )
       } yield ()
     }
@@ -383,7 +383,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       checkGasAndWitnesses(
         tx,
         preOutputs,
-        BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.onePhPerBlock)
+        BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.Max)
       )
     }
   }
