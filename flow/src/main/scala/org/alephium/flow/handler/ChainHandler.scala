@@ -22,7 +22,7 @@ import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
@@ -98,6 +98,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     with Publisher {
   import ChainHandler._
 
+  implicit val brokerConfig: BrokerConfig = blockFlow.brokerConfig
   def consensusConfig: ConsensusConfig
 
   def chainValidationTotalLabeled: Counter.Child

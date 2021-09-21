@@ -47,7 +47,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   class Fixture extends BlockValidation.Impl() {
     def checkCoinbase(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
       val groupView = flow.getMutableGroupView(block).rightValue
-      checkCoinbase(block, groupView)
+      checkCoinbase(block.chainIndex, block, groupView)
     }
 
     implicit class RichTx(tx: Transaction) {

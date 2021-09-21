@@ -120,7 +120,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           BlockEnv(
             AlephiumMainNet,
             blockTs,
-            Target.onePhPerBlock
+            Target.Max
           )
         )
       )
@@ -164,7 +164,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           BlockEnv(
             AlephiumMainNet,
             blockTs,
-            Target.onePhPerBlock
+            Target.Max
           )
         ),
         txEnv = Some(

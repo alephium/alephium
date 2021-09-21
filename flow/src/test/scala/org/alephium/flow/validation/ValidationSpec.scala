@@ -26,7 +26,10 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
 
   it should "pre-validate blocks" in {
-    val block = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
+    val block = mineFromMemPool(
+      blockFlow,
+      ChainIndex.unsafe(brokerConfig.groupRange.head, brokerConfig.groupRange.head)
+    )
     Validation.preValidate(AVector(block)) is true
 
     val newTarget = Target.unsafe(block.target.value.divide(4))

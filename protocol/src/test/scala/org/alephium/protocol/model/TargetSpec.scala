@@ -22,11 +22,13 @@ import scala.math.BigInt.javaBigInteger2bigInt
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol.config.GroupConfigFixture
+import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex}
 
-class TargetSpec extends AlephiumSpec {
+class TargetSpec extends AlephiumSpec with GroupConfigFixture {
+  val groups: Int = 1
+
   it should "check special values" in {
     Target.unsafe(BigInteger.ZERO).toHexString is "00000000"
     Target.unsafe(BigInteger.ONE).toHexString is "01010000"
@@ -37,9 +39,17 @@ class TargetSpec extends AlephiumSpec {
       .toHexString is "12ffffff"
     Target.Max.toHexString is "20ffffff"
 
-    Target.onePhPerBlock.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
-    Target.oneEhPerBlock.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
-    Target.a128EhPerBlock.value is Target.maxBigInt.divide(
+    def singleChainTarget(hashRate: HashRate): Target = {
+      Target.from(hashRate, Duration.ofSecondsUnsafe(1))
+    }
+
+    val onePhPerBlock: Target  = singleChainTarget(HashRate.onePhPerSecond)
+    val oneEhPerBlock: Target  = singleChainTarget(HashRate.oneEhPerSecond)
+    val a128EhPerBlock: Target = singleChainTarget(HashRate.a128EhPerSecond)
+
+    onePhPerBlock.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(5))
+    oneEhPerBlock.value is Target.maxBigInt.divide(BigInteger.valueOf(1024).pow(6))
+    a128EhPerBlock.value is Target.maxBigInt.divide(
       BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
     )
 
@@ -59,6 +69,14 @@ class TargetSpec extends AlephiumSpec {
         BigInteger.valueOf(1024).pow(6).multiply(BigInteger.valueOf(128))
       )
       .divide(64)
+  }
+
+  it should "consider the conversion rate from hash rate" in {
+    val hashRate = HashRate.unsafe(BigInteger.valueOf(2 * (16 * 16) / 64))
+    val target = Target.from(hashRate, Duration.ofSecondsUnsafe(64))(new GroupConfig {
+      val groups: Int = 4
+    })
+    target is Target.unsafe(Target.maxBigInt / 2)
   }
 
   it should "convert between big integer and compact bits" in {

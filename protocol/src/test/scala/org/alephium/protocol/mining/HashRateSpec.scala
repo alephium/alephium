@@ -18,10 +18,13 @@ package org.alephium.protocol.mining
 
 import java.math.BigInteger
 
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AlephiumSpec, Duration}
 
-class HashRateSpec extends AlephiumSpec {
+class HashRateSpec extends AlephiumSpec with GroupConfigFixture {
+  val groups: Int = 4
+
   it should "check special values" in {
     HashRate.onePhPerSecond.value is BigInteger.valueOf(1024).pow(5)
     HashRate.oneEhPerSecond.value is BigInteger.valueOf(1024).pow(6)
@@ -35,5 +38,10 @@ class HashRateSpec extends AlephiumSpec {
       val hashrate = HashRate.from(target, Duration.ofSecondsUnsafe(1))
       Target.from(hashrate, Duration.ofSecondsUnsafe(1)) is target
     }
+  }
+
+  it should "consider the conversion rate from target" in {
+    val hashrate = HashRate.from(Target.Max, Duration.ofSecondsUnsafe(64))
+    hashrate.value is BigInteger.valueOf((16 * 16) / 64)
   }
 }

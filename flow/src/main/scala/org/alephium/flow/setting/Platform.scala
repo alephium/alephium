@@ -24,7 +24,7 @@ import org.alephium.protocol.Hash
 import org.alephium.util.{Env, Files}
 
 object Platform extends StrictLogging {
-  def getRootPath(): Path = getRootPath(Env.resolve())
+  def getRootPath(): Path = getRootPath(Env.currentEnv)
 
   def getRootPath(env: Env): Path = {
     val rootPath = env match {

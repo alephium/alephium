@@ -496,7 +496,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BlockCandidate" in {
-    val target = Target.onePhPerBlock
+    val target = Target.Max
 
     val blockCandidate = BlockCandidate(
       1,

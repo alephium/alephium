@@ -274,6 +274,18 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     state.mightReachable(peerInfo.address) is true
   }
 
+  it should "set unreachables based on inet address" in new Fixture {
+    state.getActivePeers(None).length is 0
+    state.appendPeer(peerInfo)
+    state.getActivePeers(None).length is 1
+    state.mightReachable(peerInfo.address) is true
+
+    val newPeer = new InetSocketAddress(peerInfo.address.getAddress, peerInfo.address.getPort + 1)
+    state.setUnreachable(newPeer)
+    state.mightReachable(peerInfo.address) is false
+    state.getActivePeers(None).length is 0
+  }
+
   it should "correctly replace furthest peer when table is full" in new Fixture {
     while (
       state.getPeersWeight < state.brokerConfig.groups * state.discoveryConfig.neighborsPerGroup

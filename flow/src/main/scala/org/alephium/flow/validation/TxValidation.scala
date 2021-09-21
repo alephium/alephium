@@ -47,11 +47,13 @@ trait TxValidation {
       preContractOutputs <- fromGetPreOutputs(
         groupView.getPreContractOutputs(fullTx.contractInputs)
       )
-      _ <- checkStatefulExceptTxScript(
+      _ <- checkStateful(
+        chainIndex,
         fullTx,
-        blockEnv,
+        groupView.worldState,
         preOutputs.as[TxOutput] ++ preContractOutputs,
-        None
+        None,
+        blockEnv
       )
     } yield ()
   }
