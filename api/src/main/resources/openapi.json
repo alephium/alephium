@@ -136,7 +136,8 @@
                   "summary": "Default",
                   "value": {
                     "password": "my-secret-password",
-                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
+                    "walletName": "wallet-super-name"
                   }
                 },
                 "Example1": {
@@ -144,8 +145,8 @@
                   "value": {
                     "password": "my-secret-password",
                     "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
-                    "isMiner": true,
                     "walletName": "wallet-super-name",
+                    "isMiner": true,
                     "mnemonicPassphrase": "optional-mnemonic-passphrase"
                   }
                 }
@@ -252,7 +253,8 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "password": "my-secret-password"
+                    "password": "my-secret-password",
+                    "walletName": "wallet-super-name"
                   }
                 },
                 "Example1": {
@@ -6660,7 +6662,8 @@
       },
       "WalletCreation": {
         "required": [
-          "password"
+          "password",
+          "walletName"
         ],
         "type": "object",
         "properties": {
@@ -6695,7 +6698,8 @@
       "WalletRestore": {
         "required": [
           "password",
-          "mnemonic"
+          "mnemonic",
+          "walletName"
         ],
         "type": "object",
         "properties": {
@@ -6705,11 +6709,11 @@
           "mnemonic": {
             "type": "string"
           },
-          "isMiner": {
-            "type": "boolean"
-          },
           "walletName": {
             "type": "string"
+          },
+          "isMiner": {
+            "type": "boolean"
           },
           "mnemonicPassphrase": {
             "type": "string"

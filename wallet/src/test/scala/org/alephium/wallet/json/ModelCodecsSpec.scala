@@ -133,14 +133,15 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "WalletRestore" in {
-    val json1          = s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}"}"""
-    val walletRestore1 = WalletRestore(password, mnemonic)
+    val json1 =
+      s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","walletName":"$walletName"}"""
+    val walletRestore1 = WalletRestore(password, mnemonic, walletName)
     check(walletRestore1, json1)
 
     val json2 =
-      s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","isMiner":$bool,"walletName":"$walletName","mnemonicPassphrase":"$mnemonicPassphrase"}"""
+      s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","walletName":"$walletName","isMiner":$bool,"mnemonicPassphrase":"$mnemonicPassphrase"}"""
     val walletRestore2 =
-      WalletRestore(password, mnemonic, Some(bool), Some(walletName), Some(mnemonicPassphrase))
+      WalletRestore(password, mnemonic, walletName, Some(bool), Some(mnemonicPassphrase))
     check(walletRestore2, json2)
   }
 
@@ -151,15 +152,15 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "WalletCreation" in {
-    val json1           = s"""{"password":"$password"}"""
-    val walletCreation1 = WalletCreation(password)
+    val json1           = s"""{"password":"$password","walletName":"$walletName"}"""
+    val walletCreation1 = WalletCreation(password, walletName)
     check(walletCreation1, json1)
 
     val json2 =
       s"""{"password":"$password","walletName":"$walletName","isMiner":$bool,"mnemonicPassphrase":"$mnemonicPassphrase","mnemonicSize":${mnemonicSize.value}}"""
     val walletCreation2 = WalletCreation(
       password,
-      Some(walletName),
+      walletName,
       Some(bool),
       Some(mnemonicPassphrase),
       Some(mnemonicSize)

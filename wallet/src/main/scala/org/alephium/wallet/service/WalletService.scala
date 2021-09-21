@@ -48,7 +48,7 @@ trait WalletService extends Service {
       password: String,
       mnemonicSize: Mnemonic.Size,
       isMiner: Boolean,
-      walletName: Option[String],
+      walletName: String,
       mnemonicPassphrase: Option[String]
   ): Either[WalletError, (String, Mnemonic)]
 
@@ -56,7 +56,7 @@ trait WalletService extends Service {
       password: String,
       mnemonic: Mnemonic,
       isMiner: Boolean,
-      walletName: Option[String],
+      walletName: String,
       mnemonicPassphrase: Option[String]
   ): Either[WalletError, String]
 
@@ -234,7 +234,7 @@ object WalletService {
         mnemonic: Mnemonic,
         mnemonicPassphrase: Option[String],
         isMiner: Boolean,
-        walletName: Option[String]
+        walletName: String
     ): Either[WalletError, (String, Mnemonic)] = {
       for {
         file <- buildWalletFile(walletName)
@@ -254,7 +254,7 @@ object WalletService {
         password: String,
         mnemonicSize: Mnemonic.Size,
         isMiner: Boolean,
-        walletName: Option[String],
+        walletName: String,
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
       val mnemonic = Mnemonic.generate(mnemonicSize)
@@ -266,7 +266,7 @@ object WalletService {
         password: String,
         mnemonic: Mnemonic,
         isMiner: Boolean,
-        walletName: Option[String],
+        walletName: String,
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, String] = {
       createOrRestoreWallet(password, mnemonic, mnemonicPassphrase, isMiner, walletName).map {
@@ -634,23 +634,13 @@ object WalletService {
     ): Future[Either[WalletError, A]] =
       withAddressesM(wallet)(f)(error => Future.successful(Left(error)))
 
-    private def buildWalletFile(walletName: Option[String]): Either[WalletError, File] = {
-      walletName match {
-        case Some(name) =>
-          val regex = "^[a-zA-Z0-9_-]*$".r
-          Either.cond(
-            regex.matches(name),
-            new File(s"$secretDir/$name"),
-            InvalidWalletName(name)
-          )
-        case None =>
-          for {
-            currentWallets <- listWalletsInSecretDir()
-          } yield {
-            val name = s"wallet-${currentWallets.length}"
-            new File(s"$secretDir/$name")
-          }
-      }
+    private def buildWalletFile(walletName: String): Either[WalletError, File] = {
+      val regex = "^[a-zA-Z0-9_-]*$".r
+      Either.cond(
+        regex.matches(walletName),
+        new File(s"$secretDir/$walletName"),
+        InvalidWalletName(walletName)
+      )
     }
 
     private def buildMinerAddresses(

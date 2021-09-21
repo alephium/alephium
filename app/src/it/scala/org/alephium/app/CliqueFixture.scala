@@ -180,8 +180,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def transferFromWallet(toAddress: String, amount: U256, restPort: Int): Transfer.Result =
     eventually {
-      val walletName =
-        request[WalletRestore.Result](restoreWallet(password, mnemonic), restPort).walletName
+      val walletName = "wallet-name"
+
+      request[WalletRestore.Result](restoreWallet(password, mnemonic, walletName), restPort)
       val transfer = transferWallet(walletName, toAddress, amount)
       val res      = request[Transfer.Result](transfer, restPort)
       res
@@ -407,16 +408,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def createWallet(password: String) =
+  def createWallet(password: String, walletName: String) =
     httpPost(
       s"/wallets",
-      Some(s"""{"password":"${password}"}""")
+      Some(s"""{"password":"${password}","walletName":"$walletName"}""")
     )
 
-  def restoreWallet(password: String, mnemonic: String) =
+  def restoreWallet(password: String, mnemonic: String, walletName: String) =
     httpPut(
       s"/wallets",
-      Some(s"""{"password":"${password}","mnemonic":"${mnemonic}"}""")
+      Some(s"""{"password":"${password}","mnemonic":"${mnemonic}","walletName":"$walletName"}""")
     )
 
   def transferWallet(walletName: String, address: String, amount: U256) = {

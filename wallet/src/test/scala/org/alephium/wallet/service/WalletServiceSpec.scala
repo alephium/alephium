@@ -36,8 +36,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
   it should "handle a miner wallet" in new Fixture {
 
-    val (walletName, _) =
-      walletService.createWallet(password, mnemonicSize, true, None, None).rightValue
+    walletService.createWallet(password, mnemonicSize, true, walletName, None).rightValue
 
     val (_, addresses) = walletService.getAddresses(walletName).rightValue
 
@@ -73,8 +72,8 @@ class WalletServiceSpec extends AlephiumFutureSpec {
         "hedgehog elephant seven tired orient fragile vehicle category frame foster wall muscle surround slight original candy pyramid face bamboo like language sunny present praise"
       )
       .get
-    val walletName =
-      walletService.restoreWallet(password, mnemonic, true, None, None).rightValue
+
+    walletService.restoreWallet(password, mnemonic, true, walletName, None).rightValue
 
     walletService.deriveNextMinerAddresses(walletName).rightValue
 
@@ -102,8 +101,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
   it should "lock the wallet if inactive" in new Fixture {
     override val lockingTimeout = Duration.ofSecondsUnsafe(1)
 
-    val (walletName, _) =
-      walletService.createWallet(password, mnemonicSize, true, None, None).rightValue
+    walletService.createWallet(password, mnemonicSize, true, walletName, None).rightValue
 
     walletService.getAddresses(walletName).isRight is true
 
@@ -119,35 +117,35 @@ class WalletServiceSpec extends AlephiumFutureSpec {
   it should "return Not Found if wallet doesn't exist" in new Fixture {
     import WalletService.WalletNotFound
 
-    val walletName = "wallet"
-    val notFound   = WalletNotFound(new File(tempSecretDir.toString, walletName))
+    val wrongWalletName = "wallet"
+    val notFound        = WalletNotFound(new File(tempSecretDir.toString, wrongWalletName))
     val address =
       Address.Asset(
         LockupScript.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
       )
 
-    walletService.unlockWallet(walletName, "", None).leftValue is notFound
-    walletService.getBalances(walletName, None).futureValue.leftValue is notFound
-    walletService.getAddresses(walletName).leftValue is notFound
-    walletService.getMinerAddresses(walletName).leftValue is notFound
+    walletService.unlockWallet(wrongWalletName, "", None).leftValue is notFound
+    walletService.getBalances(wrongWalletName, None).futureValue.leftValue is notFound
+    walletService.getAddresses(wrongWalletName).leftValue is notFound
+    walletService.getMinerAddresses(wrongWalletName).leftValue is notFound
     walletService
-      .transfer(walletName, AVector(Destination(address, Amount.Zero)), None, None)
+      .transfer(wrongWalletName, AVector(Destination(address, Amount.Zero)), None, None)
       .futureValue
       .leftValue is notFound
-    walletService.deriveNextAddress(walletName).leftValue is notFound
-    walletService.deriveNextMinerAddresses(walletName).leftValue is notFound
-    walletService.changeActiveAddress(walletName, address).leftValue is notFound
+    walletService.deriveNextAddress(wrongWalletName).leftValue is notFound
+    walletService.deriveNextMinerAddresses(wrongWalletName).leftValue is notFound
+    walletService.changeActiveAddress(wrongWalletName, address).leftValue is notFound
 
     //We curently  do an optimist lock
-    walletService.lockWallet(walletName) isE ()
+    walletService.lockWallet(wrongWalletName) isE ()
   }
 
   it should "list all wallets even when locked" in new Fixture {
+    val walletName1 = "wallet-1"
+    val walletName2 = "wallet0"
 
-    val (walletName1, _) =
-      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
-    val (walletName2, _) =
-      walletService.createWallet(password, mnemonicSize, true, None, None).rightValue
+    walletService.createWallet(password, mnemonicSize, false, walletName1, None).rightValue
+    walletService.createWallet(password, mnemonicSize, true, walletName2, None).rightValue
 
     walletService
       .listWallets()
@@ -162,8 +160,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
   it should "delete a wallet" in new Fixture {
 
-    val (walletName, _) =
-      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
+    walletService.createWallet(password, mnemonicSize, false, walletName, None).rightValue
 
     walletService
       .listWallets()
@@ -177,8 +174,8 @@ class WalletServiceSpec extends AlephiumFutureSpec {
   }
 
   it should "get back mnemonic" in new Fixture {
-    val (walletName, mnemonic) =
-      walletService.createWallet(password, mnemonicSize, false, None, None).rightValue
+    val (_, mnemonic) =
+      walletService.createWallet(password, mnemonicSize, false, walletName, None).rightValue
 
     walletService
       .revealMnemonic(walletName, password) isE mnemonic
@@ -221,7 +218,15 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .rightValue is expected
   }
 
+  it should "fail to create a wallet with empty name" in new Fixture {
+    walletService
+      .createWallet(password, mnemonicSize, false, "", None)
+      .leftValue
+      .message is s"Cannot create encrypted file at $tempSecretDir"
+  }
+
   trait Fixture extends WalletConfigFixture {
+    val walletName   = "wallet-name"
     val password     = "password"
     val mnemonicSize = Mnemonic.Size(12).get
     implicit val system: ActorSystem =
@@ -254,8 +259,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .from(Hex.unsafe("18d3d0d2f72db3675db48cd38efd334eb10241c73b5df80b716f2905ff340d33"))
       .get
 
-    val walletName =
-      walletService.restoreWallet(password, mnemonic, false, None, None).rightValue
+    walletService.restoreWallet(password, mnemonic, false, walletName, None).rightValue
   }
 }
 

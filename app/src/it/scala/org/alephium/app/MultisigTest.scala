@@ -126,8 +126,8 @@ class MultisigTest extends AlephiumActorSpec {
     val group    = request[Group](getGroup(address), clique.masterRestPort)
     val restPort = clique.getRestPort(group.group)
 
-    val walletName =
-      request[WalletCreation.Result](createWallet(password), restPort).walletName
+    val walletName = "wallet-name"
+    request[WalletCreation.Result](createWallet(password, walletName), restPort)
 
     val address2 =
       request[Addresses](getAddresses(walletName), restPort).activeAddress

@@ -47,11 +47,11 @@ trait WalletExamples extends EndpointsExamples {
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
-    defaultExample(WalletCreation(password, None, None, None, None)),
+    defaultExample(WalletCreation(password, walletName, None, None, None)),
     moreSettingsExample(
       WalletCreation(
         password,
-        Some(walletName),
+        walletName,
         Some(true),
         Some(mnemonicPassphrase),
         Some(Mnemonic.Size.list.last)
@@ -64,10 +64,10 @@ trait WalletExamples extends EndpointsExamples {
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
     List(
       defaultExample(
-        WalletRestore(password, mnemonic, None, None, None)
+        WalletRestore(password, mnemonic, walletName, None, None)
       ),
       moreSettingsExample(
-        WalletRestore(password, mnemonic, Some(true), Some(walletName), Some(mnemonicPassphrase))
+        WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase))
       )
     )
 
