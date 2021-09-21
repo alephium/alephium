@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.NetworkId
-import org.alephium.util.Bytes
+import org.alephium.util.{Bytes, Duration}
 
 trait NetworkConfig {
   def networkId: NetworkId
@@ -29,4 +29,11 @@ trait NetworkConfig {
     Bytes.from(Hash.hash(s"alephium-${networkId.id}").toRandomIntUnsafe)
 
   def noPreMineProof: ByteString
+
+  //scalastyle:off magic.number
+  lazy val coinbaseLockupPeriod: Duration = networkId match {
+    case NetworkId.AlephiumMainNet => Duration.ofMinutesUnsafe(500)
+    case _                         => Duration.ofMinutesUnsafe(10)
+  }
+  //scalastyle:on magic.number
 }

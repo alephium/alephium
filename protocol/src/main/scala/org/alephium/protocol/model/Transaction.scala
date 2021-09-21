@@ -257,7 +257,7 @@ object Transaction {
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
-    val lockTime     = blockTs + coinbaseLockupPeriod
+    val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
     val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
     val netReward = miningReward match {
       case Emission.PoW(miningReward) => totalReward(gasFee, miningReward)

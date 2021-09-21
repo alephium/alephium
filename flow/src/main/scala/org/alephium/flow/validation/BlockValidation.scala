@@ -285,7 +285,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     val output = block.coinbase.unsigned.fixedOutputs.head
     if (output.amount != lockedAmount) {
       invalidBlock(InvalidCoinbaseLockedAmount)
-    } else if (output.lockTime != block.timestamp.plusUnsafe(coinbaseLockupPeriod)) {
+    } else if (output.lockTime != block.timestamp.plusUnsafe(networkConfig.coinbaseLockupPeriod)) {
       invalidBlock(InvalidCoinbaseLockupPeriod)
     } else {
       validBlock(())
