@@ -114,9 +114,13 @@ class TxHandler(
 
   def handleCommand: Receive = {
     case TxHandler.AddToSharedPool(txs) =>
-      txs.foreach(handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate))
+      txs.foreach(
+        handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
+      )
     case TxHandler.AddToGrandPool(txs) =>
-      txs.foreach(handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate))
+      txs.foreach(
+        handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate, None, acknowledge = true)
+      )
     case TxHandler.Broadcast(txs)          => handleReadyTxsFromPendingPool(txs)
     case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
     case TxHandler.BroadcastTxs            => broadcastTxs()
@@ -202,8 +206,12 @@ class TxHandler(
         groupViews(index).getPreOutputs(tx.unsigned.inputs).flatMap {
           case Some(_) =>
             valid += 1
-            val mempool = blockFlow.getMemPool(groupIndex)
-            handleValidTx(chainIndex, tx, mempool, Some(persistedTxId), acknowledge = false)
+            handleTx(
+              tx,
+              nonCoinbaseValidation.validateGrandPoolTxTemplate,
+              Some(persistedTxId),
+              acknowledge = false
+            )
             Right(())
           case None =>
             invalid += 1
@@ -211,7 +219,9 @@ class TxHandler(
         }
       }
     } yield ())
-    log.info(s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid")
+    log.info(
+      s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
+    )
   }
 
   private def downloadTxs(): Unit = {
@@ -262,7 +272,9 @@ class TxHandler(
 
   def handleTx(
       tx: TransactionTemplate,
-      validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit]
+      validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit],
+      persistedTxIdOpt: Option[PersistedTxId],
+      acknowledge: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
     val mempool    = blockFlow.getMemPool(chainIndex)
@@ -277,7 +289,7 @@ class TxHandler(
         case Left(Right(s: InvalidTxStatus)) =>
           addFailed(tx, s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
         case Right(_) =>
-          handleValidTx(chainIndex, tx, mempool, None, acknowledge = true)
+          handleValidTx(chainIndex, tx, mempool, persistedTxIdOpt, acknowledge)
         case Left(Left(e)) =>
           addFailed(tx, s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
       }
