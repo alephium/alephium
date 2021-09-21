@@ -35,7 +35,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "broadcast valid tx" in new Fixture {
     override val configValues = Map(
-      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"),
+      ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
       ("alephium.broker.groups", 4),
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.broker-id", 0)
@@ -329,16 +329,20 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       val persistedTxId1 = addPendingTx(tx1)
       val persistedTxId2 = addPendingTx(tx2)
       txHandler ! TxHandler.CleanPendingPool
-      pendingTxStorage.get(persistedTxId1) isE tx1
-      pendingTxStorage.get(persistedTxId2) isE tx2
-      pendingPool.contains(tx1.id) is true
-      pendingPool.contains(tx2.id) is true
+      eventually {
+        pendingTxStorage.get(persistedTxId1) isE tx1
+        pendingTxStorage.get(persistedTxId2) isE tx2
+        pendingPool.contains(tx1.id) is true
+        pendingPool.contains(tx2.id) is true
+      }
 
       info("Remove invalid tx(tx2)")
       removePendingTxs(AVector(tx1))
       txHandler ! TxHandler.CleanPendingPool
-      pendingTxStorage.exists(persistedTxId2) isE false
-      pendingPool.contains(tx2.id) is false
+      eventually {
+        pendingTxStorage.exists(persistedTxId2) isE false
+        pendingPool.contains(tx2.id) is false
+      }
     }
 
     {
@@ -347,10 +351,12 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       val persistedTxId2 = addPendingTx(tx2)
       removeReadyTxs(AVector(tx0))
       txHandler ! TxHandler.CleanPendingPool
-      pendingTxStorage.exists(persistedTxId1) isE false
-      pendingTxStorage.exists(persistedTxId2) isE false
-      pendingPool.contains(tx1.id) is false
-      pendingPool.contains(tx2.id) is false
+      eventually {
+        pendingTxStorage.exists(persistedTxId1) isE false
+        pendingTxStorage.exists(persistedTxId2) isE false
+        pendingPool.contains(tx1.id) is false
+        pendingPool.contains(tx2.id) is false
+      }
     }
   }
 
