@@ -219,7 +219,9 @@ class DiscoveryServer(
     }
 
   override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
-    publishEvent(NewPeer(peerInfo))
+    if (mightReachableSlow(peerInfo.address)) {
+      publishEvent(NewPeer(peerInfo))
+    }
   }
 
   private def scanAndSchedule(): Unit = {

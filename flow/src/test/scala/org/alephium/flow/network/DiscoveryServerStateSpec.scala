@@ -286,6 +286,16 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     state.getActivePeers(None).length is 0
   }
 
+  it should "clean unreachables in mightReachableSlow" in new Fixture {
+    val address = peerInfo.address.getAddress
+    state.unreachables.put(peerInfo.address.getAddress, TimeStamp.zero)
+    state.mightReachable(peerInfo.address) is false
+    state.unreachables.contains(address) is true
+    state.mightReachableSlow(peerInfo.address) is true
+    state.unreachables.contains(address) is false
+    state.mightReachable(peerInfo.address) is true
+  }
+
   it should "correctly replace furthest peer when table is full" in new Fixture {
     while (
       state.getPeersWeight < state.brokerConfig.groups * state.discoveryConfig.neighborsPerGroup
@@ -306,5 +316,4 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     state.getNeighbors(state.selfCliqueId).contains(furthestPeer) is false
     state.getNeighbors(state.selfCliqueId).contains(peer) is true
   }
-
 }

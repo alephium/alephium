@@ -52,8 +52,8 @@ trait DiscoveryServerState extends SessionManager {
 
   private val neighborMax = discoveryConfig.neighborsPerGroup * brokerConfig.groups
 
-  protected val table      = mutable.HashMap.empty[PeerId, PeerStatus]
-  private val unreachables = Cache.fifo[InetAddress, TimeStamp](neighborMax)
+  protected val table               = mutable.HashMap.empty[PeerId, PeerStatus]
+  private[network] val unreachables = Cache.fifo[InetAddress, TimeStamp](neighborMax)
 
   def setSocket(s: ActorRefT[UdpServer.Command]): Unit = {
     socketOpt = Some(s)
@@ -149,6 +149,20 @@ trait DiscoveryServerState extends SessionManager {
 
   def unsetUnreachable(remote: InetAddress): Unit = {
     unreachables.remove(remote)
+  }
+
+  def mightReachableSlow(remote: InetSocketAddress): Boolean = {
+    val remoteInet = remote.getAddress
+    unreachables.get(remoteInet) match {
+      case None => true
+      case Some(until) =>
+        if (until <= TimeStamp.now()) {
+          unreachables.remove(remoteInet)
+          true
+        } else {
+          false
+        }
+    }
   }
 
   def mightReachable(remote: InetSocketAddress): Boolean = {

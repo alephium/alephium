@@ -294,6 +294,7 @@ class InterCliqueManager(
   }
 
   def connect(broker: BrokerInfo): Unit = {
+    log.info(s"Try to connect ${broker.address}")
     if (checkForOutConnection(broker, networkSetting.maxOutboundConnectionsPerGroup)) {
       connectUnsafe(broker)
     }
