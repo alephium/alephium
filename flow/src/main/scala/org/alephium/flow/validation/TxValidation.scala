@@ -530,17 +530,16 @@ object TxValidation {
         blockEnv: BlockEnv
     ): TxValidationResult[GasBox] = {
       for {
-        gasRemaining0 <- checkBasicGas(tx, preOutputs, tx.unsigned.gasAmount)
+        gasRemaining0 <- checkBasicGas(tx, tx.unsigned.gasAmount)
         gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0)
       } yield gasRemaining1
     }
 
     protected[validation] def checkBasicGas(
         tx: Transaction,
-        preOutputs: AVector[TxOutput],
         gasRemaining: GasBox
     ): TxValidationResult[GasBox] = {
-      val inputGas      = GasSchedule.txInputBaseGas.mulUnsafe(preOutputs.length)
+      val inputGas      = GasSchedule.txInputBaseGas.mulUnsafe(tx.inputsLength)
       val outputGas     = GasSchedule.txOutputBaseGas.mulUnsafe(tx.outputsLength)
       val totalBasicGas = GasSchedule.txBaseGas.addUnsafe(inputGas).addUnsafe(outputGas)
       fromExeResult(gasRemaining.use(totalBasicGas))
@@ -651,7 +650,7 @@ object TxValidation {
         lock: LockupScript.P2SH,
         unlock: UnlockScript.P2SH
     ): TxValidationResult[GasBox] = {
-      checkScript(
+      checkUnlockScript(
         blockEnv,
         txEnv,
         gasRemaining,
@@ -661,7 +660,7 @@ object TxValidation {
       )
     }
 
-    protected[validation] def checkScript(
+    protected[validation] def checkUnlockScript(
         blockEnv: BlockEnv,
         txEnv: TxEnv,
         gasRemaining: GasBox,

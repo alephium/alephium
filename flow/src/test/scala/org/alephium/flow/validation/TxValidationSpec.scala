@@ -699,7 +699,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val groupIndex = lockup.groupIndex
     val gasRemaining =
-      checkScript(blockEnv, txEnv, initialGas, script.hash, script, AVector.empty).rightValue
+      checkUnlockScript(blockEnv, txEnv, initialGas, script.hash, script, AVector.empty).rightValue
     initialGas is gasRemaining.addUnsafe(
       script.bytes.size + GasHash.gas(script.bytes.size).value + 200 /* 200 is the call gas */
     )

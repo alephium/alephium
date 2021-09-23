@@ -74,6 +74,7 @@ final case class Transaction(
   def allInputRefs: AVector[TxOutputRef] =
     unsigned.inputs.map[TxOutputRef](_.outputRef) ++ contractInputs
 
+  def inputsLength: Int  = unsigned.inputs.length + contractInputs.length
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
 
   def getOutput(index: Int): TxOutput = {
