@@ -19,10 +19,15 @@ package org.alephium.api.model
 import org.alephium.protocol.model.Address
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Compile(
-    address: Address,
-    `type`: String,
-    code: String,
-    state: Option[String] = None,
-    issueTokenAmount: Option[Amount] = None
-)
+object Compile {
+  final case class Script(
+      code: String
+  )
+
+  final case class Contract(
+      address: Address,
+      code: String,
+      state: Option[String] = None,
+      issueTokenAmount: Option[Amount] = None
+  )
+}

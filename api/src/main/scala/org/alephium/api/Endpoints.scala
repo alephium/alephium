@@ -281,10 +281,17 @@ trait Endpoints
       .in(jsonBody[MinerAddresses])
       .summary("Update miner's addresses")
 
-  val compile: BaseEndpoint[Compile, CompileResult] =
+  val compileScript: BaseEndpoint[Compile.Script, CompileResult] =
     contractsEndpoint.post
-      .in("compile")
-      .in(jsonBody[Compile])
+      .in("compile-script")
+      .in(jsonBody[Compile.Script])
+      .out(jsonBody[CompileResult])
+      .summary("Compile a script")
+
+  val compileContract: BaseEndpoint[Compile.Contract, CompileResult] =
+    contractsEndpoint.post
+      .in("compile-contract")
+      .in(jsonBody[Compile.Contract])
       .out(jsonBody[CompileResult])
       .summary("Compile a smart contract")
 

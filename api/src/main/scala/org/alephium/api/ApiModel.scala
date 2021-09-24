@@ -212,7 +212,9 @@ trait ApiModelCodec {
 
   implicit val submitMultisigTransactionRW: RW[SubmitMultisig] = macroRW
 
-  implicit val compileRW: RW[Compile] = macroRW
+  implicit val compileScriptRW: RW[Compile.Script] = macroRW
+
+  implicit val compileContractRW: RW[Compile.Contract] = macroRW
 
   implicit val compileResultRW: RW[CompileResult] = macroRW
 

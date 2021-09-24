@@ -439,7 +439,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     serverUtils.buildContract(blockFlow, query)
   }
 
-  val compileLogic = serverLogic(compile) { query => serverUtils.compile(query) }
+  val compileScriptLogic = serverLogic(compileScript) { query => serverUtils.compileScript(query) }
+
+  val compileContractLogic = serverLogic(compileContract) { query =>
+    serverUtils.compileContract(query)
+  }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     //Run the export in background

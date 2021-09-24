@@ -555,12 +555,25 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
   }
 
-  it should "encode/decode Compile" in {
+  it should "encode/decode Compile.Script" in {
+    val compile =
+      Compile.Script(
+        code = "0000"
+      )
+    val jsonRaw =
+      s"""
+         |{
+         |  "code": "0000"
+         |}
+         |""".stripMargin
+    checkData(compile, jsonRaw)
+  }
+
+  it should "encode/decode Compile.Contract" in {
     val address = generateAddress()
-    val compile0 =
-      Compile(
+    val compile =
+      Compile.Contract(
         address,
-        "contract",
         code = "0000",
         state = Some("0001"),
         issueTokenAmount = Some(Amount(51))
@@ -569,12 +582,11 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       s"""
          |{
          |  "address":"${address.toBase58}",
-         |  "type": "contract",
          |  "code": "0000",
          |  "state": "0001",
          |  "issueTokenAmount": "51"
          |}
          |""".stripMargin
-    checkData(compile0, jsonRaw)
+    checkData(compile, jsonRaw)
   }
 }

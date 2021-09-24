@@ -4484,38 +4484,21 @@
         }
       }
     },
-    "/contracts/compile": {
+    "/contracts/compile-script": {
       "post": {
         "tags": [
           "Contracts"
         ],
-        "summary": "Compile a smart contract",
-        "operationId": "postContractsCompile",
+        "summary": "Compile a script",
+        "operationId": "postContractsCompile-script",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Compile"
+                "$ref": "#/components/schemas/Script"
               },
-              "examples": {
-                "Example0": {
-                  "summary": "Default",
-                  "value": {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "type": "contract",
-                    "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
-                  }
-                },
-                "Example1": {
-                  "summary": "More settings",
-                  "value": {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "type": "contract",
-                    "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
-                    "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
-                    "issueTokenAmount": "2000000000000000000"
-                  }
-                }
+              "example": {
+                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n, 1024) } }"
               }
             }
           },
@@ -5845,32 +5828,6 @@
           }
         }
       },
-      "Compile": {
-        "required": [
-          "address",
-          "type",
-          "code"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string"
-          },
-          "issueTokenAmount": {
-            "type": "string",
-            "format": "uint256"
-          }
-        }
-      },
       "CompileResult": {
         "required": [
           "code"
@@ -5940,6 +5897,28 @@
             "items": {
               "$ref": "#/components/schemas/Token"
             }
+          }
+        }
+      },
+      "Contract2": {
+        "required": [
+          "address",
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "issueTokenAmount": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },
@@ -6356,6 +6335,17 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          }
+        }
+      },
+      "Script": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
             "type": "string"
           }
         }

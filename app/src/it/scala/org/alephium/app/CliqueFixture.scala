@@ -502,8 +502,29 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def compileFilang(code: String) = {
-    httpPost(s"/contracts/compile", Some(code))
+  def compileScript(code: String) = {
+    val script = s"""
+          {
+            "code": ${ujson.Str(code)}
+          }
+          """
+    httpPost(s"/contracts/compile-script", Some(script))
+  }
+
+  def compileContract(
+      address: String,
+      code: String,
+      state: Option[String] = None,
+      issueTokenAmount: Option[U256]
+  ) = {
+    val contract = s"""
+          {
+            "address": "$address",
+            "code": ${ujson.Str(code)}
+            ${state.map(s => s""","state": "$s"""").getOrElse("")}
+            ${issueTokenAmount.map(v => s""","issueTokenAmount":"${v.v}"""").getOrElse("")}
+          }"""
+    httpPost(s"/contracts/compile-contract", Some(contract))
   }
 
   def multisig(keys: AVector[String], mrequired: Int) = {

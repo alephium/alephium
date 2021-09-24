@@ -329,19 +329,25 @@ trait EndpointsExamples extends ErrorExamples {
       Example(NotFound, None, Some("Cannot find tx with the id"))
     )
 
-  implicit val compileExamples: List[Example[Compile]] = List(
+  implicit val compileScriptExamples: List[Example[Compile.Script]] =
+    simpleExample(
+      Compile.Script(
+        code =
+          s"TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) } }"
+      )
+    )
+
+  implicit val compileContractExamples: List[Example[Compile.Contract]] = List(
     defaultExample(
-      Compile(
+      Compile.Contract(
         address,
-        `type` = "contract",
         code =
           "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
     ),
     moreSettingsExample(
-      Compile(
+      Compile.Contract(
         address,
-        `type` = "contract",
         code =
           "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
         state = Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),

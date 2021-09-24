@@ -91,7 +91,8 @@ class RestServer(
       minerListAddressesLogic,
       minerUpdateAddressesLogic,
       submitContractLogic,
-      compileLogic,
+      compileScriptLogic,
+      compileContractLogic,
       exportBlocksLogic,
       buildContractLogic,
       metricsLogic

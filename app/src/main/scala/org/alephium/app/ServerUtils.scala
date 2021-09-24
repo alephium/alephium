@@ -604,25 +604,31 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compile(query: Compile): FutureTry[CompileResult] = {
+  def compileScript(query: Compile.Script): FutureTry[CompileResult] = {
     Future.successful(
-      (query.`type` match {
-        case "script" =>
-          Compiler.compileTxScript(query.code)
-        case "contract" =>
-          for {
-            code  <- Compiler.compileContract(query.code)
-            state <- parseState(query.state)
-            script <- buildContract(
-              code,
-              query.address,
-              state,
-              dustUtxoAmount,
-              query.issueTokenAmount.map(_.value)
-            )
-          } yield script
-        case tpe => Left(Compiler.Error(s"Invalid code type: $tpe"))
-      }).map(script => CompileResult(Hex.toHexString(serialize(script))))
+      Compiler
+        .compileTxScript(query.code)
+        .map(script => CompileResult(Hex.toHexString(serialize(script))))
+        .left
+        .map(error => failed(error.toString))
+    )
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def compileContract(query: Compile.Contract): FutureTry[CompileResult] = {
+    Future.successful(
+      (for {
+        code  <- Compiler.compileContract(query.code)
+        state <- parseState(query.state)
+        script <- buildContract(
+          code,
+          query.address,
+          state,
+          dustUtxoAmount,
+          query.issueTokenAmount.map(_.value)
+        )
+      } yield script)
+        .map(script => CompileResult(Hex.toHexString(serialize(script))))
         .left
         .map(error => failed(error.toString))
     )

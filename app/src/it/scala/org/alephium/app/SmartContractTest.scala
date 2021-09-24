@@ -39,26 +39,20 @@ class SmartContractTest extends AlephiumActorSpec {
         state: Option[String] = None,
         issueTokenAmount: Option[U256]
     ): Hash = {
-      execute("contract", code, state, issueTokenAmount)
+      execute(compileContract(address, code, state, issueTokenAmount))
     }
+
     def script(code: String): Hash = {
-      execute("script", code, None, None)
+      execute(
+        compileScript(code)
+      )
     }
+
     def execute(
-        tpe: String,
-        code: String,
-        state: Option[String],
-        issueTokenAmount: Option[U256]
+        req: Int => this.HttpRequest
     ): Hash = {
       val compileResult = request[CompileResult](
-        compileFilang(s"""
-          {
-            "type": "$tpe",
-            "address": "$address",
-            "code": ${ujson.Str(code)}
-            ${state.map(s => s""","state": "$s"""").getOrElse("")}
-            ${issueTokenAmount.map(v => s""","issueTokenAmount":"${v.v}"""").getOrElse("")}
-          }"""),
+        req,
         restPort
       )
 
