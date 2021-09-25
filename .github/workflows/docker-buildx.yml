@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: docker
-          file: ./docker/Dockerfile.release
+          file: ./docker/release/Dockerfile.release
           build-args: RELEASE=${{ steps.version.outputs.version }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
