@@ -22,7 +22,8 @@ import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.config.ConsensusConfig
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
@@ -79,6 +80,14 @@ object ChainHandler {
     )
     .labelNames("chain_from", "chain_to")
     .register()
+
+  val targetHashRateHertz: Gauge = Gauge
+    .build(
+      "alephium_target_hash_rate_hertz",
+      "Target hash rate"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Validation[T, S]](
@@ -89,6 +98,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     with Publisher {
   import ChainHandler._
 
+  implicit val brokerConfig: BrokerConfig = blockFlow.brokerConfig
   def consensusConfig: ConsensusConfig
 
   def chainValidationTotalLabeled: Counter.Child
@@ -202,6 +212,9 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
       }
     }
 
+    val hashRate = HashRate.from(header.target, consensusConfig.blockTargetTime)
+    targetHashRateHertzLabeled.set(hashRate.value.doubleValue)
+
     chain
   }
 
@@ -212,5 +225,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     .labels(chainIndexFromString, chainIndexToString)
 
   private val blockCurrentHeightLabeled = blockCurrentHeight
+    .labels(chainIndexFromString, chainIndexToString)
+
+  private val targetHashRateHertzLabeled = targetHashRateHertz
     .labels(chainIndexFromString, chainIndexToString)
 }

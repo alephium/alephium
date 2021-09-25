@@ -79,7 +79,9 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
     val tx = TransactionTemplate.from(unsignedTx, genesisPriKey)
     TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
-    blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx) is MemPool.AddedToSharedPool
+    blockFlow
+      .getMemPool(chainIndex)
+      .addNewTx(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToSharedPool
     TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
   }
 
@@ -120,7 +122,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val block = transfer(blockFlow, chainIndex)
       val tx    = block.nonCoinbase.head
-      blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx.toTemplate)
+      blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx.toTemplate, TimeStamp.now())
 
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue

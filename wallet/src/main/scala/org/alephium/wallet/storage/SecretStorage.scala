@@ -348,19 +348,16 @@ object SecretStorage {
       number: Int,
       path: AVector[Int]
   ): Either[Error, AVector[ExtendedPrivateKey]] = {
-    if (number <= 0) {
-      Right(AVector.empty)
-    } else {
-      for {
-        rootPrivateKey <- BIP32
-          .btcMasterKey(seed)
-          .derive(path.init)
-          .toRight(CannotDeriveKey)
-        privateKeys <- AVector.from(0 until number).mapE { index =>
-          rootPrivateKey.derive(index).toRight(CannotDeriveKey)
-        }
-      } yield privateKeys
-    }
+    for {
+      _ <- if (number <= 0) Left(InvalidState) else Right(())
+      rootPrivateKey <- BIP32
+        .btcMasterKey(seed)
+        .derive(path.init)
+        .toRight(CannotDeriveKey)
+      privateKeys <- AVector.from(0 until number).mapE { index =>
+        rootPrivateKey.derive(index).toRight(CannotDeriveKey)
+      }
+    } yield privateKeys
   }
 
   private def storeStateToFile(

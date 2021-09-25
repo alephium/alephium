@@ -21,7 +21,7 @@ import org.alephium.crypto.wallet.Mnemonic
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class WalletCreation(
     password: String,
-    walletName: Option[String] = None,
+    walletName: String,
     isMiner: Option[Boolean] = None,
     mnemonicPassphrase: Option[String] = None,
     mnemonicSize: Option[Mnemonic.Size] = None

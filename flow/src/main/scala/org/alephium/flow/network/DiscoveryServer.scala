@@ -121,12 +121,13 @@ class DiscoveryServer(
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
 
-    case _ => stash()
+    case _ =>
+      stash()
   }
 
   def startBinding(): Unit = {
     udpServer ! UdpServer.Bind(bindAddress)
-    context become (handleCommand orElse binding) // binding will stash messages
+    context become binding // binding will stash messages
   }
 
   def binding: Receive = {
@@ -142,7 +143,8 @@ class DiscoveryServer(
       log.error(s"Could not bind the UDP socket, shutdown system")
       terminateSystem()
 
-    case _ => stash()
+    case _ =>
+      stash()
   }
 
   def ready: Receive = {
@@ -183,7 +185,8 @@ class DiscoveryServer(
     case PeerDenied(peerInfo) =>
       log.debug(s"peer ${peerInfo.peerId} - ${peerInfo.address} is banned, ignoring it")
       banPeer(peerInfo.peerId)
-    case PeerConfirmed(peerInfo)                => tryPing(peerInfo)
+    case PeerConfirmed(peerInfo) =>
+      tryPing(peerInfo)
     case InterCliqueManager.Unreachable(remote) => setUnreachable(remote)
     case Unban(remotes)                         => remotes.foreach(unsetUnreachable)
   }
@@ -225,14 +228,14 @@ class DiscoveryServer(
   }
 
   private def scheduleScan(): Unit = {
-    val frequnecy = if (shouldScanFast()) {
+    val frequency = if (shouldScanFast()) {
       discoveryConfig.scanFastFrequency
     } else {
       discoveryConfig.scanFrequency
     }
 
     scanScheduled.foreach(_.cancel())
-    scanScheduled = Some(scheduleCancellableOnce(self, Scan, frequnecy))
+    scanScheduled = Some(scheduleCancellableOnce(self, Scan, frequency))
   }
 
   def cancelScan(): Unit = {

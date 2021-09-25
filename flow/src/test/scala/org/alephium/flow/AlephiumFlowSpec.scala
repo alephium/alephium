@@ -25,8 +25,6 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
-import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValidation}
 import org.alephium.protocol._
@@ -34,6 +32,8 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -244,15 +244,23 @@ trait FlowFixture
     Transaction.from(unsignedTx, privateKey)
   }
 
-  def payableCall(blockFlow: BlockFlow, chainIndex: ChainIndex, script: StatefulScript): Block = {
-    mine(blockFlow, chainIndex)(payableCallTxs(_, _, script))
-  }
-
-  def payableCallTxs(
+  def payableCall(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      script: StatefulScript
-  ): AVector[Transaction] = {
+      script: StatefulScript,
+      initialGas: Int = 200000,
+      validation: Boolean = true
+  ): Block = {
+    mine(blockFlow, chainIndex)(payableCallTxs(_, _, script, initialGas, validation))
+  }
+
+  def payableCallTxTemplate(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      script: StatefulScript,
+      initialGas: Int,
+      validation: Boolean
+  ): TransactionTemplate = {
     assume(chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from))
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
@@ -263,35 +271,41 @@ trait FlowFixture
 
     val unsignedTx =
       UnsignedTransaction(Some(script), inputs, AVector.empty)
-        .copy(gasAmount = GasBox.unsafe(200000))
+        .copy(gasAmount = GasBox.unsafe(initialGas))
     val contractTx = TransactionTemplate.from(unsignedTx, privateKey)
 
-    val txValidation = TxValidation.build
-    txValidation.validateMempoolTxTemplate(contractTx, blockFlow) isE ()
+    if (validation) {
+      val txValidation = TxValidation.build
+      txValidation.validateMempoolTxTemplate(contractTx, blockFlow) isE ()
+    }
+    contractTx
+  }
+
+  def payableCallTxs(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      script: StatefulScript,
+      initialGas: Int,
+      validation: Boolean
+  ): AVector[Transaction] = {
+    val mainGroup          = chainIndex.from
+    val (privateKey, _, _) = genesisKeys(mainGroup.value)
+    val contractTx         = payableCallTxTemplate(blockFlow, chainIndex, script, initialGas, validation)
 
     val (contractInputs, generateOutputs) =
-      genInputsOutputs(blockFlow, mainGroup, contractTx, script)
-    val fullTx = Transaction.from(unsignedTx, contractInputs, generateOutputs, privateKey)
+      genInputsOutputs(blockFlow, chainIndex.from, contractTx, script)
+    val fullTx = Transaction.from(contractTx.unsigned, contractInputs, generateOutputs, privateKey)
     AVector(fullTx)
   }
 
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    val miner         = LockupScript.p2pkh(chainIndex.to.generateKey._2)
+    val miner         = getGenesisLockupScript(chainIndex.to)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    val block         = mine(blockTemplate)
+    val block         = mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
 
     block.chainIndex is chainIndex
 
     block
-  }
-
-  @tailrec
-  final def mine(template: BlockFlowTemplate): Block = {
-    val miningBlob = MiningBlob.from(template)
-    Miner.mine(template.index, miningBlob) match {
-      case Some((block, _)) => block
-      case None             => mine(template)
-    }
   }
 
   def mineWithTxs(
@@ -552,6 +566,54 @@ trait FlowFixture
       txOutputBaseGas.mulUnsafe(tx0.outputsLength) addUnsafe
       GasBox.unsafe(2054 * tx0.unsigned.inputs.length)
     print(s"estimate: $estimate\n")
+  }
+
+  def contractCreation(
+      code: StatefulContract,
+      initialState: AVector[Val],
+      lockupScript: LockupScript.Asset,
+      alfAmount: U256,
+      newTokenAmount: Option[U256] = None
+  ): StatefulScript = {
+    val address  = Address.Asset(lockupScript)
+    val codeRaw  = Hex.toHexString(serialize(code))
+    val stateRaw = Hex.toHexString(serialize(initialState))
+    val creation = newTokenAmount match {
+      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
+      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
+    }
+    val scriptRaw =
+      s"""
+         |TxScript Foo {
+         |  pub payable fn main() -> () {
+         |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
+         |    $creation
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(scriptRaw).rightValue
+  }
+
+  lazy val outOfGasTxTemplate = {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val input =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(input).toOption.get
+    val txScript =
+      contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALF.alf(1))
+    payableCallTxTemplate(
+      blockFlow,
+      chainIndex,
+      txScript,
+      33000,
+      validation = false
+    )
   }
 }
 

@@ -21,7 +21,7 @@ import org.scalatest.Assertion
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{ALF, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -31,7 +31,8 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val blockflowFetchMaxAge = Duration.unsafe(1000)
   val address              = Address.p2pkh(PublicKey.generate)
   val group                = 1
-  val balance              = Amount(U256.One)
+  val balance              = Amount(ALF.oneAlf)
+  val lockedBalance        = Amount(ALF.alf(2))
   val hash                 = Hash.generate
   val password             = "password"
   val walletName           = "wallet-name"
@@ -43,6 +44,10 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   def check[T: ReadWriter](input: T, rawJson: String): Assertion = {
     write(input) is rawJson
     read[T](rawJson) is input
+  }
+
+  def parseFail[A: Reader](jsonRaw: String): String = {
+    scala.util.Try(read[A](jsonRaw)).toEither.swap.toOption.get.getMessage
   }
 
   it should "Addresses" in {
@@ -64,15 +69,17 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Balances.AddressBalance" in {
-    val json           = s"""{"address":"$address","balance":"$balance"}"""
-    val addressBalance = Balances.AddressBalance(address, balance)
+    val json =
+      s"""{"address":"$address","balance":"$balance","balanceHint":"1 ALPH","lockedBalance":"$lockedBalance","lockedBalanceHint":"2 ALPH"}"""
+    val addressBalance = Balances.AddressBalance.from(address, balance, lockedBalance)
     check(addressBalance, json)
   }
 
   it should "Balances" in {
     val json =
-      s"""{"totalBalance":"$balance","balances":[{"address":"$address","balance":"$balance"}]}"""
-    val balances = Balances(balance, AVector(Balances.AddressBalance(address, balance)))
+      s"""{"totalBalance":"$balance","totalBalanceHint":"1 ALPH","balances":[{"address":"$address","balance":"$balance","balanceHint":"1 ALPH","lockedBalance":"$lockedBalance","lockedBalanceHint":"2 ALPH"}]}"""
+    val balances =
+      Balances.from(balance, AVector(Balances.AddressBalance.from(address, balance, lockedBalance)))
     check(balances, json)
   }
 
@@ -103,6 +110,11 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   it should "Mnemonic" in {
     val json = s""""${mnemonic.toLongString}""""
     check(mnemonic, json)
+
+    val wrongMnemonic = "two words"
+    parseFail[Mnemonic](
+      s""""$wrongMnemonic""""
+    ) is s"Cannot validate mnemonic: $wrongMnemonic at index 0"
   }
 
   it should "WalletUnlock" in {
@@ -122,14 +134,15 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "WalletRestore" in {
-    val json1          = s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}"}"""
-    val walletRestore1 = WalletRestore(password, mnemonic)
+    val json1 =
+      s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","walletName":"$walletName"}"""
+    val walletRestore1 = WalletRestore(password, mnemonic, walletName)
     check(walletRestore1, json1)
 
     val json2 =
-      s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","isMiner":$bool,"walletName":"$walletName","mnemonicPassphrase":"$mnemonicPassphrase"}"""
+      s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","walletName":"$walletName","isMiner":$bool,"mnemonicPassphrase":"$mnemonicPassphrase"}"""
     val walletRestore2 =
-      WalletRestore(password, mnemonic, Some(bool), Some(walletName), Some(mnemonicPassphrase))
+      WalletRestore(password, mnemonic, walletName, Some(bool), Some(mnemonicPassphrase))
     check(walletRestore2, json2)
   }
 
@@ -140,15 +153,15 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "WalletCreation" in {
-    val json1           = s"""{"password":"$password"}"""
-    val walletCreation1 = WalletCreation(password)
+    val json1           = s"""{"password":"$password","walletName":"$walletName"}"""
+    val walletCreation1 = WalletCreation(password, walletName)
     check(walletCreation1, json1)
 
     val json2 =
       s"""{"password":"$password","walletName":"$walletName","isMiner":$bool,"mnemonicPassphrase":"$mnemonicPassphrase","mnemonicSize":${mnemonicSize.value}}"""
     val walletCreation2 = WalletCreation(
       password,
-      Some(walletName),
+      walletName,
       Some(bool),
       Some(mnemonicPassphrase),
       Some(mnemonicSize)

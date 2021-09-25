@@ -16,17 +16,15 @@
 
 package org.alephium.flow.model
 
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Block, ChainIndex, Target, Transaction}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.protocol.Hash
+import org.alephium.serde.Serde
+import org.alephium.util.TimeStamp
 
-final case class BlockFlowTemplate(
-    index: ChainIndex,
-    deps: AVector[BlockHash],
-    depStateHash: Hash,
-    target: Target,
-    templateTs: TimeStamp,
-    transactions: AVector[Transaction]
-) {
-  lazy val txsHash = Block.calTxsHash(transactions)
+final case class PersistedTxId(timestamp: TimeStamp, hash: Hash)
+
+object PersistedTxId {
+  implicit val serde: Serde[PersistedTxId] = Serde.forProduct2[TimeStamp, Hash, PersistedTxId](
+    (ts, hash) => PersistedTxId(ts, hash),
+    id => (id.timestamp, id.hash)
+  )
 }

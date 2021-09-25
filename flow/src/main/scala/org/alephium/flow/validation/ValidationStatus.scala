@@ -47,7 +47,7 @@ final case object InvalidWorkAmount                      extends InvalidHeaderSt
 final case object InvalidPoLWWorkAmount                  extends InvalidHeaderStatus
 final case object InvalidWorkTarget                      extends InvalidHeaderStatus
 final case object CannotEnablePoLW                       extends InvalidHeaderStatus
-final case object InvalidDepTimeStamp                    extends InvalidHeaderStatus
+final case object InvalidUncleTimeStamp                  extends InvalidHeaderStatus
 final case object InvalidHeaderFlow                      extends InvalidHeaderStatus
 final case object InvalidDepsNum                         extends InvalidHeaderStatus
 final case object InvalidDepsIndex                       extends InvalidHeaderStatus

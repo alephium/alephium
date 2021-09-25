@@ -58,9 +58,12 @@ object Target {
   }
 
   // scalastyle:off magic.number
-  def from(hashRate: HashRate, blockTime: Duration): Target = {
+  def from(hashRate: HashRate, blockTime: Duration)(implicit groupConfig: GroupConfig): Target = {
     val hashNeeded =
-      hashRate.value.multiply(BigInteger.valueOf(blockTime.millis)).divide(BigInteger.valueOf(1000))
+      hashRate.value
+        .multiply(BigInteger.valueOf(blockTime.millis))
+        // divide the hashrate due to: multiple chains and chain index encoding in block hash
+        .divide(BigInteger.valueOf((1000 * groupConfig.chainNum * groupConfig.chainNum).toLong))
     Target.unsafe(Target.maxBigInt.divide(hashNeeded))
   }
   // scalastyle:on magic.number
@@ -87,10 +90,6 @@ object Target {
     }
     ByteString(size.toByte) ++ mantissa.tail
   }
-
-  val onePhPerBlock: Target  = from(HashRate.onePhPerSecond, Duration.ofSecondsUnsafe(1))
-  val oneEhPerBlock: Target  = from(HashRate.oneEhPerSecond, Duration.ofSecondsUnsafe(1))
-  val a128EhPerBlock: Target = from(HashRate.a128EhPerSecond, Duration.ofSecondsUnsafe(1))
 
   // The final target is the weighted average of the adjusted target and deps targets
   // average == (selfTarget * (2G+1) + sum(depTarget)) / 4G

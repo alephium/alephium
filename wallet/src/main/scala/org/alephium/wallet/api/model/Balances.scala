@@ -20,13 +20,42 @@ import org.alephium.api.model.Amount
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
-final case class Balances(totalBalance: Amount, balances: AVector[Balances.AddressBalance])
+final case class Balances(
+    totalBalance: Amount,
+    totalBalanceHint: Amount.Hint,
+    balances: AVector[Balances.AddressBalance]
+)
 
 object Balances {
+  def from(totalBalance: Amount, balances: AVector[Balances.AddressBalance]): Balances = Balances(
+    totalBalance,
+    totalBalance.hint,
+    balances
+  )
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class AddressBalance(
       address: Address.Asset,
       balance: Amount,
+      balanceHint: Amount.Hint,
+      lockedBalance: Amount,
+      lockedBalanceHint: Amount.Hint,
       warning: Option[String] = None
   )
+
+  object AddressBalance {
+    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+    def from(
+        address: Address.Asset,
+        balance: Amount,
+        lockedBalance: Amount,
+        warning: Option[String] = None
+    ): AddressBalance = AddressBalance(
+      address,
+      balance,
+      balance.hint,
+      lockedBalance,
+      lockedBalance.hint,
+      warning
+    )
+  }
 }

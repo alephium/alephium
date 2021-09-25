@@ -21,8 +21,7 @@ import org.alephium.util.Duration
 
 trait ConsensusConfig extends EmissionConfig {
   def blockTargetTime: Duration
-  def intraGroupDependencyGapPeriod: Duration
-  def interGroupDependencyGapPeriod: Duration
+  def uncleDependencyGapTime: Duration
   def maxMiningTarget: Target
 
   // scalastyle:off magic.number

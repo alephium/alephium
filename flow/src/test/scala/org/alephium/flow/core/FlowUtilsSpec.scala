@@ -96,7 +96,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   it should "detect tx conflicts using bestDeps" in new FlowFixture {
     override val configValues =
       Map(
-        ("alephium.consensus.intra-group-dependency-gap-period", "10 seconds"),
+        ("alephium.consensus.uncle-dependency-gap-time", "10 seconds"),
         ("alephium.broker.broker-num", 1)
       )
 
@@ -111,7 +111,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val groupIndex = GroupIndex.unsafe(fromGroup)
     val tx1        = block1.nonCoinbase.head.toTemplate
     blockFlow.isTxConflicted(groupIndex, tx1) is true
-    blockFlow.getMemPool(groupIndex).addNewTx(chainIndex1, tx1)
+    blockFlow.getMemPool(groupIndex).addNewTx(chainIndex1, tx1, TimeStamp.now())
 
     val miner    = getGenesisLockupScript(chainIndex1)
     val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
@@ -147,7 +147,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val transferBlock = {
       val tmpBlock = transfer(blockFlow, chainIndex)
       val mempool  = blockFlow.getMemPool(chainIndex)
-      mempool.addNewTx(chainIndex, tmpBlock.nonCoinbase.head.toTemplate)
+      mempool.addNewTx(chainIndex, tmpBlock.nonCoinbase.head.toTemplate, TimeStamp.now())
       mineFromMemPool(blockFlow, chainIndex)
     }
     transferBlock.coinbaseReward is consensusConfig.emission
@@ -171,6 +171,16 @@ class FlowUtilsSpec extends AlephiumSpec {
     pool.getSharedPool(index).add(AVector(tx0.toTemplate, tx1.toTemplate), TimeStamp.now())
     val miner = getGenesisLockupScript(index)
     blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
+  }
+
+  it should "exclude invalid tx template in block assembly" in new FlowFixture {
+    val index = ChainIndex.unsafe(0, 0)
+    val pool  = blockFlow.getMemPool(index)
+    pool.getSharedPool(index).add(outOfGasTxTemplate, TimeStamp.now())
+    val miner    = getGenesisLockupScript(index)
+    val template = blockFlow.prepareBlockFlowUnsafe(index, miner)
+    template.transactions.length is 1 // only coinbase tx
+    template.transactions.map(_.id).contains(outOfGasTxTemplate.id) is false
   }
 
   it should "reorg" in new FlowFixture {
@@ -228,15 +238,16 @@ class FlowUtilsSpec extends AlephiumSpec {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block0     = transfer(blockFlow, chainIndex)
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, chainIndex)
-    val tx0    = block0.nonCoinbase.head.toTemplate
-    val tx1    = block1.nonCoinbase.head.toTemplate
+    val block1    = transfer(blockFlow, chainIndex)
+    val tx0       = block0.nonCoinbase.head.toTemplate
+    val tx1       = block1.nonCoinbase.head.toTemplate
+    val currentTs = TimeStamp.now()
 
-    def test(heightGap: Int, expected: AVector[TransactionTemplate]) = {
+    def test(heightGap: Int, expected: AVector[(TransactionTemplate, TimeStamp)]) = {
       val blockFlow = isolatedBlockFlow()
       val mempool   = blockFlow.getMemPool(chainIndex)
-      mempool.addNewTx(chainIndex, tx0)
-      mempool.addNewTx(chainIndex, tx1)
+      mempool.addNewTx(chainIndex, tx0, currentTs)
+      mempool.addNewTx(chainIndex, tx1, currentTs)
       mempool.pendingPool.contains(tx0.id) is false
       mempool.pendingPool.contains(tx1.id) is true
 
@@ -247,6 +258,6 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
 
     test(0, AVector.empty)
-    test(1, AVector(tx1))
+    test(1, AVector(tx1 -> currentTs))
   }
 }

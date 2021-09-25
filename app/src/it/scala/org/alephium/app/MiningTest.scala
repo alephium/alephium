@@ -39,7 +39,7 @@ class MiningTest extends AlephiumActorSpec {
     confirmTx(tx, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(
+        Balance.from(
           Amount(initialBalance.balance.value - transferAmount - defaultGasFee),
           Amount.Zero,
           1
@@ -50,7 +50,7 @@ class MiningTest extends AlephiumActorSpec {
     confirmTx(tx2, restPort)
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(
+        Balance.from(
           Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * 2),
           Amount.Zero,
           1
@@ -96,7 +96,7 @@ class MiningTest extends AlephiumActorSpec {
 
     eventually {
       request[Balance](getBalance(address), restPort) is
-        Balance(
+        Balance.from(
           Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * n),
           Amount.Zero,
           1

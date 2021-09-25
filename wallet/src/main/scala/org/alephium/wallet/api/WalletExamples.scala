@@ -19,6 +19,7 @@ package org.alephium.wallet.api
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.EndpointsExamples
+import org.alephium.api.model.Amount
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{defaultGasPrice, minimalGas}
@@ -46,14 +47,14 @@ trait WalletExamples extends EndpointsExamples {
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
-    defaultExample(WalletCreation(password, None, None, None, None)),
+    defaultExample(WalletCreation(password, walletName, None, None, None)),
     moreSettingsExample(
       WalletCreation(
         password,
-        Some(walletName),
+        walletName,
         Some(true),
         Some(mnemonicPassphrase),
-        Some(Mnemonic.Size.list.head)
+        Some(Mnemonic.Size.list.last)
       )
     )
   )
@@ -63,10 +64,10 @@ trait WalletExamples extends EndpointsExamples {
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
     List(
       defaultExample(
-        WalletRestore(password, mnemonic, None, None, None)
+        WalletRestore(password, mnemonic, walletName, None, None)
       ),
       moreSettingsExample(
-        WalletRestore(password, mnemonic, Some(true), Some(walletName), Some(mnemonicPassphrase))
+        WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase))
       )
     )
 
@@ -90,7 +91,20 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(
-      Balances(balance, AVector(Balances.AddressBalance(address, balance, None)))
+      Balances(
+        balance,
+        balance.hint,
+        AVector(
+          Balances.AddressBalance(
+            address,
+            balance,
+            balance.hint,
+            Amount.Zero,
+            Amount.Zero.hint,
+            None
+          )
+        )
+      )
     )
 
   implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =

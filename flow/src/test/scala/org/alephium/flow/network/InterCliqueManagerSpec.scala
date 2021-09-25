@@ -285,6 +285,8 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
 
     def checkPublish(synced: Boolean) = {
+      blockFlowSynchronizer.expectMsg(SyncedResult(synced))
+      allHandlerProbes.txHandler.expectMsg(SyncedResult(synced))
       allHandlerProbes.blockHandlers.foreach(_._2.expectMsg(SyncedResult(synced)))
       allHandlerProbes.viewHandler.expectMsg(SyncedResult(synced))
     }

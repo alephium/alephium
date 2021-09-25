@@ -48,6 +48,8 @@ object Storages {
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
     val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage)
+    val pendingTxStorage  = PendingTxRocksDBStorage(db, ColumnFamily.PendingTx, writeOptions)
+    val readyTxStorage    = ReadyTxRocksDBStorage(db, ColumnFamily.ReadyTx, writeOptions)
 
     Storages(
       AVector(db),
@@ -57,7 +59,9 @@ object Storages {
       emptyWorldState,
       trieHashStorage,
       blockStateStorage,
-      nodeStateStorage
+      nodeStateStorage,
+      pendingTxStorage,
+      readyTxStorage
     )
   }
 
@@ -75,7 +79,9 @@ final case class Storages(
     emptyWorldState: WorldState.Persisted,
     worldStateStorage: WorldStateStorage,
     blockStateStorage: BlockStateStorage,
-    nodeStateStorage: NodeStateStorage
+    nodeStateStorage: NodeStateStorage,
+    pendingTxStorage: PendingTxStorage,
+    readyTxStorage: ReadyTxStorage
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 

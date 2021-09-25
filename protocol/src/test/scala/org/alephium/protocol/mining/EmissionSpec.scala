@@ -65,28 +65,14 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     emission.blocksInAboutOneYearPerChain is 492750
     emission.durationToStableMaxReward is Duration.ofHoursUnsafe(4 * 365 * 24)
 
-    emission.onePhPerSecondDivided is
-      HashRate.unsafe(HashRate.onePhPerSecond.value.divide(BigInteger.valueOf(16)))
-    emission.onePhPerSecondDividedTarget is Target.from(
-      emission.onePhPerSecondDivided,
-      blockTime
-    )
-    emission.oneEhPerSecondDivided is
-      HashRate.unsafe(HashRate.oneEhPerSecond.value.divide(BigInteger.valueOf(16)))
-    emission.oneEhPerSecondDividedTarget is Target.from(
-      emission.oneEhPerSecondDivided,
-      blockTime
-    )
-    emission.a128EhPerSecondDivided is
-      HashRate.unsafe(HashRate.a128EhPerSecond.value.divide(BigInteger.valueOf(16)))
-    emission.a128EhPerSecondDividedTarget is Target.from(
-      emission.a128EhPerSecondDivided,
-      blockTime
-    )
+    // Note: rank - 8 (chain num & chain index) + 6 (64 seconds)
+    emission.onePhPerSecondTarget is Target.unsafe(Target.maxBigInt.shiftRight(50 - 8 + 6))
+    emission.oneEhPerSecondTarget is Target.unsafe(Target.maxBigInt.shiftRight(60 - 8 + 6))
+    emission.a128EhPerSecondTarget is Target.unsafe(Target.maxBigInt.shiftRight(67 - 8 + 6))
 
-    emission.onePhPerSecondDividedRank is 46
-    emission.oneEhPerSecondDividedRank is 56
-    emission.a128EhPerSecondDividedRank is 63
+    emission.onePhPerSecondRank is 50
+    emission.oneEhPerSecondRank is 60
+    emission.a128EhPerSecondRank is 67
 
     val maxRewards = Emission.initialMaxReward * emission.blocksInAboutOneYearPerChain
     val maxRate    = getInflationRate(maxRewards)
@@ -118,9 +104,9 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   it should "compute reward based on target" in new Fixture {
     import emission._
 
-    rewardWrtTarget(onePhPerSecondDividedTarget) is initialMaxRewardPerChain
-    rewardWrtTarget(oneEhPerSecondDividedTarget) is stableMaxRewardPerChain
-    rewardWrtTarget(a128EhPerSecondDividedTarget) is U256.Zero
+    rewardWrtTarget(onePhPerSecondTarget) is initialMaxRewardPerChain
+    rewardWrtTarget(oneEhPerSecondTarget) is stableMaxRewardPerChain
+    rewardWrtTarget(a128EhPerSecondTarget) is U256.Zero
     rewardWrtTarget(Target.unsafe(BigInteger.ONE)) is U256.Zero
   }
 
@@ -128,11 +114,11 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     import emission._
 
     equalU256(
-      reward(oneEhPerSecondDividedTarget, TimeStamp.zero, TimeStamp.zero).miningReward,
+      reward(oneEhPerSecondTarget, TimeStamp.zero, TimeStamp.zero).miningReward,
       stableMaxRewardPerChain
     )
     reward(
-      onePhPerSecondDividedTarget,
+      onePhPerSecondTarget,
       TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24),
       TimeStamp.zero
     ).miningReward is stableMaxRewardPerChain
@@ -143,10 +129,10 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
   it should "fail when hashrate is low" in new Fixture {
     import emission._
 
-    assertThrows[AssertionError](burntAmountUnsafe(oneEhPerSecondDividedTarget, U256.One))
-    assertThrows[AssertionError](burntAmountUnsafe(onePhPerSecondDividedTarget, U256.One))
-    assertThrows[AssertionError](polwTargetUnsafe(oneEhPerSecondDividedTarget))
-    assertThrows[AssertionError](polwTargetUnsafe(onePhPerSecondDividedTarget))
+    assertThrows[AssertionError](burntAmountUnsafe(oneEhPerSecondTarget, U256.One))
+    assertThrows[AssertionError](burntAmountUnsafe(onePhPerSecondTarget, U256.One))
+    assertThrows[AssertionError](polwTargetUnsafe(oneEhPerSecondTarget))
+    assertThrows[AssertionError](polwTargetUnsafe(onePhPerSecondTarget))
   }
 
   it should "calculate correct poLW target" in new Fixture {
@@ -157,8 +143,8 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       equalBigInt(polwTargetUnsafe(target).value, target.value / 8, 1)
     }
 
-    check(a128EhPerSecondDividedTarget)
-    check(a128EhPerSecondDividedTarget * 2)
+    check(a128EhPerSecondTarget)
+    check(a128EhPerSecondTarget * 2)
   }
 
   it should "calculate correct burnt amount" in new Fixture {
@@ -172,8 +158,8 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       )
     }
 
-    check(a128EhPerSecondDividedTarget)
-    check(a128EhPerSecondDividedTarget * 2)
+    check(a128EhPerSecondTarget)
+    check(a128EhPerSecondTarget * 2)
   }
 
   it should "calculate correct reward" in new Fixture {
@@ -181,10 +167,10 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
 
     val now = TimeStamp.now()
     reward(Target.Max / 1024, now, now) is Emission.PoW(rewardWrtTarget(Target.Max / 1024))
-    val polwReward = reward(oneEhPerSecondDividedTarget / 2, now, now).asInstanceOf[Emission.PoLW]
-    polwReward.miningReward is rewardWrtTarget(oneEhPerSecondDividedTarget / 9)
+    val polwReward = reward(oneEhPerSecondTarget / 2, now, now).asInstanceOf[Emission.PoLW]
+    polwReward.miningReward is rewardWrtTarget(oneEhPerSecondTarget / 9)
     polwReward.burntAmount is burntAmountUnsafe(
-      oneEhPerSecondDividedTarget / 9,
+      oneEhPerSecondTarget / 9,
       polwReward.miningReward
     )
   }

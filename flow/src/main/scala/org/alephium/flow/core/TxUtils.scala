@@ -244,6 +244,12 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  def isTxConfirmed(txId: Hash, chainIndex: ChainIndex): IOResult[Boolean] = {
+    assume(brokerConfig.contains(chainIndex.from))
+    val chain = getBlockChain(chainIndex)
+    chain.isTxConfirmed(txId)
+  }
+
   def getTxStatus(txId: Hash, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))

@@ -136,7 +136,8 @@
                   "summary": "Default",
                   "value": {
                     "password": "my-secret-password",
-                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
+                    "walletName": "wallet-super-name"
                   }
                 },
                 "Example1": {
@@ -144,8 +145,8 @@
                   "value": {
                     "password": "my-secret-password",
                     "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
-                    "isMiner": true,
                     "walletName": "wallet-super-name",
+                    "isMiner": true,
                     "mnemonicPassphrase": "optional-mnemonic-passphrase"
                   }
                 }
@@ -252,7 +253,8 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "password": "my-secret-password"
+                    "password": "my-secret-password",
+                    "walletName": "wallet-super-name"
                   }
                 },
                 "Example1": {
@@ -262,7 +264,7 @@
                     "walletName": "wallet-super-name",
                     "isMiner": true,
                     "mnemonicPassphrase": "optional-mnemonic-passphrase",
-                    "mnemonicSize": 12
+                    "mnemonicSize": 24
                   }
                 }
               }
@@ -794,10 +796,14 @@
                 },
                 "example": {
                   "totalBalance": "10000000000000000000",
+                  "totalBalanceHint": "10 ALPH",
                   "balances": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                      "balance": "10000000000000000000"
+                      "balance": "10000000000000000000",
+                      "balanceHint": "10 ALPH",
+                      "lockedBalance": "0",
+                      "lockedBalanceHint": "0 ALPH"
                     }
                   ]
                 }
@@ -2916,7 +2922,9 @@
                     "summary": "Default",
                     "value": {
                       "balance": "10000000000000000000",
+                      "balanceHint": "10 ALPH",
                       "lockedBalance": "5000000000000000000",
+                      "lockedBalanceHint": "5 ALPH",
                       "utxoNum": 3
                     }
                   },
@@ -2924,7 +2932,9 @@
                     "summary": "More settings",
                     "value": {
                       "balance": "10000000000000000000",
+                      "balanceHint": "10 ALPH",
                       "lockedBalance": "5000000000000000000",
+                      "lockedBalanceHint": "5 ALPH",
                       "utxoNum": 3,
                       "warning": "Result might not include all utxos and is maybe unprecise"
                     }
@@ -5355,7 +5365,10 @@
       "AddressBalance": {
         "required": [
           "address",
-          "balance"
+          "balance",
+          "balanceHint",
+          "lockedBalance",
+          "lockedBalanceHint"
         ],
         "type": "object",
         "properties": {
@@ -5365,6 +5378,16 @@
           "balance": {
             "type": "string",
             "format": "uint256"
+          },
+          "balanceHint": {
+            "$ref": "#/components/schemas/Hint"
+          },
+          "lockedBalance": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "lockedBalanceHint": {
+            "$ref": "#/components/schemas/Hint"
           },
           "warning": {
             "type": "string"
@@ -5465,7 +5488,9 @@
       "Balance": {
         "required": [
           "balance",
+          "balanceHint",
           "lockedBalance",
+          "lockedBalanceHint",
           "utxoNum"
         ],
         "type": "object",
@@ -5474,9 +5499,15 @@
             "type": "string",
             "format": "uint256"
           },
+          "balanceHint": {
+            "$ref": "#/components/schemas/Hint"
+          },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
+          },
+          "lockedBalanceHint": {
+            "$ref": "#/components/schemas/Hint"
           },
           "utxoNum": {
             "type": "integer"
@@ -5489,6 +5520,7 @@
       "Balances": {
         "required": [
           "totalBalance",
+          "totalBalanceHint",
           "balances"
         ],
         "type": "object",
@@ -5496,6 +5528,9 @@
           "totalBalance": {
             "type": "string",
             "format": "uint256"
+          },
+          "totalBalanceHint": {
+            "$ref": "#/components/schemas/Hint"
           },
           "balances": {
             "type": "array",
@@ -5996,6 +6031,18 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "Hint": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },
@@ -6654,7 +6701,8 @@
       },
       "WalletCreation": {
         "required": [
-          "password"
+          "password",
+          "walletName"
         ],
         "type": "object",
         "properties": {
@@ -6689,7 +6737,8 @@
       "WalletRestore": {
         "required": [
           "password",
-          "mnemonic"
+          "mnemonic",
+          "walletName"
         ],
         "type": "object",
         "properties": {
@@ -6699,11 +6748,11 @@
           "mnemonic": {
             "type": "string"
           },
-          "isMiner": {
-            "type": "boolean"
-          },
           "walletName": {
             "type": "string"
+          },
+          "isMiner": {
+            "type": "boolean"
           },
           "mnemonicPassphrase": {
             "type": "string"

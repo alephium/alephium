@@ -17,8 +17,9 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.protocol.ALF
 import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike, TransactionTemplate}
-import org.alephium.util.{LockFixture, TimeStamp}
+import org.alephium.util.{AVector, LockFixture, TimeStamp}
 
 class PendingPoolSpec
     extends AlephiumFlowSpec
@@ -33,6 +34,13 @@ class PendingPoolSpec
     pool.txs.contains(tx.id) is true
     pool.timestamps.contains(tx.id) is true
     checkTx(pool.indexes, tx)
+  }
+
+  def addAndCheckTxs(pool: PendingPool, txs: AVector[(TransactionTemplate, TimeStamp)]): Unit = {
+    txs.foreach { case (tx, timestamp) =>
+      pool.add(tx, timestamp)
+      checkTx(pool, tx)
+    }
   }
 
   it should "add/remove tx" in {
@@ -63,5 +71,51 @@ class PendingPoolSpec
     pool.add(tx1, now) is false
     pool.remove(tx0)
     pool.add(tx1, now) is true
+  }
+
+  it should "clean pending pool" in {
+    val groupIndex             = GroupIndex.unsafe(0)
+    val (privKey0, pubKey0, _) = genesisKeys(0)
+    val (privKey1, pubKey1)    = groupIndex.generateKey
+
+    val blockFlow0 = isolatedBlockFlow()
+    val block0     = transfer(blockFlow0, privKey0, pubKey1, ALF.alf(4))
+    val tx0        = block0.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow0, block0)
+    val block1 = transfer(blockFlow0, privKey1, pubKey0, ALF.alf(1))
+    val tx1    = block1.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow0, block1)
+    val block2 = transfer(blockFlow0, privKey1, pubKey0, ALF.alf(1))
+    val tx2    = block2.nonCoinbase.head.toTemplate
+    addAndCheck(blockFlow0, block2)
+
+    val pool       = PendingPool.empty(groupIndex, 10)
+    val txIndexes  = TxIndexes.emptySharedPool(groupIndex)
+    val timestamp1 = TimeStamp.now()
+    val timestamp2 = timestamp1.plusSecondsUnsafe(1)
+    val txs        = AVector(tx1 -> timestamp1, tx2 -> timestamp2)
+    addAndCheckTxs(pool, txs)
+    pool.clean(blockFlow, txIndexes) isE AVector(tx1 -> timestamp1, tx2 -> timestamp2)
+    pool.contains(tx1.id) is false
+    pool.contains(tx2.id) is false
+
+    txIndexes.add(tx0)
+    addAndCheckTxs(pool, txs)
+    pool.clean(blockFlow, txIndexes) isE AVector.empty[(TransactionTemplate, TimeStamp)]
+    pool.contains(tx1.id) is true
+    pool.contains(tx2.id) is true
+
+    pool.remove(tx1)
+    pool.contains(tx1.id) is false
+    pool.clean(blockFlow, txIndexes) isE AVector(tx2 -> timestamp2)
+    pool.contains(tx2.id) is false
+
+    txIndexes.remove(tx0)
+    txIndexes.outputIndex.isEmpty is true
+    addAndCheckTxs(pool, txs)
+    addAndCheck(blockFlow, block0)
+    pool.clean(blockFlow, txIndexes) isE AVector.empty[(TransactionTemplate, TimeStamp)]
+    pool.contains(tx1.id) is true
+    pool.contains(tx2.id) is true
   }
 }

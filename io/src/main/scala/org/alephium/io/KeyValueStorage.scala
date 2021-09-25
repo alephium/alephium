@@ -22,7 +22,7 @@ import org.alephium.serde._
 
 trait AbstractKeyValueStorage[K, V] {
 
-  implicit def keySerializer: Serializer[K]
+  implicit def keySerde: Serde[K]
   implicit def valueSerde: Serde[V]
 
   def get(key: K): IOResult[V]

@@ -75,7 +75,7 @@ object Configs extends StrictLogging {
     getConfigTemplate(rootPath, "network", s"network_${networkId.networkType}", overwrite)
 
   def getConfigSystem(rootPath: Path, overwrite: Boolean): File = {
-    val env = Env.resolve().name
+    val env = Env.currentEnv.name
     getConfigTemplate(rootPath, "system", s"system_$env", overwrite)
   }
 

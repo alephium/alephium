@@ -22,8 +22,8 @@ import org.alephium.crypto.wallet.Mnemonic
 final case class WalletRestore(
     password: String,
     mnemonic: Mnemonic,
+    walletName: String,
     isMiner: Option[Boolean] = None,
-    walletName: Option[String] = None,
     mnemonicPassphrase: Option[String] = None
 )
 object WalletRestore {

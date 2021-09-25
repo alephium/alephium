@@ -48,7 +48,7 @@ trait WalletService extends Service {
       password: String,
       mnemonicSize: Mnemonic.Size,
       isMiner: Boolean,
-      walletName: Option[String],
+      walletName: String,
       mnemonicPassphrase: Option[String]
   ): Either[WalletError, (String, Mnemonic)]
 
@@ -56,7 +56,7 @@ trait WalletService extends Service {
       password: String,
       mnemonic: Mnemonic,
       isMiner: Boolean,
-      walletName: Option[String],
+      walletName: String,
       mnemonicPassphrase: Option[String]
   ): Either[WalletError, String]
 
@@ -70,7 +70,7 @@ trait WalletService extends Service {
   def getBalances(
       wallet: String,
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Option[String])]]]
+  ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
   def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
   def getMinerAddresses(
@@ -234,7 +234,7 @@ object WalletService {
         mnemonic: Mnemonic,
         mnemonicPassphrase: Option[String],
         isMiner: Boolean,
-        walletName: Option[String]
+        walletName: String
     ): Either[WalletError, (String, Mnemonic)] = {
       for {
         file <- buildWalletFile(walletName)
@@ -254,7 +254,7 @@ object WalletService {
         password: String,
         mnemonicSize: Mnemonic.Size,
         isMiner: Boolean,
-        walletName: Option[String],
+        walletName: String,
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, (String, Mnemonic)] = {
       val mnemonic = Mnemonic.generate(mnemonicSize)
@@ -266,7 +266,7 @@ object WalletService {
         password: String,
         mnemonic: Mnemonic,
         isMiner: Boolean,
-        walletName: Option[String],
+        walletName: String,
         mnemonicPassphrase: Option[String]
     ): Either[WalletError, String] = {
       createOrRestoreWallet(password, mnemonic, mnemonicPassphrase, isMiner, walletName).map {
@@ -302,7 +302,7 @@ object WalletService {
     override def getBalances(
         wallet: String,
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Option[String])]]] =
+    ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]] =
       withAddressesFut(wallet) { case (_, addresses) =>
         Future
           .sequence(
@@ -353,7 +353,7 @@ object WalletService {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareTransaction(pubKey.toHexString, destinations, gas, gasPrice)
+          .prepareTransaction(pubKey, destinations, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>
@@ -376,7 +376,7 @@ object WalletService {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareSweepAllTransaction(pubKey.toHexString, address, lockTime, gas, gasPrice)
+          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>
@@ -480,13 +480,13 @@ object WalletService {
     private def getBalance(
         address: Address.Asset,
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Address.Asset, Amount, Option[String])]] = {
+    ): Future[Either[WalletError, (Address.Asset, Amount, Amount, Option[String])]] = {
       blockFlowClient
         .fetchBalance(address, utxosLimit)
         .map(
-          _.map { case (amount, warning) => (address, amount, warning) }.left.map(error =>
-            BlockFlowClientError(error)
-          )
+          _.map { case (amount, lockedAmount, warning) =>
+            (address, amount, lockedAmount, warning)
+          }.left.map(error => BlockFlowClientError(error))
         )
     }
 
@@ -584,10 +584,29 @@ object WalletService {
           }
       }
 
+    private def withAllMinerPrivateKeysM[A, M[_]](storage: SecretStorage)(
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => M[A]
+    )(errorWrapper: WalletError => M[A]): M[A] =
+      (for {
+        _           <- checkIsMiner(storage, true)
+        privateKeys <- storage.getAllPrivateKeys().left.map(WalletError.from)
+      } yield {
+        privateKeys
+      }) match {
+        case Left(error) => errorWrapper(error)
+        case Right(privateKeys) =>
+          f(privateKeys)
+      }
+
     private def withPrivateKeys[A](storage: SecretStorage)(
         f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Either[WalletError, A]
     ): Either[WalletError, A] =
       withPrivateKeysM(storage)(f)(Left.apply)
+
+    private def withAllMinerPrivateKeys[A](storage: SecretStorage)(
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Either[WalletError, A]
+    ): Either[WalletError, A] =
+      withAllMinerPrivateKeysM(storage)(f)(Left.apply)
 
     private def withAddressesM[A, M[_]](
         wallet: String
@@ -615,23 +634,13 @@ object WalletService {
     ): Future[Either[WalletError, A]] =
       withAddressesM(wallet)(f)(error => Future.successful(Left(error)))
 
-    private def buildWalletFile(walletName: Option[String]): Either[WalletError, File] = {
-      walletName match {
-        case Some(name) =>
-          val regex = "^[a-zA-Z0-9_-]*$".r
-          Either.cond(
-            regex.matches(name),
-            new File(s"$secretDir/$name"),
-            InvalidWalletName(name)
-          )
-        case None =>
-          for {
-            currentWallets <- listWalletsInSecretDir()
-          } yield {
-            val name = s"wallet-${currentWallets.length}"
-            new File(s"$secretDir/$name")
-          }
-      }
+    private def buildWalletFile(walletName: String): Either[WalletError, File] = {
+      val regex = "^[a-zA-Z0-9_-]*$".r
+      Either.cond(
+        regex.matches(walletName),
+        new File(s"$secretDir/$walletName"),
+        InvalidWalletName(walletName)
+      )
     }
 
     private def buildMinerAddresses(
@@ -673,7 +682,7 @@ object WalletService {
     private def computeNextMinerAddresses(
         storage: SecretStorage
     ): Either[WalletError, AVector[Address.Asset]] = {
-      withPrivateKeys(storage) { case (_, keys) =>
+      withAllMinerPrivateKeys(storage) { case (_, keys) =>
         val addressByGroup = keys.toSeq
           .map { privateKey =>
             Address.p2pkh(privateKey.extendedPublicKey.publicKey)

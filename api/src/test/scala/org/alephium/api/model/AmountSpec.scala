@@ -43,6 +43,7 @@ class AmountSpec extends AlephiumSpec with NumericHelpers {
     fail("1. ALPH")
     fail(". ALPH")
     fail(" ALPH")
+    fail("0.000000000000000000001 ALPH")
   }
 
   trait Fixture {

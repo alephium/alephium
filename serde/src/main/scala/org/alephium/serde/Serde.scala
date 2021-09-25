@@ -126,6 +126,7 @@ trait FixedSizeSerde[T] extends Serde[T] {
 }
 
 object Serde extends ProductSerde {
+
   private[serde] object BoolSerde extends FixedSizeSerde[Boolean] {
     override val serdeSize: Int = java.lang.Byte.BYTES
 

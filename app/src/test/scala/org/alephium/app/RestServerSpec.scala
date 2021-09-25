@@ -736,7 +736,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   }
 }
 
-trait RestServerFixture extends ServerFixture with HttpRouteFixture with SocketUtil {
+trait RestServerFixture extends ServerFixture with HttpRouteFixture {
   val nbOfNodes: Int
   val apiKey: Option[ApiKey]
   implicit val system: ActorSystem  = ActorSystem("rest-server-spec")

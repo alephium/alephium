@@ -17,6 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -115,10 +116,15 @@ class SharedPool private (
   }
 
   // don't lock this function, only lock it's internal calls
-  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
+  def clean(
+      blockFlow: BlockFlow,
+      timeStampThreshold: TimeStamp
+  ): IOResult[AVector[TransactionTemplate]] = {
     val oldTxs = takeOldTxs(timeStampThreshold)
-    blockFlow.recheckInputs(chainIndex.from, oldTxs).map(remove)
-    ()
+    blockFlow.recheckInputs(chainIndex.from, oldTxs).map { invalidTxs =>
+      remove(invalidTxs)
+      invalidTxs
+    }
   }
 
   def takeOldTxs(timeStampThreshold: TimeStamp): AVector[TransactionTemplate] = readOnly {

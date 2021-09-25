@@ -17,17 +17,14 @@
 package org.alephium.protocol
 
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{Duration, U256}
 import org.alephium.util.Bytes.byteStringOrdering
+import org.alephium.util.U256
 
 package object model {
   val genesisBlockVersion: Byte = 0.toByte
   val defaultBlockVersion: Byte = 0.toByte
 
   val cliqueIdLength: Int = PublicKey.length
-
-  // TODO: use proper lockup period before mainnet launch
-  val coinbaseLockupPeriod: Duration = Duration.ofMinutesUnsafe(10)
 
   //scalastyle:off magic.number
   val minimalGas: GasBox        = GasBox.unsafe(20000)

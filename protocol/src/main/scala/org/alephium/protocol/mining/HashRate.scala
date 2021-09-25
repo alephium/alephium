@@ -18,6 +18,7 @@ package org.alephium.protocol.mining
 
 import java.math.BigInteger
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
@@ -36,10 +37,13 @@ object HashRate {
   def Min: HashRate = HashRate.unsafe(BigInteger.ONE)
 
   // scalastyle:off magic.number
-  def from(target: Target, blockTime: Duration): HashRate = {
+  def from(target: Target, blockTime: Duration)(implicit groupConfig: GroupConfig): HashRate = {
     val hashDone = Target.maxBigInt.divide(target.value)
     val rate =
-      hashDone.multiply(BigInteger.valueOf(1000)).divide(BigInteger.valueOf(blockTime.millis))
+      hashDone
+        // multiply the hashrate due to: multiple chains and chain index encoding in block hash
+        .multiply(BigInteger.valueOf((1000 * groupConfig.chainNum * groupConfig.chainNum).toLong))
+        .divide(BigInteger.valueOf(blockTime.millis))
     if (rate == BigInteger.ZERO) Min else unsafe(rate)
   }
 

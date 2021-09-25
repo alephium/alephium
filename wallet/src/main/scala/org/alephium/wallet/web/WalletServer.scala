@@ -21,12 +21,11 @@ import scala.concurrent.ExecutionContext
 import io.vertx.ext.web._
 import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter
-import sttp.tapir.swagger.vertx.SwaggerVertx
 
 import org.alephium.api.ApiError
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model.ApiKey
-import org.alephium.http.ServerOptions
+import org.alephium.http.{ServerOptions, SwaggerVertx}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{AVector, Duration}
 import org.alephium.wallet.WalletDocumentation
@@ -46,8 +45,7 @@ class WalletServer(
   override val vertxFutureServerOptions = ServerOptions.serverOptions
 
   lazy val docsRoute: Router => Route = new SwaggerVertx(
-    openApiJson(walletOpenAPI, maybeApiKey.isEmpty),
-    yamlName = "openapi.json"
+    openApiJson(walletOpenAPI, maybeApiKey.isEmpty)
   ).route
 
   val routes: AVector[Router => Route] = AVector(

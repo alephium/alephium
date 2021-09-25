@@ -275,37 +275,6 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     }
   }
 
-  it should "check dependencies time gap" in new FlowFixture {
-    override val configValues =
-      Map(
-        ("alephium.consensus.intra-group-dependency-gap-period", "5 seconds"),
-        ("alephium.consensus.inter-group-dependency-gap-period", "5 seconds"),
-        ("alephium.broker.broker-num", 1)
-      )
-
-    val blocks0 = for {
-      from <- 0 until groups0
-      to   <- 0 until groups0
-    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
-    blocks0.foreach(addAndCheck(blockFlow, _, 1))
-
-    val header          = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2)).header
-    val headerValidator = HeaderValidation.build
-    headerValidator.validate(header, blockFlow) isE ()
-    (0 until 2).foreach { k =>
-      val newDeps = BlockDeps.unsafe(header.blockDeps.deps.replace(k, blocks0(k * 3 + k).hash))
-      headerValidator
-        .checkDepsTimeStamp(header.copy(blockDeps = newDeps), blockFlow)
-        .leftValue isE InvalidDepTimeStamp
-    }
-    (2 until 4).foreach { k =>
-      val newDeps = BlockDeps.unsafe(header.blockDeps.deps.replace(k, blocks0(2 * 3 + k - 2).hash))
-      headerValidator
-        .checkDepsTimeStamp(header.copy(blockDeps = newDeps), blockFlow)
-        .leftValue isE InvalidDepTimeStamp
-    }
-  }
-
   it should "check state hash" in new HeaderFixture {
     val modified0 = header.copy(depStateHash = Hash.zero)
     failValidation(updateNonce(modified0), InvalidDepStateHash)

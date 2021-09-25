@@ -17,6 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.protocol.ALF
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
@@ -35,6 +36,41 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
 
   override def validate(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
     checkBlock(block, flow)
+  }
+
+  def validateTemplate(
+      chainIndex: ChainIndex,
+      template: BlockFlowTemplate,
+      blockFlow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    val dummyHeader = BlockHeader.unsafe(
+      BlockDeps.unsafe(template.deps),
+      template.depStateHash,
+      template.txsHash,
+      template.templateTs,
+      template.target,
+      Nonce.unsecureRandom()
+    )
+    val dummyBlock = Block(dummyHeader, template.transactions)
+    checkTemplate(chainIndex, dummyBlock, blockFlow)
+  }
+
+  // keep the commented lines so we could compare it easily with `checkBlockAfterHeader`
+  def checkTemplate(
+      chainIndex: ChainIndex,
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    for {
+//      _ <- checkGroup(block)
+//      _ <- checkNonEmptyTransactions(block)
+      _ <- checkTxNumber(block)
+      _ <- checkGasPriceDecreasing(block)
+      _ <- checkTotalGas(block)
+//      _ <- checkMerkleRoot(block)
+//      _ <- checkFlow(block, flow)
+      _ <- checkTxs(chainIndex, block, flow)
+    } yield ()
   }
 
   override def validateUntilDependencies(
@@ -84,17 +120,20 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       _ <- checkTotalGas(block)
       _ <- checkMerkleRoot(block)
       _ <- checkFlow(block, flow)
-      _ <- checkTxs(block, flow)
+      _ <- checkTxs(block.chainIndex, block, flow)
     } yield ()
   }
 
-  private def checkTxs(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
-    if (brokerConfig.contains(block.chainIndex.from)) {
+  private def checkTxs(
+      chainIndex: ChainIndex,
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Unit] = {
+    if (brokerConfig.contains(chainIndex.from)) {
       for {
-
-        groupView <- from(flow.getMutableGroupView(block))
-        _         <- checkNonCoinbases(block, groupView)
-        _         <- checkCoinbase(block, groupView) // validate non-coinbase first for gas fee
+        groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
+        _         <- checkNonCoinbases(chainIndex, block, groupView)
+        _         <- checkCoinbase(chainIndex, block, groupView) // validate non-coinbase first for gas fee
       } yield ()
     } else {
       validBlock(())
@@ -137,17 +176,18 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkCoinbase(
+      chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): BlockValidationResult[Unit] = {
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
         val netReward = Transaction.totalReward(block.gasFee, miningReward)
-        checkCoinbase(block, groupView, 1, netReward, netReward)
+        checkCoinbase(chainIndex, block, groupView, 1, netReward, netReward)
       case Emission.PoLW(miningReward, burntAmount) =>
         val lockedReward = Transaction.totalReward(block.gasFee, miningReward)
         val netReward    = lockedReward.subUnsafe(burntAmount)
-        checkCoinbase(block, groupView, 2, netReward, lockedReward)
+        checkCoinbase(chainIndex, block, groupView, 2, netReward, lockedReward)
     }
 
     result match {
@@ -157,6 +197,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkCoinbase(
+      chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
       outputNum: Int,
@@ -165,22 +206,23 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   ): BlockValidationResult[Unit] = {
     for {
       _ <- checkCoinbaseEasy(block, outputNum)
-      _ <- checkCoinbaseData(block)
-      _ <- checkCoinbaseAsTx(block, groupView, netReward.addUnsafe(minimalGasFee))
+      _ <- checkCoinbaseData(chainIndex, block)
+      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, netReward.addUnsafe(minimalGasFee))
       _ <- checkLockedReward(block, lockedReward)
     } yield ()
   }
 
   private[validation] def checkCoinbaseAsTx(
+      chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
       netReward: U256
   ): BlockValidationResult[Unit] = {
-    if (brokerConfig.contains(block.chainIndex.from)) {
+    if (brokerConfig.contains(chainIndex.from)) {
       val blockEnv = BlockEnv.from(block.header)
       convert(
         nonCoinbaseValidation.checkBlockTx(
-          block.chainIndex,
+          chainIndex,
           block.coinbase,
           groupView,
           blockEnv,
@@ -215,10 +257,12 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     }
   }
 
-  private[validation] def checkCoinbaseData(block: Block): BlockValidationResult[Unit] = {
-    val coinbase   = block.coinbase
-    val chainIndex = block.chainIndex
-    val data       = coinbase.unsigned.fixedOutputs.head.additionalData
+  private[validation] def checkCoinbaseData(
+      chainIndex: ChainIndex,
+      block: Block
+  ): BlockValidationResult[Unit] = {
+    val coinbase = block.coinbase
+    val data     = coinbase.unsigned.fixedOutputs.head.additionalData
     _deserialize[CoinbaseFixedData](data) match {
       case Right(Staging(coinbaseFixedData, _)) =>
         if (
@@ -241,7 +285,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     val output = block.coinbase.unsigned.fixedOutputs.head
     if (output.amount != lockedAmount) {
       invalidBlock(InvalidCoinbaseLockedAmount)
-    } else if (output.lockTime != block.timestamp.plusUnsafe(coinbaseLockupPeriod)) {
+    } else if (output.lockTime != block.timestamp.plusUnsafe(networkConfig.coinbaseLockupPeriod)) {
       invalidBlock(InvalidCoinbaseLockupPeriod)
     } else {
       validBlock(())
@@ -257,10 +301,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   }
 
   private[validation] def checkNonCoinbases(
+      chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): BlockValidationResult[Unit] = {
-    val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(brokerConfig))
 
     if (brokerConfig.contains(chainIndex.from)) {

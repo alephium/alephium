@@ -106,10 +106,17 @@ object InterCliqueManager {
     .register()
 
   trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
-    private var nodeSynced: Boolean = false
+    private var nodeSynced: Boolean      = false
+    private var firstTimeSynced: Boolean = true
+
+    protected def onFirstTimeSynced(): Unit = {}
 
     def updateNodeSyncStatus: Receive = {
       case InterCliqueManager.SyncedResult(isSynced) =>
+        if (firstTimeSynced && isSynced) {
+          firstTimeSynced = false
+          onFirstTimeSynced()
+        }
         nodeSynced = isSynced
       case InterCliqueManager.IsSynced =>
         sender() ! InterCliqueManager.SyncedResult(isNodeSynced)
@@ -282,6 +289,7 @@ class InterCliqueManager(
   def publishNodeStatus(result: SyncedResult): Unit = {
     blockFlowSynchronizer.ref ! result
     allHandlers.viewHandler.ref ! result
+    allHandlers.txHandler.ref ! result
     allHandlers.blockHandlers.foreach(_._2.ref ! result)
   }
 

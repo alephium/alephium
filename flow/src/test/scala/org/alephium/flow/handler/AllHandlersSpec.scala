@@ -32,7 +32,7 @@ class AllHandlersSpec extends AlephiumFlowActorSpec {
 
   it should "work for valid block" in {
     val allHandlers =
-      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex)
+      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex, storages)
 
     val dataAddedProbe = TestProbe()
     system.eventStream.subscribe(dataAddedProbe.ref, classOf[ChainHandler.FlowDataAdded])
@@ -66,7 +66,7 @@ class AllHandlersSpec extends AlephiumFlowActorSpec {
 
   it should "work for invalid block from peers" in new Generators {
     val allHandlers =
-      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex)
+      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex, storages)
 
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
@@ -85,7 +85,7 @@ class AllHandlersSpec extends AlephiumFlowActorSpec {
 
   it should "work for invalid block from local" in new Generators {
     val allHandlers =
-      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex)
+      AllHandlers.build(system, blockFlow, TestProbe().ref, BlockHash.random.shortHex, storages)
 
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)

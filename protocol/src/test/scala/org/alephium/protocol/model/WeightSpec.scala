@@ -16,10 +16,11 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.mining.HashRate
 import org.alephium.util.{AlephiumSpec, Duration}
 
-class WeightSpec extends AlephiumSpec {
+class WeightSpec extends AlephiumSpec with GroupConfigFixture.Default {
   it should "check special values" in {
     Weight.from(Target.Max) is Weight(1)
     (Weight(0) < Weight(1)) is true

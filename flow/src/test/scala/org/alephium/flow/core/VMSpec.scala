@@ -34,37 +34,11 @@ import org.alephium.util._
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
-  def contractCreation(
-      code: StatefulContract,
-      initialState: AVector[Val],
-      lockupScript: LockupScript.Asset,
-      alfAmount: U256,
-      newTokenAmount: Option[U256] = None
-  ): StatefulScript = {
-    val address  = Address.Asset(lockupScript)
-    val codeRaw  = Hex.toHexString(serialize(code))
-    val stateRaw = Hex.toHexString(serialize(initialState))
-    val creation = newTokenAmount match {
-      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
-    }
-    val scriptRaw =
-      s"""
-         |TxScript Foo {
-         |  pub payable fn main() -> () {
-         |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
-         |    $creation
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileTxScript(scriptRaw).rightValue
-  }
-
   it should "not start with private function" in new ContractFixture {
     val input =
       s"""
          |TxScript Foo {
-         |  pub fn add() -> () {
+         |  pub fn foo() -> () {
          |    return
          |  }
          |}

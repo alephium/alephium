@@ -200,11 +200,15 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(blockSolution)
 
   implicit val balanceExamples: List[Example[Balance]] = List(
-    defaultExample(Balance(balance, halfBalance, utxoNum = 3, None)),
+    defaultExample(
+      Balance(balance, balance.hint, halfBalance, halfBalance.hint, utxoNum = 3, None)
+    ),
     moreSettingsExample(
       Balance(
         balance,
+        balance.hint,
         halfBalance,
+        halfBalance.hint,
         utxoNum = 3,
         Some("Result might not include all utxos and is maybe unprecise")
       )

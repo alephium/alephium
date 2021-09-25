@@ -25,7 +25,8 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.{AVector, Duration, Env, Number, U256}
 
-trait AlephiumConfigFixture {
+trait AlephiumConfigFixture extends RandomPortsConfigFixture {
+
   val configValues: Map[String, Any] = Map.empty
 
   val genesisBalance: U256 = ALF.alf(Number.million)
@@ -34,7 +35,9 @@ trait AlephiumConfigFixture {
   lazy val rootPath = Platform.getRootPath(env)
 
   lazy val newConfig = ConfigFactory
-    .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)
+    .parseMap(
+      (configPortsValues ++ configValues).view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava
+    )
     .withFallback(Configs.parseConfig(rootPath, overwrite = true))
 
   lazy val groups0 = newConfig.getInt("alephium.broker.groups")

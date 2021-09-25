@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
@@ -76,7 +76,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(networkConfig.networkId, headerTs, Target.onePhPerBlock)
+          BlockEnv(networkConfig.networkId, headerTs, Target.Max)
         )
       } yield ()
     }
@@ -383,7 +383,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       checkGasAndWitnesses(
         tx,
         preOutputs,
-        BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.onePhPerBlock)
+        BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.Max)
       )
     }
   }
@@ -733,5 +733,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       prevOutputs,
       blockEnv
     ).rightValue is initialGas
+  }
+
+  it should "validate mempool tx fully" in new FlowFixture {
+    val txValidator = TxValidation.build
+    txValidator
+      .validateMempoolTxTemplate(outOfGasTxTemplate, blockFlow)
+      .leftValue isE TxScriptExeFailed(OutOfGas)
   }
 }
