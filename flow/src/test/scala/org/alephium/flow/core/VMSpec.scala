@@ -832,9 +832,47 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
-  behavior of "constant product market"
+  it should "create and use NFT contract" in new ContractFixture {
+    val nftContract =
+      s"""
+         |// credits to @chloekek
+         |TxContract Nft(author: Address, price: U256)
+         |{
+         |    pub payable fn buy(buyer: Address) -> ()
+         |    {
+         |        transferAlf!(buyer, author, price)
+         |        transferTokenFromSelf!(buyer, selfTokenId!(), 1)
+         |        destroySelf!(author)
+         |    }
+         |}
+         |""".stripMargin
+    val tokenId =
+      createContractAndCheckState(
+        nftContract,
+        2,
+        2,
+        initialState =
+          AVector[Val](Val.Address(genesisAddress.lockupScript), Val.U256(U256.unsafe(1000000))),
+        tokenAmount = Some(1024)
+      ).key
 
-  it should "swap" in new ContractFixture {
+    callTxScript(
+      s"""
+         |TxScript Main
+         |{
+         |    pub payable fn main() -> ()
+         |    {
+         |        approveAlf!(@${genesisAddress.toBase58}, 1000000)
+         |        Nft(#${tokenId.toHexString}).buy(@${genesisAddress.toBase58})
+         |    }
+         |}
+         |
+         |$nftContract
+         |""".stripMargin
+    )
+  }
+
+  it should "create and use Uniswap-like contract" in new ContractFixture {
     val tokenContract =
       s"""
          |TxContract Token(mut x: U256) {
