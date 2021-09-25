@@ -25,7 +25,6 @@ import org.alephium.serde.SerdeError
 trait ExeFailure
 case object ExpectStatefulFrame                                extends ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
-final case class NonCategorized(message: String)               extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
 case object StackUnderflow                                     extends ExeFailure
 case object NegativeArgumentInStack                            extends ExeFailure
@@ -42,28 +41,21 @@ case object RelativeLockTimeExpectPersistedUtxo                extends ExeFailur
 case object InvalidBoolean                                     extends ExeFailure
 case object IntegerOverFlow                                    extends ExeFailure
 final case class ArithmeticError(message: String)              extends ExeFailure
-case object TooManyElses                                       extends ExeFailure
-case object IncompleteIfScript                                 extends ExeFailure
-final case class InvalidScript(message: String)                extends ExeFailure
-case object InvalidParameters                                  extends ExeFailure
 case object InvalidVarIndex                                    extends ExeFailure
 case object InvalidVarType                                     extends ExeFailure
 case object InvalidFieldIndex                                  extends ExeFailure
 case object InvalidFieldLength                                 extends ExeFailure
 case object InvalidFieldType                                   extends ExeFailure
 case object EmptyMethods                                       extends ExeFailure
-case object NoReturnVal                                        extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
 final case object InvalidMethod                                extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
 case object InsufficientArgs                                   extends ExeFailure
-case object InvalidMethodParamsType                            extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
 case object AssertionFailed                                    extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
 case object PcOverflow                                         extends ExeFailure
-case object InvalidReturnType                                  extends ExeFailure
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
@@ -71,7 +63,6 @@ case object ContractDestructionShouldNotBeCalledFromSelf       extends ExeFailur
 case object InvalidAddressTypeInContractDestroy                extends ExeFailure
 case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
-case object UninitializedAddress                               extends ExeFailure
 case object ExpectNonPayableMethod                             extends ExeFailure
 case object ExpectStatefulContractObj                          extends ExeFailure
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
