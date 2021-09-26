@@ -173,8 +173,10 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     val keys = AVector.tabulate(1000) { _ =>
       val (key, value) = fixture.generateKV()
-      trie = trie.put(key, value).toOption.get
-      trie = trie.put(key, value).toOption.get //idempotent tests
+      val trie1        = trie.put(key, value).toOption.get
+      val trie2        = trie.put(key, value).toOption.get //idempotent tests
+      trie2.rootHash is trie1.rootHash
+      trie = trie2
       key
     }
 
@@ -224,6 +226,28 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
 
     trie.rootHash is genesisNode.hash
+  }
+
+  it should "work for explicit examples" in new StorageFixture {
+    val db    = newDB[Hash, SparseMerkleTrie.Node]
+    val trie0 = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+
+    val key0   = Hash.generate
+    val key1   = Hash.generate
+    val value0 = Hash.generate
+    val value1 = Hash.generate
+    val trie1  = trie0.put(key0, value0).rightValue
+    trie1.rootHash isnot trie0.rootHash
+    val trie2 = trie1.put(key0, value0).rightValue
+    trie2.rootHash is trie1.rootHash
+    val trie3 = trie2.put(key1, value1).rightValue
+    trie3.rootHash isnot trie2.rootHash
+    val trie4 = trie3.put(key1, value1).rightValue
+    trie4.rootHash is trie3.rootHash
+    val trie5 = trie4.remove(key1).rightValue
+    trie5.rootHash is trie1.rootHash
+    val trie6 = trie5.remove(key0).rightValue
+    trie6.rootHash is trie0.rootHash
   }
 }
 
