@@ -433,23 +433,14 @@ object BlockFlowState {
   }
 
   def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
-      brokerConfig: GroupConfig,
-      networkConfig: NetworkConfig
+      brokerConfig: GroupConfig
   ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
-      for {
-        _ <- {
-          val blockEnv = BlockEnv.from(block.header)
-          block.getScriptExecutionOrder.foreachE { index =>
-            updateStateForTxScript(worldState, blockEnv, block.transactions(index))
-          }
-        }
-        _ <- block.transactions.foreachE { tx =>
-          updateStateForInOutBlock(worldState, tx, targetGroup, block.timestamp)
-        }
-      } yield ()
+      block.transactions.foreachE { tx =>
+        updateStateForInOutBlock(worldState, tx, targetGroup, block.timestamp)
+      }
     } else if (chainIndex.from == targetGroup) {
       block.transactions.foreachE(
         updateStateForOutBlock(worldState, _, targetGroup, block.timestamp)
@@ -459,7 +450,7 @@ object BlockFlowState {
         updateStateForInBlock(worldState, _, targetGroup, block.timestamp)
       )
     } else {
-      // dead branch though
+      // dead branch
       Right(())
     }
   }
@@ -514,9 +505,8 @@ object BlockFlowState {
           tx.unsigned.gasAmount
         ) match {
           case Right(_)          => Right(())
+          case Left(Right(_))    => Right(()) // the contract execution failed
           case Left(Left(error)) => Left(error.error)
-          case Left(Right(error)) =>
-            throw new RuntimeException(s"Updating world state for invalid tx: $error")
         }
       case None => Right(())
     }

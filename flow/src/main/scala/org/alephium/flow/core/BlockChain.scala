@@ -26,6 +26,7 @@ import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALF, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{Block, Weight}
+import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -180,7 +181,19 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     )
   }
 
-  def add(block: Block, weight: Weight): IOResult[Unit] = {
+  def add(
+      block: Block,
+      weight: Weight
+  ): IOResult[Unit] = {
+    add(block, weight, None)
+  }
+
+  def add(
+      block: Block,
+      weight: Weight,
+      worldStateOpt: Option[WorldState.Cached]
+  ): IOResult[Unit] = {
+    assume(worldStateOpt.isEmpty)
     assume {
       val assertion = for {
         isNewIncluded    <- contains(block.hash)

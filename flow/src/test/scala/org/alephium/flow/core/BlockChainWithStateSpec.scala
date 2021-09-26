@@ -43,6 +43,11 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
         BlockChainWithState.initializeGenesis(genesis, storages.emptyWorldState)(_)
       )
     }
+
+    def addAndCheck(chain: BlockChainWithState, block: Block, weight: Weight = Weight.zero) = {
+      val worldState = chain.getCachedWorldState(block.parentHash).rightValue
+      chain.add(block, weight, Some(worldState)).isRight is true
+    }
   }
 
   it should "add block" in new Fixture {
@@ -51,8 +56,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       chain.numHashes is 1
       val blocksSize1  = chain.numHashes
       val initialCount = updateCount
-      val res          = chain.add(block, Weight.zero)
-      res.isRight is true
+      addAndCheck(chain, block)
       val blocksSize2 = chain.numHashes
       blocksSize1 + 1 is blocksSize2
       updateCount is initialCount + 1
@@ -64,7 +68,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
       val chain        = buildGenesis()
       val blocksSize1  = chain.numHashes
       val initialCount = updateCount
-      blocks.foreach(block => chain.add(block, Weight.zero))
+      blocks.foreach(block => addAndCheck(chain, block))
       val blocksSize2 = chain.numHashes
       blocksSize1 + blocks.length is blocksSize2
       updateCount is initialCount + blocks.length
@@ -76,10 +80,10 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     val shortChain = chainGenOf(2, genesis).sample.get
     val chain      = buildGenesis()
     longChain.foreachWithIndex { case (block, index) =>
-      chain.add(block, Weight(index)) isE ()
+      addAndCheck(chain, block, Weight(index))
     }
     shortChain.foreachWithIndex { case (block, index) =>
-      chain.add(block, Weight(index * 3)) isE ()
+      addAndCheck(chain, block, Weight(index * 3))
     }
     chain.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)
     chain.getBestTipUnsafe() is shortChain.last.hash

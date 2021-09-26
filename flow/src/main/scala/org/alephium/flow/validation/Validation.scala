@@ -23,15 +23,15 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
-abstract class Validation[T <: FlowData, I <: InvalidStatus] {
+abstract class Validation[T <: FlowData, I <: InvalidStatus, R] {
   implicit def brokerConfig: BrokerConfig
   implicit def consensusConfig: ConsensusConfig
 
-  def validate(data: T, flow: BlockFlow): ValidationResult[I, Unit]
+  def validate(data: T, flow: BlockFlow): ValidationResult[I, R]
 
   def validateUntilDependencies(data: T, flow: BlockFlow): ValidationResult[I, Unit]
 
-  def validateAfterDependencies(data: T, flow: BlockFlow): ValidationResult[I, Unit]
+  def validateAfterDependencies(data: T, flow: BlockFlow): ValidationResult[I, R]
 }
 
 object Validation {

@@ -42,6 +42,7 @@ import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
@@ -152,8 +153,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       }
     }
 
-    val block = mine()
-    server.node.blockFlow.addAndUpdateView(block) isE ()
+    val block           = mine()
+    val blockValidation = BlockValidation.build(blockFlow)
+    val sideResult      = blockValidation.validate(block, blockFlow).rightValue
+    blockFlow.addAndUpdateView(block, sideResult) isE ()
     block
   }
 

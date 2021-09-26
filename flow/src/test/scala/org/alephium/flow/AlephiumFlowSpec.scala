@@ -57,6 +57,18 @@ trait FlowFixture
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
+  def addWithoutViewUpdate(blockFlow: BlockFlow, block: Block): Assertion = {
+    val worldState =
+      blockFlow.getCachedWorldState(block.blockDeps, block.chainIndex.from).rightValue
+    blockFlow.add(block, Some(worldState)) isE ()
+  }
+
+  def addAndUpdateView(blockFlow: BlockFlow, block: Block): Assertion = {
+    val worldState =
+      blockFlow.getCachedWorldState(block.blockDeps, block.chainIndex.from).rightValue
+    blockFlow.addAndUpdateView(block, Some(worldState)) isE ()
+  }
+
   def getGenesisLockupScript(chainIndex: ChainIndex): LockupScript.Asset = {
     getGenesisLockupScript(chainIndex.from)
   }
@@ -436,8 +448,8 @@ trait FlowFixture
 
   private def addAndCheck0(blockFlow: BlockFlow, block: Block): Unit = {
     val blockValidation = BlockValidation.build(blockFlow)
-    blockValidation.validate(block, blockFlow).rightValue
-    blockFlow.addAndUpdateView(block).rightValue
+    val sideResult      = blockValidation.validate(block, blockFlow).rightValue
+    blockFlow.addAndUpdateView(block, sideResult).rightValue
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block): Unit = {

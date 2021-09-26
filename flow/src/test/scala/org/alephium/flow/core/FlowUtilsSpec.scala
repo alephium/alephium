@@ -251,8 +251,8 @@ class FlowUtilsSpec extends AlephiumSpec {
       mempool.pendingPool.contains(tx0.id) is false
       mempool.pendingPool.contains(tx1.id) is true
 
-      blockFlow.add(block0) isE ()
       val oldDeps = blockFlow.getBestDeps(chainIndex.from)
+      addWithoutViewUpdate(blockFlow, block0)
       val newDeps = blockFlow.calBestDepsUnsafe(chainIndex.from)
       blockFlow.updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps, heightGap) is expected
     }
