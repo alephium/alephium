@@ -178,6 +178,7 @@ lazy val app = mainProject("app")
 
         expose(12973) // http
         expose(11973) // ws
+        expose(10973) // miner
         expose(9973)  // p2p
 
         volume(s"$alephiumHome/.alephium")
