@@ -66,6 +66,6 @@ object IOUtils {
     case e: SecurityException => Left(IOError.JavaSecurity(e))
     case e: RocksDBException  => Left(IOError.RocksDB(e))
     case e: SerdeError        => Left(IOError.Serde(e))
-    case e: KeyNotFound[_]    => Left(e)
+    case e: KeyNotFound       => Left(e)
   }
 }

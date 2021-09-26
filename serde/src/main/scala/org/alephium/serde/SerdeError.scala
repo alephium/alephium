@@ -16,7 +16,9 @@
 
 package org.alephium.serde
 
-sealed abstract class SerdeError(message: String) extends Exception(message)
+import org.alephium.util.AppException
+
+sealed abstract class SerdeError(message: String) extends AppException(message)
 
 object SerdeError {
   final case class NotEnoughBytes(message: String) extends SerdeError(message)

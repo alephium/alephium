@@ -27,7 +27,8 @@ class StagingSMTSpec extends AlephiumSpec {
 
     stagingCache.put(key0, value0)
     stagingCache.get(key0) isE value0
-    stagingCache.underlying.get(key0).leftValue is IOError.KeyNotFound(key0)
+    stagingCache.underlying.get(key0).leftValue.getMessage is
+      IOError.keyNotFound(key0, "CachedTrie.get").getMessage
   }
 
   it should "commit changes in cache" in new Fixture {
@@ -39,7 +40,9 @@ class StagingSMTSpec extends AlephiumSpec {
   it should "rollback changes in cache" in new Fixture {
     stagingCache.rollback()
     stagingCache.caches.isEmpty is true
-    stagingCache.get(key0).leftValue is IOError.KeyNotFound(key0)
-    stagingCache.underlying.get(key0).leftValue is IOError.KeyNotFound(key0)
+    stagingCache.get(key0).leftValue.getMessage is
+      IOError.keyNotFound(key0, "CachedTrie.get").getMessage
+    stagingCache.underlying.get(key0).leftValue.getMessage is
+      IOError.keyNotFound(key0, "CachedTrie.get").getMessage
   }
 }

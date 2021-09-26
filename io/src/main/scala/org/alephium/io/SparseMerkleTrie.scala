@@ -235,7 +235,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 
   def get(key: K): IOResult[V] = {
     getOpt(key).flatMap {
-      case None        => Left(IOError.KeyNotFound(key))
+      case None        => Left(IOError.keyNotFound(key, "SparseMerkleTrie.get"))
       case Some(value) => Right(value)
     }
   }

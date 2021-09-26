@@ -90,7 +90,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.contains(validBlock) isE false
     chain
       .validateBlockHeight(blockWithoutParent, maxForkDepth)
-      .leftValue is a[IOError.KeyNotFound[BlockHash]]
+      .leftValue is a[IOError.KeyNotFound]
   }
 
   it should "add block correctly" in new Fixture {

@@ -17,7 +17,6 @@
 package org.alephium.flow.io
 
 import org.alephium.io.{IOError, RocksDBSource}
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
 import org.alephium.util.AlephiumSpec
@@ -64,7 +63,7 @@ class BlockHeaderStorageSpec
       storage.get(hash) isE header
       storage.getOpt(hash) isE Some(header)
       storage.delete(hash) isE ()
-      storage.get(hash).leftValue is a[IOError.KeyNotFound[BlockHash]]
+      storage.get(hash).leftValue is a[IOError.KeyNotFound]
       storage.getOpt(hash) isE None
     }
   }

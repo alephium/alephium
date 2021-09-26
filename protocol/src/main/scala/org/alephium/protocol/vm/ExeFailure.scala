@@ -93,4 +93,3 @@ final case class IOErrorUpdateState(error: IOError)    extends IOFailure
 final case class IOErrorRemoveContract(error: IOError) extends IOFailure
 final case class IOErrorLoadContract(error: IOError)   extends IOFailure
 final case class IOErrorLoadOutputs(error: IOError)    extends IOFailure
-final case class OtherIOError(error: IOError)          extends IOFailure

@@ -720,7 +720,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
     intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage.startsWith(
-      "Left(org.alephium.io.IOError$KeyNotFound: java.lang.Exception: Key ContractOutputRef("
+      "Left(org.alephium.io.IOError$KeyNotFound: org.alephium.util.AppException: Key ContractOutputRef("
     ) is true
   }
 

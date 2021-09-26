@@ -55,7 +55,7 @@ trait RocksDBColumn extends RawKeyValueStorage {
   override def getRawUnsafe(key: ByteString): ByteString = {
     val result = db.get(handle, readOptions, key.toArray)
     if (result == null) {
-      throw IOError.KeyNotFound(key)
+      throw IOError.keyNotFound(key, "RocksDBColumn.getRawUnsafe")
     } else {
       ByteString.fromArrayUnsafe(result)
     }
