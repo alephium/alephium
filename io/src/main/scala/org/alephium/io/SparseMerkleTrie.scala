@@ -156,8 +156,6 @@ object SparseMerkleTrie {
     def keyNotFound(action: String): SMTException = SMTException("Key not found in " ++ action)
   }
 
-  private val removalNoKey = IOError.Other(SMTException.keyNotFound("removal"))
-
   def getHighNibble(byte: Byte): Byte = {
     ((byte & 0xf0) >> 4).toByte
   }
@@ -319,13 +317,13 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
             handleChildUpdateResult(hash, node, nibble, result)
           }
         } else {
-          Left(SparseMerkleTrie.removalNoKey)
+          Left(IOError.keyNotFound(hash, "SparseMerkleTrie.remove"))
         }
       case leaf @ LeafNode(path, _) =>
         if (path == nibbles) {
           Right(TrieUpdateActions(None, AVector(leaf.hash), AVector.empty))
         } else {
-          Left(SparseMerkleTrie.removalNoKey)
+          Left(IOError.keyNotFound(hash, "SparseMerkleTrie.remove"))
         }
     }
   }

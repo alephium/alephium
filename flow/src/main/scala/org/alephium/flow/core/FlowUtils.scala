@@ -310,6 +310,7 @@ trait FlowUtils
         .getPreOutputs(tx.unsigned.inputs)
         .flatMap {
           case None =>
+            // Runtime exception as we have validated the inputs in collectTransactions
             Left(IOError.Other(new RuntimeException(s"Inputs should exist, but not actually")))
           case Some(outputs) => Right(outputs)
         }
