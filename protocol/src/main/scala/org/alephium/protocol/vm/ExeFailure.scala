@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import java.math.BigInteger
 
 import org.alephium.io.IOError
+import org.alephium.protocol.model.ContractId
 import org.alephium.serde.SerdeError
 
 // scalastyle:off number.of.types
@@ -59,6 +60,7 @@ case object PcOverflow                                         extends ExeFailur
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
 final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailure
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
+final case class NonExistContract(contractId: ContractId)      extends ExeFailure
 case object ContractDestructionShouldNotBeCalledFromSelf       extends ExeFailure
 case object InvalidAddressTypeInContractDestroy                extends ExeFailure
 case object NonExistTxInput                                    extends ExeFailure

@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.io.IOError
 import org.alephium.protocol.model.{ContractId, ContractOutputRef}
 import org.alephium.util.{AVector, EitherF}
 
@@ -44,8 +45,12 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  private def loadFromWorldState(contractKey: ContractId): ExeResult[StatefulContractObject] = {
-    worldState.getContractObj(contractKey).left.map(e => Left(IOErrorLoadContract(e)))
+  private def loadFromWorldState(contractId: ContractId): ExeResult[StatefulContractObject] = {
+    worldState.getContractObj(contractId) match {
+      case Right(obj)                   => Right(obj)
+      case Left(_: IOError.KeyNotFound) => failed(NonExistContract(contractId))
+      case Left(e)                      => ioFailed(IOErrorLoadContract(e))
+    }
   }
 
   private var contractFieldSize = 0
