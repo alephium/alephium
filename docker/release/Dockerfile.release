@@ -15,6 +15,8 @@ COPY entrypoint.sh /entrypoint.sh
 EXPOSE 12973
 # ws
 EXPOSE 11973
+# miner
+EXPOSE 10973
 # p2p
 EXPOSE 9973
 
