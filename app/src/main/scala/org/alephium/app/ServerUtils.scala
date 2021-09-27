@@ -501,7 +501,7 @@ class ServerUtils(implicit
 
   private def parseState(str: Option[String]): Either[Compiler.Error, AVector[Val]] = {
     str match {
-      case None => Right(AVector[Val](Val.U256(U256.Zero)))
+      case None => Right(AVector.empty[Val])
       case Some(state) =>
         val res = Compiler.compileState(state)
         res

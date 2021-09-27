@@ -16,12 +16,45 @@
 
 package org.alephium.app
 
+import sttp.model.StatusCode
+
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.util._
 
 class SmartContractTest extends AlephiumActorSpec {
+
+  it should "compile contract failed when have invalid state length" in new CliqueFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    val clique                = bootClique(1)
+    clique.start()
+
+    val restPort = clique.masterRestPort
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val compileResult = request[CompileResult](compileContract(contract), restPort)
+    unitRequest(
+      buildContract(publicKey, compileResult.code),
+      restPort
+    )
+
+    val invalidState: Option[String] = Some("[1000u]")
+    requestFailed(
+      buildContract(publicKey, compileResult.code, state = invalidState),
+      restPort,
+      StatusCode.BadRequest
+    )
+
+    clique.stop()
+  }
 
   it should "compile/execute smart contracts" in new CliqueFixture {
 
@@ -35,7 +68,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def contract(
         code: String,
-        state: Option[String] = None,
+        state: Option[String],
         issueTokenAmount: Option[U256]
     ): Hash = {
       val compileResult = request[CompileResult](compileContract(code), restPort)
@@ -92,7 +125,8 @@ class SmartContractTest extends AlephiumActorSpec {
       |}
       """.stripMargin
 
-    val tokenContractKey = contract(tokenContract, issueTokenAmount = Some(1024))
+    val tokenContractKey =
+      contract(tokenContract, state = Some("[0u]"), issueTokenAmount = Some(1024))
 
     script(s"""
       |TxScript Main {
