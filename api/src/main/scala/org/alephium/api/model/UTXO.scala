@@ -37,7 +37,7 @@ object UTXO {
     UTXO(
       OutputRef.from(ref),
       Amount(amount),
-      tokens.map((Token.from).tupled),
+      tokens.map(Token.tupled),
       lockTime,
       additionalData
     )

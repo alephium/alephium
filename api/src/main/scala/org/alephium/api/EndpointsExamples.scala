@@ -74,8 +74,8 @@ trait EndpointsExamples extends ErrorExamples {
   val contractId =
     Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
   private val tokens = AVector(
-    Token(Hash.hash("token1"), alf(42)),
-    Token(Hash.hash("token2"), alf(1000))
+    Token(Hash.hash("token1"), alf(42).value),
+    Token(Hash.hash("token2"), alf(1000).value)
   )
   val defaultDestinations = AVector(Destination(address, twoAlf, None, None))
   val moreSettingsDestinations = AVector(

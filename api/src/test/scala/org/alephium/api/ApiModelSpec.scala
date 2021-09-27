@@ -210,7 +210,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val tokenId1   = Hash.hash("token1")
     val tokenId2   = Hash.hash("token2")
     val tokens =
-      AVector(Token(tokenId1, Amount(U256.unsafe(42))), Token(tokenId2, Amount(U256.unsafe(1000))))
+      AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
 
     {
       val request: Output = Output.Contract(amount, address, tokens)
@@ -345,7 +345,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
           Destination(
             toAddress,
             Amount(1),
-            Some(AVector(Token(tokenId1, Amount(U256.Ten)))),
+            Some(AVector(Token(tokenId1, U256.Ten))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -385,7 +385,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
           Destination(
             toAddress,
             Amount(1),
-            Some(AVector(Token(tokenId1, Amount(U256.Ten)))),
+            Some(AVector(Token(tokenId1, U256.Ten))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
@@ -426,7 +426,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
           Destination(
             toAddress,
             Amount(1),
-            Some(AVector(Token(tokenId1, Amount(U256.Ten)))),
+            Some(AVector(Token(tokenId1, U256.Ten))),
             Some(TimeStamp.unsafe(1234))
           )
         ),
