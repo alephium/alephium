@@ -142,7 +142,7 @@ object StatefulScript {
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          isPayable = false,
+          isPayable = true,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,

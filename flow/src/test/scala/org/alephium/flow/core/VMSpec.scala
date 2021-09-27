@@ -23,6 +23,8 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signature}
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.mempool.MemPool.AddedToSharedPool
+import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
 import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -45,8 +47,8 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script      = Compiler.compileTxScript(input).toOption.get
     val errorScript = StatefulScript.unsafe(AVector(script.methods.head.copy(isPublic = false)))
-    val block       = simpleScript(blockFlow, chainIndex, errorScript)
-    fail(blockFlow, block, ExternalPrivateMethodCall)
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, errorScript)).getMessage is
+      s"Right(TxScriptExeFailed($ExternalPrivateMethodCall))"
   }
 
   it should "overflow frame stack" in new FlowFixture {
@@ -67,22 +69,12 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(input).toOption.get
 
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = simpleScript(blockFlow, chainIndex, script)
-    val tx = {
-      val txTemplate = block.transactions.head
-      txTemplate.copy(unsigned = txTemplate.unsigned.copy(gasAmount = 1000000))
-    }
-    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
-    val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue
-    StatefulVM.runTxScript(
-      worldState,
-      blockEnv,
-      tx,
-      None,
-      tx.unsigned.scriptOpt.get,
-      tx.unsigned.gasAmount
-    ) is
-      failed(StackOverflow)
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
+      s"Right(TxScriptExeFailed($OutOfGas))"
+    intercept[AssertionError](
+      simpleScript(blockFlow, chainIndex, script, gas = 1000000)
+    ).getMessage is
+      s"Right(TxScriptExeFailed($StackOverflow))"
   }
 
   trait CallFixture extends FlowFixture {
@@ -140,9 +132,8 @@ class VMSpec extends AlephiumSpec {
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
     val script1 = Compiler.compileTxScript(input1, 1).toOption.get
-    val block1  = simpleScript(blockFlow, chainIndex, script1)
-    intercept[AssertionError](addAndCheck(blockFlow, block1, 2)).getMessage is
-      s"Right(ExistInvalidTx(TxScriptExeFailed($ExternalPrivateMethodCall)))"
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, script1)).getMessage is
+      s"Right(TxScriptExeFailed($ExternalPrivateMethodCall))"
   }
 
   it should "handle contract states" in new CallFixture {
@@ -171,11 +162,12 @@ class VMSpec extends AlephiumSpec {
     def createContract(
         input: String,
         initialState: AVector[Val],
-        tokenAmount: Option[U256] = None
+        tokenAmount: Option[U256] = None,
+        initialAlfAmount: U256 = dustUtxoAmount
     ): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
       val txScript =
-        contractCreation(contract, initialState, genesisLockup, dustUtxoAmount, tokenAmount)
+        contractCreation(contract, initialState, genesisLockup, initialAlfAmount, tokenAmount)
       val block = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
@@ -192,9 +184,10 @@ class VMSpec extends AlephiumSpec {
         numAssets: Int,
         numContracts: Int,
         initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
-        tokenAmount: Option[U256] = None
+        tokenAmount: Option[U256] = None,
+        initialAlfAmount: U256 = dustUtxoAmount
     ): ContractOutputRef = {
-      val contractOutputRef = createContract(input, initialState, tokenAmount)
+      val contractOutputRef = createContract(input, initialState, tokenAmount, initialAlfAmount)
 
       val contractKey = contractOutputRef.key
       checkState(
@@ -241,7 +234,8 @@ class VMSpec extends AlephiumSpec {
 
     def failSimpleScript(main: String, failure: ExeFailure) = {
       val script = Compiler.compileTxScript(main).rightValue
-      fail(blockFlow, chainIndex, script, failure)
+      intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
+        s"Right(TxScriptExeFailed($failure))"
     }
 
     def fail(blockFlow: BlockFlow, block: Block, failure: ExeFailure): Assertion = {
@@ -982,8 +976,6 @@ class VMSpec extends AlephiumSpec {
     checkSwapBalance(dustUtxoAmount + 10, 100)
   }
 
-  behavior of "random execution"
-
   it should "execute tx in random order" in new ContractFixture {
     val testContract =
       s"""
@@ -1010,6 +1002,84 @@ class VMSpec extends AlephiumSpec {
     val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(contractKey).fold(throw _, identity)
     contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
+  }
+
+  it should "call a contract multiple times in a block" in new ContractFixture {
+    val testContract =
+      s"""
+        |TxContract Foo(mut x: U256) {
+        |  pub payable fn foo(address: Address) -> () {
+        |    x = x + 1
+        |    transferAlfFromSelf!(address, ${ALF.cent(1).v})
+        |  }
+        |}
+        |""".stripMargin
+    val contractId =
+      createContractAndCheckState(
+        testContract,
+        2,
+        2,
+        initialAlfAmount = ALF.alf(1)
+      ).key
+
+    def checkContract(alfReserve: U256, x: Int) = {
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+      val state      = worldState.getContractState(contractId).rightValue
+      state.fields is AVector[Val](Val.U256(x))
+      val output = worldState.getContractAsset(contractId).rightValue
+      output.amount is alfReserve
+    }
+
+    checkContract(ALF.alf(1), 0)
+
+    val block0 = transfer(blockFlow, chainIndex, amount = ALF.alf(10), numReceivers = 10)
+    addAndCheck(blockFlow, block0)
+    val newAddresses = block0.nonCoinbase.head.unsigned.fixedOutputs.init.map(_.lockupScript)
+
+    def main(address: LockupScript.Asset) =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    let foo = Foo(#${contractId.toHexString})
+         |    foo.foo(@${Address.Asset(address).toBase58})
+         |  }
+         |}
+         |
+         |$testContract
+         |""".stripMargin
+
+    val validator = TxValidation.build
+    val simpleTx  = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
+    blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, simpleTx, TimeStamp.now())
+    newAddresses.foreachWithIndex { case (address, index) =>
+      val gas    = if (index % 2 == 0) 20000 else 200000
+      val script = Compiler.compileTxScript(main(address)).toOption.get
+      val tx = payableCallTxTemplate(
+        blockFlow,
+        chainIndex,
+        address,
+        script,
+        initialGas = gas,
+        validation = false
+      )
+
+      if (index % 2 == 0) {
+        assume(tx.chainIndex == chainIndex)
+        validator.validateMempoolTxTemplate(tx, blockFlow).leftValue isE TxScriptExeFailed(OutOfGas)
+      } else {
+        validator.validateMempoolTxTemplate(tx, blockFlow) isE ()
+      }
+      blockFlow
+        .getMemPool(chainIndex)
+        .addNewTx(chainIndex, tx, TimeStamp.now()) is AddedToSharedPool
+    }
+
+    val blockTemplate =
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex))
+    blockTemplate.transactions.length is 12
+    val block = mine(blockFlow, blockTemplate)
+    addAndCheck0(blockFlow, block)
+    checkContract(ALF.cent(95), 5)
   }
 }
 // scalastyle:on file.size.limit no.equal regex

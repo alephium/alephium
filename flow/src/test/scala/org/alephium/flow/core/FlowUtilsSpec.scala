@@ -18,8 +18,11 @@ package org.alephium.flow.core
 
 import scala.util.Random
 
+import akka.util.ByteString
+
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.{Normal, Reorg}
+import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALF, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, StatefulScript}
@@ -27,7 +30,8 @@ import org.alephium.util._
 
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
-    val groupIndex = GroupIndex.unsafe(0)
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val groupIndex = chainIndex.from
     forAll(assetsToSpendGen(2, 2, 0, 1, p2pkScriptGen(groupIndex))) { assets =>
       val inputs     = assets.map(_.txInput)
       val script     = StatefulScript.alwaysFail
@@ -42,16 +46,20 @@ class FlowUtilsSpec extends AlephiumSpec {
       assets.foreach { asset =>
         worldState.addAsset(asset.txInput.outputRef, asset.referredOutput).isRight is true
       }
-      val firstInput  = assets.head.referredOutput.asInstanceOf[AssetOutput]
-      val firstOutput = firstInput.copy(amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe))
-      val bestDeps    = blockFlow.getBestDeps(groupIndex)
-      val groupView   = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
-      val blockEnv    = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
-      blockFlow.generateFullTx(groupView, blockEnv, tx, script).rightValue is
+      val firstInput = assets.head.referredOutput
+      val firstOutput = firstInput.copy(
+        amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe),
+        additionalData = ByteString.empty
+      )
+      val bestDeps  = blockFlow.getBestDeps(groupIndex)
+      val groupView = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
+      val blockEnv  = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
+      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script).rightValue is
         Transaction(
           unsignedTx,
           AVector.empty,
-          (firstOutput +: assets.tail.map(_.referredOutput)).as[TxOutput],
+          (firstOutput +: assets.tail.map(_.referredOutput.copy(additionalData = ByteString.empty)))
+            .as[TxOutput],
           tx.inputSignatures,
           tx.contractSignatures
         )
@@ -173,14 +181,19 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
   }
 
-  it should "exclude invalid tx template in block assembly" in new FlowFixture {
+  it should "include failed contract tx in block assembly" in new FlowFixture {
     val index = ChainIndex.unsafe(0, 0)
     val pool  = blockFlow.getMemPool(index)
     pool.getSharedPool(index).add(outOfGasTxTemplate, TimeStamp.now())
     val miner    = getGenesisLockupScript(index)
     val template = blockFlow.prepareBlockFlowUnsafe(index, miner)
-    template.transactions.length is 1 // only coinbase tx
-    template.transactions.map(_.id).contains(outOfGasTxTemplate.id) is false
+    template.transactions.length is 2 // it should include the invalid tx
+    template.transactions.map(_.id).contains(outOfGasTxTemplate.id) is true
+
+    val validator  = BlockValidation.build(blockFlow)
+    val worldState = validator.validateTemplate(index, template, blockFlow).rightValue.get
+    worldState.persist().rightValue.contractState.rootHash is
+      blockFlow.getBestPersistedWorldState(index.from).rightValue.contractState.rootHash
   }
 
   it should "reorg" in new FlowFixture {

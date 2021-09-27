@@ -488,30 +488,6 @@ object BlockFlowState {
     updateStateForOutputs(worldState, tx, targetGroup, blockTs)
   }
 
-  def updateStateForTxScript(
-      worldState: WorldState.Cached,
-      blockEnv: BlockEnv,
-      tx: Transaction
-  ): IOResult[Unit] = {
-    tx.unsigned.scriptOpt match {
-      case Some(script) =>
-        // we set gasRemaining = initial gas as the tx is already validated
-        StatefulVM.runTxScript(
-          worldState,
-          blockEnv,
-          tx,
-          None,
-          script,
-          tx.unsigned.gasAmount
-        ) match {
-          case Right(_)          => Right(())
-          case Left(Right(_))    => Right(()) // the contract execution failed
-          case Left(Left(error)) => Left(error.error)
-        }
-      case None => Right(())
-    }
-  }
-
   // Note: contract inputs are updated during the execution of tx script
   def updateStateForInputs(worldState: WorldState.Cached, tx: Transaction): IOResult[Unit] = {
     tx.unsigned.inputs.foreachE(txInput => worldState.removeAsset(txInput.outputRef))

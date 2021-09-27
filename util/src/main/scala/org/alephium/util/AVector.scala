@@ -44,7 +44,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def length: Int = end - start
 
-  var appendable: Boolean
+  @volatile var appendable: Boolean
 
   def isEmpty: Boolean = length == 0
 

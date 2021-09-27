@@ -46,6 +46,7 @@ trait BlockChainWithState extends BlockChain {
 
   def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit]
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   override def add(
       block: Block,
       weight: Weight,

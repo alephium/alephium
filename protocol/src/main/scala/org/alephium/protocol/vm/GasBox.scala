@@ -38,6 +38,11 @@ final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox]
     GasBox.unsafe(value + another.value)
   }
 
+  def subUnsafe(another: GasBox): GasBox = {
+    assume(this >= another)
+    GasBox.unsafe(value - another.value)
+  }
+
   def toU256: U256 = U256.unsafe(value)
 
   override def compare(that: GasBox): Int = this.value.compare(that.value)

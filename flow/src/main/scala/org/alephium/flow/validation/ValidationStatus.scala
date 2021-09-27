@@ -113,38 +113,40 @@ object ValidationStatus {
 
 sealed trait InvalidTxStatus extends InvalidStatus
 
-final case object InvalidNetworkId                      extends InvalidTxStatus
-final case object NoInputs                              extends InvalidTxStatus
-final case object TooManyInputs                         extends InvalidTxStatus
-final case object NoOutputs                             extends InvalidTxStatus
-final case object TooManyOutputs                        extends InvalidTxStatus
-final case object GeneratedOutputForInterGroupTx        extends InvalidTxStatus
-final case object InvalidStartGas                       extends InvalidTxStatus
-final case object InvalidGasPrice                       extends InvalidTxStatus
-final case object AmountIsDustOrZero                    extends InvalidTxStatus
-final case object DuplicatedInputs                      extends InvalidTxStatus
-final case object InvalidInputGroupIndex                extends InvalidTxStatus
-final case object InvalidOutputGroupIndex               extends InvalidTxStatus
-final case object TxDoubleSpending                      extends InvalidTxStatus
-final case object OutputDataSizeExceeded                extends InvalidTxStatus
-final case object NonExistInput                         extends InvalidTxStatus
-final case object TimeLockedTx                          extends InvalidTxStatus
-final case object InvalidAlfBalance                     extends InvalidTxStatus
-final case object InvalidTokenBalance                   extends InvalidTxStatus
-final case object BalanceOverFlow                       extends InvalidTxStatus
-final case object InvalidWitnessLength                  extends InvalidTxStatus
-final case object InvalidPublicKeyHash                  extends InvalidTxStatus
-final case object InvalidScriptHash                     extends InvalidTxStatus
-final case object InvalidSignature                      extends InvalidTxStatus
-final case object TooManySignature                      extends InvalidTxStatus
-final case object InvalidNumberOfPublicKey              extends InvalidTxStatus
-final case object OutOfGas                              extends InvalidTxStatus
-final case object NotEnoughSignature                    extends InvalidTxStatus
-final case object InvalidUnlockScriptType               extends InvalidTxStatus
-final case class InvalidUnlockScript(error: ExeFailure) extends InvalidTxStatus
-final case object CreateContractWithOldId               extends InvalidTxStatus
-final case class WorldStateIOError(error: IOError)      extends InvalidTxStatus
-final case object UnexpectedTxScript                    extends InvalidTxStatus
-final case class TxScriptExeFailed(error: ExeFailure)   extends InvalidTxStatus
-final case object InvalidContractInputs                 extends InvalidTxStatus
-final case object InvalidGeneratedOutputs               extends InvalidTxStatus
+final case object InvalidNetworkId                              extends InvalidTxStatus
+final case object NoInputs                                      extends InvalidTxStatus
+final case object TooManyInputs                                 extends InvalidTxStatus
+final case object NoOutputs                                     extends InvalidTxStatus
+final case object TooManyOutputs                                extends InvalidTxStatus
+final case object GeneratedOutputForInterGroupTx                extends InvalidTxStatus
+final case object InvalidStartGas                               extends InvalidTxStatus
+final case object InvalidGasPrice                               extends InvalidTxStatus
+final case object AmountIsDustOrZero                            extends InvalidTxStatus
+final case object DuplicatedInputs                              extends InvalidTxStatus
+final case object InvalidInputGroupIndex                        extends InvalidTxStatus
+final case object InvalidOutputGroupIndex                       extends InvalidTxStatus
+final case object TxDoubleSpending                              extends InvalidTxStatus
+final case object OutputDataSizeExceeded                        extends InvalidTxStatus
+final case object NonExistInput                                 extends InvalidTxStatus
+final case object TimeLockedTx                                  extends InvalidTxStatus
+final case object InvalidAlfBalance                             extends InvalidTxStatus
+final case object InvalidTokenBalance                           extends InvalidTxStatus
+final case object BalanceOverFlow                               extends InvalidTxStatus
+final case object InvalidWitnessLength                          extends InvalidTxStatus
+final case object InvalidPublicKeyHash                          extends InvalidTxStatus
+final case object InvalidScriptHash                             extends InvalidTxStatus
+final case object InvalidSignature                              extends InvalidTxStatus
+final case object TooManySignature                              extends InvalidTxStatus
+final case object InvalidNumberOfPublicKey                      extends InvalidTxStatus
+final case object OutOfGas                                      extends InvalidTxStatus
+final case object NotEnoughSignature                            extends InvalidTxStatus
+final case object InvalidUnlockScriptType                       extends InvalidTxStatus
+final case class InvalidUnlockScript(error: ExeFailure)         extends InvalidTxStatus
+final case object CreateContractWithOldId                       extends InvalidTxStatus
+final case class WorldStateIOError(error: IOError)              extends InvalidTxStatus
+final case object UnexpectedTxScript                            extends InvalidTxStatus
+final case class TxScriptExeFailed(error: ExeFailure)           extends InvalidTxStatus
+final case object ContractInputsShouldBeEmptyForFailedTxScripts extends InvalidTxStatus
+final case object InvalidContractInputs                         extends InvalidTxStatus
+final case object InvalidGeneratedOutputs                       extends InvalidTxStatus
+final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus

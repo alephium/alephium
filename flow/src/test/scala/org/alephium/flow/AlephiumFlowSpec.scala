@@ -25,6 +25,7 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{BlockValidation, HeaderValidation, TxValidation}
 import org.alephium.protocol._
@@ -97,10 +98,13 @@ trait FlowFixture
   def simpleScript(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      txScript: StatefulScript
+      txScript: StatefulScript,
+      gas: Int = 100000
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
-    mine(blockFlow, chainIndex)(transferTxs(_, _, ALF.alf(1), 1, Some(txScript), true))
+    mine(blockFlow, chainIndex)(
+      transferTxs(_, _, ALF.alf(1), 1, Some(txScript), true, scriptGas = gas)
+    )
   }
 
   def simpleScriptMulti(
@@ -156,7 +160,8 @@ trait FlowFixture
       numReceivers: Int,
       txScriptOpt: Option[StatefulScript],
       gasFeeInTheAmount: Boolean,
-      lockTimeOpt: Option[TimeStamp] = None
+      lockTimeOpt: Option[TimeStamp] = None,
+      scriptGas: Int = 100000
   ): AVector[Transaction] = {
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
@@ -167,7 +172,7 @@ trait FlowFixture
         } else {
           minimalGas
         }
-      case Some(_) => GasBox.unsafe(100000)
+      case Some(_) => GasBox.unsafe(scriptGas)
     }
     val gasFee = defaultGasPrice * gasAmount
     val outputAmount =
@@ -184,7 +189,12 @@ trait FlowFixture
         .rightValue
         .rightValue
     val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)
-    AVector(Transaction.from(newUnsignedTx, privateKey))
+    val tx            = Transaction.from(newUnsignedTx, privateKey)
+
+    val txValidation = TxValidation.build
+    txValidation.validateGrandPoolTxTemplate(tx.toTemplate, blockFlow) isE ()
+
+    AVector(tx)
   }
 
   def transferTxsMulti(
@@ -269,17 +279,17 @@ trait FlowFixture
   def payableCallTxTemplate(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
+      fromLockupScript: LockupScript.Asset,
       script: StatefulScript,
       initialGas: Int,
       validation: Boolean
   ): TransactionTemplate = {
     assume(chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from))
-    val mainGroup                  = chainIndex.from
-    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
-    val fromLockupScript           = LockupScript.p2pkh(publicKey)
-    val unlockScript               = UnlockScript.p2pkh(publicKey)
-    val balances                   = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
-    val inputs                     = balances.map(_.ref).map(TxInput(_, unlockScript))
+    val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
+    val publicKey    = privateKey.publicKey
+    val unlockScript = UnlockScript.p2pkh(publicKey)
+    val balances     = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
+    val inputs       = balances.map(_.ref).map(TxInput(_, unlockScript))
 
     val unsignedTx =
       UnsignedTransaction(Some(script), inputs, AVector.empty)
@@ -300,9 +310,11 @@ trait FlowFixture
       initialGas: Int,
       validation: Boolean
   ): AVector[Transaction] = {
-    val mainGroup          = chainIndex.from
-    val (privateKey, _, _) = genesisKeys(mainGroup.value)
-    val contractTx         = payableCallTxTemplate(blockFlow, chainIndex, script, initialGas, validation)
+    val mainGroup                  = chainIndex.from
+    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val fromLockupScript           = LockupScript.p2pkh(publicKey)
+    val contractTx =
+      payableCallTxTemplate(blockFlow, chainIndex, fromLockupScript, script, initialGas, validation)
 
     val (contractInputs, generateOutputs) =
       genInputsOutputs(blockFlow, chainIndex.from, contractTx, script)
@@ -366,6 +378,17 @@ trait FlowFixture
       Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
 
     mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs)
+  }
+
+  def mine(blockFlow: BlockFlow, template: BlockFlowTemplate): Block = {
+    mine(
+      blockFlow,
+      template.index,
+      template.deps,
+      template.transactions,
+      template.templateTs,
+      template.target
+    )
   }
 
   def mine(
@@ -435,7 +458,7 @@ trait FlowFixture
     val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
       .runTxScript(
-        groupView.worldState,
+        groupView.worldState.staging(),
         blockEnv,
         tx,
         preOutputs,
@@ -446,7 +469,7 @@ trait FlowFixture
     result.contractInputs -> result.generatedOutputs
   }
 
-  private def addAndCheck0(blockFlow: BlockFlow, block: Block): Unit = {
+  def addAndCheck0(blockFlow: BlockFlow, block: Block): Unit = {
     val blockValidation = BlockValidation.build(blockFlow)
     val sideResult      = blockValidation.validate(block, blockFlow).rightValue
     blockFlow.addAndUpdateView(block, sideResult).rightValue
@@ -549,12 +572,12 @@ trait FlowFixture
 
   def checkOutputs(blockFlow: BlockFlow, block: Block): Unit = {
     val chainIndex = block.chainIndex
+    val worldState =
+      blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     if (chainIndex.isIntraGroup) {
       block.nonCoinbase.foreach { tx =>
         tx.allOutputs.foreachWithIndex { case (output, index) =>
           val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
-          val worldState =
-            blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
           worldState.existOutput(outputRef) isE true
         }
       }
@@ -622,6 +645,7 @@ trait FlowFixture
     payableCallTxTemplate(
       blockFlow,
       chainIndex,
+      getGenesisLockupScript(chainIndex),
       txScript,
       33000,
       validation = false

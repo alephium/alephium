@@ -340,11 +340,12 @@ object StatefulVM {
   final case class TxScriptExecution(
       gasBox: GasBox,
       contractInputs: AVector[ContractOutputRef],
+      contractPrevOutputs: AVector[ContractOutput],
       generatedOutputs: AVector[TxOutput]
   )
 
   def runTxScript(
-      worldState: WorldState.Cached,
+      worldState: WorldState.Staging,
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
       preOutputs: AVector[AssetOutput],
@@ -355,7 +356,7 @@ object StatefulVM {
   }
 
   def runTxScript(
-      worldState: WorldState.Cached,
+      worldState: WorldState.Staging,
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
       preOutputsOpt: Option[AVector[AssetOutput]],
@@ -366,10 +367,10 @@ object StatefulVM {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
     } yield {
-      context.commitStates()
       TxScriptExecution(
         context.gasRemaining,
-        AVector.from(context.contractInputs),
+        AVector.from(context.contractInputs.view.map(_._1)),
+        AVector.from(context.contractInputs.view.map(_._2)),
         AVector.from(context.generatedOutputs)
       )
     }

@@ -29,6 +29,10 @@ trait CostStrategy {
 
   def chargeContractUpdate(): ExeResult[Unit] = chargeGas(GasSchedule.contractUpdateGas)
 
+  def chargeContractInput(): ExeResult[Unit] = chargeGas(GasSchedule.txInputBaseGas)
+
+  def chargeGeneratedOutput(): ExeResult[Unit] = chargeGas(GasSchedule.txOutputBaseGas)
+
   def chargeGas(gas: GasBox): ExeResult[Unit] = {
     gasRemaining.use(gas).map(gasRemaining = _)
   }

@@ -24,6 +24,8 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
+import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
+import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
@@ -328,6 +330,17 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   behavior of "stateful validation"
 
   trait StatefulFixture extends StatelessFixture {
+    def getPreOutputs(
+        tx: Transaction,
+        worldState: MutableWorldState
+    ): TxValidationResult[AVector[TxOutput]] = {
+      worldState.getPreOutputs(tx) match {
+        case Right(preOutputs)            => validTx(preOutputs)
+        case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)
+        case Left(error)                  => Left(Left(error))
+      }
+    }
+
     def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
       AssetOutput(
         U256.Zero,
