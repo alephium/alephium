@@ -371,7 +371,7 @@ class ServerUtils(implicit
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
           tokens.map { token =>
-            (token.id -> token.amount.value)
+            (token.id -> token.amount)
           }
         case None =>
           AVector.empty[(TokenId, U256)]
