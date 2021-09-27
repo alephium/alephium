@@ -48,19 +48,17 @@ class SmartContractTest extends AlephiumActorSpec {
         ),
         restPort
       )
-      submitTx(compileResult.code, buildResult.unsignedTx, buildResult.hash)
+      submitTx(buildResult.unsignedTx, buildResult.hash)
       buildResult.contractId
     }
 
-    def submitTx(code: String, unsignedTx: String, txId: Hash) = {
+    def submitTx(unsignedTx: String, txId: Hash) = {
       val signature: Signature =
         SignatureSchema.sign(txId.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
       val tx = request[TxResult](
-        submitContract(s"""
+        submitTransaction(s"""
           {
-            "tx": "$unsignedTx",
-            "code": "$code",
-            "fromGroup": ${group.group},
+            "unsignedTx": "$unsignedTx",
             "signature":"${signature.toHexString}"
           }"""),
         restPort
@@ -77,7 +75,7 @@ class SmartContractTest extends AlephiumActorSpec {
         ),
         restPort
       )
-      submitTx(compileResult.code, buildResult.unsignedTx, buildResult.hash)
+      submitTx(buildResult.unsignedTx, buildResult.hash)
     }
 
     request[Balance](getBalance(address), restPort) is initialBalance

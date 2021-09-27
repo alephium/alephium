@@ -459,6 +459,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def submitTransaction(query: String) = {
+    httpPost("/transactions/submit", Some(query))
+  }
+
   def signAndSubmitMultisigTransaction(
       buildTransactionResult: BuildTransactionResult,
       privateKeys: AVector[String]
@@ -569,10 +573,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          }
          """
     httpPost("/contracts/build-script", Some(query))
-  }
-
-  def submitContract(contract: String) = {
-    httpPost(s"/contracts/submit", Some(contract))
   }
 
   val startMining = httpPost("/miners?action=start-mining")

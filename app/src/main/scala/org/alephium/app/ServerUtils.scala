@@ -625,27 +625,6 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def submitContract(txHandler: ActorRefT[TxHandler.Command], query: SubmitContract)(implicit
-      askTimeout: Timeout
-  ): FutureTry[TxResult] = {
-    (for {
-      txByteString <- Hex.from(query.tx).toRight(badRequest(s"Invalid hex"))
-      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-    } yield {
-      TransactionTemplate(
-        unsignedTx,
-        AVector(query.signature),
-        AVector.empty
-      )
-    }) match {
-      case Left(error)       => Future.successful(Left(error))
-      case Right(txTemplate) => publishTx(txHandler, txTemplate)
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileScript(query: Compile.Script): FutureTry[CompileResult] = {
     Future.successful(
       Compiler

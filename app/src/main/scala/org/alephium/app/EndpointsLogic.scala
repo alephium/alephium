@@ -429,12 +429,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  val submitContractLogic = serverLogic(submitContract) { query =>
-    withSyncedClique {
-      serverUtils.submitContract(txHandler, query)
-    }
-  }
-
   val compileScriptLogic = serverLogic(compileScript) { query => serverUtils.compileScript(query) }
 
   val buildScriptLogic = serverLogic(buildScript) { query =>

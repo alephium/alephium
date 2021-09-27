@@ -90,7 +90,6 @@ class RestServer(
       minerActionLogic,
       minerListAddressesLogic,
       minerUpdateAddressesLogic,
-      submitContractLogic,
       compileScriptLogic,
       buildScriptLogic,
       compileContractLogic,
