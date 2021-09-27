@@ -52,7 +52,7 @@ object Output {
         Asset(
           Amount(o.amount),
           Address.Asset(o.lockupScript),
-          o.tokens.map((Token.from).tupled),
+          o.tokens.map(Token.tupled),
           o.lockTime,
           o.additionalData
         )
@@ -60,7 +60,7 @@ object Output {
         Contract(
           Amount(o.amount),
           Address.Contract(o.lockupScript),
-          o.tokens.map((Token.from).tupled)
+          o.tokens.map(Token.tupled)
         )
     }
   }
