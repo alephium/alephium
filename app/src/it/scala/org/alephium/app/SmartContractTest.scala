@@ -19,7 +19,6 @@ package org.alephium.app
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.TxOutputRef
 import org.alephium.util._
 
 class SmartContractTest extends AlephiumActorSpec {
@@ -39,48 +38,46 @@ class SmartContractTest extends AlephiumActorSpec {
         state: Option[String] = None,
         issueTokenAmount: Option[U256]
     ): Hash = {
-      execute(compileContract(address, code, state, issueTokenAmount))
-    }
-
-    def script(code: String): Hash = {
-      execute(
-        compileScript(code)
-      )
-    }
-
-    def execute(
-        req: Int => this.HttpRequest
-    ): Hash = {
-      val compileResult = request[CompileResult](
-        req,
-        restPort
-      )
-
+      val compileResult = request[CompileResult](compileContract(code), restPort)
       val buildResult = request[BuildContractResult](
-        buildContract(s"""
-        {
-          "fromPublicKey": "$publicKey",
-          "code": "${compileResult.code}",
-          "gas": 100000
-        }"""),
+        buildContract(
+          fromPublicKey = publicKey,
+          code = compileResult.code,
+          state = state,
+          issueTokenAmount = issueTokenAmount
+        ),
         restPort
       )
+      submitTx(compileResult.code, buildResult.unsignedTx, buildResult.hash)
+      buildResult.contractId
+    }
 
+    def submitTx(code: String, unsignedTx: String, txId: Hash) = {
       val signature: Signature =
-        SignatureSchema.sign(buildResult.hash.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
+        SignatureSchema.sign(txId.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
       val tx = request[TxResult](
         submitContract(s"""
           {
-            "tx": "${buildResult.unsignedTx}",
-            "code": "${compileResult.code}",
+            "tx": "$unsignedTx",
+            "code": "$code",
             "fromGroup": ${group.group},
             "signature":"${signature.toHexString}"
           }"""),
         restPort
       )
       confirmTx(tx, restPort)
+    }
 
-      TxOutputRef.key(tx.txId, 0)
+    def script(code: String) = {
+      val compileResult = request[CompileResult](compileScript(code), restPort)
+      val buildResult = request[BuildScriptResult](
+        buildScript(
+          fromPublicKey = publicKey,
+          code = compileResult.code
+        ),
+        restPort
+      )
+      submitTx(compileResult.code, buildResult.unsignedTx, buildResult.hash)
     }
 
     request[Balance](getBalance(address), restPort) is initialBalance

@@ -50,6 +50,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getTransactionStatus,
     submitContract,
     compileScript,
+    buildScript,
     compileContract,
     buildContract,
     buildMultisigAddress,

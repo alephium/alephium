@@ -46,7 +46,7 @@ import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, Block, ChainIndex}
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
 import org.alephium.util._
 import org.alephium.wallet
@@ -503,27 +503,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def compileScript(code: String) = {
-    val script = s"""
-          {
-            "code": ${ujson.Str(code)}
-          }
-          """
+    val script = s"""{"code": ${ujson.Str(code)}}"""
     httpPost(s"/contracts/compile-script", Some(script))
   }
 
-  def compileContract(
-      address: String,
-      code: String,
-      state: Option[String] = None,
-      issueTokenAmount: Option[U256]
-  ) = {
-    val contract = s"""
-          {
-            "address": "$address",
-            "code": ${ujson.Str(code)}
-            ${state.map(s => s""","state": "$s"""").getOrElse("")}
-            ${issueTokenAmount.map(v => s""","issueTokenAmount":"${v.v}"""").getOrElse("")}
-          }"""
+  def compileContract(code: String) = {
+    val contract = s"""{"code": ${ujson.Str(code)}}"""
     httpPost(s"/contracts/compile-contract", Some(contract))
   }
 
@@ -546,8 +531,44 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(s"/transactions/decode", maybeBody = Some(body))
   }
 
-  def buildContract(query: String) = {
-    httpPost(s"/contracts/build", Some(query))
+  def buildContract(
+      fromPublicKey: String,
+      code: String,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None,
+      state: Option[String] = None,
+      issueTokenAmount: Option[U256] = None
+  ) = {
+    val query =
+      s"""
+         {
+           "fromPublicKey": "$fromPublicKey",
+           "code": "$code"
+           ${gas.map(g => s""","gas": $g""").getOrElse("")}
+           ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+           ${state.map(s => s""","state": "$s"""").getOrElse("")}
+           ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
+         }
+         """
+    httpPost("/contracts/build-contract", Some(query))
+  }
+
+  def buildScript(
+      fromPublicKey: String,
+      code: String,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None
+  ) = {
+    val query =
+      s"""
+         {
+           "fromPublicKey": "$fromPublicKey",
+           "code": "$code"
+           ${gas.map(g => s""","gas": $g""").getOrElse("")}
+           ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+         }
+         """
+    httpPost("/contracts/build-script", Some(query))
   }
 
   def submitContract(contract: String) = {

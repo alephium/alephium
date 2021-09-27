@@ -92,9 +92,10 @@ class RestServer(
       minerUpdateAddressesLogic,
       submitContractLogic,
       compileScriptLogic,
+      buildScriptLogic,
       compileContractLogic,
-      exportBlocksLogic,
       buildContractLogic,
+      exportBlocksLogic,
       metricsLogic
     ).map(route(_)) :+ swaggerUiRoute
 

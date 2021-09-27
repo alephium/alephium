@@ -4495,7 +4495,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Script"
+                "type": "string"
               },
               "example": {
                 "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n, 1024) } }"
@@ -4586,22 +4586,260 @@
         }
       }
     },
-    "/contracts/build": {
+    "/contracts/build-script": {
+      "post": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Build an unsigned script",
+        "operationId": "postContractsBuild-script",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildScript"
+              },
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "gas": 20000,
+                    "gasPrice": "100000000000"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildScriptResult"
+                },
+                "example": {
+                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "fromGroup": 2,
+                  "toGroup": 2
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/compile-contract": {
+      "post": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Compile a smart contract",
+        "operationId": "postContractsCompile-contract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              },
+              "example": {
+                "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompileResult"
+                },
+                "example": {
+                  "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/build-contract": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned contract",
-        "operationId": "postContractsBuild",
+        "operationId": "postContractsBuild-contract",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BuildContract"
               },
-              "example": {
-                "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "gas": 20000,
+                    "gasPrice": "100000000000",
+                    "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
+                    "issueTokenAmount": "2000000000000000000"
+                  }
+                }
               }
             }
           },
@@ -4617,8 +4855,9 @@
                 "example": {
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                   "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "contractId": "1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8",
                   "fromGroup": 2,
-                  "toGroup": 1
+                  "toGroup": 2
                 }
               }
             }
@@ -5653,6 +5892,13 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "state": {
+            "type": "string"
+          },
+          "issueTokenAmount": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },
@@ -5660,6 +5906,7 @@
         "required": [
           "unsignedTx",
           "hash",
+          "contractId",
           "fromGroup",
           "toGroup"
         ],
@@ -5669,6 +5916,9 @@
             "type": "string"
           },
           "hash": {
+            "type": "string"
+          },
+          "contractId": {
             "type": "string"
           },
           "fromGroup": {
@@ -5724,6 +5974,50 @@
             }
           },
           "mrequired": {
+            "type": "integer"
+          }
+        }
+      },
+      "BuildScript": {
+        "required": [
+          "fromPublicKey",
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "fromPublicKey": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          }
+        }
+      },
+      "BuildScriptResult": {
+        "required": [
+          "unsignedTx",
+          "hash",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
             "type": "integer"
           }
         }
@@ -5897,28 +6191,6 @@
             "items": {
               "$ref": "#/components/schemas/Token"
             }
-          }
-        }
-      },
-      "Contract2": {
-        "required": [
-          "address",
-          "code"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string"
-          },
-          "issueTokenAmount": {
-            "type": "string",
-            "format": "uint256"
           }
         }
       },
@@ -6335,17 +6607,6 @@
         "type": "object",
         "properties": {
           "password": {
-            "type": "string"
-          }
-        }
-      },
-      "Script": {
-        "required": [
-          "code"
-        ],
-        "type": "object",
-        "properties": {
-          "code": {
             "type": "string"
           }
         }

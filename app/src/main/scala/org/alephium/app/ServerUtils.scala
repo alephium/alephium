@@ -18,7 +18,7 @@ package org.alephium.app
 
 import scala.concurrent._
 
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 
@@ -524,14 +524,13 @@ class ServerUtils(implicit
   }
 
   private def buildContract(
-      contract: StatefulContract,
+      codeRaw: String,
       address: Address,
       initialState: AVector[Val],
       alfAmount: U256,
       newTokenAmount: Option[U256]
   ): Either[Compiler.Error, StatefulScript] = {
 
-    val codeRaw  = Hex.toHexString(serialize(contract))
     val stateRaw = Hex.toHexString(serialize(initialState))
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
@@ -552,34 +551,77 @@ class ServerUtils(implicit
   private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
-      query: BuildContract
+      fromPublicKey: PublicKey,
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
   ): ExeResult[UnsignedTransaction] = {
-    val lockupScript = LockupScript.p2pkh(query.fromPublicKey)
-    val unlockScript = UnlockScript.p2pkh(query.fromPublicKey)
+    val lockupScript = LockupScript.p2pkh(fromPublicKey)
+    val unlockScript = UnlockScript.p2pkh(fromPublicKey)
     for {
       balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => Left(IOErrorLoadOutputs(e)))
       inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
     } yield UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
-      gasAmount = query.gas.getOrElse(minimalGas),
-      gasPrice = query.gasPrice.getOrElse(defaultGasPrice)
+      gasAmount = gas.getOrElse(minimalGas),
+      gasPrice = gasPrice.getOrElse(defaultGasPrice)
     )
   }
+
+  private def validateStateLength(
+      contract: StatefulContract,
+      state: AVector[Val]
+  ): Either[String, Unit] = {
+    if (contract.validate(state)) {
+      Right(())
+    } else {
+      Left(s"Invalid state length, expect ${contract.fieldLength}, have ${state.length}")
+    }
+  }
+
+  @inline private def decodeCodeHexString(str: String): Try[ByteString] =
+    Hex.from(str).toRight(badRequest("Cannot decode code hex string"))
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(blockFlow: BlockFlow, query: BuildContract): FutureTry[BuildContractResult] = {
     Future.successful((for {
-      codeBytestring <- Hex
-        .from(query.code)
-        .toRight(badRequest("Cannot decode code hex string"))
-      script <- deserialize[StatefulScript](codeBytestring).left.map(serdeError =>
+      codeByteString <- decodeCodeHexString(query.code)
+      contract <- deserialize[StatefulContract](codeByteString).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+      state <- parseState(query.state).left.map(error => badRequest(error.message))
+      _     <- validateStateLength(contract, state).left.map(badRequest)
+      address = Address.p2pkh(query.fromPublicKey)
+      script <- buildContract(
+        query.code,
+        address,
+        state,
+        dustUtxoAmount,
+        query.issueTokenAmount.map(_.value)
+      ).left.map(error => badRequest(error.message))
+      utx <- unsignedTxFromScript(
+        blockFlow,
+        script,
+        query.fromPublicKey,
+        query.gas,
+        query.gasPrice
+      ).left.map(error => badRequest(error.toString))
+    } yield utx).map(BuildContractResult.from))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def buildScript(blockFlow: BlockFlow, query: BuildScript): FutureTry[BuildScriptResult] = {
+    Future.successful((for {
+      codeByteString <- decodeCodeHexString(query.code)
+      script <- deserialize[StatefulScript](codeByteString).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        query
+        query.fromPublicKey,
+        query.gas,
+        query.gasPrice
       ).left.map(error => badRequest(error.toString))
-    } yield utx).map(BuildContractResult.from))
+    } yield utx).map(BuildScriptResult.from))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

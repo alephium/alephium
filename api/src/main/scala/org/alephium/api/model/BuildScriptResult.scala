@@ -18,25 +18,18 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{TxOutputRef, UnsignedTransaction}
+import org.alephium.protocol.model.UnsignedTransaction
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildContractResult(
-    unsignedTx: String,
-    hash: Hash,
-    contractId: Hash,
-    fromGroup: Int,
-    toGroup: Int
-)
-object BuildContractResult {
+final case class BuildScriptResult(unsignedTx: String, hash: Hash, fromGroup: Int, toGroup: Int)
+object BuildScriptResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildContractResult =
-    BuildContractResult(
+  )(implicit groupConfig: GroupConfig): BuildScriptResult =
+    BuildScriptResult(
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.hash,
-      TxOutputRef.key(unsignedTx.hash, unsignedTx.fixedOutputs.length),
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value
     )

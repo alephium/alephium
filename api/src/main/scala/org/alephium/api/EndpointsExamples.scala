@@ -71,6 +71,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+  val contractId =
+    Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
   private val tokens = AVector(
     Token(Hash.hash("token1"), alf(42)),
     Token(Hash.hash("token2"), alf(1000))
@@ -348,12 +350,51 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val compileResultExamples: List[Example[CompileResult]] =
     simpleExample(CompileResult(code = hexString))
 
-  implicit val buildContractExamples: List[Example[BuildContract]] =
-    simpleExample(BuildContract(publicKey, code = hexString))
+  implicit val buildContractExamples: List[Example[BuildContract]] = List(
+    defaultExample(BuildContract(publicKey, code = hexString)),
+    moreSettingsExample(
+      BuildContract(
+        publicKey,
+        hexString,
+        Some(minimalGas),
+        Some(defaultGasPrice),
+        Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
+        Some(twoAlf)
+      )
+    )
+  )
+
+  implicit val buildScriptExamples: List[Example[BuildScript]] = List(
+    defaultExample(BuildScript(publicKey, code = hexString)),
+    moreSettingsExample(
+      BuildScript(
+        publicKey,
+        hexString,
+        Some(minimalGas),
+        Some(defaultGasPrice)
+      )
+    )
+  )
 
   implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
     simpleExample(
-      BuildContractResult(unsignedTx = hexString, hash = hash, fromGroup = 2, toGroup = 1)
+      BuildContractResult(
+        unsignedTx = hexString,
+        hash = hash,
+        contractId = contractId,
+        fromGroup = 2,
+        toGroup = 2
+      )
+    )
+
+  implicit val buildScriptResultExamples: List[Example[BuildScriptResult]] =
+    simpleExample(
+      BuildScriptResult(
+        unsignedTx = hexString,
+        hash = hash,
+        fromGroup = 2,
+        toGroup = 2
+      )
     )
 
   implicit val submitContractExamples: List[Example[SubmitContract]] =

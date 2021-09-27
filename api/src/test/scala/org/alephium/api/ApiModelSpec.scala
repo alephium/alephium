@@ -570,23 +570,101 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Compile.Contract" in {
-    val address = generateAddress()
     val compile =
-      Compile.Contract(
-        address,
-        code = "0000",
-        state = Some("0001"),
-        issueTokenAmount = Some(Amount(51))
-      )
+      Compile.Contract(code = "0000")
     val jsonRaw =
       s"""
          |{
-         |  "address":"${address.toBase58}",
-         |  "code": "0000",
-         |  "state": "0001",
-         |  "issueTokenAmount": "51"
+         |  "code": "0000"
          |}
          |""".stripMargin
     checkData(compile, jsonRaw)
+  }
+
+  it should "encode/decode BuildContract" in {
+    val publicKey = PublicKey.generate
+    val buildContract = BuildContract(
+      fromPublicKey = publicKey,
+      code = "0000",
+      gas = Some(GasBox.unsafe(1)),
+      gasPrice = Some(GasPrice(1)),
+      state = Some("10u"),
+      issueTokenAmount = Some(Amount(1))
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "fromPublicKey": "${publicKey.toHexString}",
+         |  "code": "0000",
+         |  "gas": 1,
+         |  "gasPrice": "1",
+         |  "state": "10u",
+         |  "issueTokenAmount": "1"
+         |}
+         |""".stripMargin
+    checkData(buildContract, jsonRaw)
+  }
+
+  it should "encode/decode BuildContractResult" in {
+    val txId       = Hash.generate
+    val contractId = Hash.generate
+    val buildContractResult = BuildContractResult(
+      unsignedTx = "0000",
+      hash = txId,
+      contractId = contractId,
+      fromGroup = 2,
+      toGroup = 3
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "unsignedTx": "0000",
+         |  "hash": "${txId.toHexString}",
+         |  "contractId": "${contractId.toHexString}",
+         |  "fromGroup": 2,
+         |  "toGroup": 3
+         |}
+         |""".stripMargin
+    checkData(buildContractResult, jsonRaw)
+  }
+
+  it should "encode/decode BuildScript" in {
+    val publicKey = PublicKey.generate
+    val buildScript = BuildScript(
+      fromPublicKey = publicKey,
+      code = "0000",
+      gas = Some(GasBox.unsafe(1)),
+      gasPrice = Some(GasPrice(1))
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "fromPublicKey": "${publicKey.toHexString}",
+         |  "code": "0000",
+         |  "gas": 1,
+         |  "gasPrice": "1"
+         |}
+         |""".stripMargin
+    checkData(buildScript, jsonRaw)
+  }
+
+  it should "encode/decode BuildScriptResult" in {
+    val txId = Hash.generate
+    val buildScriptResult = BuildScriptResult(
+      unsignedTx = "0000",
+      hash = txId,
+      fromGroup = 1,
+      toGroup = 2
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "unsignedTx": "0000",
+         |  "hash": "${txId.toHexString}",
+         |  "fromGroup": 1,
+         |  "toGroup": 2
+         |}
+         |""".stripMargin
+    checkData(buildScriptResult, jsonRaw)
   }
 }
