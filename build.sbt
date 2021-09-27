@@ -327,7 +327,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.13.5",
+  scalaVersion := "2.13.6",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
