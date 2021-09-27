@@ -617,18 +617,9 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileContract(query: Compile.Contract): FutureTry[CompileResult] = {
     Future.successful(
-      (for {
-        code  <- Compiler.compileContract(query.code)
-        state <- parseState(query.state)
-        script <- buildContract(
-          code,
-          query.address,
-          state,
-          dustUtxoAmount,
-          query.issueTokenAmount.map(_.value)
-        )
-      } yield script)
-        .map(script => CompileResult(Hex.toHexString(serialize(script))))
+      Compiler
+        .compileContract(query.code)
+        .map(contract => CompileResult(Hex.toHexString(serialize(contract))))
         .left
         .map(error => failed(error.toString))
     )

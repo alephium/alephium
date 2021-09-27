@@ -337,24 +337,13 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val compileContractExamples: List[Example[Compile.Contract]] = List(
-    defaultExample(
+  implicit val compileContractExamples: List[Example[Compile.Contract]] =
+    simpleExample(
       Compile.Contract(
-        address,
         code =
           "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
-    ),
-    moreSettingsExample(
-      Compile.Contract(
-        address,
-        code =
-          "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
-        state = Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
-        issueTokenAmount = Some(twoAlf)
-      )
     )
-  )
 
   implicit val compileResultExamples: List[Example[CompileResult]] =
     simpleExample(CompileResult(code = hexString))
