@@ -89,10 +89,13 @@ object ValidationStatus {
     }
   }
 
-  private[validation] def fromExeResult[T](result: ExeResult[T]): TxValidationResult[T] =
+  private[validation] def fromExeResult[T](
+      result: ExeResult[T],
+      wrapper: ExeFailure => InvalidTxStatus
+  ): TxValidationResult[T] =
     result match {
       case Right(value)       => validTx(value)
-      case Left(Right(error)) => invalidTx(TxScriptExeFailed(error))
+      case Left(Right(error)) => invalidTx(wrapper(error))
       case Left(Left(error))  => Left(Left(error.error))
     }
 
@@ -145,8 +148,10 @@ final case class InvalidUnlockScript(error: ExeFailure)         extends InvalidT
 final case object CreateContractWithOldId                       extends InvalidTxStatus
 final case class WorldStateIOError(error: IOError)              extends InvalidTxStatus
 final case object UnexpectedTxScript                            extends InvalidTxStatus
+final case class UnlockScriptExeFailed(error: ExeFailure)       extends InvalidTxStatus
 final case class TxScriptExeFailed(error: ExeFailure)           extends InvalidTxStatus
 final case object ContractInputsShouldBeEmptyForFailedTxScripts extends InvalidTxStatus
 final case object InvalidContractInputs                         extends InvalidTxStatus
 final case object InvalidGeneratedOutputs                       extends InvalidTxStatus
 final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus
+final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus

@@ -202,6 +202,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
         Transaction(
           unsignedTx,
+          scriptExecutionOk = true,
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           inputSignatures = AVector(signature),
@@ -228,6 +229,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
         Transaction(
           unsignedTx,
+          scriptExecutionOk = true,
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           inputSignatures = AVector(signature),
@@ -270,6 +272,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
         Transaction(
           unsignedTx,
+          scriptExecutionOk = true,
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           inputSignatures = AVector(signature),
@@ -312,6 +315,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
         Transaction(
           unsignedTx,
+          scriptExecutionOk = true,
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           inputSignatures = AVector(signature),
@@ -358,6 +362,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators with NetworkCon
 
         Transaction(
           unsignedTx,
+          scriptExecutionOk = true,
           contractInputs = AVector(
             ContractOutputRef.unsafe(
               Hint.unsafe(-1038667620),

@@ -376,6 +376,7 @@ object FlowUtils {
   def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
     Transaction(
       txTemplate.unsigned,
+      scriptExecutionOk = true,
       AVector.empty,
       AVector.empty,
       txTemplate.inputSignatures,
@@ -389,6 +390,7 @@ object FlowUtils {
   ): Transaction = {
     Transaction(
       txTemplate.unsigned,
+      scriptExecutionOk = true,
       result.contractInputs,
       result.generatedOutputs,
       txTemplate.inputSignatures,
@@ -409,6 +411,7 @@ object FlowUtils {
       } yield {
         Transaction(
           txTemplate.unsigned,
+          scriptExecutionOk = false,
           AVector.empty,
           generatedOutputs = outputs,
           txTemplate.inputSignatures,
@@ -419,6 +422,7 @@ object FlowUtils {
       Some(
         Transaction(
           txTemplate.unsigned,
+          scriptExecutionOk = false,
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           txTemplate.inputSignatures,

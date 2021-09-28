@@ -1077,6 +1077,7 @@ class VMSpec extends AlephiumSpec {
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex))
     blockTemplate.transactions.length is 12
+    blockTemplate.transactions.filter(_.scriptExecutionOk == false).length is 5
     val block = mine(blockFlow, blockTemplate)
     addAndCheck0(blockFlow, block)
     checkContract(ALF.cent(95), 5)

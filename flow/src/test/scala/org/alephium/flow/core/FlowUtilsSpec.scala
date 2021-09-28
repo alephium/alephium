@@ -57,6 +57,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script).rightValue is
         Transaction(
           unsignedTx,
+          scriptExecutionOk = false,
           AVector.empty,
           (firstOutput +: assets.tail.map(_.referredOutput.copy(additionalData = ByteString.empty)))
             .as[TxOutput],

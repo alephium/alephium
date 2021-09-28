@@ -23,7 +23,8 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.{ALF, Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => _, _}
+import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => VMOutOfGas, _}
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
@@ -83,24 +84,32 @@ trait TxValidation {
   ): TxValidationResult[Transaction] = {
     val stagingWorldState = groupView.worldState.staging()
     for {
-      exeResult <- executeTxScript(
-        tx,
-        script,
-        tx.unsigned.gasAmount,
-        stagingWorldState,
-        preOutputs,
-        blockEnv
+      gasRemaining0 <- tx.unsigned.gasAmount
+        .sub(GasCall.scriptBaseGas(script.bytes.length))
+        .toRight(Right(OutOfGas))
+      scriptBaseGas = tx.unsigned.gasAmount.subUnsafe(gasRemaining0)
+      exeResult <- fromExeResult(
+        StatefulVM.runTxScript(
+          stagingWorldState,
+          blockEnv,
+          tx,
+          preOutputs,
+          script,
+          gasRemaining0
+        ),
+        TxScriptExeFailed.apply
       )
-      exeGas       = tx.unsigned.gasAmount.subUnsafe(exeResult.gasBox)
+      exeGas       = gasRemaining0.subUnsafe(exeResult.gasBox)
       successfulTx = FlowUtils.convertSuccessfulTx(tx, exeResult)
       _ <- checkStateless(chainIndex, successfulTx, checkDoubleSpending = false) // checked already
-      gasRemaining <- checkStatefulExceptTxScript(
+      gasRemaining1 <- checkStatefulExceptTxScript(
         successfulTx,
         blockEnv,
         preOutputs.as[TxOutput] ++ exeResult.contractPrevOutputs,
         None
       )
-      _ <- fromExeResult(gasRemaining.use(exeGas))
+      gasRemaining2 <- gasRemaining1.sub(scriptBaseGas).toRight(Right(OutOfGas))
+      _             <- gasRemaining2.sub(exeGas).toRight(Right(TxScriptExeFailed(VMOutOfGas)))
     } yield {
       stagingWorldState.commit()
       successfulTx
@@ -299,13 +308,6 @@ trait TxValidation {
       worldState: WorldState.Cached,
       preOutputs: AVector[AssetOutput],
       blockEnv: BlockEnv): TxValidationResult[GasBox]
-  protected[validation] def executeTxScript(
-      tx: TransactionAbstract,
-      script: StatefulScript,
-      gasRemaining: GasBox,
-      worldState: WorldState.Staging,
-      preAssetOutputs: AVector[AssetOutput],
-      blockEnv: BlockEnv): TxValidationResult[StatefulVM.TxScriptExecution]
   // format: on
 }
 
@@ -578,7 +580,7 @@ object TxValidation {
       val inputGas      = GasSchedule.txInputBaseGas.mulUnsafe(tx.unsigned.inputs.length)
       val outputGas     = GasSchedule.txOutputBaseGas.mulUnsafe(tx.unsigned.fixedOutputs.length)
       val totalBasicGas = GasSchedule.txBaseGas.addUnsafe(inputGas).addUnsafe(outputGas)
-      fromExeResult(gasRemaining.use(totalBasicGas))
+      gasRemaining.sub(totalBasicGas).toRight(Right(OutOfGas))
     }
 
     protected[validation] def checkWitnesses(
@@ -707,11 +709,14 @@ object TxValidation {
       if (script.hash != expectedScriptHash) {
         invalidTx(InvalidScriptHash)
       } else {
-        fromExeResult(for {
-          remaining0 <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
-          remaining1 <- remaining0.use(GasHash.gas(script.bytes.length))
-          result     <- StatelessVM.runAssetScript(blockEnv, txEnv, remaining1, script, params)
-        } yield result.gasRemaining)
+        fromExeResult(
+          for {
+            remaining0 <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
+            remaining1 <- remaining0.use(GasHash.gas(script.bytes.length))
+            exeResult  <- StatelessVM.runAssetScript(blockEnv, txEnv, remaining1, script, params)
+          } yield exeResult.gasRemaining,
+          UnlockScriptExeFailed.apply
+        )
       }
     }
 
@@ -727,34 +732,59 @@ object TxValidation {
         tx.unsigned.scriptOpt match {
           case Some(script) =>
             val stagingWorldState = worldState.staging()
-            executeTxScript(tx, script, gasRemaining, stagingWorldState, preAssetOutputs, blockEnv)
-              .flatMap {
-                case StatefulVM.TxScriptExecution(remaining, contractInputs, _, generatedOutputs) =>
-                  if (contractInputs != tx.contractInputs) {
-                    invalidTx(InvalidContractInputs)
-                  } else if (generatedOutputs != tx.generatedOutputs) {
-                    invalidTx(InvalidGeneratedOutputs)
-                  } else {
-                    stagingWorldState.commit()
-                    validTx(remaining)
-                  }
-              }
-          case None => validTx(gasRemaining)
+            executeTxScript(
+              tx,
+              script,
+              gasRemaining,
+              stagingWorldState,
+              preAssetOutputs,
+              blockEnv
+            ) match {
+              case Right(TxScriptExecution(remaining, contractInputs, _, generatedOutputs)) =>
+                if (contractInputs != tx.contractInputs) {
+                  invalidTx(InvalidContractInputs)
+                } else if (generatedOutputs != tx.generatedOutputs) {
+                  invalidTx(InvalidGeneratedOutputs)
+                } else {
+                  stagingWorldState.commit()
+                  checkScriptExeFlag(tx, true, remaining)
+                }
+              case Left(Right(_)) =>
+                checkScriptExeFlag(tx, false, GasBox.zero)
+              case Left(Left(ioFalure)) => Left(Left(ioFalure.error))
+            }
+          case None => checkScriptExeFlag(tx, true, gasRemaining)
         }
       } else {
-        if (tx.unsigned.scriptOpt.nonEmpty) invalidTx(UnexpectedTxScript) else validTx(gasRemaining)
+        if (tx.unsigned.scriptOpt.nonEmpty) {
+          invalidTx(UnexpectedTxScript)
+        } else {
+          checkScriptExeFlag(tx, true, gasRemaining)
+        }
       }
     }
 
-    protected[validation] def executeTxScript(
+    private def checkScriptExeFlag[T](
+        tx: Transaction,
+        expectedScriptExeOk: Boolean,
+        result: T
+    ): TxValidationResult[T] = {
+      if (tx.scriptExecutionOk == expectedScriptExeOk) {
+        validTx(result)
+      } else {
+        invalidTx(InvalidScriptExecutionFlag)
+      }
+    }
+
+    private def executeTxScript(
         tx: TransactionAbstract,
         script: StatefulScript,
         gasRemaining: GasBox,
         worldState: WorldState.Staging,
         preAssetOutputs: AVector[AssetOutput],
         blockEnv: BlockEnv
-    ): TxValidationResult[StatefulVM.TxScriptExecution] = {
-      fromExeResult(for {
+    ): ExeResult[StatefulVM.TxScriptExecution] = {
+      for {
         remaining <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
         result <-
           StatefulVM.runTxScript(
@@ -765,7 +795,7 @@ object TxValidation {
             script,
             remaining
           )
-      } yield result)
+      } yield result
     }
   }
   // scalastyle:on number.of.methods
