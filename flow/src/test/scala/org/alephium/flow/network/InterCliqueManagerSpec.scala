@@ -116,12 +116,12 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     )
 
     val broker = relevantBrokerInfo()
-    EventFilter.warning(start = "Too many inbound connections", occurrences = 0).intercept {
+    EventFilter.info(start = "Too many inbound connections", occurrences = 0).intercept {
       interCliqueManagerActor.handleNewBroker(broker, InboundConnection)
     }
 
     val newBroker = newBrokerInfo(broker)
-    EventFilter.warning(start = "Too many inbound connections", occurrences = 1).intercept {
+    EventFilter.info(start = "Too many inbound connections", occurrences = 1).intercept {
       val probe = TestProbe()
       watch(probe.ref)
       probe.send(interCliqueManager, CliqueManager.HandShaked(newBroker, InboundConnection))
@@ -135,12 +135,12 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     )
 
     val broker = relevantBrokerInfo()
-    EventFilter.warning(start = "Too many outbound connections", occurrences = 0).intercept {
+    EventFilter.info(start = "Too many outbound connections", occurrences = 0).intercept {
       interCliqueManagerActor.handleNewBroker(broker, OutboundConnection)
     }
 
     val newBroker = newBrokerInfo(broker)
-    EventFilter.warning(start = "Too many outbound connections", occurrences = 1).intercept {
+    EventFilter.info(start = "Too many outbound connections", occurrences = 1).intercept {
       val probe = TestProbe()
       watch(probe.ref)
       probe.send(interCliqueManager, CliqueManager.HandShaked(newBroker, OutboundConnection))
