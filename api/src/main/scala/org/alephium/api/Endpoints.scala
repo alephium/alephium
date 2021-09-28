@@ -100,6 +100,11 @@ trait Endpoints
       .in("blockflow")
       .tag("Blockflow")
 
+  private val utilsEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("utils")
+      .tag("Utils")
+
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
       .in("node")
@@ -327,6 +332,13 @@ trait Endpoints
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockHeaderEntry])
       .summary("Get block header")
+
+  val verifySignature: BaseEndpoint[VerifySignature, Boolean] =
+    utilsEndpoint.post
+      .in("verify-signature")
+      .in(jsonBody[VerifySignature])
+      .out(jsonBody[Boolean])
+      .summary("Verify the SecP256K1 signature of some data")
 }
 
 object Endpoints {

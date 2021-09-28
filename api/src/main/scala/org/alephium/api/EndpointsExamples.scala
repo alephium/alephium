@@ -408,5 +408,8 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
+
+  implicit val verifySignatureExamples: List[Example[VerifySignature]] =
+    simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 }
 // scalastyle:on magic.number

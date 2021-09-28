@@ -680,4 +680,21 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
          |""".stripMargin
     checkData(buildScriptResult, jsonRaw)
   }
+
+  it should "encode/decode VerifySignature" in {
+    val data      = Hash.generate.bytes
+    val publicKey = PublicKey.generate
+    val signature = Signature.generate
+
+    val verifySignature =
+      VerifySignature(data, signature, publicKey)
+    val jsonRaw = s"""
+        |{
+        |  "data": "${Hex.toHexString(data)}",
+        |  "signature": "${signature.toHexString}",
+        |  "publicKey": "${publicKey.toHexString}"
+        |}
+        """.stripMargin
+    checkData(verifySignature, jsonRaw)
+  }
 }

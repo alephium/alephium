@@ -27,7 +27,7 @@ import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -605,6 +605,10 @@ class ServerUtils(implicit
         query.gasPrice
       ).left.map(error => badRequest(error.toString))
     } yield utx).map(BuildContractResult.from))
+  }
+
+  def verifySignature(query: VerifySignature): Try[Boolean] = {
+    Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

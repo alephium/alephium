@@ -443,6 +443,10 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     serverUtils.buildContract(blockFlow, query)
   }
 
+  val verifySignatureLogic = serverLogic(verifySignature) { query =>
+    Future.successful(serverUtils.verifySignature(query))
+  }
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     //Run the export in background
     Future.successful(

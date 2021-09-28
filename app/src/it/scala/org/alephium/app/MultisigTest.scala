@@ -20,7 +20,7 @@ import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
-import org.alephium.protocol.{PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
@@ -167,6 +167,26 @@ class MultisigTest extends AlephiumActorSpec {
 
     val signature2: Signature =
       request[Sign.Result](sign(walletName, buildTxResult.txId.toHexString), restPort).signature
+
+    request[Boolean](
+      verify(buildTxResult.txId.toHexString, signature1, publicKey),
+      restPort
+    ) is true
+
+    request[Boolean](
+      verify(buildTxResult.txId.toHexString, signature2, publicKey2),
+      restPort
+    ) is true
+
+    request[Boolean](
+      verify(buildTxResult.txId.toHexString, signature2, publicKey),
+      restPort
+    ) is false
+
+    request[Boolean](
+      verify(Hash.generate.toHexString, signature1, publicKey),
+      restPort
+    ) is false
 
     val submitMultisigTx =
       submitMultisigTransaction(buildTxResult, AVector(signature1, signature2))

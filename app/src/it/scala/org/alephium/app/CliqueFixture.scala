@@ -449,6 +449,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def verify(data: String, signature: Signature, publicKey: String) = {
+    httpPost(
+      s"/utils/verify-signature",
+      Some(
+        s"""{"data":"$data","signature":"${signature.toHexString}","publicKey":"${publicKey}"}"""
+      )
+    )
+  }
+
   def submitTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,

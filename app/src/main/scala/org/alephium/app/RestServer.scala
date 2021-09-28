@@ -95,6 +95,7 @@ class RestServer(
       compileContractLogic,
       buildContractLogic,
       exportBlocksLogic,
+      verifySignatureLogic,
       metricsLogic
     ).map(route(_)) :+ swaggerUiRoute
 

@@ -305,6 +305,8 @@ trait ApiModelCodec {
     }
   }
 
+  implicit val verifySignatureRW: RW[VerifySignature] = macroRW
+
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)
 
