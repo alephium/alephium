@@ -87,11 +87,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
         val outputRef = nextContractOutputRef(contractOutput)
-        generatedOutputs.addOne(output)
         for {
           _ <- chargeGeneratedOutput()
           _ <- updateContractAsset(contractId, outputRef, contractOutput)
-        } yield ()
+        } yield {
+          generatedOutputs.addOne(output)
+          ()
+        }
       case _ =>
         generatedOutputs.addOne(output)
         chargeGeneratedOutput()
