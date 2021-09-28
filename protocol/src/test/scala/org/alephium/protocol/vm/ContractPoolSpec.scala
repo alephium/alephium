@@ -16,10 +16,12 @@
 
 package org.alephium.protocol.vm
 
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{ALF, Hash}
-import org.alephium.protocol.model.{ContractId, ContractOutput, ContractOutputRef}
+import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
+import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
 
 class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
@@ -156,5 +158,27 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.checkAllAssetsFlushed() is failed(EmptyContractAsset)
     pool.markAssetFlushed(contractId1) isE ()
     pool.checkAllAssetsFlushed() isE ()
+  }
+
+  it should "use contract assets" in new Fixture
+    with TxGenerators
+    with GroupConfigFixture.Default
+    with NetworkConfigFixture.Default {
+    val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
+    val contractId = outputRef.key
+    val output     = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
+    pool.worldState.createContractUnsafe(
+      StatefulContract.forSMT,
+      Hash.zero,
+      AVector.empty,
+      outputRef,
+      output
+    ) isE ()
+
+    pool.gasRemaining is initialGas
+    pool.worldState.getOutputOpt(outputRef).rightValue.nonEmpty is true
+    pool.useContractAsset(contractId).isRight is true
+    initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
+    pool.worldState.getOutputOpt(outputRef) isE None
   }
 }
