@@ -153,9 +153,9 @@ class BlockChainHandler(
 
   override def addDataToBlockFlow(
       block: Block,
-      sideResult: Option[WorldState.Cached]
+      validationSideEffect: Option[WorldState.Cached]
   ): IOResult[Unit] = {
-    blockFlow.add(block, sideResult)
+    blockFlow.add(block, validationSideEffect)
   }
 
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {

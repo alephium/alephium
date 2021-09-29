@@ -116,9 +116,10 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     chainValidationDurationMilliSecondsLabeled.observe(elapsedMilliSeconds)
 
     validationResult match {
-      case Left(Left(e))     => handleIOError(data, broker, e)
-      case Left(Right(x))    => handleInvalidData(data, broker, origin, x)
-      case Right(sideResult) => handleValidData(data, sideResult, broker, origin)
+      case Left(Left(e))  => handleIOError(data, broker, e)
+      case Left(Right(x)) => handleInvalidData(data, broker, origin, x)
+      case Right(validationSideEffect) =>
+        handleValidData(data, validationSideEffect, broker, origin)
     }
   }
 
@@ -156,7 +157,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
 
   def handleValidData(
       data: T,
-      sideResult: R,
+      validationSideEffect: R,
       broker: ActorRefT[ChainHandler.Event],
       origin: DataOrigin
   ): Unit = {
@@ -165,7 +166,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
       case Right(true) =>
         log.debug(s"Block/Header ${data.shortHex} exists already")
       case Right(false) =>
-        addDataToBlockFlow(data, sideResult) match {
+        addDataToBlockFlow(data, validationSideEffect) match {
           case Left(error) => handleIOError(error)
           case Right(_) =>
             publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
@@ -177,7 +178,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     }
   }
 
-  def addDataToBlockFlow(data: T, result: R): IOResult[Unit]
+  def addDataToBlockFlow(data: T, validationSideEffect: R): IOResult[Unit]
 
   def notifyBroker(broker: ActorRefT[ChainHandler.Event], data: T): Unit
 

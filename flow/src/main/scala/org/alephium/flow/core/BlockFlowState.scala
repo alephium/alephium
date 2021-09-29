@@ -438,6 +438,7 @@ object BlockFlowState {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
+      // note that script execution is already done in validation
       block.transactions.foreachE { tx =>
         updateStateForInOutBlock(worldState, tx, targetGroup, block.timestamp)
       }

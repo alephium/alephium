@@ -1004,7 +1004,7 @@ class VMSpec extends AlephiumSpec {
     contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
   }
 
-  it should "call a contract multiple times in a block" in new ContractFixture {
+  it should "be able to call a contract multiple times in a block" in new ContractFixture {
     val testContract =
       s"""
         |TxContract Foo(mut x: U256) {
