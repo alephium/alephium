@@ -667,13 +667,20 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       if (unlock.indexedPublicKeys.length != lock.m) {
         invalidTx(InvalidNumberOfPublicKey)
+      } else if (!UnlockScript.validateP2mpkh(unlock)) {
+        invalidTx(InvalidP2mpkhUnlockScript)
       } else {
         unlock.indexedPublicKeys
           .foldE(gasRemaining) { case (gasBox, (publicKey, index)) =>
-            if (!lock.pkHashes.get(index).contains(Hash.hash(publicKey.bytes))) {
-              invalidTx(InvalidPublicKeyHash)
-            } else {
-              checkSignature(txEnv, gasBox, publicKey)
+            lock.pkHashes.get(index) match {
+              case Some(pkHash) =>
+                if (Hash.hash(publicKey.bytes) != pkHash) {
+                  invalidTx(InvalidPublicKeyHash)
+                } else {
+                  checkSignature(txEnv, gasBox, publicKey)
+                }
+              case None =>
+                invalidTx(InvalidP2mpkhUnlockScript)
             }
           }
       }
