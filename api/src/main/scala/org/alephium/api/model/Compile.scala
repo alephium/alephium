@@ -16,13 +16,8 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.Address
-
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Compile(
-    address: Address,
-    `type`: String,
-    code: String,
-    state: Option[String] = None,
-    issueTokenAmount: Option[Amount] = None
-)
+object Compile {
+  // use different type to avoid ambiguous implicit values in endpoint examples
+  final case class Script(code: String)   extends AnyVal
+  final case class Contract(code: String) extends AnyVal
+}

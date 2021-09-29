@@ -237,7 +237,8 @@ object Compiler {
     }
 
     def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): FuncInfo[Ctx] = {
-      contractTable(typeId)
+      contractTable
+        .getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
         .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
     }
 

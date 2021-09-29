@@ -16,6 +16,13 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 
-final case class SubmitContract(code: String, tx: String, signature: Signature, fromGroup: Int)
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildScript(
+    fromPublicKey: PublicKey,
+    code: String,
+    gas: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None
+)

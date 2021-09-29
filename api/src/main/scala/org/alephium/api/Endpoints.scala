@@ -281,26 +281,33 @@ trait Endpoints
       .in(jsonBody[MinerAddresses])
       .summary("Update miner's addresses")
 
-  val compile: BaseEndpoint[Compile, CompileResult] =
+  val compileScript: BaseEndpoint[Compile.Script, CompileResult] =
     contractsEndpoint.post
-      .in("compile")
-      .in(jsonBody[Compile])
+      .in("compile-script")
+      .in(jsonBody[Compile.Script])
+      .out(jsonBody[CompileResult])
+      .summary("Compile a script")
+
+  val buildScript: BaseEndpoint[BuildScript, BuildScriptResult] =
+    contractsEndpoint.post
+      .in("build-script")
+      .in(jsonBody[BuildScript])
+      .out(jsonBody[BuildScriptResult])
+      .summary("Build an unsigned script")
+
+  val compileContract: BaseEndpoint[Compile.Contract, CompileResult] =
+    contractsEndpoint.post
+      .in("compile-contract")
+      .in(jsonBody[Compile.Contract])
       .out(jsonBody[CompileResult])
       .summary("Compile a smart contract")
 
   val buildContract: BaseEndpoint[BuildContract, BuildContractResult] =
     contractsEndpoint.post
-      .in("build")
+      .in("build-contract")
       .in(jsonBody[BuildContract])
       .out(jsonBody[BuildContractResult])
       .summary("Build an unsigned contract")
-
-  val submitContract: BaseEndpoint[SubmitContract, TxResult] =
-    contractsEndpoint.post
-      .in("submit")
-      .in(jsonBody[SubmitContract])
-      .out(jsonBody[TxResult])
-      .summary("Submit a signed smart contract")
 
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post

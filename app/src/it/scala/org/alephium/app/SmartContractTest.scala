@@ -16,13 +16,45 @@
 
 package org.alephium.app
 
+import sttp.model.StatusCode
+
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.TxOutputRef
 import org.alephium.util._
 
 class SmartContractTest extends AlephiumActorSpec {
+
+  it should "compile contract failed when have invalid state length" in new CliqueFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    val clique                = bootClique(1)
+    clique.start()
+
+    val restPort = clique.masterRestPort
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val compileResult = request[CompileResult](compileContract(contract), restPort)
+    unitRequest(
+      buildContract(publicKey, compileResult.code),
+      restPort
+    )
+
+    val invalidState: Option[String] = Some("[1000u]")
+    requestFailed(
+      buildContract(publicKey, compileResult.code, state = invalidState),
+      restPort,
+      StatusCode.BadRequest
+    )
+
+    clique.stop()
+  }
 
   it should "compile/execute smart contracts" in new CliqueFixture {
 
@@ -36,57 +68,47 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def contract(
         code: String,
-        state: Option[String] = None,
-        issueTokenAmount: Option[U256]
-    ): Hash = {
-      execute("contract", code, state, issueTokenAmount)
-    }
-    def script(code: String): Hash = {
-      execute("script", code, None, None)
-    }
-    def execute(
-        tpe: String,
-        code: String,
         state: Option[String],
         issueTokenAmount: Option[U256]
     ): Hash = {
-      val compileResult = request[CompileResult](
-        compileFilang(s"""
-          {
-            "type": "$tpe",
-            "address": "$address",
-            "code": ${ujson.Str(code)}
-            ${state.map(s => s""","state": "$s"""").getOrElse("")}
-            ${issueTokenAmount.map(v => s""","issueTokenAmount":"${v.v}"""").getOrElse("")}
-          }"""),
-        restPort
-      )
-
+      val compileResult = request[CompileResult](compileContract(code), restPort)
       val buildResult = request[BuildContractResult](
-        buildContract(s"""
-        {
-          "fromPublicKey": "$publicKey",
-          "code": "${compileResult.code}",
-          "gas": 100000
-        }"""),
+        buildContract(
+          fromPublicKey = publicKey,
+          code = compileResult.code,
+          state = state,
+          issueTokenAmount = issueTokenAmount
+        ),
         restPort
       )
+      submitTx(buildResult.unsignedTx, buildResult.hash)
+      buildResult.contractId
+    }
 
+    def submitTx(unsignedTx: String, txId: Hash) = {
       val signature: Signature =
-        SignatureSchema.sign(buildResult.hash.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
+        SignatureSchema.sign(txId.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
       val tx = request[TxResult](
-        submitContract(s"""
+        submitTransaction(s"""
           {
-            "tx": "${buildResult.unsignedTx}",
-            "code": "${compileResult.code}",
-            "fromGroup": ${group.group},
+            "unsignedTx": "$unsignedTx",
             "signature":"${signature.toHexString}"
           }"""),
         restPort
       )
       confirmTx(tx, restPort)
+    }
 
-      TxOutputRef.key(tx.txId, 0)
+    def script(code: String) = {
+      val compileResult = request[CompileResult](compileScript(code), restPort)
+      val buildResult = request[BuildScriptResult](
+        buildScript(
+          fromPublicKey = publicKey,
+          code = compileResult.code
+        ),
+        restPort
+      )
+      submitTx(buildResult.unsignedTx, buildResult.hash)
     }
 
     request[Balance](getBalance(address), restPort) is initialBalance
@@ -103,7 +125,8 @@ class SmartContractTest extends AlephiumActorSpec {
       |}
       """.stripMargin
 
-    val tokenContractKey = contract(tokenContract, issueTokenAmount = Some(1024))
+    val tokenContractKey =
+      contract(tokenContract, state = Some("[0u]"), issueTokenAmount = Some(1024))
 
     script(s"""
       |TxScript Main {

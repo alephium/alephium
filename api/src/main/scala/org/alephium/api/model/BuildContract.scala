@@ -24,5 +24,7 @@ final case class BuildContract(
     fromPublicKey: PublicKey,
     code: String,
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+    gasPrice: Option[GasPrice] = None,
+    state: Option[String] = None,
+    issueTokenAmount: Option[Amount] = None
 )
