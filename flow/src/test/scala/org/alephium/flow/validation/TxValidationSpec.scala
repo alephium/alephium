@@ -673,7 +673,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     passValidation(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
-    failValidation(validateTxOnlyForTest(tx1, blockFlow), TxScriptExeFailed(AssertionFailed))
+    failValidation(validateTxOnlyForTest(tx1, blockFlow), UnlockScriptExeFailed(AssertionFailed))
     val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
     val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
     failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidScriptHash)

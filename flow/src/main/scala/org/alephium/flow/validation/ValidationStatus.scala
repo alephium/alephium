@@ -89,7 +89,7 @@ object ValidationStatus {
     }
   }
 
-  private[validation] def fromExeResult[T](
+  @inline private[validation] def fromExeResult[T](
       result: ExeResult[T],
       wrapper: ExeFailure => InvalidTxStatus
   ): TxValidationResult[T] =
@@ -98,6 +98,13 @@ object ValidationStatus {
       case Left(Right(error)) => invalidTx(wrapper(error))
       case Left(Left(error))  => Left(Left(error.error))
     }
+
+  @inline private[validation] def fromOption[T](
+      result: Option[T],
+      error: InvalidTxStatus
+  ): TxValidationResult[T] = {
+    result.toRight(Right(error))
+  }
 
   private[validation] def convert[T](x: Either[Either[IOError, T], Unit], default: T): IOResult[T] =
     x match {

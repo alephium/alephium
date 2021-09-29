@@ -27,7 +27,7 @@ import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => VMOutOfGas, 
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 trait TxValidation {
   import ValidationStatus._
 
@@ -83,11 +83,9 @@ trait TxValidation {
       preOutputs: AVector[AssetOutput]
   ): TxValidationResult[Transaction] = {
     val stagingWorldState = groupView.worldState.staging()
+    val scriptBaseGas     = GasCall.scriptBaseGas(script.bytes.length)
     for {
-      gasRemaining0 <- tx.unsigned.gasAmount
-        .sub(GasCall.scriptBaseGas(script.bytes.length))
-        .toRight(Right(OutOfGas))
-      scriptBaseGas = tx.unsigned.gasAmount.subUnsafe(gasRemaining0)
+      gasRemaining0 <- fromOption(tx.unsigned.gasAmount.sub(scriptBaseGas), OutOfGas)
       exeResult <- fromExeResult(
         StatefulVM.runTxScript(
           stagingWorldState,
@@ -108,8 +106,8 @@ trait TxValidation {
         preOutputs.as[TxOutput] ++ exeResult.contractPrevOutputs,
         None
       )
-      gasRemaining2 <- gasRemaining1.sub(scriptBaseGas).toRight(Right(OutOfGas))
-      _             <- gasRemaining2.sub(exeGas).toRight(Right(TxScriptExeFailed(VMOutOfGas)))
+      gasRemaining2 <- fromOption(gasRemaining1.sub(scriptBaseGas), OutOfGas)
+      _             <- fromOption(gasRemaining2.sub(exeGas), TxScriptExeFailed(VMOutOfGas))
     } yield {
       stagingWorldState.commit()
       successfulTx
@@ -655,7 +653,7 @@ object TxValidation {
           if (!SignatureSchema.verify(txEnv.tx.id.bytes, signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
-            gasRemaining.use(GasSchedule.p2pkUnlockGas).left.map(_ => Right(OutOfGas))
+            fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)
           }
         case Left(_) => invalidTx(NotEnoughSignature)
       }
