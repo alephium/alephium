@@ -31,8 +31,8 @@ class CostStrategySpec extends AlephiumSpec {
 
     test(_.chargeGas(Pop), 2)
     test(_.chargeGasWithSize(Blake2b, 33), 60)
-    test(_.chargeContractLoad(), 800)
-    test(_.chargeContractUpdate(), 5000)
+    test(_.chargeContractLoad(123), 800 + (123 + 7) / 8)
+    test(_.chargeContractUpdate(123), 5000 + (123 + 7) / 8)
     test(_.chargeGas(GasBox.unsafe(100)), 100)
   }
 }

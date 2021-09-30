@@ -114,7 +114,7 @@ object GasCreate {
 @Gas
 trait GasDestroy extends GasSimple
 object GasDestroy {
-  val gas: GasBox = GasBox.unsafe(5000)
+  val gas: GasBox = GasSchedule.txInputBaseGas
 }
 
 @Gas
@@ -136,16 +136,22 @@ trait GasLog extends GasFormula {
   def gas(n: Int): GasBox = GasLog.gas(n)
 }
 object GasLog {
-  val gasBase: Int    = 3
-  val gasPerData: Int = 1
+  val gasBase: Int    = 100
+  val gasPerData: Int = 20
 
   def gas(n: Int): GasBox = GasBox.unsafe(gasBase + gasPerData * n)
 }
 
 object GasSchedule {
-  val callGas: GasBox           = GasBox.unsafe(200)
-  val contractLoadGas: GasBox   = GasBox.unsafe(800)
-  val contractUpdateGas: GasBox = GasBox.unsafe(5000)
+  val callGas: GasBox = GasBox.unsafe(200)
+
+  def contractLoadGas(roughSize: Int): GasBox = {
+    GasBox.unsafe(800 + GasFormula.wordLength(roughSize))
+  }
+
+  def contractUpdateGas(roughSize: Int): GasBox = {
+    GasBox.unsafe(5000 + GasFormula.wordLength(roughSize))
+  }
 
   /*
    * The gas cost of a transaction consists of 4 parts

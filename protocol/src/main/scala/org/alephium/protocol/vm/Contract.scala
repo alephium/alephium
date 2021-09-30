@@ -353,6 +353,9 @@ final case class StatefulContractObject private (
   def getInitialStateHash(): Val.ByteVec = Val.ByteVec(initialStateHash.bytes)
 
   def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
+
+  def estimateByteSize(): Int =
+    fields.foldLeft(0)(_ + _.estimateByteSize()) + code.methodsBytes.length
 }
 
 object StatefulContractObject {
