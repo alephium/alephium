@@ -19,4 +19,4 @@ package org.alephium.wallet.api.model
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.Address
 
-final case class AddressInfo(address: Address.Asset, publicKey: PublicKey)
+final case class AddressInfo(address: Address.Asset, publicKey: PublicKey, group: Int)

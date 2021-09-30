@@ -118,7 +118,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       walletService
         .getPublicKey(wallet, address)
         .map { publicKey =>
-          model.AddressInfo(address, publicKey)
+          model.AddressInfo(address, publicKey, address.groupIndex.value)
         }
         .left
         .map(toApiError)

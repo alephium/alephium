@@ -340,6 +340,7 @@ class WalletAppSpec
       val addressInfo = response.as[model.AddressInfo]
       addressInfo.address is address
       addressInfo.publicKey is publicKey
+      addressInfo.group is 2
       response.code is StatusCode.Ok
     }
 
