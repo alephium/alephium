@@ -239,7 +239,7 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkNetworkId(tx)
-      _ <- checkInputNum(tx)
+      _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
       _ <- checkOutputAmount(tx)
@@ -286,7 +286,7 @@ trait TxValidation {
   // format off for the sake of reading and checking rules
   // format: off
   protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
   protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
@@ -327,8 +327,23 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
-      val inputNum = tx.unsigned.inputs.length
+    protected[validation] def checkInputNum(
+        tx: Transaction,
+        isIntraGroup: Boolean
+    ): TxValidationResult[Unit] = {
+      if (isIntraGroup) checkIntraGroupInputNum(tx) else checkInterGroupInputNum(tx)
+    }
+    protected[validation] def checkIntraGroupInputNum(tx: Transaction): TxValidationResult[Unit] = {
+      checkInputNumCommon(tx.inputsLength)
+    }
+    protected[validation] def checkInterGroupInputNum(tx: Transaction): TxValidationResult[Unit] = {
+      if (tx.contractInputs.nonEmpty) {
+        invalidTx(ContractInputForInterGroupTx)
+      } else {
+        checkInputNumCommon(tx.unsigned.inputs.length)
+      }
+    }
+    protected[validation] def checkInputNumCommon(inputNum: Int): TxValidationResult[Unit] = {
       // inputNum can be 0 due to coinbase tx
       if (inputNum > ALF.MaxTxInputNum) {
         invalidTx(TooManyInputs)

@@ -134,6 +134,26 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     failValidation(validateTxOnlyForTest(invalidTx, blockFlow), InvalidNetworkId)
   }
 
+  it should "check too many inputs" in new StatelessFixture {
+    val tx    = transactionGen().sample.get
+    val input = tx.unsigned.inputs.head
+
+    val modified0 =
+      tx.copy(unsigned = tx.unsigned.copy(inputs = AVector.fill(ALF.MaxTxInputNum)(input)))
+    passCheck(checkInputNum(modified0, isIntraGroup = false))
+    passCheck(checkInputNum(modified0, isIntraGroup = true))
+
+    val modified1 =
+      tx.copy(unsigned = tx.unsigned.copy(inputs = AVector.fill(ALF.MaxTxInputNum + 1)(input)))
+    failCheck(checkInputNum(modified1, isIntraGroup = false), TooManyInputs)
+    failCheck(checkInputNum(modified1, isIntraGroup = true), TooManyInputs)
+
+    val contractOutputRef = ContractOutputRef.unsafe(Hint.unsafe(1), Hash.zero)
+    val modified2         = tx.copy(contractInputs = AVector(contractOutputRef))
+    passCheck(checkInputNum(modified2, isIntraGroup = true))
+    failCheck(checkInputNum(modified2, isIntraGroup = false), ContractInputForInterGroupTx)
+  }
+
   it should "check empty outputs" in new StatelessFixture {
     forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
