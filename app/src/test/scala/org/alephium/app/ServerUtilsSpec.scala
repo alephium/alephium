@@ -452,25 +452,35 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  it should "not create transaction if gas fee is above cap" in new MultipleUtxos {
-    val outputRefs = utxos.map { utxo =>
-      OutputRef(utxo.ref.hint, utxo.ref.key)
-    }
+  it should "validate unsigned transaction" in new Fixture with TxInputGenerators {
 
-    val unsignedTx = serverUtils
-      .prepareUnsignedTransaction(
-        blockFlow,
-        fromPublicKey,
-        outputRefsOpt = Some(outputRefs),
-        destinations,
-        Some(minimalGas),
-        GasPrice(ALF.oneAlf)
-      )
-      .rightValue
+    val tooMuchGasFee = UnsignedTransaction(
+      NetworkId.AlephiumDevNet,
+      None,
+      minimalGas,
+      GasPrice(ALF.oneAlf),
+      AVector(txInputGen.sample.get),
+      AVector.empty
+    )
 
-    serverUtils.validateUnsignedTransaction(unsignedTx) is Left(
+    ServerUtils.validateUnsignedTransaction(tooMuchGasFee) is Left(
       ApiError.BadRequest(
         "Too much gas fee, cap at 1000000000000000000, got 20000000000000000000000"
+      )
+    )
+
+    val noInputs = UnsignedTransaction(
+      NetworkId.AlephiumDevNet,
+      None,
+      minimalGas,
+      defaultGasPrice,
+      AVector.empty,
+      AVector.empty
+    )
+
+    ServerUtils.validateUnsignedTransaction(noInputs) is Left(
+      ApiError.BadRequest(
+        "Invalid transaction: empty inputs"
       )
     )
   }

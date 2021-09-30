@@ -118,7 +118,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildTransaction
   ): Try[BuildTransactionResult] = {
-    val resultEither = for {
+    for {
       _ <- checkGroup(query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
@@ -128,13 +128,8 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
-      _ <- validateUnsignedTransaction(unsignedTx)
     } yield {
       BuildTransactionResult.from(unsignedTx)
-    }
-    resultEither match {
-      case Right(result) => Right(result)
-      case Left(error)   => Left(error)
     }
   }
 
@@ -142,7 +137,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildMultisig
   ): Try[BuildTransactionResult] = {
-    val resultEither = for {
+    for {
       _            <- checkGroup(query.fromAddress.lockupScript)
       unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
       unsignedTx <- prepareUnsignedTransaction(
@@ -153,13 +148,8 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
-      _ <- validateUnsignedTransaction(unsignedTx)
     } yield {
       BuildTransactionResult.from(unsignedTx)
-    }
-    resultEither match {
-      case Right(result) => Right(result)
-      case Left(error)   => Left(error)
     }
   }
 
@@ -195,7 +185,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildSweepAllTransaction
   ): Try[BuildTransactionResult] = {
-    val resultEither = for {
+    for {
       _ <- checkGroup(query.fromPublicKey)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
@@ -205,13 +195,8 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
-      _ <- validateUnsignedTransaction(unsignedTx)
     } yield {
       BuildTransactionResult.from(unsignedTx)
-    }
-    resultEither match {
-      case Right(result) => Right(result)
-      case Left(error)   => Left(error)
     }
   }
 
@@ -282,10 +267,12 @@ class ServerUtils(implicit
   def decodeUnsignedTransaction(
       unsignedTx: String
   ): Try[UnsignedTransaction] = {
-    Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex")).flatMap { txByteString =>
-      deserialize[UnsignedTransaction](txByteString).left
+    for {
+      txByteString <- Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex"))
+      unsignedTx <- deserialize[UnsignedTransaction](txByteString).left
         .map(serdeError => badRequest(serdeError.getMessage))
-    }
+      _ <- validateUnsignedTransaction(unsignedTx)
+    } yield unsignedTx
   }
 
   def decodeUnlockScript(
@@ -295,36 +282,6 @@ class ServerUtils(implicit
       deserialize[UnlockScript](unlockScriptBytes).left
         .map(serdeError => badRequest(serdeError.getMessage))
     }
-  }
-
-  private def validateUtxInputs(
-      unsignedTx: UnsignedTransaction
-  ): Try[Unit] = {
-    if (unsignedTx.inputs.nonEmpty) {
-      Right(())
-    } else {
-      Left(ApiError.BadRequest("Invalid transaction: empty inputs"))
-    }
-  }
-
-  private def validateUtxGasFee(
-      unsignedTx: UnsignedTransaction
-  ): Try[Unit] = {
-    val gasFee = unsignedTx.gasPrice * unsignedTx.gasAmount
-    if (gasFee <= apiConfig.gasFeeCap) {
-      Right(())
-    } else {
-      Left(ApiError.BadRequest(s"Too much gas fee, cap at ${apiConfig.gasFeeCap}, got $gasFee"))
-    }
-  }
-
-  def validateUnsignedTransaction(
-      unsignedTx: UnsignedTransaction
-  ): Try[Unit] = {
-    for {
-      _ <- validateUtxInputs(unsignedTx)
-      _ <- validateUtxGasFee(unsignedTx)
-    } yield ()
   }
 
   def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
@@ -433,7 +390,7 @@ class ServerUtils(implicit
     }
 
     transferResult match {
-      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
     }
@@ -448,7 +405,7 @@ class ServerUtils(implicit
       gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     blockFlow.sweepAll(fromPublicKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
-      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
     }
@@ -465,7 +422,7 @@ class ServerUtils(implicit
     val outputInfos = prepareOutputInfos(destinations)
 
     blockFlow.transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice) match {
-      case Right(Right(unsignedTransaction)) => Right(unsignedTransaction)
+      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
     }
@@ -577,16 +534,18 @@ class ServerUtils(implicit
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
-  ): ExeResult[UnsignedTransaction] = {
+  ): Try[UnsignedTransaction] = {
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
-    for {
-      balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => Left(IOErrorLoadOutputs(e)))
-      inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
-    } yield UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
-      gasAmount = gas.getOrElse(minimalGas),
-      gasPrice = gasPrice.getOrElse(defaultGasPrice)
-    )
+    (for {
+      balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => failedInIO(e))
+    } yield {
+      val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
+      UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
+        gasAmount = gas.getOrElse(minimalGas),
+        gasPrice = gasPrice.getOrElse(defaultGasPrice)
+      )
+    }).flatMap(validateUnsignedTransaction)
   }
 
   private def validateStateLength(
@@ -604,8 +563,11 @@ class ServerUtils(implicit
     Hex.from(str).toRight(badRequest("Cannot decode code hex string"))
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def buildContract(blockFlow: BlockFlow, query: BuildContract): FutureTry[BuildContractResult] = {
-    Future.successful((for {
+  def buildContract(
+      blockFlow: BlockFlow,
+      query: BuildContract
+  ): Try[BuildContractResult] = {
+    for {
       codeByteString <- decodeCodeHexString(query.code)
       contract <- deserialize[StatefulContract](codeByteString).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -626,9 +588,8 @@ class ServerUtils(implicit
         query.fromPublicKey,
         query.gas,
         query.gasPrice
-      ).left.map(error => badRequest(error.toString))
-      _ <- validateUnsignedTransaction(utx)
-    } yield utx).map(BuildContractResult.from))
+      )
+    } yield BuildContractResult.from(utx)
   }
 
   def verifySignature(query: VerifySignature): Try[Boolean] = {
@@ -636,8 +597,8 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def buildScript(blockFlow: BlockFlow, query: BuildScript): FutureTry[BuildScriptResult] = {
-    Future.successful((for {
+  def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
+    for {
       codeByteString <- decodeCodeHexString(query.code)
       script <- deserialize[StatefulScript](codeByteString).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -648,31 +609,26 @@ class ServerUtils(implicit
         query.fromPublicKey,
         query.gas,
         query.gasPrice
-      ).left.map(error => badRequest(error.toString))
-      _ <- validateUnsignedTransaction(utx)
-    } yield utx).map(BuildScriptResult.from))
+      )
+    } yield BuildScriptResult.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileScript(query: Compile.Script): FutureTry[CompileResult] = {
-    Future.successful(
-      Compiler
-        .compileTxScript(query.code)
-        .map(script => CompileResult(Hex.toHexString(serialize(script))))
-        .left
-        .map(error => failed(error.toString))
-    )
+  def compileScript(query: Compile.Script): Try[CompileResult] = {
+    Compiler
+      .compileTxScript(query.code)
+      .map(script => CompileResult(Hex.toHexString(serialize(script))))
+      .left
+      .map(error => failed(error.toString))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileContract(query: Compile.Contract): FutureTry[CompileResult] = {
-    Future.successful(
-      Compiler
-        .compileContract(query.code)
-        .map(contract => CompileResult(Hex.toHexString(serialize(contract))))
-        .left
-        .map(error => failed(error.toString))
-    )
+  def compileContract(query: Compile.Contract): Try[CompileResult] = {
+    Compiler
+      .compileContract(query.code)
+      .map(contract => CompileResult(Hex.toHexString(serialize(contract))))
+      .left
+      .map(error => failed(error.toString))
   }
 
   private def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
@@ -688,4 +644,35 @@ class ServerUtils(implicit
 object ServerUtils {
   type Try[T]       = Either[ApiError[_ <: StatusCode], T]
   type FutureTry[T] = Future[Try[T]]
+
+  private def validateUtxInputs(
+      unsignedTx: UnsignedTransaction
+  ): Try[Unit] = {
+    if (unsignedTx.inputs.nonEmpty) {
+      Right(())
+    } else {
+      Left(ApiError.BadRequest("Invalid transaction: empty inputs"))
+    }
+  }
+
+  private def validateUtxGasFee(
+      unsignedTx: UnsignedTransaction
+  )(implicit apiConfig: ApiConfig): Try[Unit] = {
+    val gasFee = unsignedTx.gasPrice * unsignedTx.gasAmount
+    if (gasFee <= apiConfig.gasFeeCap) {
+      Right(())
+    } else {
+      Left(ApiError.BadRequest(s"Too much gas fee, cap at ${apiConfig.gasFeeCap}, got $gasFee"))
+    }
+  }
+
+  def validateUnsignedTransaction(
+      unsignedTx: UnsignedTransaction
+  )(implicit apiConfig: ApiConfig): Try[UnsignedTransaction] = {
+    for {
+      _ <- validateUtxInputs(unsignedTx)
+      _ <- validateUtxGasFee(unsignedTx)
+    } yield unsignedTx
+  }
+
 }
