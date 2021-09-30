@@ -39,7 +39,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, ReleaseVersion}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
@@ -821,7 +821,8 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture {
       networkInterface = address.getAddress,
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
-      apiConfig.apiKey
+      apiConfig.apiKey,
+      ALF.oneAlf
     )
 
     (peer, peerConf)

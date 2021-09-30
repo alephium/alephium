@@ -16,6 +16,9 @@
 
 package org.alephium.app
 
+import java.net.InetSocketAddress
+
+import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
@@ -23,15 +26,30 @@ import org.alephium.flow.core.UtxoUtils
 import org.alephium.protocol.{ALF, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasBox
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp, U256}
 
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  trait Fixture extends FlowFixture {
+  trait ApiConfigFixture extends SocketUtil {
+    val peerPort             = generatePort()
+    val address              = new InetSocketAddress("127.0.0.1", peerPort)
+    val blockflowFetchMaxAge = Duration.zero
+    implicit val apiConfig: ApiConfig = ApiConfig(
+      networkInterface = address.getAddress,
+      blockflowFetchMaxAge = blockflowFetchMaxAge,
+      askTimeout = Duration.ofMinutesUnsafe(1),
+      None,
+      ALF.oneAlf
+    )
+  }
+
+  trait Fixture extends FlowFixture with ApiConfigFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
   }
+
+  trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
 
   it should "check tx status for intra group txs" in new Fixture {
 
@@ -89,7 +107,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check tx status for inter group txs" in new FlowFixture {
+  it should "check tx status for inter group txs" in new FlowFixtureWithApi {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
@@ -227,7 +245,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check sweep all tx status for inter group txs" in new FlowFixture {
+  it should "check sweep all tx status for inter group txs" in new FlowFixtureWithApi {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
@@ -318,7 +336,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixture {
+  "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
@@ -351,7 +369,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     decodedUnsignedTx is unsignedTx
   }
 
-  trait MultipleUtxos extends FlowFixture {
+  trait MultipleUtxos extends FlowFixtureWithApi {
     implicit val serverUtils = new ServerUtils
 
     implicit val bf                        = blockFlow
@@ -434,6 +452,29 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  it should "not create transaction if gas fee is above cap" in new MultipleUtxos {
+    val outputRefs = utxos.map { utxo =>
+      OutputRef(utxo.ref.hint, utxo.ref.key)
+    }
+
+    val unsignedTx = serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        Some(minimalGas),
+        GasPrice(ALF.oneAlf)
+      )
+      .rightValue
+
+    serverUtils.validateUnsignedTransaction(unsignedTx) is Left(
+      ApiError.BadRequest(
+        "Too much gas fee, cap at 1000000000000000000, got 20000000000000000000000"
+      )
+    )
+  }
+
   it should "not create transaction with provided UTXOs, if Alf amount isn't enough" in new MultipleUtxos {
     val outputRefs = utxos.collect {
       case utxo if utxo.amount.value.equals(ALF.cent(50)) =>
@@ -505,7 +546,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Selected UTXOs must be of asset type"
   }
 
-  "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixture {
+  "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
@@ -522,7 +563,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     buildTransaction.detail is "Zero transaction outputs"
   }
 
-  it should "fail when outputs belong to different groups" in new FlowFixture {
+  it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
     val chainIndex1           = ChainIndex.unsafe(0, 0)

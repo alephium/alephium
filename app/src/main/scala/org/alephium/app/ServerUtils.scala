@@ -40,6 +40,7 @@ import org.alephium.util._
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
     networkConfig: NetworkConfig,
+    apiConfig: ApiConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
   import ServerUtils._
@@ -127,6 +128,7 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
+      _ <- validateUnsignedTransaction(unsignedTx)
     } yield {
       BuildTransactionResult.from(unsignedTx)
     }
@@ -151,6 +153,7 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
+      _ <- validateUnsignedTransaction(unsignedTx)
     } yield {
       BuildTransactionResult.from(unsignedTx)
     }
@@ -202,6 +205,7 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice)
       )
+      _ <- validateUnsignedTransaction(unsignedTx)
     } yield {
       BuildTransactionResult.from(unsignedTx)
     }
@@ -293,7 +297,7 @@ class ServerUtils(implicit
     }
   }
 
-  def validateUnsignedTransaction(
+  private def validateUtxInputs(
       unsignedTx: UnsignedTransaction
   ): Try[Unit] = {
     if (unsignedTx.inputs.nonEmpty) {
@@ -301,7 +305,26 @@ class ServerUtils(implicit
     } else {
       Left(ApiError.BadRequest("Invalid transaction: empty inputs"))
     }
+  }
 
+  private def validateUtxGasFee(
+      unsignedTx: UnsignedTransaction
+  ): Try[Unit] = {
+    val gasFee = unsignedTx.gasPrice * unsignedTx.gasAmount
+    if (gasFee <= apiConfig.gasFeeCap) {
+      Right(())
+    } else {
+      Left(ApiError.BadRequest(s"Too much gas fee, cap at ${apiConfig.gasFeeCap}, got $gasFee"))
+    }
+  }
+
+  def validateUnsignedTransaction(
+      unsignedTx: UnsignedTransaction
+  ): Try[Unit] = {
+    for {
+      _ <- validateUtxInputs(unsignedTx)
+      _ <- validateUtxGasFee(unsignedTx)
+    } yield ()
   }
 
   def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
@@ -604,6 +627,7 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice
       ).left.map(error => badRequest(error.toString))
+      _ <- validateUnsignedTransaction(utx)
     } yield utx).map(BuildContractResult.from))
   }
 
@@ -625,6 +649,7 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice
       ).left.map(error => badRequest(error.toString))
+      _ <- validateUnsignedTransaction(utx)
     } yield utx).map(BuildScriptResult.from))
   }
 
