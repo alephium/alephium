@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Signature
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.protocol.model.Target
@@ -223,7 +225,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "test gas amount" in {
+  it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
     def byte: Byte = bytes.sample()
@@ -266,7 +268,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     def test(instr: Instr[_], gas: Int) = {
       instr match {
         case i: ToByteVecInstr[_, _] => testToByteVec(i, gas)
-        case i: ByteVecConcat.type   => i.gas(1000).value is (1000 * gas)
+        case _: ByteVecConcat.type   => testByteVecConcatGas(gas)
         case i: LogInstr             => testLog(i, gas)
         case i: GasSimple            => i.gas().value is gas
         case i: GasFormula           => i.gas(32).value is gas
@@ -278,6 +280,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       case i: U256ToByteVec.type    => i.gas(33).value is gas
       case i: AddressToByteVec.type => i.gas(33).value is gas
       case _                        => true is false
+    }
+    def testByteVecConcatGas(gas: Int) = {
+      val frame = genStatefulFrame()
+      frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](123)))) isE ()
+      frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](200)))) isE ()
+      val initialGas = frame.ctx.gasRemaining
+      ByteVecConcat.runWith(frame) isE ()
+      (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
     }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas

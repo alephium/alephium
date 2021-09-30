@@ -18,7 +18,23 @@ package org.alephium.protocol.vm
 
 import org.alephium.util.{AlephiumSpec, AVector}
 
-class FrameSpec extends AlephiumSpec with ContextGenerators {
+class FrameSpec extends AlephiumSpec with FrameFixture {
+  it should "initialize frame and use operand stack for method args" in {
+    val frame = genStatelessFrame()
+    frame.opStack.offset is 3
+    frame.opStack.capacity is 0
+    frame.opStack.currentIndex is 3
+  }
+
+  it should "create new frame and use operand stack for method args" in {
+    val frame = genStatefulFrame()
+    frame.opStack.offset is 2
+    frame.opStack.capacity is 8
+    frame.opStack.currentIndex is 2
+  }
+}
+
+trait FrameFixture extends ContextGenerators {
   def baseMethod[Ctx <: StatelessContext](localsLength: Int) = Method[Ctx](
     isPublic = true,
     isPayable = false,
@@ -27,11 +43,12 @@ class FrameSpec extends AlephiumSpec with ContextGenerators {
     returnLength = 0,
     instrs = AVector.empty
   )
-  it should "initialize frame and use operand stack for method args" in {
+
+  def genStatelessFrame(): Frame[StatelessContext] = {
     val method         = baseMethod[StatelessContext](2)
     val script         = StatelessScript.unsafe(AVector(method))
     val (obj, context) = prepareStatelessScript(script)
-    val frame = Frame
+    Frame
       .stateless(
         context,
         obj,
@@ -40,16 +57,13 @@ class FrameSpec extends AlephiumSpec with ContextGenerators {
         _ => okay
       )
       .rightValue
-    frame.opStack.offset is 3
-    frame.opStack.capacity is 0
-    frame.opStack.currentIndex is 3
   }
 
-  it should "create new frame and use operand stack for method args" in {
+  def genStatefulFrame(): Frame[StatefulContext] = {
     val method         = baseMethod[StatefulContext](2)
     val script         = StatefulScript.unsafe(AVector(method))
     val (obj, context) = prepareStatefulScript(script)
-    val frame = Frame
+    Frame
       .stateful(
         context,
         None,
@@ -57,12 +71,9 @@ class FrameSpec extends AlephiumSpec with ContextGenerators {
         obj,
         method,
         AVector(Val.True),
-        Stack.ofCapacity(3),
+        Stack.ofCapacity(10),
         _ => okay
       )
       .rightValue
-    frame.opStack.offset is 2
-    frame.opStack.capacity is 1
-    frame.opStack.currentIndex is 2
   }
 }
