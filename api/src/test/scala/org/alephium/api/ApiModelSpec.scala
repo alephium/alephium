@@ -202,6 +202,19 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
   }
 
+  it should "encode/decode Token" in {
+    val id     = Hash.generate
+    val amount = ALF.oneAlf
+
+    val token: Token = Token(id, amount)
+    val jsonRaw =
+      s"""{"id":"${id.toHexString}","amount":"${amount}"}"""
+
+    checkData(token, jsonRaw)
+
+    parseFail[Token](s"""{"id":"${id.toHexString}","amount":"1 ALPH"}""")
+  }
+
   it should "encode/decode Output with big amount" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
