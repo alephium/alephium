@@ -34,6 +34,10 @@ final case class ContractState private (
   def updateOutputRef(ref: ContractOutputRef): ContractState = {
     this.copy(contractOutputRef = ref)
   }
+
+  def toObject(address: Hash): StatefulContractObject = {
+    StatefulContractObject(code, initialStateHash, fields, address)
+  }
 }
 
 object ContractState {

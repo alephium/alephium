@@ -143,7 +143,7 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
   def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
     for {
       state <- getContractState(key)
-    } yield state.code.toObject(key, state)
+    } yield state.toObject(key)
   }
 
   def createContractUnsafe(
@@ -204,7 +204,7 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
   def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
     for {
       state <- getContractState(key)
-    } yield state.code.toObject(key, state)
+    } yield state.toObject(key)
   }
 
   def createContractUnsafe(

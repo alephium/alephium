@@ -38,8 +38,8 @@ trait ContractPool extends CostStrategy {
       case Some(obj) => Right(obj)
       case None =>
         for {
-          _   <- chargeContractLoad()
           obj <- loadFromWorldState(contractKey)
+          _   <- chargeContractLoad(obj)
           _   <- add(contractKey, obj)
         } yield obj
     }
@@ -81,7 +81,7 @@ trait ContractPool extends CostStrategy {
     EitherF.foreachTry(contractPool) { case (contractKey, contractObj) =>
       if (contractObj.isUpdated) {
         for {
-          _ <- chargeContractUpdate()
+          _ <- chargeContractUpdate(contractObj)
           _ <- updateState(contractKey, AVector.from(contractObj.fields))
         } yield ()
       } else {
