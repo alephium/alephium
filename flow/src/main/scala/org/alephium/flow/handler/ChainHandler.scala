@@ -90,7 +90,7 @@ object ChainHandler {
     .register()
 }
 
-abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Validation[T, S]](
+abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Validation[T, S, R]](
     blockFlow: BlockFlow,
     val chainIndex: ChainIndex,
     val validator: V
@@ -118,11 +118,12 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     validationResult match {
       case Left(Left(e))  => handleIOError(data, broker, e)
       case Left(Right(x)) => handleInvalidData(data, broker, origin, x)
-      case Right(_)       => handleValidData(data, broker, origin)
+      case Right(validationSideEffect) =>
+        handleValidData(data, validationSideEffect, broker, origin)
     }
   }
 
-  def validateWithSideEffect(data: T, origin: DataOrigin): ValidationResult[S, Unit]
+  def validateWithSideEffect(data: T, origin: DataOrigin): ValidationResult[S, R]
 
   def handleIOError(
       data: T,
@@ -154,13 +155,18 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     broker ! dataInvalid(data, status)
   }
 
-  def handleValidData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
+  def handleValidData(
+      data: T,
+      validationSideEffect: R,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
     log.info(s"${data.shortHex} is validated")
     blockFlow.contains(data.hash) match {
       case Right(true) =>
         log.debug(s"Block/Header ${data.shortHex} exists already")
       case Right(false) =>
-        addDataToBlockFlow(data) match {
+        addDataToBlockFlow(data, validationSideEffect) match {
           case Left(error) => handleIOError(error)
           case Right(_) =>
             publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
@@ -172,7 +178,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, V <: Valid
     }
   }
 
-  def addDataToBlockFlow(data: T): IOResult[Unit]
+  def addDataToBlockFlow(data: T, validationSideEffect: R): IOResult[Unit]
 
   def notifyBroker(broker: ActorRefT[ChainHandler.Event], data: T): Unit
 

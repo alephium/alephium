@@ -14,26 +14,6 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium.util
 
-trait CostStrategy {
-  var gasRemaining: GasBox
-
-  def chargeGas(instr: GasSimple): ExeResult[Unit] = chargeGas(instr.gas())
-
-  def chargeGasWithSize(instr: GasFormula, size: Int): ExeResult[Unit] = {
-    chargeGas(instr.gas(size))
-  }
-
-  def chargeContractLoad(): ExeResult[Unit] = chargeGas(GasSchedule.contractLoadGas)
-
-  def chargeContractUpdate(): ExeResult[Unit] = chargeGas(GasSchedule.contractUpdateGas)
-
-  def chargeContractInput(): ExeResult[Unit] = chargeGas(GasSchedule.txInputBaseGas)
-
-  def chargeGeneratedOutput(): ExeResult[Unit] = chargeGas(GasSchedule.txOutputBaseGas)
-
-  def chargeGas(gas: GasBox): ExeResult[Unit] = {
-    gasRemaining.use(gas).map(gasRemaining = _)
-  }
-}
+class AppException(message: String) extends Exception(message)

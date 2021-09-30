@@ -178,6 +178,25 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
 
     iter(0)
   }
+
+  // scalastyle:off return
+  final def toOutputs(): Option[AVector[TxOutput]] = {
+    @tailrec
+    def iter(acc: AVector[TxOutput], index: Int): Option[AVector[TxOutput]] = {
+      if (index == all.length) {
+        Some(acc)
+      } else {
+        val (lockupScript, balancesPerLockup) = all(index)
+        balancesPerLockup.toTxOutput(lockupScript) match {
+          case Right(Some(output)) => iter(acc :+ output, index + 1)
+          case Right(None)         => iter(acc, index + 1)
+          case Left(_)             => None
+        }
+      }
+    }
+    iter(AVector.ofSize[TxOutput](all.size), 0)
+  }
+  // scalastyle:on return
 }
 
 object Balances {

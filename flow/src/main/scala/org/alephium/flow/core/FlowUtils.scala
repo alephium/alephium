@@ -25,14 +25,14 @@ import org.alephium.flow.Utils
 import org.alephium.flow.mempool._
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
-import org.alephium.flow.validation.BlockValidation
+import org.alephium.flow.validation.{BlockValidation, TxScriptExeFailed, TxValidation}
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, TimeStamp}
 
 trait FlowUtils
     extends MultiChain
@@ -166,7 +166,7 @@ trait FlowUtils
       val parentHash = deps.getOutDep(chainIndex.to)
       val order      = Block.getScriptExecutionOrder(parentHash, txTemplates)
       val fullTxs =
-        Array.ofDim[Transaction](txTemplates.length + 1) // reverse 1 slot for coinbase tx
+        Array.ofDim[Transaction](txTemplates.length + 1) // reserve 1 slot for coinbase tx
       txTemplates.foreachWithIndex { case (tx, index) =>
         if (tx.unsigned.scriptOpt.isEmpty) {
           fullTxs(index) = FlowUtils.convertNonScriptTx(tx)
@@ -176,7 +176,7 @@ trait FlowUtils
       order
         .foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
-          generateFullTx(groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
+          generateFullTx(chainIndex, groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
         .map { _ =>
@@ -300,32 +300,45 @@ trait FlowUtils
   }
 
   def generateFullTx(
+      chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       tx: TransactionTemplate,
       script: StatefulScript
   ): IOResult[Transaction] = {
+    val validator = TxValidation.build
     for {
       preOutputs <- groupView
         .getPreOutputs(tx.unsigned.inputs)
         .flatMap {
           case None =>
+            // Runtime exception as we have validated the inputs in collectTransactions
             Left(IOError.Other(new RuntimeException(s"Inputs should exist, but not actually")))
           case Some(outputs) => Right(outputs)
         }
-    } yield {
-      StatefulVM.runTxScript(
-        groupView.worldState,
-        blockEnv,
-        tx,
-        preOutputs,
-        script,
-        tx.unsigned.gasAmount
-      ) match {
-        case Left(_)       => FlowUtils.convertFailedScriptTx(preOutputs, tx)
-        case Right(result) => FlowUtils.convertSuccessfulTx(tx, result)
+      tx <- {
+        val result = validator.validateSuccessfulScriptTxTemplate(
+          tx,
+          script,
+          chainIndex,
+          groupView,
+          blockEnv,
+          preOutputs
+        )
+        result match {
+          case Right(successfulTx) => Right(successfulTx)
+          case Left(Right(TxScriptExeFailed(_))) =>
+            FlowUtils.convertFailedScriptTx(preOutputs, tx, script) match {
+              case Some(failedTx) => Right(failedTx)
+              case None =>
+                Left(IOError.Other(new RuntimeException("Invalid remaining balances in tx")))
+            }
+          case Left(Left(error)) => Left(error)
+          case Left(Right(error)) =>
+            Left(IOError.Other(new RuntimeException(s"Invalid tx: $error")))
+        }
       }
-    }
+    } yield tx
   }
 }
 
@@ -363,6 +376,7 @@ object FlowUtils {
   def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {
     Transaction(
       txTemplate.unsigned,
+      scriptExecutionOk = true,
       AVector.empty,
       AVector.empty,
       txTemplate.inputSignatures,
@@ -376,6 +390,7 @@ object FlowUtils {
   ): Transaction = {
     Transaction(
       txTemplate.unsigned,
+      scriptExecutionOk = true,
       result.contractInputs,
       result.generatedOutputs,
       txTemplate.inputSignatures,
@@ -383,22 +398,38 @@ object FlowUtils {
     )
   }
 
-  def deductGas(inputs: AVector[AssetOutput], gasFee: U256): AVector[AssetOutput] = {
-    inputs.replace(0, inputs(0).payGasUnsafe(gasFee))
-  }
-
   def convertFailedScriptTx(
       preOutputs: AVector[AssetOutput],
-      txTemplate: TransactionTemplate
-  ): Transaction = {
-    val remainingBalances = deductGas(preOutputs, txTemplate.gasFeeUnsafe)
-    Transaction(
-      txTemplate.unsigned,
-      AVector.empty,
-      generatedOutputs = remainingBalances.as[TxOutput],
-      txTemplate.inputSignatures,
-      txTemplate.contractSignatures
-    )
+      txTemplate: TransactionTemplate,
+      script: StatefulScript
+  ): Option[Transaction] = {
+    if (script.entryMethod.isPayable) {
+      for {
+        balances0 <- Balances.from(preOutputs, txTemplate.unsigned.fixedOutputs)
+        _         <- balances0.subAlf(preOutputs.head.lockupScript, txTemplate.gasFeeUnsafe)
+        outputs   <- balances0.toOutputs()
+      } yield {
+        Transaction(
+          txTemplate.unsigned,
+          scriptExecutionOk = false,
+          AVector.empty,
+          generatedOutputs = outputs,
+          txTemplate.inputSignatures,
+          txTemplate.contractSignatures
+        )
+      }
+    } else {
+      Some(
+        Transaction(
+          txTemplate.unsigned,
+          scriptExecutionOk = false,
+          contractInputs = AVector.empty,
+          generatedOutputs = AVector.empty,
+          txTemplate.inputSignatures,
+          txTemplate.contractSignatures
+        )
+      )
+    }
   }
 
   def nextTimeStamp(parentTs: TimeStamp): TimeStamp = {

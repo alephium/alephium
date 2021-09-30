@@ -31,6 +31,7 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{ActorRefT, EventBus, EventStream}
 
 object BlockChainHandler {
@@ -87,7 +88,7 @@ class BlockChainHandler(
     brokerConfig: BrokerConfig,
     val consensusConfig: ConsensusConfig,
     networkSetting: NetworkSetting
-) extends ChainHandler[Block, InvalidBlockStatus, BlockValidation](
+) extends ChainHandler[Block, InvalidBlockStatus, Option[WorldState.Cached], BlockValidation](
       blockFlow,
       chainIndex,
       BlockValidation.build
@@ -105,16 +106,17 @@ class BlockChainHandler(
   def validateWithSideEffect(
       block: Block,
       origin: DataOrigin
-  ): ValidationResult[InvalidBlockStatus, Unit] = {
+  ): ValidationResult[InvalidBlockStatus, Option[WorldState.Cached]] = {
     for {
       _ <- validator.headerValidation.validate(block.header, blockFlow)
       blockMsgOpt = {
         blockFlow.cacheHeaderVerifiedBlock(block)
         interCliqueBroadcast(block, origin)
       }
-      _ <- validator.checkBlockAfterHeader(block, blockFlow)
+      sideResult <- validator.checkBlockAfterHeader(block, blockFlow)
     } yield {
       intraCliqueBroadCast(block, blockMsgOpt, origin)
+      sideResult
     }
   }
 
@@ -149,8 +151,11 @@ class BlockChainHandler(
   override def dataInvalid(data: Block, reason: InvalidBlockStatus): Event =
     InvalidBlock(data.hash, reason)
 
-  override def addDataToBlockFlow(block: Block): IOResult[Unit] = {
-    blockFlow.add(block)
+  override def addDataToBlockFlow(
+      block: Block,
+      validationSideEffect: Option[WorldState.Cached]
+  ): IOResult[Unit] = {
+    blockFlow.add(block, validationSideEffect)
   }
 
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {

@@ -70,19 +70,13 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val publicKey0 = PublicKey.generate
     val publicKey1 = PublicKey.generate
 
-    val unlock0 = Hex.unsafe(s"0102${publicKey0.toHexString}01${publicKey1.toHexString}01")
-    deserialize[UnlockScript](unlock0).leftValue.getMessage
-      .startsWith("Invalid public keys indexes") is true
+    def test(message: String, expected: Boolean, keys: (PublicKey, Int)*) = {
+      info(message)
+      UnlockScript.validateP2mpkh(UnlockScript.p2mpkh(AVector.from(keys))) is expected
+    }
 
-    val unlock1 = Hex.unsafe(s"0102${publicKey0.toHexString}01${publicKey1.toHexString}00")
-    deserialize[UnlockScript](unlock1).leftValue.getMessage
-      .startsWith("Invalid public keys indexes") is true
-
-    val unlock2 = Hex.unsafe(s"0102${publicKey0.toHexString}3f${publicKey1.toHexString}00")
-    deserialize[UnlockScript](unlock2).leftValue.getMessage
-      .startsWith("Invalid public keys indexes") is true
-
-    val unlock3 = Hex.unsafe(s"0102${publicKey0.toHexString}00${publicKey1.toHexString}01")
-    deserialize[UnlockScript](unlock3).isRight is true
+    test("Key indexes are duplicated", false, (publicKey0, 1), (publicKey1, 1))
+    test("Key indexes are decreasing", false, (publicKey0, 1), (publicKey1, 0))
+    test("Positive case", true, (publicKey0, 0), (publicKey1, 3))
   }
 }

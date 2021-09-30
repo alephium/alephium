@@ -27,7 +27,7 @@ abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTri
 
   def get(key: K): IOResult[V] = {
     getOpt(key).flatMap {
-      case None        => Left(IOError.KeyNotFound(key))
+      case None        => Left(IOError.keyNotFound(key, "CachedTrie.get"))
       case Some(value) => Right(value)
     }
   }
@@ -55,7 +55,7 @@ abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTri
     (caches.get(key): @unchecked) match {
       case None              => removeForUnderlying(key)
       case Some(Inserted(_)) => Right(discard(caches.subtractOne(key)))
-      case Some(Removed())   => Left(IOError.KeyNotFound(key))
+      case Some(Removed())   => Left(IOError.keyNotFound(key, "CachedTrie.remove"))
       case Some(_)           => Right(discard(caches.addOne(key -> Removed())))
     }
   }
@@ -63,7 +63,7 @@ abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTri
   protected def removeForUnderlying(key: K): IOResult[Unit] = {
     underlying.exist(key).flatMap {
       case true  => Right(discard(caches.addOne(key -> Removed())))
-      case false => Left(IOError.KeyNotFound(key))
+      case false => Left(IOError.keyNotFound(key, "CachedTrie.removeForUnderlying"))
     }
   }
 

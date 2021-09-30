@@ -19,14 +19,22 @@ package org.alephium.io
 import org.rocksdb.RocksDBException
 
 import org.alephium.serde.SerdeError
+import org.alephium.util.AppException
 
 sealed abstract class IOError(val reason: Throwable) extends Exception(reason)
 
+sealed abstract class AppIOError(reason: AppException) extends IOError(reason)
+
 object IOError {
+  final case class Serde(e: SerdeError)         extends AppIOError(e)
+  final case class KeyNotFound(e: AppException) extends AppIOError(e)
+
   final case class JavaIO(e: java.io.IOException)     extends IOError(e)
   final case class JavaSecurity(e: SecurityException) extends IOError(e)
   final case class RocksDB(e: RocksDBException)       extends IOError(e)
-  final case class Serde(e: SerdeError)               extends IOError(e)
-  final case class KeyNotFound[K](key: K)             extends IOError(new Exception(s"Key $key not found"))
   final case class Other(e: Throwable)                extends IOError(e)
+
+  def keyNotFound[K](key: K, action: String): KeyNotFound = {
+    KeyNotFound(new AppException(s"Key $key not found in $action"))
+  }
 }

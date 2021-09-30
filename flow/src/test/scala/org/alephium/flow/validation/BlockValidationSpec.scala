@@ -40,7 +40,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     result.isRight is true
   }
 
-  def failValidation(result: BlockValidationResult[Unit], error: InvalidBlockStatus): Assertion = {
+  def failValidation[R](result: BlockValidationResult[R], error: InvalidBlockStatus): Assertion = {
     result.left.value isE error
   }
 
@@ -324,7 +324,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   it should "check double spending in a same block" in new DoubleSpendingFixture {
     val block0 = transferOnlyForIntraGroup(blockFlow, chainIndex)
     block0.nonCoinbase.length is 1
-    blockValidation.validate(block0, blockFlow) isE ()
+    blockValidation.validate(block0, blockFlow).isRight is true
 
     val block1 = mine(blockFlow, chainIndex)((_, _) => block0.nonCoinbase ++ block0.nonCoinbase)
     block1.nonCoinbase.length is 2
@@ -404,6 +404,6 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val block0     = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     val newBlockTs = ALF.LaunchTimestamp.plusSecondsUnsafe(1)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
-    blockValidation.validate(block1, blockFlow) isE ()
+    blockValidation.validate(block1, blockFlow).isRight is true
   }
 }

@@ -24,13 +24,14 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
+import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
+import org.alephium.io.IOError
 import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -328,6 +329,17 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   behavior of "stateful validation"
 
   trait StatefulFixture extends StatelessFixture {
+    def getPreOutputs(
+        tx: Transaction,
+        worldState: MutableWorldState
+    ): TxValidationResult[AVector[TxOutput]] = {
+      worldState.getPreOutputs(tx) match {
+        case Right(preOutputs)            => validTx(preOutputs)
+        case Left(IOError.KeyNotFound(_)) => invalidTx(NonExistInput)
+        case Left(error)                  => Left(Left(error))
+      }
+    }
+
     def genTokenOutput(tokenId: Hash, amount: U256): AssetOutput = {
       AssetOutput(
         U256.Zero,
@@ -580,64 +592,33 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidSignature)
   }
 
-  it should "validate p2mpkh" in new LockupFixture {
+  it should "invalidate p2mpkh" in new LockupFixture {
     val (priKey0, pubKey0) = keypairGen.sample.get
     val (priKey1, pubKey1) = keypairGen.sample.get
-    val (priKey2, pubKey2) = keypairGen.sample.get
+    val (_, pubKey2)       = keypairGen.sample.get
 
-    val lockup   = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
-    val unlock   = UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey1 -> 1))
-    val unsigned = prepareOutput(lockup, unlock)
-    val tx0      = sign(unsigned, priKey0, priKey1)
-    passValidation(validateTxOnlyForTest(tx0, blockFlow))
-    val tx1 = sign(unsigned, priKey0)
-    failValidation(validateTxOnlyForTest(tx1, blockFlow), NotEnoughSignature)
-    val tx2 = sign(unsigned, priKey0, priKey2)
-    failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidSignature)
-    val tx3 = sign(unsigned, priKey1, priKey1)
-    failValidation(validateTxOnlyForTest(tx3, blockFlow), InvalidSignature)
-
-    val tx4 = replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0)))
-    failValidation(validateTxOnlyForTest(tx4, blockFlow), InvalidNumberOfPublicKey)
-    val tx5 =
-      replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey1 -> 3)), priKey0, priKey1)
-    failValidation(validateTxOnlyForTest(tx5, blockFlow), InvalidPublicKeyHash)
-    val tx6 =
-      replaceUnlock(tx0, UnlockScript.p2mpkh(AVector(pubKey0 -> 0, pubKey0 -> 1)), priKey0, priKey1)
-    failValidation(validateTxOnlyForTest(tx6, blockFlow), InvalidPublicKeyHash)
-  }
-
-  it should "invalidate p2mpkh in deserialization" in new LockupFixture {
-    val (priKey0, pubKey0) = keypairGen.sample.get
-    val (priKey1, pubKey1) = keypairGen.sample.get
-
-    def wrongMultiSig(m: Int): Transaction = {
-      val lockup                = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1), m)
-      val group                 = groupIndexGen.sample.get
-      val (genesisPriKey, _, _) = genesisKeys(group.value)
-      val block                 = transfer(blockFlow, genesisPriKey, lockup, ALF.alf(2))
-      block.nonCoinbase.head
-    }
-
-    // m = 0 in m-of-n multisig
-    val tx0 = wrongMultiSig(0)
-    deserialize[Transaction](serialize(tx0)).leftValue.getMessage
-      .startsWith("Invalid m in m-of-n multisig") is true
-
-    // m = n + 1 in m-of-n multisig
-    val tx1 = wrongMultiSig(3)
-    deserialize[Transaction](serialize(tx1)).leftValue.getMessage
-      .startsWith("Invalid m in m-of-n multisig") is true
-
-    // unlock indexes are not monotonically increasing in m-of-n multisig
-    val tx2 = {
-      val lockup   = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1), 2)
-      val unlock   = UnlockScript.p2mpkh(AVector(pubKey1 -> 1, pubKey0 -> 0))
+    def test(expected: Option[InvalidTxStatus], keys: (PublicKey, Int)*) = {
+      val lockup   = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
+      val unlock   = UnlockScript.p2mpkh(AVector.from(keys))
       val unsigned = prepareOutput(lockup, unlock)
-      sign(unsigned, priKey1, priKey0)
+      val tx       = sign(unsigned, priKey0, priKey1)
+      val result   = validateTxOnlyForTest(tx, blockFlow)
+      expected match {
+        case Some(error) => result.leftValue isE error
+        case None        => result.isRight is true
+      }
     }
-    deserialize[Transaction](serialize(tx2)).leftValue.getMessage
-      .startsWith("Invalid public keys indexes") is true
+
+    test(Some(InvalidNumberOfPublicKey), pubKey0  -> 0)
+    test(Some(InvalidNumberOfPublicKey), pubKey0  -> 0, pubKey1 -> 1, pubKey2 -> 2)
+    test(Some(InvalidP2mpkhUnlockScript), pubKey1 -> 1, pubKey0 -> 0)
+    test(Some(InvalidP2mpkhUnlockScript), pubKey1 -> 0, pubKey0 -> 0)
+    test(Some(InvalidP2mpkhUnlockScript), pubKey1 -> 1, pubKey0 -> 1)
+    test(Some(InvalidP2mpkhUnlockScript), pubKey0 -> 0, pubKey1 -> 3)
+    test(Some(InvalidPublicKeyHash), pubKey0      -> 0, pubKey1 -> 2)
+    test(Some(InvalidPublicKeyHash), pubKey1      -> 0, pubKey1 -> 1)
+    test(Some(InvalidSignature), pubKey0          -> 0, pubKey2 -> 2)
+    test(None, pubKey0                            -> 0, pubKey1 -> 1)
   }
 
   it should "validate p2sh" in new LockupFixture {
@@ -660,7 +641,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     passValidation(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
-    failValidation(validateTxOnlyForTest(tx1, blockFlow), TxScriptExeFailed(AssertionFailed))
+    failValidation(validateTxOnlyForTest(tx1, blockFlow), UnlockScriptExeFailed(AssertionFailed))
     val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
     val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
     failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidScriptHash)
@@ -699,7 +680,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val groupIndex = lockup.groupIndex
     val gasRemaining =
-      checkScript(blockEnv, txEnv, initialGas, script.hash, script, AVector.empty).rightValue
+      checkUnlockScript(blockEnv, txEnv, initialGas, script.hash, script, AVector.empty).rightValue
     initialGas is gasRemaining.addUnsafe(
       script.bytes.size + GasHash.gas(script.bytes.size).value + 200 /* 200 is the call gas */
     )

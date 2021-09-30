@@ -31,13 +31,6 @@ object UnlockScript {
     val p2mpkhSerde: Serde[P2MPKH] =
       Serde
         .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
-        .validate { lock =>
-          val ok = (0 until (lock.indexedPublicKeys.length - 1)).forall { i =>
-            val index = lock.indexedPublicKeys(i)._2
-            index >= 0 && lock.indexedPublicKeys(i + 1)._2 > index
-          }
-          if (ok) Right(()) else Left(s"Invalid public keys indexes: ${lock.indexedPublicKeys}")
-        }
     val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH, t => (t.script, t.params))
 
     new Serde[UnlockScript] {
@@ -58,6 +51,13 @@ object UnlockScript {
           case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
+    }
+  }
+
+  def validateP2mpkh(unlock: UnlockScript.P2MPKH): Boolean = {
+    (0 until (unlock.indexedPublicKeys.length - 1)).forall { i =>
+      val index = unlock.indexedPublicKeys(i)._2
+      index >= 0 && unlock.indexedPublicKeys(i + 1)._2 > index
     }
   }
 

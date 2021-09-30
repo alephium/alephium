@@ -147,7 +147,11 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   def handleClientMessage(message: ClientMessage): Unit = message match {
     case SubmitBlock(blockBlob) =>
       deserialize[Block](blockBlob) match {
-        case Right(block) => submit(block)
+        case Right(block) =>
+          submit(block)
+          log.info(
+            s"A new block ${block.hash.toHexString} got mined for ${block.chainIndex}, tx: ${block.transactions.length}, target: ${block.header.target}"
+          )
         case Left(error) =>
           log.error(
             s"Deserialization error for submited block: $error : ${Hex.toHexString(blockBlob)}"

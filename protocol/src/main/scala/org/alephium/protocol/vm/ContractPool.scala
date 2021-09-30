@@ -19,7 +19,8 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.model.{ContractId, ContractOutputRef}
+import org.alephium.io.IOError
+import org.alephium.protocol.model.{ContractId, ContractOutput, ContractOutputRef}
 import org.alephium.util.{AVector, EitherF}
 
 trait ContractPool extends CostStrategy {
@@ -30,7 +31,7 @@ trait ContractPool extends CostStrategy {
   lazy val contractPool = mutable.Map.empty[ContractId, StatefulContractObject]
   lazy val assetStatus  = mutable.Map.empty[ContractId, ContractAssetStatus]
 
-  lazy val contractInputs: ArrayBuffer[ContractOutputRef] = ArrayBuffer.empty
+  lazy val contractInputs: ArrayBuffer[(ContractOutputRef, ContractOutput)] = ArrayBuffer.empty
 
   def loadContractObj(contractKey: ContractId): ExeResult[StatefulContractObject] = {
     contractPool.get(contractKey) match {
@@ -44,8 +45,12 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  private def loadFromWorldState(contractKey: ContractId): ExeResult[StatefulContractObject] = {
-    worldState.getContractObj(contractKey).left.map(e => Left(IOErrorLoadContract(e)))
+  private def loadFromWorldState(contractId: ContractId): ExeResult[StatefulContractObject] = {
+    worldState.getContractObj(contractId) match {
+      case Right(obj)                   => Right(obj)
+      case Left(_: IOError.KeyNotFound) => failed(NonExistContract(contractId))
+      case Left(e)                      => ioFailed(IOErrorLoadContract(e))
+    }
   }
 
   private var contractFieldSize = 0
@@ -92,10 +97,11 @@ trait ContractPool extends CostStrategy {
   // note: we don't charge gas here as it's charged by tx input already
   def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {
     for {
+      _ <- chargeContractInput()
       balances <- worldState
         .useContractAsset(contractId)
         .map { case (contractOutputRef, contractAsset) =>
-          contractInputs.addOne(contractOutputRef)
+          contractInputs.addOne(contractOutputRef -> contractAsset)
           BalancesPerLockup.from(contractAsset)
         }
         .left
@@ -127,11 +133,6 @@ trait ContractPool extends CostStrategy {
     } else {
       failed(EmptyContractAsset)
     }
-  }
-
-  def commitStates(): Unit = {
-    worldState.commit()
-    ()
   }
 }
 

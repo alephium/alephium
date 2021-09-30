@@ -87,11 +87,16 @@ trait StatefulContext extends StatelessContext with ContractPool {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
         val outputRef = nextContractOutputRef(contractOutput)
-        generatedOutputs.addOne(output)
-        updateContractAsset(contractId, outputRef, contractOutput)
+        for {
+          _ <- chargeGeneratedOutput()
+          _ <- updateContractAsset(contractId, outputRef, contractOutput)
+        } yield {
+          generatedOutputs.addOne(output)
+          ()
+        }
       case _ =>
         generatedOutputs.addOne(output)
-        Right(())
+        chargeGeneratedOutput()
     }
   }
 
@@ -156,7 +161,7 @@ object StatefulContext {
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
-      worldState: WorldState.Cached,
+      worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
   ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.contractSignatures))
@@ -167,7 +172,7 @@ object StatefulContext {
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
-      worldState: WorldState.Cached,
+      worldState: WorldState.Staging,
       preOutputsOpt: Option[AVector[AssetOutput]]
   ): ExeResult[StatefulContext] = {
     preOutputsOpt match {
@@ -184,12 +189,10 @@ object StatefulContext {
   final class Impl(
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
-      val initWorldState: WorldState.Cached,
+      val worldState: WorldState.Staging,
       val preOutputs: AVector[AssetOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
-    val worldState: WorldState.Staging = initWorldState.staging()
-
     def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     /*

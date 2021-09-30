@@ -23,7 +23,7 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
 
-trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus] {
+trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus, Unit] {
   def validate(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit] = {
     checkHeader(header, flow)
   }

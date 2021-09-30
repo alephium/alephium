@@ -46,15 +46,21 @@ trait BlockChainWithState extends BlockChain {
 
   def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit]
 
-  override def add(block: Block, weight: Weight): IOResult[Unit] = {
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  override def add(
+      block: Block,
+      weight: Weight,
+      worldStateOpt: Option[WorldState.Cached]
+  ): IOResult[Unit] = {
+    assume(worldStateOpt.nonEmpty)
+    val cachedWorldState = worldStateOpt.get
     for {
-      cachedWorldState <- getCachedWorldState(block.parentHash)
-      _                <- persistBlock(block)
-      _                <- persistTxs(block)
-      _                <- updateState(cachedWorldState, block)
-      newWorldState    <- cachedWorldState.persist()
-      _                <- addWorldState(block.hash, newWorldState)
-      _                <- add(block.header, weight)
+      _             <- persistBlock(block)
+      _             <- persistTxs(block)
+      _             <- updateState(cachedWorldState, block)
+      newWorldState <- cachedWorldState.persist()
+      _             <- addWorldState(block.hash, newWorldState)
+      _             <- add(block.header, weight)
     } yield ()
   }
 }

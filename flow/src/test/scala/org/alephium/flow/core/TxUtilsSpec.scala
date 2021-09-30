@@ -465,7 +465,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val outputs  = AVector.fill(n)(output.copy(amount = ALF.oneAlf))
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
     val newBlock = block.copy(transactions = AVector(newTx))
-    blockFlow.addAndUpdateView(newBlock).isRight is true
+    addAndUpdateView(blockFlow, newBlock)
 
     val (balance, lockedBalance, utxos) =
       blockFlow.getBalance(output.lockupScript, Int.MaxValue).rightValue

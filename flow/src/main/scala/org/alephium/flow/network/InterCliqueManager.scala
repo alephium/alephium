@@ -294,6 +294,7 @@ class InterCliqueManager(
   }
 
   def connect(broker: BrokerInfo): Unit = {
+    log.info(s"Try to connect ${broker.address}")
     if (checkForOutConnection(broker, networkSetting.maxOutboundConnectionsPerGroup)) {
       connectUnsafe(broker)
     }
@@ -476,7 +477,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     if (available) {
       addBroker(brokerInfo, InboundConnection, ActorRefT(sender()))
     } else {
-      log.warning(s"Too many inbound connections, ignore the one from $brokerInfo")
+      log.info(s"Too many inbound connections, ignore the one from $brokerInfo")
       context.stop(sender())
     }
   }
@@ -488,7 +489,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     if (needOutgoingConnections(brokerInfo, maxOutboundConnectionsPerGroup)) {
       addBroker(brokerInfo, OutboundConnection, ActorRefT(sender()))
     } else {
-      log.warning(s"Too many outbound connections, ignore the one from $brokerInfo")
+      log.info(s"Too many outbound connections, ignore the one from $brokerInfo")
       context.stop(sender())
     }
   }

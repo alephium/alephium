@@ -58,6 +58,7 @@ sealed trait TransactionAbstract {
 
 final case class Transaction(
     unsigned: UnsignedTransaction,
+    scriptExecutionOk: Boolean,
     contractInputs: AVector[ContractOutputRef],
     generatedOutputs: AVector[TxOutput],
     inputSignatures: AVector[Signature],
@@ -65,7 +66,14 @@ final case class Transaction(
 ) extends TransactionAbstract
     with MerkleHashable[Hash] {
   def toMerkleTx: MerkelTx =
-    MerkelTx(id, contractInputs, generatedOutputs, inputSignatures, contractSignatures)
+    MerkelTx(
+      id,
+      scriptExecutionOk,
+      contractInputs,
+      generatedOutputs,
+      inputSignatures,
+      contractSignatures
+    )
 
   def merkleHash: Hash = Hash.hash(serialize(toMerkleTx))
 
@@ -74,6 +82,7 @@ final case class Transaction(
   def allInputRefs: AVector[TxOutputRef] =
     unsigned.inputs.map[TxOutputRef](_.outputRef) ++ contractInputs
 
+  def inputsLength: Int  = unsigned.inputs.length + contractInputs.length
   def outputsLength: Int = unsigned.fixedOutputs.length + generatedOutputs.length
 
   def getOutput(index: Int): TxOutput = {
@@ -107,10 +116,17 @@ final case class Transaction(
 
 object Transaction {
   implicit val serde: Serde[Transaction] =
-    Serde.forProduct5(
+    Serde.forProduct6(
       Transaction.apply,
       t =>
-        (t.unsigned, t.contractInputs, t.generatedOutputs, t.inputSignatures, t.contractSignatures)
+        (
+          t.unsigned,
+          t.scriptExecutionOk,
+          t.contractInputs,
+          t.generatedOutputs,
+          t.inputSignatures,
+          t.contractSignatures
+        )
     )
 
   def from(
@@ -137,6 +153,7 @@ object Transaction {
   )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
+      scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures,
@@ -152,6 +169,7 @@ object Transaction {
   )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
+      scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs,
       inputSignatures,
@@ -171,6 +189,7 @@ object Transaction {
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(
       unsigned,
+      scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs,
       AVector(signature),
@@ -187,6 +206,7 @@ object Transaction {
     val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
     Transaction(
       unsigned,
+      scriptExecutionOk = true,
       contractInputs,
       generatedOutputs,
       AVector(signature),
@@ -197,6 +217,7 @@ object Transaction {
   def from(unsigned: UnsignedTransaction, inputSignatures: AVector[Signature]): Transaction = {
     Transaction(
       unsigned,
+      scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures,
@@ -275,6 +296,7 @@ object Transaction {
     val unsigned = UnsignedTransaction.coinbase(AVector.empty, AVector(txOutput))
     Transaction(
       unsigned,
+      scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures = AVector.empty,
@@ -294,6 +316,7 @@ object Transaction {
     val unsigned = UnsignedTransaction(inputs = AVector.empty, fixedOutputs = outputs)
     Transaction(
       unsigned,
+      scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures = AVector.empty,
@@ -303,15 +326,24 @@ object Transaction {
 
   final private[model] case class MerkelTx(
       id: Hash,
+      scriptExecutionOk: Boolean,
       contractInputs: AVector[ContractOutputRef],
       generatedOutputs: AVector[TxOutput],
       inputSignatures: AVector[Signature],
       contractSignatures: AVector[Signature]
   )
   object MerkelTx {
-    implicit val serde: Serde[MerkelTx] = Serde.forProduct5(
+    implicit val serde: Serde[MerkelTx] = Serde.forProduct6(
       MerkelTx.apply,
-      t => (t.id, t.contractInputs, t.generatedOutputs, t.inputSignatures, t.contractSignatures)
+      t =>
+        (
+          t.id,
+          t.scriptExecutionOk,
+          t.contractInputs,
+          t.generatedOutputs,
+          t.inputSignatures,
+          t.contractSignatures
+        )
     )
   }
 }

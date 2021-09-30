@@ -23,7 +23,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.BlockEnv
+import org.alephium.protocol.vm.{BlockEnv, WorldState}
 import org.alephium.util.{AVector, Cache, Math, RWLock, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -184,7 +184,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
     bodyVerifyingBlocks.put(block)
   }
 
-  def add(block: Block): IOResult[Unit]
+  def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]
 }
 
 object MultiChain {

@@ -38,6 +38,19 @@ final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox]
     GasBox.unsafe(value + another.value)
   }
 
+  def sub(another: GasBox): Option[GasBox] = {
+    if (this >= another) {
+      Some(GasBox.unsafe(value - another.value))
+    } else {
+      None
+    }
+  }
+
+  def subUnsafe(another: GasBox): GasBox = {
+    assume(this >= another)
+    GasBox.unsafe(value - another.value)
+  }
+
   def toU256: U256 = U256.unsafe(value)
 
   override def compare(that: GasBox): Int = this.value.compare(that.value)
@@ -47,6 +60,8 @@ object GasBox {
   implicit val serde: Serde[GasBox] = Serde
     .forProduct1[Int, GasBox](new GasBox(_), _.value)
     .validate(box => if (box.value >= 0) Right(()) else Left(s"Negative gas ${box.value}"))
+
+  val zero: GasBox = GasBox.unsafe(0)
 
   def unsafe(initialGas: Int): GasBox = {
     assume(initialGas >= 0)

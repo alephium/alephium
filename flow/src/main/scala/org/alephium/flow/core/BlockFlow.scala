@@ -40,7 +40,7 @@ trait BlockFlow
 
   def add(header: BlockHeader, weight: Weight): IOResult[Unit] = ???
 
-  def addAndUpdateView(block: Block): IOResult[Unit]
+  def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]
 
   def addAndUpdateView(header: BlockHeader): IOResult[Unit]
 
@@ -219,7 +219,9 @@ object BlockFlow extends StrictLogging {
       val mempoolSetting: MemPoolSetting
   ) extends BlockFlow {
 
-    def add(block: Block): IOResult[Unit] = {
+    // for intra-group block, worldStateOpt should not be empty
+    // for inter-group block, worldStateOpt should be empty
+    def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = {
       val index = block.chainIndex
       assume(index.relateTo(brokerConfig))
 
@@ -229,13 +231,13 @@ object BlockFlow extends StrictLogging {
       }
       for {
         weight <- calWeight(block)
-        _      <- getBlockChain(index).add(block, weight)
+        _      <- getBlockChain(index).add(block, weight, worldStateOpt)
       } yield ()
     }
 
-    def addAndUpdateView(block: Block): IOResult[Unit] = {
+    def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = {
       for {
-        _ <- add(block)
+        _ <- add(block, worldStateOpt)
         _ <- updateBestDeps()
       } yield ()
     }

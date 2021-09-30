@@ -103,7 +103,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     val tx1       = block1.nonCoinbase.head.toTemplate
     val currentTs = TimeStamp.now()
     blockFlow.getMemPool(chainIndex).pendingPool.add(tx1, currentTs)
-    blockFlow.add(block0).isRight is true
+    addWithoutViewUpdate(blockFlow, block0)
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ViewHandler.Subscribe

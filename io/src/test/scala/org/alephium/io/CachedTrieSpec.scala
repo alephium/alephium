@@ -50,7 +50,7 @@ class CachedTrieSpec extends AlephiumSpec {
 
     def testFalseRead() = {
       val (key, _) = generateKV()
-      cached.get(key).swap isE a[IOError.KeyNotFound[_]]
+      cached.get(key).swap isE a[IOError.KeyNotFound]
       cached.getOpt(key) isE None
       cached.exist(key) isE false
     }
@@ -78,7 +78,7 @@ class CachedTrieSpec extends AlephiumSpec {
 
     def testFalseDelete() = {
       val (key, _) = generateKV()
-      cached.remove(key).swap isE a[IOError.KeyNotFound[_]]
+      cached.remove(key).swap isE a[IOError.KeyNotFound]
     }
 
     def switchMode() =

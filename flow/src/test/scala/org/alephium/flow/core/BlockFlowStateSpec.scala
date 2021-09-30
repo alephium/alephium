@@ -51,7 +51,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
           worldState.getOutput(outputRef) isE output.copy(lockTime = block.timestamp)
         } else {
           // the Utxo is not persisted yet
-          worldState.getOutput(outputRef).leftValue is a[IOError.KeyNotFound[_]]
+          worldState.getOutput(outputRef).leftValue is a[IOError.KeyNotFound]
         }
       }
     }

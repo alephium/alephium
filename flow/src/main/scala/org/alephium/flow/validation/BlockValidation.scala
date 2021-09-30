@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.protocol.ALF
+import org.alephium.protocol.{ALF, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
@@ -26,7 +26,7 @@ import org.alephium.protocol.vm.{BlockEnv, GasPrice, WorldState}
 import org.alephium.serde._
 import org.alephium.util.U256
 
-trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
+trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[WorldState.Cached]] {
   import ValidationStatus._
 
   implicit def networkConfig: NetworkConfig
@@ -34,7 +34,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   def headerValidation: HeaderValidation
   def nonCoinbaseValidation: TxValidation
 
-  override def validate(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+  override def validate(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     checkBlock(block, flow)
   }
 
@@ -42,14 +45,14 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       chainIndex: ChainIndex,
       template: BlockFlowTemplate,
       blockFlow: BlockFlow
-  ): BlockValidationResult[Unit] = {
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     val dummyHeader = BlockHeader.unsafe(
       BlockDeps.unsafe(template.deps),
       template.depStateHash,
-      template.txsHash,
+      Hash.zero,
       template.templateTs,
       template.target,
-      Nonce.unsecureRandom()
+      Nonce.zero
     )
     val dummyBlock = Block(dummyHeader, template.transactions)
     checkTemplate(chainIndex, dummyBlock, blockFlow)
@@ -60,7 +63,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       chainIndex: ChainIndex,
       block: Block,
       flow: BlockFlow
-  ): BlockValidationResult[Unit] = {
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     for {
 //      _ <- checkGroup(block)
 //      _ <- checkNonEmptyTransactions(block)
@@ -69,8 +72,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
       _ <- checkTotalGas(block)
 //      _ <- checkMerkleRoot(block)
 //      _ <- checkFlow(block, flow)
-      _ <- checkTxs(chainIndex, block, flow)
-    } yield ()
+      sideResult <- checkTxs(chainIndex, block, flow)
+    } yield sideResult
   }
 
   override def validateUntilDependencies(
@@ -80,7 +83,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     checkBlockUntilDependencies(block, flow)
   }
 
-  def validateAfterDependencies(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+  def validateAfterDependencies(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     checkBlockAfterDependencies(block, flow)
   }
 
@@ -94,49 +100,54 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
   private[validation] def checkBlockAfterDependencies(
       block: Block,
       flow: BlockFlow
-  ): BlockValidationResult[Unit] = {
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     for {
-      _ <- headerValidation.checkHeaderAfterDependencies(block.header, flow)
-      _ <- checkBlockAfterHeader(block, flow)
-    } yield ()
+      _          <- headerValidation.checkHeaderAfterDependencies(block.header, flow)
+      sideResult <- checkBlockAfterHeader(block, flow)
+    } yield sideResult
   }
 
-  private[validation] def checkBlock(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+  private[validation] def checkBlock(
+      block: Block,
+      flow: BlockFlow
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     for {
-      _ <- headerValidation.checkHeader(block.header, flow)
-      _ <- checkBlockAfterHeader(block, flow)
-    } yield ()
+      _          <- headerValidation.checkHeader(block.header, flow)
+      sideResult <- checkBlockAfterHeader(block, flow)
+    } yield sideResult
   }
 
   private[flow] def checkBlockAfterHeader(
       block: Block,
       flow: BlockFlow
-  ): BlockValidationResult[Unit] = {
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     for {
-      _ <- checkGroup(block)
-      _ <- checkNonEmptyTransactions(block)
-      _ <- checkTxNumber(block)
-      _ <- checkGasPriceDecreasing(block)
-      _ <- checkTotalGas(block)
-      _ <- checkMerkleRoot(block)
-      _ <- checkFlow(block, flow)
-      _ <- checkTxs(block.chainIndex, block, flow)
-    } yield ()
+      _          <- checkGroup(block)
+      _          <- checkNonEmptyTransactions(block)
+      _          <- checkTxNumber(block)
+      _          <- checkGasPriceDecreasing(block)
+      _          <- checkTotalGas(block)
+      _          <- checkMerkleRoot(block)
+      _          <- checkFlow(block, flow)
+      sideResult <- checkTxs(block.chainIndex, block, flow)
+    } yield sideResult
   }
 
   private def checkTxs(
       chainIndex: ChainIndex,
       block: Block,
       flow: BlockFlow
-  ): BlockValidationResult[Unit] = {
+  ): BlockValidationResult[Option[WorldState.Cached]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
         groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
         _         <- checkNonCoinbases(chainIndex, block, groupView)
         _         <- checkCoinbase(chainIndex, block, groupView) // validate non-coinbase first for gas fee
-      } yield ()
+      } yield {
+        if (chainIndex.isIntraGroup) Some(groupView.worldState) else None
+      }
     } else {
-      validBlock(())
+      validBlock(None)
     }
   }
 
@@ -310,21 +321,40 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus] {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
         _ <- checkBlockDoubleSpending(block)
-        _ <- {
-          val blockEnv = BlockEnv.from(block.header)
-          convert(block.getNonCoinbaseExecutionOrder.foreachE { index =>
-            nonCoinbaseValidation.checkBlockTx(
-              chainIndex,
-              block.transactions(index),
-              groupView,
-              blockEnv,
-              None
-            )
-          })
-        }
+        _ <- convert(checkNonCoinbasesEach(chainIndex, block, groupView))
       } yield ()
     } else {
       validBlock(())
+    }
+  }
+
+  private[validation] def checkNonCoinbasesEach(
+      chainIndex: ChainIndex,
+      block: Block,
+      groupView: BlockFlowGroupView[WorldState.Cached]
+  ): TxValidationResult[Unit] = {
+    val blockEnv       = BlockEnv.from(block.header)
+    val parentHash     = block.blockDeps.uncleHash(chainIndex.to)
+    val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase)
+    executionOrder.foreachE { index =>
+      val tx = block.transactions(index)
+      val txValidationResult = nonCoinbaseValidation.checkBlockTx(
+        chainIndex,
+        block.transactions(index),
+        groupView,
+        blockEnv,
+        None
+      )
+      txValidationResult match {
+        case Right(_) => Right(())
+        case Left(Right(TxScriptExeFailed(_))) =>
+          if (tx.contractInputs.isEmpty) {
+            Right(())
+          } else {
+            invalidTx(ContractInputsShouldBeEmptyForFailedTxScripts)
+          }
+        case result => result
+      }
     }
   }
 
