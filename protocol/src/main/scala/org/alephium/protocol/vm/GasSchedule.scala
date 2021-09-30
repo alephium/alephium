@@ -99,6 +99,14 @@ object GasBytesEq {
   def gas(byteLength: Int): GasBox = GasBox.unsafe(gasPerWord * GasFormula.wordLength(byteLength))
 }
 
+trait GasBytesConcat extends GasFormula {
+  def gas(byteLength: Int): GasBox = GasBytesConcat.gas(byteLength)
+}
+object GasBytesConcat {
+  val gasPerByte: Int              = 1
+  def gas(byteLength: Int): GasBox = GasBox.unsafe(byteLength * gasPerByte)
+}
+
 @Gas
 trait GasSignature extends GasSimple
 object GasSignature {
@@ -158,11 +166,9 @@ object GasSchedule {
    * 1. a fixed base gas for each transaction
    * 2. gas for each input including the auto generated contract inputs:
    *    2.1. gas for removing the input from the blockchain state trie
-   *    2.2. data gas based on the length of the serialized input
-   *    2.3. execution gas for the unlock script of the input
+   *    2.2. execution gas for the unlock script of the input
    * 3. gas for each output including the auto generated vm outputs:
    *    3.1. gas for adding the output into the blockchain state trie
-   *    3.2. data gas based on the length of the serialized output
    * 4. execution gas for the optional tx script
    */
   val txBaseGas: GasBox       = GasBox.unsafe(1000)

@@ -660,15 +660,14 @@ case object ByteVecSize extends StatelessInstrSimpleGas with StatelessInstrCompa
     } yield ()
   }
 }
-case object ByteVecConcat
-    extends StatelessInstrSimpleGas
-    with StatelessInstrCompanion0
-    with GasVeryLow {
-  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 with GasBytesConcat {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v2 <- frame.popOpStackT[Val.ByteVec]()
       v1 <- frame.popOpStackT[Val.ByteVec]()
-      _  <- frame.pushOpStack(Val.ByteVec(v1.bytes ++ v2.bytes))
+      result = Val.ByteVec(v1.bytes ++ v2.bytes)
+      _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
+      _ <- frame.pushOpStack(result)
     } yield ()
   }
 }
