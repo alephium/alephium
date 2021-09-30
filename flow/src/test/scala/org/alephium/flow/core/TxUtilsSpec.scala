@@ -23,7 +23,7 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALF, Generators, Hash}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class TxUtilsSpec extends AlephiumSpec {
@@ -482,7 +482,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         ALF.alf((n - 2).toLong),
-        None,
+        Some(GasBox.unsafe(1200000)),
         defaultGasPrice
       )
       .rightValue
@@ -512,7 +512,7 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        None,
+        Some(GasBox.unsafe(1200000)),
         defaultGasPrice
       )
       .rightValue
