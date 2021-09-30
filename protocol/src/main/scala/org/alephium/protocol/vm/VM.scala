@@ -18,6 +18,8 @@ package org.alephium.protocol.vm
 
 import scala.annotation.tailrec
 
+import akka.util.ByteString
+
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
 
@@ -156,6 +158,23 @@ sealed abstract class VM[Ctx <: StatelessContext](
 object VM {
   val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
     if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
+
+  def checkCodeSize(initialGas: GasBox, codeBytes: ByteString): ExeResult[GasBox] = {
+    if (codeBytes.length > maximalScriptSize) {
+      failed(CodeSizeTooLarge)
+    } else {
+      initialGas.use(GasCall.scriptBaseGas(codeBytes.length))
+    }
+  }
+
+  def checkFieldSize(initialGas: GasBox, fields: Iterable[Val]): ExeResult[GasBox] = {
+    val estimatedSize = fields.foldLeft(0)(_ + _.estimateByteSize())
+    if (estimatedSize >= maximalFieldSize) {
+      failed(FieldsSizeTooLarge)
+    } else {
+      initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
+    }
+  }
 }
 
 final class StatelessVM(

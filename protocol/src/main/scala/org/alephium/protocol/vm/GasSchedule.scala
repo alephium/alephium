@@ -135,9 +135,11 @@ trait GasCall extends GasFormula {
   def gas(size: Int): GasBox = ??? // should call the companion object instead
 }
 object GasCall {
-  val gasPerScriptByte: Int = 1
   def scriptBaseGas(byteLength: Int): GasBox =
-    GasBox.unsafe(gasPerScriptByte * byteLength + GasSchedule.callGas.value)
+    GasBox.unsafe(byteLength + GasSchedule.callGas.value)
+
+  def fieldsBaseGas(byteLength: Int): GasBox =
+    GasBox.unsafe(byteLength)
 }
 
 trait GasLog extends GasFormula {

@@ -1108,10 +1108,12 @@ sealed trait CreateContractBase extends CreateContractAbstract {
     for {
       tokenAmount     <- getTokenAmount(frame, issueToken)
       fields          <- frame.popFields()
+      _               <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractCodeRaw <- frame.popOpStackT[Val.ByteVec]()
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
+      _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
       _ <- {
         val initialStateHash =
@@ -1139,6 +1141,7 @@ sealed trait CopyCreateContractBase extends CreateContractAbstract {
     for {
       tokenAmount <- getTokenAmount(frame, issueToken)
       fields      <- frame.popFields()
+      _           <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
       _ <- {

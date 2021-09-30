@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
+
 import org.alephium.protocol.model.minimalGas
 import org.alephium.util.AlephiumSpec
 
@@ -34,5 +36,9 @@ class CostStrategySpec extends AlephiumSpec {
     test(_.chargeContractLoad(123), 800 + (123 + 7) / 8)
     test(_.chargeContractUpdate(123), 5000 + (123 + 7) / 8)
     test(_.chargeGas(GasBox.unsafe(100)), 100)
+
+    val bytes = ByteString.fromArrayUnsafe(Array.ofDim[Byte](123))
+    test(_.chargeCodeSize(bytes), 200 + 123)
+    test(_.chargeFieldSize(Seq(Val.ByteVec(bytes))), 123)
   }
 }

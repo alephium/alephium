@@ -24,6 +24,8 @@ import org.alephium.serde.SerdeError
 
 // scalastyle:off number.of.types
 trait ExeFailure
+final case object CodeSizeTooLarge                             extends ExeFailure
+final case object FieldsSizeTooLarge                           extends ExeFailure
 case object ExpectStatefulFrame                                extends ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
 case object StackOverflow                                      extends ExeFailure

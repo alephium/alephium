@@ -44,6 +44,9 @@ package object model {
   val maximalGasPerBlock: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
   val maximalGasPerTx: GasBox    = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock / 32)
 
+  val maximalScriptSize: Int = 12 * 1024 // 12KB
+  val maximalFieldSize: Int  = 3 * 1024  // 2KB
+
   val dustUtxoAmount: U256 = ALF.nanoAlf(1000)
 
   def minimalAlfAmountPerTxOutput(tokenNum: Int): U256 = {
