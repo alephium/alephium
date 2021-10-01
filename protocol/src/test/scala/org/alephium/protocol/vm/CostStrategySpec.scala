@@ -31,13 +31,12 @@ class CostStrategySpec extends AlephiumSpec {
       strategy.gasRemaining.addUnsafe(GasBox.unsafe(cost)) is minimalGas
     }
 
+    val bytes = ByteString.fromArrayUnsafe(Array.ofDim[Byte](123))
     test(_.chargeGas(Pop), 2)
     test(_.chargeGasWithSize(Blake2b, 33), 60)
     test(_.chargeContractLoad(123), 800 + (123 + 7) / 8)
-    test(_.chargeContractUpdate(123), 5000 + (123 + 7) / 8)
+    test(_.chargeContractStateUpdate(Seq(Val.ByteVec(bytes))), 5000 + 123)
     test(_.chargeGas(GasBox.unsafe(100)), 100)
-
-    val bytes = ByteString.fromArrayUnsafe(Array.ofDim[Byte](123))
     test(_.chargeCodeSize(bytes), 200 + 123)
     test(_.chargeFieldSize(Seq(Val.ByteVec(bytes))), 123)
   }

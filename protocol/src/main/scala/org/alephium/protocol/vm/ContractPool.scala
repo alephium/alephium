@@ -81,7 +81,7 @@ trait ContractPool extends CostStrategy {
     EitherF.foreachTry(contractPool) { case (contractKey, contractObj) =>
       if (contractObj.isUpdated) {
         for {
-          _ <- chargeContractUpdate(contractObj)
+          _ <- chargeContractStateUpdate(contractObj)
           _ <- updateState(contractKey, AVector.from(contractObj.fields))
         } yield ()
       } else {

@@ -133,9 +133,9 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "update contract only when the state of the contract is altered" in new Fixture {
-    val (contractId, contract) = createContract(fieldLength = 1)
-    val obj                    = pool.loadContractObj(contractId).rightValue
-    val gasRemaining           = pool.gasRemaining
+    val (contractId, _) = createContract(fieldLength = 1)
+    val obj             = pool.loadContractObj(contractId).rightValue
+    val gasRemaining    = pool.gasRemaining
     pool.updateContractStates().rightValue // no updates
     pool.gasRemaining is gasRemaining
     pool.worldState.getContractState(contractId).rightValue.fields is fields(1)
@@ -144,7 +144,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.updateContractStates().rightValue
     pool.worldState.getContractState(contractId).rightValue.fields is AVector[Val](Val.False)
     pool.gasRemaining is gasRemaining
-      .use(GasSchedule.contractUpdateGas(1 + contract.toHalfDecoded().methodsBytes.length))
+      .use(GasSchedule.contractStateUpdateBaseGas.addUnsafe(GasBox.unsafe(1)))
       .rightValue
   }
 

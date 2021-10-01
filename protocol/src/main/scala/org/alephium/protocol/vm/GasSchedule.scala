@@ -155,13 +155,11 @@ object GasLog {
 object GasSchedule {
   val callGas: GasBox = GasBox.unsafe(200)
 
-  def contractLoadGas(roughSize: Int): GasBox = {
-    GasBox.unsafe(800 + GasFormula.wordLength(roughSize))
+  def contractLoadGas(roughContractSize: Int): GasBox = {
+    GasBox.unsafe(800 + GasFormula.wordLength(roughContractSize))
   }
 
-  def contractUpdateGas(roughSize: Int): GasBox = {
-    GasBox.unsafe(5000 + GasFormula.wordLength(roughSize))
-  }
+  val contractStateUpdateBaseGas: GasBox = GasBox.unsafe(5000)
 
   /*
    * The gas cost of a transaction consists of 4 parts

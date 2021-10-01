@@ -35,16 +35,15 @@ trait CostStrategy {
     chargeGas(GasSchedule.contractLoadGas(size))
   }
 
-  def chargeContractUpdate(obj: StatefulContractObject): ExeResult[Unit] = {
-    val codeSize = obj.code.methodsBytes.length
-    for {
-      _ <- chargeFieldSize(obj.fields)
-      _ <- chargeContractUpdate(codeSize)
-    } yield ()
+  def chargeContractStateUpdate(obj: StatefulContractObject): ExeResult[Unit] = {
+    chargeContractStateUpdate(obj.fields)
   }
 
-  def chargeContractUpdate(size: Int): ExeResult[Unit] = {
-    chargeGas(GasSchedule.contractUpdateGas(size))
+  def chargeContractStateUpdate(fields: Iterable[Val]): ExeResult[Unit] = {
+    for {
+      _ <- chargeGas(GasSchedule.contractStateUpdateBaseGas)
+      _ <- chargeFieldSize(fields)
+    } yield ()
   }
 
   def chargeContractInput(): ExeResult[Unit] = chargeGas(GasSchedule.txInputBaseGas)
