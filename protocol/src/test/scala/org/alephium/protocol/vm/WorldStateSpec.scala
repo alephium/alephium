@@ -123,4 +123,35 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   it should "test immutable world state" in {
     test(WorldState.emptyPersisted(newDB))
   }
+
+  trait StagingFixture {
+    val worldState = WorldState.emptyCached(newDB)
+    val staging    = worldState.staging()
+
+    val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
+
+    val contractId  = contractOutputRef.key
+    val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
+    staging.createContractUnsafe(code, Hash.zero, state, contractOutputRef, contractOutput) isE ()
+    staging.getContractObj(contractId) isE contractObj
+    worldState.getContractObj(contractId).isLeft is true
+  }
+
+  it should "commit staged changes" in new StagingFixture {
+    staging.commit()
+    staging.getContractObj(contractId) isE contractObj
+    worldState.getContractObj(contractId) isE contractObj
+  }
+
+  it should "rollback staged changes" in new StagingFixture {
+    staging.rollback()
+    staging.getContractObj(contractId).isLeft is true
+    staging.getContractState(contractId).isLeft is true
+    staging.getContractCode(code.hash).isLeft is true
+    staging.getContractAsset(contractId).isLeft is true
+    worldState.getContractObj(contractId).isLeft is true
+    worldState.getContractState(contractId).isLeft is true
+    worldState.getContractCode(code.hash).isLeft is true
+    worldState.getContractAsset(contractId).isLeft is true
+  }
 }
