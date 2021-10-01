@@ -22,7 +22,7 @@ import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
 final case class ContractState private (
-    code: StatefulContract.HalfDecoded,
+    codeHash: Hash,
     initialStateHash: Hash,
     fields: AVector[Val],
     contractOutputRef: ContractOutputRef
@@ -35,7 +35,7 @@ final case class ContractState private (
     this.copy(contractOutputRef = ref)
   }
 
-  def toObject(address: Hash): StatefulContractObject = {
+  def toObject(address: Hash, code: StatefulContract.HalfDecoded): StatefulContractObject = {
     StatefulContractObject(code, initialStateHash, fields, address)
   }
 }
@@ -44,11 +44,11 @@ object ContractState {
   implicit val serde: Serde[ContractState] =
     Serde.forProduct4(
       ContractState.apply,
-      t => (t.code, t.initialStateHash, t.fields, t.contractOutputRef)
+      t => (t.codeHash, t.initialStateHash, t.fields, t.contractOutputRef)
     )
 
   val forMPt: ContractState =
-    ContractState(StatefulContract.forSMT, Hash.zero, AVector.empty, ContractOutputRef.forSMT)
+    ContractState(StatefulContract.forSMT.hash, Hash.zero, AVector.empty, ContractOutputRef.forSMT)
 
   def unsafe(
       code: StatefulContract.HalfDecoded,
@@ -57,6 +57,6 @@ object ContractState {
       contractOutputRef: ContractOutputRef
   ): ContractState = {
     assume(code.validate(fields))
-    new ContractState(code, initialStateHash, fields, contractOutputRef)
+    new ContractState(code.hash, initialStateHash, fields, contractOutputRef)
   }
 }
