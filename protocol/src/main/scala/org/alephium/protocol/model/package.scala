@@ -48,6 +48,7 @@ package object model {
   val maximalFieldSize: Int  = 3 * 1024  // 2KB
 
   val dustUtxoAmount: U256 = ALF.nanoAlf(1000)
+  val maxTokenPerUtxo: Int = 64
 
   def minimalAlfAmountPerTxOutput(tokenNum: Int): U256 = {
     ALF.nanoAlf(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)

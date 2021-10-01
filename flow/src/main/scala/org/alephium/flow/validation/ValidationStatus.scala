@@ -131,7 +131,7 @@ final case object TooManyOutputs                                extends InvalidT
 final case object GeneratedOutputForInterGroupTx                extends InvalidTxStatus
 final case object InvalidStartGas                               extends InvalidTxStatus
 final case object InvalidGasPrice                               extends InvalidTxStatus
-final case object AmountIsDustOrZero                            extends InvalidTxStatus
+final case object InvalidOutputStats                            extends InvalidTxStatus
 final case object DuplicatedInputs                              extends InvalidTxStatus
 final case object InvalidInputGroupIndex                        extends InvalidTxStatus
 final case object InvalidOutputGroupIndex                       extends InvalidTxStatus

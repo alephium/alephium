@@ -219,7 +219,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val alfAmount = tx.alfAmountInOutputs.get
         val delta     = U256.MaxValue - alfAmount + 1
         val txNew     = modifyAlfAmount(tx, delta)
-        failCheck(checkOutputAmount(txNew), BalanceOverFlow)
+        failCheck(checkOutputStats(txNew), BalanceOverFlow)
         failValidation(validateTxOnlyForTest(txNew, blockFlow), BalanceOverFlow)
         failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
       }
@@ -230,9 +230,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroAlfAmount(tx)
-        failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), AmountIsDustOrZero)
-        failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
+        failCheck(checkOutputStats(txNew), InvalidOutputStats)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputStats)
+        failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputStats)
       }
     }
   }
@@ -241,11 +241,20 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroTokenAmount(tx)
-        failCheck(checkOutputAmount(txNew), AmountIsDustOrZero)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), AmountIsDustOrZero)
-        failCheck(checkBlockTx(txNew, preOutputs), AmountIsDustOrZero)
+        failCheck(checkOutputStats(txNew), InvalidOutputStats)
+        failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputStats)
+        failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputStats)
       }
     }
+  }
+
+  it should "check the number of tokens for outputs" in new StatelessFixture {
+    val tx0 =
+      transactionGen(minTokens = maxTokenPerUtxo + 1, maxTokens = maxTokenPerUtxo + 1).sample.get
+    failCheck(checkOutputStats(tx0), InvalidOutputStats)
+    val tx1 =
+      transactionGen(minTokens = maxTokenPerUtxo, maxTokens = maxTokenPerUtxo).sample.get
+    passCheck(checkOutputStats(tx1))
   }
 
   it should "check the inputs indexes" in new StatelessFixture {

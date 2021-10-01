@@ -242,7 +242,7 @@ trait TxValidation {
       _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
-      _ <- checkOutputAmount(tx)
+      _ <- checkOutputStats(tx)
       _ <- checkChainIndex(tx, chainIndex)
       _ <- checkUniqueInputs(tx, checkDoubleSpending)
       _ <- checkOutputDataSize(tx)
@@ -289,7 +289,7 @@ trait TxValidation {
   protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
-  protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
+  protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256]
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
   protected[validation] def checkChainIndex(tx: Transaction, expected: ChainIndex): TxValidationResult[Unit]
   protected[validation] def checkUniqueInputs(tx: Transaction, checkDoubleSpending: Boolean): TxValidationResult[Unit]
@@ -394,25 +394,27 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {
+    protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256] = {
       for {
-        _      <- checkEachOutputAmount(tx)
+        _      <- checkEachOutputStats(tx)
         amount <- checkAlfOutputAmount(tx)
       } yield amount
     }
 
-    protected[validation] def checkEachOutputAmount(
+    protected[validation] def checkEachOutputStats(
         tx: Transaction
     ): TxValidationResult[Unit] = {
       val ok = tx.unsigned.fixedOutputs.forall(checkOutputAmount) &&
         tx.generatedOutputs.forall(checkOutputAmount)
-      if (ok) validTx(()) else invalidTx(AmountIsDustOrZero)
+      if (ok) validTx(()) else invalidTx(InvalidOutputStats)
     }
 
     @inline private def checkOutputAmount(
         output: TxOutput
     ): Boolean = {
-      output.amount >= dustUtxoAmount && output.tokens.forall(_._2.nonZero)
+      output.amount >= dustUtxoAmount &&
+      output.tokens.length <= maxTokenPerUtxo &&
+      output.tokens.forall(_._2.nonZero)
     }
 
     protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256] = {
