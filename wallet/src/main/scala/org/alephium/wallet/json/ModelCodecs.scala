@@ -25,6 +25,8 @@ import org.alephium.wallet.api.model._
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ModelCodecs extends ApiModelCodec {
 
+  implicit val addressesInfoRW: RW[Addresses.Info] = macroRW
+
   implicit val addressesRW: RW[Addresses] = macroRW
 
   implicit val addressInfoRW: RW[AddressInfo] = macroRW

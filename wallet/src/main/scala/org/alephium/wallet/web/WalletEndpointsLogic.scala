@@ -106,7 +106,10 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       walletService
         .getAddresses(wallet)
         .map { case (active, addresses) =>
-          model.Addresses(active, addresses)
+          model.Addresses(
+            active,
+            addresses.map(address => model.Addresses.Info(address, address.groupIndex.value))
+          )
         }
         .left
         .map(toApiError)

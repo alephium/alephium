@@ -221,7 +221,10 @@ class WalletAppSpec
 
     deriveNextAddress() check { response =>
       address = response.as[model.DeriveNextAddress.Result].address
-      addresses = model.Addresses(address, addresses.addresses :+ address)
+      addresses = model.Addresses(
+        address,
+        addresses.addresses :+ model.Addresses.Info(address, address.groupIndex.value)
+      )
       response.code is StatusCode.Ok
     }
 
@@ -230,7 +233,7 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
-    address = addresses.addresses.head
+    address = addresses.addresses.head.address
     addresses = addresses.copy(activeAddress = address)
 
     changeActiveAddress(address) check { response =>
