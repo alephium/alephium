@@ -1092,7 +1092,7 @@ sealed trait ContractInstr
     with StatefulInstrCompanion0
     with GasSimple {}
 
-sealed trait CreateContractAbstract extends ContractInstr with GasCreate {
+sealed trait CreateContractAbstract extends ContractInstr {
   @inline protected def getTokenAmount[C <: StatefulContext](
       frame: Frame[C],
       issueToken: Boolean
@@ -1101,7 +1101,7 @@ sealed trait CreateContractAbstract extends ContractInstr with GasCreate {
   }
 }
 
-sealed trait CreateContractBase extends CreateContractAbstract {
+sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
   val fieldsSerde: Serde[AVector[Val]] = serdeImpl[AVector[Val]]
 
   def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
@@ -1136,7 +1136,7 @@ object CreateContractWithToken extends CreateContractBase {
   }
 }
 
-sealed trait CopyCreateContractBase extends CreateContractAbstract {
+sealed trait CopyCreateContractBase extends CreateContractAbstract with GasCopyCreate {
   def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
       tokenAmount <- getTokenAmount(frame, issueToken)
