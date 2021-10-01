@@ -158,7 +158,7 @@ lazy val app = mainProject("app")
       val alephiumHome = "/alephium-home"
 
       new Dockerfile {
-        from("adoptopenjdk/openjdk11:jre")
+        from("openjdk:17-jdk")
 
         // Uncomment the next line and comment the previous one if you want to use GraalVM instead of OpenJDK
         // from("ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2")
@@ -193,7 +193,8 @@ lazy val app = mainProject("app")
       val baseImageName = "alephium/dev-alephium"
       val versionTag    = version.value.replace('+', '_')
       Seq(
-        ImageName(baseImageName + ":" + versionTag)
+        ImageName(baseImageName + ":" + versionTag),
+        ImageName(baseImageName + ":" + versionTag + "-jdk17")
       )
     },
     buildInfoKeys := Seq[BuildInfoKey](
@@ -327,7 +328,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.13.5",
+  scalaVersion := "2.13.6",
   parallelExecution in Test := false,
   scalacOptions ++= Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
