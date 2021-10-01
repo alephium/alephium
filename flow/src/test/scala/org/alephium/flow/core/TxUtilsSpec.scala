@@ -482,7 +482,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         ALF.alf((n - 2).toLong),
-        Some(GasBox.unsafe(1200000)),
+        Some(GasBox.unsafe(600000)),
         defaultGasPrice
       )
       .rightValue
@@ -512,7 +512,7 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        Some(GasBox.unsafe(1200000)),
+        Some(GasBox.unsafe(600000)),
         defaultGasPrice
       )
       .rightValue

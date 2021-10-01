@@ -72,7 +72,7 @@ class VMSpec extends AlephiumSpec {
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
       s"Right(TxScriptExeFailed($OutOfGas))"
     intercept[AssertionError](
-      simpleScript(blockFlow, chainIndex, script, gas = 1000000)
+      simpleScript(blockFlow, chainIndex, script, gas = 400000)
     ).getMessage is
       s"Right(TxScriptExeFailed($StackOverflow))"
   }

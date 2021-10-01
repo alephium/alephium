@@ -42,7 +42,7 @@ package object model {
 
   val maximalTxsInOneBlock: Int  = 2000
   val maximalGasPerBlock: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
-  val maximalGasPerTx: GasBox    = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock / 32)
+  val maximalGasPerTx: GasBox    = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock / 64)
 
   val maximalScriptSize: Int = 12 * 1024 // 12KB
   val maximalFieldSize: Int  = 3 * 1024  // 2KB
