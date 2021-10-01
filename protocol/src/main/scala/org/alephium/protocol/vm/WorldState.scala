@@ -25,6 +25,10 @@ import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
 trait WorldState[T] {
+  def outputState: ReadableTrie[TxOutputRef, TxOutput]
+  def contractState: ReadableTrie[Hash, ContractState]
+  def codeState: ReadableTrie[Hash, WorldState.CodeRecord]
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def getAsset(outputRef: AssetOutputRef): IOResult[AssetOutput] = {
     // we use asInstanceOf for optimization
@@ -43,19 +47,46 @@ trait WorldState[T] {
     }
   }
 
-  def getOutput(outputRef: TxOutputRef): IOResult[TxOutput]
+  def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
+    outputState.get(outputRef)
+  }
 
-  def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]]
+  def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
+    outputState.getOpt(outputRef)
+  }
 
-  def existOutput(outputRef: TxOutputRef): IOResult[Boolean]
+  def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
+    outputState.exist(outputRef)
+  }
 
-  def getContractState(key: Hash): IOResult[ContractState]
+  def getContractState(key: Hash): IOResult[ContractState] = {
+    contractState.get(key)
+  }
 
-  def getContractCode(key: Hash): IOResult[WorldState.CodeRecord]
+  def getContractCode(key: Hash): IOResult[WorldState.CodeRecord] = {
+    codeState.get(key)
+  }
 
-  def getContractAsset(key: Hash): IOResult[ContractOutput]
+  def getContractAsset(key: Hash): IOResult[ContractOutput] = {
+    for {
+      state     <- getContractState(key)
+      outputRaw <- getOutput(state.contractOutputRef)
+      output <- outputRaw match {
+        case _: AssetOutput =>
+          val error = s"ContractOutput expected, but got AssetOutput for contract $key"
+          Left(IOError.Other(new RuntimeException(error)))
+        case o: ContractOutput =>
+          Right(o)
+      }
+    } yield output
+  }
 
-  def getContractObj(key: Hash): IOResult[StatefulContractObject]
+  def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
+    for {
+      state <- getContractState(key)
+      code  <- getContractCode(state.codeHash)
+    } yield state.toObject(key, code.code)
+  }
 
   def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
 
@@ -112,20 +143,6 @@ trait WorldState[T] {
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit] {
-  def getContractAsset(key: Hash): IOResult[ContractOutput] = {
-    for {
-      state     <- getContractState(key)
-      outputRaw <- getOutput(state.contractOutputRef)
-      output <- outputRaw match {
-        case _: AssetOutput =>
-          val error = s"ContractOutput expected, but got AssetOutput for contract $key"
-          Left(IOError.Other(new RuntimeException(error)))
-        case o: ContractOutput =>
-          Right(o)
-      }
-    } yield output
-  }
-
   def useContractAsset(contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
     for {
       state     <- getContractState(contractId)
@@ -140,13 +157,6 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
       }
       _ <- removeAsset(state.contractOutputRef)
     } yield (state.contractOutputRef, output)
-  }
-
-  def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
-    for {
-      state <- getContractState(key)
-      code  <- getContractCode(state.codeHash)
-    } yield state.toObject(key, code.code)
   }
 
   def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[Unit] = {
@@ -164,20 +174,6 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
 }
 
 sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState] {
-  def getContractAsset(key: Hash): IOResult[ContractOutput] = {
-    for {
-      state     <- getContractState(key)
-      outputRaw <- getOutput(state.contractOutputRef)
-      output <- outputRaw match {
-        case _: AssetOutput =>
-          val error = s"ContractOutput expected, but got AssetOutput for contract $key"
-          Left(IOError.Other(new RuntimeException(error)))
-        case o: ContractOutput =>
-          Right(o)
-      }
-    } yield output
-  }
-
   def useContractAsset(
       contractId: ContractId
   ): IOResult[(ContractOutputRef, ContractOutput, ImmutableWorldState)] = {
@@ -194,13 +190,6 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
       }
       newWorldState <- removeAsset(state.contractOutputRef)
     } yield (state.contractOutputRef, output, newWorldState)
-  }
-
-  def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
-    for {
-      state <- getContractState(key)
-      code  <- getContractCode(state.codeHash)
-    } yield state.toObject(key, code.code)
   }
 
   def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
@@ -225,18 +214,6 @@ object WorldState {
       contractState: SparseMerkleTrie[Hash, ContractState],
       codeState: SparseMerkleTrie[Hash, CodeRecord]
   ) extends ImmutableWorldState {
-    def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
-      outputState.get(outputRef)
-    }
-
-    def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
-      outputState.getOpt(outputRef)
-    }
-
-    def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
-      outputState.exist(outputRef)
-    }
-
     def getAssetOutputs(
         outputRefPrefix: ByteString,
         maxOutputs: Int,
@@ -263,14 +240,6 @@ object WorldState {
           (outputRef, output) => outputRef.isContractType && output.isContract
         )
         .map(_.asUnsafe[(ContractOutputRef, ContractOutput)])
-    }
-
-    def getContractState(key: Hash): IOResult[ContractState] = {
-      contractState.get(key)
-    }
-
-    def getContractCode(key: Hash): IOResult[CodeRecord] = {
-      codeState.get(key)
     }
 
     def getContractStates(): IOResult[AVector[(ContractId, ContractState)]] = {
@@ -360,26 +329,6 @@ object WorldState {
     def outputState: MutableTrie[TxOutputRef, TxOutput]
     def contractState: MutableTrie[Hash, ContractState]
     def codeState: MutableTrie[Hash, CodeRecord]
-
-    def getOutput(outputRef: TxOutputRef): IOResult[TxOutput] = {
-      outputState.get(outputRef)
-    }
-
-    def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
-      outputState.getOpt(outputRef)
-    }
-
-    def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
-      outputState.exist(outputRef)
-    }
-
-    def getContractState(key: Hash): IOResult[ContractState] = {
-      contractState.get(key)
-    }
-
-    def getContractCode(key: Hash): IOResult[CodeRecord] = {
-      codeState.get(key)
-    }
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
