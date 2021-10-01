@@ -22,7 +22,6 @@ import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
 import org.alephium.protocol.{PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasBox
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -110,9 +109,8 @@ class MultisigTest extends AlephiumActorSpec {
 
     confirmTx(multisigTx, restPort)
 
-    val gasFee = defaultGasPrice * GasBox.unsafe(6000 * 4) // 2 inputs and 2 outputs
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
-      Balance.from(Amount(transferAmount.mulUnsafe(2) - amount - gasFee), Amount.Zero, 1)
+      Balance.from(Amount(transferAmount.mulUnsafe(2) - amount - defaultGasFee), Amount.Zero, 1)
 
     clique.stopMining()
     clique.stop()
