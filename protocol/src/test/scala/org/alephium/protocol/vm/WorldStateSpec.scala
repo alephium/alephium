@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
-import org.alephium.io.StorageFixture
+import org.alephium.io.{IOResult, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, U256}
@@ -44,13 +44,22 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     } yield (counterContract.toHalfDecoded(), contractState, outputRef, output)
   }
 
-  it should "test mutable world state" in {
+  // scalastyle:off method.length
+  def test[T](initialWorldState: WorldState[T]) = {
     val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
     val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
-    val contractKey                                      = contractOutputRef.key
+    val (_, _, contractOutputRef1, contractOutput1)      = generateContract.sample.get
+    val contractId                                       = contractOutputRef.key
+    val contractId1                                      = contractOutputRef1.key
 
     val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
-    val worldState  = WorldState.emptyCached(newDB)
+    var worldState  = initialWorldState
+
+    def update(f: => IOResult[T]) = f.rightValue match {
+      case _: Unit                      => ()
+      case newWorldState: WorldState[_] => worldState = newWorldState.asInstanceOf[WorldState[T]]
+      case _                            => ???
+    }
 
     worldState.getOutput(assetOutputRef).isLeft is true
     worldState.getOutput(contractOutputRef).isLeft is true
@@ -58,58 +67,60 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.removeAsset(assetOutputRef).isLeft is true
     worldState.removeAsset(contractOutputRef).isLeft is true
 
-    worldState.addAsset(assetOutputRef, assetOutput) isE ()
-    worldState.createContractUnsafe(
-      code,
-      Hash.zero,
-      state,
-      contractOutputRef,
-      contractOutput
-    ) isE ()
-
+    update(worldState.addAsset(assetOutputRef, assetOutput))
     worldState.getOutput(assetOutputRef) isE assetOutput
-    worldState.getOutput(contractOutputRef) isE contractOutput
+
+    update(
+      worldState.createContractUnsafe(
+        code,
+        Hash.zero,
+        state,
+        contractOutputRef,
+        contractOutput
+      )
+    )
     worldState.getContractObj(contractOutputRef.key) isE contractObj
+    worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+    worldState.getOutput(contractOutputRef) isE contractOutput
 
-    worldState.removeAsset(assetOutputRef) isE ()
-    worldState.removeContract(contractKey) isE ()
-
+    update(worldState.removeAsset(assetOutputRef))
     worldState.getOutput(assetOutputRef).isLeft is true
+
+    val newState = AVector[Val](Val.Bool(false))
+    assume(newState != state)
+    update(
+      worldState.createContractUnsafe(
+        code,
+        Hash.zero,
+        newState,
+        contractOutputRef1,
+        contractOutput1
+      )
+    )
+    worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
+    worldState.getContractObj(contractId1) isE
+      StatefulContractObject(code, contractObj.initialStateHash, newState, contractId1)
+
+    update(worldState.removeContract(contractId))
+    worldState.getContractObj(contractId).isLeft is true
     worldState.getOutput(contractOutputRef).isLeft is true
-    worldState.getContractObj(contractOutputRef.key).isLeft is true
+    worldState.getContractState(contractId).isLeft is true
+    worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+    worldState.removeContract(contractId).isLeft is true
+
+    update(worldState.removeContract(contractId1))
+    worldState.getContractObj(contractId1).isLeft is true
+    worldState.getOutput(contractOutputRef1).isLeft is true
+    worldState.getContractState(contractId).isLeft is true
+    worldState.getContractCode(code.hash).isLeft is true
+    worldState.removeContract(contractId1).isLeft is true
+  }
+
+  it should "test mutable world state" in {
+    test(WorldState.emptyCached(newDB))
   }
 
   it should "test immutable world state" in {
-
-    val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
-    val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
-    val contractKey                                      = contractOutputRef.key
-
-    val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
-    val worldState  = WorldState.emptyPersisted(newDB)
-
-    worldState.getOutput(assetOutputRef).isLeft is true
-    worldState.getOutput(contractOutputRef).isLeft is true
-    worldState.getContractObj(contractOutputRef.key).isLeft is true
-    worldState.removeAsset(assetOutputRef).isLeft is true
-    worldState.removeAsset(contractOutputRef).isLeft is true
-
-    val worldState0 = worldState.addAsset(assetOutputRef, assetOutput).rightValue
-    val worldState1 =
-      worldState0
-        .createContractUnsafe(code, Hash.zero, state, contractOutputRef, contractOutput)
-        .rightValue
-
-    worldState1.getOutput(assetOutputRef) isE assetOutput
-    worldState1.getOutput(contractOutputRef) isE contractOutput
-    worldState1.getContractObj(contractOutputRef.key) isE contractObj
-
-    val worldState2 = worldState1.removeAsset(assetOutputRef).toOption.get
-    val worldState3 = worldState2.removeContract(contractKey).toOption.get
-    val worldState4 = worldState3
-
-    worldState4.getOutput(assetOutputRef).isLeft is true
-    worldState4.getOutput(contractOutputRef).isLeft is true
-    worldState4.getContractObj(contractOutputRef.key).isLeft is true
+    test(WorldState.emptyPersisted(newDB))
   }
 }
