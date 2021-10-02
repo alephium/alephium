@@ -103,6 +103,9 @@ trait BlockFlowState extends FlowTipsUtil {
       }
     }
 
+  protected[core] val intraGroupHeaderChains: AVector[BlockHeaderChain] =
+    AVector.tabulate(groups)(group => blockHeaderChains(group)(group))
+
   def sanityCheckUnsafe(): Unit = {
     inBlockChains.foreach(_.foreach { chain =>
       chain.getAllTips.foreach { tip =>
