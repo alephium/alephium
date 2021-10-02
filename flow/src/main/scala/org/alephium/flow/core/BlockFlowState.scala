@@ -59,7 +59,7 @@ trait BlockFlowState extends FlowTipsUtil {
   def blockchainBuilder: Block => BlockChain
   def blockheaderChainBuilder: BlockHeader => BlockHeaderChain
 
-  protected[core] val intraGroupChains: AVector[BlockChainWithState] = {
+  protected[core] val intraGroupBlockChains: AVector[BlockChainWithState] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker) { groupShift =>
       val group        = brokerConfig.groupRange(groupShift)
       val genesisBlock = genesisBlocks(group)(group)
@@ -71,7 +71,7 @@ trait BlockFlowState extends FlowTipsUtil {
     AVector.tabulate(brokerConfig.groupNumPerBroker, groups) { (fromShift, to) =>
       val mainGroup = brokerConfig.groupRange(fromShift)
       if (mainGroup == to) {
-        intraGroupChains(fromShift)
+        intraGroupBlockChains(fromShift)
       } else {
         val genesisBlock = genesisBlocks(mainGroup)(to)
         blockchainBuilder(genesisBlock)
@@ -119,7 +119,7 @@ trait BlockFlowState extends FlowTipsUtil {
         require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
       }
     })
-    intraGroupChains.foreach { chain =>
+    intraGroupBlockChains.foreach { chain =>
       chain.getAllTips.foreach { tip =>
         require(chain.worldStateStorage.existsUnsafe(tip), "Tip should have its state trie stored")
       }
@@ -189,7 +189,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   protected def getBlockChainWithState(group: GroupIndex): BlockChainWithState = {
     assume(brokerConfig.contains(group))
-    intraGroupChains(brokerConfig.groupIndexOfBroker(group))
+    intraGroupBlockChains(brokerConfig.groupIndexOfBroker(group))
   }
 
   def getHeaderChain(chainIndex: ChainIndex): BlockHeaderChain
