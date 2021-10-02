@@ -48,6 +48,7 @@ trait EmptyBlockFlow extends BlockFlow {
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
   def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]]                    = ???
   def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)]                        = ???
+  def getBestIntraGroupTip(): BlockHash                                                        = ???
   def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]              = ???
   def add(header: BlockHeader): IOResult[Unit]                                                 = ???
   def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = ???
