@@ -485,10 +485,14 @@ trait FlowFixture
     blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * weightRatio
   }
 
-  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
+  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader): Assertion = {
     val headerValidation = HeaderValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
     headerValidation.validate(header, blockFlow).isRight is true
     blockFlow.addAndUpdateView(header).isRight is true
+  }
+
+  def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
+    addAndCheck(blockFlow, header)
     blockFlow.getWeight(header) isE consensusConfig.minBlockWeight * weightFactor
   }
 

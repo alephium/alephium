@@ -474,7 +474,7 @@ class BlockFlowSpec extends AlephiumSpec {
     checkBalance(blockFlow, testGroup, genesisBalance - ALF.alf(1))
   }
 
-  it should "transfer token for inter-group transactions" in new FlowFixture { Test =>
+  trait InterGroupFixture extends FlowFixture { Test =>
     val anotherBroker = (brokerConfig.brokerId + 1 + Random.nextInt(
       brokerConfig.brokerNum - 1
     )) % brokerConfig.brokerNum
@@ -491,7 +491,9 @@ class BlockFlowSpec extends AlephiumSpec {
     config.genesisBlocks is anotherConfig.genesisBlocks
     val blockFlow0 = BlockFlow.fromGenesisUnsafe(config, storages)
     val blockFlow1 = BlockFlow.fromGenesisUnsafe(anotherConfig, anotherStorages)
+  }
 
+  it should "transfer token for inter-group transactions" in new InterGroupFixture {
     val fromGroup = UnsecureRandom.sample(brokerConfig.groupRange)
     val toGroup   = UnsecureRandom.sample(anotherConfig.broker.groupRange)
 
@@ -521,6 +523,17 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   behavior of "Utilities"
+
+  it should "find the best tip" in new InterGroupFixture {
+    val fromGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+
+    val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
+    addAndCheck(blockFlow0, block)
+    addAndCheck(blockFlow1, block.header)
+
+    blockFlow0.getBestIntraGroupTip() is block.hash
+    blockFlow1.getBestIntraGroupTip() is block.hash
+  }
 
   it should "cache blocks & headers during initialization" in new FlowFixture {
     blockFlow.getGroupCache(GroupIndex.unsafe(0)).size is 5

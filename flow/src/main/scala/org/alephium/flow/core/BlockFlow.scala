@@ -111,6 +111,8 @@ trait BlockFlow
   def isRecent(data: FlowData): Boolean = {
     data.timestamp > TimeStamp.now().minusUnsafe(consensusConfig.recentBlockTimestampDiff)
   }
+
+  def getBestIntraGroupTip(): BlockHash
 }
 
 object BlockFlow extends StrictLogging {
