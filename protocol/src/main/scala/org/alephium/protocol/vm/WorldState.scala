@@ -24,10 +24,10 @@ import org.alephium.protocol.model._
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
-trait WorldState[T] {
-  def outputState: ReadableTrie[TxOutputRef, TxOutput]
-  def contractState: ReadableTrie[Hash, ContractState]
-  def codeState: ReadableTrie[Hash, WorldState.CodeRecord]
+trait WorldState[T, R1, R2, R3] {
+  def outputState: MutableTrie[TxOutputRef, TxOutput, R1]
+  def contractState: MutableTrie[Hash, ContractState, R2]
+  def codeState: MutableTrie[Hash, WorldState.CodeRecord, R3]
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def getAsset(outputRef: AssetOutputRef): IOResult[AssetOutput] = {
@@ -69,11 +69,17 @@ trait WorldState[T] {
 
   def getContractAsset(key: Hash): IOResult[ContractOutput] = {
     for {
-      state     <- getContractState(key)
-      outputRaw <- getOutput(state.contractOutputRef)
+      state  <- getContractState(key)
+      output <- getContractAsset(state.contractOutputRef)
+    } yield output
+  }
+
+  def getContractAsset(outputRef: ContractOutputRef): IOResult[ContractOutput] = {
+    for {
+      outputRaw <- getOutput(outputRef)
       output <- outputRaw match {
         case _: AssetOutput =>
-          val error = s"ContractOutput expected, but got AssetOutput for contract $key"
+          val error = s"ContractOutput expected, but got AssetOutput at $outputRef"
           Left(IOError.Other(new RuntimeException(error)))
         case o: ContractOutput =>
           Right(o)
@@ -107,6 +113,20 @@ trait WorldState[T] {
   def removeAsset(outputRef: TxOutputRef): IOResult[T]
 
   def removeContract(contractKey: Hash): IOResult[T]
+
+  protected def removeContractCode(
+      currentState: ContractState,
+      currentRecord: WorldState.CodeRecord
+  ): IOResult[R3] = {
+    if (currentRecord.refCount > 1) {
+      codeState.put(
+        currentState.codeHash,
+        currentRecord.copy(refCount = currentRecord.refCount - 1)
+      )
+    } else {
+      codeState.remove(currentState.codeHash)
+    }
+  }
 
   def persist(): IOResult[WorldState.Persisted]
 
@@ -142,20 +162,12 @@ trait WorldState[T] {
   ): IOResult[AVector[(AssetOutputRef, AssetOutput)]]
 }
 
-sealed abstract class MutableWorldState extends WorldState[Unit] {
+sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Unit] {
   def useContractAsset(contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
     for {
-      state     <- getContractState(contractId)
-      outputRaw <- getOutput(state.contractOutputRef)
-      output <- outputRaw match {
-        case _: AssetOutput =>
-          val error =
-            s"ContractOutput expected, but got AssetOutput for contract $contractId"
-          Left(IOError.Other(new RuntimeException(error)))
-        case o: ContractOutput =>
-          Right(o)
-      }
-      _ <- removeAsset(state.contractOutputRef)
+      state  <- getContractState(contractId)
+      output <- getContractAsset(state.contractOutputRef)
+      _      <- removeAsset(state.contractOutputRef)
     } yield (state.contractOutputRef, output)
   }
 
@@ -173,25 +185,14 @@ sealed abstract class MutableWorldState extends WorldState[Unit] {
   ): IOResult[Unit]
 }
 
-sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState] {
-  def useContractAsset(
-      contractId: ContractId
-  ): IOResult[(ContractOutputRef, ContractOutput, ImmutableWorldState)] = {
-    for {
-      state     <- getContractState(contractId)
-      outputRaw <- getOutput(state.contractOutputRef)
-      output <- outputRaw match {
-        case _: AssetOutput =>
-          val error =
-            s"ContractOutput expected, but got AssetOutput for contract $contractId"
-          Left(IOError.Other(new RuntimeException(error)))
-        case o: ContractOutput =>
-          Right(o)
-      }
-      newWorldState <- removeAsset(state.contractOutputRef)
-    } yield (state.contractOutputRef, output, newWorldState)
-  }
-
+// scalastyle:off no.whitespace.after.left.bracket
+sealed abstract class ImmutableWorldState
+    extends WorldState[
+      ImmutableWorldState,
+      SparseMerkleTrie[TxOutputRef, TxOutput],
+      SparseMerkleTrie[Hash, ContractState],
+      SparseMerkleTrie[Hash, WorldState.CodeRecord]
+    ] {
   def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
     for {
       oldState <- getContractState(key)
@@ -199,6 +200,7 @@ sealed abstract class ImmutableWorldState extends WorldState[ImmutableWorldState
     } yield newState
   }
 }
+// scalastyle:on
 
 object WorldState {
   val expectedAssetError: IOError = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
@@ -207,6 +209,12 @@ object WorldState {
   object CodeRecord {
     implicit val serde: Serde[CodeRecord] =
       Serde.forProduct2(CodeRecord.apply, t => (t.code, t.refCount))
+
+    def from(code: StatefulContract.HalfDecoded, recordOpt: Option[CodeRecord]): CodeRecord =
+      recordOpt match {
+        case Some(record) => record.copy(refCount = record.refCount + 1)
+        case None         => CodeRecord(code, 1)
+      }
   }
 
   final case class Persisted(
@@ -268,12 +276,8 @@ object WorldState {
       for {
         newOutputState   <- outputState.put(outputRef, output)
         newContractState <- contractState.put(outputRef.key, state)
-        codeOpt          <- codeState.getOpt(code.hash)
-        newCodeState <- codeOpt match {
-          case Some(codeRecord) =>
-            codeState.put(code.hash, codeRecord.copy(refCount = codeRecord.refCount + 1))
-          case None => codeState.put(code.hash, CodeRecord(code, 1))
-        }
+        recordOpt        <- codeState.getOpt(code.hash)
+        newCodeState     <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
       } yield Persisted(newOutputState, newContractState, newCodeState)
     }
 
@@ -303,12 +307,7 @@ object WorldState {
         newOutputState   <- outputState.remove(state.contractOutputRef)
         newContractState <- contractState.remove(contractKey)
         codeRecord       <- codeState.get(state.codeHash)
-        newCodeState <-
-          if (codeRecord.refCount > 1) {
-            codeState.put(state.codeHash, codeRecord.copy(refCount = codeRecord.refCount - 1))
-          } else {
-            codeState.remove(state.codeHash)
-          }
+        newCodeState     <- removeContractCode(state, codeRecord)
       } yield Persisted(newOutputState, newContractState, newCodeState)
     }
 
@@ -326,9 +325,9 @@ object WorldState {
   }
 
   sealed abstract class AbstractCached extends MutableWorldState {
-    def outputState: MutableTrie[TxOutputRef, TxOutput]
-    def contractState: MutableTrie[Hash, ContractState]
-    def codeState: MutableTrie[Hash, CodeRecord]
+    def outputState: MutableTrie[TxOutputRef, TxOutput, Unit]
+    def contractState: MutableTrie[Hash, ContractState, Unit]
+    def codeState: MutableTrie[Hash, CodeRecord, Unit]
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
@@ -343,14 +342,10 @@ object WorldState {
     ): IOResult[Unit] = {
       val state = ContractState.unsafe(code, initialStateHash, fields, outputRef)
       for {
-        _       <- outputState.put(outputRef, output)
-        _       <- contractState.put(outputRef.key, state)
-        codeOpt <- codeState.getOpt(code.hash)
-        _ <- codeOpt match {
-          case Some(codeRecord) =>
-            codeState.put(code.hash, codeRecord.copy(refCount = codeRecord.refCount + 1))
-          case None => codeState.put(code.hash, CodeRecord(code, 1))
-        }
+        _         <- outputState.put(outputRef, output)
+        _         <- contractState.put(outputRef.key, state)
+        recordOpt <- codeState.getOpt(code.hash)
+        _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
       } yield ()
     }
 
@@ -379,13 +374,8 @@ object WorldState {
         state      <- getContractState(contractKey)
         _          <- outputState.remove(state.contractOutputRef)
         codeRecord <- codeState.get(state.codeHash)
-        _ <-
-          if (codeRecord.refCount > 1) {
-            codeState.put(state.codeHash, codeRecord.copy(refCount = codeRecord.refCount - 1))
-          } else {
-            codeState.remove(state.codeHash)
-          }
-        _ <- contractState.remove(contractKey)
+        _          <- removeContractCode(state, codeRecord)
+        _          <- contractState.remove(contractKey)
       } yield ()
     }
 

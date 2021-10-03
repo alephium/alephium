@@ -45,7 +45,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   }
 
   // scalastyle:off method.length
-  def test[T](initialWorldState: WorldState[T]) = {
+  def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3]) = {
     val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
     val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
     val (_, _, contractOutputRef1, contractOutput1)      = generateContract.sample.get
@@ -56,9 +56,10 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     var worldState  = initialWorldState
 
     def update(f: => IOResult[T]) = f.rightValue match {
-      case _: Unit                      => ()
-      case newWorldState: WorldState[_] => worldState = newWorldState.asInstanceOf[WorldState[T]]
-      case _                            => ???
+      case _: Unit => ()
+      case newWorldState: WorldState[_, _, _, _] =>
+        worldState = newWorldState.asInstanceOf[WorldState[T, R1, R2, R3]]
+      case _ => ???
     }
 
     worldState.getOutput(assetOutputRef).isLeft is true

@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.util.discard
 
-abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTrie[K, V] {
+abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTrie[K, V, Unit] {
   def underlying: ReadableTrie[K, V]
 
   def caches: mutable.Map[K, C]
