@@ -161,8 +161,8 @@ object GasLog {
 object GasSchedule {
   val callGas: GasBox = GasBox.unsafe(200)
 
-  def contractLoadGas(roughContractSize: Int): GasBox = {
-    GasBox.unsafe(800 + GasFormula.wordLength(roughContractSize))
+  def contractLoadGas(estimatedContractSize: Int): GasBox = {
+    GasBox.unsafe(800 + GasFormula.wordLength(estimatedContractSize))
   }
 
   val contractStateUpdateBaseGas: GasBox = GasBox.unsafe(5000)
