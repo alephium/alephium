@@ -25,7 +25,7 @@ import scala.util.Random
 import org.alephium.macros.HPC
 
 /*
- * Immutable vector that is optimized for appending
+ * Immutable vector that is optimized for appending, not synchronized
  */
 // scalastyle:off number.of.methods return
 @SuppressWarnings(Array("org.wartremover.warts.While"))
@@ -44,7 +44,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   def length: Int = end - start
 
-  @volatile var appendable: Boolean
+  var appendable: Boolean
 
   def isEmpty: Boolean = length == 0
 
