@@ -122,7 +122,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     watch(probe.ref)
 
     probe.send(IO(Tcp), Tcp.Connect(bindAddress))
-    probe.expectMsgType[Tcp.Connected]
+    eventually(probe.expectMsgType[Tcp.Connected])
     eventually(minerApiController.underlyingActor.pendings.length is 1)
     probe.reply(Tcp.Register(probe.ref))
   }
