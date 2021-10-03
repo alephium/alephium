@@ -121,10 +121,12 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "charge IO fee once when loading a contract multiple times" in new Fixture {
-    val (contractId, _) = createContract()
+    val (contractId, contract) = createContract()
     pool.gasRemaining is initialGas
     pool.loadContractObj(contractId).rightValue
-    pool.gasRemaining is initialGas.use(GasSchedule.contractLoadGas).rightValue
+    pool.gasRemaining is initialGas
+      .use(GasSchedule.contractLoadGas(contract.toHalfDecoded().methodsBytes.length))
+      .rightValue
     val remainingGas = pool.gasRemaining
     pool.loadContractObj(contractId).rightValue
     pool.gasRemaining is remainingGas
@@ -135,12 +137,15 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     val obj             = pool.loadContractObj(contractId).rightValue
     val gasRemaining    = pool.gasRemaining
     pool.updateContractStates().rightValue // no updates
+    pool.gasRemaining is gasRemaining
     pool.worldState.getContractState(contractId).rightValue.fields is fields(1)
     pool.gasRemaining is gasRemaining
     obj.setField(0, Val.False)
     pool.updateContractStates().rightValue
     pool.worldState.getContractState(contractId).rightValue.fields is AVector[Val](Val.False)
-    pool.gasRemaining is gasRemaining.use(GasSchedule.contractUpdateGas).rightValue
+    pool.gasRemaining is gasRemaining
+      .use(GasSchedule.contractStateUpdateBaseGas.addUnsafe(GasBox.unsafe(1)))
+      .rightValue
   }
 
   it should "market assets properly" in new Fixture {

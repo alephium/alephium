@@ -239,10 +239,10 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkNetworkId(tx)
-      _ <- checkInputNum(tx)
+      _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
-      _ <- checkOutputAmount(tx)
+      _ <- checkOutputStats(tx)
       _ <- checkChainIndex(tx, chainIndex)
       _ <- checkUniqueInputs(tx, checkDoubleSpending)
       _ <- checkOutputDataSize(tx)
@@ -286,10 +286,10 @@ trait TxValidation {
   // format off for the sake of reading and checking rules
   // format: off
   protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit]
+  protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
-  protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256]
+  protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256]
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
   protected[validation] def checkChainIndex(tx: Transaction, expected: ChainIndex): TxValidationResult[Unit]
   protected[validation] def checkUniqueInputs(tx: Transaction, checkDoubleSpending: Boolean): TxValidationResult[Unit]
@@ -327,8 +327,23 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkInputNum(tx: Transaction): TxValidationResult[Unit] = {
-      val inputNum = tx.unsigned.inputs.length
+    protected[validation] def checkInputNum(
+        tx: Transaction,
+        isIntraGroup: Boolean
+    ): TxValidationResult[Unit] = {
+      if (isIntraGroup) checkIntraGroupInputNum(tx) else checkInterGroupInputNum(tx)
+    }
+    protected[validation] def checkIntraGroupInputNum(tx: Transaction): TxValidationResult[Unit] = {
+      checkInputNumCommon(tx.inputsLength)
+    }
+    protected[validation] def checkInterGroupInputNum(tx: Transaction): TxValidationResult[Unit] = {
+      if (tx.contractInputs.nonEmpty) {
+        invalidTx(ContractInputForInterGroupTx)
+      } else {
+        checkInputNumCommon(tx.unsigned.inputs.length)
+      }
+    }
+    protected[validation] def checkInputNumCommon(inputNum: Int): TxValidationResult[Unit] = {
       // inputNum can be 0 due to coinbase tx
       if (inputNum > ALF.MaxTxInputNum) {
         invalidTx(TooManyInputs)
@@ -379,25 +394,27 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkOutputAmount(tx: Transaction): TxValidationResult[U256] = {
+    protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256] = {
       for {
-        _      <- checkEachOutputAmount(tx)
+        _      <- checkEachOutputStats(tx)
         amount <- checkAlfOutputAmount(tx)
       } yield amount
     }
 
-    protected[validation] def checkEachOutputAmount(
+    protected[validation] def checkEachOutputStats(
         tx: Transaction
     ): TxValidationResult[Unit] = {
       val ok = tx.unsigned.fixedOutputs.forall(checkOutputAmount) &&
         tx.generatedOutputs.forall(checkOutputAmount)
-      if (ok) validTx(()) else invalidTx(AmountIsDustOrZero)
+      if (ok) validTx(()) else invalidTx(InvalidOutputStats)
     }
 
     @inline private def checkOutputAmount(
         output: TxOutput
     ): Boolean = {
-      output.amount >= dustUtxoAmount && output.tokens.forall(_._2.nonZero)
+      output.amount >= dustUtxoAmount &&
+      output.tokens.length <= maxTokenPerUtxo &&
+      output.tokens.forall(_._2.nonZero)
     }
 
     protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256] = {
@@ -716,7 +733,7 @@ object TxValidation {
       } else {
         fromExeResult(
           for {
-            remaining0 <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
+            remaining0 <- VM.checkCodeSize(gasRemaining, script.bytes)
             remaining1 <- remaining0.use(GasHash.gas(script.bytes.length))
             exeResult  <- StatelessVM.runAssetScript(blockEnv, txEnv, remaining1, script, params)
           } yield exeResult.gasRemaining,
@@ -790,7 +807,7 @@ object TxValidation {
         blockEnv: BlockEnv
     ): ExeResult[StatefulVM.TxScriptExecution] = {
       for {
-        remaining <- gasRemaining.use(GasCall.scriptBaseGas(script.bytes.length))
+        remaining <- VM.checkCodeSize(gasRemaining, script.bytes)
         result <-
           StatefulVM.runTxScript(
             worldState,

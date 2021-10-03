@@ -660,15 +660,14 @@ case object ByteVecSize extends StatelessInstrSimpleGas with StatelessInstrCompa
     } yield ()
   }
 }
-case object ByteVecConcat
-    extends StatelessInstrSimpleGas
-    with StatelessInstrCompanion0
-    with GasVeryLow {
-  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 with GasBytesConcat {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v2 <- frame.popOpStackT[Val.ByteVec]()
       v1 <- frame.popOpStackT[Val.ByteVec]()
-      _  <- frame.pushOpStack(Val.ByteVec(v1.bytes ++ v2.bytes))
+      result = Val.ByteVec(v1.bytes ++ v2.bytes)
+      _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
+      _ <- frame.pushOpStack(result)
     } yield ()
   }
 }
@@ -1093,7 +1092,7 @@ sealed trait ContractInstr
     with StatefulInstrCompanion0
     with GasSimple {}
 
-sealed trait CreateContractAbstract extends ContractInstr with GasCreate {
+sealed trait CreateContractAbstract extends ContractInstr {
   @inline protected def getTokenAmount[C <: StatefulContext](
       frame: Frame[C],
       issueToken: Boolean
@@ -1102,17 +1101,19 @@ sealed trait CreateContractAbstract extends ContractInstr with GasCreate {
   }
 }
 
-sealed trait CreateContractBase extends CreateContractAbstract {
+sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
   val fieldsSerde: Serde[AVector[Val]] = serdeImpl[AVector[Val]]
 
   def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
       tokenAmount     <- getTokenAmount(frame, issueToken)
       fields          <- frame.popFields()
+      _               <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractCodeRaw <- frame.popOpStackT[Val.ByteVec]()
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
+      _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
       _ <- {
         val initialStateHash =
@@ -1135,11 +1136,12 @@ object CreateContractWithToken extends CreateContractBase {
   }
 }
 
-sealed trait CopyCreateContractBase extends CreateContractAbstract {
+sealed trait CopyCreateContractBase extends CreateContractAbstract with GasCopyCreate {
   def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
       tokenAmount <- getTokenAmount(frame, issueToken)
       fields      <- frame.popFields()
+      _           <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
       _ <- {

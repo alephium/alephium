@@ -79,7 +79,7 @@ class ContextSpec
     context.generateOutput(newOutput) isE ()
     context.worldState.getContractAsset(contractId) isE newOutput
     (initialGas.value -
-      GasSchedule.contractLoadGas.value -
+      GasSchedule.contractLoadGas(StatefulContract.forSMT.methodsBytes.length).value -
       GasSchedule.txInputBaseGas.value -
       GasSchedule.txOutputBaseGas.value) is context.gasRemaining.value
     context.generatedOutputs.size is 2

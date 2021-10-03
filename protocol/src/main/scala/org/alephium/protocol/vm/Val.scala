@@ -26,6 +26,8 @@ sealed trait Val extends Any {
   def tpe: Val.Type
 
   def toByteVec(): Val.ByteVec
+
+  def estimateByteSize(): Int
 }
 
 // scalastyle:off number.of.methods
@@ -87,27 +89,40 @@ object Val {
     def or(other: Val.Bool): Val.Bool  = Val.Bool(v || other.v)
 
     override def toByteVec(): ByteVec = ByteVec(encode(v))
+
+    override def estimateByteSize(): Int = 1
   }
   final case class I256(v: util.I256) extends Val {
     def tpe: Val.Type = I256
 
     override def toByteVec(): ByteVec = ByteVec(encode(v))
+
+    override def estimateByteSize(): Int = 32
   }
   final case class U256(v: util.U256) extends Val {
     def tpe: Val.Type = U256
 
     override def toByteVec(): ByteVec = ByteVec(encode(v))
+
+    override def estimateByteSize(): Int = 32
   }
 
   final case class ByteVec(bytes: ByteString) extends AnyVal with Val {
     def tpe: Val.Type = ByteVec
 
     override def toByteVec(): ByteVec = this
+
+    override def estimateByteSize(): Int = bytes.length
   }
   final case class Address(lockupScript: LockupScript) extends AnyVal with Val {
     def tpe: Val.Type = Address
 
     override def toByteVec(): ByteVec = ByteVec(encode(lockupScript))
+
+    override def estimateByteSize(): Int = lockupScript match {
+      case LockupScript.P2MPKH(mpkh, _) => mpkh.length * 32
+      case _                            => 32
+    }
   }
 
   object Bool extends Type {

@@ -32,8 +32,8 @@ object ALF {
   val GenesisTimestamp: TimeStamp = TimeStamp.unsafe(1231006505000L) // BTC genesis timestamp
   val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1630879601000L) // 2021-09-05T22:06:37+00:00
 
-  val MaxTxInputNum: Int     = 512
-  val MaxTxOutputNum: Int    = 512
+  val MaxTxInputNum: Int     = 256
+  val MaxTxOutputNum: Int    = 256
   val MaxOutputDataSize: Int = 256
   //scalastyle:on magic.number
 

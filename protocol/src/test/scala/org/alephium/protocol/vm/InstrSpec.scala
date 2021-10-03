@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Signature
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.protocol.model.Target
@@ -223,7 +225,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "test gas amount" in {
+  it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
     def byte: Byte = bytes.sample()
@@ -242,7 +244,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256Add -> 3, U256Sub -> 3, U256Mul -> 5, U256Div -> 5, U256Mod -> 5, U256Eq -> 3, U256Neq -> 3, U256Lt -> 3, U256Le -> 3, U256Gt -> 3, U256Ge -> 3,
       U256ModAdd -> 8, U256ModSub -> 8, U256ModMul -> 8, U256BitAnd -> 5, U256BitOr -> 5, U256Xor -> 5, U256SHL -> 5, U256SHR -> 5,
       I256ToU256 -> 3, I256ToByteVec -> 5, U256ToI256 -> 3, U256ToByteVec -> 5,
-      ByteVecEq -> 4, ByteVecNeq -> 4, ByteVecSize -> 2, ByteVecConcat -> 3, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
+      ByteVecEq -> 4, ByteVecNeq -> 4, ByteVecSize -> 2, ByteVecConcat -> 1, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
       IsAssetAddress -> 3, IsContractAddress -> 3,
       Jump(int) -> 8, IfTrue(int) -> 8, IfFalse(int) -> 8,
       /* CallLocal(byte) -> ???, */ Return -> 0,
@@ -250,13 +252,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log1 -> 4, Log2 -> 5, Log3 -> 6, Log4 -> 7, Log5 -> 8
+      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
       ApproveAlf -> 30, ApproveToken -> 30, AlfRemaining -> 30, TokenRemaining -> 30, IsPaying -> 30,
       TransferAlf -> 30, TransferAlfFromSelf -> 30, TransferAlfToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
-      CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 32000, DestroySelf -> 5000, SelfContractId -> 3, SelfAddress -> 3,
+      CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, ContractInitialStateHash -> 5
     )
     // format: on
@@ -266,6 +268,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     def test(instr: Instr[_], gas: Int) = {
       instr match {
         case i: ToByteVecInstr[_, _] => testToByteVec(i, gas)
+        case _: ByteVecConcat.type   => testByteVecConcatGas(gas)
         case i: LogInstr             => testLog(i, gas)
         case i: GasSimple            => i.gas().value is gas
         case i: GasFormula           => i.gas(32).value is gas
@@ -277,6 +280,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       case i: U256ToByteVec.type    => i.gas(33).value is gas
       case i: AddressToByteVec.type => i.gas(33).value is gas
       case _                        => true is false
+    }
+    def testByteVecConcatGas(gas: Int) = {
+      val frame = genStatefulFrame()
+      frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](123)))) isE ()
+      frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](200)))) isE ()
+      val initialGas = frame.ctx.gasRemaining
+      ByteVecConcat.runWith(frame) isE ()
+      (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
     }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas

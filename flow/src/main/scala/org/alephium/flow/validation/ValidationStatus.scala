@@ -124,14 +124,14 @@ object ValidationStatus {
 sealed trait InvalidTxStatus extends InvalidStatus
 
 final case object InvalidNetworkId                              extends InvalidTxStatus
-final case object NoInputs                                      extends InvalidTxStatus
 final case object TooManyInputs                                 extends InvalidTxStatus
+final case object ContractInputForInterGroupTx                  extends InvalidTxStatus
 final case object NoOutputs                                     extends InvalidTxStatus
 final case object TooManyOutputs                                extends InvalidTxStatus
 final case object GeneratedOutputForInterGroupTx                extends InvalidTxStatus
 final case object InvalidStartGas                               extends InvalidTxStatus
 final case object InvalidGasPrice                               extends InvalidTxStatus
-final case object AmountIsDustOrZero                            extends InvalidTxStatus
+final case object InvalidOutputStats                            extends InvalidTxStatus
 final case object DuplicatedInputs                              extends InvalidTxStatus
 final case object InvalidInputGroupIndex                        extends InvalidTxStatus
 final case object InvalidOutputGroupIndex                       extends InvalidTxStatus

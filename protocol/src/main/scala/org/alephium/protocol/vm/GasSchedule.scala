@@ -99,6 +99,14 @@ object GasBytesEq {
   def gas(byteLength: Int): GasBox = GasBox.unsafe(gasPerWord * GasFormula.wordLength(byteLength))
 }
 
+trait GasBytesConcat extends GasFormula {
+  def gas(byteLength: Int): GasBox = GasBytesConcat.gas(byteLength)
+}
+object GasBytesConcat {
+  val gasPerByte: Int              = 1
+  def gas(byteLength: Int): GasBox = GasBox.unsafe(byteLength * gasPerByte)
+}
+
 @Gas
 trait GasSignature extends GasSimple
 object GasSignature {
@@ -112,9 +120,15 @@ object GasCreate {
 }
 
 @Gas
+trait GasCopyCreate extends GasSimple
+object GasCopyCreate {
+  val gas: GasBox = GasBox.unsafe(24000)
+}
+
+@Gas
 trait GasDestroy extends GasSimple
 object GasDestroy {
-  val gas: GasBox = GasBox.unsafe(5000)
+  val gas: GasBox = GasSchedule.txInputBaseGas
 }
 
 @Gas
@@ -127,36 +141,40 @@ trait GasCall extends GasFormula {
   def gas(size: Int): GasBox = ??? // should call the companion object instead
 }
 object GasCall {
-  val gasPerScriptByte: Int = 1
   def scriptBaseGas(byteLength: Int): GasBox =
-    GasBox.unsafe(gasPerScriptByte * byteLength + GasSchedule.callGas.value)
+    GasBox.unsafe(byteLength + GasSchedule.callGas.value)
+
+  def fieldsBaseGas(byteLength: Int): GasBox =
+    GasBox.unsafe(byteLength)
 }
 
 trait GasLog extends GasFormula {
   def gas(n: Int): GasBox = GasLog.gas(n)
 }
 object GasLog {
-  val gasBase: Int    = 3
-  val gasPerData: Int = 1
+  val gasBase: Int    = 100
+  val gasPerData: Int = 20
 
   def gas(n: Int): GasBox = GasBox.unsafe(gasBase + gasPerData * n)
 }
 
 object GasSchedule {
-  val callGas: GasBox           = GasBox.unsafe(200)
-  val contractLoadGas: GasBox   = GasBox.unsafe(800)
-  val contractUpdateGas: GasBox = GasBox.unsafe(5000)
+  val callGas: GasBox = GasBox.unsafe(200)
+
+  def contractLoadGas(estimatedContractSize: Int): GasBox = {
+    GasBox.unsafe(800 + GasFormula.wordLength(estimatedContractSize))
+  }
+
+  val contractStateUpdateBaseGas: GasBox = GasBox.unsafe(5000)
 
   /*
    * The gas cost of a transaction consists of 4 parts
    * 1. a fixed base gas for each transaction
    * 2. gas for each input including the auto generated contract inputs:
    *    2.1. gas for removing the input from the blockchain state trie
-   *    2.2. data gas based on the length of the serialized input
-   *    2.3. execution gas for the unlock script of the input
+   *    2.2. execution gas for the unlock script of the input
    * 3. gas for each output including the auto generated vm outputs:
    *    3.1. gas for adding the output into the blockchain state trie
-   *    3.2. data gas based on the length of the serialized output
    * 4. execution gas for the optional tx script
    */
   val txBaseGas: GasBox       = GasBox.unsafe(1000)

@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, SignatureSchema}
@@ -467,5 +468,36 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       )
     val contract = StatefulContract(2, methods = AVector(method))
     serialize(contract)(StatefulContract.serde).nonEmpty is true
+  }
+
+  it should "check code size" in {
+    VM
+      .checkCodeSize(minimalGas, ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024 + 1)))
+      .leftValue isE CodeSizeTooLarge
+    VM
+      .checkCodeSize(
+        GasBox.unsafe(200 + 12 * 1024 - 1),
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024))
+      )
+      .leftValue isE OutOfGas
+    VM.checkCodeSize(
+      GasBox.unsafe(200 + 12 * 1024),
+      ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024))
+    ) isE GasBox.zero
+  }
+
+  it should "check field size" in {
+    VM.checkFieldSize(
+      minimalGas,
+      Seq(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](3 * 1024 + 1))))
+    ).leftValue isE FieldsSizeTooLarge
+    VM.checkFieldSize(
+      GasBox.unsafe(122),
+      Seq(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](123))))
+    ).leftValue isE OutOfGas
+    VM.checkFieldSize(
+      GasBox.unsafe(123),
+      Seq(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](123))))
+    ) isE GasBox.zero
   }
 }

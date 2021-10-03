@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
+
 trait CostStrategy {
   var gasRemaining: GasBox
 
@@ -25,15 +27,42 @@ trait CostStrategy {
     chargeGas(instr.gas(size))
   }
 
-  def chargeContractLoad(): ExeResult[Unit] = chargeGas(GasSchedule.contractLoadGas)
+  def chargeContractLoad(obj: StatefulContractObject): ExeResult[Unit] = {
+    chargeContractLoad(obj.estimateByteSize())
+  }
 
-  def chargeContractUpdate(): ExeResult[Unit] = chargeGas(GasSchedule.contractUpdateGas)
+  def chargeContractLoad(size: Int): ExeResult[Unit] = {
+    chargeGas(GasSchedule.contractLoadGas(size))
+  }
+
+  def chargeContractStateUpdate(obj: StatefulContractObject): ExeResult[Unit] = {
+    chargeContractStateUpdate(obj.fields)
+  }
+
+  def chargeContractStateUpdate(fields: Iterable[Val]): ExeResult[Unit] = {
+    for {
+      _ <- chargeGas(GasSchedule.contractStateUpdateBaseGas)
+      _ <- chargeFieldSize(fields)
+    } yield ()
+  }
 
   def chargeContractInput(): ExeResult[Unit] = chargeGas(GasSchedule.txInputBaseGas)
 
   def chargeGeneratedOutput(): ExeResult[Unit] = chargeGas(GasSchedule.txOutputBaseGas)
 
   def chargeGas(gas: GasBox): ExeResult[Unit] = {
-    gasRemaining.use(gas).map(gasRemaining = _)
+    updateGas(gasRemaining.use(gas))
+  }
+
+  def chargeFieldSize(fields: Iterable[Val]): ExeResult[Unit] = {
+    updateGas(VM.checkFieldSize(gasRemaining, fields))
+  }
+
+  def chargeCodeSize(codeBytes: ByteString): ExeResult[Unit] = {
+    updateGas(VM.checkCodeSize(gasRemaining, codeBytes))
+  }
+
+  @inline private def updateGas(f: => ExeResult[GasBox]): ExeResult[Unit] = {
+    f.map(gasRemaining = _)
   }
 }

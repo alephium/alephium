@@ -24,7 +24,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.util.AVector
 
-trait BlockFlowGroupView[WS <: WorldState[_]] {
+trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   def worldState: WS
 
   def getPreOutput(outputRef: TxOutputRef): IOResult[Option[TxOutput]]
@@ -90,14 +90,14 @@ trait BlockFlowGroupView[WS <: WorldState[_]] {
 }
 
 object BlockFlowGroupView {
-  def onlyBlocks[WS <: WorldState[_]](
+  def onlyBlocks[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache]
   ): BlockFlowGroupView[WS] = {
     new Impl0[WS](worldState, blockCaches)
   }
 
-  def includePool[WS <: WorldState[_]](
+  def includePool[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache],
       mempool: MemPool
@@ -105,7 +105,7 @@ object BlockFlowGroupView {
     new Impl1[WS](worldState, blockCaches, mempool)
   }
 
-  private class Impl0[WS <: WorldState[_]](
+  private class Impl0[WS <: WorldState[_, _, _, _]](
       _worldState: WS,
       blockCaches: AVector[BlockCache]
   ) extends BlockFlowGroupView[WS] {
@@ -203,7 +203,7 @@ object BlockFlowGroupView {
     }
   }
 
-  private class Impl1[WS <: WorldState[_]](
+  private class Impl1[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache],
       mempool: MemPool
