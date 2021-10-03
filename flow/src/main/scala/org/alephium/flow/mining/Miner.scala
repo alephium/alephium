@@ -58,15 +58,17 @@ object Miner extends LazyLogging {
       groupConfig: GroupConfig,
       miningConfig: MiningSetting
   ): Option[(Nonce, U256)] = {
-    val nonceArray = Array.ofDim[Byte](Nonce.byteLength)
-    SecureAndSlowRandom.source.nextBytes(nonceArray)
+    val noncePostfixArray = Array.ofDim[Byte](Nonce.byteLength - 4)
+    UnsecureRandom.source.nextBytes(noncePostfixArray)
+    val noncePostfix   = ByteString.fromArrayUnsafe(noncePostfixArray)
+    var noncePrefixInt = UnsecureRandom.source.nextInt()
 
     @tailrec
     def iter(toTry: U256): Option[(Nonce, U256)] = {
       if (toTry != U256.Zero) {
-        val nonceIndex = toTry.v.intValue() % Nonce.byteLength
-        nonceArray(nonceIndex) = (nonceArray(nonceIndex) + 1).toByte
-        val rawNonce      = ByteString.fromArrayUnsafe(nonceArray)
+        noncePrefixInt += 1
+        val noncePrefix   = Bytes.from(noncePrefixInt)
+        val rawNonce      = noncePrefix ++ noncePostfix
         val newHeaderBlob = rawNonce ++ headerBlob
         if (PoW.checkMined(index, newHeaderBlob, target)) {
           Some(Nonce.unsafe(rawNonce) -> (miningConfig.nonceStep subUnsafe toTry))
