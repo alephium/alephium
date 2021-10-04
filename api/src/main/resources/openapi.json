@@ -1393,7 +1393,10 @@
                 "example": {
                   "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                   "addresses": [
-                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    {
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "group": 0
+                    }
                   ]
                 }
               }
@@ -5645,7 +5648,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Info"
             }
           }
         }
@@ -6295,6 +6298,21 @@
           "value": {
             "type": "string",
             "format": "uint256"
+          }
+        }
+      },
+      "Info": {
+        "required": [
+          "address",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "group": {
+            "type": "integer"
           }
         }
       },
