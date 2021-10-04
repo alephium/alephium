@@ -19,7 +19,6 @@ package org.alephium.protocol.vm
 import org.scalacheck.Gen
 
 import org.alephium.io.{IOResult, StorageFixture}
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
@@ -52,7 +51,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val contractId                                       = contractOutputRef.key
     val contractId1                                      = contractOutputRef1.key
 
-    val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
+    val contractObj = code.toObjectUnsafe(contractId, state)
     var worldState  = initialWorldState
 
     def update(f: => IOResult[T]) = f.rightValue match {
@@ -74,7 +73,6 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     update(
       worldState.createContractUnsafe(
         code,
-        Hash.zero,
         state,
         contractOutputRef,
         contractOutput
@@ -92,15 +90,13 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     update(
       worldState.createContractUnsafe(
         code,
-        Hash.zero,
         newState,
         contractOutputRef1,
         contractOutput1
       )
     )
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
-    worldState.getContractObj(contractId1) isE
-      StatefulContractObject(code, contractObj.initialStateHash, newState, contractId1)
+    worldState.getContractObj(contractId1) isE code.toObjectUnsafe(contractId1, newState)
 
     update(worldState.removeContract(contractId))
     worldState.getContractObj(contractId).isLeft is true
@@ -132,8 +128,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
 
     val contractId  = contractOutputRef.key
-    val contractObj = StatefulContractObject(code, Hash.zero, state, contractOutputRef.key)
-    staging.createContractUnsafe(code, Hash.zero, state, contractOutputRef, contractOutput) isE ()
+    val contractObj = code.toObjectUnsafe(contractId, state)
+    staging.createContractUnsafe(code, state, contractOutputRef, contractOutput) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true
   }

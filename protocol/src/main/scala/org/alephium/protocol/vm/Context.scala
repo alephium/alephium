@@ -102,7 +102,6 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def createContract(
       code: StatefulContract.HalfDecoded,
-      initialStateHash: Hash,
       initialBalances: BalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
@@ -119,7 +118,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- code.check(initialFields)
       _ <-
         worldState
-          .createContractUnsafe(code, initialStateHash, initialFields, outputRef, contractOutput)
+          .createContractUnsafe(code, initialFields, outputRef, contractOutput)
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))

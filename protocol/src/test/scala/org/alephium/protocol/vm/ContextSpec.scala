@@ -39,7 +39,6 @@ class ContextSpec
       val balances = BalancesPerLockup.from(output)
       context.createContract(
         StatefulContract.forSMT,
-        Hash.zero,
         balances,
         AVector.empty,
         None
