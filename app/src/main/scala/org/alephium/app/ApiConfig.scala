@@ -24,13 +24,14 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.api.model.ApiKey
 import org.alephium.conf._
-import org.alephium.util.Duration
+import org.alephium.util.{Duration, U256}
 
 final case class ApiConfig(
     networkInterface: InetAddress,
     blockflowFetchMaxAge: Duration,
     askTimeout: Duration,
-    apiKey: Option[ApiKey]
+    apiKey: Option[ApiKey],
+    gasFeeCap: U256
 )
 
 object ApiConfig {
@@ -49,7 +50,8 @@ object ApiConfig {
         as[InetAddress]("networkInterface"),
         as[Duration]("blockflowFetchMaxAge"),
         as[Duration]("askTimeout"),
-        as[Option[ApiKey]]("apiKey")
+        as[Option[ApiKey]]("apiKey"),
+        as[U256]("gasFeeCap")
       )
     }
 

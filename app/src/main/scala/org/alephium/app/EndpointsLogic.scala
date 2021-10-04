@@ -242,10 +242,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     buildTransaction =>
       withSyncedClique {
         Future.successful(
-          serverUtils.buildTransaction(
-            blockFlow,
-            buildTransaction
-          )
+          serverUtils
+            .buildTransaction(
+              blockFlow,
+              buildTransaction
+            )
         )
       },
     bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)
@@ -255,10 +256,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     buildMultisig =>
       withSyncedClique {
         Future.successful(
-          serverUtils.buildMultisig(
-            blockFlow,
-            buildMultisig
-          )
+          serverUtils
+            .buildMultisig(
+              blockFlow,
+              buildMultisig
+            )
         )
       },
     bt => bt.fromAddress.lockupScript.groupIndex(brokerConfig)
@@ -268,10 +270,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     buildSweepAllTransaction =>
       withSyncedClique {
         Future.successful(
-          serverUtils.buildSweepAllTransaction(
-            blockFlow,
-            buildSweepAllTransaction
-          )
+          serverUtils
+            .buildSweepAllTransaction(
+              blockFlow,
+              buildSweepAllTransaction
+            )
         )
       },
     bst => LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)
@@ -429,18 +432,20 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  val compileScriptLogic = serverLogic(compileScript) { query => serverUtils.compileScript(query) }
+  val compileScriptLogic = serverLogic(compileScript) { query =>
+    Future.successful(serverUtils.compileScript(query))
+  }
 
   val buildScriptLogic = serverLogic(buildScript) { query =>
-    serverUtils.buildScript(blockFlow, query)
+    Future.successful(serverUtils.buildScript(blockFlow, query))
   }
 
   val compileContractLogic = serverLogic(compileContract) { query =>
-    serverUtils.compileContract(query)
+    Future.successful(serverUtils.compileContract(query))
   }
 
   val buildContractLogic = serverLogic(buildContract) { query =>
-    serverUtils.buildContract(blockFlow, query)
+    Future.successful(serverUtils.buildContract(blockFlow, query))
   }
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>
