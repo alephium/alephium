@@ -41,6 +41,7 @@ trait DiscoveryServerState extends SessionManager {
   def selfCliqueInfo: CliqueInfo
   def selfCliqueId: CliqueId = selfCliqueInfo.id
 
+  lazy val maxSentPeers                                          = 20
   lazy val selfPeerId: PeerId                                    = selfCliqueInfo.selfInterBrokerInfo.peerId
   lazy val selfPeerInfoOpt: Option[BrokerInfo]                   = selfCliqueInfo.selfBrokerInfo
   lazy val selfCliqueBrokerInfosOpt: Option[AVector[BrokerInfo]] = selfCliqueInfo.interBrokers
@@ -86,7 +87,7 @@ trait DiscoveryServerState extends SessionManager {
     val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != target))
     candidates
       .sortBy(info => target.hammingDist(info.cliqueId))
-      .takeUpto(neighborMax)
+      .takeUpto(maxSentPeers)
   }
 
   def isInTable(peerId: PeerId): Boolean = {
