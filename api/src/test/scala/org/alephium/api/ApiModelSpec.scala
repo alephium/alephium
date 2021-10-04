@@ -134,9 +134,9 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode NodeInfo" in {
-    val nodeInfo = NodeInfo(isMining = true)
+    val nodeInfo = NodeInfo(ReleaseVersion(0, 0, 0), isMining = true)
     val jsonRaw =
-      s"""{"isMining":true}"""
+      s"""{"version":"v0.0.0","isMining":true}"""
     checkData(nodeInfo, jsonRaw)
   }
 

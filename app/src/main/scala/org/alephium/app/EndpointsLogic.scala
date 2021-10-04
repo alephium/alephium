@@ -99,7 +99,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     for {
       isMining <- miner.ask(Miner.IsMining).mapTo[Boolean]
     } yield {
-      Right(NodeInfo(isMining = isMining))
+      Right(NodeInfo(ReleaseVersion.current, isMining = isMining))
     }
   }
 

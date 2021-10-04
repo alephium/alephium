@@ -144,6 +144,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val nodeInfoExamples: List[Example[NodeInfo]] =
     simpleExample(
       NodeInfo(
+        ReleaseVersion(0, 0, 1),
         isMining = true
       )
     )

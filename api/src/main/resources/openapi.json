@@ -2010,6 +2010,7 @@
                   "$ref": "#/components/schemas/NodeInfo"
                 },
                 "example": {
+                  "version": "v0.0.1",
                   "isMining": true
                 }
               }
@@ -6395,10 +6396,14 @@
       },
       "NodeInfo": {
         "required": [
+          "version",
           "isMining"
         ],
         "type": "object",
         "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ReleaseVersion"
+          },
           "isMining": {
             "type": "boolean"
           }
@@ -6502,6 +6507,25 @@
         "type": "object",
         "properties": {
           "value": {
+            "type": "integer"
+          }
+        }
+      },
+      "ReleaseVersion": {
+        "required": [
+          "major",
+          "minor",
+          "patch"
+        ],
+        "type": "object",
+        "properties": {
+          "major": {
+            "type": "integer"
+          },
+          "minor": {
+            "type": "integer"
+          },
+          "patch": {
             "type": "integer"
           }
         }
