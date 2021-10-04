@@ -16,6 +16,9 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.model.ReleaseVersion
+
 final case class NodeInfo(
+    version: ReleaseVersion,
     isMining: Boolean
 )

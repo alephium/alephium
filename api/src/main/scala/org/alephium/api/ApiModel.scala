@@ -307,6 +307,14 @@ trait ApiModelCodec {
 
   implicit val verifySignatureRW: RW[VerifySignature] = macroRW
 
+  implicit val releaseVersionEncoder: Writer[ReleaseVersion] = StringWriter.comap(_.toString)
+  implicit val releaseVersionDecoder: Reader[ReleaseVersion] = StringReader.map { raw =>
+    ReleaseVersion.from(raw) match {
+      case Some(version) => version
+      case None          => throw Abort(s"Cannot decode version: $raw")
+    }
+  }
+
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)
 

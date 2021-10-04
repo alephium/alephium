@@ -27,5 +27,8 @@ class ReleaseVersionSpec extends AlephiumSpec {
 
     val release = "0.1.1-rc1"
     ReleaseVersion.from(release) is Some(ReleaseVersion(0, 1, 1))
+
+    val releaseV = "v0.1.1-rc1"
+    ReleaseVersion.from(releaseV) is Some(ReleaseVersion(0, 1, 1))
   }
 }

@@ -40,7 +40,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, ReleaseVersion}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
@@ -631,19 +631,19 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
 
     Get(s"/infos/node") check { response =>
       response.code is StatusCode.Ok
-      response.as[NodeInfo] is NodeInfo(isMining = false)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false)
     }
 
     miner ! Miner.Start
 
     Get(s"/infos/node") check { response =>
-      response.as[NodeInfo] is NodeInfo(isMining = true)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = true)
     }
 
     miner ! Miner.Stop
 
     Get(s"/infos/node") check { response =>
-      response.as[NodeInfo] is NodeInfo(isMining = false)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false)
     }
   }
 

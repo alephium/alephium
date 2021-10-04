@@ -22,6 +22,7 @@ import org.alephium.api.EndpointsExamples
 import org.alephium.api.model.Amount
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.PublicKey
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{defaultGasPrice, minimalGas}
 import org.alephium.util.{AVector, Hex}
 import org.alephium.wallet.api.model._
@@ -36,6 +37,11 @@ trait WalletExamples extends EndpointsExamples {
         "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
       )
       .get
+
+  implicit private val groupConfig =
+    new GroupConfig {
+      override def groups: Int = 4
+    }
 
   private val walletName         = "wallet-super-name"
   private val mnemonicPassphrase = "optional-mnemonic-passphrase"
@@ -133,10 +139,10 @@ trait WalletExamples extends EndpointsExamples {
     simpleExample(Transfer.Result(txId, fromGroup, toGroup))
 
   implicit val addressesExamples: List[Example[Addresses]] =
-    simpleExample(Addresses(address, AVector(address)))
+    simpleExample(Addresses(address, AVector(Addresses.Info(address, 0))))
 
   implicit val addressInfoExamples: List[Example[AddressInfo]] =
-    simpleExample(AddressInfo(address, publicKey))
+    simpleExample(AddressInfo(address, publicKey, address.groupIndex.value))
 
   implicit val minerAddressInfoExamples: List[Example[MinerAddressInfo]] =
     simpleExample(MinerAddressInfo(address, fromGroup))

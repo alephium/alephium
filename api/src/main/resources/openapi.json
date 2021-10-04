@@ -1393,7 +1393,10 @@
                 "example": {
                   "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                   "addresses": [
-                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    {
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "group": 0
+                    }
                   ]
                 }
               }
@@ -1502,7 +1505,8 @@
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                  "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                  "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                  "group": 0
                 }
               }
             }
@@ -2010,6 +2014,7 @@
                   "$ref": "#/components/schemas/NodeInfo"
                 },
                 "example": {
+                  "version": "v0.0.1",
                   "isMining": true
                 }
               }
@@ -5614,7 +5619,8 @@
       "AddressInfo": {
         "required": [
           "address",
-          "publicKey"
+          "publicKey",
+          "group"
         ],
         "type": "object",
         "properties": {
@@ -5623,6 +5629,9 @@
           },
           "publicKey": {
             "type": "string"
+          },
+          "group": {
+            "type": "integer"
           }
         }
       },
@@ -5639,7 +5648,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Info"
             }
           }
         }
@@ -6292,6 +6301,21 @@
           }
         }
       },
+      "Info": {
+        "required": [
+          "address",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "group": {
+            "type": "integer"
+          }
+        }
+      },
       "Input": {
         "oneOf": [
           {
@@ -6395,10 +6419,14 @@
       },
       "NodeInfo": {
         "required": [
+          "version",
           "isMining"
         ],
         "type": "object",
         "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ReleaseVersion"
+          },
           "isMining": {
             "type": "boolean"
           }
@@ -6502,6 +6530,25 @@
         "type": "object",
         "properties": {
           "value": {
+            "type": "integer"
+          }
+        }
+      },
+      "ReleaseVersion": {
+        "required": [
+          "major",
+          "minor",
+          "patch"
+        ],
+        "type": "object",
+        "properties": {
+          "major": {
+            "type": "integer"
+          },
+          "minor": {
+            "type": "integer"
+          },
+          "patch": {
             "type": "integer"
           }
         }

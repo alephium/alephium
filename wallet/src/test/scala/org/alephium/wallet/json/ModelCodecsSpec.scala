@@ -40,6 +40,9 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val mnemonicSize         = Mnemonic.Size.list.last
   val mnemonic             = Mnemonic.generate(mnemonicSize)
   val bool                 = true
+  val publicKey = PublicKey
+    .from(Hex.unsafe("0362a56b41565582ec52c78f6adf76d7afdcf4b7584682011b0caa6846c3f44819"))
+    .get
 
   def check[T: ReadWriter](input: T, rawJson: String): Assertion = {
     write(input) is rawJson
@@ -51,14 +54,15 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Addresses" in {
-    val json      = s"""{"activeAddress":"$address","addresses":["$address"]}"""
-    val addresses = Addresses(address, AVector(address))
+    val json =
+      s"""{"activeAddress":"$address","addresses":[{"address":"$address","group":$group}]}"""
+    val addresses = Addresses(address, AVector(Addresses.Info(address, group)))
     check(addresses, json)
   }
 
   it should "AddressInfo" in {
-    val json        = s"""{"address":"$address","group":$group}"""
-    val addressInfo = MinerAddressInfo(address, group)
+    val json        = s"""{"address":"$address","publicKey":"${publicKey.toHexString}","group":$group}"""
+    val addressInfo = AddressInfo(address, publicKey, group)
     check(addressInfo, json)
   }
 
