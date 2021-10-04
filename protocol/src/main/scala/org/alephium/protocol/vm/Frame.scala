@@ -110,7 +110,6 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def createContract(
       code: StatefulContract.HalfDecoded,
-      initialStateHash: Hash,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit]
@@ -175,7 +174,6 @@ final class StatelessFrame(
   def balanceStateOpt: Option[BalanceState] = None
   def createContract(
       code: StatefulContract.HalfDecoded,
-      initialStateHash: Hash,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit]                                          = StatelessFrame.notAllowed
@@ -233,14 +231,13 @@ final class StatefulFrame(
 
   def createContract(
       code: StatefulContract.HalfDecoded,
-      initialStateHash: Hash,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit] = {
     for {
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- ctx.createContract(code, initialStateHash, balances, fields, tokenAmount)
+      _            <- ctx.createContract(code, balances, fields, tokenAmount)
     } yield ()
   }
 

@@ -24,7 +24,7 @@ import org.alephium.crypto
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.AssetOutput
-import org.alephium.serde.{deserialize => decode, serialize => encode, _}
+import org.alephium.serde.{deserialize => decode, _}
 import org.alephium.util
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 
@@ -1102,8 +1102,6 @@ sealed trait CreateContractAbstract extends ContractInstr {
 }
 
 sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
-  val fieldsSerde: Serde[AVector[Val]] = serdeImpl[AVector[Val]]
-
   def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
       tokenAmount     <- getTokenAmount(frame, issueToken)
@@ -1115,11 +1113,7 @@ sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
       )
       _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
-      _ <- {
-        val initialStateHash =
-          Hash.doubleHash(contractCodeRaw.bytes ++ fieldsSerde.serialize(fields))
-        frame.createContract(contractCode.toHalfDecoded(), initialStateHash, fields, tokenAmount)
-      }
+      _ <- frame.createContract(contractCode.toHalfDecoded(), fields, tokenAmount)
     } yield ()
   }
 }
@@ -1144,12 +1138,7 @@ sealed trait CopyCreateContractBase extends CreateContractAbstract with GasCopyC
       _           <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
-      _ <- {
-        val contractCodeBytes = encode(contractObj.code)
-        val initialStateHash =
-          Hash.doubleHash(contractCodeBytes ++ CreateContract.fieldsSerde.serialize(fields))
-        frame.createContract(contractObj.code, initialStateHash, fields, tokenAmount)
-      }
+      _           <- frame.createContract(contractObj.code, fields, tokenAmount)
     } yield ()
   }
 }

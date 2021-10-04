@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractOutputRef
-import org.alephium.serde.Serde
+import org.alephium.serde.{avectorSerde, Serde}
 import org.alephium.util.AVector
 
 final case class ContractState private (
@@ -41,6 +41,7 @@ final case class ContractState private (
 }
 
 object ContractState {
+  implicit val fieldsSerde: Serde[AVector[Val]] = avectorSerde[Val]
   implicit val serde: Serde[ContractState] =
     Serde.forProduct4(
       ContractState.apply,
@@ -52,11 +53,11 @@ object ContractState {
 
   def unsafe(
       code: StatefulContract.HalfDecoded,
-      initialStateHash: Hash,
       fields: AVector[Val],
       contractOutputRef: ContractOutputRef
   ): ContractState = {
     assume(code.validate(fields))
+    val initialStateHash = Hash.doubleHash(code.hash.bytes ++ fieldsSerde.serialize(fields))
     new ContractState(code.hash, initialStateHash, fields, contractOutputRef)
   }
 }

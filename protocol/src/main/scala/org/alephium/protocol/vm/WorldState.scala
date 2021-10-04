@@ -98,7 +98,6 @@ trait WorldState[T, R1, R2, R3] {
 
   def createContractUnsafe(
       code: StatefulContract.HalfDecoded,
-      initialStateHash: Hash,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
@@ -267,12 +266,11 @@ object WorldState {
 
     def createContractUnsafe(
         code: StatefulContract.HalfDecoded,
-        initialStateHash: Hash,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Persisted] = {
-      val state = ContractState.unsafe(code, initialStateHash, fields, outputRef)
+      val state = ContractState.unsafe(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
         newContractState <- contractState.put(outputRef.key, state)
@@ -335,12 +333,11 @@ object WorldState {
 
     def createContractUnsafe(
         code: StatefulContract.HalfDecoded,
-        initialStateHash: Hash,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Unit] = {
-      val state = ContractState.unsafe(code, initialStateHash, fields, outputRef)
+      val state = ContractState.unsafe(code, fields, outputRef)
       for {
         _         <- outputState.put(outputRef, output)
         _         <- contractState.put(outputRef.key, state)
@@ -434,7 +431,7 @@ object WorldState {
     val emptyOutputTrie =
       SparseMerkleTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
     val emptyState =
-      ContractState.unsafe(StatefulContract.forSMT, Hash.zero, AVector.empty, genesisRef)
+      ContractState.unsafe(StatefulContract.forSMT, AVector.empty, genesisRef)
     val emptyCode         = CodeRecord(StatefulContract.forSMT, 0)
     val emptyContractTrie = SparseMerkleTrie.build(storage, Hash.zero, emptyState)
     val emptyCodeTrie     = SparseMerkleTrie.build(storage, Hash.zero, emptyCode)

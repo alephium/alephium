@@ -31,7 +31,7 @@ package object serde {
 
   type SerdeResult[T] = Either[SerdeError, T]
 
-  def serdeImpl[T](implicit sd: Serde[T]): Serde[T] = sd
+  def serdeImpl[T](implicit serde: Serde[T]): Serde[T] = serde
 
   def serialize[T](input: T)(implicit serializer: Serializer[T]): ByteString =
     serializer.serialize(input)

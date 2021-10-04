@@ -237,12 +237,14 @@ object StatefulContract {
       AVector.tabulateE(methodsLength)(deserializeMethod).map(StatefulContract(fieldLength, _))
     }
 
+    // For testing purpose
     def toObjectUnsafe(
         address: Hash,
-        initialStateHash: Hash,
         fields: AVector[Val]
     ): StatefulContractObject = {
-      StatefulContractObject(this, initialStateHash, fields, address)
+      val initialStateHash =
+        Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
+      StatefulContractObject.apply(this, initialStateHash, fields, address)
     }
   }
 
