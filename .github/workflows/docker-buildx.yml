@@ -23,7 +23,7 @@ jobs:
       - name: Get the version
         id: version
         run: |
-          version=$(echo ${GITHUB_REF/refs\/tags\//} | cut -c 2-)
+          version=$(echo ${GITHUB_REF##*/} | cut -c 2-)
           echo ::set-output name=version::$version
 
       - name: Log in to Docker Hub
