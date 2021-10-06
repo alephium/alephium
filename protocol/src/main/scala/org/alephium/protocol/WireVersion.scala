@@ -27,6 +27,6 @@ object WireVersion {
   implicit val serde: Serde[WireVersion] = Serde.forProduct1(apply, _.value)
 
   // scalastyle:off magic.number
-  val currentWireVersion: WireVersion = WireVersion(Bytes.toIntUnsafe(ByteString(0, 0, 11, 0)))
+  val currentWireVersion: WireVersion = WireVersion(Bytes.toIntUnsafe(ByteString(0, 0, 12, 0)))
   // scalastyle:on
 }
