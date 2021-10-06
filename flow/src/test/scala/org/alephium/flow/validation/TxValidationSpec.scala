@@ -45,14 +45,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     result.left.value isE error
   }
 
-  def passValidation(result: TxValidationResult[Unit]): Assertion = {
-    result.isRight is true
-  }
-
-  def failValidation(result: TxValidationResult[Unit], error: InvalidTxStatus): Assertion = {
-    result.left.value isE error
-  }
-
   class Fixture extends TxValidation.Impl with VMFactory {
 
     // TODO: prepare blockflow to test checkMempool
@@ -128,10 +120,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
     val block      = transfer(blockFlow, chainIndex)
     val tx         = block.nonCoinbase.head
-    passValidation(validateTxOnlyForTest(tx, blockFlow))
+    passCheck(validateTxOnlyForTest(tx, blockFlow))
     tx.unsigned.networkId isnot NetworkId.AlephiumMainNet
     val invalidTx = tx.copy(unsigned = tx.unsigned.copy(networkId = NetworkId.AlephiumMainNet))
-    failValidation(validateTxOnlyForTest(invalidTx, blockFlow), InvalidNetworkId)
+    failCheck(validateTxOnlyForTest(invalidTx, blockFlow), InvalidNetworkId)
   }
 
   it should "check too many inputs" in new StatelessFixture {
@@ -159,7 +151,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val unsignedNew = tx.unsigned.copy(fixedOutputs = AVector.empty)
       val txNew       = tx.copy(unsigned = unsignedNew)
       failCheck(checkOutputNum(txNew, tx.chainIndex.isIntraGroup), NoOutputs)
-      failValidation(validateTxOnlyForTest(txNew, blockFlow), NoOutputs)
+      failCheck(validateTxOnlyForTest(txNew, blockFlow), NoOutputs)
       failCheck(checkBlockTx(txNew, preOutputs), NoOutputs)
     }
   }
@@ -197,13 +189,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val txNew0 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafeTest(-1)))
     failCheck(checkGasBound(txNew0), InvalidStartGas)
-    failValidation(validateTxOnlyForTest(txNew0, blockFlow), InvalidStartGas)
+    failCheck(validateTxOnlyForTest(txNew0, blockFlow), InvalidStartGas)
     val txNew1 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafeTest(0)))
     failCheck(checkGasBound(txNew1), InvalidStartGas)
-    failValidation(validateTxOnlyForTest(txNew1, blockFlow), InvalidStartGas)
+    failCheck(validateTxOnlyForTest(txNew1, blockFlow), InvalidStartGas)
     val txNew2 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = minimalGas.use(1).rightValue))
     failCheck(checkGasBound(txNew2), InvalidStartGas)
-    failValidation(validateTxOnlyForTest(txNew2, blockFlow), InvalidStartGas)
+    failCheck(validateTxOnlyForTest(txNew2, blockFlow), InvalidStartGas)
     val txNew3 = tx.copy(unsigned = tx.unsigned.copy(gasAmount = minimalGas))
     passCheck(checkGasBound(txNew3))
 
@@ -220,7 +212,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val delta     = U256.MaxValue - alfAmount + 1
         val txNew     = modifyAlfAmount(tx, delta)
         failCheck(checkOutputStats(txNew), BalanceOverFlow)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), BalanceOverFlow)
+        failCheck(validateTxOnlyForTest(txNew, blockFlow), BalanceOverFlow)
         failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
       }
     }
@@ -231,7 +223,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroAlfAmount(tx)
         failCheck(checkOutputStats(txNew), InvalidOutputStats)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputStats)
+        failCheck(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputStats)
         failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputStats)
       }
     }
@@ -242,7 +234,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
         val txNew = zeroTokenAmount(tx)
         failCheck(checkOutputStats(txNew), InvalidOutputStats)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputStats)
+        failCheck(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputStats)
         failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputStats)
       }
     }
@@ -275,7 +267,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       forAll(localUnsignedGen) { unsignedNew =>
         val txNew = tx.copy(unsigned = unsignedNew)
         failCheck(getChainIndex(txNew), InvalidInputGroupIndex)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidInputGroupIndex)
+        failCheck(validateTxOnlyForTest(txNew, blockFlow), InvalidInputGroupIndex)
         failCheck(checkBlockTx(txNew, preOutputs), InvalidInputGroupIndex)
       }
     }
@@ -301,7 +293,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         forAll(localUnsignedGen) { unsignedNew =>
           val txNew = tx.copy(unsigned = unsignedNew)
           failCheck(getChainIndex(txNew), InvalidOutputGroupIndex)
-          failValidation(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputGroupIndex)
+          failCheck(validateTxOnlyForTest(txNew, blockFlow), InvalidOutputGroupIndex)
           failCheck(checkBlockTx(txNew, preOutputs), InvalidOutputGroupIndex)
         }
       }
@@ -314,7 +306,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val unsignedNew = tx.unsigned.copy(inputs = inputs ++ inputs)
       val txNew       = tx.copy(unsigned = unsignedNew)
       failCheck(checkUniqueInputs(txNew, checkDoubleSpending = true), TxDoubleSpending)
-      failValidation(validateTxOnlyForTest(txNew, blockFlow), TxDoubleSpending)
+      failCheck(validateTxOnlyForTest(txNew, blockFlow), TxDoubleSpending)
       failCheck(checkBlockTx(txNew, preOutputs), TxDoubleSpending)
     }
   }
@@ -349,7 +341,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           tx.copy(generatedOutputs = outputsNew)
         }
         failCheck(checkOutputDataSize(txNew), OutputDataSizeExceeded)
-        failValidation(validateTxOnlyForTest(txNew, blockFlow), OutputDataSizeExceeded)
+        failCheck(validateTxOnlyForTest(txNew, blockFlow), OutputDataSizeExceeded)
         failCheck(checkBlockTx(txNew, preOutputs), OutputDataSizeExceeded)
       }
     }
@@ -616,11 +608,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val unsigned = prepareOutput(lockup, unlock)
     val tx0      = Transaction.from(unsigned, priKey)
-    passValidation(validateTxOnlyForTest(tx0, blockFlow))
+    passCheck(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2pkh(PublicKey.generate))
-    failValidation(validateTxOnlyForTest(tx1, blockFlow), InvalidPublicKeyHash)
+    failCheck(validateTxOnlyForTest(tx1, blockFlow), InvalidPublicKeyHash)
     val tx2 = tx0.copy(inputSignatures = AVector(Signature.generate))
-    failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidSignature)
+    failCheck(validateTxOnlyForTest(tx2, blockFlow), InvalidSignature)
   }
 
   it should "invalidate p2mpkh" in new LockupFixture {
@@ -670,12 +662,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unsigned = prepareOutput(lockup, unlock)
 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
-    passValidation(validateTxOnlyForTest(tx0, blockFlow))
+    passCheck(validateTxOnlyForTest(tx0, blockFlow))
     val tx1 = replaceUnlock(tx0, UnlockScript.p2sh(script, AVector(Val.U256(50))))
-    failValidation(validateTxOnlyForTest(tx1, blockFlow), UnlockScriptExeFailed(AssertionFailed))
+    failCheck(validateTxOnlyForTest(tx1, blockFlow), UnlockScriptExeFailed(AssertionFailed))
     val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
     val tx2       = replaceUnlock(tx0, UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
-    failValidation(validateTxOnlyForTest(tx2, blockFlow), InvalidScriptHash)
+    failCheck(validateTxOnlyForTest(tx2, blockFlow), InvalidScriptHash)
   }
 
   trait GasFixture extends LockupFixture {
