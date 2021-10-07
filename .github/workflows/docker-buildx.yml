@@ -23,7 +23,7 @@ jobs:
       - name: Get the version
         id: version
         run: |
-          version=${GITHUB_REF##*/}
+          version=$(basename ${{ github.event.workflow_run.head_branch }})
           echo ::set-output name=version::$version
 
       - name: Log in to Docker Hub
