@@ -18,7 +18,7 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.actor.ActorRef.noSender
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, SocketUtil, TestProbe}
@@ -26,7 +26,7 @@ import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.flow.setting.AlephiumConfigFixture
+import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}
 import org.alephium.util._
 
 class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
@@ -145,5 +145,40 @@ class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
     val probe       = TestProbe()
     controller ! TcpController.ConnectTo(freeAddress, probe.ref)
     probe.expectMsgType[Tcp.CommandFailed]
+  }
+
+  it should "publish unreachable event when the connection failed" in new Fixture
+    with PatienceConfiguration {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DiscoveryServer.Unreachable])
+
+    val controller1 = testController(bindAddress, misbehaviorManager.ref)
+
+    EventFilter.info(start = "Failed to connect to").intercept {
+      val freeAddress = SocketUtil.temporaryServerAddress()
+      controller1 ! Tcp.CommandFailed(Tcp.Connect(freeAddress))
+      listener.expectMsgType[DiscoveryServer.Unreachable]
+    }
+  }
+
+  class TcpControllerTest(
+      bindAddress: InetSocketAddress,
+      misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+      tcpListener: ActorRef,
+      target: ActorRef
+  )(implicit networkSetting: NetworkSetting)
+      extends TcpController(bindAddress, misbehaviorManager)(networkSetting) {
+    override def receive: Receive = workFor(tcpListener, target)
+  }
+
+  def testController(
+      bindAddress: InetSocketAddress,
+      misbehaviorManager: ActorRefT[MisbehaviorManager.Command]
+  )(implicit system: ActorSystem): ActorRef = {
+    val props =
+      Props(
+        new TcpControllerTest(bindAddress, misbehaviorManager, TestProbe().ref, TestProbe().ref)
+      )
+    system.actorOf(props)
   }
 }

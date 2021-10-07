@@ -22,7 +22,6 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp
 import akka.util.ByteString
 
-import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
@@ -202,15 +201,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.start().futureValue is ()
 
     eventually {
-      val misbehaviors1 =
-        request[AVector[PeerMisbehavior]](
-          getMisbehaviors,
-          restPort(server0.config.network.bindAddress.getPort)
-        )
-      misbehaviors1.map(_.status).exists {
-        case PeerStatus.Banned(_) => true
-        case _                    => false
-      } is true
+      existUnreachable(server0) is true
+      existUnreachable(server1) is true
     }
 
     server0.stop().futureValue is ()
@@ -247,16 +239,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.start().futureValue is ()
 
     eventually {
-      val misbehaviors =
-        request[AVector[PeerMisbehavior]](
-          getMisbehaviors,
-          restPort(server0.config.network.bindAddress.getPort)
-        )
-
-      misbehaviors.map(_.status).exists {
-        case PeerStatus.Banned(_) => true
-        case _                    => false
-      } is true
+      existBannedPeers(server0)
     }
 
     server0.stop().futureValue is ()
@@ -281,15 +264,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.start().futureValue is ()
 
     eventually {
-      val misbehaviors0 =
-        request[AVector[PeerMisbehavior]](
-          getMisbehaviors,
-          restPort(server0.config.network.bindAddress.getPort)
-        )
-      misbehaviors0.map(_.status).exists {
-        case PeerStatus.Banned(_) => true
-        case _                    => false
-      } is true
+      existUnreachable(server0) is true
+      existUnreachable(server1) is true
     }
 
     server0.stop().futureValue is ()
@@ -315,15 +291,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.start().futureValue is ()
 
     eventually {
-      val misbehaviors =
-        request[AVector[PeerMisbehavior]](
-          getMisbehaviors,
-          restPort(server0.config.network.bindAddress.getPort)
-        )
-
-      val server1Address = server1.config.network.bindAddress.getAddress
-      misbehaviors.head.peer is server1Address
-      misbehaviors.head.status is a[PeerStatus.Banned]
+      existUnreachable(server0) is true
+      existUnreachable(server1) is true
     }
 
     server0.stop().futureValue is ()

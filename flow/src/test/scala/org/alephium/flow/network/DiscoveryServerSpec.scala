@@ -205,7 +205,7 @@ class DiscoveryServerSpec
 
   it should "mark address as unreachable" in new UnreachableFixture {
     val remote = Generators.socketAddressGen.sample.get
-    server2 ! InterCliqueManager.Unreachable(remote)
+    server2 ! DiscoveryServer.Unreachable(remote)
     eventually {
       server2.underlyingActor.mightReachable(remote) is false
     }

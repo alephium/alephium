@@ -112,11 +112,12 @@ class TcpController(
       }
       tcpListener ! Tcp.ResumeAccepting(batchSize = 1)
     case failure @ Tcp.CommandFailed(c: Tcp.Connect) =>
+      log.debug(s"Failed to connect to ${c.remoteAddress} - $failure")
       pendingOutboundConnections.get(c.remoteAddress).foreach { forwardTo =>
-        log.debug(s"Failed to connect to ${c.remoteAddress} - $failure")
         pendingOutboundConnections -= c.remoteAddress
         forwardTo.forward(failure)
       }
+      publishEvent(DiscoveryServer.Unreachable(c.remoteAddress))
     case TcpController.ConnectionConfirmed(connected, connection) =>
       confirmConnection(actor, connected, connection)
     case TcpController.ConnectionDenied(connected, connection) =>
