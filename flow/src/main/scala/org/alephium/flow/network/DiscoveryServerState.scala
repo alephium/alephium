@@ -139,6 +139,10 @@ trait DiscoveryServerState extends SessionManager {
     ()
   }
 
+  def getUnreachable(): AVector[InetAddress] = {
+    AVector.from(unreachables.keys())
+  }
+
   def setUnreachable(remote: InetSocketAddress): Unit = {
     val remoteInet = remote.getAddress
     unreachables.get(remoteInet) match {

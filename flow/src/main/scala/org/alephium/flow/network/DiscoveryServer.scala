@@ -71,6 +71,8 @@ object DiscoveryServer {
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                        extends Command
   final case class PeerConfirmed(peerInfo: BrokerInfo)                           extends Command
   final case class PeerDenied(peerInfo: BrokerInfo)                              extends Command
+  final case class Unreachable(remote: InetSocketAddress)                        extends Command with EventStream.Event
+  case object GetUnreachable                                                     extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -148,7 +150,7 @@ class DiscoveryServer(
   }
 
   def ready: Receive = {
-    subscribeEvent(self, classOf[InterCliqueManager.Unreachable])
+    subscribeEvent(self, classOf[Unreachable])
     subscribeEvent(self, classOf[MisbehaviorManager.PeerBanned])
     handleUdp orElse handleCommand orElse handleBanning
   }
@@ -187,8 +189,9 @@ class DiscoveryServer(
       banPeer(peerInfo.peerId)
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
-    case InterCliqueManager.Unreachable(remote) => setUnreachable(remote)
-    case Unban(remotes)                         => remotes.foreach(unsetUnreachable)
+    case Unreachable(remote) => setUnreachable(remote)
+    case GetUnreachable      => sender() ! getUnreachable()
+    case Unban(remotes)      => remotes.foreach(unsetUnreachable)
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
