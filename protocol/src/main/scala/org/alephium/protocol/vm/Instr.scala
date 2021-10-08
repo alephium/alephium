@@ -590,7 +590,7 @@ case object BoolNeq extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 != bool2)
 }
 
-sealed trait ToByteVecInstr[R <: Val, U <: Val]
+sealed trait ToByteVecInstr[R <: Val]
     extends StatelessInstr
     with StackOps[R]
     with GasToByte
@@ -605,7 +605,7 @@ sealed trait ToByteVecInstr[R <: Val, U <: Val]
     } yield ()
   }
 }
-case object BoolToByteVec extends ToByteVecInstr[Val.Bool, Val.ByteVec] with BoolStackOps
+case object BoolToByteVec extends ToByteVecInstr[Val.Bool] with BoolStackOps
 
 sealed trait ConversionInstr[R <: Val, U <: Val]
     extends StatelessInstrSimpleGas
@@ -632,7 +632,7 @@ case object I256ToU256
     util.U256.fromI256(from.v).map(Val.U256.apply).toRight(Right(InvalidConversion(from, Val.U256)))
   }
 }
-case object I256ToByteVec extends ToByteVecInstr[Val.I256, Val.ByteVec] with I256StackOps
+case object I256ToByteVec extends ToByteVecInstr[Val.I256] with I256StackOps
 case object U256ToI256
     extends ConversionInstr[Val.U256, Val.I256]
     with U256StackOps
@@ -641,7 +641,7 @@ case object U256ToI256
     util.I256.fromU256(from.v).map(Val.I256.apply).toRight(Right(InvalidConversion(from, Val.I256)))
   }
 }
-case object U256ToByteVec extends ToByteVecInstr[Val.U256, Val.ByteVec] with U256StackOps
+case object U256ToByteVec extends ToByteVecInstr[Val.U256] with U256StackOps
 
 sealed trait ComparisonInstr[T <: Val]
     extends StatelessInstrSimpleGas
@@ -707,7 +707,7 @@ case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 w
 }
 case object AddressEq        extends EqT[Val.Address] with AddressStackOps
 case object AddressNeq       extends NeT[Val.Address] with AddressStackOps
-case object AddressToByteVec extends ToByteVecInstr[Val.Address, Val.ByteVec] with AddressStackOps
+case object AddressToByteVec extends ToByteVecInstr[Val.Address] with AddressStackOps
 
 case object IsAssetAddress
     extends StatelessInstrSimpleGas

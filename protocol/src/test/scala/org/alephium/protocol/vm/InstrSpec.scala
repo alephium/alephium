@@ -267,14 +267,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {
-        case i: ToByteVecInstr[_, _] => testToByteVec(i, gas)
-        case _: ByteVecConcat.type   => testByteVecConcatGas(gas)
-        case i: LogInstr             => testLog(i, gas)
-        case i: GasSimple            => i.gas().value is gas
-        case i: GasFormula           => i.gas(32).value is gas
+        case i: ToByteVecInstr[_]  => testToByteVec(i, gas)
+        case _: ByteVecConcat.type => testByteVecConcatGas(gas)
+        case i: LogInstr           => testLog(i, gas)
+        case i: GasSimple          => i.gas().value is gas
+        case i: GasFormula         => i.gas(32).value is gas
       }
     }
-    def testToByteVec(instr: ToByteVecInstr[_, _], gas: Int) = instr match {
+    def testToByteVec(instr: ToByteVecInstr[_], gas: Int) = instr match {
       case i: BoolToByteVec.type    => i.gas(1).value is gas
       case i: I256ToByteVec.type    => i.gas(33).value is gas
       case i: U256ToByteVec.type    => i.gas(33).value is gas
