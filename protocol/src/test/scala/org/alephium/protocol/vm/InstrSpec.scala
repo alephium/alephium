@@ -17,12 +17,17 @@
 package org.alephium.protocol.vm
 
 import akka.util.ByteString
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 
-import org.alephium.protocol.Signature
+import org.alephium.crypto
+import org.alephium.protocol.{Signature, SignatureSchema}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.protocol.model.Target
+import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
 
+// scalastyle:off file.size.limit no.equal
 class InstrSpec extends AlephiumSpec with NumericHelpers {
   import Instr._
 
@@ -90,6 +95,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait StatelessFixture extends ContextGenerators {
+    lazy val localsLength = 0
     def prepareFrame(
         instrs: AVector[Instr[StatelessContext]],
         blockEnv: Option[BlockEnv] = None,
@@ -99,7 +105,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         isPayable = false,
         argsLength = 0,
-        localsLength = 0,
+        localsLength = localsLength,
         returnLength = 0,
         instrs
       )
@@ -112,9 +118,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .stateless(ctx, obj, obj.getMethod(0).rightValue, Stack.ofCapacity(10), VM.noReturnTo)
         .rightValue
     }
+    val addressValGen: Gen[Val.Address] = for {
+      group        <- groupIndexGen
+      lockupScript <- lockupGen(group)
+    } yield Val.Address(lockupScript)
   }
 
-  it should "verify absolute lock time" in new StatelessFixture {
+  trait StatelessInstrFixture extends StatelessFixture {
+    lazy val frame   = prepareFrame(AVector.empty)
+    lazy val stack   = frame.opStack
+    lazy val context = frame.ctx
+    lazy val locals  = frame.locals
+  }
+
+  it should "VerifyAbsoluteLocktime" in new StatelessFixture {
     def prepare(timeLock: TimeStamp, blockTs: TimeStamp): Frame[StatelessContext] = {
       val frame = prepareFrame(
         AVector.empty,
@@ -152,7 +169,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "verify relative lock time" in new StatelessFixture {
+  it should "VerifyRelativeLocktime" in new StatelessFixture {
     def prepare(
         timeLock: Duration,
         blockTs: TimeStamp,
@@ -223,6 +240,1099 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
       VerifyRelativeLocktime.runWith(frame) isE ()
     }
+  }
+
+  trait ConstInstrFixture extends StatelessInstrFixture {
+    def test[C <: ConstInstr](constInstr: C, value: Val) = {
+      val initialGas = context.gasRemaining
+      constInstr.runWith(frame) isE ()
+      stack.size is 1
+      stack.top.get is value
+      initialGas.subUnsafe(context.gasRemaining) is constInstr.gas()
+    }
+  }
+
+  it should "ConstTrue" in new ConstInstrFixture {
+    test(ConstTrue, Val.True)
+  }
+
+  it should "ConstFalse" in new ConstInstrFixture {
+    test(ConstFalse, Val.False)
+  }
+
+  it should "I256Const0" in new ConstInstrFixture {
+    test(I256Const0, Val.I256(I256.Zero))
+  }
+
+  it should "I256Const1" in new ConstInstrFixture {
+    test(I256Const1, Val.I256(I256.One))
+  }
+
+  it should "I256Const2" in new ConstInstrFixture {
+    test(I256Const2, Val.I256(I256.Two))
+  }
+
+  it should "I256Const3" in new ConstInstrFixture {
+    test(I256Const3, Val.I256(I256.from(3L)))
+  }
+
+  it should "I256Const4" in new ConstInstrFixture {
+    test(I256Const4, Val.I256(I256.from(4L)))
+  }
+
+  it should "I256Const5" in new ConstInstrFixture {
+    test(I256Const5, Val.I256(I256.from(5L)))
+  }
+
+  it should "I256ConstN1" in new ConstInstrFixture {
+    test(I256ConstN1, Val.I256(I256.NegOne))
+  }
+
+  it should "U256Const0" in new ConstInstrFixture {
+    test(U256Const0, Val.U256(U256.Zero))
+  }
+
+  it should "U256Const1" in new ConstInstrFixture {
+    test(U256Const1, Val.U256(U256.One))
+  }
+
+  it should "U256Const2" in new ConstInstrFixture {
+    test(U256Const2, Val.U256(U256.Two))
+  }
+
+  it should "U256Const3" in new ConstInstrFixture {
+    test(U256Const3, Val.U256(U256.unsafe(3L)))
+  }
+
+  it should "U256Const4" in new ConstInstrFixture {
+    test(U256Const4, Val.U256(U256.unsafe(4L)))
+  }
+
+  it should "U256Const5" in new ConstInstrFixture {
+    test(U256Const5, Val.U256(U256.unsafe(5L)))
+  }
+
+  it should "I256Const" in new ConstInstrFixture {
+    forAll(arbitrary[Long]) { long =>
+      val value = Val.I256(I256.from(long))
+      test(I256Const(value), value)
+      stack.pop()
+    }
+  }
+
+  it should "U256Const" in new ConstInstrFixture {
+    forAll(posLongGen) { long =>
+      val value = Val.U256(U256.unsafe(long))
+      test(U256Const(value), value)
+      stack.pop()
+    }
+  }
+
+  it should "BytesConst" in new ConstInstrFixture {
+    forAll(dataGen) { data =>
+      val value = Val.ByteVec(data)
+      test(BytesConst(value), value)
+      stack.pop()
+    }
+  }
+
+  it should "AddressConst" in new ConstInstrFixture {
+    forAll(addressValGen) { address =>
+      test(AddressConst(address), address)
+      stack.pop()
+    }
+  }
+
+  it should "LoadLocal" in new StatelessInstrFixture {
+    override lazy val localsLength = 1
+
+    val bool: Val = Val.Bool(true)
+    locals.set(0, bool)
+
+    val initialGas = context.gasRemaining
+    val instr      = LoadLocal(0.toByte)
+    instr.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is bool
+    initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+
+    LoadLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex
+    LoadLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex
+  }
+
+  it should "StoreLocal" in new ConstInstrFixture {
+    override lazy val localsLength = 1
+
+    val bool: Val = Val.Bool(true)
+    stack.push(bool)
+
+    val initialGas = context.gasRemaining
+    val instr      = StoreLocal(0.toByte)
+    instr.runWith(frame) isE ()
+    locals.getUnsafe(0) is bool
+    initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+
+    StoreLocal(1.toByte).runWith(frame).leftValue isE StackUnderflow
+    StoreLocal(-1.toByte).runWith(frame).leftValue isE StackUnderflow
+
+  }
+
+  it should "Pop" in new ConstInstrFixture {
+
+    val bool: Val = Val.Bool(true)
+    stack.push(bool)
+
+    val initialGas = context.gasRemaining
+    Pop.runWith(frame) isE ()
+    stack.size is 0
+    initialGas.subUnsafe(context.gasRemaining) is Pop.gas()
+
+    Pop.runWith(frame).leftValue isE StackUnderflow
+  }
+
+  it should "BoolNot" in new StatelessInstrFixture {
+    val bool: Val = Val.Bool(true)
+    stack.push(bool)
+
+    val initialGas = context.gasRemaining
+    BoolNot.runWith(frame) isE ()
+    stack.top.get is Val.Bool(false)
+    initialGas.subUnsafe(context.gasRemaining) is BoolNot.gas()
+
+    val zero = Val.I256(I256.Zero)
+    stack.push(zero)
+    BoolNot.runWith(frame).leftValue isE InvalidType(zero)
+  }
+
+  trait BinaryBoolFixture extends StatelessInstrFixture {
+    def test(binaryBoll: BinaryBool, op: (Boolean, Boolean) => Boolean) = {
+
+      forAll(arbitrary[Boolean], arbitrary[Boolean]) { case (b1, b2) =>
+        val bool1: Val = Val.Bool(b1)
+        val bool2: Val = Val.Bool(b2)
+        stack.push(bool1)
+        stack.push(bool2)
+
+        val initialGas = context.gasRemaining
+
+        binaryBoll.runWith(frame) isE ()
+
+        stack.size is 1
+        stack.top.get is Val.Bool(op(b1, b2))
+        initialGas.subUnsafe(context.gasRemaining) is BoolNot.gas()
+        stack.pop()
+
+        stack.push(bool1)
+        binaryBoll.runWith(frame).leftValue isE StackUnderflow
+      }
+    }
+  }
+
+  it should "BoolAnd" in new BinaryBoolFixture {
+    test(BoolAnd, _ && _)
+  }
+
+  it should "BoolOr" in new BinaryBoolFixture {
+    test(BoolOr, _ || _)
+  }
+
+  it should "BoolEq" in new BinaryBoolFixture {
+    test(BoolEq, _ == _)
+  }
+
+  it should "BoolNeq" in new BinaryBoolFixture {
+    test(BoolNeq, _ != _)
+  }
+
+  it should "BoolToByteVec" in new StatelessInstrFixture {
+    forAll(arbitrary[Boolean]) { boolean =>
+      val bool       = Val.Bool(boolean)
+      val initialGas = context.gasRemaining
+      val bytes      = serialize(bool)
+
+      stack.push(bool)
+      BoolToByteVec.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      initialGas.subUnsafe(context.gasRemaining) is BoolToByteVec.gas(bytes.length)
+
+      stack.pop()
+    }
+  }
+
+  trait BinaryArithmeticInstrFixture extends StatelessInstrFixture {
+    def binaryArithmeticGenTest[A <: Val, B, R](
+        instr: BinaryArithmeticInstr[A],
+        buildArg: B => A,
+        buildRes: R => Val,
+        op: (B, B) => R,
+        genB: Gen[B]
+    ) = {
+      forAll(genB, genB) { case (b1, b2) =>
+        binaryArithmeticTest(instr, buildArg, buildRes, op, b1, b2)
+      }
+    }
+
+    def binaryArithmeticTest[A <: Val, B, R](
+        instr: BinaryArithmeticInstr[A],
+        buildArg: B => A,
+        buildRes: R => Val,
+        op: (B, B) => R,
+        b1: B,
+        b2: B
+    ) = {
+      val a1: A = buildArg(b1)
+      val a2: A = buildArg(b2)
+      stack.push(a1)
+      stack.push(a2)
+
+      val initialGas = context.gasRemaining
+
+      instr.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is buildRes(op(b1, b2))
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+      stack.pop()
+
+      stack.push(a1)
+      instr.runWith(frame).leftValue isE StackUnderflow
+    }
+
+    def binaryArithmeticfail[A <: Val, B](
+        instr: BinaryArithmeticInstr[A],
+        b1: B,
+        b2: B,
+        buildArg: B => A
+    ) = {
+      val a1: A = buildArg(b1)
+      val a2: A = buildArg(b2)
+      stack.push(a1)
+      stack.push(a2)
+
+      instr.runWith(frame).leftValue isE a[ArithmeticError]
+    }
+  }
+
+  trait I256BinaryArithmeticInstrFixture extends BinaryArithmeticInstrFixture {
+    val i256Gen: Gen[I256] = arbitrary[Long].map(I256.from)
+
+    def testOp(instr: BinaryArithmeticInstr[Val.I256], op: (I256, I256) => I256) = {
+      binaryArithmeticGenTest(instr, Val.I256.apply, Val.I256.apply, op, i256Gen)
+    }
+
+    def testOp(
+        instr: BinaryArithmeticInstr[Val.I256],
+        op: (I256, I256) => I256,
+        b1: I256,
+        b2: I256
+    ) = {
+      binaryArithmeticTest(instr, Val.I256.apply, Val.I256.apply, op, b1, b2)
+    }
+
+    def testComp(instr: BinaryArithmeticInstr[Val.I256], comp: (I256, I256) => Boolean) = {
+      binaryArithmeticGenTest(instr, Val.I256.apply, Val.Bool.apply, comp, i256Gen)
+    }
+
+    def fail(instr: BinaryArithmeticInstr[Val.I256], b1: I256, b2: I256) = {
+      binaryArithmeticfail(instr, b1, b2, Val.I256.apply)
+    }
+  }
+
+  it should "I256Add" in new I256BinaryArithmeticInstrFixture {
+    testOp(I256Add, _ addUnsafe _)
+    fail(I256Add, I256.MaxValue, I256.One)
+    fail(I256Add, I256.MinValue, I256.NegOne)
+  }
+
+  it should "I256Sub" in new I256BinaryArithmeticInstrFixture {
+    testOp(I256Sub, _ subUnsafe _)
+    fail(I256Sub, I256.MinValue, I256.One)
+    fail(I256Sub, I256.MaxValue, I256.NegOne)
+  }
+
+  it should "I256Mul" in new I256BinaryArithmeticInstrFixture {
+    testOp(I256Mul, _ mulUnsafe _)
+    fail(I256Mul, I256.MaxValue, I256.Two)
+    fail(I256Mul, I256.MinValue, I256.Two)
+  }
+
+  it should "I256Div" in new I256BinaryArithmeticInstrFixture {
+    override val i256Gen: Gen[I256] = arbitrary[Long].retryUntil(_ != 0).map(I256.from)
+    testOp(I256Div, _ divUnsafe _)
+    testOp(I256Div, _ divUnsafe _, I256.Zero, I256.One)
+    fail(I256Div, I256.One, I256.Zero)
+    fail(I256Div, I256.MinValue, I256.NegOne)
+    testOp(I256Div, _ divUnsafe _, I256.NegOne, I256.MinValue)
+  }
+
+  it should "I256Mod" in new I256BinaryArithmeticInstrFixture {
+    override val i256Gen: Gen[I256] = arbitrary[Long].retryUntil(_ != 0).map(I256.from)
+    testOp(I256Mod, _ modUnsafe _)
+    testOp(I256Mod, _ modUnsafe _, I256.Zero, I256.One)
+    fail(I256Mod, I256.One, I256.Zero)
+  }
+
+  it should "I256Eq" in new I256BinaryArithmeticInstrFixture {
+    testComp(I256Eq, _ == _)
+  }
+
+  it should "I256Neq" in new I256BinaryArithmeticInstrFixture {
+    testComp(I256Neq, _ != _)
+  }
+
+  it should "I256Lt" in new I256BinaryArithmeticInstrFixture {
+    testComp(I256Lt, _ < _)
+  }
+
+  it should "I256Le" in new I256BinaryArithmeticInstrFixture {
+    testComp(I256Le, _ <= _)
+  }
+
+  it should "I256Gt" in new I256BinaryArithmeticInstrFixture {
+    testComp(I256Gt, _ > _)
+  }
+
+  it should "I256Ge" in new I256BinaryArithmeticInstrFixture {
+    testComp(I256Ge, _ >= _)
+  }
+
+  trait U256BinaryArithmeticInstrFixture extends BinaryArithmeticInstrFixture {
+    val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
+
+    def testOp(instr: BinaryArithmeticInstr[Val.U256], op: (U256, U256) => U256) = {
+      binaryArithmeticGenTest(instr, Val.U256.apply, Val.U256.apply, op, u256Gen)
+    }
+
+    def testOp(
+        instr: BinaryArithmeticInstr[Val.U256],
+        op: (U256, U256) => U256,
+        b1: U256,
+        b2: U256
+    ) = {
+      binaryArithmeticTest(instr, Val.U256.apply, Val.U256.apply, op, b1, b2)
+    }
+
+    def testComp(instr: BinaryArithmeticInstr[Val.U256], comp: (U256, U256) => Boolean) = {
+      binaryArithmeticGenTest(instr, Val.U256.apply, Val.Bool.apply, comp, u256Gen)
+    }
+
+    def fail(instr: BinaryArithmeticInstr[Val.U256], b1: U256, b2: U256) = {
+      binaryArithmeticfail(instr, b1, b2, Val.U256.apply)
+    }
+  }
+  it should "U256Add" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256Add, _ addUnsafe _)
+    fail(U256Add, U256.MaxValue, U256.One)
+  }
+
+  it should "U256Sub" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256Sub, _ subUnsafe _, U256.Ten, U256.One)
+    testOp(U256Sub, _ subUnsafe _, U256.One, U256.One)
+    testOp(U256Sub, _ subUnsafe _, U256.MaxValue, U256.MaxValue)
+    fail(U256Sub, U256.MinValue, U256.One)
+    fail(U256Sub, U256.Zero, U256.One)
+    fail(U256Sub, U256.One, U256.Two)
+  }
+
+  it should "U256Mul" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256Mul, _ mulUnsafe _)
+    fail(U256Mul, U256.MaxValue, U256.Two)
+  }
+
+  it should "U256Div" in new U256BinaryArithmeticInstrFixture {
+    override val u256Gen: Gen[U256] = posLongGen.retryUntil(_ != 0).map(U256.unsafe)
+    testOp(U256Div, _ divUnsafe _)
+    testOp(U256Div, _ divUnsafe _, U256.Zero, U256.One)
+    fail(U256Div, U256.One, U256.Zero)
+  }
+
+  it should "U256Mod" in new U256BinaryArithmeticInstrFixture {
+    override val u256Gen: Gen[U256] = posLongGen.retryUntil(_ != 0).map(U256.unsafe)
+    testOp(U256Mod, _ modUnsafe _)
+    testOp(U256Mod, _ modUnsafe _, U256.Zero, U256.One)
+    fail(U256Mod, U256.One, U256.Zero)
+  }
+
+  it should "U256Eq" in new U256BinaryArithmeticInstrFixture {
+    testComp(U256Eq, _ == _)
+  }
+
+  it should "U256Neq" in new U256BinaryArithmeticInstrFixture {
+    testComp(U256Neq, _ != _)
+  }
+
+  it should "U256Lt" in new U256BinaryArithmeticInstrFixture {
+    testComp(U256Lt, _ < _)
+  }
+
+  it should "U256Le" in new U256BinaryArithmeticInstrFixture {
+    testComp(U256Le, _ <= _)
+  }
+
+  it should "U256Gt" in new U256BinaryArithmeticInstrFixture {
+    testComp(U256Gt, _ > _)
+  }
+
+  it should "U256Ge" in new U256BinaryArithmeticInstrFixture {
+    testComp(U256Ge, _ >= _)
+  }
+
+  it should "U256ModAdd" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256ModAdd, _ modAdd _)
+  }
+
+  it should "U256ModSub" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256ModSub, _ modSub _)
+  }
+
+  it should "U256ModMul" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256ModMul, _ modMul _)
+  }
+
+  it should "U256BitAnd" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256BitAnd, _ bitAnd _)
+  }
+
+  it should "U256BitOr" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256BitOr, _ bitOr _)
+  }
+
+  it should "U256Xor" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256Xor, _ xor _)
+  }
+
+  it should "U256SHL" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256SHL, _ shl _)
+  }
+
+  it should "U256SHR" in new U256BinaryArithmeticInstrFixture {
+    testOp(U256SHR, _ shr _)
+  }
+
+  it should "I256ToU256" in new StatelessInstrFixture {
+    val i256Gen: Gen[I256] = posLongGen.map(I256.from)
+
+    forAll(i256Gen) { i256 =>
+      val value = Val.I256(i256)
+      stack.push(value)
+
+      val initialGas = context.gasRemaining
+      I256ToU256.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.U256(U256.fromI256(i256).get)
+      initialGas.subUnsafe(context.gasRemaining) is I256ToU256.gas()
+
+      stack.pop()
+    }
+
+    val negI256Gen: Gen[I256] = negLongGen.map(I256.from)
+
+    forAll(negI256Gen) { i256 =>
+      val value = Val.I256(i256)
+      stack.push(value)
+      I256ToU256.runWith(frame).leftValue isE a[InvalidConversion]
+      stack.pop()
+    }
+  }
+
+  it should "I256ToByteVec" in new StatelessInstrFixture {
+    val i256Gen: Gen[I256] = arbitrary[Long].map(I256.from)
+
+    forAll(i256Gen) { i256 =>
+      val value = Val.I256(i256)
+      stack.push(value)
+
+      val initialGas = context.gasRemaining
+      I256ToByteVec.runWith(frame) isE ()
+
+      val bytes = serialize(i256)
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      initialGas.subUnsafe(context.gasRemaining) is I256ToByteVec.gas(bytes.length)
+
+      stack.pop()
+    }
+  }
+
+  it should "U256ToI256" in new StatelessInstrFixture {
+    val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
+
+    forAll(u256Gen) { u256 =>
+      val value = Val.U256(u256)
+      stack.push(value)
+
+      val initialGas = context.gasRemaining
+      U256ToI256.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.I256(I256.fromU256(u256).get)
+      initialGas.subUnsafe(context.gasRemaining) is U256ToI256.gas()
+
+      stack.pop()
+
+      stack.push(Val.U256(U256.MaxValue))
+      U256ToI256.runWith(frame).leftValue isE a[InvalidConversion]
+    }
+  }
+
+  it should "U256ToByteVec" in new StatelessInstrFixture {
+    val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
+
+    forAll(u256Gen) { u256 =>
+      val value = Val.U256(u256)
+      stack.push(value)
+
+      val initialGas = context.gasRemaining
+      U256ToByteVec.runWith(frame) isE ()
+
+      val bytes = serialize(u256)
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      initialGas.subUnsafe(context.gasRemaining) is U256ToByteVec.gas(bytes.length)
+
+      stack.pop()
+    }
+  }
+
+  trait ByteVecCompFixture extends StatelessInstrFixture {
+    def test(
+        instr: ByteVecComparison,
+        op: (ByteString, ByteString) => Boolean,
+        sameByteVecComp: Boolean
+    ) = {
+      forAll(dataGen) { data =>
+        val value = Val.ByteVec(data)
+
+        stack.push(value)
+        stack.push(value)
+
+        val initialGas = context.gasRemaining
+        instr.runWith(frame) isE ()
+
+        stack.size is 1
+        stack.top.get is Val.Bool(sameByteVecComp)
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas(data.length)
+
+        stack.pop()
+      }
+
+      forAll(dataGen, dataGen) { case (data1, data2) =>
+        val value1 = Val.ByteVec(data1)
+        val value2 = Val.ByteVec(data2)
+
+        stack.push(value1)
+        stack.push(value2)
+
+        val initialGas = context.gasRemaining
+        instr.runWith(frame) isE ()
+
+        stack.size is 1
+        stack.top.get is Val.Bool(op(data1, data2))
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas(data2.length)
+
+        stack.pop()
+      }
+
+      stack.push(Val.ByteVec(dataGen.sample.get))
+      instr.runWith(frame).leftValue isE StackUnderflow
+    }
+  }
+
+  it should "ByteVecEq" in new ByteVecCompFixture {
+    test(ByteVecEq, _ == _, true)
+  }
+
+  it should "ByteVecNeq" in new ByteVecCompFixture {
+    test(ByteVecNeq, _ != _, false)
+  }
+
+  it should "ByteVecSize" in new StatelessInstrFixture {
+    forAll(dataGen) { data =>
+      val value = Val.ByteVec(data)
+
+      stack.push(value)
+
+      val initialGas = context.gasRemaining
+      ByteVecSize.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.U256(U256.unsafe(data.length))
+      initialGas.subUnsafe(context.gasRemaining) is ByteVecSize.gas()
+
+      stack.pop()
+    }
+  }
+
+  it should "ByteVecConcat" in new StatelessInstrFixture {
+    forAll(dataGen, dataGen) { case (data1, data2) =>
+      val value1 = Val.ByteVec(data1)
+      val value2 = Val.ByteVec(data2)
+      val concat = data1 ++ data2
+
+      stack.push(value1)
+      stack.push(value2)
+
+      val initialGas = context.gasRemaining
+      ByteVecConcat.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.ByteVec(concat)
+      initialGas.subUnsafe(context.gasRemaining) is ByteVecConcat.gas(concat.length)
+
+      stack.pop()
+    }
+
+    stack.push(Val.ByteVec(dataGen.sample.get))
+    ByteVecNeq.runWith(frame).leftValue isE StackUnderflow
+  }
+
+  trait AddressCompFixture extends StatelessInstrFixture {
+    def test(
+        instr: ComparisonInstr[Val.Address],
+        op: (LockupScript, LockupScript) => Boolean,
+        sameAddressComp: Boolean
+    ) = {
+      forAll(addressValGen) { address =>
+        stack.push(address)
+        stack.push(address)
+
+        val initialGas = context.gasRemaining
+        instr.runWith(frame) isE ()
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+
+        stack.size is 1
+        stack.top.get is Val.Bool(sameAddressComp)
+        stack.pop()
+      }
+
+      forAll(addressValGen, addressValGen) { case (address1, address2) =>
+        stack.push(address1)
+        stack.push(address2)
+
+        val initialGas = context.gasRemaining
+        instr.runWith(frame) isE ()
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+
+        stack.size is 1
+        stack.top.get is Val.Bool(op(address1.lockupScript, address2.lockupScript))
+        stack.pop()
+      }
+
+      stack.push(addressValGen.sample.get)
+      instr.runWith(frame).leftValue isE StackUnderflow
+    }
+  }
+
+  it should "AddressEq" in new AddressCompFixture {
+    test(AddressEq, _ == _, true)
+  }
+
+  it should "AddressNeq" in new AddressCompFixture {
+    test(AddressNeq, _ != _, false)
+  }
+
+  it should "AddressToByteVec" in new StatelessInstrFixture {
+    forAll(addressValGen) { address =>
+      stack.push(address)
+
+      val initialGas = context.gasRemaining
+      AddressToByteVec.runWith(frame) isE ()
+
+      val bytes = serialize(address)
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      initialGas.subUnsafe(context.gasRemaining) is AddressToByteVec.gas(bytes.length)
+
+      stack.pop()
+    }
+  }
+
+  it should "IsAssetAddress" in new StatelessInstrFixture {
+    forAll(addressValGen) { address =>
+      stack.push(address)
+
+      val initialGas = context.gasRemaining
+      IsAssetAddress.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.Bool(address.lockupScript.isAssetType)
+      initialGas.subUnsafe(context.gasRemaining) is IsAssetAddress.gas()
+
+      stack.pop()
+    }
+  }
+
+  it should "IsContractAddress" in new StatelessInstrFixture {
+    forAll(addressValGen) { address =>
+      stack.push(address)
+
+      val initialGas = context.gasRemaining
+      IsContractAddress.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.Bool(!address.lockupScript.isAssetType)
+      initialGas.subUnsafe(context.gasRemaining) is IsContractAddress.gas()
+
+      stack.pop()
+    }
+  }
+
+  it should "Jump" in new StatelessInstrFixture {
+    Jump(0).runWith(frame).leftValue isE InvalidInstrOffset
+
+    val newFrame = prepareFrame(AVector(ConstTrue, ConstTrue, ConstTrue))
+
+    Jump(-1).runWith(newFrame).leftValue isE InvalidInstrOffset
+
+    Jump(0).runWith(newFrame) isE ()
+    newFrame.pc is 0
+
+    Jump(2).runWith(newFrame) isE ()
+    newFrame.pc is 2
+
+    Jump(-1).runWith(newFrame) isE ()
+    newFrame.pc is 1
+
+    Jump(2).runWith(newFrame).leftValue isE InvalidInstrOffset
+  }
+
+  it should "IfTrue" in new StatelessInstrFixture {
+    override lazy val frame = prepareFrame(AVector(ConstTrue, ConstTrue))
+
+    stack.push(Val.Bool(false))
+    stack.push(Val.Bool(true))
+
+    val initialGas = context.gasRemaining
+    IfTrue(1).runWith(frame) isE ()
+    frame.pc is 1
+    stack.size is 1
+    initialGas.subUnsafe(context.gasRemaining) is IfTrue(1).gas()
+
+    IfTrue(-1).runWith(frame) isE ()
+    frame.pc is 1
+    stack.size is 0
+
+    IfTrue(0).runWith(frame).leftValue isE StackUnderflow
+  }
+
+  it should "IfFalse" in new StatelessInstrFixture {
+    override lazy val frame = prepareFrame(AVector(ConstTrue, ConstTrue))
+
+    stack.push(Val.Bool(true))
+    stack.push(Val.Bool(false))
+
+    val initialGas = context.gasRemaining
+    IfFalse(1).runWith(frame) isE ()
+    frame.pc is 1
+    stack.size is 1
+    initialGas.subUnsafe(context.gasRemaining) is IfFalse(1).gas()
+
+    IfFalse(-1).runWith(frame) isE ()
+    frame.pc is 1
+    stack.size is 0
+
+    IfFalse(0).runWith(frame).leftValue isE StackUnderflow
+  }
+
+  it should "CallLocal" in new StatelessInstrFixture {
+    intercept[NotImplementedError] {
+      CallLocal(0.toByte).runWith(frame)
+    }
+  }
+
+  //TODO Not sure how to test this one
+  it should "Return" in new StatelessInstrFixture {
+    Return.runWith(frame) isE ()
+  }
+
+  it should "Assert" in new StatelessInstrFixture {
+    forAll(arbitrary[Boolean]) { boolean =>
+      val bool       = Val.Bool(boolean)
+      val initialGas = context.gasRemaining
+
+      stack.push(bool)
+
+      if (boolean) {
+        Assert.runWith(frame) isE ()
+      } else {
+        Assert.runWith(frame).leftValue isE AssertionFailed
+      }
+      initialGas.subUnsafe(context.gasRemaining) is Assert.gas()
+    }
+  }
+
+  trait HashFixture extends StatelessInstrFixture {
+    def test[H <: RandomBytes](instr: HashAlg[H], hashSchema: crypto.HashSchema[H]) = {
+      forAll(dataGen) { data =>
+        val value = Val.ByteVec(data)
+        stack.push(value)
+
+        val initialGas = context.gasRemaining
+        instr.runWith(frame)
+        stack.size is 1
+        stack.top.get is Val.ByteVec.from(hashSchema.hash(data))
+
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas(data.length)
+
+        stack.pop()
+      }
+      instr.runWith(frame).leftValue isE StackUnderflow
+    }
+  }
+  it should "Blake2b" in new HashFixture {
+    test(Blake2b, crypto.Blake2b)
+  }
+
+  it should "Keccak256" in new HashFixture {
+    test(Keccak256, crypto.Keccak256)
+  }
+
+  it should "Sha256" in new HashFixture {
+    test(Sha256, crypto.Sha256)
+  }
+
+  it should "Sha3" in new HashFixture {
+    test(Sha3, crypto.Sha3)
+  }
+
+  it should "VerifyTxSignature" in new StatelessInstrFixture {
+    val keysGen = for {
+      group         <- groupIndexGen
+      (_, pub, pri) <- addressGen(group)
+    } yield ((pub, pri))
+
+    val tx               = transactionGen().sample.get
+    val (pubKey, priKey) = keysGen.sample.get
+
+    val signature      = SignatureSchema.sign(tx.id.bytes, priKey)
+    val signatureStack = Stack.ofCapacity[Signature](1)
+    signatureStack.push(signature)
+
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      txEnv = Some(TxEnv(tx, AVector.empty, signatureStack))
+    )
+
+    val initialGas = context.gasRemaining
+    stack.push(Val.ByteVec(pubKey.bytes))
+    VerifyTxSignature.runWith(frame) isE ()
+    initialGas.subUnsafe(context.gasRemaining) is VerifyTxSignature.gas()
+
+    val (wrongKey, _) = keysGen.sample.get
+
+    signatureStack.push(signature)
+    stack.push(Val.ByteVec(wrongKey.bytes))
+    VerifyTxSignature.runWith(frame).leftValue isE InvalidSignature
+
+    stack.push(Val.ByteVec(dataGen.sample.get))
+    VerifyTxSignature.runWith(frame).leftValue isE InvalidPublicKey
+  }
+
+  trait GenericSignatureFixture extends StatelessInstrFixture {
+    val data32Gen: Gen[ByteString] = for {
+      bytes <- Gen.listOfN(32, arbitrary[Byte])
+    } yield ByteString(bytes)
+
+    def test[PriKey <: RandomBytes, PubKey <: RandomBytes, Sig <: RandomBytes](
+        instr: GenericVerifySignature[PubKey, Sig],
+        genratePriPub: => (PriKey, PubKey),
+        sign: (ByteString, PriKey) => Sig
+    ) = {
+      val keysGen = for {
+        (pri, pub) <- Gen.const(()).map(_ => genratePriPub)
+      } yield ((pri, pub))
+
+      val (priKey, pubKey) = keysGen.sample.get
+      val data             = data32Gen.sample.get
+
+      val signature = sign(data, priKey)
+
+      stack.push(Val.ByteVec(data))
+      stack.push(Val.ByteVec(pubKey.bytes))
+      stack.push(Val.ByteVec(signature.bytes))
+
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+
+      stack.push(Val.ByteVec(ByteString("zzz")))
+      instr.runWith(frame).leftValue isE InvalidSignatureFormat
+
+      stack.push(Val.ByteVec(dataGen.sample.get))
+      stack.push(Val.ByteVec(signature.bytes))
+      instr.runWith(frame).leftValue isE InvalidPublicKey
+
+      stack.push(Val.ByteVec(dataGen.sample.get))
+      stack.push(Val.ByteVec(pubKey.bytes))
+      stack.push(Val.ByteVec(signature.bytes))
+      instr.runWith(frame).leftValue isE SignedDataIsNot32Bytes
+
+      stack.push(Val.ByteVec(data))
+      stack.push(Val.ByteVec(pubKey.bytes))
+      stack.push(Val.ByteVec(sign(dataGen.sample.get, priKey).bytes))
+      instr.runWith(frame).leftValue isE InvalidSignature
+    }
+  }
+
+  it should "VerifySecP256K1" in new GenericSignatureFixture {
+    test(VerifySecP256K1, crypto.SecP256K1.generatePriPub(), crypto.SecP256K1.sign)
+  }
+
+  it should "VerifyED25519" in new GenericSignatureFixture {
+    test(VerifyED25519, crypto.ED25519.generatePriPub(), crypto.ED25519.sign)
+  }
+
+  it should "NetworkId" in new StatelessInstrFixture {
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      blockEnv = Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max))
+    )
+
+    val initialGas = context.gasRemaining
+    NetworkId.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is Val.ByteVec(ByteString(AlephiumMainNet.id))
+    initialGas.subUnsafe(context.gasRemaining) is NetworkId.gas()
+  }
+
+  it should "BlockTimeStamp" in {
+    new StatelessInstrFixture {
+      private val timestamp = TimeStamp.now()
+      override lazy val frame = prepareFrame(
+        AVector.empty,
+        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max))
+      )
+
+      private val initialGas = context.gasRemaining
+      BlockTimeStamp.runWith(frame) isE ()
+      stack.size is 1
+      stack.top.get is Val.U256(timestamp.millis)
+      initialGas.subUnsafe(context.gasRemaining) is BlockTimeStamp.gas()
+    }
+
+    new StatelessInstrFixture {
+      val timestamp = new TimeStamp(-1)
+      override lazy val frame = prepareFrame(
+        AVector.empty,
+        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max))
+      )
+
+      BlockTimeStamp.runWith(frame).leftValue isE NegativeTimeStamp(-1)
+    }
+  }
+
+  it should "BlockTarget" in new StatelessInstrFixture {
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      blockEnv = Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max))
+    )
+
+    private val initialGas = context.gasRemaining
+    BlockTarget.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is Val.U256(U256.unsafe(Target.Max.value))
+    initialGas.subUnsafe(context.gasRemaining) is BlockTarget.gas()
+  }
+
+  it should "TxId" in new StatelessInstrFixture {
+    val tx = transactionGen().sample.get
+
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      txEnv = Some(TxEnv(tx, AVector.empty, Stack.ofCapacity[Signature](0)))
+    )
+
+    val initialGas = context.gasRemaining
+    TxId.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is Val.ByteVec(tx.id.bytes)
+    initialGas.subUnsafe(context.gasRemaining) is TxId.gas()
+  }
+
+  it should "TxCaller" in new StatelessInstrFixture {
+    val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
+    val prevOutputs   = prevOut.map(_.referredOutput)
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      txEnv = Some(
+        TxEnv(
+          tx,
+          prevOutputs,
+          Stack.ofCapacity[Signature](0)
+        )
+      )
+    )
+
+    val index      = prevOutputs.length - 1
+    val initialGas = context.gasRemaining
+    stack.push(Val.U256(U256.unsafe(index)))
+    TxCaller.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is Val.Address(prevOutputs.get(index).get.lockupScript)
+    initialGas.subUnsafe(context.gasRemaining) is TxCaller.gas()
+  }
+
+  it should "TxCallerSize" in new StatelessInstrFixture {
+    val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
+    val prevOutputs   = prevOut.map(_.referredOutput)
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      txEnv = Some(
+        TxEnv(
+          tx,
+          prevOutputs,
+          Stack.ofCapacity[Signature](0)
+        )
+      )
+    )
+
+    val initialGas = context.gasRemaining
+    TxCallerSize.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is Val.U256(U256.unsafe(prevOutputs.length))
+    initialGas.subUnsafe(context.gasRemaining) is TxCallerSize.gas()
+  }
+
+  trait LogFixture extends StatelessInstrFixture {
+    def test(instr: LogInstr, n: Int) = {
+      (0 until n).foreach { _ =>
+        stack.push(Val.True)
+      }
+
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      stack.size is 0
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas(n)
+
+      (0 until (n - 1)).foreach { _ =>
+        stack.push(Val.True)
+      }
+
+      instr.runWith(frame).leftValue isE StackUnderflow
+    }
+  }
+
+  it should "Log1" in new LogFixture {
+    test(Log1, 1)
+  }
+
+  it should "Log2" in new LogFixture {
+    test(Log2, 2)
+  }
+
+  it should "Log3" in new LogFixture {
+    test(Log3, 3)
+  }
+
+  it should "Log4" in new LogFixture {
+    test(Log4, 4)
+  }
+
+  it should "Log5" in new LogFixture {
+    test(Log5, 5)
   }
 
   it should "test gas amount" in new FrameFixture {
