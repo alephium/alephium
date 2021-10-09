@@ -624,7 +624,7 @@ object TxValidation {
             )
           }
         }
-        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignature)
+        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignatures)
       } yield remaining
     }
 
