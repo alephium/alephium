@@ -192,8 +192,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0)
 
     val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
-    addAndCheck(blockFlow, block1)
-    addAndCheck(blockFlow, block2)
+    addAndCheck(blockFlow, block1, block2)
 
     val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     Set(block1.hash, block2.hash).intersect(block3.blockDeps.deps.toSet).size is 1

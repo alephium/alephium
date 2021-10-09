@@ -16,10 +16,11 @@
 
 package org.alephium.flow.validation
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -28,382 +29,392 @@ import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
-  def passCheck[T](result: BlockValidationResult[T]): Assertion = {
-    result.isRight is true
-  }
 
-  def failCheck[T](result: BlockValidationResult[T], error: InvalidBlockStatus): Assertion = {
-    result.left.value isE error
-  }
+  trait Fixture extends BlockValidation.Impl() {
+    val blockFlow  = isolatedBlockFlow()
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
 
-  def passValidation(result: BlockValidationResult[Unit]): Assertion = {
-    result.isRight is true
-  }
+    implicit class RichBlock(block: Block) {
+      object Coinbase {
+        def unsignedTx(f: UnsignedTransaction => UnsignedTransaction): Block = {
+          val updated = block.coinbase.copy(unsigned = f(block.coinbase.unsigned))
+          block.copy(transactions = block.nonCoinbase :+ updated)
+        }
 
-  def failValidation[R](result: BlockValidationResult[R], error: InvalidBlockStatus): Assertion = {
-    result.left.value isE error
-  }
+        def tx(f: Transaction => Transaction): Block = {
+          block.copy(transactions = block.nonCoinbase :+ f(block.coinbase))
+        }
 
-  class Fixture extends BlockValidation.Impl() {
-    def checkCoinbase(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
-      val groupView = flow.getMutableGroupView(block).rightValue
-      checkCoinbase(block.chainIndex, block, groupView)
+        def output(f: AssetOutput => AssetOutput): Block = {
+          val outputs = block.coinbase.unsigned.fixedOutputs
+          unsignedTx(_.copy(fixedOutputs = outputs.replace(0, f(outputs.head))))
+        }
+      }
+
+      def pass()(implicit validator: (Block) => BlockValidationResult[Unit]) = {
+        validator(block).isRight is true
+      }
+
+      def replaceTxGas(gas: U256): Block = {
+        assert(block.transactions.length >= 2) // at least 1 non-coinbase tx
+        val tx        = block.nonCoinbase.head
+        val gasAmount = tx.unsigned.gasAmount
+        val gasPrice  = gas.divUnsafe(gasAmount.value)
+        val newTx     = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(gasPrice)))
+        block.copy(transactions = newTx +: block.transactions.tail)
+      }
+
+      def fail(error: InvalidBlockStatus)(implicit
+          validator: (Block) => BlockValidationResult[Unit]
+      ): Assertion = {
+        validator(block).left.value isE error
+      }
+
+      def fail()(implicit
+          validator: (Block) => BlockValidationResult[Unit],
+          error: InvalidBlockStatus
+      ): Assertion = {
+        fail(error)
+      }
     }
 
-    implicit class RichTx(tx: Transaction) {
-      def update(f: UnsignedTransaction => UnsignedTransaction): Transaction = {
-        tx.copy(unsigned = f(tx.unsigned))
-      }
+    def checkBlockUnit(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+      checkBlock(block, flow).map(_ => ())
     }
   }
 
   it should "validate group for block" in new Fixture {
-    forAll(blockGenOf(brokerConfig)) { block => passCheck(checkGroup(block)) }
-    forAll(blockGenNotOf(brokerConfig)) { block => failCheck(checkGroup(block), InvalidGroup) }
+    implicit val validator = checkGroup _
+
+    forAll(blockGenOf(brokerConfig))(_.pass())
+    forAll(blockGenNotOf(brokerConfig))(_.fail(InvalidGroup))
   }
 
   it should "validate nonEmpty transaction list" in new Fixture {
-    val block0 = blockGen.retryUntil(_.transactions.nonEmpty).sample.get
-    val block1 = block0.copy(transactions = AVector.empty)
-    passCheck(checkNonEmptyTransactions(block0))
-    failCheck(checkNonEmptyTransactions(block1), EmptyTransactionList)
-  }
+    implicit val validator = checkNonEmptyTransactions _
 
-  trait CoinbaseFixture extends Fixture {
-    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.get
+    forAll(blockGen) { block =>
+      if (block.transactions.nonEmpty) {
+        block.pass()
+      }
 
-    def newCoinbase(chainIndex: ChainIndex): Transaction = {
-      val block = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block)
-      block.coinbase
+      val withoutTx = block.copy(transactions = AVector.empty)
+      withoutTx.fail(EmptyTransactionList)
     }
   }
 
-  it should "validate coinbase transaction simple format" in new CoinbaseFixture {
+  it should "validate coinbase transaction simple format" in new Fixture {
+    val block           = emptyBlock(blockFlow, chainIndex)
     val (privateKey, _) = SignatureSchema.generatePriPub()
-    val block0          = emptyBlock(blockFlow, chainIndex)
     val output0         = assetOutputGen.sample.get
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
     val script          = StatefulScript.alwaysFail
-    val coinbase        = newCoinbase(block0.chainIndex).pass()
     val testSignatures =
-      AVector[Signature](SignatureSchema.sign(coinbase.unsigned.hash.bytes, privateKey))
+      AVector[Signature](SignatureSchema.sign(block.coinbase.unsigned.hash.bytes, privateKey))
 
-    implicit class RichCoinbase(coinbase: Transaction) {
-      def update(f: UnsignedTransaction => UnsignedTransaction): Transaction = {
-        coinbase.copy(unsigned = f(coinbase.unsigned))
-      }
-
-      def pass() = {
-        val block = block0.copy(transactions = AVector(coinbase))
-        passCheck(checkCoinbaseEasy(block, 1))
-        coinbase
-      }
-
-      def fail() = {
-        val block = block0.copy(transactions = AVector(coinbase))
-        failCheck(checkCoinbaseEasy(block, 1), InvalidCoinbaseFormat)
-        coinbase
-      }
-
-      def testNegPos(
-          negative: UnsignedTransaction => UnsignedTransaction,
-          positive: UnsignedTransaction => UnsignedTransaction
-      ) = {
-        update(negative).fail()
-        update(positive).pass()
-      }
-
-      def testTxNegPos(
-          negative: Transaction => Transaction,
-          positive: Transaction => Transaction
-      ) = {
-        negative(coinbase).fail()
-        positive(coinbase).pass()
-      }
-    }
+    implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 1)
+    implicit val error: InvalidBlockStatus = InvalidCoinbaseFormat
 
     info("script")
-    coinbase.testNegPos(
-      _.copy(scriptOpt = Some(script)),
-      _.copy(scriptOpt = None)
-    )
+    block.Coinbase.unsignedTx(_.copy(scriptOpt = None)).pass()
+    block.Coinbase.unsignedTx(_.copy(scriptOpt = Some(script))).fail()
 
     info("gasAmount")
-    coinbase.testNegPos(
-      _.copy(gasAmount = GasBox.from(0).get),
-      _.copy(gasAmount = minimalGas)
-    )
+    block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas)).pass()
+    block.Coinbase.unsignedTx(_.copy(gasAmount = GasBox.from(0).value)).fail()
 
     info("gasPrice")
-    coinbase.testNegPos(
-      _.copy(gasPrice = GasPrice(U256.Zero)),
-      _.copy(gasPrice = minimalGasPrice)
-    )
+    block.Coinbase.unsignedTx(_.copy(gasPrice = minimalGasPrice)).pass()
+    block.Coinbase.unsignedTx(_.copy(gasPrice = GasPrice(U256.Zero))).fail()
 
     info("output length")
-    coinbase.testNegPos(
-      _.copy(fixedOutputs = emptyOutputs),
-      _.copy(fixedOutputs = AVector(output0))
-    )
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = emptyOutputs)).fail()
 
     info("output token")
-    coinbase.testNegPos(
-      _.copy(fixedOutputs = AVector(output0.copy(tokens = AVector(Hash.zero -> 10)))),
-      _.copy(fixedOutputs = AVector(output0))
-    )
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
+    val outputsWithTokens = AVector(output0.copy(tokens = AVector(Hash.zero -> 10)))
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = outputsWithTokens)).fail()
 
     info("contract input")
-    coinbase.testTxNegPos(
-      _.copy(contractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)),
-      _.copy(contractInputs = AVector.empty)
-    )
+    block.Coinbase.tx(_.copy(contractInputs = AVector.empty)).pass()
+    val invalidContractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)
+    block.Coinbase.tx(_.copy(contractInputs = invalidContractInputs)).fail()
 
     info("generated output")
-    coinbase.testTxNegPos(
-      _.copy(generatedOutputs = AVector(output0)),
-      _.copy(generatedOutputs = emptyOutputs.as[TxOutput])
-    )
+    block.Coinbase.tx(_.copy(generatedOutputs = emptyOutputs.as[TxOutput])).pass()
+    block.Coinbase.tx(_.copy(generatedOutputs = AVector(output0))).fail()
 
     info("input signature")
-    coinbase.testTxNegPos(
-      _.copy(inputSignatures = testSignatures),
-      _.copy(inputSignatures = emptySignatures)
-    )
+    block.Coinbase.tx(_.copy(inputSignatures = emptySignatures)).pass()
+    block.Coinbase.tx(_.copy(inputSignatures = testSignatures)).fail()
 
     info("contract signature")
-    coinbase.testTxNegPos(
-      _.copy(contractSignatures = testSignatures),
-      _.copy(contractSignatures = emptySignatures)
-    )
+    block.Coinbase.tx(_.copy(contractSignatures = emptySignatures)).pass()
+    block.Coinbase.tx(_.copy(contractSignatures = testSignatures)).fail()
   }
 
-  it should "check coinbase data" in new CoinbaseFixture {
-    val block = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
+  it should "check coinbase data" in new Fixture {
+    val block        = emptyBlock(blockFlow, chainIndex)
     val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
     val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
     coinbaseData.startsWith(expected) is true
+
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
+
+    info("wrong block timestamp")
+    val wrongTimestamp =
+      serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now().plusSecondsUnsafe(5)))
+    block.Coinbase.output(_.copy(additionalData = wrongTimestamp)).fail(InvalidCoinbaseData)
+
+    info("wrong chain index")
+    val wrongChainIndex = {
+      val index = chainIndexGen.retryUntil(_ != chainIndex).sample.get
+      serialize(CoinbaseFixedData.from(index, block.header.timestamp))
+    }
+    block.Coinbase.output(_.copy(additionalData = wrongChainIndex)).fail(InvalidCoinbaseData)
+
+    info("wrong format")
+    val wrongFormat = ByteString("wrong-coinbase-data-format")
+    block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
   }
 
-  it should "check coinbase locked amount" in new CoinbaseFixture {
+  it should "check coinbase locked amount" in new Fixture {
+    val block              = emptyBlock(blockFlow, chainIndex)
+    val miningReward       = consensusConfig.emission.reward(block.header).miningReward
+    val lockedAmount       = miningReward
+    implicit val validator = (blk: Block) => checkLockedReward(blk, lockedAmount)
+
+    info("valid")
+    block.pass()
+
+    info("invalid locked amount")
+    block.Coinbase.output(_.copy(amount = U256.One)).fail(InvalidCoinbaseLockedAmount)
+
+    info("invalid lockup period")
+    block.Coinbase.output(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
+  }
+
+  it should "check coinbase reward" in new Fixture {
     val block = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
-    val coinbase     = block.coinbase
-    val outputs      = coinbase.unsigned.fixedOutputs
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    val lockedAmount = miningReward
-    passCheck(checkLockedReward(block, lockedAmount))
-
-    def replace(f: AssetOutput => AssetOutput): Block = {
-      val coinbase1 = coinbase.copy(unsigned =
-        coinbase.unsigned.copy(fixedOutputs = outputs.replace(0, f(outputs.head)))
-      )
-      block.copy(transactions = AVector(coinbase1))
+    implicit val validator = (blk: Block) => {
+      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      checkCoinbase(blk.chainIndex, blk, groupView)
     }
 
-    val block1 = replace(_.copy(amount = U256.One))
-    failCheck(checkLockedReward(block1, lockedAmount), InvalidCoinbaseLockedAmount)
+    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    block.Coinbase.output(_.copy(amount = miningReward)).pass()
 
-    val block2 = replace(_.copy(lockTime = TimeStamp.now()))
-    failCheck(checkLockedReward(block2, lockedAmount), InvalidCoinbaseLockupPeriod)
+    val invalidMiningReward = miningReward.subUnsafe(1)
+    block.Coinbase.output(_.copy(amount = invalidMiningReward)).fail(InvalidCoinbaseReward)
   }
 
-  trait RewardFixture extends Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 1)
-    implicit class RichBlock(block: Block) {
-      def replaceCoinbaseReward(reward: U256): Block = {
-        val coinbaseOutputNew =
-          block.coinbase.unsigned.fixedOutputs.head.copy(amount = reward)
-        val coinbaseNew = block.coinbase.copy(
-          unsigned = block.coinbase.unsigned.copy(fixedOutputs = AVector(coinbaseOutputNew))
-        )
-        val txsNew   = block.transactions.replace(block.transactions.length - 1, coinbaseNew)
-        val blockNew = block.copy(transactions = txsNew)
-        blockNew.coinbaseReward is reward
-        blockNew
-      }
-
-      def replaceTxGas(reward: U256): Block = {
-        val tx       = block.nonCoinbase.head
-        val gas      = tx.unsigned.gasAmount
-        val gasPrice = reward.divUnsafe(gas.value)
-        val newTx    = tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(gasPrice)))
-        val newBlock = block.copy(transactions = AVector(newTx, block.coinbase))
-        reMine(blockFlow, chainIndex, newBlock)
-      }
-
-      def fail(): Block = {
-        failCheck(checkCoinbase(block, blockFlow), InvalidCoinbaseReward)
-        block
-      }
-
-      def pass(): Block = {
-        passCheck(checkCoinbase(block, blockFlow))
-        block
-      }
+  it should "check gas reward cap" in new Fixture {
+    implicit val validator = (blk: Block) => {
+      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      checkCoinbase(blk.chainIndex, blk, groupView)
     }
-  }
 
-  it should "check coinbase reward" in new RewardFixture {
-    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)).pass()
+    val block0 = transfer(blockFlow, chainIndex)
+    block0.pass()
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    block.replaceCoinbaseReward(miningReward).pass()
-    block.replaceCoinbaseReward(miningReward.subUnsafe(minimalGasFee)).fail()
-  }
+    info("gas reward is set to 1/2 of miningReward, miningReward not enough")
+    val miningReward = consensusConfig.emission.reward(block0.header).miningReward
+    val block1       = block0.replaceTxGas(miningReward)
+    block1.fail(InvalidCoinbaseReward)
 
-  it should "check gas reward cap" in new RewardFixture {
-    val block = transfer(blockFlow, ChainIndex.unsafe(0, 1)).pass()
+    info("adjust the miningReward to account for the adjusted gas reward")
+    block1.Coinbase.output(_.copy(amount = miningReward + (block1.gasFee / 2))).pass()
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
-    val block1       = block.replaceTxGas(miningReward).fail()
-    block1.replaceCoinbaseReward(miningReward + (block1.gasFee / 2)).pass()
+    info("gas reward is set to the max: the same as miningReward, miningReward not enough")
+    val block2 = block0.replaceTxGas(miningReward * 3)
+    block2.fail(InvalidCoinbaseReward)
 
-    val block2 = block.replaceTxGas(miningReward * 3).fail()
-    block2.replaceCoinbaseReward(miningReward * 2).pass()
+    info("adjust the miningReward to account for the adjusted gas reward")
+    block2.Coinbase.output(_.copy(amount = miningReward * 2)).pass()
   }
 
   it should "check non-empty txs" in new Fixture {
-    val block    = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    val modified = block.copy(transactions = AVector.empty)
-    failCheck(checkBlock(modified, blockFlow), EmptyTransactionList)
+    val block = emptyBlock(blockFlow, chainIndex)
+    block.copy(transactions = AVector.empty).fail(EmptyTransactionList)(checkNonEmptyTransactions)
   }
 
   it should "check the number of txs" in new Fixture {
-    val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val modified0 =
-      block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(block.nonCoinbase.head))
-    passValidation(checkTxNumber(modified0))
+    implicit val validator = checkTxNumber _
 
-    val modified1 =
-      block.copy(transactions = AVector.fill(maximalTxsInOneBlock + 1)(block.nonCoinbase.head))
-    failCheck(checkTxNumber(modified1), TooManyTransactions)
-    failCheck(checkBlock(modified1, blockFlow), TooManyTransactions)
+    val block   = transfer(blockFlow, chainIndex)
+    val maxTxs  = AVector.fill(maximalTxsInOneBlock)(block.nonCoinbase.head)
+    val moreTxs = block.nonCoinbase.head +: maxTxs
+
+    block.copy(transactions = maxTxs).pass()
+    block.copy(transactions = moreTxs).fail(TooManyTransactions)
+    block.copy(transactions = moreTxs).fail(TooManyTransactions)(checkBlockUnit(_, blockFlow))
   }
 
   it should "check the gas price decreasing" in new Fixture {
-    val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val tx    = block.nonCoinbase.head
-    tx.unsigned.gasPrice is defaultGasPrice
+    implicit val validator = checkGasPriceDecreasing _
 
-    val tx1    = tx.update(_.copy(gasPrice = GasPrice(defaultGasPrice.value + 1)))
-    val block1 = block.copy(transactions = AVector(tx1, tx))
-    passValidation(checkGasPriceDecreasing(block1))
+    val block = transfer(blockFlow, chainIndex)
+    val low   = block.nonCoinbase.head
+    low.unsigned.gasPrice is defaultGasPrice
 
-    val block2 = block.copy(transactions = AVector(tx, tx1))
-    failValidation(checkBlock(block2, blockFlow), TxGasPriceNonDecreasing)
+    val higherGas = GasPrice(defaultGasPrice.value + 1)
+    val high      = low.copy(unsigned = low.unsigned.copy(gasPrice = higherGas))
+
+    block.copy(transactions = AVector(high, low, low)).pass()
+    block.copy(transactions = AVector(low, low, low)).pass()
+    block.copy(transactions = AVector(low, high, low)).fail(TxGasPriceNonDecreasing)
+
+    block
+      .copy(transactions = AVector(low, high, low))
+      .fail(TxGasPriceNonDecreasing)(checkBlockUnit(_, blockFlow))
   }
 
   it should "check the amount of gas" in new Fixture {
-    val block = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    implicit val validator = checkTotalGas _
+
+    val block = transfer(blockFlow, chainIndex)
     val tx    = block.nonCoinbase.head
     tx.unsigned.gasAmount is minimalGas
 
-    val modified0 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock)(tx))
-    passValidation(checkTotalGas(modified0))
+    val higherGas   = GasBox.unsafe(minimalGas.value + 1)
+    val higherGasTx = tx.copy(unsigned = tx.unsigned.copy(gasAmount = higherGas))
 
-    val tx1       = tx.copy(unsigned = tx.unsigned.copy(gasAmount = GasBox.unsafe(minimalGas.value + 1)))
-    val modified1 = block.copy(transactions = AVector.fill(maximalTxsInOneBlock - 1)(tx) :+ tx1)
-    failValidation(checkTotalGas(modified1), TooManyGasUsed)
-    failValidation(checkBlock(modified1, blockFlow), TooManyGasUsed)
+    val maxTxs = AVector.fill(maximalTxsInOneBlock)(tx)
+
+    block.pass()
+    block.copy(transactions = maxTxs).pass()
+    block.copy(transactions = higherGasTx +: maxTxs.tail).fail(TooMuchGasUsed)
+
+    block
+      .copy(transactions = higherGasTx +: maxTxs.tail)
+      .fail(TooMuchGasUsed)(checkBlockUnit(_, blockFlow))
   }
 
-  trait DoubleSpendingFixture extends FlowFixture {
-    val chainIndex      = ChainIndex.unsafe(0, 0)
-    val blockValidation = BlockValidation.build(blockFlow)
-  }
-
-  it should "check double spending in a same tx" in new DoubleSpendingFixture {
+  it should "check double spending in a same tx" in new Fixture {
     val invalidTx = doubleSpendingTx(blockFlow, chainIndex)
     val block     = mine(blockFlow, chainIndex)((_, _) => AVector(invalidTx))
-    blockValidation.validate(block, blockFlow) is Left(Right(BlockDoubleSpending))
+
+    block.fail(BlockDoubleSpending)(checkBlockDoubleSpending)
+    block.fail(BlockDoubleSpending)(checkBlockUnit(_, blockFlow))
   }
 
-  it should "check double spending in a same block" in new DoubleSpendingFixture {
-    val block0 = transferOnlyForIntraGroup(blockFlow, chainIndex)
+  it should "check double spending in a same block" in new Fixture {
+    implicit val validator = checkBlockDoubleSpending _
+    val intraChainIndex    = ChainIndex.unsafe(0, 0)
+
+    val block0 = transferOnlyForIntraGroup(blockFlow, intraChainIndex)
     block0.nonCoinbase.length is 1
-    blockValidation.validate(block0, blockFlow).isRight is true
+    block0.pass()
 
-    val block1 = mine(blockFlow, chainIndex)((_, _) => block0.nonCoinbase ++ block0.nonCoinbase)
+    val block1 =
+      mine(blockFlow, intraChainIndex)((_, _) => block0.nonCoinbase ++ block0.nonCoinbase)
     block1.nonCoinbase.length is 2
-    blockValidation.validate(block1, blockFlow) is Left(Right(BlockDoubleSpending))
+    block1.fail(BlockDoubleSpending)
+    block1.fail(BlockDoubleSpending)(checkBlockUnit(_, blockFlow))
   }
 
-  it should "check double spending in block dependencies (1)" in new DoubleSpendingFixture {
-    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val block1 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
+  it should "check double spending when UTXOs are directly spent again" in new Fixture {
+    forAll(chainIndexGenForBroker(brokerConfig)) { index =>
+      val block0 = transfer(blockFlow, index)
+      addAndCheck(blockFlow, block0)
+
+      for (to <- 0 until brokerConfig.groups) {
+        // UTXOs spent by `block0.nonCoinbase` can not be spent again
+        val from  = block0.chainIndex.from.value
+        val block = mine(blockFlow, ChainIndex.unsafe(from, to))((_, _) => block0.nonCoinbase)
+        block.nonCoinbaseLength is 1
+        checkFlow(block, blockFlow) is Left(Right(InvalidFlowTxs))
+      }
+    }
+  }
+
+  it should "check double spending in block dependencies" in new Fixture {
+    val mainGroup = GroupIndex.unsafe(0)
+    val block0    = transfer(blockFlow, ChainIndex.unsafe(mainGroup.value, 0))
+    val block1    = transfer(blockFlow, ChainIndex.unsafe(mainGroup.value, 1))
 
     addAndCheck(blockFlow, block0, 1)
     addAndCheck(blockFlow, block1, 1)
+
+    // block1 and block2 conflict with each other
     blockFlow.isConflicted(AVector(block1.hash, block0.hash), blockFlow.getBlockUnsafe) is true
 
-    val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val newDeps2 = block2.header.blockDeps.deps
-      .replace(brokerConfig.groups - 1, block0.hash)
-      .replace(brokerConfig.groups, block1.hash)
-    val block3 = mine(
-      blockFlow,
-      chainIndex,
-      newDeps2,
-      block2.transactions,
-      block2.header.timestamp
-    )
+    for (to <- 0 until brokerConfig.groups) {
+      val index = ChainIndex.unsafe(mainGroup.value, to)
+      val block = transfer(blockFlow, index)
 
-    blockFlow.isConflicted(block3.header.outDeps, blockFlow.getBlockUnsafe) is true
-    blockValidation.validate(block3, blockFlow) is Left(Right(InvalidFlowTxs))
+      // Update outDeps to contain conflicting blocks: block1 and block2
+      val newDeps = block.header.blockDeps.deps
+        .replace(brokerConfig.groups - 1, block0.hash)
+        .replace(brokerConfig.groups, block1.hash)
 
-    val block4 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
-    val newDeps4 = block4.header.blockDeps.deps
-      .replace(brokerConfig.groups - 1, block0.hash)
-      .replace(brokerConfig.groups, block1.hash)
-    val block5 =
-      mine(
+      val newBlock = mine(
         blockFlow,
-        ChainIndex.unsafe(0, 1),
-        newDeps4,
-        block4.transactions,
-        block4.header.timestamp
+        index,
+        newDeps,
+        block.transactions,
+        block.header.timestamp
       )
 
-    blockFlow.isConflicted(block5.header.outDeps, blockFlow.getBlockUnsafe) is true
-    blockValidation.validate(block5, blockFlow) is Left(Right(InvalidFlowTxs))
+      blockFlow.isConflicted(newBlock.header.outDeps, blockFlow.getBlockUnsafe) is true
+      blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, newBlock.blockDeps).toSet is
+        Set(block0.hash, block1.hash)
+
+      checkFlow(newBlock, blockFlow) is Left(Right(InvalidFlowTxs))
+    }
   }
 
-  it should "check double spending in block dependencies (2)" in new DoubleSpendingFixture {
-    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
-    addAndCheck(blockFlow, block0)
+  it should "calculate all the hashes for double spending check when there are genesis deps" in new Fixture {
+    val blockFlow1 = isolatedBlockFlow()
 
-    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    addAndCheck(blockFlow, block1)
+    val block1 = emptyBlock(blockFlow1, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow1, block1)
+    val block2 = emptyBlock(blockFlow1, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow1, block2)
+    val block3 = emptyBlock(blockFlow1, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow1, block3)
 
-    val block2 = mine(blockFlow, ChainIndex.unsafe(0, 0))((_, _) => block0.nonCoinbase)
-    block2.nonCoinbaseLength is 1
-    blockValidation.validate(block2, blockFlow) is Left(Right(InvalidFlowTxs))
+    val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block0, block1, block2, block3)
 
-    val block3 = mine(blockFlow, ChainIndex.unsafe(0, 1))((_, _) => block0.nonCoinbase)
-    block3.nonCoinbaseLength is 1
-    blockValidation.validate(block3, blockFlow) is Left(Right(InvalidFlowTxs))
+    val mainGroup = GroupIndex.unsafe(0)
+    val bestDeps  = blockFlow.getBestDeps(mainGroup)
+    blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, bestDeps).toSet is
+      Set(block0.hash, block1.hash, block2.hash, block3.hash)
+
+    val bestDeps1 = blockFlow1.getBestDeps(mainGroup)
+    blockFlow1.getHashesForDoubleSpendingCheckUnsafe(mainGroup, bestDeps1).toSet is
+      Set(block1.hash, block2.hash, block3.hash)
   }
 
-  it should "check double spending in block dependencies (3)" in new DoubleSpendingFixture {
-    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    addAndCheck(blockFlow, block0)
+  it should "calculate all the hashes for double spending check when there are no genesis deps" in new Fixture {
+    val blockFlow1 = isolatedBlockFlow()
+    val mainGroup  = GroupIndex.unsafe(0)
+    (0 until groups0).reverse.foreach { toGroup =>
+      val chainIndex = ChainIndex.unsafe(mainGroup.value, toGroup)
+      val block      = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      addAndCheck(blockFlow1, block)
+    }
 
-    val block1 = mine(blockFlow, ChainIndex.unsafe(0, 0))((_, _) => block0.nonCoinbase)
-    block1.nonCoinbaseLength is 1
-    blockValidation.validate(block1, blockFlow) is Left(Right(InvalidFlowTxs))
+    val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    val block1 = emptyBlock(blockFlow1, ChainIndex.unsafe(0, 0))
+    val block2 = emptyBlock(blockFlow1, ChainIndex.unsafe(0, 2))
 
-    val block2 = mine(blockFlow, ChainIndex.unsafe(0, 1))((_, _) => block0.nonCoinbase)
-    block2.nonCoinbaseLength is 1
-    blockValidation.validate(block2, blockFlow) is Left(Right(InvalidFlowTxs))
+    addAndCheck(blockFlow, block0, block1, block2)
+
+    val bestDeps = blockFlow.getBestDeps(mainGroup)
+
+    blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, bestDeps).toSet is
+      Set(block0.hash, block1.hash, block2.hash)
   }
 
-  it should "validate old blocks" in new DoubleSpendingFixture {
-    val block0     = transfer(blockFlow, ChainIndex.unsafe(0, 0))
-    val newBlockTs = ALF.LaunchTimestamp.plusSecondsUnsafe(1)
+  it should "validate old blocks" in new Fixture {
+    val block0     = transfer(blockFlow, chainIndex)
+    val newBlockTs = ALF.LaunchTimestamp.plusSecondsUnsafe(10)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
-    blockValidation.validate(block1, blockFlow).isRight is true
+    checkBlockUnit(block1, blockFlow) isE ()
   }
 }

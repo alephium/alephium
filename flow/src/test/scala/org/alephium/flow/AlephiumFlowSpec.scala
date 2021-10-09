@@ -475,9 +475,11 @@ trait FlowFixture
     blockFlow.addAndUpdateView(block, sideResult).rightValue
   }
 
-  def addAndCheck(blockFlow: BlockFlow, block: Block): Unit = {
-    addAndCheck0(blockFlow, block)
-    checkOutputs(blockFlow, block)
+  def addAndCheck(blockFlow: BlockFlow, blocks: Block*): Unit = {
+    blocks.foreach { block =>
+      addAndCheck0(blockFlow, block)
+      checkOutputs(blockFlow, block)
+    }
   }
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
