@@ -37,16 +37,16 @@ trait SafeSerde[T, Config] {
 }
 
 trait SafeSerdeImpl[T, Config] extends SafeSerde[T, Config] {
-  def _serde: Serde[T]
+  def unsafeSerde: Serde[T]
 
-  implicit def serializer: Serializer[T] = _serde
+  implicit def serializer: Serializer[T] = unsafeSerde
 
   def validate(t: T)(implicit config: Config): Either[String, Unit]
 
-  def serialize(t: T): ByteString = _serde.serialize(t)
+  def serialize(t: T): ByteString = unsafeSerde.serialize(t)
 
   def _deserialize(input: ByteString)(implicit config: Config): SerdeResult[Staging[T]] = {
-    _serde._deserialize(input).flatMap { case Staging(t, rest) =>
+    unsafeSerde._deserialize(input).flatMap { case Staging(t, rest) =>
       validate(t) match {
         case Right(_)    => Right(Staging(t, rest))
         case Left(error) => Left(SerdeError.validation(error))

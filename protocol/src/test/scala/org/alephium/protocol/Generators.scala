@@ -127,13 +127,6 @@ trait Generators extends NumericHelpers {
       cidPri._2
     )
 
-  def interCliqueInfoGen(implicit config: GroupConfig): Gen[InterCliqueInfo] =
-    for {
-      groupNumPerBroker <- groupNumPerBrokerGen
-      peers             <- Gen.listOfN(config.groups / groupNumPerBroker, socketAddressGen)
-      cid               <- cliqueIdGen
-    } yield InterCliqueInfo.unsafe(cid, AVector.from(peers), groupNumPerBroker)
-
   def peerInfoGen(implicit config: BrokerConfig): Gen[BrokerInfo] =
     for {
       cid               <- cliqueIdGen

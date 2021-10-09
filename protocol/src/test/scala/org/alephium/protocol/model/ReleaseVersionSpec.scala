@@ -31,4 +31,17 @@ class ReleaseVersionSpec extends AlephiumSpec {
     val releaseV = "v0.1.1-rc1"
     ReleaseVersion.from(releaseV) is Some(ReleaseVersion(0, 1, 1))
   }
+
+  // scalastyle:off no.equal
+  it should "have order" in {
+    forAll(Generators.versionGen) { case (_, version1) =>
+      forAll(Generators.versionGen) { case (_, version2) =>
+        val compareResult = version1.major > version2.major ||
+          version1.major == version2.major && version1.minor > version2.minor ||
+          version1.major == version2.major && version1.minor == version2.minor && version1.patch > version2.patch
+
+        (version1 > version2) is compareResult
+      }
+    }
+  }
 }

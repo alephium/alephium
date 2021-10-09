@@ -49,9 +49,9 @@ object IntraCliqueInfo extends SafeSerdeImpl[IntraCliqueInfo, GroupConfig] {
     new IntraCliqueInfo(id, peers, groupNumPerBroker, priKey)
   }
 
-  implicit private val peerSerde  = PeerInfo._serde
+  implicit private val peerSerde  = PeerInfo.unsafeSerde
   implicit private val peersSerde = avectorSerde[PeerInfo]
-  override val _serde: Serde[IntraCliqueInfo] =
+  override val unsafeSerde: Serde[IntraCliqueInfo] =
     Serde.forProduct4(unsafe, t => (t.id, t.peers, t.groupNumPerBroker, t.priKey))
 
   override def validate(

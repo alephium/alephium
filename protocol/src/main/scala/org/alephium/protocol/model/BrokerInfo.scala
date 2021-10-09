@@ -67,10 +67,10 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
       remoteAddress
     )
 
-  val _serde: Serde[BrokerInfo] =
+  val unsafeSerde: Serde[BrokerInfo] =
     Serde.forProduct4(unsafe, t => (t.cliqueId, t.brokerId, t.brokerNum, t.address))
 
-  override def validate(info: BrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
+  def validate(info: BrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
     validate(info.brokerId, info.brokerNum)
   }
 
@@ -112,7 +112,7 @@ final case class InterBrokerInfo private (
 }
 
 object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {
-  val _serde: Serde[InterBrokerInfo] =
+  val unsafeSerde: Serde[InterBrokerInfo] =
     Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.brokerNum))
 
   def unsafe(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int): InterBrokerInfo =
