@@ -164,7 +164,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
 
     info("wrong block timestamp")
-    val wrongTimestamp = serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now()))
+    val wrongTimestamp =
+      serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now().plusSecondsUnsafe(5)))
     block.Coinbase.output(_.copy(additionalData = wrongTimestamp)).fail(InvalidCoinbaseData)
 
     info("wrong chain index")
