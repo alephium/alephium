@@ -363,7 +363,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     info("Hello")
 
-    implicit val interBrokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.serde
+    implicit val interBrokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.unsafeSerde
 
     val interBrokerInfo = BrokerInfo
       .unsafe(CliqueId(pubKey1), 0, 1, new InetSocketAddress("127.0.0.1", 0))

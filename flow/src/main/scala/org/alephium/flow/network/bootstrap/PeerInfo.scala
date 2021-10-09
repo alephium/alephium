@@ -54,7 +54,7 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       minerApiPort
     )
 
-  val _serde: Serde[PeerInfo] =
+  val unsafeSerde: Serde[PeerInfo] =
     Serde.forProduct7(
       unsafe,
       t =>

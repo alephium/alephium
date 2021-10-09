@@ -19,8 +19,8 @@ package org.alephium.flow.network.bootstrap
 import org.alephium.serde.{Serde, SerdeError, SerdeResult, Staging}
 
 trait SerdeUtils {
-  implicit val peerInfoSerde: Serde[PeerInfo]          = PeerInfo._serde
-  implicit val intraCliqueInfo: Serde[IntraCliqueInfo] = IntraCliqueInfo._serde
+  implicit val peerInfoSerde: Serde[PeerInfo]          = PeerInfo.unsafeSerde
+  implicit val intraCliqueInfo: Serde[IntraCliqueInfo] = IntraCliqueInfo.unsafeSerde
 }
 
 object SerdeUtils {

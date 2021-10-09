@@ -30,7 +30,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde" in {
     forAll(blockGen) { block =>
       val bytes  = serialize[Block](block)
-      val output = deserialize[Block](bytes).toOption.value
+      val output = deserialize[Block](bytes).rightValue
       output is block
     }
   }

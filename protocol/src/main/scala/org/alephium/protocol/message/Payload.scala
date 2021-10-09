@@ -192,7 +192,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
     unsafe(ReleaseVersion.clientId, TimeStamp.now(), brokerInfo, signature)
   }
 
-  implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.serde
+  implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.unsafeSerde
   val serde: Serde[T] =
     Serde.forProduct4(unsafe, t => (t.clientId, t.timestamp, t.brokerInfo, t.signature))
 
@@ -210,7 +210,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
       ) {
         Right(())
       } else {
-        Left(s"invalid HandShake: $message")
+        Left(s"Invalid HandShake: $message")
       }
     }
   }
