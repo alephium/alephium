@@ -29,7 +29,7 @@ import org.scalatest.concurrent.Eventually.eventually
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TestUtils, TxHandler}
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, DiscoveryServer}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
 import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
@@ -191,6 +191,16 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(invalidPoWBlock.hash))
     listener.expectMsg(MisbehaviorManager.InvalidPoW(remoteAddress))
     expectTerminated(brokerHandler.ref)
+  }
+
+  it should "publish unreachable event when the connection is terminated" in new Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DiscoveryServer.Unreachable])
+
+    EventFilter.info(start = "Connection handler for").intercept {
+      system.stop(brokerHandler.underlyingActor.brokerConnectionHandler.ref)
+      listener.expectMsgType[DiscoveryServer.Unreachable]
+    }
   }
 
   it should "send announcements only if remote have not seen the block" in new Fixture {
@@ -431,5 +441,7 @@ class TestBrokerHandler(
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseInboundBrokerHandler
     with BrokerHandler {
+  context.watch(brokerConnectionHandler.ref)
+
   override def receive: Receive = exchanging
 }

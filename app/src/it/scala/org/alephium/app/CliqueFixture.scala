@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -41,6 +41,7 @@ import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.MiningBlob
+import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
@@ -653,6 +654,29 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     eventually(
       request[TxStatus](getTransactionStatus(tx), port) is status
     )
+  }
+
+  def existBannedPeers(server: Server): Boolean = {
+    import org.alephium.api.UtilJson._
+    val misbehaviors =
+      request[AVector[PeerMisbehavior]](
+        getMisbehaviors,
+        restPort(server.config.network.bindAddress.getPort)
+      )
+    misbehaviors.map(_.status).exists {
+      case PeerStatus.Banned(_) => true
+      case _                    => false
+    }
+  }
+
+  def existUnreachable(server: Server): Boolean = {
+    import akka.util.Timeout
+    implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
+    val unreachable = server.node.discoveryServer
+      .ask(DiscoveryServer.GetUnreachable)
+      .mapTo[AVector[InetAddress]]
+      .futureValue
+    unreachable.nonEmpty
   }
 }
 // scalastyle:on method.length
