@@ -470,23 +470,25 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "test token balance overflow" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
-        val tokenId     = sampleToken(tx)
-        val tokenAmount = getTokenAmount(tx, tokenId)
-        val txNew       = modifyTokenAmount(tx, tokenId, U256.MaxValue - tokenAmount + 1 + _)
-        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
-        failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
-      }
+    forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10))) {
+      case (tx, preOutputs) =>
+        whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
+          val tokenId     = sampleToken(tx)
+          val tokenAmount = getTokenAmount(tx, tokenId)
+          val txNew       = modifyTokenAmount(tx, tokenId, U256.MaxValue - tokenAmount + 1 + _)
+          failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), BalanceOverFlow)
+          failCheck(checkBlockTx(txNew, preOutputs), BalanceOverFlow)
+        }
     }
   }
 
   it should "validate token balances" in new StatefulFixture {
-    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      val tokenId = sampleToken(tx)
-      val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
-      failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
-      failCheck(checkBlockTx(txNew, preOutputs), InvalidTokenBalance)
+    forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10))) {
+      case (tx, preOutputs) =>
+        val tokenId = sampleToken(tx)
+        val txNew   = modifyTokenAmount(tx, tokenId, _ + 1)
+        failCheck(checkTokenBalance(txNew, preOutputs.map(_.referredOutput)), InvalidTokenBalance)
+        failCheck(checkBlockTx(txNew, preOutputs), InvalidTokenBalance)
     }
   }
 
