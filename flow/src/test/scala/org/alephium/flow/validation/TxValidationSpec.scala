@@ -506,15 +506,38 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "validate token balances" in new Fixture {
-    forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10))) {
-      case (tx, preOutputs) =>
+    forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10)), Gen.prob(0.5)) {
+      case ((tx, preOutputs), isPayable) =>
         implicit val validator = nestedValidator(
           checkTokenBalance(_, preOutputs.map(_.referredOutput)),
           preOutputs
         )
 
-        val tokenId = tx.sampleToken()
-        tx.modifyTokenAmount(tokenId, _ + 1).fail(InvalidTokenBalance)
+        tx.pass()
+
+        val tokenId   = tx.sampleToken()
+        val invalidTx = tx.modifyTokenAmount(tokenId, _ + 1)
+        invalidTx.fail(InvalidTokenBalance)
+
+        val invalidTxWithScript = {
+          val method = Method[StatefulContext](
+            isPublic = true,
+            isPayable = isPayable,
+            argsLength = 0,
+            localsLength = 0,
+            returnLength = 0,
+            instrs = AVector.empty
+          )
+          val script = StatefulScript.unsafe(AVector(method))
+
+          invalidTx.updateUnsigned(_.copy(scriptOpt = Some(script)))
+        }
+
+        if (isPayable) {
+          invalidTxWithScript.pass()
+        } else {
+          invalidTxWithScript.fail(InvalidTokenBalance)
+        }
     }
   }
 
@@ -531,51 +554,35 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val initialGas = tx.unsigned.gasAmount
     val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv).rightValue
     val gasUsed    = initialGas.use(gasLeft).rightValue
+
+    tx.unsigned.inputs.length is 1
+    tx.unsigned.inputs(0).unlockScript is a[UnlockScript.P2PKH]
+    tx.unsigned.fixedOutputs.length is 2
+
+    gasUsed is (
+      txBaseGas addUnsafe
+        txInputBaseGas addUnsafe
+        txOutputBaseGas.mulUnsafe(2) addUnsafe
+        GasSchedule.p2pkUnlockGas
+    )
     gasUsed is GasBox.unsafe(14060)
-    gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas.mulUnsafe(
-      2
-    ) addUnsafe GasSchedule.p2pkUnlockGas)
   }
 
   it should "validate witnesses" in new Fixture {
     import ModelGenerators.ScriptPair
     forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
-      val inputsState              = preOutputs.map(_.referredOutput)
+      val inputsState              = preOutputs.map(_.referredOutput).as[TxOutput]
       val ScriptPair(_, unlock, _) = p2pkScriptGen(GroupIndex.unsafe(1)).sample.get
-      val unsigned                 = tx.unsigned
-      val inputs                   = unsigned.inputs
-      val preparedWorldState       = preOutputs
 
-      implicit val validator = nestedValidator(
-        checkWitnesses(_, inputsState.as[TxOutput]),
-        preparedWorldState
-      )
+      implicit val validator = nestedValidator(checkWitnesses(_, inputsState), preOutputs)
 
-      {
-        val txNew = tx.copy(inputSignatures = tx.inputSignatures.init)
-        txNew.fail(NotEnoughSignature)
-      }
+      tx.updateRandomInputs(_.copy(unlockScript = unlock)).fail(InvalidPublicKeyHash)
 
-      {
-        val (sampleIndex, sample) = inputs.sampleWithIndex()
-        val inputNew              = sample.copy(unlockScript = unlock)
-        val inputsNew             = inputs.replace(sampleIndex, inputNew)
-        val txNew                 = tx.copy(unsigned = unsigned.copy(inputs = inputsNew))
-        txNew.fail(InvalidPublicKeyHash)
-      }
-
-      {
-        val signature        = Signature.generate
-        val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
-        val signaturesNew    = tx.inputSignatures.replace(sampleIndex, signature)
-        val txNew            = tx.copy(inputSignatures = signaturesNew)
-        txNew.fail(InvalidSignature)
-      }
-
-      {
-        val txNew = tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures)
-        txNew.fail(TooManySignatures)
-      }
+      val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
+      val signaturesNew    = tx.inputSignatures.replace(sampleIndex, Signature.generate)
+      tx.copy(inputSignatures = signaturesNew).fail(InvalidSignature)
+      tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures).fail(TooManySignatures)
+      tx.copy(inputSignatures = tx.inputSignatures.init).fail(NotEnoughSignature)
     }
   }
 
