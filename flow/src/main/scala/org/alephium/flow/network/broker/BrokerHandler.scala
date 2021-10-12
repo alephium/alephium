@@ -77,12 +77,20 @@ trait BrokerHandler extends FlowDataHandler {
 
   def handShakeMessage: Payload
 
+  private var handshakeTimeoutTickOpt: Option[Cancellable] = None
+  @inline private def cancelHandshakeTick(): Unit = {
+    handshakeTimeoutTickOpt.foreach(_.cancel())
+    handshakeTimeoutTickOpt = None
+  }
+
   def handShaking: Receive = {
     send(handShakeMessage)
-    val handshakeTimeoutTick = scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
+    handshakeTimeoutTickOpt = Some(
+      scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
+    )
 
     def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
-      handshakeTimeoutTick.cancel()
+      cancelHandshakeTick()
       publishEvent(misbehavior)
       context.stop(self)
     }
@@ -90,7 +98,7 @@ trait BrokerHandler extends FlowDataHandler {
     val receive: Receive = {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
-        handshakeTimeoutTick.cancel()
+        cancelHandshakeTick()
         handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo))
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
@@ -246,6 +254,7 @@ trait BrokerHandler extends FlowDataHandler {
 
   override def postStop(): Unit = {
     super.postStop()
+    cancelHandshakeTick()
     pingPongTickOpt.foreach(_.cancel())
   }
 }
