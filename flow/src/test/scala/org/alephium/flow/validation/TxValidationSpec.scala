@@ -726,7 +726,18 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     )
   }
 
-  it should "charge gas for tx script size" in new GasFixture {
+  trait ScriptFixture extends GasFixture {
+    def rawScript: String
+
+    lazy val script     = Compiler.compileTxScript(rawScript).rightValue
+    lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val block      = simpleScript(blockFlow, chainIndex, script)
+    lazy val tx         = block.nonCoinbase.head
+    lazy val groupIndex = GroupIndex.unsafe(0)
+    lazy val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
+  }
+
+  it should "charge gas for tx script size" in new ScriptFixture {
     val rawScript =
       s"""
          |TxScript P2sh {
@@ -735,12 +746,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |  }
          |}
          |""".stripMargin
-    val script     = Compiler.compileTxScript(rawScript).rightValue
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = simpleScript(blockFlow, chainIndex, script)
-    val tx         = block.nonCoinbase.head
-    val groupIndex = GroupIndex.unsafe(0)
-    val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
 
     val gasRemaining =
       checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv).rightValue
@@ -757,7 +762,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     ).rightValue is initialGas
   }
 
-  it should "match generated contract inputs and outputs" in new GasFixture {
+  it should "match generated contract inputs and outputs" in new ScriptFixture {
     val rawScript =
       s"""
          |TxScript Main {
@@ -766,13 +771,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |  }
          |}
          |""".stripMargin
-
-    val script     = Compiler.compileTxScript(rawScript).rightValue
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = simpleScript(blockFlow, chainIndex, script)
-    val tx         = block.nonCoinbase.head
-    val groupIndex = GroupIndex.unsafe(0)
-    val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
 
     implicit val validator = (tx: Transaction) => {
       checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
@@ -788,6 +786,69 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)
 
     tx.copy(generatedOutputs = AVector(assetOutputGen.sample.get)).fail(InvalidGeneratedOutputs)
+  }
+
+  it should "check script execution flag, intra group" in new ScriptFixture {
+
+    info("valid script")
+    val rawScript =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    implicit val validator = (tx: Transaction) => {
+      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
+    }
+
+    tx.scriptExecutionOk is true
+    tx.pass()
+
+    tx.copy(scriptExecutionOk = false).fail(InvalidScriptExecutionFlag)
+
+    info("script that fails execution")
+
+    // scalastyle:off no.equal
+    val invalidExecutionRawScript =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(1 == 2)
+         |  }
+         |}
+         |""".stripMargin
+    // scalastyle:on no.equal
+
+    val invalidExecutionScript = Compiler.compileTxScript(invalidExecutionRawScript).rightValue
+    val invalidExecutionTx     = tx.updateUnsigned(_.copy(scriptOpt = Some(invalidExecutionScript)))
+    invalidExecutionTx.fail(InvalidScriptExecutionFlag)
+
+    invalidExecutionTx.copy(scriptExecutionOk = false).pass()
+  }
+
+  it should "check script execution flag, inter group" in new ScriptFixture {
+    val rawScript =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    implicit val validator = (tx: Transaction) => {
+      checkTxScript(ChainIndex.unsafe(0, 1), tx, initialGas, worldState, prevOutputs, blockEnv)
+    }
+
+    tx.scriptExecutionOk is true
+    tx.fail(UnexpectedTxScript)
+
+    val noScriptTx = tx.updateUnsigned(_.copy(scriptOpt = None))
+    noScriptTx.pass()
+    noScriptTx.copy(scriptExecutionOk = false).fail(InvalidScriptExecutionFlag)
   }
 
   it should "validate mempool tx fully" in new FlowFixture {

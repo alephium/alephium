@@ -366,9 +366,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
           status is dummyTxStatus
         }
 
-        // scalastyle:off no.equal
         val rightNode = server.node.config.broker.contains(txChainIndex.from)
-        // scalastyle:on no.equal
 
         Get(
           s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}&toGroup=${txChainIndex.to.value}",
