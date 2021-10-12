@@ -48,7 +48,7 @@ class BlocksExportImportTest extends AlephiumActorSpec {
 
     val file = rootPath.resolve(filename).toFile
 
-    BlocksImporter.importBlocks(file, newServer.node).toOption.get >= blockMinedNum is true
+    BlocksImporter.importBlocks(file, newServer.node).rightValue >= blockMinedNum is true
 
     awaitNBlocks(blockMinedNum)
 

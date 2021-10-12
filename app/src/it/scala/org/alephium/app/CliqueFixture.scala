@@ -202,7 +202,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     def iter(): Unit = {
       blockNotifyProbe.receiveOne(max = timeout) match {
         case text: String =>
-          val notification = read[NotificationUnsafe](text).asNotification.toOption.get
+          val notification = read[NotificationUnsafe](text).asNotification.rightValue
           val blockEntry   = read[BlockEntry](notification.params)
           buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
           if (buffer.forall(_.forall(_ >= number))) () else iter()

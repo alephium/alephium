@@ -99,7 +99,7 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block, 1)
     }
 
-    val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).toOption.get
+    val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).rightValue
     cache0.length is 1
     cache0.contains(newBlocks(0).hash) is false
     cache0.contains(newBlocks(1).hash) is true

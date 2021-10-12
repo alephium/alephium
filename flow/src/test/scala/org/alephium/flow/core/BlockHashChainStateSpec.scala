@@ -37,7 +37,7 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
 
       override def getTimestamp(hash: BlockHash): IOResult[TimeStamp] = ???
 
-      def state: BlockHashChain.State = chainStateStorage.loadState().toOption.get
+      def state: BlockHashChain.State = chainStateStorage.loadState().rightValue
 
       def allTipsInMem: ConcurrentHashMap[BlockHash, TimeStamp] = tips
 

@@ -296,10 +296,10 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val p    = cmp.lt(_: A, a)
       val vc0  = vc.filterE[Unit](e => Right(p(e)))
       val arr0 = arr.filter(p)
-      checkEq(vc0.toOption.get, arr0)
+      checkEq(vc0.rightValue, arr0)
       val vc1  = vc.filterNotE[Unit](e => Right(p(e)))
       val arr1 = arr.filterNot(p)
-      checkEq(vc1.toOption.get, arr1)
+      checkEq(vc1.rightValue, arr1)
       vc.filterE[Unit](_ => Left(())).isLeft is true
       vc.filterNotE[Unit](_ => Left(())).isLeft is true
     }
@@ -366,9 +366,9 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   it should "flatMapE" in new FixtureF {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
-      val vc0 = vc.flatMapE(e => Right(AVector(e))).toOption.get
+      val vc0 = vc.flatMapE(e => Right(AVector(e))).rightValue
       checkEq(vc0, arr)
-      val vc1 = vc0.flatMapE(elem => Right(AVector(elem, elem))).toOption.get
+      val vc1 = vc0.flatMapE(elem => Right(AVector(elem, elem))).rightValue
       checkEq(vc1, arr.flatMap(x => Array(x, x)))
     }
   }

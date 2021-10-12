@@ -74,7 +74,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   def parseFail[A: Reader](jsonRaw: String): String = {
-    scala.util.Try(read[A](jsonRaw)).toEither.swap.toOption.get.getMessage
+    scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getMessage
   }
 
   it should "encode/decode TimeStamp" in {

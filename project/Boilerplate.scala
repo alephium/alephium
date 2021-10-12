@@ -217,7 +217,7 @@ object Boilerplate {
         +  it should "serde $arity fields" in {
         +    forAll { ($fields) =>
         +      val input  = Test$arity(${`a..n`})
-        +      val output = deserialize[Test$arity](serialize(input)).toOption.get
+        +      val output = deserialize[Test$arity](serialize(input)).rightValue
         +      output is input
         +    }
         +  }
@@ -226,7 +226,7 @@ object Boilerplate {
         +    forAll { ($fields) =>
         +      val input  = (${`a..n`})
         +      val serde = Serde.tuple$arity[$types]
-        +      val output = serde.deserialize(serde.serialize(input)).toOption.get
+        +      val output = serde.deserialize(serde.serialize(input)).rightValue
         +      output is input
         +    }
         +  }

@@ -36,7 +36,7 @@ class HashSpec extends AlephiumSpec {
     it should "serde correctly" in {
       for ((message, _) <- tests) {
         val input  = provider.hash(message)
-        val output = deserialize[T](serialize(input)).toOption.get
+        val output = deserialize[T](serialize(input)).rightValue
         output is input
       }
     }
