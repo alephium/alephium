@@ -34,6 +34,7 @@ import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util.{AVector, TimeStamp, U256}
 
+// scalastyle:off number.of.methods file.size.limit
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   override val configValues = Map(("alephium.broker.broker-num", 1))
 
@@ -628,9 +629,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "invalidate p2mpkh" in new Fixture {
-    val (priKey0, pubKey0) = keypairGen.sample.get
-    val (priKey1, pubKey1) = keypairGen.sample.get
-    val (_, pubKey2)       = keypairGen.sample.get
+    val (priKey0, pubKey0) = keypairGen.sample.value
+    val (priKey1, pubKey1) = keypairGen.sample.value
+    val (_, pubKey2)       = keypairGen.sample.value
 
     def tx(keys: (PublicKey, Int)*): Transaction = {
       val lockup   = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
@@ -717,8 +718,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val groupIndex = lockup.groupIndex
     val gasRemaining =
       checkUnlockScript(blockEnv, txEnv, initialGas, script.hash, script, AVector.empty).rightValue
+
     initialGas is gasRemaining.addUnsafe(
-      script.bytes.size + GasHash.gas(script.bytes.size).value + 200 /* 200 is the call gas */
+      script.bytes.size +
+        GasHash.gas(script.bytes.size).value +
+        GasSchedule.callGas.value
     )
   }
 
@@ -736,11 +740,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val block      = simpleScript(blockFlow, chainIndex, script)
     val tx         = block.nonCoinbase.head
     val groupIndex = GroupIndex.unsafe(0)
-
     val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
+
     val gasRemaining =
       checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv).rightValue
-    initialGas is gasRemaining.addUnsafe(script.bytes.size + 200 /* 200 is the call gas */ )
+    initialGas is gasRemaining.addUnsafe(script.bytes.size + GasSchedule.callGas.value)
+
     val noScriptTx = tx.copy(unsigned = tx.unsigned.copy(scriptOpt = None))
     checkTxScript(
       chainIndex,
@@ -750,6 +755,39 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       prevOutputs,
       blockEnv
     ).rightValue is initialGas
+  }
+
+  it should "match generated contract inputs and outputs" in new GasFixture {
+    val rawScript =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val script     = Compiler.compileTxScript(rawScript).rightValue
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = simpleScript(blockFlow, chainIndex, script)
+    val tx         = block.nonCoinbase.head
+    val groupIndex = GroupIndex.unsafe(0)
+    val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
+
+    implicit val validator = (tx: Transaction) => {
+      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
+    }
+
+    tx.generatedOutputs.length is 0
+    tx.contractInputs.length is 0
+    tx.pass()
+
+    val contractId = Hash.generate
+    val output     = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
+    val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
+    tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)
+
+    tx.copy(generatedOutputs = AVector(assetOutputGen.sample.get)).fail(InvalidGeneratedOutputs)
   }
 
   it should "validate mempool tx fully" in new FlowFixture {

@@ -645,7 +645,7 @@ trait FlowFixture
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compileContract(input).toOption.get
+    val contract = Compiler.compileContract(input).rightValue
     val txScript =
       contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALF.alf(1))
     payableCallTxTemplate(
