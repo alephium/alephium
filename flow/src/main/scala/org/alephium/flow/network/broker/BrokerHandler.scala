@@ -25,7 +25,6 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
@@ -247,7 +246,6 @@ trait BrokerHandler extends FlowDataHandler {
         log.info(
           s"Connection handler for $remoteAddress is terminated. Stopping the broker handler."
         )
-        publishEvent(DiscoveryServer.Unreachable(remoteAddress))
         context stop self
       case _ => super.unhandled(message)
     }

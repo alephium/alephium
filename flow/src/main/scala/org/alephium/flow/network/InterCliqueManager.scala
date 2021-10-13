@@ -224,14 +224,19 @@ class InterCliqueManager(
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
       connecting.remove(peer)
+      publishEvent(DiscoveryServer.Unreachable(peer))
       removeBroker(peer)
-      if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
-        discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
-      }
+      moreOutConnections()
 
     case DiscoveryServer.NeighborPeers(sortedPeers) =>
       extractPeersToConnect(sortedPeers, networkSetting.maxOutboundConnectionsPerGroup)
         .foreach(connectUnsafe)
+  }
+
+  def moreOutConnections(): Unit = {
+    if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
+      discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
+    }
   }
 
   def handleBroadCastBlock(message: InterCliqueManager.BroadCastBlock): Unit = {
@@ -326,6 +331,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def selfCliqueId: CliqueId
   def networkSetting: NetworkSetting
+  def moreOutConnections(): Unit
 
   def log: LoggingAdapter
   implicit def brokerConfig: BrokerConfig
@@ -539,18 +545,23 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   ): Unit = {
     assume(brokerInfo.peerId == existedBroker.info.peerId)
     if (connectionType != existedBroker.connectionType) {
-      if (
-        (selfCliqueId < brokerInfo.cliqueId && existedBroker.connectionType == OutboundConnection) ||
-        (selfCliqueId > brokerInfo.cliqueId && existedBroker.connectionType == InboundConnection)
-      ) { // keep the existed connection
-        log.debug(s"Ignore valid double connection")
-        context.stop(sender())
-      } else { // replace the existed connection
-        log.debug(s"Replace the existed connection")
-        brokers.remove(existedBroker.info.peerId)
-        context.stop(existedBroker.actor.ref)
-        addBroker(brokerInfo, connectionType, ActorRefT(sender()))
-      }
+      val removedBroker =
+        if (
+          (selfCliqueId < brokerInfo.cliqueId && existedBroker.connectionType == OutboundConnection) ||
+          (selfCliqueId > brokerInfo.cliqueId && existedBroker.connectionType == InboundConnection)
+        ) { // keep the existed connection
+          log.debug(s"Ignore valid double connection")
+          sender()
+        } else { // replace the existed connection
+          log.debug(s"Replace the existed connection")
+          brokers.remove(existedBroker.info.peerId)
+          addBroker(brokerInfo, connectionType, ActorRefT(sender()))
+          existedBroker.actor.ref
+        }
+      // unwatch to avoid publish unreachable
+      context.unwatch(removedBroker)
+      context.stop(removedBroker)
+      moreOutConnections()
     } else {
       log.debug(s"Invalid double connection from ${brokerInfo.peerId}")
       brokers.remove(existedBroker.info.peerId)
