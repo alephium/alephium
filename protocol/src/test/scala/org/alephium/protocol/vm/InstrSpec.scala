@@ -16,14 +16,16 @@
 
 package org.alephium.protocol.vm
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 import org.alephium.crypto
-import org.alephium.protocol.{Signature, SignatureSchema}
+import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
-import org.alephium.protocol.model.Target
 import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
 
@@ -373,12 +375,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     initialGas.subUnsafe(context.gasRemaining) is instr.gas()
 
     StoreLocal(1.toByte).runWith(frame).leftValue isE StackUnderflow
-    StoreLocal(-1.toByte).runWith(frame).leftValue isE StackUnderflow
 
+    stack.push(bool)
+    StoreLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex
+    stack.push(bool)
+    StoreLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex
   }
 
   it should "Pop" in new ConstInstrFixture {
-
     val bool: Val = Val.Bool(true)
     stack.push(bool)
 
@@ -1333,6 +1337,513 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "Log5" in new LogFixture {
     test(Log5, 5)
+  }
+
+  trait StatefulFixture extends ContextGenerators {
+    val baseMethod =
+      Method[StatefulContext](
+        isPublic = true,
+        isPayable = false,
+        argsLength = 0,
+        localsLength = 0,
+        returnLength = 0,
+        instrs = AVector()
+      )
+    val contract = StatefulContract(1, methods = AVector(baseMethod))
+
+    val tokenId = Hash.generate
+
+    def alfBalance(lockupScript: LockupScript, amount: U256): Balances = {
+      Balances(ArrayBuffer((lockupScript, BalancesPerLockup.alf(amount))))
+    }
+
+    def tokenBalance(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Balances = {
+      Balances(ArrayBuffer((lockupScript, BalancesPerLockup.token(tokenId, amount))))
+    }
+
+    def prepareFrame(
+        balanceState: Option[BalanceState] = None,
+        contractOutputOpt: Option[(ContractOutput, ContractOutputRef)] = None,
+        txEnvOpt: Option[TxEnv] = None,
+        callerFrameOpt: Option[Frame[StatefulContext]] = None
+    ) = {
+      val (obj, ctx) =
+        prepareContract(
+          contract,
+          AVector[Val](Val.True),
+          contractOutputOpt = contractOutputOpt,
+          txEnvOpt = txEnvOpt
+        )
+      Frame
+        .stateful(
+          ctx,
+          callerFrameOpt,
+          balanceState,
+          obj,
+          baseMethod,
+          AVector.empty,
+          Stack.ofCapacity(10),
+          _ => okay
+        )
+        .rightValue
+    }
+
+    val lockupScriptGen: Gen[LockupScript] = for {
+      group        <- groupIndexGen
+      lockupScript <- lockupGen(group)
+    } yield lockupScript
+
+    val p2cGen: Gen[LockupScript.P2C] = for {
+      group <- groupIndexGen
+      p2c   <- p2cLockupGen(group)
+    } yield p2c
+
+    val assetGen: Gen[LockupScript] = for {
+      group <- groupIndexGen
+      asset <- assetLockupGen(group)
+    } yield asset
+
+  }
+
+  trait StatefulInstrFixture extends StatefulFixture {
+    lazy val frame   = prepareFrame()
+    lazy val stack   = frame.opStack
+    lazy val context = frame.ctx
+
+    def runAndCheckGas[I <: StatefulInstrSimpleGas](instr: I) = {
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+    }
+  }
+
+  it should "LoadField(byte)" in new StatefulInstrFixture {
+    runAndCheckGas(LoadField(0.toByte))
+    stack.size is 1
+    stack.top.get is Val.True
+
+    LoadField(1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+    LoadField(-1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+  }
+
+  it should "StoreField(byte)" in new StatefulInstrFixture {
+    stack.push(Val.False)
+    runAndCheckGas(StoreField(0.toByte))
+    stack.size is 0
+    frame.obj.getField(0) isE Val.False
+
+    stack.push(Val.True)
+    StoreField(1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+    stack.push(Val.True)
+    StoreField(-1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+  }
+
+  it should "CallExternal(byte)" in new StatefulInstrFixture {
+    intercept[NotImplementedError] {
+      CallExternal(0.toByte).runWith(frame)
+    }
+  }
+
+  it should "ApproveAlf" in new StatefulInstrFixture {
+    val lockupScript        = lockupScriptGen.sample.get
+    val balanceState        = BalanceState.from(alfBalance(lockupScript, ALF.oneAlf))
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    frame.balanceStateOpt.get is balanceState
+    stack.push(Val.Address(lockupScript))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(ApproveAlf)
+
+    frame.balanceStateOpt.get is BalanceState(
+      alfBalance(lockupScript, ALF.oneAlf.subUnsafe(ALF.oneNanoAlf)),
+      alfBalance(lockupScript, ALF.oneNanoAlf)
+    )
+  }
+
+  it should "ApproveToken" in new StatefulInstrFixture {
+    val lockupScript = lockupScriptGen.sample.get
+    val balanceState =
+      BalanceState.from(
+        tokenBalance(lockupScript, tokenId, ALF.oneAlf)
+      )
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    stack.push(Val.Address(lockupScript))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    frame.balanceStateOpt.get is balanceState
+
+    runAndCheckGas(ApproveToken)
+
+    frame.balanceStateOpt.get is BalanceState(
+      tokenBalance(lockupScript, tokenId, ALF.oneAlf.subUnsafe(ALF.oneNanoAlf)),
+      tokenBalance(lockupScript, tokenId, ALF.oneNanoAlf)
+    )
+  }
+
+  it should "AlfRemaining" in new StatefulInstrFixture {
+    val lockupScript = lockupScriptGen.sample.get
+    val balanceState =
+      BalanceState.from(alfBalance(lockupScript, ALF.oneAlf))
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    stack.push(Val.Address(lockupScript))
+
+    runAndCheckGas(AlfRemaining)
+
+    stack.size is 1
+    stack.top.get is Val.U256(ALF.oneAlf)
+  }
+
+  it should "TokenRemaining" in new StatefulInstrFixture {
+    val lockupScript = lockupScriptGen.sample.get
+    val balanceState =
+      BalanceState.from(
+        tokenBalance(lockupScript, tokenId, ALF.oneAlf)
+      )
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    stack.push(Val.Address(lockupScript))
+    stack.push(Val.ByteVec(tokenId.bytes))
+
+    runAndCheckGas(TokenRemaining)
+
+    stack.size is 1
+    stack.top.get is Val.U256(ALF.oneAlf)
+  }
+
+  it should "IsPaying" in new StatefulFixture {
+    {
+      info("Alf")
+      val lockupScript = lockupScriptGen.sample.get
+      val balanceState =
+        BalanceState.from(alfBalance(lockupScript, ALF.oneAlf))
+      val frame = prepareFrame(Some(balanceState))
+      val stack = frame.opStack
+
+      stack.push(Val.Address(lockupScript))
+
+      val initialGas = frame.ctx.gasRemaining
+      IsPaying.runWith(frame) isE ()
+      initialGas.subUnsafe(frame.ctx.gasRemaining) is IsPaying.gas()
+
+      stack.size is 1
+      stack.top.get is Val.Bool(true)
+      stack.pop()
+
+      stack.push(Val.Address(lockupScriptGen.sample.get))
+      IsPaying.runWith(frame) isE ()
+      stack.size is 1
+      stack.top.get is Val.Bool(false)
+    }
+    {
+      info("Token")
+      val lockupScript = lockupScriptGen.sample.get
+      val balanceState =
+        BalanceState.from(
+          tokenBalance(lockupScript, tokenId, ALF.oneAlf)
+        )
+      val frame = prepareFrame(Some(balanceState))
+      val stack = frame.opStack
+
+      stack.push(Val.Address(lockupScript))
+
+      val initialGas = frame.ctx.gasRemaining
+      IsPaying.runWith(frame) isE ()
+      initialGas.subUnsafe(frame.ctx.gasRemaining) is IsPaying.gas()
+
+      stack.size is 1
+      stack.top.get is Val.Bool(true)
+      stack.pop()
+
+      stack.push(Val.Address(lockupScriptGen.sample.get))
+      IsPaying.runWith(frame) isE ()
+      stack.size is 1
+      stack.top.get is Val.Bool(false)
+    }
+  }
+
+  it should "TransferAlf" in new StatefulInstrFixture {
+    val from = lockupScriptGen.sample.get
+    val to   = lockupScriptGen.sample.get
+    val balanceState =
+      BalanceState.from(alfBalance(from, ALF.oneAlf))
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    stack.push(Val.Address(from))
+    stack.push(Val.Address(to))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(TransferAlf)
+
+    frame.ctx.outputBalances is Balances(ArrayBuffer((to, BalancesPerLockup.alf(ALF.oneNanoAlf))))
+
+    stack.push(Val.Address(from))
+    stack.push(Val.Address(to))
+    stack.push(Val.U256(ALF.alf(10)))
+
+    TransferAlf.runWith(frame).leftValue isE NotEnoughBalance
+  }
+
+  trait ContractOutputFixture extends StatefulInstrFixture {
+    val contractOutput    = ContractOutput(ALF.alf(0), p2cGen.sample.get, AVector.empty)
+    val txId              = Hash.generate
+    val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
+  }
+
+  it should "TransferAlfFromSelf" in new ContractOutputFixture {
+    val from = LockupScript.P2C(contractOutputRef.key)
+    val to   = lockupScriptGen.sample.get
+
+    val balanceState =
+      BalanceState.from(alfBalance(from, ALF.oneAlf))
+    override lazy val frame =
+      prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
+
+    stack.push(Val.Address(to))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(TransferAlfFromSelf)
+    frame.ctx.outputBalances is Balances(ArrayBuffer((to, BalancesPerLockup.alf(ALF.oneNanoAlf))))
+  }
+
+  it should "TransferAlfToSelf" in new ContractOutputFixture {
+    val from = lockupScriptGen.sample.get
+    val to   = LockupScript.P2C(contractOutputRef.key)
+
+    val balanceState =
+      BalanceState.from(alfBalance(from, ALF.oneAlf))
+    override lazy val frame =
+      prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
+
+    stack.push(Val.Address(from))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(TransferAlfToSelf)
+    frame.ctx.outputBalances is Balances(ArrayBuffer((to, BalancesPerLockup.alf(ALF.oneNanoAlf))))
+  }
+
+  it should "TransferToken" in new ContractOutputFixture {
+    val from = lockupScriptGen.sample.get
+    val to   = lockupScriptGen.sample.get
+    val balanceState =
+      BalanceState.from(
+        tokenBalance(from, tokenId, ALF.oneAlf)
+      )
+
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    stack.push(Val.Address(from))
+    stack.push(Val.Address(to))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(TransferToken)
+
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALF.oneNanoAlf)))
+    )
+  }
+
+  it should "TransferTokenFromSelf" in new ContractOutputFixture {
+    val from = LockupScript.P2C(contractOutputRef.key)
+    val to   = lockupScriptGen.sample.get
+
+    val balanceState =
+      BalanceState.from(
+        tokenBalance(from, tokenId, ALF.oneAlf)
+      )
+
+    override lazy val frame =
+      prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
+
+    stack.push(Val.Address(to))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(TransferTokenFromSelf)
+
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALF.oneNanoAlf)))
+    )
+  }
+
+  it should "TransferTokenToSelf" in new ContractOutputFixture {
+    val from = lockupScriptGen.sample.get
+    val to   = LockupScript.P2C(contractOutputRef.key)
+
+    val balanceState =
+      BalanceState.from(
+        tokenBalance(from, tokenId, ALF.oneAlf)
+      )
+
+    override lazy val frame =
+      prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
+
+    stack.push(Val.Address(from))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    runAndCheckGas(TransferTokenToSelf)
+
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALF.oneNanoAlf)))
+    )
+  }
+
+  trait CreateContractAbstractFixture extends StatefulInstrFixture {
+    val from              = lockupScriptGen.sample.get
+    val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
+
+    def balanceState: BalanceState
+
+    override lazy val frame = prepareFrame(
+      Some(balanceState),
+      txEnvOpt = Some(
+        TxEnv(
+          tx,
+          prevOutputs.map(_.referredOutput),
+          Stack.ofCapacity[Signature](0)
+        )
+      )
+    )
+  }
+
+  trait CreateContractFixture extends CreateContractAbstractFixture {
+    val fields        = AVector[Val](Val.True)
+    val contractBytes = serialize(contract)
+
+    def test(instr: CreateContractBase) = {
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      initialGas.subUnsafe(frame.ctx.gasRemaining) is GasBox.unsafe(
+        instr
+          .gas()
+          .value + fields.length + contractBytes.length + 200 //TODO where those 200 come from?
+      )
+      //TODO Test the updated contract, like code, state, and assets
+    }
+  }
+
+  it should "CreateContract" in new CreateContractFixture {
+    val balanceState =
+      BalanceState(Balances.empty, alfBalance(from, ALF.oneAlf))
+
+    stack.push(Val.ByteVec(contractBytes))
+    stack.push(Val.ByteVec(serialize(fields)))
+
+    test(CreateContract)
+  }
+
+  it should "CreateContractWithToken" in new CreateContractFixture {
+    val balanceState =
+      BalanceState(
+        Balances.empty,
+        tokenBalance(from, tokenId, ALF.oneAlf)
+      )
+
+    stack.push(Val.ByteVec(contractBytes))
+    stack.push(Val.ByteVec(serialize(fields)))
+    stack.push(Val.U256(ALF.oneNanoAlf))
+
+    test(CreateContractWithToken)
+  }
+
+  it should "CopyCreateContract" in new CreateContractAbstractFixture {
+    val balanceState =
+      BalanceState(Balances.empty, alfBalance(from, ALF.oneAlf))
+
+    stack.push(Val.ByteVec(serialize(Hash.generate)))
+    stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
+    CopyCreateContract.runWith(frame).leftValue isE a[NonExistContract]
+
+    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+    stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
+    CopyCreateContract.runWith(frame) isE ()
+  }
+
+  it should "DestroySelf" in new StatefulInstrFixture {
+    val contractOutput = ContractOutput(ALF.alf(0), p2cGen.sample.get, AVector.empty)
+    val txId           = Hash.generate
+
+    val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
+
+    val callerFrame = prepareFrame()
+
+    val from = LockupScript.P2C(contractOutputRef.key)
+
+    val balanceState =
+      BalanceState.from(alfBalance(from, ALF.oneAlf))
+    override lazy val frame =
+      prepareFrame(
+        Some(balanceState),
+        Some((contractOutput, contractOutputRef)),
+        callerFrameOpt = Some(callerFrame)
+      )
+
+    stack.push(Val.Address(assetGen.sample.get))
+
+    DestroySelf.runWith(frame).leftValue isE ContractAssetUnloaded
+    //TODO how to get beyond that state?
+  }
+
+  trait ContractInstrFixture extends StatefulInstrFixture {
+    override lazy val frame = prepareFrame()
+
+    def test(instr: ContractInstr, value: Val) = {
+      val initialGas = context.gasRemaining
+      instr.runWith(frame)
+      stack.size is 1
+      stack.top.get is value
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+    }
+  }
+
+  it should "SelfContractId" in new ContractInstrFixture {
+    test(SelfContractId, Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+  }
+
+  it should "SelfAddress" in new ContractInstrFixture {
+    test(SelfAddress, Val.Address(LockupScript.p2c(frame.obj.contractIdOpt.get)))
+  }
+
+  trait CallerFrameFixture extends ContractInstrFixture {
+    val callerFrame         = prepareFrame()
+    override lazy val frame = prepareFrame(callerFrameOpt = Some(callerFrame))
+  }
+
+  it should "CallerContractId" in new CallerFrameFixture {
+    test(CallerContractId, Val.ByteVec(callerFrame.obj.contractIdOpt.get.bytes))
+  }
+
+  it should "CallerAddress" in new CallerFrameFixture {
+    test(CallerAddress, Val.Address(LockupScript.p2c(callerFrame.obj.contractIdOpt.get)))
+  }
+
+  it should "IsCalledFromTxScript" in new CallerFrameFixture {
+    test(IsCalledFromTxScript, Val.Bool(false))
+  }
+
+  it should "CallerInitialStateHash" in new CallerFrameFixture {
+    test(
+      CallerInitialStateHash,
+      Val.ByteVec(callerFrame.obj.asInstanceOf[StatefulContractObject].initialStateHash.bytes)
+    )
+  }
+
+  it should "ContractInitialStateHash" in new StatefulInstrFixture {
+    override lazy val frame = prepareFrame()
+
+    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+
+    ContractInitialStateHash.runWith(frame) isE ()
+
+    stack.size is 1
+    stack.top.get is Val.ByteVec(
+      frame.obj.asInstanceOf[StatefulContractObject].initialStateHash.bytes
+    )
   }
 
   it should "test gas amount" in new FrameFixture {
