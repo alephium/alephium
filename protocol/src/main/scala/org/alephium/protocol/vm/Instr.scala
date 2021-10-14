@@ -360,23 +360,23 @@ sealed trait ArithmeticInstr
     with GasSimple {}
 
 trait StackOps[T <: Val] {
-  def popOpStack(frame: Frame[_]): ExeResult[T]
+  @inline def popOpStack(frame: Frame[_]): ExeResult[T]
 }
 
 trait I256StackOps extends StackOps[Val.I256] {
-  def popOpStack(frame: Frame[_]): ExeResult[Val.I256] = frame.popOpStackI256()
+  @inline def popOpStack(frame: Frame[_]): ExeResult[Val.I256] = frame.popOpStackI256()
 }
 
 trait U256StackOps extends StackOps[Val.U256] {
-  def popOpStack(frame: Frame[_]): ExeResult[Val.U256] = frame.popOpStackU256()
+  @inline def popOpStack(frame: Frame[_]): ExeResult[Val.U256] = frame.popOpStackU256()
 }
 
 trait BoolStackOps extends StackOps[Val.Bool] {
-  def popOpStack(frame: Frame[_]): ExeResult[Val.Bool] = frame.popOpStackBool()
+  @inline def popOpStack(frame: Frame[_]): ExeResult[Val.Bool] = frame.popOpStackBool()
 }
 
 trait AddressStackOps extends StackOps[Val.Address] {
-  def popOpStack(frame: Frame[_]): ExeResult[Val.Address] = frame.popOpStackAddress()
+  @inline def popOpStack(frame: Frame[_]): ExeResult[Val.Address] = frame.popOpStackAddress()
 }
 
 sealed trait BinaryArithmeticInstr[T <: Val]
