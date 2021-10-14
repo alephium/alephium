@@ -52,6 +52,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     buildScript,
     compileContract,
     buildContract,
+    contractState,
     buildMultisigAddress,
     buildMultisig,
     submitMultisigTransaction,

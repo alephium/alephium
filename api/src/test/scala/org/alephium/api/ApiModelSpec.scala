@@ -27,7 +27,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -63,7 +63,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   val inetAddress = InetAddress.getByName("127.0.0.1")
 
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
-
+  def generateContractAddress(): Address.Contract =
+    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
   def checkData[T: Reader: Writer](
       data: T,
       jsonRaw: String,
@@ -696,5 +697,74 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |}
         """.stripMargin
     checkData(verifySignature, jsonRaw)
+  }
+
+  it should "encode/decode Val.Bool" in {
+    checkData[Val](Val.True, """{"type": "bool", "value": true}""")
+    checkData[Val](Val.False, """{"type": "bool", "value": false}""")
+  }
+
+  it should "encode/decode Val.ByteVec" in {
+    val bytes = Hash.generate.bytes
+    checkData[Val](
+      Val.ByteVec(bytes),
+      s"""{"type": "bytevec", "value": "${Hex.toHexString(bytes)}"}"""
+    )
+  }
+
+  it should "encode/decode Val.U256" in {
+    checkData[Val](Val.U256(U256.MaxValue), s"""{"type": "u256", "value": "${U256.MaxValue}"}""")
+  }
+
+  it should "encode/decode Val.I256" in {
+    checkData[Val](Val.I256(I256.MinValue), s"""{"type": "i256", "value": "${I256.MinValue}"}""")
+  }
+
+  it should "encode/decode Val.Address" in {
+    val address = generateContractAddress()
+    checkData[Val](
+      Val.Address(address),
+      s"""{"type": "address", "value": "${address.toBase58}"}"""
+    )
+  }
+
+  it should "encode/decode ContractStateResult" in {
+    val u256     = Val.U256(U256.MaxValue)
+    val i256     = Val.I256(I256.MaxValue)
+    val bool     = Val.True
+    val byteVec  = Val.ByteVec(U256.MaxValue.toBytes)
+    val address1 = Val.Address(generateContractAddress())
+    val address2 = Val.Address(generateAddress())
+    val jsonRaw  = s"""
+        |{
+        |  "fields": [
+        |     {
+        |       "type":"u256",
+        |       "value": "${u256.value}"
+        |     },
+        |     {
+        |       "type":"i256",
+        |       "value": "${i256.value}"
+        |     },
+        |     {
+        |       "type":"bool",
+        |       "value": ${bool.value}
+        |     },
+        |     {
+        |       "type":"bytevec",
+        |       "value": "${Hex.toHexString(byteVec.value)}"
+        |     },
+        |     {
+        |       "type":"address",
+        |       "value": "${address1.value.toBase58}"
+        |     },
+        |     {
+        |       "type":"address",
+        |       "value": "${address2.value.toBase58}"
+        |     }
+        |   ]
+        |}
+        """.stripMargin
+    checkData(ContractStateResult(AVector(u256, i256, bool, byteVec, address1, address2)), jsonRaw)
   }
 }

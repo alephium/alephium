@@ -40,7 +40,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALF, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, ReleaseVersion}
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, ReleaseVersion, TxGenerators}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
@@ -52,6 +52,7 @@ import org.alephium.wallet.config.WalletConfig
 abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = None)
     extends AlephiumFutureSpec
     with RestServerFixture
+    with TxGenerators
     with EitherValues
     with NumericHelpers
     with BeforeAndAfterAll
@@ -136,6 +137,10 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     Get(s"/addresses/$dummyKeyAddress/group") check { response =>
       response.code is StatusCode.Ok
       response.as[Group] is dummyGroup
+    }
+    Get(s"/addresses/${dummyContractAddress}/group") check { response =>
+      response.code is StatusCode.Ok
+      response.as[Group] is dummyContractGroup
     }
   }
 
@@ -603,8 +608,12 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     val wrongGroupBody = s"""{"addresses":${writeJs(wrongGroup)}}"""
     Put(s"/miners/addresses", wrongGroupBody) check { response =>
       response.code is StatusCode.BadRequest
+      val errorGroup = dummyGroup.group match {
+        case 0 => 1
+        case _ => 0
+      }
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        s"Address ${dummyKeyAddress} doesn't belong to group 1"
+        s"Address ${dummyKeyAddress} doesn't belong to group $errorGroup"
       )
     }
   }
@@ -672,6 +681,19 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
     val body = """{"type":"unban","peers":["123.123.123.123"]}"""
     Post(s"/infos/misbehaviors", body) check { response =>
       response.code is StatusCode.Ok
+    }
+  }
+
+  it should "call GET /contracts/<address>/state" in {
+    0.until(brokerConfig.groups).filter(_ != dummyContractGroup.group).foreach { group =>
+      Get(s"/contracts/${dummyContractAddress}/state?group=${group}") check { response =>
+        response.code is StatusCode.InternalServerError
+      }
+    }
+    Get(s"/contracts/${dummyContractAddress}/state?group=${dummyContractGroup.group}") check {
+      response =>
+        response.code is StatusCode.Ok
+        response.as[ContractStateResult] is ContractStateResult(AVector(Val.U256(U256.Zero)))
     }
   }
 
@@ -783,6 +805,7 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture {
     blockFlowProbe.ref,
     allHandlers,
     dummyTx,
+    counterContract,
     storages,
     cliqueManagerOpt = Some(cliqueManager),
     misbehaviorManagerOpt = Some(misbehaviorManager)
@@ -849,6 +872,7 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture {
         blockFlowProbe.ref,
         allHandlers,
         dummyTx,
+        dummyContract,
         storages,
         cliqueManagerOpt = Some(cliqueManager),
         misbehaviorManagerOpt = Some(misbehaviorManager)

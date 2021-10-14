@@ -146,7 +146,33 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getGroupLogic = serverLogic(getGroup) { address =>
-    Future.successful(serverUtils.getGroup(GetGroup(address)))
+    address match {
+      case Address.Asset(_) => Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
+      case Address.Contract(_) =>
+        val failure: Future[Either[ApiError[_ <: StatusCode], Group]] =
+          Future.successful(
+            Left(ApiError.NotFound(s"Group not found. Please check another broker"))
+              .withRight[Group]
+          )
+        brokerConfig.allGroups.take(brokerConfig.brokerNum).fold(failure) {
+          case (prevResult, currentGroup: GroupIndex) =>
+            prevResult flatMap {
+              case Right(_) =>
+                prevResult
+              case _ =>
+                requestFromGroupIndex(
+                  currentGroup,
+                  Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address))),
+                  getGroupLocal,
+                  address
+                )
+            }
+        }
+    }
+  }
+
+  val getGroupLocalLogic = serverLogic(getGroupLocal) { address =>
+    Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
   }
 
   val getMisbehaviorsLogic = serverLogic(getMisbehaviors) { _ =>
@@ -450,6 +476,15 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>
     Future.successful(serverUtils.verifySignature(query))
+  }
+
+  val contractStateLogic = serverLogic(contractState) { case (contractAddress, groupIndex) =>
+    requestFromGroupIndex(
+      groupIndex,
+      Future.successful(serverUtils.getContractState(blockFlow, contractAddress, groupIndex)),
+      contractState,
+      (contractAddress, groupIndex)
+    )
   }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>

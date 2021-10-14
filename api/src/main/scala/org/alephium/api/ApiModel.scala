@@ -60,6 +60,10 @@ trait ApiModelCodec {
     U256.from(u256).getOrElse(throw new Abort(s"Invalid U256: $u256"))
   }
 
+  implicit val i256Writer: Writer[I256] = javaBigIntegerWriter.comap[I256](_.toBigInt)
+  implicit val i256Reader: Reader[I256] = javaBigIntegerReader.map { i256 =>
+    I256.from(i256).getOrElse(throw new Abort(s"Invalid I256: $i256"))
+  }
   implicit val nonceWriter: Writer[Nonce] = byteStringWriter.comap[Nonce](_.value)
   implicit val nonceReader: Reader[Nonce] = byteStringReader.map { bytes =>
     Nonce.from(bytes).getOrElse(throw Abort(s"Invalid nonce: $bytes"))
@@ -119,6 +123,18 @@ trait ApiModelCodec {
         throw Abort(s"Unable to decode address from $input")
     }
   }
+
+  implicit lazy val contractAddressRW: RW[Address.Contract] = readwriter[String].bimap(
+    _.toBase58,
+    input =>
+      Address.fromBase58(input) match {
+        case Some(address: Address.Contract) => address
+        case Some(_: Address.Asset) =>
+          throw Abort(s"Expect contract address, but got asset address: $input")
+        case None =>
+          throw Abort(s"Unable to decode address from $input")
+      }
+  )
 
   implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
   implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
@@ -296,6 +312,21 @@ trait ApiModelCodec {
         )
     }
   )
+
+  implicit val valBoolRW: RW[Val.Bool]       = macroRW
+  implicit val valU256RW: RW[Val.U256]       = macroRW
+  implicit val valI256RW: RW[Val.I256]       = macroRW
+  implicit val valAddressRW: RW[Val.Address] = macroRW
+  implicit val valByteVecRW: RW[Val.ByteVec] = macroRW
+  implicit val valRW: RW[Val] = RW.merge(
+    valBoolRW,
+    valU256RW,
+    valI256RW,
+    valAddressRW,
+    valByteVecRW
+  )
+
+  implicit val contractStateRW: RW[ContractStateResult] = macroRW
 
   implicit val apiKeyEncoder: Writer[ApiKey] = StringWriter.comap(_.value)
   implicit val apiKeyDecoder: Reader[ApiKey] = StringReader.map { raw =>

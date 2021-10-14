@@ -75,6 +75,7 @@ class RestServer(
       getBalanceLogic,
       getUTXOsLogic,
       getGroupLogic,
+      getGroupLocalLogic,
       getHashesAtHeightLogic,
       getChainInfoLogic,
       getBlockHeaderEntryLogic,
@@ -94,6 +95,7 @@ class RestServer(
       buildScriptLogic,
       compileContractLogic,
       buildContractLogic,
+      contractStateLogic,
       exportBlocksLogic,
       verifySignatureLogic,
       metricsLogic

@@ -254,7 +254,7 @@ object Compiler {
 
     def checkAssign(ident: Ast.Ident, tpe: Type): Unit = {
       val varInfo = getVariable(ident)
-      if (varInfo.tpe != tpe) throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe}")
+      if (varInfo.tpe != tpe) throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe.toVal}")
       if (!varInfo.isMutable) throw Error(s"Assign value to immutable variable $ident")
     }
 

@@ -41,20 +41,25 @@ trait EndpointsExamples extends ErrorExamples {
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
   val address                            = Address.Asset(lockupScript)
-  private val cliqueId                   = CliqueId(publicKey)
-  private val port                       = 12344
-  private val minerApiPort               = 12355
-  private val wsPort                     = 12366
-  private val restPort                   = 12377
-  private val inetSocketAddress          = new InetSocketAddress("1.2.3.4", port)
-  private val inetAddress                = inetSocketAddress.getAddress
-  private val peerAddress                = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
-  private val peers                      = AVector(peerAddress)
-  private val twoAlf                     = Amount(ALF.oneAlf.mulUnsafe(U256.Two))
-  private def alf(value: Int)            = Amount(ALF.oneAlf.mulUnsafe(U256.unsafe(value)))
-  private val height                     = 42
-  val balance                            = alf(10)
-  val halfBalance                        = alf(5)
+  val contractAddress = Address.Contract(
+    LockupScript.p2c(
+      Hash.unsafe(Hex.unsafe("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"))
+    )
+  )
+  private val cliqueId          = CliqueId(publicKey)
+  private val port              = 12344
+  private val minerApiPort      = 12355
+  private val wsPort            = 12366
+  private val restPort          = 12377
+  private val inetSocketAddress = new InetSocketAddress("1.2.3.4", port)
+  private val inetAddress       = inetSocketAddress.getAddress
+  private val peerAddress       = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
+  private val peers             = AVector(peerAddress)
+  private val twoAlf            = Amount(ALF.oneAlf.mulUnsafe(U256.Two))
+  private def alf(value: Int)   = Amount(ALF.oneAlf.mulUnsafe(U256.unsafe(value)))
+  private val height            = 42
+  val balance                   = alf(10)
+  val halfBalance               = alf(5)
   val signature = Signature
     .from(
       Hex.unsafe(
@@ -395,6 +400,19 @@ trait EndpointsExamples extends ErrorExamples {
         hash = hash,
         fromGroup = 2,
         toGroup = 2
+      )
+    )
+
+  implicit val contractStateExamples: List[Example[ContractStateResult]] =
+    simpleExample(
+      ContractStateResult(
+        AVector(
+          Val.I256(I256.from(-10)),
+          Val.U256(U256.unsafe(10)),
+          Val.True,
+          Val.Address(contractAddress),
+          Val.ByteVec(U256.Ten.toBytes)
+        )
       )
     )
 
