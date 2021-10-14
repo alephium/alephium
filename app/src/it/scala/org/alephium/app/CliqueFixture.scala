@@ -27,6 +27,7 @@ import akka.Done
 import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
 import akka.io.Tcp
 import akka.testkit.TestProbe
+import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.WebSocketBase
 import org.scalatest.Assertion
@@ -42,6 +43,7 @@ import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.DiscoveryServer
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
@@ -669,8 +671,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     }
   }
 
+  def haveBeenPunished(server: Server, address: InetAddress, value: Int): Boolean = {
+    implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
+    val penalty = server.node.misbehaviorManager
+      .ask(MisbehaviorManager.GetPenalty(address))
+      .mapTo[Int]
+      .futureValue
+    penalty >= value
+  }
+
   def existUnreachable(server: Server): Boolean = {
-    import akka.util.Timeout
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
     val unreachable = server.node.discoveryServer
       .ask(DiscoveryServer.GetUnreachable)
