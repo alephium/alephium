@@ -23,6 +23,7 @@ import org.alephium.protocol.model.ContractId
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
 
+// scalastyle:off number.of.methods
 abstract class Frame[Ctx <: StatelessContext] {
   var pc: Int
   def obj: ContractObj[Ctx]
@@ -60,9 +61,45 @@ abstract class Frame[Ctx <: StatelessContext] {
   def popOpStack(): ExeResult[Val] = opStack.pop()
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def popOpStackT[T <: Val](): ExeResult[T] =
+  def popOpStackBool(): ExeResult[Val.Bool] =
     popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[T])
+      try Right(elem.asInstanceOf[Val.Bool])
+      catch {
+        case _: ClassCastException => failed(InvalidType(elem))
+      }
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def popOpStackI256(): ExeResult[Val.I256] =
+    popOpStack().flatMap { elem =>
+      try Right(elem.asInstanceOf[Val.I256])
+      catch {
+        case _: ClassCastException => failed(InvalidType(elem))
+      }
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def popOpStackU256(): ExeResult[Val.U256] =
+    popOpStack().flatMap { elem =>
+      try Right(elem.asInstanceOf[Val.U256])
+      catch {
+        case _: ClassCastException => failed(InvalidType(elem))
+      }
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def popOpStackByteVec(): ExeResult[Val.ByteVec] =
+    popOpStack().flatMap { elem =>
+      try Right(elem.asInstanceOf[Val.ByteVec])
+      catch {
+        case _: ClassCastException => failed(InvalidType(elem))
+      }
+    }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def popOpStackAddress(): ExeResult[Val.Address] =
+    popOpStack().flatMap { elem =>
+      try Right(elem.asInstanceOf[Val.Address])
       catch {
         case _: ClassCastException => failed(InvalidType(elem))
       }
@@ -71,7 +108,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   @inline
   def popContractId(): ExeResult[ContractId] = {
     for {
-      byteVec     <- popOpStackT[Val.ByteVec]()
+      byteVec     <- popOpStackByteVec()
       contractKey <- Hash.from(byteVec.bytes).toRight(Right(InvalidContractAddress))
     } yield contractKey
   }
@@ -79,7 +116,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   @inline
   def popFields(): ExeResult[AVector[Val]] = {
     for {
-      fieldsRaw <- popOpStackT[Val.ByteVec]()
+      fieldsRaw <- popOpStackByteVec()
       fields <- deserialize[AVector[Val]](fieldsRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )

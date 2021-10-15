@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -85,13 +85,17 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareContract(
       contract: StatefulContract,
       fields: AVector[Val],
-      gasLimit: GasBox = GasBox.unsafe(100000)
+      gasLimit: GasBox = GasBox.unsafe(100000),
+      contractOutputOpt: Option[(ContractOutput, ContractOutputRef)] = None,
+      txEnvOpt: Option[TxEnv] = None
   ): (StatefulContractObject, StatefulContext) = {
-    val groupIndex        = GroupIndex.unsafe(0)
-    val contractOutputRef = contractOutputRefGen(groupIndex).sample.get
-    val p2cLockup         = p2cLockupGen(groupIndex)
-    val contractOutput    = contractOutputGen(scriptGen = p2cLockup).sample.get
-    val halfDecoded       = contract.toHalfDecoded()
+    val groupIndex = GroupIndex.unsafe(0)
+    val (contractOutput, contractOutputRef) = contractOutputOpt.getOrElse {
+      val co  = contractOutputGen(scriptGen = p2cLockupGen(groupIndex)).sample.get
+      val cor = ContractOutputRef.unsafe(Hash.generate, co, 0)
+      (co, cor)
+    }
+    val halfDecoded = contract.toHalfDecoded()
 
     cachedWorldState.createContractUnsafe(
       halfDecoded,
@@ -103,10 +107,10 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val obj = halfDecoded.toObjectUnsafe(contractOutputRef.key, fields)
     val context = new StatefulContext {
       val worldState: WorldState.Staging            = cachedWorldState.staging()
-      def outputBalances: Balances                  = ???
-      def nextOutputIndex: Int                      = ???
+      val outputBalances: Balances                  = Balances.empty
+      def nextOutputIndex: Int                      = 0
       def blockEnv: BlockEnv                        = ???
-      def txEnv: TxEnv                              = ???
+      def txEnv: TxEnv                              = txEnvOpt.getOrElse(???)
       def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
       var gasRemaining: GasBox                      = gasLimit
     }
