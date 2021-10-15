@@ -147,20 +147,6 @@ class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
     probe.expectMsgType[Tcp.CommandFailed]
   }
 
-  it should "publish unreachable event when the connection failed" in new Fixture
-    with PatienceConfiguration {
-    val listener = TestProbe()
-    system.eventStream.subscribe(listener.ref, classOf[DiscoveryServer.Unreachable])
-
-    val controller1 = testController(bindAddress, misbehaviorManager.ref)
-
-    EventFilter.info(start = "Failed to connect to").intercept {
-      val freeAddress = SocketUtil.temporaryServerAddress()
-      controller1 ! Tcp.CommandFailed(Tcp.Connect(freeAddress))
-      listener.expectMsgType[DiscoveryServer.Unreachable]
-    }
-  }
-
   class TcpControllerTest(
       bindAddress: InetSocketAddress,
       misbehaviorManager: ActorRefT[MisbehaviorManager.Command],

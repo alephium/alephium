@@ -25,6 +25,7 @@ import org.alephium.flow.network.{DiscoveryServer, TcpController}
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
 
+// scalastyle:off number.of.methods
 object MisbehaviorManager {
   def props(
       banDuration: Duration,
@@ -37,6 +38,7 @@ object MisbehaviorManager {
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
       extends Command
   final case class ConfirmPeer(peerInfo: BrokerInfo) extends Command
+  final case class GetPenalty(peer: InetAddress)     extends Command
 
   sealed trait Misbehavior extends Command with EventStream.Event {
     def remoteAddress: InetSocketAddress
@@ -88,6 +90,7 @@ object MisbehaviorManager {
   final case class Penalty(value: Int, timestamp: TimeStamp) extends MisbehaviorStatus
   final case class Banned(until: TimeStamp)                  extends MisbehaviorStatus
 }
+// scalastyle:on number.of.methods
 
 class MisbehaviorManager(
     banDuration: Duration,
@@ -166,5 +169,13 @@ class MisbehaviorManager(
 
     case GetPeers =>
       sender() ! Peers(misbehaviorStorage.list())
+
+    case GetPenalty(peer: InetAddress) =>
+      val penalty = misbehaviorStorage.get(peer) match {
+        case Some(_: Banned)         => misbehaviorThreshold
+        case Some(Penalty(value, _)) => value
+        case None                    => 0
+      }
+      sender() ! penalty
   }
 }

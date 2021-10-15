@@ -23,6 +23,7 @@ import akka.io.Tcp
 import akka.util.ByteString
 
 import org.alephium.api.model._
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
@@ -177,7 +178,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     // scalastyle:on method.length
   }
 
-  it should "ban node if not same chain id" in new CliqueFixture {
+  it should "punish peer if not same chain id" in new CliqueFixture {
     val server0 = bootClique(1).servers.head
     server0.start().futureValue is ()
 
@@ -200,8 +201,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       ).servers.head
     server1.start().futureValue is ()
 
+    val server1Address = server1.config.network.bindAddress.getAddress
     eventually {
-      existUnreachable(server0) is true
+      haveBeenPunished(server0, server1Address, MisbehaviorManager.Warning.penalty)
       existUnreachable(server1) is true
     }
 
@@ -239,14 +241,15 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.start().futureValue is ()
 
     eventually {
-      existBannedPeers(server0)
+      existBannedPeers(server0) is true
+      existUnreachable(server1) is true
     }
 
     server0.stop().futureValue is ()
     server1.stop().futureValue is ()
   }
 
-  it should "ban node if spamming" in new CliqueFixture {
+  it should "punish peer if spamming" in new CliqueFixture {
     val injectionData: ByteString => ByteString = { _ =>
       ByteString.fromArray(Array.fill[Byte](51)(-1))
     }
@@ -263,8 +266,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
     server1.start().futureValue is ()
 
+    val server1Address = server1.config.network.bindAddress.getAddress
     eventually {
-      existUnreachable(server0) is true
+      haveBeenPunished(server0, server1Address, MisbehaviorManager.Warning.penalty)
       existUnreachable(server1) is true
     }
 
@@ -272,7 +276,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "ban node if version is not compatible" in new CliqueFixture {
+  it should "punish peer if version is not compatible" in new CliqueFixture {
     val dummyVersion = WireVersion(WireVersion.currentWireVersion.value + 1)
     val injection: PartialFunction[Message, Message] = { case Message(_, payload: Hello) =>
       Message(Header(dummyVersion), payload)
@@ -290,8 +294,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
     server1.start().futureValue is ()
 
+    val server1Address = server1.config.network.bindAddress.getAddress
     eventually {
-      existUnreachable(server0) is true
+      haveBeenPunished(server0, server1Address, MisbehaviorManager.Warning.penalty)
       existUnreachable(server1) is true
     }
 

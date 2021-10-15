@@ -25,7 +25,6 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
@@ -77,12 +76,20 @@ trait BrokerHandler extends FlowDataHandler {
 
   def handShakeMessage: Payload
 
+  private var handshakeTimeoutTickOpt: Option[Cancellable] = None
+  @inline private def cancelHandshakeTick(): Unit = {
+    handshakeTimeoutTickOpt.foreach(_.cancel())
+    handshakeTimeoutTickOpt = None
+  }
+
   def handShaking: Receive = {
     send(handShakeMessage)
-    val handshakeTimeoutTick = scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
+    handshakeTimeoutTickOpt = Some(
+      scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
+    )
 
     def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
-      handshakeTimeoutTick.cancel()
+      cancelHandshakeTick()
       publishEvent(misbehavior)
       context.stop(self)
     }
@@ -90,7 +97,7 @@ trait BrokerHandler extends FlowDataHandler {
     val receive: Receive = {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
-        handshakeTimeoutTick.cancel()
+        cancelHandshakeTick()
         handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo))
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
@@ -239,13 +246,13 @@ trait BrokerHandler extends FlowDataHandler {
         log.info(
           s"Connection handler for $remoteAddress is terminated. Stopping the broker handler."
         )
-        publishEvent(DiscoveryServer.Unreachable(remoteAddress))
         context stop self
       case _ => super.unhandled(message)
     }
 
   override def postStop(): Unit = {
     super.postStop()
+    cancelHandshakeTick()
     pingPongTickOpt.foreach(_.cancel())
   }
 }

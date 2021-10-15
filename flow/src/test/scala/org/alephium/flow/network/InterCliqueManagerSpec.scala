@@ -30,7 +30,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.SyncedResult
-import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, OutboundConnection}
+import org.alephium.flow.network.broker._
 import org.alephium.protocol.{Generators, Hash}
 import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
@@ -148,16 +148,30 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     }
   }
 
-  it should "deal with double connection (1)" in new Fixture {
-    val broker = relevantBrokerInfo()
+  trait DoubleConnectionFixture extends Fixture {
+    val broker   = relevantBrokerInfo()
+    val probe0   = TestProbe()
+    val probe1   = TestProbe()
+    val listener = TestProbe()
 
-    val probe0 = TestProbe()
     watch(probe0.ref)
+    watch(probe1.ref)
+    system.eventStream.subscribe(listener.ref, classOf[DiscoveryServer.Unreachable])
+
+    interCliqueManagerActor.context.watchWith(
+      probe0.ref,
+      InterCliqueManager.PeerDisconnected(broker.address)
+    )
+    interCliqueManagerActor.context.watchWith(
+      probe1.ref,
+      InterCliqueManager.PeerDisconnected(broker.address)
+    )
+  }
+
+  it should "deal with double connection (1)" in new DoubleConnectionFixture {
     probe0.send(interCliqueManager, CliqueManager.HandShaked(broker, InboundConnection))
     interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
 
-    val probe1 = TestProbe()
-    watch(probe1.ref)
     probe1.send(interCliqueManager, CliqueManager.HandShaked(broker, OutboundConnection))
 
     if (cliqueInfo.id < broker.cliqueId) {
@@ -165,22 +179,17 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       expectTerminated(probe0.ref)
       interCliqueManagerActor.brokers(broker.peerId).connectionType is OutboundConnection
     } else {
-      // we should kill the inbound connection, and keep the inbound connection
+      // we should kill the outbound connection, and keep the inbound connection
       expectTerminated(probe1.ref)
       interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
     }
+    listener.expectNoMessage()
   }
 
-  it should "deal with double connection (2)" in new Fixture {
-    val broker = relevantBrokerInfo()
-
-    val probe0 = TestProbe()
-    watch(probe0.ref)
+  it should "deal with double connection (2)" in new DoubleConnectionFixture {
     probe0.send(interCliqueManager, CliqueManager.HandShaked(broker, OutboundConnection))
     interCliqueManagerActor.brokers(broker.peerId).connectionType is OutboundConnection
 
-    val probe1 = TestProbe()
-    watch(probe1.ref)
     probe1.send(interCliqueManager, CliqueManager.HandShaked(broker, InboundConnection))
 
     if (cliqueInfo.id < broker.cliqueId) {
@@ -188,10 +197,11 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       expectTerminated(probe1.ref)
       interCliqueManagerActor.brokers(broker.peerId).connectionType is OutboundConnection
     } else {
-      // we should kill the inbound connection, and keep the inbound connection
+      // we should kill the outbound connection, and keep the inbound connection
       expectTerminated(probe0.ref)
       interCliqueManagerActor.brokers(broker.peerId).connectionType is InboundConnection
     }
+    listener.expectNoMessage()
   }
 
   it should "close the double connections when they are of the same type" in new Fixture {
@@ -210,6 +220,37 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     expectTerminated(probe0.ref)
     expectTerminated(probe1.ref)
+  }
+
+  it should "publish unreachable when connection broken" in new Fixture {
+    val broker0  = relevantBrokerInfo()
+    val probe0   = TestProbe()
+    val broker1  = relevantBrokerInfo()
+    val probe1   = TestProbe()
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DiscoveryServer.Unreachable])
+
+    def test(
+        brokerHandler: TestProbe,
+        brokerInfo: BrokerInfo,
+        connectionType: ConnectionType
+    ): Unit = {
+      interCliqueManagerActor.context.watchWith(
+        brokerHandler.ref,
+        InterCliqueManager.PeerDisconnected(brokerInfo.address)
+      )
+      brokerHandler.send(interCliqueManager, CliqueManager.HandShaked(brokerInfo, connectionType))
+    }
+
+    test(probe0, broker0, InboundConnection)
+    system.stop(probe0.ref)
+    eventually(listener.expectMsg(DiscoveryServer.Unreachable(broker0.address)))
+    eventually(interCliqueManagerActor.brokers.contains(broker0.peerId) is false)
+
+    test(probe1, broker1, OutboundConnection)
+    system.stop(probe1.ref)
+    eventually(listener.expectMsg(DiscoveryServer.Unreachable(broker1.address)))
+    eventually(interCliqueManagerActor.brokers.contains(broker1.peerId) is false)
   }
 
   behavior of "Extract peers"
