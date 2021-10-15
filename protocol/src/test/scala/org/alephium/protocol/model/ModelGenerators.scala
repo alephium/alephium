@@ -28,14 +28,19 @@ import org.scalatest.Assertion
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, Number, NumericHelpers, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, I256, Number, NumericHelpers, TimeStamp, U256}
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
 
   implicit def groupConfig: GroupConfig
+
+  lazy val dataGen: Gen[ByteString] = for {
+    length <- Gen.choose(0, 20)
+    bytes  <- Gen.listOfN(length, arbByte.arbitrary)
+  } yield ByteString(bytes)
 
   def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
     for {
@@ -112,6 +117,32 @@ trait LockupScriptGenerators extends Generators {
         privateKey.toHexString
       )
     }
+
+  private val i256Gen: Gen[I256] =
+    Gen.choose[java.math.BigInteger](I256.MinValue.v, I256.MaxValue.v).map(I256.unsafe)
+  private val u256Gen: Gen[U256] =
+    Gen.choose[java.math.BigInteger](U256.MinValue.v, U256.MaxValue.v).map(U256.unsafe)
+
+  lazy val valBoolGen: Gen[Val.Bool]       = arbitrary[Boolean].map(Val.Bool.apply)
+  lazy val valI256Gen: Gen[Val.I256]       = i256Gen.map(Val.I256.apply)
+  lazy val valU256Gen: Gen[Val.U256]       = u256Gen.map(Val.U256.apply)
+  lazy val valByteVecGen: Gen[Val.ByteVec] = dataGen.map(Val.ByteVec.apply)
+
+  def valAddressGen(implicit groupConfig: GroupConfig): Gen[Val.Address] =
+    for {
+      groupIndex   <- groupIndexGen
+      lockupScript <- lockupGen(groupIndex)
+    } yield Val.Address(lockupScript)
+
+  def vmValGen(implicit groupConfig: GroupConfig): Gen[Val] = {
+    Gen.oneOf(
+      valBoolGen,
+      valI256Gen,
+      valU256Gen,
+      valByteVecGen,
+      valAddressGen
+    )
+  }
 }
 
 trait TxInputGenerators extends Generators {
@@ -201,11 +232,6 @@ trait TxGenerators
   implicit def networkConfig: NetworkConfig
 
   lazy val createdHeightGen: Gen[Int] = Gen.choose(ALF.GenesisHeight, Int.MaxValue)
-
-  lazy val dataGen: Gen[ByteString] = for {
-    length <- Gen.choose(0, 20)
-    bytes  <- Gen.listOfN(length, arbByte.arbitrary)
-  } yield ByteString(bytes)
 
   def assetOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256] = amountGen(1),

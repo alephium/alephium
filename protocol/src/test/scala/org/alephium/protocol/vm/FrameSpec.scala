@@ -16,6 +16,9 @@
 
 package org.alephium.protocol.vm
 
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import scala.reflect.ClassTag
+
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class FrameSpec extends AlephiumSpec with FrameFixture {
@@ -31,6 +34,26 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     frame.opStack.offset is 2
     frame.opStack.capacity is 8
     frame.opStack.currentIndex is 2
+  }
+
+  it should "popOpStackBool" in new PopOpStackFixture {
+    test[Val.Bool](_.popOpStackBool())
+  }
+
+  it should "popOpStackI256" in new PopOpStackFixture {
+    test[Val.I256](_.popOpStackI256())
+  }
+
+  it should "popOpStackU256" in new PopOpStackFixture {
+    test[Val.U256](_.popOpStackU256())
+  }
+
+  it should "popOpStackByteVec" in new PopOpStackFixture {
+    test[Val.ByteVec](_.popOpStackByteVec())
+  }
+
+  it should "popOpStackAddress" in new PopOpStackFixture {
+    test[Val.Address](_.popOpStackAddress())
   }
 }
 
@@ -75,5 +98,20 @@ trait FrameFixture extends ContextGenerators {
         _ => okay
       )
       .rightValue
+  }
+}
+
+trait PopOpStackFixture extends FrameFixture with ScalaCheckDrivenPropertyChecks {
+  val frame = genStatefulFrame()
+
+  def test[A <: Val: ClassTag](popOp: Frame[_] => ExeResult[A]) = {
+    forAll(vmValGen) {
+      case a: A =>
+        frame.opStack.push(a)
+        popOp(frame) isE a
+      case other =>
+        frame.opStack.push(other)
+        popOp(frame).leftValue isE a[InvalidType]
+    }
   }
 }
