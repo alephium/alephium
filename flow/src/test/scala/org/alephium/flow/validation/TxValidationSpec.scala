@@ -95,14 +95,18 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         validator: TxValidator[T],
         preOutputs: AVector[AssetInputInfo]
     ): TxValidator[T] = (transaction: Transaction) => {
-      checkBlockTx(transaction, preOutputs)
-      nestedValidator(validator)(transaction)
+      for {
+        result <- nestedValidator(validator)(transaction)
+        _      <- checkBlockTx(transaction, preOutputs)
+      } yield result
     }
 
     def nestedValidator[T](validator: TxValidator[T]): TxValidator[T] =
       (transaction: Transaction) => {
-        validateTxOnlyForTest(transaction, blockFlow)
-        validator(transaction)
+        for {
+          result <- validator(transaction)
+          _      <- validateTxOnlyForTest(transaction, blockFlow)
+        } yield result
       }
 
     implicit class RichTxValidationResult[T](res: TxValidationResult[T]) {
@@ -315,7 +319,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check gas bounds" in new Fixture {
-    implicit val validator = nestedValidator(checkGasBound)
+    implicit val validator = checkGasBound
 
     val tx = transactionGen(1, 1).sample.value
     tx.pass()
@@ -335,8 +339,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check ALF balance stats" in new Fixture {
-    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      implicit val validator = nestedValidator(checkOutputStats, preOutputs)
+    forAll(transactionGenWithPreOutputs()) { case (tx, _) =>
+      implicit val validator = checkOutputStats
 
       // balance overflow
       val alfAmount = tx.alfAmountInOutputs.value
@@ -374,8 +378,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       case (tx, preOutputs) =>
         implicit val validator = nestedValidator(getChainIndex, preOutputs)
 
-        tx.pass()
-
         val chainIndex = tx.chainIndex
         val invalidTxGen = for {
           fromGroupNew <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
@@ -397,8 +399,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         whenever(!chainIndex.isIntraGroup) {
           implicit val validator = nestedValidator(getChainIndex, preOutputs)
 
-          tx.pass()
-
           val invalidTxGen = for {
             invalidToGroup      <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
             invalidLockupScript <- assetLockupGen(invalidToGroup)
@@ -413,8 +413,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "check distinction of inputs" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       val validator = nestedValidator(checkUniqueInputs(_, true), preOutputs)
-
-      tx.pass()(validator)
 
       val inputs    = tx.unsigned.inputs
       val invalidTx = tx.updateUnsigned(_.copy(inputs = inputs ++ inputs))
@@ -514,8 +512,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           preOutputs
         )
 
-        tx.pass()
-
         val tokenId   = tx.sampleToken()
         val invalidTx = tx.modifyTokenAmount(tokenId, _ + 1)
         invalidTx.fail(InvalidTokenBalance)
@@ -534,9 +530,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           invalidTx.updateUnsigned(_.copy(scriptOpt = Some(script)))
         }
 
-        if (isPayable) {
-          invalidTxWithScript.pass()
-        } else {
+        if (!isPayable) {
           invalidTxWithScript.fail(InvalidTokenBalance)
         }
     }
