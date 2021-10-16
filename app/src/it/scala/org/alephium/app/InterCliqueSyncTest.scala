@@ -50,7 +50,7 @@ object Injected {
       ref: ActorRef
   )(implicit groupConfig: GroupConfig, networkConfig: NetworkConfig): Injected[T] = {
     val injectionData: ByteString => ByteString = data => {
-      val message = Message.deserialize(data).rightValue
+      val message = Message.deserialize(data).toOption.get
       if (injection.isDefinedAt(message)) {
         val injected     = injection.apply(message)
         val injectedData = Message.serialize(injected)

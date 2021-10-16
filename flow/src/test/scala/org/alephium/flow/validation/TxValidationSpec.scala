@@ -106,6 +106,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         for {
           result <- validator(transaction)
           _      <- validateTxOnlyForTest(transaction, blockFlow)
+          _      <- validateMempoolTxTemplate(transaction.toTemplate, blockFlow)
         } yield result
       }
 
