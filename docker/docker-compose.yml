@@ -7,7 +7,7 @@ volumes:
 
 services:
   alephium:
-    image: alephium/alephium:v0.11.1
+    image: alephium/alephium:v0.11.2
 
     restart: unless-stopped
     ports:
