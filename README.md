@@ -1,4 +1,7 @@
-# Alephium
+Alephium
+=========
+[![codecov](https://codecov.io/gh/polarker/alephium/branch/master/graph/badge.svg?token=TAMKL8CWO3)](https://codecov.io/gh/polarker/alephium)
+[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/4BEUkc9zpA)
 
 This repository contains the reference implementation of Alephium, a sharded
 blockchain that makes programmable money scalable and secure.
