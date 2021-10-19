@@ -146,7 +146,7 @@ final case object InvalidWitnessLength                          extends InvalidT
 final case object InvalidPublicKeyHash                          extends InvalidTxStatus
 final case object InvalidScriptHash                             extends InvalidTxStatus
 final case object InvalidSignature                              extends InvalidTxStatus
-final case object TooManySignature                              extends InvalidTxStatus
+final case object TooManySignatures                             extends InvalidTxStatus
 final case object InvalidNumberOfPublicKey                      extends InvalidTxStatus
 final case object InvalidP2mpkhUnlockScript                     extends InvalidTxStatus
 final case object OutOfGas                                      extends InvalidTxStatus

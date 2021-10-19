@@ -45,7 +45,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val script      = Compiler.compileTxScript(input).toOption.get
+    val script      = Compiler.compileTxScript(input).rightValue
     val errorScript = StatefulScript.unsafe(AVector(script.methods.head.copy(isPublic = false)))
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, errorScript)).getMessage is
       s"Right(TxScriptExeFailed($ExternalPrivateMethodCall))"
@@ -66,7 +66,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val script = Compiler.compileTxScript(input).toOption.get
+    val script = Compiler.compileTxScript(input).rightValue
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
@@ -92,7 +92,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    lazy val script0      = Compiler.compileContract(input0).toOption.get
+    lazy val script0      = Compiler.compileContract(input0).rightValue
     lazy val initialState = AVector[Val](Val.U256(U256.Zero))
 
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
@@ -131,7 +131,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
-    val script1 = Compiler.compileTxScript(input1, 1).toOption.get
+    val script1 = Compiler.compileTxScript(input1, 1).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script1)).getMessage is
       s"Right(TxScriptExeFailed($ExternalPrivateMethodCall))"
   }
@@ -142,7 +142,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
-    val script1   = Compiler.compileTxScript(input1, 1).toOption.get
+    val script1   = Compiler.compileTxScript(input1, 1).rightValue
     val newState1 = AVector[Val](Val.U256(U256.unsafe(10)))
     val block1    = simpleScript(blockFlow, chainIndex, script1)
     addAndCheck(blockFlow, block1, 2)
@@ -204,7 +204,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     def callTxScript(input: String): Unit = {
-      val script = Compiler.compileTxScript(input).toOption.get
+      val script = Compiler.compileTxScript(input).rightValue
       val block =
         if (script.entryMethod.isPayable) {
           payableCall(blockFlow, chainIndex, script)
@@ -289,7 +289,7 @@ class VMSpec extends AlephiumSpec {
          |$input
          |""".stripMargin
 
-    val script = Compiler.compileTxScript(main).toOption.get
+    val script = Compiler.compileTxScript(main).rightValue
     fail(blockFlow, chainIndex, script, EmptyContractAsset)
   }
 
@@ -366,7 +366,7 @@ class VMSpec extends AlephiumSpec {
     testSimpleScript(main)
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-    worldState.getContractStates().toOption.get.length is 3
+    worldState.getContractStates().rightValue.length is 3
 
     checkState(
       blockFlow,
@@ -392,7 +392,7 @@ class VMSpec extends AlephiumSpec {
     val contractKey       = contractOutputRef.key
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-    worldState.getContractStates().toOption.get.length is 2
+    worldState.getContractStates().rightValue.length is 2
     worldState.getContractOutputs(ByteString.empty, Int.MaxValue).rightValue.foreach {
       case (ref, output) =>
         if (ref != ContractOutputRef.forSMT) {
@@ -928,7 +928,7 @@ class VMSpec extends AlephiumSpec {
 
     def checkSwapBalance(alfReserve: U256, tokenReserve: U256) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-      val output     = worldState.getContractAsset(swapContractKey).toOption.get
+      val output     = worldState.getContractAsset(swapContractKey).rightValue
       output.amount is alfReserve
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
     }
@@ -1053,7 +1053,7 @@ class VMSpec extends AlephiumSpec {
     blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, simpleTx, TimeStamp.now())
     newAddresses.foreachWithIndex { case (address, index) =>
       val gas    = if (index % 2 == 0) 20000 else 200000
-      val script = Compiler.compileTxScript(main(address)).toOption.get
+      val script = Compiler.compileTxScript(main(address)).rightValue
       val tx = payableCallTxTemplate(
         blockFlow,
         chainIndex,

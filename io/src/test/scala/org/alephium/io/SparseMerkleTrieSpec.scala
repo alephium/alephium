@@ -139,12 +139,12 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       } else {
         val prefix       = ByteString(i.toByte)
         val (key, value) = fixture.generateKV(prefix)
-        trie = trie.put(key, value).toOption.get
+        trie = trie.put(key, value).rightValue
         Some(key)
       }
     }
 
-    val rootNode = trie.getNode(trie.rootHash).toOption.get
+    val rootNode = trie.getNode(trie.rootHash).rightValue
     rootNode match {
       case BranchNode(path, children) =>
         children.foreach(_.nonEmpty is true)
@@ -155,13 +155,13 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     keys.foreach { key => trie.getOpt(key).map(_.nonEmpty) isE true }
 
-    val allStored    = trie.getAll(ByteString.empty, Int.MaxValue).toOption.get
+    val allStored    = trie.getAll(ByteString.empty, Int.MaxValue).rightValue
     val allKeys      = allStored.map(_._1).toSet
     val expectedKeys = (keys :+ genesisKey).toSet
     allKeys is expectedKeys
 
     keys.foreach { key =>
-      trie = trie.remove(key).toOption.get
+      trie = trie.remove(key).rightValue
       trie.getOpt(key).map(_.isEmpty) isE true
     }
 
@@ -173,8 +173,8 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     val keys = AVector.tabulate(1000) { _ =>
       val (key, value) = fixture.generateKV()
-      val trie1        = trie.put(key, value).toOption.get
-      val trie2        = trie.put(key, value).toOption.get //idempotent tests
+      val trie1        = trie.put(key, value).rightValue
+      val trie2        = trie.put(key, value).rightValue //idempotent tests
       trie2.rootHash is trie1.rootHash
       trie = trie2
       key
@@ -205,7 +205,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     keys.foreach { key =>
       val (_, value) = fixture.generateKV()
-      trie = trie.put(key, value).toOption.get
+      trie = trie.put(key, value).rightValue
     }
 
     (1 to 1001).foreach { k =>

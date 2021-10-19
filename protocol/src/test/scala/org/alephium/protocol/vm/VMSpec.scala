@@ -451,7 +451,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       case Some(instrCompanion: StatefulInstrCompanion0) =>
         deserialize[Instr[StatefulContext]](
           instrCompanion.serialize()
-        ).toOption.get is instrCompanion
+        ).rightValue is instrCompanion
       case _ => ()
     }
   }

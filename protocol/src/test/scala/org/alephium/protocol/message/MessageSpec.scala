@@ -55,7 +55,7 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
     Message.deserialize(serialized) isE message
 
     val Staging(deserialized, rest) =
-      Message._deserialize(serialized ++ serialized).toOption.get
+      Message._deserialize(serialized ++ serialized).rightValue
 
     deserialized is message
     Message.deserialize(rest) isE message

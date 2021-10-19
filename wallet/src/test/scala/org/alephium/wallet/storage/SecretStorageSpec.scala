@@ -41,13 +41,13 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       val miner = false
 
       val secretStorage =
-        SecretStorage.create(mnemonic, None, password, miner, file, path).toOption.get
+        SecretStorage.create(mnemonic, None, password, miner, file, path).rightValue
       val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
       secretStorage.getCurrentPrivateKey() isE privateKey
       secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey)))
 
-      val newKey = secretStorage.deriveNextKey().toOption.get
+      val newKey = secretStorage.deriveNextKey().rightValue
 
       secretStorage.getCurrentPrivateKey() isE newKey
       secretStorage.getAllPrivateKeys() isE ((newKey, AVector(privateKey, newKey)))
@@ -85,7 +85,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       val miner = false
 
       val secretStorage =
-        SecretStorage.create(mnemonic, Some(passphrase), password, miner, file, path).toOption.get
+        SecretStorage.create(mnemonic, Some(passphrase), password, miner, file, path).rightValue
 
       val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
@@ -123,7 +123,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     outWriter.write(rawFile)
     outWriter.close()
 
-    val secretStorage = SecretStorage.fromFile(file, password, path, None).toOption.get
+    val secretStorage = SecretStorage.fromFile(file, password, path, None).rightValue
 
     secretStorage.unlock(password, None) is Right(())
 

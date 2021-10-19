@@ -248,7 +248,7 @@ trait FlowFixture
     val unlockScript               = UnlockScript.p2pkh(publicKey)
 
     val balances = {
-      val balances = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
+      val balances = blockFlow.getUsableUtxos(fromLockupScript).rightValue
       balances ++ balances
     }
     balances.length is 2 // this function is used in this particular case
@@ -288,7 +288,7 @@ trait FlowFixture
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
-    val balances     = blockFlow.getUsableUtxos(fromLockupScript).toOption.get
+    val balances     = blockFlow.getUsableUtxos(fromLockupScript).rightValue
     val inputs       = balances.map(_.ref).map(TxInput(_, unlockScript))
 
     val unsignedTx =
@@ -513,7 +513,7 @@ trait FlowFixture
       pubScript: LockupScript.Asset,
       expected: U256
   ): Assertion = {
-    blockFlow.getUsableUtxos(pubScript).toOption.get.sumBy(_.output.amount.v: BigInt) is expected.v
+    blockFlow.getUsableUtxos(pubScript).rightValue.sumBy(_.output.amount.v: BigInt) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -540,7 +540,7 @@ trait FlowFixture
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
     val query = blockFlow.getUsableUtxos(lockupScript)
-    U256.unsafe(query.toOption.get.sumBy(_.output.amount.v: BigInt).underlying())
+    U256.unsafe(query.rightValue.sumBy(_.output.amount.v: BigInt).underlying())
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {
@@ -550,7 +550,7 @@ trait FlowFixture
 
     val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
-    val txOutputs = blockFlow.getUsableUtxos(pubScript).toOption.get.map(_.output)
+    val txOutputs = blockFlow.getUsableUtxos(pubScript).rightValue.map(_.output)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 
@@ -645,7 +645,7 @@ trait FlowFixture
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compileContract(input).toOption.get
+    val contract = Compiler.compileContract(input).rightValue
     val txScript =
       contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALF.alf(1))
     payableCallTxTemplate(

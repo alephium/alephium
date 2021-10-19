@@ -123,7 +123,7 @@ class WebSocketServerSpec
       node.eventBus ! blockNotify
 
       blockNotifyProbe.expectMsgPF() { case message: String =>
-        val notification = read[NotificationUnsafe](message).asNotification.toOption.get
+        val notification = read[NotificationUnsafe](message).asNotification.rightValue
         notification.method is "block_notify"
       }
     }

@@ -606,9 +606,8 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
-      val txEnv =
-        TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
-      val inputs = tx.unsigned.inputs
+      val txEnv      = TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
+      val inputs     = tx.unsigned.inputs
       for {
         remaining <- EitherF.foldTry(inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
           val unlockScript = inputs(idx).unlockScript
@@ -624,7 +623,7 @@ object TxValidation {
             )
           }
         }
-        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignature)
+        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignatures)
       } yield remaining
     }
 
