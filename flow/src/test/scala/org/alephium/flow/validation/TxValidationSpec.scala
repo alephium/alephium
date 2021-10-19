@@ -401,10 +401,14 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           implicit val validator = nestedValidator(getChainIndex, preOutputs)
 
           val invalidTxGen = for {
-            invalidToGroup      <- groupIndexGen.retryUntil(!chainIndex.relateTo(_))
-            invalidLockupScript <- assetLockupGen(invalidToGroup)
+            toGroup1 <- groupIndexGen.retryUntil(chainIndex.from != _)
+            toGroup2 <- groupIndexGen.retryUntil { index =>
+              (chainIndex.from != index) && (toGroup1 != index)
+            }
+            assetOutput1 <- assetOutputGen(toGroup1)()
+            assetOutput2 <- assetOutputGen(toGroup2)()
           } yield {
-            tx.updateRandomFixedOutputs(_.copy(lockupScript = invalidLockupScript))
+            tx.updateUnsigned(_.copy(fixedOutputs = AVector(assetOutput1, assetOutput2)))
           }
           forAll(invalidTxGen)(_.fail(InvalidOutputGroupIndex))
         }
