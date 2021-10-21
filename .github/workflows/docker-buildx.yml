@@ -22,7 +22,13 @@ jobs:
 
       - name: Get the version
         id: get_version
-        uses: battila7/get-version-action@v2
+        run: |
+          version=$(git describe --tags --abbrev=0)
+          echo $version
+          echo ${version:1}
+          echo ::set-output name=VERSION::$version
+          echo ::set-output name=VERSION-NO-V::${version:1}
+        shell: bash
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v1
@@ -35,9 +41,9 @@ jobs:
         with:
           context: docker/release
           file: ./docker/release/Dockerfile.release
-          build-args: RELEASE=${{ steps.get_version.outputs.version-without-v }}
+          build-args: RELEASE=${{ steps.get_version.outputs.VERSION-NO-V }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            docker.io/alephium/alephium:${{ steps.get_version.outputs.version }}
+            docker.io/alephium/alephium:${{ steps.get_version.outputs.VERSION }}
             docker.io/alephium/alephium:latest
           push: true
