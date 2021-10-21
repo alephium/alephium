@@ -84,6 +84,12 @@ object LockupScript {
     P2SH(Hash.hash(serdeImpl[StatelessScript].serialize(script)))
   def p2sh(scriptHash: Hash): P2SH = P2SH(scriptHash)
   def p2c(contractId: Hash): P2C   = P2C(contractId)
+  def p2c(input: String): Option[LockupScript.P2C] = {
+    fromBase58(input).flatMap {
+      case e: LockupScript.P2C => Some(e)
+      case _                   => None
+    }
+  }
 
   sealed trait Asset extends LockupScript {
     def hintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))

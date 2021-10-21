@@ -23,6 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
+import org.alephium.api.model
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, BlockFlowState}
 import org.alephium.flow.handler.TxHandler
@@ -31,6 +32,7 @@ import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSc
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -91,8 +93,36 @@ class ServerUtils(implicit
     } yield UTXOs.from(utxos, utxosLimit)
   }
 
-  def getGroup(query: GetGroup): Try[Group] = {
-    Right(Group(query.address.groupIndex(brokerConfig).value))
+  def getContractGroup(
+      blockFlow: BlockFlow,
+      contractId: Hash,
+      groupIndex: GroupIndex
+  ): Try[Group] = {
+    val searchResult = for {
+      worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
+      existed    <- worldState.contractState.exist(contractId)
+    } yield existed
+
+    searchResult match {
+      case Right(true)  => Right(Group(groupIndex.value))
+      case Right(false) => Left(failed("Group not found. Please check another broker"))
+      case Left(error)  => Left(failedInIO(error))
+    }
+  }
+
+  def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = query match {
+    case GetGroup(assetAddress: Address.Asset) =>
+      Right(Group(assetAddress.groupIndex(brokerConfig).value))
+    case GetGroup(Address.Contract(LockupScript.P2C(contractId))) => {
+      val failure: Try[Group] = Left(failed("Group not found.")).withRight[Group]
+      brokerConfig.groupRange.foldLeft(failure) { case (prevResult, currentGroup: Int) =>
+        prevResult match {
+          case Right(prevResult) => Right(prevResult)
+          case Left(_) =>
+            getContractGroup(blockFlow, contractId, GroupIndex.unsafe(currentGroup))
+        }
+      }
+    }
   }
 
   def listUnconfirmedTransactions(
@@ -479,9 +509,9 @@ class ServerUtils(implicit
       Right(true)
     }
 
-  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[Val]] = {
+  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
     str match {
-      case None => Right(AVector.empty[Val])
+      case None => Right(AVector.empty[vm.Val])
       case Some(state) =>
         val res = Compiler.compileState(state)
         res
@@ -506,7 +536,7 @@ class ServerUtils(implicit
   private def buildContract(
       codeRaw: String,
       address: Address,
-      initialState: AVector[Val],
+      initialState: AVector[vm.Val],
       alfAmount: U256,
       newTokenAmount: Option[U256]
   ): Either[Compiler.Error, StatefulScript] = {
@@ -550,7 +580,7 @@ class ServerUtils(implicit
 
   private def validateStateLength(
       contract: StatefulContract,
-      state: AVector[Val]
+      state: AVector[vm.Val]
   ): Either[String, Unit] = {
     if (contract.validate(state)) {
       Right(())
@@ -631,6 +661,20 @@ class ServerUtils(implicit
       .map(error => failed(error.toString))
   }
 
+  def getContractState(
+      blockFlow: BlockFlow,
+      address: Address.Contract,
+      groupIndex: GroupIndex
+  ): Try[ContractStateResult] = {
+    val result = for {
+      worldState <- blockFlow.getBestCachedWorldState(groupIndex)
+      state      <- worldState.getContractState(address.lockupScript.contractId)
+    } yield {
+      val convertedFields = state.fields.map(model.Val.from)
+      ContractStateResult(convertedFields)
+    }
+    result.left.map(failedInIO(_))
+  }
   private def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
   private def failed(error: String): ApiError[_ <: StatusCode] =
     ApiError.InternalServerError(error)

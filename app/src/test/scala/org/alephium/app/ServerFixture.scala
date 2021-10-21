@@ -22,6 +22,7 @@ import scala.util.Random
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestProbe
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
@@ -40,8 +41,9 @@ import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm._
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -49,6 +51,8 @@ trait ServerFixture
     extends InfoFixture
     with ApiModelCodec
     with AlephiumConfigFixture
+    with ModelGenerators
+    with TxGenerators
     with StoragesFixture.Default
     with NoIndexModelGeneratorsLike {
 
@@ -61,13 +65,15 @@ trait ServerFixture
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique =
     EndpointsLogic.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true, true)
-  lazy val dummyBlockEntry    = BlockEntry.from(dummyBlock, 1)
-  lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
-  lazy val dummyBalance       = Balance.from(Amount.Zero, Amount.Zero, 0)
-  lazy val dummyGroup         = Group(0)
-
+  lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
+  lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
+  lazy val dummyBalance         = Balance.from(Amount.Zero, Amount.Zero, 0)
+  lazy val dummyGroup           = Group(Gen.choose(0, brokerConfig.groups - 1).sample.get)
+  lazy val dummyContract        = counterContract
+  lazy val dummyContractGroup   = Group(brokerConfig.groups - 1)
+  lazy val dummyContractAddress = Address.Contract(LockupScript.P2C(counterContract.hash)).toBase58
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
-    GroupIndex.unsafe(0)
+    GroupIndex.unsafe(dummyGroup.group)
   ).sample.get
   lazy val dummyKeyHex                     = dummyKey.toHexString
   lazy val (dummyToAddress, dummyToKey, _) = addressStringGen(GroupIndex.unsafe(1)).sample.get
@@ -163,6 +169,7 @@ object ServerFixture {
       blockFlowProbe: ActorRef,
       _allHandlers: AllHandlers,
       dummyTx: Transaction,
+      dummyContract: StatefulContract,
       storages: Storages,
       cliqueManagerOpt: Option[ActorRefT[CliqueManager.Command]] = None,
       misbehaviorManagerOpt: Option[ActorRefT[MisbehaviorManager.Command]] = None
@@ -170,7 +177,8 @@ object ServerFixture {
       extends Node {
     implicit val system: ActorSystem       = ActorSystem("NodeDummy")
     val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    val blockFlow: BlockFlow               = new BlockFlowDummy(block, blockFlowProbe, dummyTx, storages)
+    val blockFlow: BlockFlow =
+      new BlockFlowDummy(block, blockFlowProbe, dummyTx, dummyContract, storages)
 
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
       misbehaviorManagerOpt.getOrElse(ActorRefT(TestProbe().ref))
@@ -219,6 +227,7 @@ object ServerFixture {
       block: Block,
       blockFlowProbe: ActorRef,
       dummyTx: Transaction,
+      dummyContract: StatefulContract,
       val storages: Storages
   )(implicit val config: AlephiumConfig)
       extends EmptyBlockFlow {
@@ -307,5 +316,33 @@ object ServerFixture {
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
     override def calWeight(block: Block): IOResult[Weight]              = ???
+
+    // scalastyle:off no.equal
+    override def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
+      val contractGroup = brokerConfig.groups - 1
+      if (
+        brokerConfig.groupRange
+          .contains(groupIndex.value) && brokerConfig.groupRange.contains(
+          contractGroup
+        ) && (groupIndex.value == contractGroup)
+      ) {
+        val contractId: Hash = dummyContract.toHalfDecoded().hash
+        storages.emptyWorldState
+          .createContractUnsafe(
+            dummyContract.toHalfDecoded(),
+            AVector(vm.Val.U256(U256.Zero)),
+            ContractOutputRef.unsafe(Hint.unsafe(0), contractId),
+            ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector())
+          )
+          .map(_.cached())
+      } else {
+        Right(storages.emptyWorldState.cached())
+      }
+    }
+    // scalastyle:on no.equal
+
+    override def getBestPersistedWorldState(
+        groupIndex: GroupIndex
+    ): IOResult[WorldState.Persisted] = getBestCachedWorldState(groupIndex).flatMap(_.persist())
   }
 }

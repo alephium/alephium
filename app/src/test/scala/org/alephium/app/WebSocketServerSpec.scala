@@ -103,6 +103,7 @@ class WebSocketServerSpec
       blockFlowProbe.ref,
       allHandlers,
       dummyTx,
+      dummyContract,
       storages
     )
     lazy val server: WebSocketServer = WebSocketServer(node)

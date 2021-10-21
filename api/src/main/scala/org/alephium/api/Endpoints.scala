@@ -177,13 +177,19 @@ trait Endpoints
       .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")
 
-  val getGroup: BaseEndpoint[Address.Asset, Group] =
+  val getGroup: BaseEndpoint[Address, Group] =
     addressesEndpoint.get
-      .in(path[Address.Asset]("address"))
+      .in(path[Address]("address"))
       .in("group")
       .out(jsonBody[Group])
       .summary("Get the group of an address")
 
+  val getGroupLocal: BaseEndpoint[Address, Group] =
+    addressesEndpoint.get
+      .in(path[Address]("address"))
+      .in("groupLocal")
+      .out(jsonBody[Group])
+      .summary("Get the group of an address. Checks locally for contract addressses")
   //have to be lazy to let `groupConfig` being initialized
   lazy val getHashesAtHeight: BaseEndpoint[(ChainIndex, Int), HashesAtHeight] =
     blockflowEndpoint.get
@@ -313,6 +319,14 @@ trait Endpoints
       .in(jsonBody[BuildContract])
       .out(jsonBody[BuildContractResult])
       .summary("Build an unsigned contract")
+
+  lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractStateResult] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("state")
+      .in(query[GroupIndex]("group"))
+      .out(jsonBody[ContractStateResult])
+      .summary("Get contract state")
 
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post

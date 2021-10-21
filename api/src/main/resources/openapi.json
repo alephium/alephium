@@ -4829,6 +4829,134 @@
         }
       }
     },
+    "/contracts/{address}/state": {
+      "get": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Get contract state",
+        "operationId": "getContractsAddressState",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractStateResult"
+                },
+                "example": {
+                  "fields": [
+                    {
+                      "type": "i256",
+                      "value": "-10"
+                    },
+                    {
+                      "type": "u256",
+                      "value": "10"
+                    },
+                    {
+                      "type": "bool",
+                      "value": true
+                    },
+                    {
+                      "type": "address",
+                      "value": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                    },
+                    {
+                      "type": "bytevec",
+                      "value": "000000000000000000000000000000000000000000000000000000000000000a"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/multisig/address": {
       "post": {
         "tags": [
@@ -5584,6 +5712,17 @@
   },
   "components": {
     "schemas": {
+      "Address": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
       "AddressBalance": {
         "required": [
           "address",
@@ -5855,6 +5994,17 @@
           }
         }
       },
+      "Bool": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "boolean"
+          }
+        }
+      },
       "BrokerInfo": {
         "required": [
           "cliqueId",
@@ -6104,6 +6254,17 @@
           }
         }
       },
+      "ByteVec": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
       "ChainInfo": {
         "required": [
           "currentHeight"
@@ -6194,6 +6355,20 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Token"
+            }
+          }
+        }
+      },
+      "ContractStateResult": {
+        "required": [
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
             }
           }
         }
@@ -6298,6 +6473,17 @@
           "value": {
             "type": "string",
             "format": "uint256"
+          }
+        }
+      },
+      "I256": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
           }
         }
       },
@@ -6873,6 +7059,18 @@
           }
         ]
       },
+      "U256": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uint256"
+          }
+        }
+      },
       "UTXO": {
         "required": [
           "ref",
@@ -6968,6 +7166,25 @@
             }
           }
         }
+      },
+      "Val": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Address"
+          },
+          {
+            "$ref": "#/components/schemas/Bool"
+          },
+          {
+            "$ref": "#/components/schemas/ByteVec"
+          },
+          {
+            "$ref": "#/components/schemas/I256"
+          },
+          {
+            "$ref": "#/components/schemas/U256"
+          }
+        ]
       },
       "VerifySignature": {
         "required": [
