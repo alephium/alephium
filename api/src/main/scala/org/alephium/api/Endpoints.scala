@@ -320,7 +320,7 @@ trait Endpoints
       .out(jsonBody[BuildContractResult])
       .summary("Build an unsigned contract")
 
-  val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractStateResult] =
+  lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractStateResult] =
     contractsEndpoint.get
       .in(path[Address.Contract]("address"))
       .in("state")
