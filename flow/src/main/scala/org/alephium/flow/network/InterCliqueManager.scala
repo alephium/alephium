@@ -103,7 +103,7 @@ object InterCliqueManager {
     .build("alephium_peers_total", "Number of connected peers")
     .register()
 
-  trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
+  trait NodeSyncStatus extends BaseActor {
     private var nodeSynced: Boolean      = false
     private var firstTimeSynced: Boolean = true
 
@@ -356,12 +356,6 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def containsBroker(brokerInfo: BrokerInfo): Boolean = {
     brokers.contains(brokerInfo.peerId)
-  }
-
-  def iterBrokers(f: (PeerId, BrokerState) => Unit): Unit = {
-    brokers.foreach { case (peerId, state) =>
-      f(peerId, state)
-    }
   }
 
   def mapBrokers[A](f: (PeerId, BrokerState) => A): Seq[A] = {
