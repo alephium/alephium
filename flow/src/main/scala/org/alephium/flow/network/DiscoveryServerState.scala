@@ -96,10 +96,6 @@ trait DiscoveryServerState extends SessionManager {
 
   def isUnknown(peerId: PeerId): Boolean = !isInTable(peerId) && !isPending(peerId)
 
-  def getPeer(peerId: PeerId): Option[BrokerInfo] = {
-    table.get(peerId).map(_.info)
-  }
-
   def updateStatus(peerId: PeerId): Unit = {
     table.get(peerId) match {
       case Some(status) =>

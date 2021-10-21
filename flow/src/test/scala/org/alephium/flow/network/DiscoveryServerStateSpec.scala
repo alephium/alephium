@@ -286,8 +286,11 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     state.getActivePeers(None).length is 0
   }
 
-  it should "clean unreachables in mightReachableSlow" in new Fixture {
+  it should "clean unreachable peers in mightReachableSlow" in new Fixture {
     val address = peerInfo.address.getAddress
+    state.unreachables.put(peerInfo.address.getAddress, TimeStamp.now().plusSecondsUnsafe(2))
+    state.mightReachable(peerInfo.address) is false
+    state.mightReachableSlow(peerInfo.address) is false
     state.unreachables.put(peerInfo.address.getAddress, TimeStamp.zero)
     state.mightReachable(peerInfo.address) is false
     state.unreachables.contains(address) is true
