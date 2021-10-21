@@ -51,7 +51,7 @@ class OutboundBrokerHandlerSpec extends AlephiumActorSpec {
     )
 
     watch(brokerHandler)
-    (0 to 8).foreach { _ =>
+    (0 to BackoffStrategy.maxRetry).foreach { _ =>
       listener.expectMsg(TcpController.ConnectTo(remoteAddress, ActorRefT(brokerHandler)))
       brokerHandler ! Tcp.CommandFailed(Tcp.Connect(remoteAddress))
     }
