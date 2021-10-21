@@ -7,7 +7,7 @@ volumes:
 
 services:
   alephium:
-    image: alephium/alephium:v0.11.2
+    image: alephium/alephium:v0.11.3
 
     restart: unless-stopped
     ports:
@@ -16,6 +16,7 @@ services:
       - 9973:9973/udp
       # ws and http port might not be widely exposed, but to your internal clique/apps/network only.
       # Defaults are set to not open these two ports publicly. Configure this with caution.
+      - 127.0.0.1:10973:10973
       - 127.0.0.1:11973:11973
       - 127.0.0.1:12973:12973
     security_opt:
