@@ -238,6 +238,7 @@ trait TxValidation {
       checkDoubleSpending: Boolean
   ): TxValidationResult[Unit] = {
     for {
+      _ <- checkVersion(tx)
       _ <- checkNetworkId(tx)
       _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
@@ -285,6 +286,7 @@ trait TxValidation {
 
   // format off for the sake of reading and checking rules
   // format: off
+  protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
@@ -319,6 +321,14 @@ object TxValidation {
   // scalastyle:off number.of.methods
   class Impl(implicit val groupConfig: GroupConfig, networkConfig: NetworkConfig)
       extends TxValidation {
+    protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit] = {
+      if (tx.unsigned.version == defaultTxVersion) {
+        validTx(())
+      } else {
+        invalidTx(InvalidTxVersion)
+      }
+    }
+
     protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit] = {
       if (tx.unsigned.networkId == networkConfig.networkId) {
         validTx(())

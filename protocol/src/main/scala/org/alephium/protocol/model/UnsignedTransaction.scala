@@ -69,13 +69,10 @@ final case class UnsignedTransaction(
 }
 
 object UnsignedTransaction {
-  implicit val serde: Serde[UnsignedTransaction] = {
-    val serde: Serde[UnsignedTransaction] = Serde.forProduct7(
-      UnsignedTransaction.apply,
-      t => (t.version, t.networkId, t.scriptOpt, t.gasAmount, t.gasPrice, t.inputs, t.fixedOutputs)
-    )
-    serde.validate(tx => if (GasBox.validate(tx.gasAmount)) Right(()) else Left("Invalid Gas"))
-  }
+  implicit val serde: Serde[UnsignedTransaction] = Serde.forProduct7(
+    UnsignedTransaction.apply,
+    t => (t.version, t.networkId, t.scriptOpt, t.gasAmount, t.gasPrice, t.inputs, t.fixedOutputs)
+  )
 
   def apply(
       scriptOpt: Option[StatefulScript],

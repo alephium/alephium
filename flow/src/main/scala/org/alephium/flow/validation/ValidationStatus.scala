@@ -123,6 +123,7 @@ object ValidationStatus {
 
 sealed trait InvalidTxStatus extends InvalidStatus
 
+final case object InvalidTxVersion                              extends InvalidTxStatus
 final case object InvalidNetworkId                              extends InvalidTxStatus
 final case object TooManyInputs                                 extends InvalidTxStatus
 final case object ContractInputForInterGroupTx                  extends InvalidTxStatus

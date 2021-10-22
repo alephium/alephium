@@ -237,8 +237,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   behavior of "Stateless Validation"
 
+  it should "check tx version" in new Fixture {
+    implicit val validator = nestedValidator(checkVersion)
+
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    val block      = transfer(blockFlow, chainIndex)
+    val tx         = block.nonCoinbase.head
+    tx.pass()
+
+    tx.unsigned.version is defaultTxVersion
+    tx.unsigned.version isnot Byte.MaxValue
+    val invalidTx = tx.updateUnsigned(_.copy(version = Byte.MaxValue))
+    invalidTx.fail(InvalidTxVersion)
+  }
+
   it should "check network Id" in new Fixture {
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = nestedValidator(checkVersion)
 
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     val block      = transfer(blockFlow, chainIndex)
