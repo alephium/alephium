@@ -87,23 +87,22 @@ object Configs extends StrictLogging {
 
   def parseConfigFile(file: File): Either[String, Config] =
     try {
-      Right(ConfigFactory.parseFile(file))
+      if (file.exists()) {
+        Right(ConfigFactory.parseFile(file))
+      } else {
+        Right(ConfigFactory.empty())
+      }
     } catch {
       case e: ConfigException =>
         Left(s"Cannot parse config file: $file, exception: $e")
     }
 
-  def parseNetworkId(rootPath: Path, config: Config): Either[String, NetworkId] = {
-    if (!config.hasPath("alephium.network.network-id")) {
-      Left(s"""|The network-id isn't configed!
-               |
-               |Please set the network-id in your $rootPath/user.conf and try again.
-               |
-               |Example:
-               |alephium.network.network-id = 1 // 0 for alepium mainnet, 1 for alephium testnet
-          """.stripMargin)
+  def parseNetworkId(config: Config): Either[String, NetworkId] = {
+    val keyPath = "alephium.network.network-id"
+    if (!config.hasPath(keyPath)) {
+      Right(NetworkId.AlephiumMainNet)
     } else {
-      val id = config.getInt("alephium.network.network-id")
+      val id = config.getInt(keyPath)
       NetworkId.from(id).toRight(s"Invalid chain id: $id")
     }
   }
@@ -112,7 +111,7 @@ object Configs extends StrictLogging {
     val resultEither = for {
       userConfig    <- parseConfigFile(getConfigUser(rootPath))
       systemConfig  <- parseConfigFile(getConfigSystem(rootPath, overwrite))
-      networkType   <- parseNetworkId(rootPath, userConfig.withFallback(systemConfig).resolve())
+      networkType   <- parseNetworkId(userConfig.withFallback(systemConfig).resolve())
       networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
