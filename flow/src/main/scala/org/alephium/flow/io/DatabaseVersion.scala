@@ -26,5 +26,5 @@ final case class DatabaseVersion(value: Int) extends AnyVal
 object DatabaseVersion {
   implicit val serde: Serde[DatabaseVersion] = Serde.forProduct1(apply, _.value)
 
-  val currentDBVersion: DatabaseVersion = DatabaseVersion(Bytes.toIntUnsafe(ByteString(0, 0, 0, 0)))
+  val currentDBVersion: DatabaseVersion = DatabaseVersion(Bytes.toIntUnsafe(ByteString(0, 1, 0, 0)))
 }

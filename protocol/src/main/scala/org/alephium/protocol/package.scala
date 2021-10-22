@@ -41,8 +41,8 @@ package object protocol {
 
   // scalastyle:off magic.number
   val CurrentWireVersion: WireVersion =
-    WireVersion(Bytes.toIntUnsafe(ByteString(0, 0, 11, 0)))
+    WireVersion(Bytes.toIntUnsafe(ByteString(0, 1, 0, 0)))
   val CurrentDiscoveryVersion: DiscoveryVersion =
-    DiscoveryVersion(Bytes.toIntUnsafe(ByteString(0, 0, 0, 0)))
+    DiscoveryVersion(Bytes.toIntUnsafe(ByteString(0, 1, 0, 0)))
   // scalastyle:on
 }
