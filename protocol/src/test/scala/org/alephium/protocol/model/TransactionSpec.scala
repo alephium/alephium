@@ -136,6 +136,7 @@ class TransactionSpec
       info("no inputs and outputs")
 
       val unsignedTx = UnsignedTransaction(
+        defaultTxVersion,
         networkId,
         scriptOpt = None,
         GasBox.unsafe(100000),
@@ -159,6 +160,7 @@ class TransactionSpec
       info("multiple fixed inputs and outputs")
 
       val unsignedTx = UnsignedTransaction(
+        defaultTxVersion,
         networkId,
         scriptOpt = None,
         GasBox.unsafe(100000),
@@ -350,6 +352,7 @@ class TransactionSpec
       }
 
       val unsignedTx = UnsignedTransaction(
+        defaultTxVersion,
         networkId,
         scriptOpt = None,
         GasBox.unsafe(100000),
@@ -406,6 +409,7 @@ class TransactionSpec
       }
 
       val unsignedTx = UnsignedTransaction(
+        defaultTxVersion,
         networkId,
         scriptOpt = Some(script),
         GasBox.unsafe(100000),

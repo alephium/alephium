@@ -457,6 +457,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "validate unsigned transaction" in new Fixture with TxInputGenerators {
 
     val tooMuchGasFee = UnsignedTransaction(
+      defaultTxVersion,
       NetworkId.AlephiumDevNet,
       None,
       minimalGas,
@@ -472,6 +473,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     val noInputs = UnsignedTransaction(
+      defaultTxVersion,
       NetworkId.AlephiumDevNet,
       None,
       minimalGas,
