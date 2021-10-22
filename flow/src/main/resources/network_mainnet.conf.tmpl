@@ -11,9 +11,22 @@ alephium {
   }
 
   network {
+    network-id = 0
     no-pre-mine-proof = [
       "00000000000000000001b3a4df896d60492f0041a1cfe3b9dccd4e6b83ff57f3", # BTC 697677 block hash
       "cf874fe2276967ab4d514a4e59b2d2a60b9fc810a3763b188f0b122368004deb"  # ETH 13100948 block hash
+    ]
+  }
+
+  discovery {
+    bootstrap = [
+      "bootstrap0.alephium.org:9973",
+      "bootstrap1.alephium.org:9973",
+      "bootstrap2.alephium.org:9973",
+      "bootstrap3.alephium.org:9973",
+      "bootstrap4.alephium.org:9973",
+      "bootstrap5.alephium.org:9973",
+      # 6 more raw IPs here
     ]
   }
 
