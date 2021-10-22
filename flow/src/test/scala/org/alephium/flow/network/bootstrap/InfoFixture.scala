@@ -19,11 +19,11 @@ package org.alephium.flow.network.bootstrap
 import org.scalacheck.Gen
 
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.protocol.model.ModelGenerators
+import org.alephium.protocol.model.{CliqueInfo, ModelGenerators}
 import org.alephium.util.TimeStamp
 
 trait InfoFixture extends ModelGenerators {
-  lazy val intraCliqueInfoGen: Gen[IntraCliqueInfo] = {
+  def intraCliqueInfoGen(cliqueInfoGen: Gen[CliqueInfo]): Gen[IntraCliqueInfo] = {
     for {
       info         <- cliqueInfoGen
       restPort     <- portGen
@@ -60,7 +60,10 @@ trait InfoFixture extends ModelGenerators {
     }
   }
 
+  def genIntraCliqueInfo(groupNumPerBroker: Int): IntraCliqueInfo =
+    intraCliqueInfoGen(cliqueInfoGen(groupNumPerBroker)).sample.get
+
   def genIntraCliqueInfo: IntraCliqueInfo = {
-    intraCliqueInfoGen.sample.get
+    intraCliqueInfoGen(cliqueInfoGen).sample.get
   }
 }

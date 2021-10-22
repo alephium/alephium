@@ -19,7 +19,7 @@ package org.alephium.flow.network
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
@@ -61,7 +61,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   it should "publish `PeerDisconnected` on outbound peer disconnection" in new Fixture {
     EventFilter.info(start = "Try to connect to").intercept {
       interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
-      interCliqueManager.underlyingActor.connecting.contains(peerInfo.address) is true
+      interCliqueManagerActor.connecting.contains(peerInfo.address) is true
     }
 
     // It's already connecting, so there is no retry
@@ -79,7 +79,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
     discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
-    interCliqueManager.underlyingActor.connecting.contains(peerInfo.address) is false
+    interCliqueManagerActor.connecting.contains(peerInfo.address) is false
 
     getPeers() is Seq.empty
   }
@@ -381,7 +381,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     broker1.expectNoMessage()
     broker2.expectNoMessage()
 
-    interCliqueManager.underlyingActor.lastNodeSyncedStatus = Some(true)
+    interCliqueManagerActor.lastNodeSyncedStatus = Some(true)
     interCliqueManager ! message
     broker0.expectMsg(BrokerHandler.Send(message.blockMsg))
     broker1.expectNoMessage()
@@ -418,7 +418,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     broker2.expectNoMessage()
     broker3.expectNoMessage()
 
-    interCliqueManager.underlyingActor.lastNodeSyncedStatus = Some(true)
+    interCliqueManagerActor.lastNodeSyncedStatus = Some(true)
     interCliqueManager ! message
     broker0.expectNoMessage()
     broker1.expectNoMessage()
@@ -486,6 +486,19 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
         origin
       )
     }
+  }
+
+  it should "get sync status" in {
+    class TestNodeSyncStatus extends InterCliqueManager.NodeSyncStatus {
+      def receive = updateNodeSyncStatus
+    }
+
+    val actor = TestActorRef[TestNodeSyncStatus](Props(new TestNodeSyncStatus))
+    actor ! InterCliqueManager.IsSynced
+    eventually(expectMsg(InterCliqueManager.SyncedResult(false)))
+    actor ! InterCliqueManager.SyncedResult(true)
+    actor ! InterCliqueManager.IsSynced
+    eventually(expectMsg(InterCliqueManager.SyncedResult(true)))
   }
 
   trait Fixture extends FlowFixture with Generators {

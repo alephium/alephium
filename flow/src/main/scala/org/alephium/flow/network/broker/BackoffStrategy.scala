@@ -23,15 +23,18 @@ trait BackoffStrategy {
   def retry(f: Duration => Unit): Boolean
 }
 
+object BackoffStrategy {
+  val maxRetry: Int = 8
+}
+
 class DefaultBackoffStrategy(network: NetworkSetting) extends BackoffStrategy {
   def baseDelay: Duration       = network.backoffBaseDelay
   def maxDelay: Duration        = network.backoffMaxDelay
-  def maxRetry: Int             = 8
   protected var retryCount: Int = 0
   protected def backoff         = Math.min(baseDelay.timesUnsafe(1L << retryCount), maxDelay)
 
   def retry(f: Duration => Unit): Boolean = {
-    if (retryCount < maxRetry) {
+    if (retryCount < BackoffStrategy.maxRetry) {
       f(backoff)
       retryCount += 1
       true
@@ -51,7 +54,7 @@ class ResetBackoffStrategy(network: NetworkSetting) extends DefaultBackoffStrate
   val resetDelay: Duration  = network.backoffResetDelay
 
   override def retry(f: Duration => Unit): Boolean = {
-    if (retryCount == maxRetry) {
+    if (retryCount == BackoffStrategy.maxRetry) {
       resetCount()
     }
     val retried = super.retry(f)

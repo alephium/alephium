@@ -19,28 +19,26 @@ package org.alephium.flow.network.broker
 import java.net.InetSocketAddress
 
 import akka.actor.Props
-import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
+import akka.testkit.{TestActorRef, TestProbe}
+import org.scalatest.concurrent.Eventually.eventually
 
-import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.AllHandlers
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.SignatureSchema
+import org.alephium.flow.validation.InvalidHeaderFlow
+import org.alephium.protocol.{BlockHash, Generators, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{Hello, Payload, Pong, RequestId}
-import org.alephium.protocol.model.{BrokerInfo, CliqueId}
-import org.alephium.util.{ActorRefT, Duration}
+import org.alephium.protocol.message._
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
-class BrokerHandlerSpec extends AlephiumFlowActorSpec {
+class BrokerHandlerSpec extends AlephiumActorSpec {
   it should "handshake with new connection" in new Fixture {
-    val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
-    val brokerInfo =
-      BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
-    val hello = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
-    brokerHandler ! BrokerHandler.Received(hello)
-    brokerHandler.underlyingActor.pingPongTickOpt is a[Some[_]]
+    receivedHandshakeMessage()
+    brokerHandlerActor.pingPongTickOpt is a[Some[_]]
   }
 
   it should "stop when handshake timeout" in new Fixture {
@@ -55,30 +53,158 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     expectTerminated(brokerHandler)
   }
 
-  trait Fixture {
+  it should "publish misbehavior if receive invalid ping" in new Fixture {
+    receivedHandshakeMessage()
+    val requestId = RequestId.random()
+    brokerHandler ! BrokerHandler.Received(Ping(requestId, TimeStamp.now()))
+    val message = Message.serialize(Pong(requestId))
+    connectionHandler.expectMsg(ConnectionHandler.Send(message))
+
+    watch(brokerHandler)
+    brokerHandler ! BrokerHandler.Received(Ping(RequestId.unsafe(0), TimeStamp.now()))
+    listener.expectMsg(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
+    expectTerminated(brokerHandler)
+  }
+
+  it should "publish misbehavior if receive invalid pong" in new Fixture {
+    override val pingFrequency: Duration = Duration.ofMillisUnsafe(500)
+    receivedHandshakeMessage()
+    val ping = connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      Message.deserialize(message).rightValue.payload.asInstanceOf[Ping]
+    }
+    brokerHandlerActor.pingRequestId is ping.id
+    brokerHandler ! BrokerHandler.Received(Pong(ping.id))
+    brokerHandlerActor.pingRequestId is RequestId.unsafe(0)
+
+    brokerHandler ! BrokerHandler.Received(Pong(RequestId.random()))
+    listener.expectMsg(MisbehaviorManager.InvalidPingPong(remoteAddress))
+  }
+
+  it should "publish misbehavior if ping timeout" in new Fixture {
+    override val pingFrequency: Duration = Duration.ofMillisUnsafe(500)
+    receivedHandshakeMessage()
+    eventually {
+      listener.expectMsg(MisbehaviorManager.RequestTimeout(remoteAddress))
+    }
+  }
+
+  it should "notify synchronizer when block added" in new Fixture {
+    receivedHandshakeMessage()
+    val hash = BlockHash.generate
+    brokerHandler ! BlockChainHandler.BlockAdded(hash)
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
+  }
+
+  it should "publish misbehavior if block is invalid" in new Fixture {
+    receivedHandshakeMessage()
+    val hash = BlockHash.generate
+    brokerHandler ! BlockChainHandler.InvalidBlock(hash, InvalidHeaderFlow)
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
+  }
+
+  it should "publish misbehavior if block header is invalid" in new Fixture {
+    receivedHandshakeMessage()
+    val hash = BlockHash.generate
+    brokerHandler ! HeaderChainHandler.InvalidHeader(hash)
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
+  }
+
+  it should "send blocks request" in new Fixture {
+    receivedHandshakeMessage()
+    val hashes = AVector(BlockHash.generate)
+    brokerHandler ! BrokerHandler.DownloadBlocks(hashes)
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      Message.deserialize(message).rightValue.payload.asInstanceOf[BlocksRequest].locators is hashes
+    }
+  }
+
+  it should "send data to peer" in new Fixture {
+    receivedHandshakeMessage()
+    val data = BlockHash.generate.bytes
+    brokerHandler ! BrokerHandler.Send(data)
+    connectionHandler.expectMsg(ConnectionHandler.Send(data))
+  }
+
+  it should "publish misbehavior when received invalid block" in new Fixture {
+    override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+    receivedHandshakeMessage()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = invalidNonceBlock(blockFlow, chainIndex)
+    brokerHandler ! BrokerHandler.Received(NewBlock(block))
+    listener.expectMsg(MisbehaviorManager.InvalidPoW(remoteAddress))
+  }
+
+  it should "handle headers request" in new Fixture {
+    receivedHandshakeMessage()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    val request = HeadersRequest(AVector(block.hash))
+    brokerHandler ! BrokerHandler.Received(request)
+    val response = HeadersResponse(request.id, AVector(block.header))
+    connectionHandler.expectMsg(ConnectionHandler.Send(Message.serialize(response)))
+  }
+
+  trait Fixture extends FlowFixture with Generators {
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
-    val brokerHandler =
-      TestActorRef[TestBrokerHandler](
-        TestBrokerHandler.props(connectionHandler.ref, blockFlowSynchronizer.ref, blockFlow)
-      )
+    val listener              = TestProbe()
+    val remoteAddress         = socketAddressGen.sample.get
+    val (priKey, pubKey)      = SignatureSchema.secureGeneratePriPub()
+    val pingFrequency         = Duration.ofSecondsUnsafe(10)
 
-    connectionHandler.expectMsgType[ConnectionHandler.Send]
-    brokerHandler.underlyingActor.pingPongTickOpt is None
+    lazy val brokerHandler = {
+      val handler = TestActorRef[TestBrokerHandler](
+        TestBrokerHandler.props(
+          pingFrequency,
+          remoteAddress,
+          connectionHandler.ref,
+          blockFlowSynchronizer.ref,
+          blockFlow
+        )
+      )
+      val message = Message.serialize(handler.underlyingActor.handShakeMessage)
+      connectionHandler.expectMsg(ConnectionHandler.Send(message))
+      handler.underlyingActor.pingPongTickOpt is None
+      handler
+    }
+    lazy val brokerHandlerActor = brokerHandler.underlyingActor
+    lazy val brokerInfo =
+      BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, socketAddressGen.sample.get)
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+
+    def receivedHandshakeMessage() = {
+      val hello = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+      brokerHandler ! BrokerHandler.Received(hello)
+    }
   }
 }
 
 object TestBrokerHandler {
   def props(
+      pingFrequency: Duration,
+      remoteAddress: InetSocketAddress,
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
       blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
       blockflow: BlockFlow
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
-    Props(new TestBrokerHandler(brokerConnectionHandler, blockFlowSynchronizer, blockflow))
+    Props(
+      new TestBrokerHandler(
+        pingFrequency,
+        remoteAddress,
+        brokerConnectionHandler,
+        blockFlowSynchronizer,
+        blockflow
+      )
+    )
   }
 }
 
 class TestBrokerHandler(
+    val pingFrequency: Duration,
+    val remoteAddress: InetSocketAddress,
     val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
     val blockflow: BlockFlow
@@ -88,8 +214,6 @@ class TestBrokerHandler(
 
   val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
 
-  override val remoteAddress: InetSocketAddress = SocketUtil.temporaryServerAddress()
-
   override def handShakeDuration: Duration = Duration.ofSecondsUnsafe(2)
 
   override def allHandlers: AllHandlers = ???
@@ -98,9 +222,7 @@ class TestBrokerHandler(
 
   override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
 
-  override def exchanging: Receive = exchangingCommon
+  override def exchanging: Receive = exchangingCommon orElse flowEvents
 
-  override def dataOrigin: DataOrigin = ???
-
-  override def pingFrequency: Duration = Duration.ofSecondsUnsafe(10)
+  override def dataOrigin: DataOrigin = DataOrigin.Local
 }

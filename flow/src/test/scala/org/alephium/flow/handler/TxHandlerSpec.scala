@@ -487,13 +487,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "broadcast txs regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
+    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "300 ms"))
 
     test("Start to broadcast txs")
   }
 
   it should "download txs regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.batch-download-txs-frequency", "200 ms"))
+    override val configValues = Map(("alephium.mempool.batch-download-txs-frequency", "300 ms"))
 
     test("Start to download txs")
   }

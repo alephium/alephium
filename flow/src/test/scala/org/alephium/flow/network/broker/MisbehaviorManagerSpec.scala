@@ -21,9 +21,11 @@ import akka.testkit.TestProbe
 import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.network.TcpController
 import org.alephium.flow.network.broker.MisbehaviorManager._
 import org.alephium.protocol.Generators
+import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
@@ -148,6 +150,39 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
       peers.head.status is a[Banned]
     }
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
+  }
+
+  it should "re-ban peer" in new Fixture {
+    def getBanUntil(): TimeStamp = {
+      misbehaviorManager ! GetPeers
+      expectMsgPF() { case Peers(peers) =>
+        peers.head.peer is peer.getAddress
+        peers.head.status is a[Banned]
+        peers.head.status.asInstanceOf[Banned].until
+      }
+    }
+
+    misbehaviorManager ! InvalidPoW(peer)
+    bannedProbe.expectMsg(PeerBanned(peer.getAddress))
+    val until1 = getBanUntil()
+
+    Thread.sleep(100)
+    misbehaviorManager ! Spamming(peer)
+    bannedProbe.expectMsg(PeerBanned(peer.getAddress))
+    val until2 = getBanUntil()
+    until1.isBefore(until2) is true
+  }
+
+  it should "not confirm banned peer" in new Fixture {
+    misbehaviorManager ! InvalidFlowData(peer)
+    val brokerInfo = BrokerInfo.unsafe(
+      Generators.cliqueIdGen.sample.get,
+      1,
+      config.broker.brokerNum,
+      peer
+    )
+    misbehaviorManager ! ConfirmPeer(brokerInfo)
+    expectMsg(DiscoveryServer.PeerDenied(brokerInfo))
   }
 
   trait Fixture extends Generators {

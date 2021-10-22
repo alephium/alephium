@@ -32,7 +32,7 @@ class BackoffStrategySpec extends AlephiumSpec with AlephiumConfigFixture {
       backoff is expected
     }
 
-    (0 until strategy.maxRetry).foreach { _ =>
+    (0 until BackoffStrategy.maxRetry).foreach { _ =>
       val expected =
         Math.min(backoff.timesUnsafe(2), strategy.maxDelay)
       test(expected)
@@ -41,7 +41,7 @@ class BackoffStrategySpec extends AlephiumSpec with AlephiumConfigFixture {
 
   it should "not retry more than 1 minute" in new DefaultFixture {
     var total = Duration.zero
-    (0 until strategy.maxRetry).foreach { _ =>
+    (0 until BackoffStrategy.maxRetry).foreach { _ =>
       strategy.retry(backoff => total = total + backoff)
     }
     (total < Duration.ofMinutesUnsafe(1)) is true
@@ -63,7 +63,7 @@ class ResetBackoffStrategySpec extends BackoffStrategySpec {
   }
 
   it should "correctly reset the counter" in new ResetFixture {
-    (0 until strategy.maxRetry).foreach { _ => strategy.retry(discard) is true }
+    (0 until BackoffStrategy.maxRetry).foreach { _ => strategy.retry(discard) is true }
     strategy.retry(discard) is false
     eventually(strategy.retry(discard) is true)
   }
