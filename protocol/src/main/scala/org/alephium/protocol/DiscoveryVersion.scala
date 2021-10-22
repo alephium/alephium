@@ -23,5 +23,5 @@ final case class DiscoveryVersion(value: Int) extends AnyVal
 object DiscoveryVersion {
   implicit val serde: Serde[DiscoveryVersion] = Serde.forProduct1(apply, _.value)
 
-  val currentDiscoveryVersion: DiscoveryVersion = DiscoveryVersion(0)
+  val currentDiscoveryVersion: DiscoveryVersion = CurrentDiscoveryVersion
 }

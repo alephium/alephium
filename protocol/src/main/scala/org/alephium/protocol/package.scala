@@ -16,7 +16,10 @@
 
 package org.alephium
 
-import org.alephium.crypto._
+import akka.util.ByteString
+
+import org.alephium.crypto.*
+import org.alephium.util.Bytes
 
 package object protocol {
   type Hash = Blake2b
@@ -35,4 +38,11 @@ package object protocol {
   val Signature: SecP256K1Signature.type = SecP256K1Signature
 
   val SignatureSchema: SecP256K1.type = SecP256K1
+
+  // scalastyle:off magic.number
+  val CurrentWireVersion: WireVersion =
+    WireVersion(Bytes.toIntUnsafe(ByteString(0, 0, 11, 0)))
+  val CurrentDiscoveryVersion: DiscoveryVersion =
+    DiscoveryVersion(Bytes.toIntUnsafe(ByteString(0, 0, 0, 0)))
+  // scalastyle:on
 }
