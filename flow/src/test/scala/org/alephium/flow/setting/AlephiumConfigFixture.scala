@@ -38,7 +38,7 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
     .parseMap(
       (configPortsValues ++ configValues).view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava
     )
-    .withFallback(Configs.parseConfig(rootPath, overwrite = true))
+    .withFallback(Configs.parseConfig(Env.currentEnv, rootPath, overwrite = true))
 
   lazy val groups0 = newConfig.getInt("alephium.broker.groups")
 

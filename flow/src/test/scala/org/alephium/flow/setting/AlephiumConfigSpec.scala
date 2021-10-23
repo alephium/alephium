@@ -16,21 +16,23 @@
 
 package org.alephium.flow.setting
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import com.typesafe.config.ConfigValueFactory
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.conf._
+import org.alephium.conf.*
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
-import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, U256}
 
 class AlephiumConfigSpec extends AlephiumSpec {
   it should "load alephium config" in new AlephiumConfigFixture {
@@ -43,6 +45,20 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.networkId is NetworkId(2)
     config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.network.connectionBufferCapacityInByte is 100000000L
+  }
+
+  it should "load mainnet config" in {
+    lazy val rootPath = Platform.getRootPath(Env.Test)
+    val config        = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.numZerosAtLeastInHash is 37
+    val initialHashRate =
+      HashRate.from(config.consensus.maxMiningTarget, config.consensus.blockTargetTime)(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("549756862464"))
+    config.discovery.bootstrap.head is new InetSocketAddress("bootstrap0.alephium.org", 9973)
   }
 
   it should "load bootstrap config" in {

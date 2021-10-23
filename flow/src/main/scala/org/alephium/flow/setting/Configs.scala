@@ -74,9 +74,8 @@ object Configs extends StrictLogging {
   def getConfigNetwork(rootPath: Path, networkId: NetworkId, overwrite: Boolean): File =
     getConfigTemplate(rootPath, "network", s"network_${networkId.networkType}", overwrite)
 
-  def getConfigSystem(rootPath: Path, overwrite: Boolean): File = {
-    val env = Env.currentEnv.name
-    getConfigTemplate(rootPath, "system", s"system_$env", overwrite)
+  def getConfigSystem(env: Env, rootPath: Path, overwrite: Boolean): File = {
+    getConfigTemplate(rootPath, "system", s"system_${env.name}", overwrite)
   }
 
   def getConfigUser(rootPath: Path): File = {
@@ -107,10 +106,10 @@ object Configs extends StrictLogging {
     }
   }
 
-  def parseConfig(rootPath: Path, overwrite: Boolean): Config = {
+  def parseConfig(env: Env, rootPath: Path, overwrite: Boolean): Config = {
     val resultEither = for {
       userConfig    <- parseConfigFile(getConfigUser(rootPath))
-      systemConfig  <- parseConfigFile(getConfigSystem(rootPath, overwrite))
+      systemConfig  <- parseConfigFile(getConfigSystem(env, rootPath, overwrite))
       networkType   <- parseNetworkId(userConfig.withFallback(systemConfig).resolve())
       networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
@@ -122,8 +121,8 @@ object Configs extends StrictLogging {
     }
   }
 
-  def parseConfigAndValidate(rootPath: Path, overwrite: Boolean): Config = {
-    val config = parseConfig(rootPath, overwrite)
+  def parseConfigAndValidate(env: Env, rootPath: Path, overwrite: Boolean): Config = {
+    val config = parseConfig(env, rootPath, overwrite)
     if (!config.hasPath("alephium.discovery.bootstrap")) {
       logger.error(s"""|The bootstrap nodes are not defined!
                        |

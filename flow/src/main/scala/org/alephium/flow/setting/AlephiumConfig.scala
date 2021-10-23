@@ -26,17 +26,17 @@ import akka.actor.ActorRef
 import akka.io.Tcp
 import akka.util.ByteString
 import com.typesafe.config.Config
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.conf._
+import org.alephium.conf.*
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config._
+import org.alephium.protocol.config.*
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
-import org.alephium.util.{ActorRefT, AVector, Duration, U256}
+import org.alephium.util.{ActorRefT, AVector, Duration, Env, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
   override lazy val groupNumPerBroker: Int = groups / brokerNum
@@ -341,8 +341,11 @@ object AlephiumConfig {
       ).toAlephiumConfig
     }
 
-  def load(rootPath: Path, path: String): AlephiumConfig =
-    load(Configs.parseConfig(rootPath, overwrite = true), path)
-  def load(config: Config, path: String): AlephiumConfig = config.as[AlephiumConfig](path)
-  def load(config: Config): AlephiumConfig               = config.as[AlephiumConfig]("alephium")
+  def load(env: Env, rootPath: Path, configPath: String): AlephiumConfig =
+    load(Configs.parseConfig(env, rootPath, overwrite = true), configPath)
+  def load(rootPath: Path, configPath: String): AlephiumConfig =
+    load(Env.currentEnv, rootPath, configPath)
+  def load(config: Config, configPath: String): AlephiumConfig =
+    config.as[AlephiumConfig](configPath)
+  def load(config: Config): AlephiumConfig = load(config, "alephium")
 }
