@@ -380,7 +380,7 @@ object FlowUtils {
       AVector.empty,
       AVector.empty,
       txTemplate.inputSignatures,
-      txTemplate.contractSignatures
+      txTemplate.scriptSignatures
     )
   }
 
@@ -394,7 +394,7 @@ object FlowUtils {
       result.contractInputs,
       result.generatedOutputs,
       txTemplate.inputSignatures,
-      txTemplate.contractSignatures
+      txTemplate.scriptSignatures
     )
   }
 
@@ -415,7 +415,7 @@ object FlowUtils {
           AVector.empty,
           generatedOutputs = outputs,
           txTemplate.inputSignatures,
-          txTemplate.contractSignatures
+          txTemplate.scriptSignatures
         )
       }
     } else {
@@ -426,7 +426,7 @@ object FlowUtils {
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           txTemplate.inputSignatures,
-          txTemplate.contractSignatures
+          txTemplate.scriptSignatures
         )
       )
     }

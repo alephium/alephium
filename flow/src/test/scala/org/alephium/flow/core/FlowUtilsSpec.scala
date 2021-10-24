@@ -66,7 +66,7 @@ class FlowUtilsSpec extends AlephiumSpec {
           (firstOutput +: assets.tail.map(_.referredOutput.copy(additionalData = ByteString.empty)))
             .as[TxOutput],
           tx.inputSignatures,
-          tx.contractSignatures
+          tx.scriptSignatures
         )
     }
   }

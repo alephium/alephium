@@ -151,8 +151,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     block.Coinbase.tx(_.copy(inputSignatures = testSignatures)).fail()
 
     info("contract signature")
-    block.Coinbase.tx(_.copy(contractSignatures = emptySignatures)).pass()
-    block.Coinbase.tx(_.copy(contractSignatures = testSignatures)).fail()
+    block.Coinbase.tx(_.copy(scriptSignatures = emptySignatures)).pass()
+    block.Coinbase.tx(_.copy(scriptSignatures = testSignatures)).fail()
   }
 
   it should "check coinbase data" in new Fixture {

@@ -267,7 +267,7 @@ class ServerUtils(implicit
     TransactionTemplate(
       unsignedTx,
       signatures,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 

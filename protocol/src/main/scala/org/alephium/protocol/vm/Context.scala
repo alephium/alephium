@@ -163,7 +163,7 @@ object StatefulContext {
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
   ): StatefulContext = {
-    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.contractSignatures))
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
 

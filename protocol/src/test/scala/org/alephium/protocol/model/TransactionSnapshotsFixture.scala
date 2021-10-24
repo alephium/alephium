@@ -117,7 +117,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures = signatures,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -126,6 +126,6 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       SignatureSchema.sign(tx.unsigned.hash.bytes, privateKey)
     }
 
-    tx.copy(contractSignatures = tx.contractSignatures ++ signatures)
+    tx.copy(scriptSignatures = tx.scriptSignatures ++ signatures)
   }
 }

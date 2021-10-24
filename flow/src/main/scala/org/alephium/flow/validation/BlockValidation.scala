@@ -260,7 +260,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       coinbase.contractInputs.isEmpty &&
       coinbase.generatedOutputs.isEmpty &&
       coinbase.inputSignatures.isEmpty &&
-      coinbase.contractSignatures.isEmpty
+      coinbase.scriptSignatures.isEmpty
     ) {
       validBlock(())
     } else {
