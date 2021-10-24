@@ -244,7 +244,7 @@ object StatefulContract {
     ): StatefulContractObject = {
       val initialStateHash =
         Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
-      StatefulContractObject.apply(this, initialStateHash, fields, address)
+      StatefulContractObject.unsafe(this.hash, this, initialStateHash, fields, address)
     }
   }
 
@@ -344,6 +344,7 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
 final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext]
 
 final case class StatefulContractObject private (
+    codeHash: Hash,
     code: StatefulContract.HalfDecoded,
     initialStateHash: Hash,      // the state hash when the contract is created
     initialFields: AVector[Val], // the initial field values when the contract is loaded
@@ -361,13 +362,16 @@ final case class StatefulContractObject private (
 }
 
 object StatefulContractObject {
-  def apply(
+  def unsafe(
+      codeHash: Hash,
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
       initialFields: AVector[Val],
       contractId: ContractId
   ): StatefulContractObject = {
+    assume(code.hash == codeHash)
     new StatefulContractObject(
+      codeHash,
       code,
       initialStateHash,
       initialFields,
