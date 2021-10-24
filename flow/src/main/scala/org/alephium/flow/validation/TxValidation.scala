@@ -242,6 +242,7 @@ trait TxValidation {
       _ <- checkNetworkId(tx)
       _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
+      _ <- checkScriptSigNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
       _ <- checkOutputStats(tx)
       _ <- checkChainIndex(tx, chainIndex)
@@ -290,6 +291,7 @@ trait TxValidation {
   protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
+  protected[validation] def checkScriptSigNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
   protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256]
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
@@ -368,12 +370,12 @@ object TxValidation {
     ): TxValidationResult[Unit] = {
       if (isIntraGroup) checkIntraGroupOutputNum(tx) else checkInterGroupOutputNum(tx)
     }
-    protected[validation] def checkIntraGroupOutputNum(
+    @inline protected[validation] def checkIntraGroupOutputNum(
         tx: Transaction
     ): TxValidationResult[Unit] = {
       checkOutputNumCommon(tx.outputsLength)
     }
-    protected[validation] def checkInterGroupOutputNum(
+    @inline protected[validation] def checkInterGroupOutputNum(
         tx: Transaction
     ): TxValidationResult[Unit] = {
       if (tx.generatedOutputs.nonEmpty) {
@@ -382,13 +384,38 @@ object TxValidation {
         checkOutputNumCommon(tx.unsigned.fixedOutputs.length)
       }
     }
-    protected[validation] def checkOutputNumCommon(
+    @inline protected[validation] def checkOutputNumCommon(
         outputNum: Int
     ): TxValidationResult[Unit] = {
       if (outputNum == 0) {
         invalidTx(NoOutputs)
       } else if (outputNum > ALF.MaxTxOutputNum) {
         invalidTx(TooManyOutputs)
+      } else {
+        validTx(())
+      }
+    }
+
+    protected[validation] def checkScriptSigNum(
+        tx: Transaction,
+        isIntraGroup: Boolean
+    ): TxValidationResult[Unit] = {
+      if (isIntraGroup) checkIntraGroupScriptSigNum(tx) else checkInterGroupScriptSigNum(tx)
+    }
+    @inline protected[validation] def checkIntraGroupScriptSigNum(
+        tx: Transaction
+    ): TxValidationResult[Unit] = {
+      if (tx.scriptSignatures.length > ALF.MaxScriptSigNum) {
+        invalidTx(TooManyScriptSignatures)
+      } else {
+        validTx(())
+      }
+    }
+    @inline protected[validation] def checkInterGroupScriptSigNum(
+        tx: Transaction
+    ): TxValidationResult[Unit] = {
+      if (tx.scriptSignatures.length != 0) {
+        invalidTx(UnexpectedScriptSignatures)
       } else {
         validTx(())
       }
@@ -633,7 +660,7 @@ object TxValidation {
             )
           }
         }
-        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignatures)
+        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManyInputSignatures)
       } yield remaining
     }
 

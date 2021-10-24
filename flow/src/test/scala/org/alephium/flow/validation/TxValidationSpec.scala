@@ -333,6 +333,28 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
+  it should "check the number of script signatures" in new Fixture {
+    val tx        = transactionGen().sample.get
+    val signature = Signature.generate
+    val modified0 = tx.copy(scriptSignatures = AVector.empty)
+    val modified1 = tx.copy(scriptSignatures = AVector.fill(ALF.MaxScriptSigNum)(signature))
+    val modified2 = tx.copy(scriptSignatures = AVector.fill(ALF.MaxScriptSigNum + 1)(signature))
+
+    {
+      implicit val validator = checkScriptSigNum(_, isIntraGroup = true)
+      modified0.pass()
+      modified1.pass()
+      modified2.fail(TooManyScriptSignatures)
+    }
+
+    {
+      implicit val validator = checkScriptSigNum(_, isIntraGroup = false)
+      modified0.pass()
+      modified1.fail(UnexpectedScriptSignatures)
+      modified2.fail(UnexpectedScriptSignatures)
+    }
+  }
+
   it should "check gas bounds" in new Fixture {
     implicit val validator = checkGasBound
 
@@ -595,7 +617,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
       val signaturesNew    = tx.inputSignatures.replace(sampleIndex, Signature.generate)
       tx.copy(inputSignatures = signaturesNew).fail(InvalidSignature)
-      tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures).fail(TooManySignatures)
+      tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures)
+        .fail(TooManyInputSignatures)
       tx.copy(inputSignatures = tx.inputSignatures.init).fail(NotEnoughSignature)
     }
   }
@@ -621,7 +644,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx2 = tx1.copy(inputSignatures = tx1.inputSignatures ++ tx1.inputSignatures)
     tx2.unsigned.inputs.length is 2
     tx2.inputSignatures.length is 2
-    tx2.fail(TooManySignatures)
+    tx2.fail(TooManyInputSignatures)
   }
 
   behavior of "lockup script"

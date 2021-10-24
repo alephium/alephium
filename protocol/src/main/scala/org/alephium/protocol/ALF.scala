@@ -35,6 +35,7 @@ object ALF {
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256
   val MaxOutputDataSize: Int = 256
+  val MaxScriptSigNum: Int   = 32
   //scalastyle:on magic.number
 
   def alf(amount: U256): Option[U256] = amount.mul(CoinInOneALF)
