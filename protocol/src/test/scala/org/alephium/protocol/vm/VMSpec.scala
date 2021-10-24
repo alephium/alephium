@@ -22,11 +22,11 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{Hash, SignatureSchema}
+import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.minimalGas
-import org.alephium.serde._
-import org.alephium.util._
+import org.alephium.serde.*
+import org.alephium.util.*
 
 class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
   trait BaseFixture[Ctx <: StatelessContext] {
@@ -499,5 +499,14 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       GasBox.unsafe(123),
       Seq(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](123))))
     ) isE GasBox.zero
+  }
+
+  it should "check signature size" in {
+    val context0 = genStatefulContext(None)
+    StatefulVM.checkRemainingSignature(context0) isE ()
+
+    val signature = Signature.generate
+    val context1  = genStatefulContext(None, signatures = AVector(signature))
+    StatefulVM.checkRemainingSignature(context1).leftValue isE TooManySignatures
   }
 }

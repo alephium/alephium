@@ -32,6 +32,7 @@ case object StackOverflow                                      extends ExeFailur
 case object StackUnderflow                                     extends ExeFailure
 case object NegativeArgumentInStack                            extends ExeFailure
 case object InsufficientSignatures                             extends ExeFailure
+case object TooManySignatures                                  extends ExeFailure
 case object InvalidPublicKey                                   extends ExeFailure
 case object SignedDataIsNot32Bytes                             extends ExeFailure
 case object InvalidSignatureFormat                             extends ExeFailure

@@ -385,6 +385,7 @@ object StatefulVM {
     for {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
+      _       <- checkRemainingSignature(context)
     } yield {
       TxScriptExecution(
         context.gasRemaining,
@@ -392,6 +393,14 @@ object StatefulVM {
         AVector.from(context.contractInputs.view.map(_._2)),
         AVector.from(context.generatedOutputs)
       )
+    }
+  }
+
+  def checkRemainingSignature(context: StatefulContext): ExeResult[Unit] = {
+    if (context.txEnv.signatures.isEmpty) {
+      okay
+    } else {
+      failed(TooManySignatures)
     }
   }
 

@@ -158,13 +158,23 @@ trait StatefulContext extends StatelessContext with ContractPool {
 object StatefulContext {
   def apply(
       blockEnv: BlockEnv,
+      txEnv: TxEnv,
+      worldState: WorldState.Staging,
+      preOutputs: AVector[AssetOutput],
+      gasRemaining: GasBox
+  ): StatefulContext = {
+    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
+  }
+
+  def apply(
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
   ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
-    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
+    apply(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
 
   def build(
