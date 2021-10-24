@@ -81,7 +81,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
       TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
     )
     // format: on
 
@@ -1833,17 +1833,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
-  it should "ContractInitialStateHash" in new StatefulInstrFixture {
-    override lazy val frame = prepareFrame()
+  it should "CallerCodeHash" in new CallerFrameFixture {
+    test(
+      CallerCodeHash,
+      Val.ByteVec(callerFrame.obj.asInstanceOf[StatefulContractObject].codeHash.bytes)
+    )
+  }
 
+  it should "ContractInitialStateHash" in new ContractInstrFixture {
     stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
-
     ContractInitialStateHash.runWith(frame) isE ()
 
     stack.size is 1
     stack.top.get is Val.ByteVec(
       frame.obj.asInstanceOf[StatefulContractObject].initialStateHash.bytes
     )
+  }
+
+  it should "ContractCodeHash" in new ContractInstrFixture {
+    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+    ContractCodeHash.runWith(frame) isE ()
+
+    stack.size is 1
+    stack.top.get is Val.ByteVec(frame.obj.code.hash.bytes)
   }
 
   it should "test gas amount" in new FrameFixture {
@@ -1880,7 +1892,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ApproveAlf -> 30, ApproveToken -> 30, AlfRemaining -> 30, TokenRemaining -> 30, IsPaying -> 30,
       TransferAlf -> 30, TransferAlfFromSelf -> 30, TransferAlfToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
-      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, ContractInitialStateHash -> 5
+      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1

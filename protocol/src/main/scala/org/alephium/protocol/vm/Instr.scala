@@ -118,7 +118,7 @@ object Instr {
     ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
     TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
+    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
   )
   // format: on
 
@@ -1248,27 +1248,47 @@ object IsCalledFromTxScript extends ContractInstr with GasLow {
   }
 }
 
-object CallerInitialStateHash extends ContractInstr with GasLow {
+sealed trait CallerStateInstr extends ContractInstr with GasLow {
+  def extractVal(callerObj: StatefulContractObject): Val
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       callerFrame <- frame.getCallerFrame()
-      statefulObj <- callerFrame.obj match {
+      callerObj <- callerFrame.obj match {
         case obj: StatefulContractObject => Right(obj)
         case _                           => failed(ExpectStatefulContractObj)
       }
-      _ <- frame.pushOpStack(statefulObj.getInitialStateHash())
+      _ <- frame.pushOpStack(extractVal(callerObj))
     } yield ()
   }
 }
 
-object ContractInitialStateHash extends ContractInstr with GasLow {
+object CallerInitialStateHash extends CallerStateInstr {
+  def extractVal(callerObj: StatefulContractObject): Val = callerObj.getInitialStateHash()
+}
+
+object CallerCodeHash extends CallerStateInstr {
+  def extractVal(callerObj: StatefulContractObject): Val = callerObj.getCodeHash()
+}
+
+sealed trait ContractStateInstr extends ContractInstr with GasLow {
+  def extractVal(contractObj: StatefulContractObject): Val
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
-      _           <- frame.pushOpStack(contractObj.getInitialStateHash())
+      _           <- frame.pushOpStack(extractVal(contractObj))
     } yield ()
   }
+}
+
+object ContractInitialStateHash extends ContractStateInstr {
+  def extractVal(contractObj: StatefulContractObject): Val = contractObj.getInitialStateHash()
+}
+
+object ContractCodeHash extends ContractStateInstr {
+  def extractVal(contractObj: StatefulContractObject): Val = contractObj.getCodeHash()
 }
 
 sealed trait BlockInstr

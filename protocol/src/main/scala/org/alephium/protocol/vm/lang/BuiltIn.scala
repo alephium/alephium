@@ -356,12 +356,28 @@ object BuiltIn {
       CallerInitialStateHash
     )
 
+  val callerCodeHash: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "callerCodeHash",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      CallerCodeHash
+    )
+
   val contractInitialStateHash: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "contractInitialStateHash",
       Seq(Type.ByteVec),
       Seq(Type.ByteVec),
       ContractInitialStateHash
+    )
+
+  val contractCodeHash: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "contractCodeHash",
+      Seq(Type.ByteVec),
+      Seq(Type.ByteVec),
+      ContractCodeHash
     )
 
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
@@ -389,6 +405,8 @@ object BuiltIn {
       callerAddress,
       isCalledFromTxScript,
       callerInitialStateHash,
-      contractInitialStateHash
+      callerCodeHash,
+      contractInitialStateHash,
+      contractCodeHash
     ).map(f => f.name -> f)
 }

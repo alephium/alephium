@@ -503,41 +503,49 @@ class VMSpec extends AlephiumSpec {
 
   // scalastyle:off no.equal
   it should "test contract instructions" in new ContractFixture {
-    def createContract(input: String): (String, String, String) = {
+    def createContract(input: String): (String, String, String, String) = {
       val contractId    = createContract(input, initialState = AVector.empty).key
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
       val address       = Address.Contract(LockupScript.p2c(contractId)).toBase58
-      (contractId.toHexString, address, contractState.initialStateHash.toHexString)
+      (
+        contractId.toHexString,
+        address,
+        contractState.initialStateHash.toHexString,
+        contractState.codeHash.toHexString
+      )
     }
 
     val foo =
       s"""
          |TxContract Foo() {
-         |  pub fn foo(fooId: ByteVec, fooHash: ByteVec, barId: ByteVec, barHash: ByteVec, barAddress: Address) -> () {
+         |  pub fn foo(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == fooId)
          |    assert!(contractInitialStateHash!(fooId) == fooHash)
          |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
+         |    assert!(contractCodeHash!(barId) == barCodeHash)
          |    assert!(callerContractId!() == barId)
          |    assert!(callerAddress!() == barAddress)
          |    assert!(callerInitialStateHash!() == barHash)
+         |    assert!(callerCodeHash!() == barCodeHash)
          |    assert!(isCalledFromTxScript!() == false)
          |    assert!(isAssetAddress!(barAddress) == false)
          |    assert!(isContractAddress!(barAddress) == true)
          |  }
          |}
          |""".stripMargin
-    val (fooId, _, fooHash) = createContract(foo)
+    val (fooId, _, fooHash, fooCodeHash) = createContract(foo)
 
     val bar =
       s"""
          |TxContract Bar() {
-         |  pub payable fn bar(fooId: ByteVec, fooHash: ByteVec, barId: ByteVec, barHash: ByteVec, barAddress: Address) -> () {
+         |  pub payable fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
          |    assert!(contractInitialStateHash!(fooId) == fooHash)
          |    assert!(contractInitialStateHash!(barId) == barHash)
-         |    Foo(#$fooId).foo(fooId, fooHash, barId, barHash, barAddress)
+         |    Foo(#$fooId).foo(fooId, fooHash, fooCodeHash, barId, barHash, barCodeHash, barAddress)
          |    assert!(isCalledFromTxScript!() == true)
          |    assert!(isPaying!(@$genesisAddress) == false)
          |    assert!(isAssetAddress!(@$genesisAddress) == true)
@@ -547,13 +555,13 @@ class VMSpec extends AlephiumSpec {
          |
          |$foo
          |""".stripMargin
-    val (barId, barAddress, barHash) = createContract(bar)
+    val (barId, barAddress, barHash, barCodeHash) = createContract(bar)
 
     def main(state: String) =
       s"""
          |TxScript Main {
          |  pub payable fn main() -> () {
-         |    Bar(#$barId).bar(#$fooId, #$fooHash, #$barId, #$barHash, @$barAddress)
+         |    Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
          |    approveAlf!(@$genesisAddress, ${ALF.alf(1).v})
          |    copyCreateContract!(#$fooId, #$state)
          |    assert!(isPaying!(@$genesisAddress) == true)
