@@ -183,6 +183,8 @@ trait ApiModelCodec {
 
   implicit val nodeInfoRW: RW[NodeInfo] = macroRW
 
+  implicit val buildInfoRW: RW[NodeInfo.BuildInfo] = macroRW
+
   implicit val selfCliqueRW: RW[SelfClique] = macroRW
 
   implicit val neighborPeersRW: RW[NeighborPeers] = macroRW

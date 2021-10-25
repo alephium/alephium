@@ -150,7 +150,11 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       NodeInfo(
         ReleaseVersion(0, 0, 1),
-        isMining = true
+        isMining = true,
+        NodeInfo.BuildInfo(
+          "1.2.3",
+          "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
+        )
       )
     )
 

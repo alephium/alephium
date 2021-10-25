@@ -619,6 +619,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   }
 
   it should "call GET /infos/node" in {
+    val buildInfo = NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId)
     minerProbe.setAutoPilot(new TestActor.AutoPilot {
       var miningStarted: Boolean = false
       def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
@@ -638,19 +639,19 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
 
     Get(s"/infos/node") check { response =>
       response.code is StatusCode.Ok
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false, buildInfo)
     }
 
     miner ! Miner.Start
 
     Get(s"/infos/node") check { response =>
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = true)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = true, buildInfo)
     }
 
     miner ! Miner.Stop
 
     Get(s"/infos/node") check { response =>
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false, buildInfo)
     }
   }
 
