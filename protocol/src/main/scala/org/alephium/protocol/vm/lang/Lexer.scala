@@ -57,7 +57,7 @@ object Lexer {
   def lineComment[_: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[_: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
-  def hexNum[_: P]: P[BigInteger] = P("0x" ~ hex).!.map(new BigInteger(_, 16))
+  def hexNum[_: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
   def decNum[_: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
   def num[_: P]: P[BigInteger]    = negatable(P(hexNum | decNum))
   def negatable[_: P](p: => P[BigInteger]): P[BigInteger] =
