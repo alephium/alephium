@@ -17,7 +17,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.macros.HashSerde
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
@@ -145,14 +145,14 @@ object UnsignedTransaction {
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
     assume(gas >= minimalGas)
-    assume(gasPrice.value <= ALF.MaxALFValue)
+    assume(gasPrice.value <= ALPH.MaxALPHValue)
     val gasFee = gasPrice * gas
     for {
       _               <- checkWithMaxTxInputNum(inputs)
-      _               <- checkMinimalAlfPerOutput(outputs)
-      alfRemainder    <- calculateAlfRemainder(inputs, outputs, gasFee)
+      _               <- checkMinimalAlphPerOutput(outputs)
+      alphRemainder   <- calculateAlphRemainder(inputs, outputs, gasFee)
       tokensRemainder <- calculateTokensRemainder(inputs, outputs)
-      changeOutputOpt <- calculateChangeOutput(alfRemainder, tokensRemainder, fromLockupScript)
+      changeOutputOpt <- calculateChangeOutput(alphRemainder, tokensRemainder, fromLockupScript)
     } yield {
       var txOutputs = outputs.map {
         case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
@@ -180,21 +180,21 @@ object UnsignedTransaction {
   def checkWithMaxTxInputNum(
       assets: AVector[(AssetOutputRef, AssetOutput)]
   ): Either[String, Unit] = {
-    if (assets.length > ALF.MaxTxInputNum) {
+    if (assets.length > ALPH.MaxTxInputNum) {
       Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
     } else {
       Right(())
     }
   }
 
-  def calculateAlfRemainder(
+  def calculateAlphRemainder(
       inputs: AVector[(AssetOutputRef, AssetOutput)],
       outputs: AVector[TxOutputInfo],
       gasFee: U256
   ): Either[String, U256] = {
     for {
       inputSum     <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
-      outputAmount <- outputs.foldE(U256.Zero)(_ add _.alfAmount toRight "Output amount overflow")
+      outputAmount <- outputs.foldE(U256.Zero)(_ add _.alphAmount toRight "Output amount overflow")
       remainder0   <- inputSum.sub(outputAmount).toRight("Not enough balance")
       remainder    <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
     } yield remainder
@@ -215,30 +215,30 @@ object UnsignedTransaction {
   }
 
   def calculateChangeOutput(
-      alfRemainder: U256,
+      alphRemainder: U256,
       tokensRemainder: AVector[(TokenId, U256)],
       fromLockupScript: LockupScript.Asset
   ): Either[String, Option[AssetOutput]] = {
-    if (alfRemainder == U256.Zero && tokensRemainder.isEmpty) {
+    if (alphRemainder == U256.Zero && tokensRemainder.isEmpty) {
       Right(None)
     } else {
-      if (alfRemainder > minimalAlfAmountPerTxOutput(tokensRemainder.length)) {
-        Right(Some(TxOutput.asset(alfRemainder, tokensRemainder, fromLockupScript)))
+      if (alphRemainder > minimalAlphAmountPerTxOutput(tokensRemainder.length)) {
+        Right(Some(TxOutput.asset(alphRemainder, tokensRemainder, fromLockupScript)))
       } else {
-        Left("Not enough Alf for change output")
+        Left("Not enough Alph for change output")
       }
     }
   }
 
-  private def checkMinimalAlfPerOutput(
+  private def checkMinimalAlphPerOutput(
       outputs: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
     val notOk = outputs.exists { output =>
-      output.alfAmount < minimalAlfAmountPerTxOutput(output.tokens.length)
+      output.alphAmount < minimalAlphAmountPerTxOutput(output.tokens.length)
     }
 
     if (notOk) {
-      Left("Not enough Alf for transaction output")
+      Left("Not enough Alph for transaction output")
     } else {
       Right(())
     }
@@ -286,7 +286,7 @@ object UnsignedTransaction {
 
   final case class TxOutputInfo(
       lockupScript: LockupScript.Asset,
-      alfAmount: U256,
+      alphAmount: U256,
       tokens: AVector[(TokenId, U256)],
       lockTime: Option[TimeStamp]
   )

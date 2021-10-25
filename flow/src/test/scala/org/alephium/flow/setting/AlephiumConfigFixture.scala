@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.protocol.{ALF, PrivateKey, PublicKey}
+import org.alephium.protocol.{ALPH, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.{AVector, Duration, Env, Number, U256}
@@ -29,7 +29,7 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
 
   val configValues: Map[String, Any] = Map.empty
 
-  val genesisBalance: U256 = ALF.alf(Number.million)
+  val genesisBalance: U256 = ALPH.alph(Number.million)
 
   lazy val env      = Env.resolve()
   lazy val rootPath = Platform.getRootPath(env)

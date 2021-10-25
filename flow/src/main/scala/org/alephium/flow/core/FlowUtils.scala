@@ -406,7 +406,7 @@ object FlowUtils {
     if (script.entryMethod.isPayable) {
       for {
         balances0 <- Balances.from(preOutputs, txTemplate.unsigned.fixedOutputs)
-        _         <- balances0.subAlf(preOutputs.head.lockupScript, txTemplate.gasFeeUnsafe)
+        _         <- balances0.subAlph(preOutputs.head.lockupScript, txTemplate.gasFeeUnsafe)
         outputs   <- balances0.toOutputs()
       } yield {
         Transaction(

@@ -26,7 +26,7 @@ import org.alephium.json.Json._
 
 //we need to redefine this, because `tapir-upickle` is depening only on `upickle.default`
 package object api {
-  def alfJsonBody[T: ReadWriter: Schema]: EndpointIO.Body[String, T] =
+  def alphJsonBody[T: ReadWriter: Schema]: EndpointIO.Body[String, T] =
     anyFromUtf8StringBody(readWriterCodec[T])
 
   implicit def readWriterCodec[T: ReadWriter: Schema]: JsonCodec[T] =
@@ -37,7 +37,7 @@ package object api {
       }
     } { t => write(t) }
 
-  def alfPlainTextBody: EndpointIO.Body[String, String] = {
+  def alphPlainTextBody: EndpointIO.Body[String, String] = {
     anyFromUtf8StringBody(Codec.string)
   }
 }

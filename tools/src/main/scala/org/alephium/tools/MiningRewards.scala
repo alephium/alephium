@@ -16,7 +16,7 @@
 
 package org.alephium.tools
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.Emission
 import org.alephium.util.{Duration, Number, U256}
@@ -30,8 +30,8 @@ object MiningRewards extends App {
   val emission: Emission        = Emission(groupConfig, blockTargetTime)
 
   private def calInflation(yearlyReward: U256): BigDecimal = {
-    val alfReward = yearlyReward.divUnsafe(ALF.oneAlf).v
-    BigDecimal(alfReward) / BigDecimal.valueOf(Number.billion)
+    val alphReward = yearlyReward.divUnsafe(ALPH.oneAlph).v
+    BigDecimal(alphReward) / BigDecimal.valueOf(Number.billion)
   }
 
   printLine("--- Inflation according to hashrate ---")

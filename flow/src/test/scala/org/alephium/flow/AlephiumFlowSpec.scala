@@ -82,7 +82,7 @@ trait FlowFixture
   def transferOnlyForIntraGroup(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      amount: U256 = ALF.alf(1)
+      amount: U256 = ALPH.alph(1)
   ): Block = {
     if (chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
@@ -103,7 +103,7 @@ trait FlowFixture
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
     mine(blockFlow, chainIndex)(
-      transferTxs(_, _, ALF.alf(1), 1, Some(txScript), true, scriptGas = gas)
+      transferTxs(_, _, ALPH.alph(1), 1, Some(txScript), true, scriptGas = gas)
     )
   }
 
@@ -117,13 +117,13 @@ trait FlowFixture
     val zipped = invokers.mapWithIndex { case (invoker, index) =>
       invoker -> txScripts(index)
     }
-    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALF.alf(1) / 100))
+    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
   }
 
   def transfer(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      amount: U256 = ALF.alf(1),
+      amount: U256 = ALPH.alph(1),
       numReceivers: Int = 1,
       gasFeeInTheAmount: Boolean = true,
       lockTimeOpt: Option[TimeStamp] = None
@@ -254,7 +254,7 @@ trait FlowFixture
     balances.length is 2 // this function is used in this particular case
 
     val total  = balances.fold(U256.Zero)(_ addUnsafe _.output.amount)
-    val amount = ALF.alf(1)
+    val amount = ALPH.alph(1)
 
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
@@ -613,7 +613,7 @@ trait FlowFixture
       code: StatefulContract,
       initialState: AVector[Val],
       lockupScript: LockupScript.Asset,
-      alfAmount: U256,
+      alphAmount: U256,
       newTokenAmount: Option[U256] = None
   ): StatefulScript = {
     val address  = Address.Asset(lockupScript)
@@ -627,7 +627,7 @@ trait FlowFixture
       s"""
          |TxScript Foo {
          |  pub payable fn main() -> () {
-         |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
+         |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
          |    $creation
          |  }
          |}
@@ -647,7 +647,7 @@ trait FlowFixture
          |""".stripMargin
     val contract = Compiler.compileContract(input).rightValue
     val txScript =
-      contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALF.alf(1))
+      contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALPH.alph(1))
     payableCallTxTemplate(
       blockFlow,
       chainIndex,

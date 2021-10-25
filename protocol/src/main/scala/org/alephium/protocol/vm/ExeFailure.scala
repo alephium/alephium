@@ -73,7 +73,7 @@ case object ExpectStatefulContractObj                          extends ExeFailur
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure
-case object NoAlfBalanceForTheAddress                          extends ExeFailure
+case object NoAlphBalanceForTheAddress                         extends ExeFailure
 case object NoTokenBalanceForTheAddress                        extends ExeFailure
 case object InvalidBalances                                    extends ExeFailure
 case object UnableToPayGasFee                                  extends ExeFailure

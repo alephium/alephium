@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALF, Generators, Hash}
+import org.alephium.protocol.{ALPH, Generators, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
@@ -56,14 +56,14 @@ class TxUtilsSpec extends AlephiumSpec {
     val block                 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
     val tx                    = block.nonCoinbase.head
     tx.gasFeeUnsafe is defaultGasFee
-    defaultGasFee is ALF.nanoAlf(20000 * 100)
+    defaultGasFee is ALPH.nanoAlph(20000 * 100)
   }
 
   it should "consider outputs for inter-group blocks" in new FlowFixture {
     val chainIndex            = ChainIndex.unsafe(0, 1)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (_, toPubKey)         = chainIndex.to.generateKey
-    val block                 = transfer(blockFlow, genesisPriKey, toPubKey, ALF.alf(1))
+    val block                 = transfer(blockFlow, genesisPriKey, toPubKey, ALPH.alph(1))
     addAndCheck(blockFlow, block)
 
     val unsignedTx = blockFlow
@@ -71,7 +71,7 @@ class TxUtilsSpec extends AlephiumSpec {
         genesisPriKey.publicKey,
         LockupScript.p2pkh(toPubKey),
         None,
-        ALF.cent(50),
+        ALPH.cent(50),
         None,
         defaultGasPrice
       )
@@ -157,14 +157,14 @@ class TxUtilsSpec extends AlephiumSpec {
 
   "UnsignedTransaction.build" should "build transaction successfully" in new UnsignedTransactionFixture {
     val inputs = {
-      val input1 = input("input1", ALF.oneAlf, fromLockupScript)
-      val input2 = input("input2", ALF.cent(50), fromLockupScript)
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
+      val input2 = input("input2", ALPH.cent(50), fromLockupScript)
 
       AVector(input1, input2)
     }
 
     val outputs = {
-      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf)
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph)
       AVector(output1)
     }
 
@@ -182,16 +182,16 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "fail without enough ALF" in new UnsignedTransactionFixture {
+  it should "fail without enough ALPH" in new UnsignedTransactionFixture {
     val inputs = {
-      val input1 = input("input1", ALF.oneAlf, fromLockupScript)
-      val input2 = input("input2", ALF.cent(50), fromLockupScript)
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
+      val input2 = input("input2", ALPH.cent(50), fromLockupScript)
 
       AVector(input1, input2)
     }
 
     val outputs = {
-      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.alf(2))
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.alph(2))
       AVector(output1)
     }
 
@@ -209,12 +209,12 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "fail without enough Gas" in new UnsignedTransactionFixture {
     val inputs = {
-      val input1 = input("input1", ALF.oneAlf, fromLockupScript)
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
       AVector(input1)
     }
 
     val outputs = {
-      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf)
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph)
       AVector(output1)
     }
 
@@ -235,16 +235,16 @@ class TxUtilsSpec extends AlephiumSpec {
     val tokenId2 = Hash.hash("tokenId2")
 
     val inputs = {
-      val input1 = input("input1", ALF.oneAlf, fromLockupScript, (tokenId2, U256.unsafe(10)))
-      val input2 = input("input2", ALF.alf(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
+      val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
       AVector(input1, input2)
     }
 
     val outputs = {
-      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf, (tokenId1, U256.unsafe(10)))
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph, (tokenId1, U256.unsafe(10)))
       val output2 = output(
         LockupScript.p2pkh(toPubKey),
-        ALF.alf(2),
+        ALPH.alph(2),
         (tokenId2, U256.unsafe(9)),
         (tokenId1, U256.unsafe(39))
       )
@@ -265,7 +265,7 @@ class TxUtilsSpec extends AlephiumSpec {
     unsignedTx.fixedOutputs.length is 3
 
     info("verify change output")
-    unsignedTx.fixedOutputs(2).amount is ALF.oneAlf.subUnsafe(defaultGasFee)
+    unsignedTx.fixedOutputs(2).amount is ALPH.oneAlph.subUnsafe(defaultGasFee)
     unsignedTx.fixedOutputs(2).tokens.length is 2
     unsignedTx.fixedOutputs(2).tokens.foreach { case (_, amount) =>
       amount is U256.unsafe(1)
@@ -277,13 +277,13 @@ class TxUtilsSpec extends AlephiumSpec {
     val tokenId2 = Hash.hash("tokenId2")
 
     val inputs = {
-      val input1 = input("input1", ALF.oneAlf, fromLockupScript, (tokenId2, U256.unsafe(10)))
-      val input2 = input("input2", ALF.cent(50), fromLockupScript)
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
+      val input2 = input("input2", ALPH.cent(50), fromLockupScript)
       AVector(input1, input2)
     }
 
     val outputs = {
-      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf, (tokenId1, U256.unsafe(10)))
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph, (tokenId1, U256.unsafe(10)))
       AVector(output1)
     }
 
@@ -305,13 +305,13 @@ class TxUtilsSpec extends AlephiumSpec {
     val tokenId2 = Hash.hash("tokenId2")
 
     val inputs = {
-      val input1 = input("input1", ALF.oneAlf, fromLockupScript, (tokenId2, U256.unsafe(10)))
-      val input2 = input("input2", ALF.alf(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
+      val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
       AVector(input1, input2)
     }
 
     val outputs = {
-      val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf, (tokenId2, U256.unsafe(11)))
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph, (tokenId2, U256.unsafe(11)))
       AVector(output1)
     }
 
@@ -328,22 +328,22 @@ class TxUtilsSpec extends AlephiumSpec {
       .startsWith("Not enough balance for token") is true
   }
 
-  it should "fail when outputs doesn't have minimal amount of Alf" in new UnsignedTransactionFixture {
+  it should "fail when outputs doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
     {
       info("with tokens")
       val tokenId1 = Hash.hash("tokenId1")
       val tokenId2 = Hash.hash("tokenId2")
 
       val inputs = {
-        val input1 = input("input1", ALF.oneAlf, fromLockupScript, (tokenId2, U256.unsafe(10)))
-        val input2 = input("input2", ALF.alf(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+        val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
+        val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
         AVector(input1, input2)
       }
 
       val outputs = {
-        info(s"minimalAlfAmountPerTxOutput is ${minimalAlfAmountPerTxOutput(1)}")
+        info(s"minimalAlphAmountPerTxOutput is ${minimalAlphAmountPerTxOutput(1)}")
         val output1 =
-          output(LockupScript.p2pkh(toPubKey), ALF.nanoAlf(900), (tokenId2, U256.unsafe(11)))
+          output(LockupScript.p2pkh(toPubKey), ALPH.nanoAlph(900), (tokenId2, U256.unsafe(11)))
         AVector(output1)
       }
 
@@ -357,20 +357,20 @@ class TxUtilsSpec extends AlephiumSpec {
           defaultGasPrice
         )
         .leftValue
-        .startsWith("Not enough Alf for transaction output") is true
+        .startsWith("Not enough Alph for transaction output") is true
     }
 
     {
       info("without tokens")
       val inputs = {
-        val input1 = input("input1", ALF.oneAlf, fromLockupScript)
-        val input2 = input("input2", ALF.alf(3), fromLockupScript)
+        val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
+        val input2 = input("input2", ALPH.alph(3), fromLockupScript)
         AVector(input1, input2)
       }
 
       val outputs = {
-        info(s"minimalAlfAmountPerTxOutput is ${minimalAlfAmountPerTxOutput(0)}")
-        val output1 = output(LockupScript.p2pkh(toPubKey), ALF.nanoAlf(900))
+        info(s"minimalAlphAmountPerTxOutput is ${minimalAlphAmountPerTxOutput(0)}")
+        val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.nanoAlph(900))
         AVector(output1)
       }
 
@@ -384,28 +384,29 @@ class TxUtilsSpec extends AlephiumSpec {
           defaultGasPrice
         )
         .leftValue
-        .startsWith("Not enough Alf for transaction output") is true
+        .startsWith("Not enough Alph for transaction output") is true
     }
   }
 
-  it should "fail when change output doesn't have minimal amount of Alf" in new UnsignedTransactionFixture {
+  it should "fail when change output doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
     {
       info("with tokens")
       val tokenId1 = Hash.hash("tokenId1")
       val tokenId2 = Hash.hash("tokenId2")
 
       val inputs = {
-        val input1Amount = defaultGasFee.addUnsafe(minimalAlfAmountPerTxOutput(1)).subUnsafe(1)
+        val input1Amount = defaultGasFee.addUnsafe(minimalAlphAmountPerTxOutput(1)).subUnsafe(1)
         val input1       = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
-        val input2       = input("input2", ALF.alf(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+        val input2       = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
         AVector(input1, input2)
       }
 
       val outputs = {
-        val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf, (tokenId1, U256.unsafe(10)))
+        val output1 =
+          output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph, (tokenId1, U256.unsafe(10)))
         val output2 = output(
           LockupScript.p2pkh(toPubKey),
-          ALF.alf(2),
+          ALPH.alph(2),
           (tokenId2, U256.unsafe(9)),
           (tokenId1, U256.unsafe(39))
         )
@@ -422,21 +423,21 @@ class TxUtilsSpec extends AlephiumSpec {
           defaultGasPrice
         )
         .leftValue
-        .startsWith("Not enough Alf for change output") is true
+        .startsWith("Not enough Alph for change output") is true
     }
 
     {
       info("without tokens")
       val inputs = {
-        val input1Amount = defaultGasFee.addUnsafe(minimalAlfAmountPerTxOutput(0)).subUnsafe(1)
+        val input1Amount = defaultGasFee.addUnsafe(minimalAlphAmountPerTxOutput(0)).subUnsafe(1)
         val input1       = input("input1", input1Amount, fromLockupScript)
-        val input2       = input("input2", ALF.alf(3), fromLockupScript)
+        val input2       = input("input2", ALPH.alph(3), fromLockupScript)
         AVector(input1, input2)
       }
 
       val outputs = {
-        val output1 = output(LockupScript.p2pkh(toPubKey), ALF.oneAlf)
-        val output2 = output(LockupScript.p2pkh(toPubKey), ALF.alf(2))
+        val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph)
+        val output2 = output(LockupScript.p2pkh(toPubKey), ALPH.alph(2))
         AVector(output1, output2)
       }
 
@@ -450,7 +451,7 @@ class TxUtilsSpec extends AlephiumSpec {
           defaultGasPrice
         )
         .leftValue
-        .startsWith("Not enough Alf for change output") is true
+        .startsWith("Not enough Alph for change output") is true
     }
   }
 
@@ -490,9 +491,9 @@ class TxUtilsSpec extends AlephiumSpec {
     val tx         = block.nonCoinbase.head
     val output     = tx.unsigned.fixedOutputs.head
 
-    val n = ALF.MaxTxInputNum + 1
+    val n = ALPH.MaxTxInputNum + 1
 
-    val outputs  = AVector.fill(n)(output.copy(amount = ALF.oneAlf))
+    val outputs  = AVector.fill(n)(output.copy(amount = ALPH.oneAlph))
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
     val newBlock = block.copy(transactions = AVector(newTx))
     addAndUpdateView(blockFlow, newBlock)
@@ -511,7 +512,7 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        ALF.alf((n - 2).toLong),
+        ALPH.alph((n - 2).toLong),
         Some(GasBox.unsafe(600000)),
         defaultGasPrice
       )
@@ -527,7 +528,7 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        ALF.alf((n - 1).toLong),
+        ALPH.alph((n - 1).toLong),
         None,
         defaultGasPrice
       )
@@ -571,12 +572,12 @@ class TxUtilsSpec extends AlephiumSpec {
 
   private def output(
       lockupScript: LockupScript.Asset,
-      alfAmount: U256,
+      alphAmount: U256,
       tokens: (TokenId, U256)*
   ): UnsignedTransaction.TxOutputInfo = {
     UnsignedTransaction.TxOutputInfo(
       lockupScript,
-      alfAmount,
+      alphAmount,
       AVector.from(tokens),
       lockTime = None
     )

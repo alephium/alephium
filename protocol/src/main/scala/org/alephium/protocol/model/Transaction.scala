@@ -94,7 +94,7 @@ final case class Transaction(
     }
   }
 
-  lazy val alfAmountInOutputs: Option[U256] = {
+  lazy val alphAmountInOutputs: Option[U256] = {
     val sum1Opt =
       unsigned.fixedOutputs
         .foldE(U256.Zero)((sum, output) => sum.add(output.amount).toRight(()))
@@ -227,7 +227,7 @@ object Transaction {
 
   // PoLW burning is not considered
   def totalReward(gasFee: U256, miningReward: U256): U256 = {
-    val threshold = Math.max(miningReward, ALF.oneAlf)
+    val threshold = Math.max(miningReward, ALPH.oneAlph)
     val gasReward = gasFee.divUnsafe(U256.Two)
     if (gasReward >= threshold) {
       miningReward.addUnsafe(threshold)
@@ -279,7 +279,7 @@ object Transaction {
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
     val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
-    val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
+    val miningReward = emissionConfig.emission.reward(target, blockTs, ALPH.LaunchTimestamp)
     val netReward = miningReward match {
       case Emission.PoW(miningReward) => totalReward(gasFee, miningReward)
       case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough

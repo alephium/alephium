@@ -182,10 +182,10 @@ trait TxInputGenerators extends Generators {
 }
 
 trait TokenGenerators extends Generators with NumericHelpers {
-  val minAmountInNanoAlf = dustUtxoAmount.divUnsafe(ALF.oneNanoAlf).toBigInt.longValue()
-  val minAmount          = ALF.nanoAlf(minAmountInNanoAlf)
+  val minAmountInNanoAlph = dustUtxoAmount.divUnsafe(ALPH.oneNanoAlph).toBigInt.longValue()
+  val minAmount           = ALPH.nanoAlph(minAmountInNanoAlph)
   def amountGen(inputNum: Int): Gen[U256] = {
-    Gen.choose(minAmountInNanoAlf * inputNum, Number.quadrillion).map(ALF.nanoAlf)
+    Gen.choose(minAmountInNanoAlph * inputNum, Number.quadrillion).map(ALPH.nanoAlph)
   }
 
   def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
@@ -210,7 +210,7 @@ trait TokenGenerators extends Generators with NumericHelpers {
     AVector.tabulate(num)(i => pivots(i + 1) - pivots(i) + minAmount)
   }
   def split(balances: Balances, outputNum: Int): AVector[Balances] = {
-    val alfSplits = split(balances.alfAmount, minAmount, outputNum)
+    val alphSplits = split(balances.alphAmount, minAmount, outputNum)
     val tokenSplits = balances.tokens.map { case (tokenId, amount) =>
       tokenId -> split(amount, 0, outputNum)
     }
@@ -218,7 +218,7 @@ trait TokenGenerators extends Generators with NumericHelpers {
       val tokens = tokenSplits.map { case (tokenId, amounts) =>
         tokenId -> amounts(index)
       }
-      Balances(alfSplits(index), tokens)
+      Balances(alphSplits(index), tokens)
     }
   }
 }
@@ -231,7 +231,7 @@ trait TxGenerators
     with TokenGenerators {
   implicit def networkConfig: NetworkConfig
 
-  lazy val createdHeightGen: Gen[Int] = Gen.choose(ALF.GenesisHeight, Int.MaxValue)
+  lazy val createdHeightGen: Gen[Int] = Gen.choose(ALPH.GenesisHeight, Int.MaxValue)
 
   def assetOutputGen(groupIndex: GroupIndex)(
       _amountGen: Gen[U256] = amountGen(1),
@@ -288,7 +288,7 @@ trait TxGenerators
       outputHash                             <- hashGen
     } yield {
       val assetOutput =
-        AssetOutput(balances.alfAmount, lockup, lockTime, AVector.from(balances.tokens), data)
+        AssetOutput(balances.alphAmount, lockup, lockTime, AVector.from(balances.tokens), data)
       val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
@@ -311,7 +311,7 @@ trait TxGenerators
       val inputs         = assets.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
       val gas            = math.max(minimalGas.value, inputs.length * 20000)
-      val alfAmount      = outputsToSpend.map(_.amount).reduce(_ + _) - defaultGasPrice * gas
+      val alphAmount     = outputsToSpend.map(_.amount).reduce(_ + _) - defaultGasPrice * gas
       val tokenTable = {
         val tokens = mutable.Map.empty[TokenId, U256]
         assets.foreach(_.referredOutput.tokens.foreach { case (tokenId, amount) =>
@@ -321,8 +321,8 @@ trait TxGenerators
         tokens
       }
 
-      val initialBalances = Balances(alfAmount, tokenTable.toMap)
-      val outputNum       = min(alfAmount / minAmount, inputs.length * 2, ALF.MaxTxOutputNum).v.toInt
+      val initialBalances = Balances(alphAmount, tokenTable.toMap)
+      val outputNum       = min(alphAmount / minAmount, inputs.length * 2, ALPH.MaxTxOutputNum).v.toInt
       val splitBalances   = split(initialBalances, outputNum)
       val selectedIndex   = Gen.choose(0, outputNum - 1).sample.get
       val outputs = splitBalances.mapWithIndex[AssetOutput] { case (balance, index) =>
@@ -339,9 +339,9 @@ trait TxGenerators
 
   def balancesGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Balances] =
     for {
-      alfAmount <- amountGen(inputNum)
-      tokens    <- tokensGen(inputNum, tokensNumGen)
-    } yield Balances(alfAmount, tokens)
+      alphAmount <- amountGen(inputNum)
+      tokens     <- tokensGen(inputNum, tokensNumGen)
+    } yield Balances(alphAmount, tokens)
 
   def assetsToSpendGen(
       inputsNumGen: Gen[Int] = Gen.choose(1, 10),
@@ -524,14 +524,14 @@ object ModelGenerators {
       privateKey: PrivateKey
   )
 
-  final case class Balances(alfAmount: U256, tokens: Map[TokenId, U256]) {
+  final case class Balances(alphAmount: U256, tokens: Map[TokenId, U256]) {
     def toOutput(
         lockupScript: LockupScript.Asset,
         lockTime: TimeStamp,
         data: ByteString
     ): AssetOutput = {
       val tokensVec = AVector.from(tokens)
-      AssetOutput(alfAmount, lockupScript, lockTime, tokensVec, data)
+      AssetOutput(alphAmount, lockupScript, lockTime, tokensVec, data)
     }
   }
 

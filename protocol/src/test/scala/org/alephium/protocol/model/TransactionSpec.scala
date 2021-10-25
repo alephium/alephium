@@ -59,7 +59,7 @@ class TransactionSpec
           script,
           Hash.generate.bytes,
           Target.Max,
-          ALF.LaunchTimestamp
+          ALPH.LaunchTimestamp
         )
     )
 
@@ -81,14 +81,14 @@ class TransactionSpec
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = ALF.LaunchTimestamp
+      blockTs = ALPH.LaunchTimestamp
     )
     val coinbase1 = Transaction.coinbase(
       ChainIndex.unsafe(0, 1),
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = ALF.LaunchTimestamp
+      blockTs = ALPH.LaunchTimestamp
     )
     val coinbase2 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),
@@ -116,7 +116,7 @@ class TransactionSpec
   }
 
   it should "cap the gas reward" in {
-    val hardReward = ALF.oneAlf
+    val hardReward = ALPH.oneAlph
     Transaction.totalReward(1, 100) is U256.unsafe(100)
     Transaction.totalReward(2, 100) is U256.unsafe(101)
     Transaction.totalReward(200, 100) is U256.unsafe(200)
@@ -225,11 +225,11 @@ class TransactionSpec
          |TxScript Main {
          | pub payable fn main() -> () {
          |   verifyTxSignature!(#${pubKey1.toHexString})
-         |   transferAlfFromSelf!(@$address1, 1)
+         |   transferAlphFromSelf!(@$address1, 1)
          |   transferTokenToSelf!(@$address1, #${tokenId.toHexString}, 42)
          |
          |   verifyTxSignature!(#${pubKey2.toHexString})
-         |   transferAlfFromSelf!(@$address2, 5)
+         |   transferAlphFromSelf!(@$address2, 5)
          | }
          |}
          |""".stripMargin
@@ -400,7 +400,7 @@ class TransactionSpec
            |TxScript Main {
            |  pub payable fn main() -> () {
            |    verifyTxSignature!(#${pubKey1.toHexString})
-           |    transferAlfFromSelf!(@$contractAddress, 1000)
+           |    transferAlphFromSelf!(@$contractAddress, 1000)
            |  }
            |}
            |""".stripMargin

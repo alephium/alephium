@@ -21,7 +21,7 @@ import org.scalatest.Assertion
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALF, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -31,8 +31,8 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val blockflowFetchMaxAge = Duration.unsafe(1000)
   val address              = Address.p2pkh(PublicKey.generate)
   val group                = 1
-  val balance              = Amount(ALF.oneAlf)
-  val lockedBalance        = Amount(ALF.alf(2))
+  val balance              = Amount(ALPH.oneAlph)
+  val lockedBalance        = Amount(ALPH.alph(2))
   val hash                 = Hash.generate
   val password             = "password"
   val walletName           = "wallet-name"

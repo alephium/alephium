@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
@@ -172,7 +172,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   private[validation] def checkGasPriceDecreasing(block: Block): BlockValidationResult[Unit] = {
-    val result = block.transactions.foldE[Unit, GasPrice](GasPrice(ALF.MaxALFValue)) {
+    val result = block.transactions.foldE[Unit, GasPrice](GasPrice(ALPH.MaxALPHValue)) {
       case (lastGasPrice, tx) =>
         val txGasPrice = tx.unsigned.gasPrice
         if (txGasPrice > lastGasPrice) Left(()) else Right(txGasPrice)
@@ -202,8 +202,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
 
     result match {
-      case Left(Right(ExistInvalidTx(InvalidAlfBalance))) => Left(Right(InvalidCoinbaseReward))
-      case result                                         => result
+      case Left(Right(ExistInvalidTx(InvalidAlphBalance))) => Left(Right(InvalidCoinbaseReward))
+      case result                                          => result
     }
   }
 

@@ -20,7 +20,7 @@ import java.math.BigInteger
 
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
@@ -36,7 +36,7 @@ trait ChainDifficultyAdjustment {
   // TODO: optimize this
   final protected[core] def calTimeSpan(hash: BlockHash, height: Int): IOResult[Duration] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
-    assume(earlyHeight >= ALF.GenesisHeight)
+    assume(earlyHeight >= ALPH.GenesisHeight)
     for {
       hashes        <- chainBackUntil(hash, earlyHeight)
       timestampNow  <- getTimestamp(hash)
@@ -50,7 +50,7 @@ trait ChainDifficultyAdjustment {
       currentTarget: Target
   ): IOResult[Target] = {
     getHeight(hash).flatMap {
-      case height if height >= ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
+      case height if height >= ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
         calTimeSpan(hash, height).map { timeSpan =>
           var clippedTimeSpan =
             consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4

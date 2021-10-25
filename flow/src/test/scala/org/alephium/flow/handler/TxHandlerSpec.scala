@@ -26,7 +26,7 @@ import org.alephium.flow.model.{PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, Hex, TimeStamp}
@@ -42,7 +42,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     )
 
     def createTx(chainIndex: ChainIndex): Transaction = {
-      transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
+      transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None).head
     }
 
     setSynced()
@@ -98,7 +98,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val (privKey0, pubKey0)    = GroupIndex.unsafe(0).generateKey
     val (privKey1, pubKey1, _) = genesisKeys(0)
-    val block0                 = transfer(blockFlow, privKey1, pubKey0, ALF.alf(3))
+    val block0                 = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(3))
     val tx0                    = block0.nonCoinbase.head.toTemplate
     val mempool                = blockFlow.getMemPool(tx0.chainIndex)
 
@@ -110,7 +110,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler.underlyingActor.delayedTxs.contains(tx0) is false
 
     addAndCheck(blockFlow, block0)
-    val block1     = transfer(blockFlow, privKey0, pubKey1, ALF.alf(1))
+    val block1     = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(1))
     val tx1        = block1.nonCoinbase.head.toTemplate
     val worldState = blockFlow.getBestPersistedWorldState(tx1.chainIndex.from).rightValue
 
@@ -141,11 +141,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val (privKey0, pubKey0, _) = genesisKeys(0)
     val (privKey1, pubKey1)    = GroupIndex.unsafe(1).generateKey
-    val block0                 = transfer(blockFlow, privKey0, pubKey1, ALF.alf(3))
+    val block0                 = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(3))
     addAndCheck(blockFlow, block0)
     addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
 
-    val block1     = transfer(blockFlow, privKey1, pubKey0, ALF.alf(2))
+    val block1     = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(2))
     val tx         = block1.nonCoinbase.head.toTemplate
     val worldState = blockFlow.getBestPersistedWorldState(block0.chainIndex.from).rightValue
 
@@ -190,11 +190,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val pendingTxStorage       = storages.pendingTxStorage
     val readyTxStorage         = storages.readyTxStorage
 
-    lazy val block0 = transfer(blockFlow, privKey0, pubKey1, ALF.alf(4))
+    lazy val block0 = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(4))
     lazy val tx0    = block0.firstTx
-    lazy val block1 = transfer(blockFlow, privKey1, pubKey0, ALF.alf(1))
+    lazy val block1 = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(1))
     lazy val tx1    = block1.firstTx
-    lazy val block2 = transfer(blockFlow, privKey1, pubKey0, ALF.alf(1))
+    lazy val block2 = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(1))
     lazy val tx2    = block2.firstTx
 
     implicit class FirstTxOfBlock(block: Block) {
@@ -363,7 +363,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "fail in case of duplicate txs" in new Fixture {
     override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
 
-    val tx = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
+    val tx = transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None).head
 
     setSynced()
     txHandler ! addTx(tx)
@@ -382,8 +382,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "fail in double-spending" in new Fixture {
     override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
 
-    val tx0 = transferTxs(blockFlow, chainIndex, ALF.alf(1), 1, None, true, None).head
-    val tx1 = transferTxs(blockFlow, chainIndex, ALF.alf(2), 1, None, true, None).head
+    val tx0 = transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None).head
+    val tx1 = transferTxs(blockFlow, chainIndex, ALPH.alph(2), 1, None, true, None).head
 
     setSynced()
     txHandler ! addTx(tx0)
@@ -526,7 +526,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     TxHandler.checkHighGasPrice(tx) is true
     TxHandler.checkHighGasPrice(lowGasPriceTx) is false
     TxHandler.checkHighGasPrice(
-      ALF.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(366)),
+      ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(366)),
       lowGasPriceTx
     ) is true
   }

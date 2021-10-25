@@ -24,7 +24,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
@@ -67,11 +67,11 @@ trait BlockFlow
     if (brokerConfig.contains(chainIndex.from)) {
       val chain     = getHeaderChain(chainIndex)
       val maxHeight = chain.maxHeightUnsafe
-      if (maxHeight == ALF.GenesisHeight) {
+      if (maxHeight == ALPH.GenesisHeight) {
         AVector.empty
       } else {
         HistoryLocators
-          .sampleHeights(ALF.GenesisHeight + 1, maxHeight)
+          .sampleHeights(ALPH.GenesisHeight + 1, maxHeight)
           .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
       }
     } else {
@@ -91,7 +91,7 @@ trait BlockFlow
       val chainIndex = ChainIndex.unsafe(fromGroup, toGroup)
       val chain      = getBlockChain(chainIndex)
       if (locatorsPerChain.isEmpty) {
-        chain.getSyncDataFromHeightUnsafe(ALF.GenesisHeight + 1)
+        chain.getSyncDataFromHeightUnsafe(ALPH.GenesisHeight + 1)
       } else {
         chain.getSyncDataUnsafe(locatorsPerChain)
       }
@@ -170,7 +170,7 @@ object BlockFlow extends StrictLogging {
   ): Unit = {
     val maxHeight = chain.maxHeightUnsafe
     val startHeight =
-      Math.max(ALF.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain)
+      Math.max(ALPH.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain)
     (startHeight to maxHeight).foreach { height =>
       val block = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head)
       blockflow.cacheBlock(block)
@@ -182,7 +182,7 @@ object BlockFlow extends StrictLogging {
   ): Unit = {
     val maxHeight = chain.maxHeightUnsafe
     val startHeight =
-      Math.max(ALF.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain * 2)
+      Math.max(ALPH.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain * 2)
     (startHeight to maxHeight).foreach { height =>
       val header = chain.getBlockHeaderUnsafe(chain.getHashesUnsafe(height).head)
       chain.cacheHeader(header)
@@ -271,7 +271,7 @@ object BlockFlow extends StrictLogging {
 
     private def calWeightUnsafe(header: BlockHeader): Weight = {
       if (header.isGenesis) {
-        ALF.GenesisWeight
+        ALPH.GenesisWeight
       } else {
         val targetGroup  = header.chainIndex.from
         val depsFlowTips = FlowTips.from(header.blockDeps, targetGroup)

@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALF, BlockHash, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
@@ -124,13 +124,13 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
-      _              <- checkOutputInfos(outputInfos)
-      totalAlfAmount <- checkTotalAmount(outputInfos)
-      _              <- checkWithMinimalGas(gasOpt, minimalGas)
+      _               <- checkOutputInfos(outputInfos)
+      totalAlphAmount <- checkTotalAmount(outputInfos)
+      _               <- checkWithMinimalGas(gasOpt, minimalGas)
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
       )
-    } yield (totalAlfAmount, totalAmountPerToken)
+    } yield (totalAlphAmount, totalAmountPerToken)
 
     totalAmountsE match {
       case Right((totalAmount, totalAmountPerToken)) =>
@@ -220,7 +220,7 @@ trait TxUtils { Self: FlowUtils =>
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
     getUsableUtxos(fromLockupScript).map { allUtxos =>
-      val utxos = allUtxos.takeUpto(ALF.MaxTxInputNum) // sweep as much as we can
+      val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
       for {
         _   <- checkWithMinimalGas(gasOpt, minimalGas)
         gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length)))
@@ -322,7 +322,7 @@ trait TxUtils { Self: FlowUtils =>
     }
 
     if (header.isGenesis) {
-      toChain.maxHeightUnsafe - ALF.GenesisHeight + 1
+      toChain.maxHeightUnsafe - ALPH.GenesisHeight + 1
     } else {
       iter(toTipHeight + 1) match {
         case None => 0
@@ -347,7 +347,7 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo]
   ): Either[String, U256] = {
     outputInfos.foldE(U256.Zero) { case (acc, outputInfo) =>
-      acc.add(outputInfo.alfAmount).toRight("Amount overflow")
+      acc.add(outputInfo.alphAmount).toRight("Amount overflow")
     }
   }
 
@@ -392,7 +392,7 @@ trait TxUtils { Self: FlowUtils =>
 
   private def selectUTXOs(
       fromLockupScript: LockupScript.Asset,
-      totalAlfAmount: U256,
+      totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
       outputsLength: Int,
       gasOpt: Option[GasBox],
@@ -401,7 +401,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(fromLockupScript).map { utxos =>
       UtxoUtils.select(
         utxos,
-        totalAlfAmount,
+        totalAlphAmount,
         totalAmountPerToken,
         gasOpt,
         gasPrice,

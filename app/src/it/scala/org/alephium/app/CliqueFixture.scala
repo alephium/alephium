@@ -48,7 +48,7 @@ import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALF, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, Block, ChainIndex}
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -93,7 +93,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   val password = "password"
 
   val initialBalance = Balance.from(Amount(genesisBalance), Amount.Zero, 1)
-  val transferAmount = ALF.alf(1)
+  val transferAmount = ALPH.alph(1)
 
   val defaultMasterPort     = generatePort()
   val defaultRestMasterPort = restPort(defaultMasterPort)

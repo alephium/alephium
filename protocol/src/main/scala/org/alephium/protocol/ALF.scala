@@ -19,13 +19,13 @@ package org.alephium.protocol
 import org.alephium.protocol.model.Weight
 import org.alephium.util.{Number, TimeStamp, U256}
 
-object ALF {
+object ALPH {
   //scalastyle:off magic.number
-  val CoinInOneALF: U256     = U256.unsafe(Number.quintillion)
-  val CoinInOneCent: U256    = CoinInOneALF divUnsafe U256.unsafe(100)
-  val CoinInOneNanoAlf: U256 = U256.unsafe(Number.billion)
+  val CoinInOneALPH: U256     = U256.unsafe(Number.quintillion)
+  val CoinInOneCent: U256     = CoinInOneALPH divUnsafe U256.unsafe(100)
+  val CoinInOneNanoAlph: U256 = U256.unsafe(Number.billion)
 
-  val MaxALFValue: U256 = U256.Billion mulUnsafe CoinInOneALF
+  val MaxALPHValue: U256 = U256.Billion mulUnsafe CoinInOneALPH
 
   val GenesisHeight: Int          = 0
   val GenesisWeight: Weight       = Weight.zero
@@ -38,11 +38,11 @@ object ALF {
   val MaxScriptSigNum: Int   = 32
   //scalastyle:on magic.number
 
-  def alf(amount: U256): Option[U256] = amount.mul(CoinInOneALF)
+  def alph(amount: U256): Option[U256] = amount.mul(CoinInOneALPH)
 
-  def alf(amount: Long): U256 = {
+  def alph(amount: Long): U256 = {
     assume(amount >= 0)
-    U256.unsafe(amount).mulUnsafe(CoinInOneALF)
+    U256.unsafe(amount).mulUnsafe(CoinInOneALPH)
   }
 
   def cent(amount: Long): U256 = {
@@ -50,11 +50,11 @@ object ALF {
     U256.unsafe(amount).mulUnsafe(CoinInOneCent)
   }
 
-  def nanoAlf(amount: Long): U256 = {
+  def nanoAlph(amount: Long): U256 = {
     assume(amount >= 0)
-    U256.unsafe(amount).mulUnsafe(CoinInOneNanoAlf)
+    U256.unsafe(amount).mulUnsafe(CoinInOneNanoAlph)
   }
 
-  val oneAlf: U256     = CoinInOneALF
-  val oneNanoAlf: U256 = CoinInOneNanoAlf
+  val oneAlph: U256     = CoinInOneALPH
+  val oneNanoAlph: U256 = CoinInOneNanoAlph
 }

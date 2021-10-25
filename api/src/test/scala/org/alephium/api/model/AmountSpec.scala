@@ -16,25 +16,25 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.ALF._
+import org.alephium.protocol.ALPH._
 import org.alephium.util._
 
 class AmountSpec extends AlephiumSpec with NumericHelpers {
 
   it should "parse `x.y ALPH` format" in new Fixture {
-    check("1.2ALPH", alf(12) / 10)
-    check("1.2 ALPH", alf(12) / 10)
-    check("1 ALPH", alf(1))
-    check("1ALPH", alf(1))
-    check("0.1ALPH", alf(1) / 10)
-    check(".1ALPH", alf(1) / 10)
-    check(".1     ALPH", alf(1) / 10)
+    check("1.2ALPH", alph(12) / 10)
+    check("1.2 ALPH", alph(12) / 10)
+    check("1 ALPH", alph(1))
+    check("1ALPH", alph(1))
+    check("0.1ALPH", alph(1) / 10)
+    check(".1ALPH", alph(1) / 10)
+    check(".1     ALPH", alph(1) / 10)
     check("0 ALPH", U256.Zero)
-    check("1234.123456 ALPH", alf(1234123456) / 1000000)
+    check("1234.123456 ALPH", alph(1234123456) / 1000000)
 
-    val alfMax = s"${MaxALFValue.divUnsafe(oneAlf)}"
-    alfMax is "1000000000"
-    check(s"$alfMax ALPH", MaxALFValue)
+    val alphMax = s"${MaxALPHValue.divUnsafe(oneAlph)}"
+    alphMax is "1000000000"
+    check(s"$alphMax ALPH", MaxALPHValue)
 
     fail("1.2alph")
     fail("-1.2alph")

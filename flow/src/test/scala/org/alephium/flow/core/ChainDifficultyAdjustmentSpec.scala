@@ -24,7 +24,7 @@ import scala.util.Random
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
@@ -91,7 +91,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "return initial target when few blocks" in {
-    val maxHeight = ALF.GenesisHeight + consensusConfig.powAveragingWindow + 1
+    val maxHeight = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
     (1 until maxHeight).foreach { n =>
       val data       = AVector.fill(n)(BlockHash.random -> TimeStamp.zero)
       val fixture    = new MockFixture { setup(data) }

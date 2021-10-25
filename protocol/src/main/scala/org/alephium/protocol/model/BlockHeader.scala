@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.serde.{u256Serde => _, _}
@@ -40,7 +40,7 @@ final case class BlockHeader(
     ChainIndex.from(hash, groups)
   }
 
-  def isGenesis: Boolean = timestamp == ALF.GenesisTimestamp
+  def isGenesis: Boolean = timestamp == ALPH.GenesisTimestamp
 
   def parentHash: BlockHash = {
     assume(!isGenesis)
@@ -103,7 +103,7 @@ object BlockHeader {
       config: GroupConfig
   ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
-    BlockHeader(nonce, defaultBlockVersion, deps, Hash.zero, txsHash, ALF.GenesisTimestamp, target)
+    BlockHeader(nonce, defaultBlockVersion, deps, Hash.zero, txsHash, ALPH.GenesisTimestamp, target)
   }
 
   def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit

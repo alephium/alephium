@@ -17,7 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
@@ -182,7 +182,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
 
   it should "detect tx conflicts" in new FlowFixture {
     val (genesisPriKey, _, _) = genesisKeys(0)
-    val block                 = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALF.alf(10))
+    val block                 = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALPH.alph(10))
     val blockFlow1            = isolatedBlockFlow()
     addAndCheck(blockFlow, block)
     addAndCheck(blockFlow1, block)

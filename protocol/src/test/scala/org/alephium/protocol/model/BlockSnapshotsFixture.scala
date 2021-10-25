@@ -39,7 +39,7 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
       depStateHash =
         Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
       txsHash = txsHash,
-      // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
+      // Must be later than org.alephium.protocol.ALPH.LaunchTimestamp
       timestamp = TimeStamp.unsafe(1630167995025L),
       target = Target(hex"20ffffff")
     )

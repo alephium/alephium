@@ -537,7 +537,7 @@ class ServerUtils(implicit
       codeRaw: String,
       address: Address,
       initialState: AVector[vm.Val],
-      alfAmount: U256,
+      alphAmount: U256,
       newTokenAmount: Option[U256]
   ): Either[Compiler.Error, StatefulScript] = {
 
@@ -550,7 +550,7 @@ class ServerUtils(implicit
     val scriptRaw = s"""
       |TxScript Main {
       |  pub payable fn main() -> () {
-      |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
+      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
       |    $creation
       |  }
       |}

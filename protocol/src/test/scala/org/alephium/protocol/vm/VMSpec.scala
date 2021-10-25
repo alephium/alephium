@@ -308,9 +308,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "show remaining balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      AlfRemaining,
+      AlphRemaining,
       AddressConst(address1),
-      AlfRemaining,
+      AlphRemaining,
       AddressConst(address1),
       BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
@@ -331,15 +331,15 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       U256Const(Val.U256(10)),
-      ApproveAlf,
+      ApproveAlph,
       AddressConst(address0),
-      AlfRemaining,
+      AlphRemaining,
       AddressConst(address1),
       BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken,
       AddressConst(address1),
-      AlfRemaining,
+      AlphRemaining,
       AddressConst(address1),
       BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
@@ -351,23 +351,23 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val instrs0 = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       U256Const(Val.U256(10)),
-      ApproveAlf,
+      ApproveAlph,
       CallLocal(1),
       AddressConst(address0),
       U256Const(Val.U256(20)),
-      ApproveAlf,
+      ApproveAlph,
       CallLocal(2)
     )
     val instrs1 = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      AlfRemaining,
+      AlphRemaining,
       U256Const(Val.U256(10)),
       U256Eq,
       Assert
     )
     val instrs2 = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      AlfRemaining,
+      AlphRemaining,
       U256Const(Val.U256(20)),
       U256Eq,
       Assert
@@ -390,24 +390,24 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address0),
       AddressConst(address1),
       U256Const(Val.U256(10)),
-      TransferAlf,
+      TransferAlph,
       AddressConst(address1),
       AddressConst(address0),
       BytesConst(Val.ByteVec(tokenId.bytes)),
       U256Const(Val.U256(1)),
       TransferToken,
       AddressConst(address0),
-      AlfRemaining,
+      AlphRemaining,
       AddressConst(address1),
-      AlfRemaining,
+      AlphRemaining,
       AddressConst(address1),
       BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
 
     val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(98)))
-    context.outputBalances.getAlfAmount(address0.lockupScript).get is 90
-    context.outputBalances.getAlfAmount(address1.lockupScript).get is 11
+    context.outputBalances.getAlphAmount(address0.lockupScript).get is 90
+    context.outputBalances.getAlphAmount(address1.lockupScript).get is 11
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
     context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }
@@ -417,7 +417,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       val instrs = AVector[Instr[StatefulContext]](
         AddressConst(address0),
         U256Const(Val.U256(10)),
-        ApproveAlf,
+        ApproveAlph,
         BytesConst(Val.ByteVec(serialize(contract))),
         BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
         CreateContract

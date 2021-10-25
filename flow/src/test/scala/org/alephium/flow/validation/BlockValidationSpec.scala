@@ -22,7 +22,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALF, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript}
 import org.alephium.serde.serialize
@@ -413,7 +413,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   it should "validate old blocks" in new Fixture {
     val block0     = transfer(blockFlow, chainIndex)
-    val newBlockTs = ALF.LaunchTimestamp.plusSecondsUnsafe(10)
+    val newBlockTs = ALPH.LaunchTimestamp.plusSecondsUnsafe(10)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
     checkBlockUnit(block1, blockFlow) isE ()
   }

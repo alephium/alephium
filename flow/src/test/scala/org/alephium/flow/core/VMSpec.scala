@@ -25,7 +25,7 @@ import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signa
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToSharedPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -97,7 +97,7 @@ class VMSpec extends AlephiumSpec {
 
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val fromLockup = getGenesisLockupScript(chainIndex)
-    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, ALF.alf(1))
+    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, ALPH.alph(1))
     lazy val block0     = payableCall(blockFlow, chainIndex, txScript0)
     lazy val contractOutputRef0 =
       TxOutputRef.unsafe(block0.transactions.head, 0).asInstanceOf[ContractOutputRef]
@@ -163,11 +163,11 @@ class VMSpec extends AlephiumSpec {
         input: String,
         initialState: AVector[Val],
         tokenAmount: Option[U256] = None,
-        initialAlfAmount: U256 = dustUtxoAmount
+        initialAlphAmount: U256 = dustUtxoAmount
     ): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
       val txScript =
-        contractCreation(contract, initialState, genesisLockup, initialAlfAmount, tokenAmount)
+        contractCreation(contract, initialState, genesisLockup, initialAlphAmount, tokenAmount)
       val block = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
@@ -185,9 +185,9 @@ class VMSpec extends AlephiumSpec {
         numContracts: Int,
         initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
         tokenAmount: Option[U256] = None,
-        initialAlfAmount: U256 = dustUtxoAmount
+        initialAlphAmount: U256 = dustUtxoAmount
     ): ContractOutputRef = {
-      val contractOutputRef = createContract(input, initialState, tokenAmount, initialAlfAmount)
+      val contractOutputRef = createContract(input, initialState, tokenAmount, initialAlphAmount)
 
       val contractKey = contractOutputRef.key
       checkState(
@@ -270,7 +270,7 @@ class VMSpec extends AlephiumSpec {
       """
          |TxContract Foo() {
          |  pub payable fn foo(address: Address) -> () {
-         |    transferAlfFromSelf!(address, alfRemaining!(selfAddress!()))
+         |    transferAlphFromSelf!(address, alphRemaining!(selfAddress!()))
          |  }
          |}
          |""".stripMargin
@@ -562,7 +562,7 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  pub payable fn main() -> () {
          |    Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
-         |    approveAlf!(@$genesisAddress, ${ALF.alf(1).v})
+         |    approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
          |    copyCreateContract!(#$fooId, #$state)
          |    assert!(isPaying!(@$genesisAddress) == true)
          |  }
@@ -698,7 +698,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Foo() {
          |  pub payable fn foo(targetAddress: Address) -> () {
-         |    approveAlf!(selfAddress!(), alfRemaining!(selfAddress!()))
+         |    approveAlph!(selfAddress!(), alphRemaining!(selfAddress!()))
          |    destroy(targetAddress)
          |  }
          |
@@ -842,7 +842,7 @@ class VMSpec extends AlephiumSpec {
          |{
          |    pub payable fn buy(buyer: Address) -> ()
          |    {
-         |        transferAlf!(buyer, author, price)
+         |        transferAlph!(buyer, author, price)
          |        transferTokenFromSelf!(buyer, selfTokenId!(), 1)
          |        destroySelf!(author)
          |    }
@@ -864,7 +864,7 @@ class VMSpec extends AlephiumSpec {
          |{
          |    pub payable fn main() -> ()
          |    {
-         |        approveAlf!(@${genesisAddress.toBase58}, 1000000)
+         |        approveAlph!(@${genesisAddress.toBase58}, 1000000)
          |        Nft(#${tokenId.toHexString}).buy(@${genesisAddress.toBase58})
          |    }
          |}
@@ -902,28 +902,28 @@ class VMSpec extends AlephiumSpec {
       s"""
          |// Simple swap contract purely for testing
          |
-         |TxContract Swap(tokenId: ByteVec, mut alfReserve: U256, mut tokenReserve: U256) {
+         |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
          |
-         |  pub payable fn addLiquidity(lp: Address, alfAmount: U256, tokenAmount: U256) -> () {
-         |    transferAlfToSelf!(lp, alfAmount)
+         |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
+         |    transferAlphToSelf!(lp, alphAmount)
          |    transferTokenToSelf!(lp, tokenId, tokenAmount)
-         |    alfReserve = alfAmount
+         |    alphReserve = alphAmount
          |    tokenReserve = tokenAmount
          |  }
          |
-         |  pub payable fn swapToken(buyer: Address, alfAmount: U256) -> () {
-         |    let tokenAmount = tokenReserve - alfReserve * tokenReserve / (alfReserve + alfAmount)
-         |    transferAlfToSelf!(buyer, alfAmount)
+         |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
+         |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
+         |    transferAlphToSelf!(buyer, alphAmount)
          |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
-         |    alfReserve = alfReserve + alfAmount
+         |    alphReserve = alphReserve + alphAmount
          |    tokenReserve = tokenReserve - tokenAmount
          |  }
          |
-         |  pub payable fn swapAlf(buyer: Address, tokenAmount: U256) -> () {
-         |    let alfAmount = alfReserve - alfReserve * tokenReserve / (tokenReserve + tokenAmount)
+         |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
+         |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
          |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-         |    transferAlfFromSelf!(buyer, alfAmount)
-         |    alfReserve = alfReserve - alfAmount
+         |    transferAlphFromSelf!(buyer, alphAmount)
+         |    alphReserve = alphReserve - alphAmount
          |    tokenReserve = tokenReserve + tokenAmount
          |  }
          |}
@@ -934,10 +934,10 @@ class VMSpec extends AlephiumSpec {
       tokenAmount = Some(1024)
     ).key
 
-    def checkSwapBalance(alfReserve: U256, tokenReserve: U256) = {
+    def checkSwapBalance(alphReserve: U256, tokenReserve: U256) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
       val output     = worldState.getContractAsset(swapContractKey).rightValue
-      output.amount is alfReserve
+      output.amount is alphReserve
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
     }
 
@@ -946,7 +946,7 @@ class VMSpec extends AlephiumSpec {
     callTxScript(s"""
                     |TxScript Main {
                     |  pub payable fn main() -> () {
-                    |    approveAlf!(@${genesisAddress.toBase58}, 10)
+                    |    approveAlph!(@${genesisAddress.toBase58}, 10)
                     |    approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 100)
                     |    let swap = Swap(#${swapContractKey.toHexString})
                     |    swap.addLiquidity(@${genesisAddress.toBase58}, 10, 100)
@@ -960,7 +960,7 @@ class VMSpec extends AlephiumSpec {
     callTxScript(s"""
                     |TxScript Main {
                     |  pub payable fn main() -> () {
-                    |    approveAlf!(@${genesisAddress.toBase58}, 10)
+                    |    approveAlph!(@${genesisAddress.toBase58}, 10)
                     |    let swap = Swap(#${swapContractKey.toHexString})
                     |    swap.swapToken(@${genesisAddress.toBase58}, 10)
                     |  }
@@ -975,7 +975,7 @@ class VMSpec extends AlephiumSpec {
                     |  pub payable fn main() -> () {
                     |    approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 50)
                     |    let swap = Swap(#${swapContractKey.toHexString})
-                    |    swap.swapAlf(@${genesisAddress.toBase58}, 50)
+                    |    swap.swapAlph(@${genesisAddress.toBase58}, 50)
                     |  }
                     |}
                     |
@@ -1018,7 +1018,7 @@ class VMSpec extends AlephiumSpec {
         |TxContract Foo(mut x: U256) {
         |  pub payable fn foo(address: Address) -> () {
         |    x = x + 1
-        |    transferAlfFromSelf!(address, ${ALF.cent(1).v})
+        |    transferAlphFromSelf!(address, ${ALPH.cent(1).v})
         |  }
         |}
         |""".stripMargin
@@ -1027,20 +1027,20 @@ class VMSpec extends AlephiumSpec {
         testContract,
         2,
         2,
-        initialAlfAmount = ALF.alf(1)
+        initialAlphAmount = ALPH.alph(1)
       ).key
 
-    def checkContract(alfReserve: U256, x: Int) = {
+    def checkContract(alphReserve: U256, x: Int) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val state      = worldState.getContractState(contractId).rightValue
       state.fields is AVector[Val](Val.U256(x))
       val output = worldState.getContractAsset(contractId).rightValue
-      output.amount is alfReserve
+      output.amount is alphReserve
     }
 
-    checkContract(ALF.alf(1), 0)
+    checkContract(ALPH.alph(1), 0)
 
-    val block0 = transfer(blockFlow, chainIndex, amount = ALF.alf(10), numReceivers = 10)
+    val block0 = transfer(blockFlow, chainIndex, amount = ALPH.alph(10), numReceivers = 10)
     addAndCheck(blockFlow, block0)
     val newAddresses = block0.nonCoinbase.head.unsigned.fixedOutputs.init.map(_.lockupScript)
 
@@ -1088,7 +1088,7 @@ class VMSpec extends AlephiumSpec {
     blockTemplate.transactions.filter(_.scriptExecutionOk == false).length is 5
     val block = mine(blockFlow, blockTemplate)
     addAndCheck0(blockFlow, block)
-    checkContract(ALF.cent(95), 5)
+    checkContract(ALPH.cent(95), 5)
   }
 }
 // scalastyle:on file.size.limit no.equal regex
