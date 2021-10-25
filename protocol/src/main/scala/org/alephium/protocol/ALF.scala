@@ -17,7 +17,7 @@
 package org.alephium.protocol
 
 import org.alephium.protocol.model.Weight
-import org.alephium.util.{Number, TimeStamp, U256}
+import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALPH {
   //scalastyle:off magic.number
@@ -31,6 +31,10 @@ object ALPH {
   val GenesisWeight: Weight       = Weight.zero
   val GenesisTimestamp: TimeStamp = TimeStamp.unsafe(1231006505000L) // BTC genesis timestamp
   val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1633438948000L) // 2021-10-05T13:04:28+00:00
+
+  val OneYear: Duration                         = Duration.ofDaysUnsafe(365)
+  val DifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
+  val ExpDiffPeriod: Duration                   = Duration.ofDaysUnsafe(30)
 
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256

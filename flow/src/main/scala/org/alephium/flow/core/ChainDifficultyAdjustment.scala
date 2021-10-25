@@ -44,10 +44,22 @@ trait ChainDifficultyAdjustment {
     } yield timestampNow.deltaUnsafe(timestampLast)
   }
 
+  final def calIceAgeTarget(currentTarget: Target, timestamp: TimeStamp): Target = {
+    if (timestamp.isBefore(ALPH.DifficultyBombEnabledTimestamp)) {
+      currentTarget
+    } else {
+      val periodCount = timestamp
+        .deltaUnsafe(ALPH.DifficultyBombEnabledTimestamp)
+        .millis / ALPH.ExpDiffPeriod.millis
+      Target.unsafe(currentTarget.value.shiftRight(periodCount.toInt))
+    }
+  }
+
   // DigiShield DAA V3 variant
   final protected[core] def calNextHashTargetRaw(
       hash: BlockHash,
-      currentTarget: Target
+      currentTarget: Target,
+      timestamp: TimeStamp
   ): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height >= ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
@@ -59,7 +71,8 @@ trait ChainDifficultyAdjustment {
           } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
             clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
           }
-          reTarget(currentTarget, clippedTimeSpan)
+          val target = reTarget(currentTarget, clippedTimeSpan)
+          calIceAgeTarget(target, timestamp)
         }
       case _ => Right(currentTarget)
     }

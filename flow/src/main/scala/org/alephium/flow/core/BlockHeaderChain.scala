@@ -139,7 +139,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def getNextHashTargetRaw(hash: BlockHash): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
-      newTarget <- calNextHashTargetRaw(hash, header.target)
+      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp)
     } yield newTarget
   }
 

@@ -98,7 +98,11 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val latestHash = data.last._1
       fixture.chainBackUntil(latestHash, 0) isE data.tail.map(_._1)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      fixture.calNextHashTargetRaw(latestHash, currentTarget) isE currentTarget
+      fixture.calNextHashTargetRaw(
+        latestHash,
+        currentTarget,
+        ALPH.LaunchTimestamp
+      ) isE currentTarget
     }
   }
 
@@ -113,7 +117,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
       calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget) isE currentTarget
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE currentTarget
     }
   }
 
@@ -132,7 +136,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
       calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget) isE
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
   }
@@ -152,9 +156,26 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
       calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget) isE
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
+  }
+
+  it should "decrease the target when difficulty bomb enabled" in new MockFixture {
+    val currentTarget = consensusConfig.maxMiningTarget
+    val timestamp0    = ALPH.DifficultyBombEnabledTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    calIceAgeTarget(currentTarget, timestamp0) is currentTarget
+
+    (0 until 20).foreach { i =>
+      val period    = ALPH.ExpDiffPeriod.timesUnsafe(i.toLong)
+      val timestamp = ALPH.DifficultyBombEnabledTimestamp.plusUnsafe(period)
+      val target    = calIceAgeTarget(currentTarget, timestamp)
+      target is Target.unsafe(currentTarget.value.shiftRight(i))
+    }
+
+    val period     = ALPH.ExpDiffPeriod.timesUnsafe(256)
+    val timestamp1 = ALPH.DifficultyBombEnabledTimestamp.plusUnsafe(period)
+    calIceAgeTarget(currentTarget, timestamp1) is Target.Zero
   }
 
   trait SimulationFixture extends MockFixture {
@@ -174,7 +195,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     val initialTarget =
       Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
-    var currentTarget = calNextHashTargetRaw(getHash(currentHeight), initialTarget).rightValue
+    var currentTarget =
+      calNextHashTargetRaw(getHash(currentHeight), initialTarget, ALPH.LaunchTimestamp).rightValue
     currentTarget is initialTarget
     def stepSimulation(finalTarget: Target) = {
       val ratio =
@@ -184,7 +206,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val nextTs   = currentTs.plusMillisUnsafe(duration.toLong)
       val newHash  = BlockHash.random
       addNew(newHash, nextTs)
-      currentTarget = calNextHashTargetRaw(newHash, currentTarget).rightValue
+      currentTarget = calNextHashTargetRaw(newHash, currentTarget, ALPH.LaunchTimestamp).rightValue
     }
 
     def checkRatio(ratio: Double, expected: Double) = {
