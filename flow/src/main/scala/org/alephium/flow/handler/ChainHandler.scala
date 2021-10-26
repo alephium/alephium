@@ -191,14 +191,13 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   def measure(data: T): Unit
 
   def showHeader(header: BlockHeader): String = {
-    val total = blockFlow.numHashes
-    val index = header.chainIndex
-    val chain = blockFlow.getHeaderChain(header)
-    val targetRatio =
-      (BigDecimal(header.target.value) / BigDecimal(consensusConfig.maxMiningTarget.value)).toFloat
+    val total     = blockFlow.numHashes
+    val index     = header.chainIndex
+    val chain     = blockFlow.getHeaderChain(header)
+    val hashRate  = HashRate.from(header.target, consensusConfig.blockTargetTime)
     val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
 
-    s"hash: ${header.hash.toHexString}; $index; ${chain.showHeight(header.hash)}; total: $total; targetRatio: $targetRatio, blockTime: $blockTime"
+    s"hash: ${header.hash.toHexString}; $index; ${chain.showHeight(header.hash)}; total: $total; hashRate: ${hashRate.value}, blockTime: $blockTime"
   }
 
   protected def measureCommon(header: BlockHeader): BlockHeaderChain = {
