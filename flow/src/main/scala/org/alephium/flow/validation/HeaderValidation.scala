@@ -136,7 +136,7 @@ object HeaderValidation {
     protected[validation] def checkGenesisVersion(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
-      if (header.version == defaultBlockVersion) {
+      if (header.version == DefaultBlockVersion) {
         validHeader(())
       } else {
         invalidHeader(InvalidGenesisVersion)
@@ -186,7 +186,7 @@ object HeaderValidation {
     }
 
     protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.version == defaultBlockVersion) {
+      if (header.version == DefaultBlockVersion) {
         validHeader(())
       } else {
         invalidHeader(InvalidBlockVersion)

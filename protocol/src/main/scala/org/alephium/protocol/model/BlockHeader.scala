@@ -103,7 +103,7 @@ object BlockHeader {
       config: GroupConfig
   ): BlockHeader = {
     val deps = BlockDeps.build(AVector.fill(config.depsNum)(BlockHash.zero))
-    BlockHeader(nonce, defaultBlockVersion, deps, Hash.zero, txsHash, ALPH.GenesisTimestamp, target)
+    BlockHeader(nonce, DefaultBlockVersion, deps, Hash.zero, txsHash, ALPH.GenesisTimestamp, target)
   }
 
   def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit
@@ -130,7 +130,7 @@ object BlockHeader {
       nonce: Nonce
   ): BlockHeader = {
     val blockDeps = BlockDeps.unsafe(deps)
-    BlockHeader(nonce, defaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target)
+    BlockHeader(nonce, DefaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target)
   }
 
   def unsafe(

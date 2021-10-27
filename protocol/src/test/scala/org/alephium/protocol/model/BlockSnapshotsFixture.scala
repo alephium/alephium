@@ -26,7 +26,7 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
 
     BlockHeader(
       nonce = Nonce.unsafe(hex"bb557f744763ca4f5ef8079b4b76c2dbb26a4cd845fbc84d"),
-      version = defaultBlockVersion,
+      version = DefaultBlockVersion,
       blockDeps = BlockDeps.build(
         deps = AVector(
           Blake3.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),

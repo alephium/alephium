@@ -245,7 +245,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx         = block.nonCoinbase.head
     tx.pass()
 
-    tx.unsigned.version is defaultTxVersion
+    tx.unsigned.version is DefaultTxVersion
     tx.unsigned.version isnot Byte.MaxValue
     val invalidTx = tx.updateUnsigned(_.copy(version = Byte.MaxValue))
     invalidTx.fail(InvalidTxVersion)

@@ -21,8 +21,8 @@ import org.alephium.util.Bytes.byteStringOrdering
 import org.alephium.util.U256
 
 package object model {
-  val defaultBlockVersion: Byte = 0.toByte
-  val defaultTxVersion: Byte    = 0.toByte
+  val DefaultBlockVersion: Byte = 0.toByte
+  val DefaultTxVersion: Byte    = 0.toByte
 
   val cliqueIdLength: Int = PublicKey.length
 

@@ -324,7 +324,7 @@ object TxValidation {
   class Impl(implicit val groupConfig: GroupConfig, networkConfig: NetworkConfig)
       extends TxValidation {
     protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit] = {
-      if (tx.unsigned.version == defaultTxVersion) {
+      if (tx.unsigned.version == DefaultTxVersion) {
         validTx(())
       } else {
         invalidTx(InvalidTxVersion)

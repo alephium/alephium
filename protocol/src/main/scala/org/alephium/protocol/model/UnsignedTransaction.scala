@@ -82,7 +82,7 @@ object UnsignedTransaction {
       fixedOutputs: AVector[AssetOutput]
   )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
     new UnsignedTransaction(
-      defaultTxVersion,
+      DefaultTxVersion,
       networkConfig.networkId,
       scriptOpt,
       startGas,
@@ -98,7 +98,7 @@ object UnsignedTransaction {
       fixedOutputs: AVector[AssetOutput]
   )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
     UnsignedTransaction(
-      defaultTxVersion,
+      DefaultTxVersion,
       networkConfig.networkId,
       txScriptOpt,
       minimalGas,
@@ -112,7 +112,7 @@ object UnsignedTransaction {
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
     UnsignedTransaction(
-      defaultTxVersion,
+      DefaultTxVersion,
       networkConfig.networkId,
       None,
       minimalGas,
@@ -126,7 +126,7 @@ object UnsignedTransaction {
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
     UnsignedTransaction(
-      defaultTxVersion,
+      DefaultTxVersion,
       networkConfig.networkId,
       None,
       minimalGas,
@@ -164,7 +164,7 @@ object UnsignedTransaction {
       }
 
       UnsignedTransaction(
-        defaultTxVersion,
+        DefaultTxVersion,
         networkConfig.networkId,
         scriptOpt = None,
         gas,

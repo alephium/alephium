@@ -70,10 +70,10 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis version" in new GenesisFixture {
-    genesis.version is defaultBlockVersion
+    genesis.version is DefaultBlockVersion
 
     forAll { byte: Byte =>
-      whenever(byte != defaultBlockVersion) {
+      whenever(byte != DefaultBlockVersion) {
         val header = genesis.copy(version = byte)
         failValidation(headerValidator.validateGenesisHeader(header), InvalidGenesisVersion)
       }
@@ -186,7 +186,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check header version" in new HeaderFixture {
-    val modified0 = updateNonce(header.copy(version = defaultBlockVersion))
+    val modified0 = updateNonce(header.copy(version = DefaultBlockVersion))
     passValidation(modified0)
   }
 

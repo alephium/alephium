@@ -503,10 +503,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check signature size" in {
     val context0 = genStatefulContext(None)
-    StatefulVM.checkRemainingSignature(context0) isE ()
+    StatefulVM.checkRemainingSignatures(context0) isE ()
 
     val signature = Signature.generate
     val context1  = genStatefulContext(None, signatures = AVector(signature))
-    StatefulVM.checkRemainingSignature(context1).leftValue isE TooManySignatures
+    StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures
   }
 }

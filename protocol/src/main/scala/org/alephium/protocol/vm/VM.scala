@@ -385,7 +385,7 @@ object StatefulVM {
     for {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
-      _       <- checkRemainingSignature(context)
+      _       <- checkRemainingSignatures(context)
     } yield {
       TxScriptExecution(
         context.gasRemaining,
@@ -396,7 +396,7 @@ object StatefulVM {
     }
   }
 
-  def checkRemainingSignature(context: StatefulContext): ExeResult[Unit] = {
+  def checkRemainingSignatures(context: StatefulContext): ExeResult[Unit] = {
     if (context.txEnv.signatures.isEmpty) {
       okay
     } else {

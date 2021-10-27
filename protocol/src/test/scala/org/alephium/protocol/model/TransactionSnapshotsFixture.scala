@@ -44,7 +44,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
     import Hex._
 
     UnsignedTransaction(
-      defaultTxVersion,
+      DefaultTxVersion,
       networkId,
       scriptOpt.map(script => Compiler.compileTxScript(script).rightValue),
       GasBox.unsafe(100000),
