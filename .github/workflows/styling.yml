@@ -14,4 +14,4 @@ jobs:
         with:
           java-version: 11
       - run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck it:scalafmtCheck scalastyle test:scalastyle it:scalastyle doc
-      - run: ./make assembly
+      - run: make assembly

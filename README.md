@@ -52,7 +52,6 @@ You can obtain our latest single JAR distribution from the GitHub releases and s
 
 In order to build the project from source the following dependencies must be installed on your system:
 - java (>= 8, 11 is recommended)
-- Python (Python3 is recommended)
 - [SBT](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html)
 
 ### Single JAR
