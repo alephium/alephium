@@ -223,7 +223,7 @@ trait TxUtils { Self: FlowUtils =>
       val utxos = allUtxos.takeUpto(ALF.MaxTxInputNum) // sweep as much as we can
       for {
         _   <- checkWithMinimalGas(gasOpt, minimalGas)
-        gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateGas(utxos.length, 2)))
+        gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length)))
         totalAmount <- utxos.foldE(U256.Zero)(
           _ add _.output.amount toRight "Input amount overflow"
         )

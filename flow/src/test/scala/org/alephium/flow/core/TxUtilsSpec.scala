@@ -512,7 +512,7 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        Some(GasBox.unsafe(600000)),
+        None,
         defaultGasPrice
       )
       .rightValue

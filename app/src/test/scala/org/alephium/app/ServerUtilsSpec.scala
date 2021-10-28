@@ -265,8 +265,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toAddress                          = Address.p2pkh(toPublicKey)
       val destination                        = Destination(toAddress, Amount(ALF.oneAlf))
 
-      info("Sending some coins to an address, resulting 3 UTXOs for its corresponding public key")
-      val destinations = AVector(destination, destination)
+      info("Sending some coins to an address, resulting 10 UTXOs for its corresponding public key")
+      val destinations = AVector.fill(10)(destination)
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
@@ -281,7 +281,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         fromPrivateKey
       )
 
-      val senderBalanceWithGas   = genesisBalance - ALF.alf(2)
+      val senderBalanceWithGas   = genesisBalance - ALF.alf(10)
       val receiverInitialBalance = genesisBalance
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
@@ -298,10 +298,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 1, 0)
       checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
-      checkAddressBalance(toAddress, receiverInitialBalance + ALF.alf(2), 3)
+      checkAddressBalance(toAddress, receiverInitialBalance + ALF.alf(10), 11)
 
-      info("Sweep coins from the 3 UTXOs for the same public key to another address")
-      val senderBalanceBeforeSweep = receiverInitialBalance + ALF.alf(2)
+      info("Sweep coins from the 10 UTXOs for the same public key to another address")
+      val senderBalanceBeforeSweep = receiverInitialBalance + ALF.alf(10)
       val sweepAllToAddress        = generateAddress(chainIndex)
       val buildSweepAllTransaction = serverUtils
         .buildSweepAllTransaction(
@@ -318,8 +318,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         toPrivateKey
       )
 
-      // Spend 3 UTXOs and generate 2 outputs, including a change output
-      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateGas(3, 2)
+      // Spend 10 UTXOs and generate 1 output
+      sweepAllTxTemplate.unsigned.fixedOutputs.length is 1
+      sweepAllTxTemplate.unsigned.gasAmount > minimalGas is true
+      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11)
 
       checkAddressBalance(
         sweepAllToAddress,

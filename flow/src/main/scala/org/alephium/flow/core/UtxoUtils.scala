@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.{GasBox, GasPrice, GasSchedule}
 import org.alephium.util._
 
 /*
@@ -138,8 +138,17 @@ object UtxoUtils {
     }
   }
 
+  // TODO: improve gas estimator
   def estimateGas(numInputs: Int, numOutputs: Int): GasBox = {
     estimateGas(defaultGasPerInput, defaultGasPerOutput, numInputs, numOutputs, minimalGas)
+  }
+
+  def estimateSweepAllTxGas(numInputs: Int): GasBox = {
+    val gas = GasSchedule.txBaseGas
+      .addUnsafe(GasSchedule.txInputBaseGas.mulUnsafe(numInputs))
+      .addUnsafe(GasSchedule.txOutputBaseGas)
+      .addUnsafe(GasSchedule.p2pkUnlockGas)
+    Math.max(gas, minimalGas)
   }
 
   private def select(
