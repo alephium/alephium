@@ -454,6 +454,36 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "estimate gas for sweep all tx" in new FlowFixture {
+    val txValidation = TxValidation.build
+    def test(inputNum: Int) = {
+      val blockflow = isolatedBlockFlow()
+      val block     = transfer(blockflow, ChainIndex.unsafe(0, 0))
+      val tx        = block.nonCoinbase.head
+      val output    = tx.unsigned.fixedOutputs.head
+      val outputs   = AVector.fill(inputNum)(output.copy(amount = ALF.oneAlf))
+      val newTx     = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
+      val newBlock  = block.copy(transactions = AVector(newTx))
+      addAndUpdateView(blockflow, newBlock)
+
+      val unsignedTx = blockflow
+        .sweepAll(
+          keyManager(output.lockupScript).publicKey,
+          output.lockupScript,
+          None,
+          None,
+          defaultGasPrice
+        )
+        .rightValue
+        .rightValue
+      unsignedTx.gasAmount is UtxoUtils.estimateSweepAllTxGas(inputNum)
+      val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
+      txValidation.validateTxOnlyForTest(sweepTx, blockflow) isE ()
+    }
+
+    (1 to 10).foreach(test)
+  }
+
   trait LargeUtxos extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)
