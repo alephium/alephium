@@ -24,7 +24,7 @@ import org.alephium.flow.network.bootstrap.InfoFixture
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
 class CliqueManagerSpec extends AlephiumActorSpec {
-  it should "ready after connected to brokers" in new FlowFixture with InfoFixture {
+  it should "become ready after connected to brokers" in new FlowFixture with InfoFixture {
     val (allHandlers, _) = TestUtils.createAllHandlersProbe
     val cliqueManager = system.actorOf(
       CliqueManager.props(
@@ -35,7 +35,8 @@ class CliqueManagerSpec extends AlephiumActorSpec {
         discoverySetting.bootstrap.size
       )
     )
-    val cliqueInfo = genIntraCliqueInfo.cliqueInfo
+    val cliqueInfo = genIntraCliqueInfo(1).cliqueInfo
+    cliqueInfo.brokerNum is 3
     cliqueManager ! CliqueManager.Start(cliqueInfo)
     cliqueManager ! CliqueManager.IsSelfCliqueReady
     expectMsg(false)
