@@ -21,7 +21,7 @@ jobs:
           version=$(echo ${GITHUB_REF/refs\/tags\//} | cut -c 2-)
           echo ::set-output name=VERSION::$version
         shell: bash
-      - run: ./make assembly
+      - run: make assembly
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
