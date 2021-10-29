@@ -462,7 +462,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val block     = transfer(blockflow, ChainIndex.unsafe(0, 0))
       val tx        = block.nonCoinbase.head
       val output    = tx.unsigned.fixedOutputs.head
-      val outputs   = AVector.fill(inputNum)(output.copy(amount = ALF.oneAlf))
+      val outputs   = AVector.fill(inputNum)(output.copy(amount = ALPH.oneAlph))
       val newTx     = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
       val newBlock  = block.copy(transactions = AVector(newTx))
       addAndUpdateView(blockflow, newBlock)
