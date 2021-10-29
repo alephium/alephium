@@ -639,19 +639,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
 
     Get(s"/infos/node") check { response =>
       response.code is StatusCode.Ok
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false, buildInfo)
-    }
-
-    miner ! Miner.Start
-
-    Get(s"/infos/node") check { response =>
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = true, buildInfo)
-    }
-
-    miner ! Miner.Stop
-
-    Get(s"/infos/node") check { response =>
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, isMining = false, buildInfo)
+      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, buildInfo)
     }
   }
 

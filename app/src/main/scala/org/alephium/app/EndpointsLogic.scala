@@ -96,17 +96,14 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getNodeInfoLogic = serverLogic(getNodeInfo) { _ =>
-    for {
-      isMining <- miner.ask(Miner.IsMining).mapTo[Boolean]
-    } yield {
+    Future.successful(
       Right(
         NodeInfo(
           ReleaseVersion.current,
-          isMining = isMining,
           NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId)
         )
       )
-    }
+    )
   }
 
   val getSelfCliqueLogic = serverLogic(getSelfClique) { _ =>
