@@ -2015,7 +2015,10 @@
                 },
                 "example": {
                   "version": "v0.0.1",
-                  "isMining": true
+                  "buildInfo": {
+                    "releaseVersion": "1.2.3",
+                    "commit": "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
+                  }
                 }
               }
             }
@@ -6083,6 +6086,21 @@
           }
         }
       },
+      "BuildInfo": {
+        "required": [
+          "releaseVersion",
+          "commit"
+        ],
+        "type": "object",
+        "properties": {
+          "releaseVersion": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          }
+        }
+      },
       "BuildMultisig": {
         "required": [
           "fromAddress",
@@ -6606,15 +6624,15 @@
       "NodeInfo": {
         "required": [
           "version",
-          "isMining"
+          "buildInfo"
         ],
         "type": "object",
         "properties": {
           "version": {
             "$ref": "#/components/schemas/ReleaseVersion"
           },
-          "isMining": {
-            "type": "boolean"
+          "buildInfo": {
+            "$ref": "#/components/schemas/BuildInfo"
           }
         }
       },
