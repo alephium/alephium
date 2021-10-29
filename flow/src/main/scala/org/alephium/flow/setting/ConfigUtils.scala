@@ -16,6 +16,8 @@
 
 package org.alephium.flow.setting
 
+import scala.util.{Failure, Success, Try}
+
 import com.typesafe.config.ConfigException
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
@@ -24,7 +26,7 @@ import org.alephium.crypto.Sha256
 import org.alephium.flow.mining.Miner
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkId}
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.{AVector, Hex, U256}
 
 object ConfigUtils {
 
@@ -82,5 +84,21 @@ object ConfigUtils {
       .getOrElse(
         throw new ConfigException.BadValue("", s"invalid chain id: $id")
       )
+  }
+
+  implicit val allocationAmountReader: ValueReader[Allocation.Amount] = ValueReader[String].map {
+    input =>
+      Try(new java.math.BigInteger(input)) match {
+        case Success(bigInt) =>
+          Allocation.Amount(
+            U256
+              .from(bigInt)
+              .getOrElse(throw new ConfigException.BadValue("amount", s"Invalid amount: $bigInt"))
+          )
+        case Failure(_) =>
+          Allocation.Amount
+            .from(input)
+            .getOrElse(throw new ConfigException.BadValue("amount", s"Invalid amount: $input"))
+      }
   }
 }

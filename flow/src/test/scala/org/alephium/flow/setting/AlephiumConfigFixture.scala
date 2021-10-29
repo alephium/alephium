@@ -56,7 +56,7 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
       .load(newConfig)
 
     val allocations = genesisKeys.map { case (_, pubKey, amount) =>
-      Allocation(Address.p2pkh(pubKey), amount, Duration.zero)
+      Allocation(Address.p2pkh(pubKey), Allocation.Amount(amount), Duration.zero)
     }
     tmp.copy(genesis = GenesisSetting(allocations))
   }

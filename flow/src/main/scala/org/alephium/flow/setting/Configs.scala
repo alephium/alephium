@@ -163,7 +163,7 @@ object Configs extends StrictLogging {
         val balancesOI = balances
           .filter(_.address.lockupScript.groupIndex.value == from)
           .map(allocation =>
-            (allocation.address.lockupScript, allocation.amount, allocation.lockDuration)
+            (allocation.address.lockupScript, allocation.amount.value, allocation.lockDuration)
           )
         val transaction = Transaction.genesis(balancesOI, networkConfig.noPreMineProof)
         AVector(transaction)

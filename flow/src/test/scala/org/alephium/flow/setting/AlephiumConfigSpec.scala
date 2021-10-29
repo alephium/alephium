@@ -29,12 +29,14 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf.*
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Env}
 
 class AlephiumConfigSpec extends AlephiumSpec {
+  import ConfigUtils._
   it should "load alephium config" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "13"),
@@ -84,13 +86,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "load genesis config" in {
-    val amount = U256.unsafe(1000000L)
+    val amount = ALPH.oneAlph
     val addresses = AVector(
       "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",
       "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA"
     )
     val genesisSetting = GenesisSetting(addresses.map { address =>
-      Allocation(Address.asset(address).get, amount, Duration.ofSecondsUnsafe(2))
+      Allocation(Address.asset(address).get, Allocation.Amount(amount), Duration.ofDaysUnsafe(2))
     })
 
     val configs =
@@ -100,13 +102,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
          |    allocations = [
          |      {
          |        address = "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",
-         |        amount = "1000000",
-         |        lock-duration = 2 seconds
+         |        amount = "1000000000000000000",
+         |        lock-duration = ${2 * 24 * 60 * 60} seconds
          |      },
          |      {
          |        address = "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA",
-         |        amount = "1000000",
-         |        lock-duration = 2 seconds
+         |        amount = "1 ALPH",
+         |        lock-duration = 2 days
          |      }
          |    ]
          |  }

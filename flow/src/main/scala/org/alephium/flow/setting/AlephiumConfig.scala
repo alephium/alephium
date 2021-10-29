@@ -32,7 +32,7 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf.*
 import org.alephium.flow.network.nat.Upnp
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.*
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
@@ -164,7 +164,19 @@ object WalletSetting {
 
 final case class NodeSetting(dbSyncWrite: Boolean)
 
-final case class Allocation(address: Address.Asset, amount: U256, lockDuration: Duration)
+final case class Allocation(
+    address: Address.Asset,
+    amount: Allocation.Amount,
+    lockDuration: Duration
+)
+object Allocation {
+  final case class Amount(value: U256)
+  object Amount {
+    def from(string: String): Option[Amount] =
+      ALPH.alphFromString(string).map(Amount(_))
+  }
+}
+
 final case class GenesisSetting(allocations: AVector[Allocation])
 
 final case class AlephiumConfig(

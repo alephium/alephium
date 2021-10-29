@@ -16,16 +16,53 @@
 
 package org.alephium.protocol
 
-import org.alephium.util.{AlephiumSpec, U256}
+import org.alephium.util.{AlephiumSpec, NumericHelpers, U256}
 
 class ALPHSpec extends AlephiumSpec {
-  it should "use correct unit" in {
-    ALPH.alph(1) is ALPH.nanoAlph(1).mul(U256.Billion).get
-    ALPH.alph(1).toBigInt.longValue() is math.pow(10, 18).longValue()
-    ALPH.cent(1).mulUnsafe(U256.unsafe(100)) is ALPH.alph(1)
+  import ALPH._
 
-    ALPH.oneAlph is ALPH.alph(1)
-    ALPH.oneNanoAlph is ALPH.nanoAlph(1)
-    ALPH.oneAlph is (ALPH.oneNanoAlph.mulUnsafe(U256.unsafe(1000000000)))
+  it should "use correct unit" in {
+    alph(1) is nanoAlph(1).mul(U256.Billion).get
+    alph(1).toBigInt.longValue() is math.pow(10, 18).longValue()
+    cent(1).mulUnsafe(U256.unsafe(100)) is alph(1)
+
+    oneAlph is alph(1)
+    oneNanoAlph is nanoAlph(1)
+    oneAlph is (oneNanoAlph.mulUnsafe(U256.unsafe(1000000000)))
+  }
+
+  it should "parse `x.y ALPH` format" in new Fixture {
+    check("1.2ALPH", alph(12) / 10)
+    check("1.2 ALPH", alph(12) / 10)
+    check("1 ALPH", alph(1))
+    check("1ALPH", alph(1))
+    check("0.1ALPH", alph(1) / 10)
+    check(".1ALPH", alph(1) / 10)
+    check(".1     ALPH", alph(1) / 10)
+    check("0 ALPH", U256.Zero)
+    check("1234.123456 ALPH", alph(1234123456) / 1000000)
+
+    val alphMax = s"${MaxALPHValue.divUnsafe(oneAlph)}"
+    alphMax is "1000000000"
+    check(s"$alphMax ALPH", MaxALPHValue)
+
+    fail("1.2alph")
+    fail("-1.2alph")
+    fail("1.2 alph")
+    fail("1 Alph")
+    fail("1. ALPH")
+    fail(". ALPH")
+    fail(" ALPH")
+    fail("0.000000000000000000001 ALPH")
+  }
+
+  trait Fixture extends NumericHelpers {
+
+    def check(str: String, expected: U256) = {
+      ALPH.alphFromString(str) is Some(expected)
+    }
+    def fail(str: String) = {
+      ALPH.alphFromString(str) is None
+    }
   }
 }
