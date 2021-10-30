@@ -37,6 +37,20 @@ and `Alephium Overview`:
 http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 ```
 
+## GPU Miner
+
+Make sure that Graphics card works on the host machine. One way to verify is to run
+the `nvidia-smi` command.
+
+Install [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker),
+which enables the docker runtime to access Graphics card on the host machine.
+
+Restart docker daemon and run
+```
+sudo docker run --rm --gpus all --privileged nvidia/cuda:11.0-base nvidia-smi
+```
+to verify the setup is successful.
+
 # Configuration
 
 In order to persist your data (blocks, wallets, ...), two volumes/mounts can be used.

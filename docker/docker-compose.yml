@@ -43,6 +43,20 @@ services:
       - ./grafana/config.monitoring
     restart: unless-stopped
 
+  alephium_gpu_miner:
+    image: liuhongchao/gpu-miner:v0.5
+    depends_on:
+      - alephium
+    runtime: nvidia
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   prometheus:
     image: prom/prometheus:v2.21.0
     ports:
