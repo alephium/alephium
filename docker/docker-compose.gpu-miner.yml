@@ -5,12 +5,15 @@ services:
     image: liuhongchao/gpu-miner:v0.7
     depends_on:
       - alephium
+    restart: always
     runtime: nvidia
     privileged: true
+    command:
+      - 'alephium'
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
