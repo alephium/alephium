@@ -1,0 +1,16 @@
+version: "3.3"
+
+services:
+  alephium_gpu_miner:
+    image: liuhongchao/gpu-miner:v0.7
+    depends_on:
+      - alephium
+    runtime: nvidia
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

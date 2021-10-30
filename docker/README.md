@@ -47,11 +47,11 @@ which enables the docker runtime to access Graphics card on the host machine.
 
 Restart docker daemon and run
 ```
-sudo docker run --rm --gpus all --privileged nvidia/cuda:11.0-base nvidia-smi
+docker run --rm --gpus all --privileged --entrypoint nvidia-smi liuhongchao/gpu-miner:v0.7
 ```
 to verify the setup is successful.
 
-Run `docker-compose up -d`
+Run `docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d`
 
 # Configuration
 
