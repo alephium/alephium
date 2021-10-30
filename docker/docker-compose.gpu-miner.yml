@@ -5,7 +5,7 @@ services:
     image: alephium/gpu-miner:latest
     depends_on:
       - alephium
-    restart: always
+    restart: unless-stopped
     runtime: nvidia
     privileged: true
     command:

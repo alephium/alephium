@@ -76,7 +76,13 @@ docker run --rm --gpus all --privileged --entrypoint nvidia-smi alephium/gpu-min
 ```
 to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
 
-To start the GPU miner docker container, run
+To start the GPU miner docker container, either run the following `docker-compose` command (requires version [v1.28.0+](https://docs.docker.com/compose/gpu-support/#enabling-gpu-access-to-service-containers))
+
 ```
 docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
+```
+
+or run the following docker command:
+```
+docker run --network="docker_default" --gpus all --privileged --name gpu-miner -d alephium/gpu-miner:latest alephium
 ```
