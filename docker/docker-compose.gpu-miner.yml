@@ -1,0 +1,19 @@
+version: "3.3"
+
+services:
+  alephium_gpu_miner:
+    image: alephium/gpu-miner:latest
+    depends_on:
+      - alephium
+    restart: unless-stopped
+    runtime: nvidia
+    privileged: true
+    command:
+      - 'alephium'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -8,6 +8,13 @@ This folder container all the necessary material to build and run Alephium via d
 We're using [docker-compose](https://docs.docker.com/compose/) to run Alephium here.
 Make sure you installed `docker` and `docker-compose` before proceeding further.
 
+If you prefer running `docker` or `docker-compose` command without `sudo`, add your use name
+in the `docker` group by running the following command.
+
+```
+sudo usermod -aG docker $USER
+```
+
 # Run
 
 The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
@@ -61,3 +68,28 @@ Mount them as volumes inside the container:
 All good, your data will survive accross restarts!
 
 For more configuration, check the [Testnet Guide](https://github.com/alephium/alephium/wiki/Testnet-Guide) on the wiki.
+
+## GPU Miner (Optional)
+
+Make sure that the Nvidia graphics card works on the host machine. One way to verify is to run
+the `nvidia-smi` command.
+
+Install [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker),
+which enables the docker runtime to access the Nvidia graphics card on the host machine.
+
+Restart docker daemon and run
+```
+docker run --rm --gpus all --privileged --entrypoint nvidia-smi alephium/gpu-miner:latest
+```
+to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
+
+To start the GPU miner docker container, either run the following `docker-compose` command (requires version [v1.28.0+](https://docs.docker.com/compose/gpu-support/#enabling-gpu-access-to-service-containers))
+
+```
+docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
+```
+
+or run the following docker command:
+```
+docker run --network="docker_default" --gpus all --privileged --name gpu-miner -d alephium/gpu-miner:latest alephium
+```
