@@ -2,7 +2,7 @@ version: "3.3"
 
 services:
   alephium_gpu_miner:
-    image: liuhongchao/gpu-miner:v0.7
+    image: alephium/gpu-miner:latest
     depends_on:
       - alephium
     restart: always

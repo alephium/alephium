@@ -72,7 +72,7 @@ which enables the docker runtime to access the Nvidia graphics card on the host 
 
 Restart docker daemon and run
 ```
-docker run --rm --gpus all --privileged --entrypoint nvidia-smi liuhongchao/gpu-miner:v0.7
+docker run --rm --gpus all --privileged --entrypoint nvidia-smi alephium/gpu-miner:latest
 ```
 to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
 
