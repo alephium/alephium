@@ -51,6 +51,8 @@ sudo docker run --rm --gpus all --privileged nvidia/cuda:11.0-base nvidia-smi
 ```
 to verify the setup is successful.
 
+Run `docker-compose up -d`
+
 # Configuration
 
 In order to persist your data (blocks, wallets, ...), two volumes/mounts can be used.

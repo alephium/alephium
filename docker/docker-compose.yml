@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
 
   alephium_gpu_miner:
-    image: liuhongchao/gpu-miner:v0.5
+    image: liuhongchao/gpu-miner:v0.6
     depends_on:
       - alephium
     runtime: nvidia
