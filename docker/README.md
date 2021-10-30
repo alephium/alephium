@@ -39,19 +39,22 @@ http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 
 ## GPU Miner
 
-Make sure that Graphics card works on the host machine. One way to verify is to run
+Make sure that the Nvidia graphics card works on the host machine. One way to verify is to run
 the `nvidia-smi` command.
 
 Install [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker),
-which enables the docker runtime to access Graphics card on the host machine.
+which enables the docker runtime to access the Nvidia graphics card on the host machine.
 
 Restart docker daemon and run
 ```
 docker run --rm --gpus all --privileged --entrypoint nvidia-smi liuhongchao/gpu-miner:v0.7
 ```
-to verify the setup is successful.
+to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
 
-Run `docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d`
+To start the GPU miner docker container, run
+```
+docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
+```
 
 # Configuration
 
