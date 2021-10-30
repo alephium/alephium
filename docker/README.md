@@ -37,25 +37,6 @@ and `Alephium Overview`:
 http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 ```
 
-## GPU Miner
-
-Make sure that the Nvidia graphics card works on the host machine. One way to verify is to run
-the `nvidia-smi` command.
-
-Install [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker),
-which enables the docker runtime to access the Nvidia graphics card on the host machine.
-
-Restart docker daemon and run
-```
-docker run --rm --gpus all --privileged --entrypoint nvidia-smi liuhongchao/gpu-miner:v0.7
-```
-to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
-
-To start the GPU miner docker container, run
-```
-docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
-```
-
 # Configuration
 
 In order to persist your data (blocks, wallets, ...), two volumes/mounts can be used.
@@ -80,3 +61,22 @@ Mount them as volumes inside the container:
 All good, your data will survive accross restarts!
 
 For more configuration, check the [Testnet Guide](https://github.com/alephium/alephium/wiki/Testnet-Guide) on the wiki.
+
+## GPU Miner (Optional)
+
+Make sure that the Nvidia graphics card works on the host machine. One way to verify is to run
+the `nvidia-smi` command.
+
+Install [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker),
+which enables the docker runtime to access the Nvidia graphics card on the host machine.
+
+Restart docker daemon and run
+```
+docker run --rm --gpus all --privileged --entrypoint nvidia-smi liuhongchao/gpu-miner:v0.7
+```
+to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
+
+To start the GPU miner docker container, run
+```
+docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
+```
