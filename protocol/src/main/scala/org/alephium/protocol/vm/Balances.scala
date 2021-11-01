@@ -22,61 +22,6 @@ import scala.collection.mutable.ArrayBuffer
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, U256}
 
-/*
- * For each stateful frame, users could put a set of assets.
- * Contracts could move funds, generate outputs by using vm's instructions.
- * `remaining` is the current usable balances
- * `approved` is the balances for payable function call
- */
-final case class BalanceState(remaining: Balances, approved: Balances) {
-  def approveALPH(lockupScript: LockupScript, amount: U256): Option[Unit] = {
-    for {
-      _ <- remaining.subAlph(lockupScript, amount)
-      _ <- approved.addAlph(lockupScript, amount)
-    } yield ()
-  }
-
-  def approveToken(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Option[Unit] = {
-    for {
-      _ <- remaining.subToken(lockupScript, tokenId, amount)
-      _ <- approved.addToken(lockupScript, tokenId, amount)
-    } yield ()
-  }
-
-  def alphRemaining(lockupScript: LockupScript): Option[U256] = {
-    remaining.getBalances(lockupScript).map(_.alphAmount)
-  }
-
-  def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {
-    remaining.getTokenAmount(lockupScript, tokenId)
-  }
-
-  def isPaying(lockupScript: LockupScript): Boolean = {
-    remaining.all.exists(_._1 == lockupScript)
-  }
-
-  def useApproved(): BalanceState = {
-    val toUse = approved.use()
-    BalanceState(toUse, Balances.empty)
-  }
-
-  def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
-    remaining.useAll(lockupScript)
-  }
-
-  def useAlph(lockupScript: LockupScript, amount: U256): Option[Unit] = {
-    remaining.subAlph(lockupScript, amount)
-  }
-
-  def useToken(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Option[Unit] = {
-    remaining.subToken(lockupScript, tokenId, amount)
-  }
-}
-
-object BalanceState {
-  def from(balances: Balances): BalanceState = BalanceState(balances, Balances.empty)
-}
-
 final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
   def getBalances(lockupScript: LockupScript): Option[BalancesPerLockup] = {
     all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
