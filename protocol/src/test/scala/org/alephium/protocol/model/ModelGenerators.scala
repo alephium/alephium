@@ -128,11 +128,14 @@ trait LockupScriptGenerators extends Generators {
   lazy val valU256Gen: Gen[Val.U256]       = u256Gen.map(Val.U256.apply)
   lazy val valByteVecGen: Gen[Val.ByteVec] = dataGen.map(Val.ByteVec.apply)
 
-  def valAddressGen(implicit groupConfig: GroupConfig): Gen[Val.Address] =
+  def lockupScriptGen(implicit groupConfig: GroupConfig): Gen[LockupScript] =
     for {
       groupIndex   <- groupIndexGen
       lockupScript <- lockupGen(groupIndex)
-    } yield Val.Address(lockupScript)
+    } yield lockupScript
+
+  def valAddressGen(implicit groupConfig: GroupConfig): Gen[Val.Address] =
+    lockupScriptGen.map(Val.Address(_))
 
   def vmValGen(implicit groupConfig: GroupConfig): Gen[Val] = {
     Gen.oneOf(
