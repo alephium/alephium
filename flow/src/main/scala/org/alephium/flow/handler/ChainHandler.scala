@@ -197,7 +197,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     val hashRate  = HashRate.from(header.target, consensusConfig.blockTargetTime)
     val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
 
-    s"hash: ${header.hash.toHexString}; $index; ${chain.showHeight(header.hash)}; total: $total; hashRate: ${hashRate.value}, blockTime: $blockTime"
+    s"hash: ${header.hash.toHexString}; $index; ${chain.showHeight(header.hash)}; total: $total; target hashrate: ${hashRate.value}, blockTime: $blockTime"
   }
 
   protected def measureCommon(header: BlockHeader): BlockHeaderChain = {

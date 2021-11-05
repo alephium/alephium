@@ -106,12 +106,22 @@ object Configs extends StrictLogging {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def checkRootPath(rootPath: Path, networkId: NetworkId): Either[String, Unit] = {
+    if (rootPath.toString.contains("mainnet") && networkId != NetworkId.AlephiumMainNet) {
+      Left("The network is not mainnet, but the path contains mainnet")
+    } else {
+      Right(())
+    }
+  }
+
   def parseConfig(env: Env, rootPath: Path, overwrite: Boolean): Config = {
     val resultEither = for {
       userConfig    <- parseConfigFile(getConfigUser(rootPath))
       systemConfig  <- parseConfigFile(getConfigSystem(env, rootPath, overwrite))
-      networkType   <- parseNetworkId(userConfig.withFallback(systemConfig).resolve())
-      networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
+      networkId     <- parseNetworkId(userConfig.withFallback(systemConfig).resolve())
+      _             <- checkRootPath(rootPath, networkId)
+      networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkId, overwrite))
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
       case Right(config) => config

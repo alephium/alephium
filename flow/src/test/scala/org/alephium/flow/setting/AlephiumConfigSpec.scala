@@ -18,6 +18,7 @@ package org.alephium.flow.setting
 
 import java.math.BigInteger
 import java.net.InetSocketAddress
+import java.nio.file.Paths
 
 import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters.*
@@ -168,5 +169,18 @@ class AlephiumConfigSpec extends AlephiumSpec {
     Seq(0, 1, 2)
   ) {
     config.mining.minerAddresses.get.toSeq is minerAddresses.map(str => Address.asset(str).get)
+  }
+
+  it should "check root path for mainnet" in {
+    val rootPath0 = Paths.get("/user/foo/mainnet")
+    val rootPath1 = Paths.get("/user/foo/mainnet/test")
+    val rootPath2 = Paths.get("/user/foo/mainne/test")
+
+    Configs.checkRootPath(rootPath0, NetworkId.AlephiumMainNet) isE ()
+    Configs.checkRootPath(rootPath1, NetworkId.AlephiumMainNet) isE ()
+    Configs.checkRootPath(rootPath2, NetworkId.AlephiumMainNet) isE ()
+    Configs.checkRootPath(rootPath0, NetworkId.AlephiumTestNet).isLeft is true
+    Configs.checkRootPath(rootPath1, NetworkId.AlephiumTestNet).isLeft is true
+    Configs.checkRootPath(rootPath2, NetworkId.AlephiumTestNet) isE ()
   }
 }

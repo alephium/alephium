@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Path
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
@@ -30,16 +30,10 @@ import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.Block
-import org.alephium.util.{AVector, Duration, Env, Files => AFiles}
+import org.alephium.util.{AVector, Duration, Env}
 
 object Boot extends App with StrictLogging {
   try {
-    val rootPath = sys.env.get("ALEPHIUM_HOME") match {
-      case Some(rawPath) => Paths.get(rawPath)
-      case None          => AFiles.homeDir.resolve(".alephium")
-    }
-    if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
-
     (new BootUp).init()
   } catch {
     case error: Throwable =>
