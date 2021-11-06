@@ -62,6 +62,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       )
     initialHashRate is HashRate.unsafe(new BigInteger("549756862464"))
     config.discovery.bootstrap.head is new InetSocketAddress("bootstrap0.alephium.org", 9973)
+    config.genesis.allocations.length is 858
   }
 
   it should "load bootstrap config" in {
