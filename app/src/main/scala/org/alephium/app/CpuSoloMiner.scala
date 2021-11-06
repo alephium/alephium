@@ -25,11 +25,12 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.mining.{ExternalMinerMock, Miner}
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Env}
 
 object CpuSoloMiner extends App {
-  val rootPath: Path         = Platform.getRootPath()
-  val typesafeConfig: Config = Configs.parseConfigAndValidate(rootPath, overwrite = false)
+  val rootPath: Path = Platform.getRootPath()
+  val typesafeConfig: Config =
+    Configs.parseConfigAndValidate(Env.currentEnv, rootPath, overwrite = false)
   val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   val system: ActorSystem    = ActorSystem("cpu-miner", typesafeConfig)
 

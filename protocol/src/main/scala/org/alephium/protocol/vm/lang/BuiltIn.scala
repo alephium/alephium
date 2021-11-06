@@ -217,8 +217,8 @@ object BuiltIn {
     isContractAddress
   ).map(f => f.name -> f).toMap
 
-  val approveAlf: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("approveAlf", Seq[Type](Type.Address, Type.U256), Seq.empty, ApproveAlf)
+  val approveAlph: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("approveAlph", Seq[Type](Type.Address, Type.U256), Seq.empty, ApproveAlph)
 
   val approveToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
@@ -228,8 +228,8 @@ object BuiltIn {
       ApproveToken
     )
 
-  val alfRemaining: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn("alfRemaining", Seq(Type.Address), Seq(Type.U256), AlfRemaining)
+  val alphRemaining: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn("alphRemaining", Seq(Type.Address), Seq(Type.U256), AlphRemaining)
 
   val tokenRemaining: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
@@ -242,28 +242,28 @@ object BuiltIn {
   val isPaying: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("isPaying", Seq(Type.Address), Seq(Type.Bool), IsPaying)
 
-  val transferAlf: SimpleStatefulBuiltIn =
+  val transferAlph: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "transferAlf",
+      "transferAlph",
       Seq[Type](Type.Address, Type.Address, Type.U256),
       Seq.empty,
-      TransferAlf
+      TransferAlph
     )
 
-  val transferAlfFromSelf: SimpleStatefulBuiltIn =
+  val transferAlphFromSelf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "transferAlfFromSelf",
+      "transferAlphFromSelf",
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
-      TransferAlfFromSelf
+      TransferAlphFromSelf
     )
 
-  val transferAlfToSelf: SimpleStatefulBuiltIn =
+  val transferAlphToSelf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "transferAlfToSelf",
+      "transferAlphToSelf",
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
-      TransferAlfToSelf
+      TransferAlphToSelf
     )
 
   val transferToken: SimpleStatefulBuiltIn =
@@ -356,6 +356,14 @@ object BuiltIn {
       CallerInitialStateHash
     )
 
+  val callerCodeHash: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "callerCodeHash",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      CallerCodeHash
+    )
+
   val contractInitialStateHash: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "contractInitialStateHash",
@@ -364,16 +372,24 @@ object BuiltIn {
       ContractInitialStateHash
     )
 
+  val contractCodeHash: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "contractCodeHash",
+      Seq(Type.ByteVec),
+      Seq(Type.ByteVec),
+      ContractCodeHash
+    )
+
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
     statelessFuncs ++ Seq(
-      approveAlf,
+      approveAlph,
       approveToken,
-      alfRemaining,
+      alphRemaining,
       tokenRemaining,
       isPaying,
-      transferAlf,
-      transferAlfFromSelf,
-      transferAlfToSelf,
+      transferAlph,
+      transferAlphFromSelf,
+      transferAlphToSelf,
       transferToken,
       transferTokenFromSelf,
       transferTokenToSelf,
@@ -389,6 +405,8 @@ object BuiltIn {
       callerAddress,
       isCalledFromTxScript,
       callerInitialStateHash,
-      contractInitialStateHash
+      callerCodeHash,
+      contractInitialStateHash,
+      contractCodeHash
     ).map(f => f.name -> f)
 }

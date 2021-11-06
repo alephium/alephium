@@ -14,27 +14,37 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol
 
-import org.alephium.protocol.ALF._
-import org.alephium.util._
+import org.alephium.util.{AlephiumSpec, NumericHelpers, U256}
 
-class AmountSpec extends AlephiumSpec with NumericHelpers {
+class ALPHSpec extends AlephiumSpec {
+  import ALPH._
+
+  it should "use correct unit" in {
+    alph(1) is nanoAlph(1).mul(U256.Billion).get
+    alph(1).toBigInt.longValue() is math.pow(10, 18).longValue()
+    cent(1).mulUnsafe(U256.unsafe(100)) is alph(1)
+
+    oneAlph is alph(1)
+    oneNanoAlph is nanoAlph(1)
+    oneAlph is (oneNanoAlph.mulUnsafe(U256.unsafe(1000000000)))
+  }
 
   it should "parse `x.y ALPH` format" in new Fixture {
-    check("1.2ALPH", alf(12) / 10)
-    check("1.2 ALPH", alf(12) / 10)
-    check("1 ALPH", alf(1))
-    check("1ALPH", alf(1))
-    check("0.1ALPH", alf(1) / 10)
-    check(".1ALPH", alf(1) / 10)
-    check(".1     ALPH", alf(1) / 10)
+    check("1.2ALPH", alph(12) / 10)
+    check("1.2 ALPH", alph(12) / 10)
+    check("1 ALPH", alph(1))
+    check("1ALPH", alph(1))
+    check("0.1ALPH", alph(1) / 10)
+    check(".1ALPH", alph(1) / 10)
+    check(".1     ALPH", alph(1) / 10)
     check("0 ALPH", U256.Zero)
-    check("1234.123456 ALPH", alf(1234123456) / 1000000)
+    check("1234.123456 ALPH", alph(1234123456) / 1000000)
 
-    val alfMax = s"${MaxALFValue.divUnsafe(oneAlf)}"
-    alfMax is "1000000000"
-    check(s"$alfMax ALPH", MaxALFValue)
+    val alphMax = s"${MaxALPHValue.divUnsafe(oneAlph)}"
+    alphMax is "1000000000"
+    check(s"$alphMax ALPH", MaxALPHValue)
 
     fail("1.2alph")
     fail("-1.2alph")
@@ -46,13 +56,13 @@ class AmountSpec extends AlephiumSpec with NumericHelpers {
     fail("0.000000000000000000001 ALPH")
   }
 
-  trait Fixture {
+  trait Fixture extends NumericHelpers {
 
     def check(str: String, expected: U256) = {
-      Amount.from(str) is Some(Amount(expected))
+      ALPH.alphFromString(str) is Some(expected)
     }
     def fail(str: String) = {
-      Amount.from(str) is None
+      ALPH.alphFromString(str) is None
     }
   }
 }

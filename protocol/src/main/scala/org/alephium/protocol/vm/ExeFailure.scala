@@ -32,6 +32,7 @@ case object StackOverflow                                      extends ExeFailur
 case object StackUnderflow                                     extends ExeFailure
 case object NegativeArgumentInStack                            extends ExeFailure
 case object InsufficientSignatures                             extends ExeFailure
+case object TooManySignatures                                  extends ExeFailure
 case object InvalidPublicKey                                   extends ExeFailure
 case object SignedDataIsNot32Bytes                             extends ExeFailure
 case object InvalidSignatureFormat                             extends ExeFailure
@@ -72,7 +73,7 @@ case object ExpectStatefulContractObj                          extends ExeFailur
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure
-case object NoAlfBalanceForTheAddress                          extends ExeFailure
+case object NoAlphBalanceForTheAddress                         extends ExeFailure
 case object NoTokenBalanceForTheAddress                        extends ExeFailure
 case object InvalidBalances                                    extends ExeFailure
 case object UnableToPayGasFee                                  extends ExeFailure

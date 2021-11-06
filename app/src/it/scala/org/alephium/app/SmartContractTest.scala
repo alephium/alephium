@@ -142,28 +142,28 @@ class SmartContractTest extends AlephiumActorSpec {
     val swapContract = s"""
       |// Simple swap contract purely for testing
       |
-      |TxContract Swap(tokenId: ByteVec, mut alfReserve: U256, mut tokenReserve: U256) {
+      |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
       |
-      |  pub payable fn addLiquidity(lp: Address, alfAmount: U256, tokenAmount: U256) -> () {
-      |    transferAlfToSelf!(lp, alfAmount)
+      |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
+      |    transferAlphToSelf!(lp, alphAmount)
       |    transferTokenToSelf!(lp, tokenId, tokenAmount)
-      |    alfReserve = alfAmount
+      |    alphReserve = alphAmount
       |    tokenReserve = tokenAmount
       |  }
       |
-      |  pub payable fn swapToken(buyer: Address, alfAmount: U256) -> () {
-      |    let tokenAmount = tokenReserve - alfReserve * tokenReserve / (alfReserve + alfAmount)
-      |    transferAlfToSelf!(buyer, alfAmount)
+      |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
+      |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
+      |    transferAlphToSelf!(buyer, alphAmount)
       |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
-      |    alfReserve = alfReserve + alfAmount
+      |    alphReserve = alphReserve + alphAmount
       |    tokenReserve = tokenReserve - tokenAmount
       |  }
       |
-      |  pub payable fn swapAlf(buyer: Address, tokenAmount: U256) -> () {
-      |    let alfAmount = alfReserve - alfReserve * tokenReserve / (tokenReserve + tokenAmount)
+      |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
+      |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
       |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-      |    transferAlfFromSelf!(buyer, alfAmount)
-      |    alfReserve = alfReserve - alfAmount
+      |    transferAlphFromSelf!(buyer, alphAmount)
+      |    alphReserve = alphReserve - alphAmount
       |    tokenReserve = tokenReserve + tokenAmount
       |  }
       |}
@@ -178,7 +178,7 @@ class SmartContractTest extends AlephiumActorSpec {
     script(s"""
       |TxScript Main {
       |  pub payable fn main() -> () {
-      |    approveAlf!(@${address}, 10)
+      |    approveAlph!(@${address}, 10)
       |    approveToken!(@${address}, #${tokenContractKey.toHexString}, 100)
       |    let swap = Swap(#${swapContractKey.toHexString})
       |    swap.addLiquidity(@${address}, 10, 100)
@@ -191,7 +191,7 @@ class SmartContractTest extends AlephiumActorSpec {
     script(s"""
       |TxScript Main {
       |  pub payable fn main() -> () {
-      |    approveAlf!(@${address}, 10)
+      |    approveAlph!(@${address}, 10)
       |    let swap = Swap(#${swapContractKey.toHexString})
       |    swap.swapToken(@${address}, 10)
       |  }
@@ -205,7 +205,7 @@ class SmartContractTest extends AlephiumActorSpec {
       |  pub payable fn main() -> () {
       |    approveToken!(@${address}, #${tokenContractKey.toHexString}, 50)
       |    let swap = Swap(#${swapContractKey.toHexString})
-      |    swap.swapAlf(@${address}, 50)
+      |    swap.swapAlph(@${address}, 50)
       |  }
       |}
       |

@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -97,7 +97,7 @@ object TxOutput {
       lockupDuration: Duration,
       data: ByteString
   ): AssetOutput = {
-    val lockTime = ALF.LaunchTimestamp.plusUnsafe(lockupDuration)
+    val lockTime = ALPH.LaunchTimestamp.plusUnsafe(lockupDuration)
     AssetOutput(amount, lockupScript, lockTime, AVector.empty, data)
   }
 
@@ -106,7 +106,7 @@ object TxOutput {
     ContractOutput(U256.One, LockupScript.p2c(Hash.zero), AVector.empty)
 }
 
-/** @param amount the number of ALF in the output
+/** @param amount the number of ALPH in the output
   * @param lockupScript guarding script for unspent output
   * @param lockTime the timestamp until when the tx can be used.
   *                 it's zero by default, and will be replaced with block timestamp in worldstate if it's zero

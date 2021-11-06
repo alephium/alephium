@@ -29,7 +29,10 @@ object Platform extends StrictLogging {
   def getRootPath(env: Env): Path = {
     val rootPath = env match {
       case Env.Prod =>
-        sys.env.get("ALEPHIUM_HOME").fold[Path](Files.homeDir.resolve(".alephium"))(Paths.get(_))
+        sys.env.get("ALEPHIUM_HOME") match {
+          case Some(rawPath) => Paths.get(rawPath)
+          case None          => Files.homeDir.resolve(".alephium/mainnet")
+        }
       case Env.Debug =>
         Files.homeDir.resolve(s".alephium-${env.name}")
       case Env.Test =>

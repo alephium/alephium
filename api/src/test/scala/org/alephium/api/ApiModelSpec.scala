@@ -89,14 +89,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Amount.Hint" in {
-    checkData(Amount.Hint(ALF.oneAlf), """"1 ALPH"""", dropWhiteSpace = false)
-    read[Amount.Hint](""""1000000000000000000"""") is Amount.Hint(ALF.oneAlf)
+    checkData(Amount.Hint(ALPH.oneAlph), """"1 ALPH"""", dropWhiteSpace = false)
+    read[Amount.Hint](""""1000000000000000000"""") is Amount.Hint(ALPH.oneAlph)
 
-    val alph = ALF.alf(1234) / 1000
+    val alph = ALPH.alph(1234) / 1000
     checkData(Amount.Hint(alph), """"1.234 ALPH"""", dropWhiteSpace = false)
     read[Amount.Hint](""""1234000000000000000"""") is Amount.Hint(alph)
 
-    val small = ALF.alf(1234) / 1000000000
+    val small = ALPH.alph(1234) / 1000000000
     checkData(Amount.Hint(small), """"0.000001234 ALPH"""", dropWhiteSpace = false)
     read[Amount.Hint](""""1234000000000"""") is Amount.Hint(small)
 
@@ -206,7 +206,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   it should "encode/decode Token" in {
     val id     = Hash.generate
-    val amount = ALF.oneAlf
+    val amount = ALPH.oneAlph
 
     val token: Token = Token(id, amount)
     val jsonRaw =
@@ -283,8 +283,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Balance" in {
-    val amount   = Amount(ALF.alf(100))
-    val locked   = Amount(ALF.alf(50))
+    val amount   = Amount(ALPH.alph(100))
+    val locked   = Amount(ALPH.alph(50))
     val response = Balance(amount, amount.hint, locked, locked.hint, 1)
     val jsonRaw =
       """{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","utxoNum":1}"""

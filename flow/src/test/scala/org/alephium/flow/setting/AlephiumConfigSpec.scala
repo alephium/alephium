@@ -16,23 +16,28 @@
 
 package org.alephium.flow.setting
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
+import java.nio.file.Paths
 
 import scala.collection.immutable.ArraySeq
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import com.typesafe.config.ConfigValueFactory
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.conf._
+import org.alephium.conf.*
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
-import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Env}
 
 class AlephiumConfigSpec extends AlephiumSpec {
+  import ConfigUtils._
   it should "load alephium config" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "13"),
@@ -43,6 +48,20 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.networkId is NetworkId(2)
     config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.network.connectionBufferCapacityInByte is 100000000L
+  }
+
+  it should "load mainnet config" in {
+    lazy val rootPath = Platform.getRootPath(Env.Test)
+    val config        = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.numZerosAtLeastInHash is 37
+    val initialHashRate =
+      HashRate.from(config.consensus.maxMiningTarget, config.consensus.blockTargetTime)(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("549756862464"))
+    config.discovery.bootstrap.head is new InetSocketAddress("bootstrap0.alephium.org", 9973)
   }
 
   it should "load bootstrap config" in {
@@ -68,13 +87,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "load genesis config" in {
-    val amount = U256.unsafe(1000000L)
+    val amount = ALPH.oneAlph
     val addresses = AVector(
       "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",
       "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA"
     )
     val genesisSetting = GenesisSetting(addresses.map { address =>
-      Allocation(Address.asset(address).get, amount, Duration.ofSecondsUnsafe(2))
+      Allocation(Address.asset(address).get, Allocation.Amount(amount), Duration.ofDaysUnsafe(2))
     })
 
     val configs =
@@ -84,13 +103,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
          |    allocations = [
          |      {
          |        address = "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",
-         |        amount = "1000000",
-         |        lock-duration = 2 seconds
+         |        amount = "1000000000000000000",
+         |        lock-duration = ${2 * 24 * 60 * 60} seconds
          |      },
          |      {
          |        address = "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA",
-         |        amount = "1000000",
-         |        lock-duration = 2 seconds
+         |        amount = "1 ALPH",
+         |        lock-duration = 2 days
          |      }
          |    ]
          |  }
@@ -150,5 +169,18 @@ class AlephiumConfigSpec extends AlephiumSpec {
     Seq(0, 1, 2)
   ) {
     config.mining.minerAddresses.get.toSeq is minerAddresses.map(str => Address.asset(str).get)
+  }
+
+  it should "check root path for mainnet" in {
+    val rootPath0 = Paths.get("/user/foo/mainnet")
+    val rootPath1 = Paths.get("/user/foo/mainnet/test")
+    val rootPath2 = Paths.get("/user/foo/mainne/test")
+
+    Configs.checkRootPath(rootPath0, NetworkId.AlephiumMainNet) isE ()
+    Configs.checkRootPath(rootPath1, NetworkId.AlephiumMainNet) isE ()
+    Configs.checkRootPath(rootPath2, NetworkId.AlephiumMainNet) isE ()
+    Configs.checkRootPath(rootPath0, NetworkId.AlephiumTestNet).isLeft is true
+    Configs.checkRootPath(rootPath1, NetworkId.AlephiumTestNet).isLeft is true
+    Configs.checkRootPath(rootPath2, NetworkId.AlephiumTestNet) isE ()
   }
 }

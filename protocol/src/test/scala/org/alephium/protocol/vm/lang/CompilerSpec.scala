@@ -360,12 +360,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val contract =
       s"""
          |TxContract Uniswap(
-         |  mut alfReserve: U256,
+         |  mut alphReserve: U256,
          |  mut btcReserve: U256
          |) {
-         |  pub fn exchange(alfAmount: U256) -> (U256) {
-         |    let tokenAmount = btcReserve * alfAmount / (alfReserve + alfAmount)
-         |    alfReserve = alfReserve + alfAmount
+         |  pub fn exchange(alphAmount: U256) -> (U256) {
+         |    let tokenAmount = btcReserve * alphAmount / (alphReserve + alphAmount)
+         |    alphReserve = alphReserve + alphAmount
          |    btcReserve = btcReserve - tokenAmount
          |    return tokenAmount
          |  }

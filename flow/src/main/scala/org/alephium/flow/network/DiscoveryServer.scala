@@ -166,8 +166,6 @@ class DiscoveryServer(
           log.warning(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
           misbehaviorManager ! MisbehaviorManager.SerdeError(remote)
       }
-    case UdpServer.SendFailed(send, reason) =>
-      logUdpFailure(s"Failed in sending data to ${send.remote}: $reason")
     case Terminated(_) =>
       log.error(s"Udp listener stopped, there might be network issue")
       unsetSocket()
@@ -246,23 +244,5 @@ class DiscoveryServer(
   def cancelScan(): Unit = {
     scanScheduled.foreach(_.cancel())
     scanScheduled = None
-  }
-
-  private var silentDuration: Duration = Duration.ofSecondsUnsafe(1)
-  private var unsilentPoint: TimeStamp = TimeStamp.now()
-  private var lastFailureTs: TimeStamp = TimeStamp.zero
-  def logUdpFailure(message: String): Unit = {
-    val currentTs = TimeStamp.now()
-    if (currentTs > lastFailureTs + Duration.ofMinutesUnsafe(2)) {
-      silentDuration = Duration.ofSecondsUnsafe(1)
-    }
-    if (currentTs > unsilentPoint) {
-      log.warning(message)
-      silentDuration = silentDuration.timesUnsafe(2)
-      unsilentPoint = unsilentPoint + silentDuration
-    } else {
-      log.debug(message)
-    }
-    lastFailureTs = currentTs
   }
 }

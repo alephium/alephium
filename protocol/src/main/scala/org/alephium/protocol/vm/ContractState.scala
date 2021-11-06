@@ -35,8 +35,11 @@ final case class ContractState private (
     this.copy(contractOutputRef = ref)
   }
 
-  def toObject(address: Hash, code: StatefulContract.HalfDecoded): StatefulContractObject = {
-    StatefulContractObject(code, initialStateHash, fields, address)
+  def toObject(
+      address: Hash,
+      code: StatefulContract.HalfDecoded
+  ): StatefulContractObject = {
+    StatefulContractObject.unsafe(codeHash, code, initialStateHash, fields, address)
   }
 }
 

@@ -31,7 +31,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, SignatureSchema}
+import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
 import org.alephium.serde.serialize
@@ -71,8 +71,8 @@ class WalletAppSpec
   val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
   val transferAddress            = Address.p2pkh(transferPublicKey).toBase58
   val transferAmount             = 10
-  val balanceAmount              = Amount(ALF.alf(42))
-  val lockedAmount               = Amount(ALF.alf(21))
+  val balanceAmount              = Amount(ALPH.alph(42))
+  val lockedAmount               = Amount(ALPH.alph(21))
 
   def creationJson(size: Int, name: String) =
     s"""{"password":"$password","mnemonicSize":${size},"walletName":"$name"}"""
@@ -475,7 +475,7 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      complete(ctx, Balance.from(Amount(ALF.alf(42)), Amount(ALF.alf(21)), 1))
+      complete(ctx, Balance.from(Amount(ALPH.alph(42)), Amount(ALPH.alph(21)), 1))
     }
 
     private val server = vertx.createHttpServer().requestHandler(router)

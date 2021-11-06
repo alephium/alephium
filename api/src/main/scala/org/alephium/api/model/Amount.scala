@@ -16,8 +16,7 @@
 
 package org.alephium.api.model
 
-import java.math.BigDecimal
-
+import org.alephium.protocol.ALPH
 import org.alephium.util.U256
 
 final case class Amount(value: U256) {
@@ -27,22 +26,8 @@ final case class Amount(value: U256) {
 
 object Amount {
   // x.x ALPH format
-  def from(string: String): Option[Amount] = {
-    val regex = """([0-9]*\.?[0-9]+) *ALPH""".r
-    string match {
-      case regex(v) =>
-        val bigDecimal = new BigDecimal(v)
-        val scaling    = bigDecimal.scale()
-        // scalastyle:off magic.number
-        if (scaling > 18) {
-          None
-        } else {
-          U256.from(bigDecimal.movePointRight(18).toBigInteger).map(Amount(_))
-        }
-      // scalastyle:on magic.number
-      case _ => None
-    }
-  }
+  def from(string: String): Option[Amount] =
+    ALPH.alphFromString(string).map(Amount(_))
 
   val Zero: Amount = Amount(U256.Zero)
 

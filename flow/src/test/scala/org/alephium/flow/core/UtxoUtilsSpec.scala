@@ -273,7 +273,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     case class UtxoSelection(amount: U256, tokens: (TokenId, U256)*)(implicit
         utxos: AVector[AssetOutputInfo]
     ) {
-      val utxosSorted            = utxos.sorted(assetOrderByAlf)
+      val utxosSorted            = utxos.sorted(assetOrderByAlph)
       var dustAmount: U256       = U256.Zero
       var gasOpt: Option[GasBox] = None
       var minimalGas: Int        = 1

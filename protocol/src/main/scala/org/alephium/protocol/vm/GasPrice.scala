@@ -16,13 +16,13 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.minimalGasPrice
 import org.alephium.serde.Serde
 import org.alephium.util.U256
 
 final case class GasPrice(value: U256) extends Ordered[GasPrice] {
-  // this is safe as value <= ALF.MaxALFValue
+  // this is safe as value <= ALPH.MaxALPHValue
   def *(gas: GasBox): U256 = {
     value.mulUnsafe(gas.toU256)
   }
@@ -34,6 +34,6 @@ object GasPrice {
   implicit val serde: Serde[GasPrice] = Serde.forProduct1(GasPrice.apply, _.value)
 
   def validate(gasPrice: GasPrice): Boolean = {
-    gasPrice >= minimalGasPrice && gasPrice.value < ALF.MaxALFValue
+    gasPrice >= minimalGasPrice && gasPrice.value < ALPH.MaxALPHValue
   }
 }

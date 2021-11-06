@@ -23,7 +23,7 @@ import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
@@ -63,12 +63,12 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   it should "initialize genesis correctly" in new Fixture {
     val chain = buildBlockChain()
     chain.contains(genesis) isE true
-    chain.getHeight(genesis.hash) isE ALF.GenesisHeight
-    chain.getWeight(genesis.hash) isE ALF.GenesisWeight
+    chain.getHeight(genesis.hash) isE ALPH.GenesisHeight
+    chain.getWeight(genesis.hash) isE ALPH.GenesisWeight
     chain.containsUnsafe(genesis.hash) is true
-    chain.getHeightUnsafe(genesis.hash) is ALF.GenesisHeight
-    chain.getWeightUnsafe(genesis.hash) is ALF.GenesisWeight
-    chain.getTimestamp(genesis.hash) isE ALF.GenesisTimestamp
+    chain.getHeightUnsafe(genesis.hash) is ALPH.GenesisHeight
+    chain.getWeightUnsafe(genesis.hash) is ALPH.GenesisWeight
+    chain.getTimestamp(genesis.hash) isE ALPH.GenesisTimestamp
   }
 
   it should "validate block height" in new Fixture {
@@ -102,8 +102,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val blocksSize2 = chain.numHashes
     blocksSize1 + 1 is blocksSize2
 
-    chain.getHeightUnsafe(block.hash) is (ALF.GenesisHeight + 1)
-    chain.getHeight(block.hash) isE (ALF.GenesisHeight + 1)
+    chain.getHeightUnsafe(block.hash) is (ALPH.GenesisHeight + 1)
+    chain.getHeight(block.hash) isE (ALPH.GenesisHeight + 1)
 
     val diff = chain.calHashDiff(block.hash, genesis.hash).rightValue
     diff.toAdd is AVector(block.hash)
@@ -260,7 +260,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val lastBlock     = blocks.last
     val chainExpected = AVector(genesis) ++ blocks
 
-    chain.getHeight(headBlock) isE ALF.GenesisHeight
+    chain.getHeight(headBlock) isE ALPH.GenesisHeight
     chain.getHeight(lastBlock) isE blocks.length
     chain.getBlockSlice(headBlock) isE AVector(headBlock)
     chain.getBlockSlice(lastBlock) isE chainExpected
@@ -329,22 +329,22 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     val chain = buildBlockChain()
     addBlocks(chain, shortChain)
-    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(shortChain(0).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash)
 
     addBlocks(chain, longChain.take(2))
     if (chain.blockHashOrdering.compare(longChain(1).hash, shortChain(1).hash) > 0) {
-      chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
-      chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
     } else {
-      chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
-      chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
+      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
     }
 
     addBlocks(chain, longChain.drop(2))
-    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
-    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
   }
 
   it should "check reorg when weights of blocks are different" in new Fixture {
@@ -369,19 +369,19 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     val chain = buildBlockChain()
     addBlocks(chain, longChain)
-    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash)
-    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
 
     addBlocks(chain, shortChain.take(1))
-    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash)
-    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
 
     addBlocks(chain, shortChain.drop(1))
-    chain.getHashes(ALF.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
-    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain(2).hash)
+    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
   }
 
   it should "test chain diffs with two chains of blocks" in new Fixture {
@@ -407,12 +407,12 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val longChain  = chainGenOf(3, genesis).sample.get
     val chain      = buildBlockChain()
     addBlocks(chain, shortChain)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(shortChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash)
     chain.maxWeight isE chain.getWeightUnsafe(shortChain.last.hash)
     addBlocks(chain, longChain)
     chain.maxWeight isE chain.getWeightUnsafe(longChain.last.hash)
-    chain.getHashes(ALF.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
-    chain.getHashes(ALF.GenesisHeight + 3) isE AVector(longChain.last.hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain.last.hash)
   }
 
   it should "compute correct weights for a single chain" in new Fixture {
@@ -473,15 +473,17 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "test chainBack" in new UnforkedFixture {
-    chain.chainBackUntil(genesis.hash, ALF.GenesisHeight) isE AVector.empty[BlockHash]
-    chain.chainBackUntil(blocks.last.hash, ALF.GenesisHeight) isE blocks.map(_.hash)
-    chain.chainBackUntil(blocks.last.hash, ALF.GenesisHeight + 1) isE blocks.tail.map(_.hash)
-    chain.chainBackUntil(blocks.init.last.hash, ALF.GenesisHeight) isE blocks.init.map(_.hash)
+    chain.chainBackUntil(genesis.hash, ALPH.GenesisHeight) isE AVector.empty[BlockHash]
+    chain.chainBackUntil(blocks.last.hash, ALPH.GenesisHeight) isE blocks.map(_.hash)
+    chain.chainBackUntil(blocks.last.hash, ALPH.GenesisHeight + 1) isE blocks.tail.map(_.hash)
+    chain.chainBackUntil(blocks.init.last.hash, ALPH.GenesisHeight) isE blocks.init.map(_.hash)
   }
 
   it should "test getPredecessor" in new UnforkedFixture {
-    blocks.foreach { block => chain.getPredecessor(block.hash, ALF.GenesisHeight) isE genesis.hash }
-    chain.getPredecessor(blocks.last.hash, ALF.GenesisHeight + 1) isE blocks.head.hash
+    blocks.foreach { block =>
+      chain.getPredecessor(block.hash, ALPH.GenesisHeight) isE genesis.hash
+    }
+    chain.getPredecessor(blocks.last.hash, ALPH.GenesisHeight + 1) isE blocks.head.hash
   }
 
   it should "test getBlockHashSlice" in new UnforkedFixture {

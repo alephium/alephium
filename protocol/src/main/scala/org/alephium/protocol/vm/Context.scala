@@ -109,7 +109,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     val contractId = TxOutputRef.key(txId, nextOutputIndex)
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
-      initialBalances.alfAmount,
+      initialBalances.alphAmount,
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
@@ -158,13 +158,23 @@ trait StatefulContext extends StatelessContext with ContractPool {
 object StatefulContext {
   def apply(
       blockEnv: BlockEnv,
+      txEnv: TxEnv,
+      worldState: WorldState.Staging,
+      preOutputs: AVector[AssetOutput],
+      gasRemaining: GasBox
+  ): StatefulContext = {
+    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
+  }
+
+  def apply(
+      blockEnv: BlockEnv,
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
   ): StatefulContext = {
-    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.contractSignatures))
-    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
+    apply(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
 
   def build(
@@ -213,7 +223,7 @@ object StatefulContext {
             .from(preOutputs, tx.unsigned.fixedOutputs)
             .toRight(Right(InvalidBalances))
           _ <- balances
-            .subAlf(preOutputs.head.lockupScript, tx.gasFeeUnsafe)
+            .subAlph(preOutputs.head.lockupScript, tx.gasFeeUnsafe)
             .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {

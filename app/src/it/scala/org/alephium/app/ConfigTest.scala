@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.util.AlephiumActorSpec
 
 class ConfigTest extends AlephiumActorSpec {
@@ -29,7 +29,7 @@ class ConfigTest extends AlephiumActorSpec {
     theConfig.genesisBlocks(3)(3).coinbase.outputsLength is 2
 
     val specialTx = theConfig.genesisBlocks(3)(3).coinbase
-    specialTx.unsigned.fixedOutputs.head.lockTime is ALF.LaunchTimestamp
-    specialTx.unsigned.fixedOutputs.last.lockTime is ALF.LaunchTimestamp.plusHoursUnsafe(3 * 24)
+    specialTx.unsigned.fixedOutputs.head.lockTime is ALPH.LaunchTimestamp
+    specialTx.unsigned.fixedOutputs.last.lockTime is ALPH.LaunchTimestamp.plusHoursUnsafe(3 * 24)
   }
 }

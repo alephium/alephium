@@ -30,7 +30,7 @@ import org.alephium.util.{AVector, Duration, Math, TimeStamp, U256}
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
   def inputSignatures: AVector[Signature]
-  def contractSignatures: AVector[Signature]
+  def scriptSignatures: AVector[Signature]
 
   def id: Hash = unsigned.hash
 
@@ -62,7 +62,7 @@ final case class Transaction(
     contractInputs: AVector[ContractOutputRef],
     generatedOutputs: AVector[TxOutput],
     inputSignatures: AVector[Signature],
-    contractSignatures: AVector[Signature]
+    scriptSignatures: AVector[Signature]
 ) extends TransactionAbstract
     with MerkleHashable[Hash] {
   def toMerkleTx: MerkelTx =
@@ -72,7 +72,7 @@ final case class Transaction(
       contractInputs,
       generatedOutputs,
       inputSignatures,
-      contractSignatures
+      scriptSignatures
     )
 
   def merkleHash: Hash = Hash.hash(serialize(toMerkleTx))
@@ -94,7 +94,7 @@ final case class Transaction(
     }
   }
 
-  lazy val alfAmountInOutputs: Option[U256] = {
+  lazy val alphAmountInOutputs: Option[U256] = {
     val sum1Opt =
       unsigned.fixedOutputs
         .foldE(U256.Zero)((sum, output) => sum.add(output.amount).toRight(()))
@@ -111,7 +111,7 @@ final case class Transaction(
   }
 
   def toTemplate: TransactionTemplate =
-    TransactionTemplate(unsigned, inputSignatures, contractSignatures)
+    TransactionTemplate(unsigned, inputSignatures, scriptSignatures)
 }
 
 object Transaction {
@@ -125,7 +125,7 @@ object Transaction {
           t.contractInputs,
           t.generatedOutputs,
           t.inputSignatures,
-          t.contractSignatures
+          t.scriptSignatures
         )
     )
 
@@ -157,7 +157,7 @@ object Transaction {
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -173,7 +173,7 @@ object Transaction {
       contractInputs = AVector.empty,
       generatedOutputs,
       inputSignatures,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -193,7 +193,7 @@ object Transaction {
       contractInputs = AVector.empty,
       generatedOutputs,
       AVector(signature),
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -210,7 +210,7 @@ object Transaction {
       contractInputs,
       generatedOutputs,
       AVector(signature),
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -221,13 +221,13 @@ object Transaction {
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
   // PoLW burning is not considered
   def totalReward(gasFee: U256, miningReward: U256): U256 = {
-    val threshold = Math.max(miningReward, ALF.oneAlf)
+    val threshold = Math.max(miningReward, ALPH.oneAlph)
     val gasReward = gasFee.divUnsafe(U256.Two)
     if (gasReward >= threshold) {
       miningReward.addUnsafe(threshold)
@@ -279,7 +279,7 @@ object Transaction {
     val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
     val outputData   = serialize(coinbaseData) ++ minerData
     val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
-    val miningReward = emissionConfig.emission.reward(target, blockTs, ALF.LaunchTimestamp)
+    val miningReward = emissionConfig.emission.reward(target, blockTs, ALPH.LaunchTimestamp)
     val netReward = miningReward match {
       case Emission.PoW(miningReward) => totalReward(gasFee, miningReward)
       case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
@@ -300,7 +300,7 @@ object Transaction {
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures = AVector.empty,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -320,7 +320,7 @@ object Transaction {
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures = AVector.empty,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -330,7 +330,7 @@ object Transaction {
       contractInputs: AVector[ContractOutputRef],
       generatedOutputs: AVector[TxOutput],
       inputSignatures: AVector[Signature],
-      contractSignatures: AVector[Signature]
+      scriptSignatures: AVector[Signature]
   )
   object MerkelTx {
     implicit val serde: Serde[MerkelTx] = Serde.forProduct6(
@@ -342,7 +342,7 @@ object Transaction {
           t.contractInputs,
           t.generatedOutputs,
           t.inputSignatures,
-          t.contractSignatures
+          t.scriptSignatures
         )
     )
   }
@@ -351,7 +351,7 @@ object Transaction {
 final case class TransactionTemplate(
     unsigned: UnsignedTransaction,
     inputSignatures: AVector[Signature],
-    contractSignatures: AVector[Signature]
+    scriptSignatures: AVector[Signature]
 ) extends TransactionAbstract {
   override def outputsLength: Int = unsigned.fixedOutputs.length
 
@@ -361,7 +361,7 @@ final case class TransactionTemplate(
 object TransactionTemplate {
   implicit val serde: Serde[TransactionTemplate] = Serde.forProduct3(
     TransactionTemplate.apply,
-    t => (t.unsigned, t.inputSignatures, t.contractSignatures)
+    t => (t.unsigned, t.inputSignatures, t.scriptSignatures)
   )
 
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
@@ -369,7 +369,7 @@ object TransactionTemplate {
     TransactionTemplate(
       unsigned,
       AVector(signature),
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 }

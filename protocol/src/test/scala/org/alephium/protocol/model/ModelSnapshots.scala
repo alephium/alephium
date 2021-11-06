@@ -27,7 +27,8 @@ import org.alephium.util.{AlephiumFixture, Hex}
 
 trait ModelSnapshots extends AlephiumFixture with OptionValues {
   def readFile(path: Path): String = {
-    new String(Files.readAllBytes(path), StandardCharsets.UTF_8)
+    val all = new String(Files.readAllBytes(path), StandardCharsets.UTF_8)
+    all.filterNot(_.isWhitespace)
   }
 
   implicit class SnapshotVerifier[T: Serde](model: T)(implicit
@@ -64,9 +65,10 @@ trait ModelSnapshots extends AlephiumFixture with OptionValues {
     }
 
     private def serializeAndWrite(filePath: Path): Path = {
-      val serializedHex = Hex.toHexString(serialize(model).toIndexedSeq)
+      val serializedHex = Hex.toHexString(serialize(model))
       Files.createDirectories(filePath.getParent())
-      Files.write(filePath, serializedHex.getBytes())
+      val bytes = serializedHex.grouped(32).mkString("\n").getBytes()
+      Files.write(filePath, bytes)
     }
   }
 }

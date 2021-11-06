@@ -26,7 +26,7 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
 
     BlockHeader(
       nonce = Nonce.unsafe(hex"bb557f744763ca4f5ef8079b4b76c2dbb26a4cd845fbc84d"),
-      version = defaultBlockVersion,
+      version = DefaultBlockVersion,
       blockDeps = BlockDeps.build(
         deps = AVector(
           Blake3.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
@@ -39,7 +39,7 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
       depStateHash =
         Hash.unsafe(hex"a670c675a926606f1f01fe28660c50621fe31719414f43eccfa871432fe8ce8a"),
       txsHash = txsHash,
-      // Must be later than org.alephium.protocol.ALF.LaunchTimestamp
+      // Must be later than org.alephium.protocol.ALPH.LaunchTimestamp
       timestamp = TimeStamp.unsafe(1630167995025L),
       target = Target(hex"20ffffff")
     )

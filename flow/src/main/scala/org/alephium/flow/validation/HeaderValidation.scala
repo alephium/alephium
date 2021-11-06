@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
@@ -136,7 +136,7 @@ object HeaderValidation {
     protected[validation] def checkGenesisVersion(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
-      if (header.version == genesisBlockVersion) {
+      if (header.version == DefaultBlockVersion) {
         validHeader(())
       } else {
         invalidHeader(InvalidGenesisVersion)
@@ -145,7 +145,7 @@ object HeaderValidation {
     protected[validation] def checkGenesisTimeStamp(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
-      if (header.timestamp != ALF.GenesisTimestamp) {
+      if (header.timestamp != ALPH.GenesisTimestamp) {
         invalidHeader(InvalidGenesisTimeStamp)
       } else {
         validHeader(())
@@ -186,7 +186,7 @@ object HeaderValidation {
     }
 
     protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.version == defaultBlockVersion) {
+      if (header.version == DefaultBlockVersion) {
         validHeader(())
       } else {
         invalidHeader(InvalidBlockVersion)
@@ -197,7 +197,7 @@ object HeaderValidation {
         header: BlockHeader,
         parent: BlockHeader
     ): HeaderValidationResult[Unit] = {
-      if (header.timestamp < ALF.LaunchTimestamp) {
+      if (header.timestamp < ALPH.LaunchTimestamp) {
         invalidHeader(EarlierThanLaunchTimeStamp)
       } else if (header.timestamp <= parent.timestamp) {
         invalidHeader(NoIncreasingTimeStamp)

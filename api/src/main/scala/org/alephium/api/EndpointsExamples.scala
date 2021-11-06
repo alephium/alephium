@@ -55,11 +55,11 @@ trait EndpointsExamples extends ErrorExamples {
   private val inetAddress       = inetSocketAddress.getAddress
   private val peerAddress       = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers             = AVector(peerAddress)
-  private val twoAlf            = Amount(ALF.oneAlf.mulUnsafe(U256.Two))
-  private def alf(value: Int)   = Amount(ALF.oneAlf.mulUnsafe(U256.unsafe(value)))
+  private val twoAlph           = Amount(ALPH.oneAlph.mulUnsafe(U256.Two))
+  private def alph(value: Int)  = Amount(ALPH.oneAlph.mulUnsafe(U256.unsafe(value)))
   private val height            = 42
-  val balance                   = alf(10)
-  val halfBalance               = alf(5)
+  val balance                   = alph(10)
+  val halfBalance               = alph(5)
   val signature = Signature
     .from(
       Hex.unsafe(
@@ -79,12 +79,12 @@ trait EndpointsExamples extends ErrorExamples {
   val contractId =
     Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
   private val tokens = AVector(
-    Token(Hash.hash("token1"), alf(42).value),
-    Token(Hash.hash("token2"), alf(1000).value)
+    Token(Hash.hash("token1"), alph(42).value),
+    Token(Hash.hash("token2"), alph(1000).value)
   )
-  val defaultDestinations = AVector(Destination(address, twoAlf, None, None))
+  val defaultDestinations = AVector(Destination(address, twoAlph, None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, twoAlf, Some(tokens), Some(ts))
+    Destination(address, twoAlph, Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
@@ -368,7 +368,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(minimalGas),
         Some(defaultGasPrice),
         Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
-        Some(twoAlf)
+        Some(twoAlph)
       )
     )
   )

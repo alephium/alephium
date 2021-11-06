@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALF, Hash, PublicKey, SignatureSchema}
+import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{InvalidSignature => _, OutOfGas => VMOutOfGas, _}
@@ -238,9 +238,11 @@ trait TxValidation {
       checkDoubleSpending: Boolean
   ): TxValidationResult[Unit] = {
     for {
+      _ <- checkVersion(tx)
       _ <- checkNetworkId(tx)
       _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
+      _ <- checkScriptSigNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx)
       _ <- checkOutputStats(tx)
       _ <- checkChainIndex(tx, chainIndex)
@@ -270,7 +272,7 @@ trait TxValidation {
   ): TxValidationResult[GasBox] = {
     for {
       _            <- checkLockTime(preOutputs, blockEnv.timeStamp)
-      _            <- checkAlfBalance(tx, preOutputs, coinbaseNetReward)
+      _            <- checkAlphBalance(tx, preOutputs, coinbaseNetReward)
       _            <- checkTokenBalance(tx, preOutputs)
       gasRemaining <- checkGasAndWitnesses(tx, preOutputs, blockEnv)
     } yield gasRemaining
@@ -285,9 +287,11 @@ trait TxValidation {
 
   // format off for the sake of reading and checking rules
   // format: off
+  protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
+  protected[validation] def checkScriptSigNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
   protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256]
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
@@ -296,7 +300,7 @@ trait TxValidation {
   protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
 
   protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
-  protected[validation] def checkAlfBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
+  protected[validation] def checkAlphBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
   def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
@@ -319,6 +323,14 @@ object TxValidation {
   // scalastyle:off number.of.methods
   class Impl(implicit val groupConfig: GroupConfig, networkConfig: NetworkConfig)
       extends TxValidation {
+    protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit] = {
+      if (tx.unsigned.version == DefaultTxVersion) {
+        validTx(())
+      } else {
+        invalidTx(InvalidTxVersion)
+      }
+    }
+
     protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit] = {
       if (tx.unsigned.networkId == networkConfig.networkId) {
         validTx(())
@@ -345,7 +357,7 @@ object TxValidation {
     }
     protected[validation] def checkInputNumCommon(inputNum: Int): TxValidationResult[Unit] = {
       // inputNum can be 0 due to coinbase tx
-      if (inputNum > ALF.MaxTxInputNum) {
+      if (inputNum > ALPH.MaxTxInputNum) {
         invalidTx(TooManyInputs)
       } else {
         validTx(())
@@ -358,12 +370,12 @@ object TxValidation {
     ): TxValidationResult[Unit] = {
       if (isIntraGroup) checkIntraGroupOutputNum(tx) else checkInterGroupOutputNum(tx)
     }
-    protected[validation] def checkIntraGroupOutputNum(
+    @inline protected[validation] def checkIntraGroupOutputNum(
         tx: Transaction
     ): TxValidationResult[Unit] = {
       checkOutputNumCommon(tx.outputsLength)
     }
-    protected[validation] def checkInterGroupOutputNum(
+    @inline protected[validation] def checkInterGroupOutputNum(
         tx: Transaction
     ): TxValidationResult[Unit] = {
       if (tx.generatedOutputs.nonEmpty) {
@@ -372,13 +384,38 @@ object TxValidation {
         checkOutputNumCommon(tx.unsigned.fixedOutputs.length)
       }
     }
-    protected[validation] def checkOutputNumCommon(
+    @inline protected[validation] def checkOutputNumCommon(
         outputNum: Int
     ): TxValidationResult[Unit] = {
       if (outputNum == 0) {
         invalidTx(NoOutputs)
-      } else if (outputNum > ALF.MaxTxOutputNum) {
+      } else if (outputNum > ALPH.MaxTxOutputNum) {
         invalidTx(TooManyOutputs)
+      } else {
+        validTx(())
+      }
+    }
+
+    protected[validation] def checkScriptSigNum(
+        tx: Transaction,
+        isIntraGroup: Boolean
+    ): TxValidationResult[Unit] = {
+      if (isIntraGroup) checkIntraGroupScriptSigNum(tx) else checkInterGroupScriptSigNum(tx)
+    }
+    @inline protected[validation] def checkIntraGroupScriptSigNum(
+        tx: Transaction
+    ): TxValidationResult[Unit] = {
+      if (tx.scriptSignatures.length > ALPH.MaxScriptSigNum) {
+        invalidTx(TooManyScriptSignatures)
+      } else {
+        validTx(())
+      }
+    }
+    @inline protected[validation] def checkInterGroupScriptSigNum(
+        tx: Transaction
+    ): TxValidationResult[Unit] = {
+      if (tx.scriptSignatures.length != 0) {
+        invalidTx(UnexpectedScriptSignatures)
       } else {
         validTx(())
       }
@@ -397,7 +434,7 @@ object TxValidation {
     protected[validation] def checkOutputStats(tx: Transaction): TxValidationResult[U256] = {
       for {
         _      <- checkEachOutputStats(tx)
-        amount <- checkAlfOutputAmount(tx)
+        amount <- checkAlphOutputAmount(tx)
       } yield amount
     }
 
@@ -417,8 +454,8 @@ object TxValidation {
       output.tokens.forall(_._2.nonZero)
     }
 
-    protected[validation] def checkAlfOutputAmount(tx: Transaction): TxValidationResult[U256] = {
-      tx.alfAmountInOutputs match {
+    protected[validation] def checkAlphOutputAmount(tx: Transaction): TxValidationResult[U256] = {
+      tx.alphAmountInOutputs match {
         case Some(total) => validTx(total)
         case None        => invalidTx(BalanceOverFlow)
       }
@@ -496,7 +533,7 @@ object TxValidation {
       EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
         tx.getOutput(outputIndex) match {
           case output: AssetOutput =>
-            if (output.additionalData.length > ALF.MaxOutputDataSize) {
+            if (output.additionalData.length > ALPH.MaxOutputDataSize) {
               invalidTx(OutputDataSizeExceeded)
             } else {
               Right(())
@@ -523,19 +560,19 @@ object TxValidation {
         case _                                       => true
       }
 
-    protected[validation] def checkAlfBalance(
+    protected[validation] def checkAlphBalance(
         tx: Transaction,
         preOutputs: AVector[TxOutput],
         coinbaseNetReward: Option[U256]
     ): TxValidationResult[Unit] = {
       val inputSum = preOutputs.fold(coinbaseNetReward.getOrElse(U256.Zero))(_ addUnsafe _.amount)
       val result = for {
-        outputSum <- tx.alfAmountInOutputs
+        outputSum <- tx.alphAmountInOutputs
         allOutSum <- outputSum.add(tx.gasFeeUnsafe) // safe after gas bound check
       } yield allOutSum == inputSum
       result match {
         case Some(true)  => validTx(())
-        case Some(false) => invalidTx(InvalidAlfBalance)
+        case Some(false) => invalidTx(InvalidAlphBalance)
         case None        => invalidTx(BalanceOverFlow)
       }
     }
@@ -623,7 +660,7 @@ object TxValidation {
             )
           }
         }
-        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManySignatures)
+        _ <- if (signatures.isEmpty) validTx(()) else invalidTx(TooManyInputSignatures)
       } yield remaining
     }
 

@@ -40,10 +40,11 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       publicKey: PublicKey,
       scriptOpt: Option[String],
       outputs: AssetOutput*
-  ) = {
+  ): UnsignedTransaction = {
     import Hex._
 
     UnsignedTransaction(
+      DefaultTxVersion,
       networkId,
       scriptOpt.map(script => Compiler.compileTxScript(script).rightValue),
       GasBox.unsafe(100000),
@@ -74,14 +75,14 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
   }
 
   def p2shOutput(
-      alfAmount: U256,
+      alphAmount: U256,
       hash: ByteString,
       timeStamp: TimeStamp = TimeStamp.unsafe(0),
       additionalData: ByteString = ByteString.empty,
       tokens: AVector[(TokenId, U256)] = AVector.empty
   ) = {
     AssetOutput(
-      alfAmount,
+      alphAmount,
       LockupScript.P2SH(Hash.unsafe(hash)),
       timeStamp,
       tokens,
@@ -90,14 +91,14 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
   }
 
   def p2pkhOutput(
-      alfAmount: U256,
+      alphAmount: U256,
       hash: ByteString,
       timeStamp: TimeStamp = TimeStamp.unsafe(0),
       additionalData: ByteString = ByteString.empty,
       tokens: AVector[(TokenId, U256)] = AVector.empty
   ) = {
     AssetOutput(
-      alfAmount,
+      alphAmount,
       LockupScript.P2PKH(Hash.unsafe(hash)),
       timeStamp,
       tokens,
@@ -116,7 +117,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
       inputSignatures = signatures,
-      contractSignatures = AVector.empty
+      scriptSignatures = AVector.empty
     )
   }
 
@@ -125,6 +126,6 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       SignatureSchema.sign(tx.unsigned.hash.bytes, privateKey)
     }
 
-    tx.copy(contractSignatures = tx.contractSignatures ++ signatures)
+    tx.copy(scriptSignatures = tx.scriptSignatures ++ signatures)
   }
 }
