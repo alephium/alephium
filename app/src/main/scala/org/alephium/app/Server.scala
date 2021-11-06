@@ -106,10 +106,6 @@ object Server {
     new Impl(rootPath, flowSystem)
   }
 
-  def storageFolder(implicit config: AlephiumConfig): String = {
-    s"db-${config.broker.brokerId}-${config.network.bindAddress.getPort}"
-  }
-
   final private class Impl(
       rootPath: Path,
       val flowSystem: ActorSystem
@@ -118,13 +114,10 @@ object Server {
       val apiConfig: ApiConfig,
       val executionContext: ExecutionContext
   ) extends Server {
-    val storages: Storages = {
-      if (config.node.dbSyncWrite) {
-        Storages.createUnsafe(rootPath, storageFolder, Settings.syncWrite)(config.broker)
-      } else {
-        Storages.createUnsafe(rootPath, storageFolder, Settings.writeOptions)(config.broker)
-      }
-    }
+    val storageFolder: String = "db"
+    val writeOptions          = if (config.node.dbSyncWrite) Settings.syncWrite else Settings.writeOptions
+    val storages: Storages =
+      Storages.createUnsafe(rootPath, storageFolder, writeOptions)(config.broker)
 
     val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
   }
