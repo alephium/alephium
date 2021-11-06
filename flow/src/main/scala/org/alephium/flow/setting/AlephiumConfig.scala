@@ -31,6 +31,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf.*
+import org.alephium.flow.core.maxForkDepth
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.*
@@ -48,7 +49,6 @@ final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
     numZerosAtLeastInHash: Int,
-    tipsPruneInterval: Int,
     blockCacheCapacityPerChain: Int,
     emission: Emission
 ) extends ConsensusConfig {
@@ -70,7 +70,7 @@ final case class ConsensusSetting(
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
 
-  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
+  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(maxForkDepth.toLong)
   val conflictCacheKeepDuration: Duration =
     expectedTimeSpan timesUnsafe blockCacheCapacityPerChain.toLong
 }
@@ -205,7 +205,6 @@ object AlephiumConfig {
       blockTargetTime: Duration,
       uncleDependencyGapTime: Option[Duration],
       numZerosAtLeastInHash: Int,
-      tipsPruneInterval: Int,
       blockCacheCapacityPerChain: Int
   ) {
     def toConsensusSetting(groupConfig: GroupConfig): ConsensusSetting = {
@@ -214,7 +213,6 @@ object AlephiumConfig {
         blockTargetTime,
         uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
         numZerosAtLeastInHash,
-        tipsPruneInterval,
         blockCacheCapacityPerChain,
         emission
       )

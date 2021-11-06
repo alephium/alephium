@@ -34,7 +34,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     implicit val consensusConfig: ConsensusSetting = {
       val blockTargetTime = Duration.ofSecondsUnsafe(64)
       val emission        = Emission(Test.groupConfig, blockTargetTime)
-      ConsensusSetting(blockTargetTime, blockTargetTime, 18, 100, 25, emission)
+      ConsensusSetting(blockTargetTime, blockTargetTime, 18, 25, emission)
     }
 
     val chainInfo =
