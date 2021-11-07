@@ -130,10 +130,9 @@ trait TxUtils { Self: FlowUtils =>
       utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
-      _              <- checkOutputInfos(outputInfos)
-      totalAlphAmount <- checkTotalAmount(outputInfos)
-      _              <- checkGasAmount(gasOpt)
-      _              <- checkGasPrice(gasPrice)
+      _               <- checkOutputInfos(outputInfos)
+      totalAlphAmount <- checkTotalAmount(outputInfos.map(_.alphAmount))
+      _               <- checkGas(gasOpt, gasPrice)
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
       )
@@ -186,10 +185,9 @@ trait TxUtils { Self: FlowUtils =>
 
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
-        _ <- checkTotalAmount(outputInfos)
         _ <- checkOutputInfos(outputInfos)
-        _ <- checkGasAmount(gasOpt)
-        _ <- checkGasPrice(gasPrice)
+        _ <- checkTotalAmount(outputInfos.map(_.alphAmount))
+        _ <- checkGas(gasOpt, gasPrice)
       } yield ()
 
       checkResult match {
@@ -229,30 +227,54 @@ trait TxUtils { Self: FlowUtils =>
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-    getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
-      val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
-      for {
-        _   <- checkGasAmount(gasOpt)
-        _   <- checkGasPrice(gasPrice)
-        gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length)))
-        totalAmount <- utxos.foldE(U256.Zero)(
-          _ add _.output.amount toRight "Input amount overflow"
-        )
-        amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
-        totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
-          utxos.flatMap(_.output.tokens)
-        )
-        unsignedTx <- UnsignedTransaction
-          .build(
-            fromLockupScript,
-            fromUnlockScript,
-            utxos.map(asset => (asset.ref, asset.output)),
-            AVector(TxOutputInfo(toLockupScript, amount, totalAmountPerToken, lockTimeOpt)),
-            gas,
-            gasPrice
-          )
-      } yield unsignedTx
+    val checkResult = checkGas(gasOpt, gasPrice)
+
+    checkResult match {
+      case Right(()) =>
+        getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
+          val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
+          for {
+            totalAmount <- checkTotalAmount(utxos.map(_.output.amount))
+            txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
+              toLockupScript,
+              lockTimeOpt,
+              totalAmount,
+              utxos,
+              gasOpt,
+              gasPrice
+            )
+            unsignedTx <- UnsignedTransaction
+              .build(
+                fromLockupScript,
+                fromUnlockScript,
+                utxos.map(asset => (asset.ref, asset.output)),
+                txOutputsWithGas._1,
+                txOutputsWithGas._2,
+                gasPrice
+              )
+          } yield unsignedTx
+        }
+
+      case Left(e) =>
+        Right(Left(e))
     }
+  }
+
+  def buildSweepAllTxOutputsWithGas(
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      totalAmount: U256,
+      utxos: AVector[AssetOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, (AVector[TxOutputInfo], GasBox)] = {
+    for {
+      gas    <- Right(gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length)))
+      amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
+      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
+        utxos.flatMap(_.output.tokens)
+      )
+    } yield (AVector(TxOutputInfo(toLockupScript, amount, totalAmountPerToken, lockTimeOpt)), gas)
   }
 
   def isTxConfirmed(txId: Hash, chainIndex: ChainIndex): IOResult[Boolean] = {
@@ -355,11 +377,18 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkTotalAmount(
-      outputInfos: AVector[TxOutputInfo]
+      amounts: AVector[U256]
   ): Either[String, U256] = {
-    outputInfos.foldE(U256.Zero) { case (acc, outputInfo) =>
-      acc.add(outputInfo.alphAmount).toRight("Amount overflow")
+    amounts.foldE(U256.Zero) { case (acc, amount) =>
+      acc.add(amount).toRight("Amount overflow")
     }
+  }
+
+  private def checkGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {
+    for {
+      _ <- checkGasAmount(gasOpt)
+      _ <- checkGasPrice(gasPrice)
+    } yield ()
   }
 
   private def checkGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {

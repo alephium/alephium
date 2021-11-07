@@ -314,11 +314,7 @@ object UnsignedTransaction {
   }
 
   private def check(failCondition: Boolean, errorMessage: String): Either[String, Unit] = {
-    if (failCondition) {
-      Left(errorMessage)
-    } else {
-      Right(())
-    }
+    Either.cond(!failCondition, (), errorMessage)
   }
 
   final case class TxOutputInfo(

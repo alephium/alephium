@@ -516,6 +516,32 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Not enough balance"
   }
 
+  it should "not create transaction with provided UTXOs, if they are not from the same group" in new MultipleUtxos {
+    // scalastyle:off no.equal
+    val outputRefs = utxos.zipWithIndex.map { case (utxo, index) =>
+      if (index % 2 == 1) {
+        OutputRef(utxo.ref.hint + 4, utxo.ref.key)
+      } else {
+        OutputRef(utxo.ref.hint, utxo.ref.key)
+      }
+    }
+    // scalastyle:on no.equal
+
+    outputRefs.length is 2
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        defaultGasPrice
+      )
+      .leftValue
+      .detail is "Selected UTXOs are not from the same group"
+  }
+
   it should "not create transaction with empty provided UTXOs" in new MultipleUtxos {
     serverUtils
       .prepareUnsignedTransaction(
@@ -536,6 +562,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
+    info("Gas amount too small")
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
@@ -549,6 +576,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .leftValue
       .detail is "Gas GasBox(100) too small, minimal GasBox(20000)"
 
+    info("Gas amount too large")
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
@@ -567,6 +595,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
+    info("Gas price too small")
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
@@ -579,6 +608,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
 
+    info("Gas price too large")
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
@@ -611,21 +641,31 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Selected UTXOs must be of asset type"
   }
 
-  "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixtureWithApi {
+  "ServerUtils.buildTransaction" should "fail with invalid number of outputs" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
-    val destinations          = AVector.empty[Destination]
+    val emptyDestinations     = AVector.empty[Destination]
 
-    val buildTransaction = serverUtils
+    info("Output number is zero")
+    serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, destinations)
+        BuildTransaction(fromPublicKey, emptyDestinations)
       )
       .leftValue
+      .detail is "Zero transaction outputs"
 
-    buildTransaction.detail is "Zero transaction outputs"
+    info("Too many outputs")
+    val tooManyDestinations = AVector.fill(ALF.MaxTxOutputNum + 1)(generateDestination(chainIndex))
+    serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, tooManyDestinations)
+      )
+      .leftValue
+      .detail is "Too many transaction outputs, maximal value: 256"
   }
 
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
