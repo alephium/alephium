@@ -29,6 +29,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
@@ -622,8 +623,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
   }
 
-  it should "not create transaction when with amount overflow" in new MultipleUtxos {
-    val amountOverflowDestinations = AVector(
+  it should "not create transaction when with ALPH amount overflow" in new MultipleUtxos {
+    val alphAmountOverflowDestinations = AVector(
       destination1,
       destination2.copy(amount = Amount(ALPH.MaxALPHValue))
     )
@@ -632,12 +633,31 @@ class ServerUtilsSpec extends AlephiumSpec {
         blockFlow,
         fromPublicKey,
         outputRefsOpt = None,
-        amountOverflowDestinations,
+        alphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        GasPrice(minimalGasPrice.value - 1)
+        defaultGasPrice
       )
       .leftValue
       .detail is "ALPH Amount overflow"
+  }
+
+  it should "not create transaction when with token amount overflow" in new MultipleUtxos {
+    val tokenId = Hash.hash("token1")
+    val tokenAmountOverflowDestinations = AVector(
+      destination1.copy(tokens = Some(AVector(Token(tokenId, U256.MaxValue)))),
+      destination2.copy(tokens = Some(AVector(Token(tokenId, U256.One))))
+    )
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = None,
+        tokenAmountOverflowDestinations,
+        gasOpt = Some(minimalGas),
+        defaultGasPrice
+      )
+      .leftValue
+      .detail is s"Amount overflow for token $tokenId"
   }
 
   it should "not create transaction when not all utxos are of asset type" in new MultipleUtxos {

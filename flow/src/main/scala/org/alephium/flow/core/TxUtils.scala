@@ -131,8 +131,8 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(outputInfos)
-      totalAlphAmount <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
       _               <- checkGas(gasOpt, gasPrice)
+      totalAlphAmount <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
       )
@@ -186,8 +186,11 @@ trait TxUtils { Self: FlowUtils =>
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkOutputInfos(outputInfos)
-        _ <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
         _ <- checkGas(gasOpt, gasPrice)
+        _ <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
+        _ <- UnsignedTransaction.calculateTotalAmountPerToken(
+          outputInfos.flatMap(_.tokens)
+        )
       } yield ()
 
       checkResult match {
