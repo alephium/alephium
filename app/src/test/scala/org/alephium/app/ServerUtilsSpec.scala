@@ -616,10 +616,28 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(ALF.MaxALFValue)
+        GasPrice(ALPH.MaxALPHValue)
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
+  }
+
+  it should "not create transaction when with amount overflow" in new MultipleUtxos {
+    val amountOverflowDestinations = AVector(
+      destination1,
+      destination2.copy(amount = Amount(ALPH.MaxALPHValue))
+    )
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = None,
+        amountOverflowDestinations,
+        gasOpt = Some(minimalGas),
+        GasPrice(minimalGasPrice.value - 1)
+      )
+      .leftValue
+      .detail is "ALPH Amount overflow"
   }
 
   it should "not create transaction when not all utxos are of asset type" in new MultipleUtxos {
@@ -658,7 +676,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Zero transaction outputs"
 
     info("Too many outputs")
-    val tooManyDestinations = AVector.fill(ALF.MaxTxOutputNum + 1)(generateDestination(chainIndex))
+    val tooManyDestinations = AVector.fill(ALPH.MaxTxOutputNum + 1)(generateDestination(chainIndex))
     serverUtils
       .buildTransaction(
         blockFlow,

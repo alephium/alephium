@@ -131,7 +131,7 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(outputInfos)
-      totalAlphAmount <- checkTotalAmount(outputInfos.map(_.alphAmount))
+      totalAlphAmount <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
       _               <- checkGas(gasOpt, gasPrice)
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
@@ -186,7 +186,7 @@ trait TxUtils { Self: FlowUtils =>
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkOutputInfos(outputInfos)
-        _ <- checkTotalAmount(outputInfos.map(_.alphAmount))
+        _ <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
         _ <- checkGas(gasOpt, gasPrice)
       } yield ()
 
@@ -234,7 +234,7 @@ trait TxUtils { Self: FlowUtils =>
         getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
           val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
           for {
-            totalAmount <- checkTotalAmount(utxos.map(_.output.amount))
+            totalAmount <- checkTotalAlphAmount(utxos.map(_.output.amount))
             txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
               toLockupScript,
               lockTimeOpt,
@@ -376,11 +376,17 @@ trait TxUtils { Self: FlowUtils =>
     } yield failedTxs
   }
 
-  private def checkTotalAmount(
+  private def checkTotalAlphAmount(
       amounts: AVector[U256]
   ): Either[String, U256] = {
     amounts.foldE(U256.Zero) { case (acc, amount) =>
-      acc.add(amount).toRight("Amount overflow")
+      acc.add(amount).toRight("Alph Amount overflow").flatMap { newAmount =>
+        if (newAmount > ALPH.MaxALPHValue) {
+          Left("ALPH Amount overflow")
+        } else {
+          Right(newAmount)
+        }
+      }
     }
   }
 
