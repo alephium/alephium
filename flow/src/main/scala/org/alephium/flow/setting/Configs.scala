@@ -115,17 +115,13 @@ object Configs extends StrictLogging {
     }
   }
 
-  def updateGenesis(
-      networkId: NetworkId,
-      networkConfig: Config
-  ): Either[String, Config] = {
+  def updateGenesis(networkId: NetworkId, networkConfig: Config): Config = {
     if (networkId == NetworkId.AlephiumMainNet) {
-      val genesisResource = this.getClass.getResource("/mainnet_genesis.conf").getPath
-      parseConfigFile(new File(genesisResource)).map { genesis =>
-        networkConfig.withFallback(genesis)
-      }
+      val genesisResource = this.getClass.getResource("/mainnet_genesis.conf")
+      val genesis         = ConfigFactory.parseURL(genesisResource)
+      networkConfig.withFallback(genesis)
     } else {
-      Right(networkConfig)
+      networkConfig
     }
   }
 
@@ -136,7 +132,7 @@ object Configs extends StrictLogging {
       networkId      <- parseNetworkId(userConfig.withFallback(systemConfig).resolve())
       _              <- checkRootPath(rootPath, networkId)
       _networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkId, overwrite))
-      networkConfig  <- updateGenesis(networkId, _networkConfig)
+      networkConfig = updateGenesis(networkId, _networkConfig)
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
       case Right(config) => config
