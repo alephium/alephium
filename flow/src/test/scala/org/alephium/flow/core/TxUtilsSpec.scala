@@ -298,8 +298,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGas,
         defaultGasPrice
       )
-      .leftValue
-      .startsWith("New tokens found in outputs") is true
+      .leftValue is s"New tokens found in outputs: ${Set(tokenId1)}"
   }
 
   it should "fail without enough tokens" in new UnsignedTransactionFixture {
@@ -326,8 +325,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGas,
         defaultGasPrice
       )
-      .leftValue
-      .startsWith("Not enough balance for token") is true
+      .leftValue is s"Not enough balance for token $tokenId2"
   }
 
   it should "fail when outputs doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
@@ -358,8 +356,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for transaction output") is true
+        .leftValue is "Not enough ALPH for transaction output"
     }
 
     {
@@ -385,8 +382,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for transaction output") is true
+        .leftValue is "Not enough ALPH for transaction output"
     }
   }
 
@@ -424,8 +420,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for change output") is true
+        .leftValue is "Not enough ALPH for change output"
     }
 
     {
@@ -452,9 +447,82 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for change output") is true
+        .leftValue is "Not enough ALPH for change output"
     }
+  }
+
+  it should "fail when inputs are not unique" in new UnsignedTransactionFixture {
+    val inputs = {
+      val input1 = input("input1", ALPH.alph(4), fromLockupScript)
+      val input2 = input("input1", ALPH.alph(3), fromLockupScript)
+      AVector(input1, input2)
+    }
+
+    val outputs = AVector(output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph))
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue is "Inputs not unique"
+  }
+
+  it should "fail when there are too many tokens in the transaction output" in new UnsignedTransactionFixture {
+    val inputs = AVector(input("input", ALPH.alph(3), fromLockupScript))
+    val outputs = {
+      val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph, tokens.toSeq: _*)
+      AVector(output1)
+    }
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue is "Too many tokens in the transaction output, maximal number 64"
+  }
+
+  it should "fail when there are tokens with zero value in the transaction output" in new UnsignedTransactionFixture {
+    val tokenId1 = Hash.hash("tokenId1")
+    val tokenId2 = Hash.hash("tokenId2")
+    val inputs = AVector(
+      input("input", ALPH.alph(3), fromLockupScript, (tokenId1, U256.Zero), (tokenId2, U256.Two))
+    )
+    val outputs = {
+      val output1 = output(
+        LockupScript.p2pkh(toPubKey),
+        ALPH.alph(1),
+        (tokenId1, U256.Zero),
+        (tokenId2, U256.Two)
+      )
+      val output2 = output(LockupScript.p2pkh(toPubKey), ALPH.alph(2), (tokenId1, U256.One))
+      AVector(output1, output2)
+    }
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue is "Value is Zero for one or many tokens in the transaction output"
   }
 
   it should "estimate gas for sweep all tx" in new FlowFixture {

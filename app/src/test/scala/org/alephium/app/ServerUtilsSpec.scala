@@ -623,7 +623,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
   }
 
-  it should "not create transaction when with ALPH amount overflow" in new MultipleUtxos {
+  it should "not create transaction with overflowing ALPH amount" in new MultipleUtxos {
     val alphAmountOverflowDestinations = AVector(
       destination1,
       destination2.copy(amount = Amount(ALPH.MaxALPHValue))
@@ -638,7 +638,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         defaultGasPrice
       )
       .leftValue
-      .detail is "ALPH Amount overflow"
+      .detail is "ALPH amount overflow"
   }
 
   it should "not create transaction when with token amount overflow" in new MultipleUtxos {

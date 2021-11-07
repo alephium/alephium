@@ -263,6 +263,8 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  // TODO: Here if we have too many tokens in the output, we could split it into multiple
+  //       outputs
   def buildSweepAllTxOutputsWithGas(
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
@@ -385,7 +387,7 @@ trait TxUtils { Self: FlowUtils =>
     amounts.foldE(U256.Zero) { case (acc, amount) =>
       acc.add(amount).toRight("Alph Amount overflow").flatMap { newAmount =>
         if (newAmount > ALPH.MaxALPHValue) {
-          Left("ALPH Amount overflow")
+          Left("ALPH amount overflow")
         } else {
           Right(newAmount)
         }
