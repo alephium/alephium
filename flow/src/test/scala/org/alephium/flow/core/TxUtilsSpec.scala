@@ -543,7 +543,7 @@ class TxUtilsSpec extends AlephiumSpec {
         defaultUtxoLimit
       )
       .rightValue
-      .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
+      .leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-all` endpoint to consolidate the inputs first"
   }
 
   it should "sweep as much as we can" in new LargeUtxos {

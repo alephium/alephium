@@ -130,9 +130,10 @@ trait TxUtils { Self: FlowUtils =>
       utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
-      _               <- checkOutputInfos(outputInfos)
+      _              <- checkOutputInfos(outputInfos)
       totalAlphAmount <- checkTotalAmount(outputInfos)
-      _               <- checkWithMinimalGas(gasOpt, minimalGas)
+      _              <- checkGasAmount(gasOpt)
+      _              <- checkGasPrice(gasPrice)
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
       )
@@ -187,7 +188,8 @@ trait TxUtils { Self: FlowUtils =>
         _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkTotalAmount(outputInfos)
         _ <- checkOutputInfos(outputInfos)
-        _ <- checkWithMinimalGas(gasOpt, minimalGas)
+        _ <- checkGasAmount(gasOpt)
+        _ <- checkGasPrice(gasPrice)
       } yield ()
 
       checkResult match {
@@ -230,7 +232,8 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
       val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
       for {
-        _   <- checkWithMinimalGas(gasOpt, minimalGas)
+        _   <- checkGasAmount(gasOpt)
+        _   <- checkGasPrice(gasPrice)
         gas <- Right(gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length)))
         totalAmount <- utxos.foldE(U256.Zero)(
           _ add _.output.amount toRight "Input amount overflow"
@@ -359,14 +362,28 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def checkWithMinimalGas(
-      gasOpt: Option[GasBox],
-      minimalGas: GasBox
-  ): Either[String, Unit] = {
+  private def checkGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
     gasOpt match {
       case None => Right(())
       case Some(gas) =>
-        if (gas < minimalGas) Left(s"Invalid gas $gas, minimal $minimalGas") else Right(())
+        if (gas < minimalGas) {
+          Left(s"Gas $gas too small, minimal $minimalGas")
+        } else if (gas > maximalGasPerTx) {
+          Left(s"Gas $gas too large, maximal $maximalGasPerTx")
+        } else {
+          Right(())
+        }
+    }
+  }
+
+  private def checkGasPrice(gasPrice: GasPrice): Either[String, Unit] = {
+    if (gasPrice < minimalGasPrice) {
+      Left(s"Gas price $gasPrice too small, minimal $minimalGasPrice")
+    } else if (gasPrice.value >= ALPH.MaxALPHValue) {
+      val maximalGasPrice = GasPrice(ALPH.MaxALPHValue.subOneUnsafe())
+      Left(s"Gas price $gasPrice too large, maximal $maximalGasPrice")
+    } else {
+      Right(())
     }
   }
 
@@ -375,6 +392,8 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, Unit] = {
     if (outputInfos.isEmpty) {
       Left("Zero transaction outputs")
+    } else if (outputInfos.length > ALPH.MaxTxOutputNum) {
+      Left(s"Too many transaction outputs, maximal value: ${ALPH.MaxTxOutputNum}")
     } else {
       val groupIndexes = outputInfos.map(_.lockupScript.groupIndex)
 

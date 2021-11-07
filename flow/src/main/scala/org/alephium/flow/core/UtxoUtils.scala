@@ -210,8 +210,8 @@ object UtxoUtils {
       } yield result
 
       foundResult match {
-        case Right((_, foundUtxos, otherUtxos)) =>
-          findUtxosForTokens(currentUtxos ++ foundUtxos, otherUtxos, totalAmountPerToken.tail)
+        case Right((_, foundUtxos, remainingUtxos)) =>
+          findUtxosForTokens(currentUtxos ++ foundUtxos, remainingUtxos, totalAmountPerToken.tail)
         case Left(e) =>
           Left(e)
       }

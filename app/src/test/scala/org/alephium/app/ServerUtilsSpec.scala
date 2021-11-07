@@ -531,7 +531,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Empty UTXOs"
   }
 
-  it should "not create transaction without enough gas" in new MultipleUtxos {
+  it should "not create transaction with invalid gas amount" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
       OutputRef(utxo.ref.hint, utxo.ref.key)
     }
@@ -547,7 +547,49 @@ class ServerUtilsSpec extends AlephiumSpec {
         defaultUtxosLimit
       )
       .leftValue
-      .detail is "Invalid gas GasBox(100), minimal GasBox(20000)"
+      .detail is "Gas GasBox(100) too small, minimal GasBox(20000)"
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(GasBox.unsafe(625001)),
+        defaultGasPrice
+      )
+      .leftValue
+      .detail is "Gas GasBox(625001) too large, maximal GasBox(625000)"
+  }
+
+  it should "not create transaction with invalid gas price" in new MultipleUtxos {
+    val outputRefs = utxos.map { utxo =>
+      OutputRef(utxo.ref.hint, utxo.ref.key)
+    }
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        GasPrice(minimalGasPrice.value - 1)
+      )
+      .leftValue
+      .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        GasPrice(ALF.MaxALFValue)
+      )
+      .leftValue
+      .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
   }
 
   it should "not create transaction when not all utxos are of asset type" in new MultipleUtxos {
