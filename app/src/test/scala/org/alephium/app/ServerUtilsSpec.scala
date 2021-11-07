@@ -324,7 +324,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       // Spend 10 UTXOs and generate 1 output
       sweepAllTxTemplate.unsigned.fixedOutputs.length is 1
       sweepAllTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11)
+      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11, 1)
 
       checkAddressBalance(
         sweepAllToAddress,
@@ -518,17 +518,12 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with provided UTXOs, if they are not from the same group" in new MultipleUtxos {
-    // scalastyle:off no.equal
-    val outputRefs = utxos.zipWithIndex.map { case (utxo, index) =>
-      if (index % 2 == 1) {
-        OutputRef(utxo.ref.hint + 4, utxo.ref.key)
-      } else {
-        OutputRef(utxo.ref.hint, utxo.ref.key)
-      }
-    }
-    // scalastyle:on no.equal
+    utxos.length is 2
 
-    outputRefs.length is 2
+    val outputRefs = AVector(
+      OutputRef(3, utxos(1).ref.key),
+      OutputRef(1, utxos(0).ref.key)
+    )
 
     serverUtils
       .prepareUnsignedTransaction(
@@ -537,7 +532,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Selected UTXOs are not from the same group"
@@ -585,7 +581,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(625001)),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Gas GasBox(625001) too large, maximal GasBox(625000)"
@@ -604,7 +601,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(minimalGasPrice.value - 1)
+        GasPrice(minimalGasPrice.value - 1),
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
@@ -617,7 +615,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(ALPH.MaxALPHValue)
+        GasPrice(ALPH.MaxALPHValue),
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
@@ -635,7 +634,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         alphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "ALPH amount overflow"
@@ -654,7 +654,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         tokenAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is s"Amount overflow for token $tokenId"

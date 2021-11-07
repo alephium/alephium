@@ -242,7 +242,7 @@ trait TxUtils { Self: FlowUtils =>
               toLockupScript,
               lockTimeOpt,
               totalAmount,
-              utxos,
+              utxos.map(_.output),
               gasOpt,
               gasPrice
             )
@@ -263,23 +263,59 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  // TODO: Here if we have too many tokens in the output, we could split it into multiple
-  //       outputs
+  // Normally there is one output for the `sweepAll` transaction. However, If there are more
+  // tokens than `maxTokenPerUtxo`, instead of failing the transaction validation, we will
+  // try to build a valid transaction by creating more outputs.
   def buildSweepAllTxOutputsWithGas(
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       totalAmount: U256,
-      utxos: AVector[AssetOutputInfo],
+      utxos: AVector[AssetOutput],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Either[String, (AVector[TxOutputInfo], GasBox)] = {
     for {
-      gas    <- Right(gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length)))
-      amount <- totalAmount.sub(gasPrice * gas).toRight("Not enough balance for gas fee")
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
-        utxos.flatMap(_.output.tokens)
+        utxos.flatMap(_.tokens)
       )
-    } yield (AVector(TxOutputInfo(toLockupScript, amount, totalAmountPerToken, lockTimeOpt)), gas)
+      groupsOfTokens    = Math.ceil(totalAmountPerToken.length / maxTokenPerUtxo.toDouble).toInt
+      extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
+      gas               = gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length, extraNumOfOutputs + 1))
+      totalAmountWithoutGas <- totalAmount
+        .sub(gasPrice * gas)
+        .toRight("Not enough balance for gas fee")
+      amountRequiredForExtraOutputs <- minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
+        .mul(U256.unsafe(extraNumOfOutputs))
+        .toRight("Too many tokens")
+      amountOfFirstOutput <- totalAmountWithoutGas
+        .sub(amountRequiredForExtraOutputs)
+        .toRight("Not enough ALPH balance for transaction outputs")
+    } yield {
+      val firstOutputTokensNum = {
+        val tokensNum = totalAmountPerToken.length
+        val remainder = tokensNum % maxTokenPerUtxo
+        if (tokensNum == 0) {
+          tokensNum
+        } else if (remainder == 0) {
+          maxTokenPerUtxo
+        } else {
+          remainder
+        }
+      }
+      val firstTokens  = totalAmountPerToken.take(firstOutputTokensNum)
+      val restOfTokens = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
+      val firstOutput  = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
+      val restOfOutputs = restOfTokens.map { tokens =>
+        TxOutputInfo(
+          toLockupScript,
+          minimalAlphAmountPerTxOutput(maxTokenPerUtxo),
+          tokens,
+          lockTimeOpt
+        )
+      }
+
+      (firstOutput +: restOfOutputs, gas)
+    }
   }
 
   def isTxConfirmed(txId: Hash, chainIndex: ChainIndex): IOResult[Boolean] = {

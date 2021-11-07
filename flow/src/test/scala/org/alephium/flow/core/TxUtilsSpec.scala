@@ -17,12 +17,14 @@
 package org.alephium.flow.core
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash}
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
@@ -548,12 +550,139 @@ class TxUtilsSpec extends AlephiumSpec {
         )
         .rightValue
         .rightValue
-      unsignedTx.gasAmount is UtxoUtils.estimateSweepAllTxGas(inputNum)
+      unsignedTx.fixedOutputs.length is 1
+      unsignedTx.gasAmount is UtxoUtils.estimateSweepAllTxGas(inputNum, 1)
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
       txValidation.validateTxOnlyForTest(sweepTx, blockflow) isE ()
     }
 
     (1 to 10).foreach(test)
+  }
+
+  it should "create multiple outputs for sweep all tx if too many tokens" in new FlowFixture
+    with LockupScriptGenerators {
+    def test(
+        tokens: AVector[(TokenId, U256)]
+    )(verify: ((AVector[TxOutputInfo], GasBox)) => Assertion) = {
+      val blockflow        = isolatedBlockFlow()
+      val groupIndex       = groupIndexGen.sample.value
+      val toLockupScript   = p2pkhLockupGen(groupIndex).sample.value
+      val fromLockupScript = p2pkhLockupGen(groupIndex).sample.value
+      val output = AssetOutput(
+        U256.One,
+        fromLockupScript,
+        TimeStamp.unsafe(0),
+        tokens,
+        additionalData = ByteString(0)
+      )
+
+      val result = blockflow
+        .buildSweepAllTxOutputsWithGas(
+          toLockupScript,
+          lockTimeOpt = None,
+          ALPH.alph(3),
+          AVector(output),
+          gasOpt = None,
+          defaultGasPrice
+        )
+        .rightValue
+
+      verify(result)
+    }
+
+    def verifyExtraOutput(output: TxOutputInfo) = {
+      output.alphAmount is minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
+      output.tokens.length is maxTokenPerUtxo
+    }
+
+    {
+      info("no tokens")
+      test(AVector.empty) { case (outputs, gas) =>
+        outputs.length is 1
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
+      }
+    }
+
+    {
+      info("token amount not more than `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(maxTokenPerUtxo) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      test(tokens) { case (outputs, gas) =>
+        outputs.length is 1
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
+      }
+    }
+
+    {
+      info("token amount more than `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      test(tokens) { case (outputs, gas) =>
+        outputs.length is 2
+
+        outputs(0).alphAmount is ALPH
+          .alph(3)
+          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo))
+          .subUnsafe(defaultGasPrice * gas)
+        outputs(0).tokens.length is 1
+
+        verifyExtraOutput(outputs(1))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 2)
+      }
+    }
+
+    {
+      info("token amount a bit more than two times of `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(2 * maxTokenPerUtxo + 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      test(tokens) { case (outputs, gas) =>
+        outputs.length is 3
+
+        outputs(0).alphAmount is ALPH
+          .alph(3)
+          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(defaultGasPrice * gas)
+        outputs(0).tokens.length is 1
+
+        verifyExtraOutput(outputs(1))
+        verifyExtraOutput(outputs(2))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+      }
+    }
+
+    {
+      info("token amount three times of `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(3 * maxTokenPerUtxo) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      test(tokens) { case (outputs, gas) =>
+        outputs.length is 3
+
+        outputs(0).alphAmount is ALPH
+          .alph(3)
+          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(defaultGasPrice * gas)
+        outputs(0).tokens.length is maxTokenPerUtxo
+
+        verifyExtraOutput(outputs(1))
+        verifyExtraOutput(outputs(2))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+      }
+    }
   }
 
   trait LargeUtxos extends FlowFixture {
