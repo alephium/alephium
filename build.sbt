@@ -153,7 +153,7 @@ lazy val app = mainProject("app")
       val artifact: File     = assembly.value
       val artifactTargetPath = "/alephium.jar"
 
-      val userConf: File = file("docker/user-testnet.conf")
+      val userConf: File = file("docker/user-mainnet.conf")
 
       val alephiumHome = "/alephium-home"
 
@@ -167,12 +167,13 @@ lazy val app = mainProject("app")
           Seq(
             s"mkdir -p $alephiumHome && usermod -d $alephiumHome nobody && chown nobody $alephiumHome",
             s"mkdir -p $alephiumHome/.alephium && chown nobody $alephiumHome/.alephium",
+            s"mkdir -p $alephiumHome/.alephium/mainnet && chown nobody $alephiumHome/.alephium/mainnet",
             s"mkdir -p $alephiumHome/.alephium-wallets && chown nobody $alephiumHome/.alephium-wallets"
           ).mkString(" && ")
         )
         workDir(alephiumHome)
 
-        copy(userConf, file(s"$alephiumHome/.alephium/user.conf"))
+        copy(userConf, file(s"$alephiumHome/.alephium/mainnet/user.conf"))
 
         copy(artifact, artifactTargetPath)
 

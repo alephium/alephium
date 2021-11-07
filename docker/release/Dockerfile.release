@@ -8,7 +8,7 @@ RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/a
   mkdir -p ~nobody/.alephium && chown nobody ~nobody/.alephium && \
   mkdir -p ~nobody/.alephium-wallets && chown nobody ~nobody/.alephium-wallets
 
-COPY user-testnet-release.conf /alephium-home/.alephium/user.conf
+COPY user-mainnet-release.conf /alephium-home/.alephium/mainnet/user.conf
 COPY entrypoint.sh /entrypoint.sh
 
 # http
