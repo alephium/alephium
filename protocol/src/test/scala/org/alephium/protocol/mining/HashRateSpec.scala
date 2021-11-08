@@ -44,4 +44,11 @@ class HashRateSpec extends AlephiumSpec with GroupConfigFixture {
     val hashrate = HashRate.from(Target.Max, Duration.ofSecondsUnsafe(64))
     hashrate.value is BigInteger.valueOf((16 * 16) / 64)
   }
+
+  it should "convert to MH/s" in {
+    val hashrate0 = HashRate.unsafe(1000 * 1000)
+    hashrate0.MHs is "1 MH/s"
+    val hashrate1 = HashRate.unsafe(2000 * 1000)
+    hashrate1.MHs is "2 MH/s"
+  }
 }

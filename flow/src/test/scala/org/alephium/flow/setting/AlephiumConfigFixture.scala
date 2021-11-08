@@ -34,11 +34,16 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
   lazy val env      = Env.resolve()
   lazy val rootPath = Platform.getRootPath(env)
 
-  lazy val newConfig = ConfigFactory
-    .parseMap(
-      (configPortsValues ++ configValues).view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava
-    )
-    .withFallback(Configs.parseConfig(Env.currentEnv, rootPath, overwrite = true))
+  lazy val newConfig = {
+    val predefined = ConfigFactory
+      .parseMap(
+        (configPortsValues ++ configValues).view
+          .mapValues(ConfigValueFactory.fromAnyRef)
+          .toMap
+          .asJava
+      )
+    Configs.parseConfig(Env.currentEnv, rootPath, overwrite = true, predefined)
+  }
 
   lazy val groups0 = newConfig.getInt("alephium.broker.groups")
 
