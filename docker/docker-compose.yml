@@ -26,7 +26,7 @@ services:
     volumes:
       # The provided file user-mainnet.conf is a minimal default config to connect your container to the mainnet.
       - alephium-data:/alephium-home/.alephium
-      - ./user-mainnet.conf:/alephium-home/.alephium/mainnet/user.conf
+      - ./user-mainnet.conf:/alephium-home/.alephium/user.conf
 #      - ./alephium-wallets:/alephium-home/.alephium-wallets
 
   grafana:

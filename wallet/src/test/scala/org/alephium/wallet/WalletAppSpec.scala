@@ -305,13 +305,10 @@ class WalletAppSpec
     }
 
     lock()
-    unlock()
-
-    getAddresses() check { response =>
-      response.as[model.Addresses].activeAddress isnot address
+    unlock() check { response =>
+      response.code is StatusCode.Unauthorized
     }
 
-    lock()
     unlock(Some(mnemonicPassphrase))
 
     getAddresses() check { response =>

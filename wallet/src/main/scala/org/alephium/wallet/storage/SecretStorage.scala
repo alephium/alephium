@@ -25,7 +25,7 @@ import scala.util.{Try, Using}
 import akka.util.ByteString
 
 import org.alephium.api.UtilJson._
-import org.alephium.crypto.AES
+import org.alephium.crypto.{AES, Sha256}
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.json.Json._
@@ -54,14 +54,15 @@ object SecretStorage {
 
   sealed trait Error
 
-  case object Locked                  extends Error
-  case object CannotDeriveKey         extends Error
-  case object CannotParseFile         extends Error
-  case object CannotDecryptSecret     extends Error
-  case object InvalidState            extends Error
-  case object SecretFileError         extends Error
-  case object SecretFileAlreadyExists extends Error
-  case object UnknownKey              extends Error
+  case object Locked                    extends Error
+  case object CannotDeriveKey           extends Error
+  case object CannotParseFile           extends Error
+  case object CannotDecryptSecret       extends Error
+  case object InvalidState              extends Error
+  case object SecretFileError           extends Error
+  case object SecretFileAlreadyExists   extends Error
+  case object UnknownKey                extends Error
+  case object InvalidMnemonicPassphrase extends Error
 
   implicit private val mnemonicSerde: Serde[Mnemonic] = Serde.forProduct1(Mnemonic.unsafe, _.words)
 
@@ -71,27 +72,39 @@ object SecretStorage {
       mnemonic: Mnemonic,
       isMiner: Boolean,
       numberOfAddresses: Int,
-      activeAddressIndex: Int
+      activeAddressIndex: Int,
+      passphraseDoubleSha256: Option[Sha256]
   )
 
   object StoredState {
     implicit val serde: Serde[StoredState] =
-      Serde.forProduct4(
+      Serde.forProduct5(
         apply,
         state =>
           (
             state.mnemonic,
             state.isMiner,
             state.numberOfAddresses,
-            state.activeAddressIndex
+            state.activeAddressIndex,
+            state.passphraseDoubleSha256
           )
       )
 
-    def from(state: State, mnemonic: Mnemonic): Either[Error, StoredState] = {
+    def from(
+        state: State,
+        mnemonic: Mnemonic,
+        passphraseDoubleSha256: Option[Sha256]
+    ): Either[Error, StoredState] = {
       val index = state.privateKeys.indexWhere(_.privateKey == state.activeKey.privateKey)
       Either.cond(
         index >= 0,
-        StoredState(mnemonic, state.isMiner, state.privateKeys.length, index),
+        StoredState(
+          mnemonic,
+          state.isMiner,
+          state.privateKeys.length,
+          index,
+          passphraseDoubleSha256
+        ),
         UnknownKey
       )
     }
@@ -142,6 +155,8 @@ object SecretStorage {
     if (file.exists) {
       Left(SecretFileAlreadyExists)
     } else {
+      val passphraseDoubleSha256 =
+        mnemonicPassphrase.map(passphrase => Sha256.doubleHash(ByteString(passphrase)))
       for {
         _ <- storeStateToFile(
           file,
@@ -149,7 +164,8 @@ object SecretStorage {
             mnemonic,
             isMiner,
             numberOfAddresses = 1,
-            activeAddressIndex = 0
+            activeAddressIndex = 0,
+            passphraseDoubleSha256
           ),
           password
         )
@@ -254,11 +270,15 @@ object SecretStorage {
     private def updateState(state: State): Either[SecretStorage.Error, Unit] = {
       synchronized {
         for {
-          mnemonic    <- revealMnemonicFromFile(file, state.password)
-          storedState <- StoredState.from(state, mnemonic)
+          oldStoredState <- storedStateFromFile(file, state.password)
+          newStoredState <- StoredState.from(
+            state,
+            oldStoredState.mnemonic,
+            oldStoredState.passphraseDoubleSha256
+          )
           _ <- storeStateToFile(
             file,
-            storedState,
+            newStoredState,
             state.password
           )
         } yield {
@@ -323,6 +343,15 @@ object SecretStorage {
   ): Either[Error, State] = {
     for {
       state <- storedStateFromFile(file, password)
+      passphraseDoubleSha256 = mnemonicPassphrase.map(passphrase =>
+        Sha256.doubleHash(ByteString(passphrase))
+      )
+      _ <-
+        if (passphraseDoubleSha256 != state.passphraseDoubleSha256) {
+          Left(InvalidMnemonicPassphrase)
+        } else {
+          Right(())
+        }
       seed = state.mnemonic.toSeed(mnemonicPassphrase)
       privateKeys <- deriveKeys(seed, state.numberOfAddresses, path)
       active      <- privateKeys.get(state.activeAddressIndex).toRight(InvalidState)
