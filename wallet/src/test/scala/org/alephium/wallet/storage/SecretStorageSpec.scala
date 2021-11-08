@@ -92,13 +92,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
       secretStorage.getCurrentPrivateKey() isE privateKey
 
       secretStorage.lock()
-
-      //unlocking without passphrase gives another seed
-      secretStorage.unlock(password, None)
-      secretStorage.getCurrentPrivateKey() isnotE privateKey
-
-      secretStorage.lock()
-
+      secretStorage.unlock(password, None).leftValue is SecretStorage.InvalidMnemonicPassphrase
       secretStorage.unlock(password, Some(passphrase))
       secretStorage.getCurrentPrivateKey() isE privateKey
     }
@@ -106,15 +100,16 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   it should "create secret storage from a file" in {
 
-    val password = "36ae0b75ef06d2e902e473c879c6e853193760ffa5dc29dc8da76133149e0892"
+    val password   = "36ae0b75ef06d2e902e473c879c6e853193760ffa5dc29dc8da76133149e0892"
+    val mnemonicph = "5bd63aa99d9bc6e610e473c879c6e853193760ffa5dc29dc8da76133149e0892"
 
     // scan pause slender around cube flavor neck shrug gadget ramp rude lend capable tone nose unhappy gift across cluster minor tragic fever detail script
     val seed = Hex.unsafe(
-      "f585d130dd79d3b5bd63aa99d9bc6e6107cfbbe393b86d70e865f6e75c60a37496afc1b25cd4d1ab3b82d9b41f469c6c112a9f310e441814147ff27a5d65882b"
+      "7c3308b5b2fe6c6feb2ed8ca3e54fc91b8a411c09e8c62ab2b19e3dd24129eacc9f44f64e9ae2101cdbe9ea1f36e1715bba38ced09ae8778eb05cf11305349cd"
     )
 
     val rawFile =
-      """{"encrypted":"267cdaf3f8a740c6fb70ec0413d90dd7389c0898a09cc08b476f66c232572ff2590a40bd1d6e560596880de981939fb6a7a7300a390bcf6c762dae0a36d8188c6cc1b2214c6e459aa2cbf2df1c6cdf16703748ae3e386879e6fd03927c24b85a633e79f71abf432fea719a622ed68b6beda79b509f8b3e1c3a192466f6cd21a9ce09f935e27f32c6083dd1e8cb80fdd8fc67b2a70f22df0468a735d42e5c83d5dc95f8a0a9ac228a57b8","salt":"c2eeb77b1d46fa53db20130cd9c0a6f281459274d06e3e597c83d0db4e3d1dd503eb86b6b2e1cb18b5563b02150ee02e11c262b024e6e7787f8de48cabb2d56b","iv":"d6a57f8ecf1df03b1dd1095a66608c3a580feb539a0dc8094f2c3de07a516cc1aacf0acd00de5a79dd6f4b3802640da78088f52e810b40739e04e8c30d0104f8","version":1}"""
+      """{"encrypted":"46e53f15468c210a31a738b2875b0202301d8ac470151090a18b1a0f36bcaef9f091dc1423b07794b1c9702de6ca4e00111c7b4daeedfa0bffdae417b102224f626f4cf143d061b5e3848afeb74ab6e0624af37fd9beaf76ce8fbb6d9176d1e739c34fff30ac7dcd11071487420c0c14d8ba81245d4007dfe635346b659913052f819c5c6766a45df15c2d47a22550da39632b27256a0a475fc328d9b5e3ccc937dcab1c8e1950bdd9aaa9ad97f0cb3a32d4b1a9a5449558d36549f371f850fb11d7cd577808c72744b7a1","salt":"18f4b8cfc2d99942a015046936dcae94afcc3fad64d4c2a8e6d7ee91a8c198f83d8f02fbfc5b1dadfedb7b2bc8f539b3832c6ee4188ccb51b06b8d266c6b81f0","iv":"695a244a83d99b34434ff255d3ca8c22e784c57958475935fe8fbb91e27aeccbdc2e558ba04b4482c73405b88e3afb3f9bd45c61731e0b15a040f170b607709b","version":1}"""
 
     val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
@@ -123,9 +118,15 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     outWriter.write(rawFile)
     outWriter.close()
 
-    val secretStorage = SecretStorage.fromFile(file, password, path, None).rightValue
+    SecretStorage
+      .fromFile(file, password, path, None)
+      .leftValue is SecretStorage.InvalidMnemonicPassphrase
 
-    secretStorage.unlock(password, None) is Right(())
+    val secretStorage =
+      SecretStorage.fromFile(file, password, path, Some(mnemonicph)).rightValue
+
+    secretStorage.unlock(password, None).leftValue is SecretStorage.InvalidMnemonicPassphrase
+    secretStorage.unlock(password, Some(mnemonicph)) is Right(())
 
     secretStorage.getCurrentPrivateKey() isE privateKey
   }

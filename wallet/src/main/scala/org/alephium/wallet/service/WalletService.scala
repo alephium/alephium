@@ -110,15 +110,16 @@ object WalletService {
   object WalletError {
     def from(error: SecretStorage.Error): WalletError =
       error match {
-        case SecretStorage.Locked                   => WalletLocked
-        case SecretStorage.CannotDeriveKey          => UnexpectedError
-        case SecretStorage.CannotParseFile          => InvalidWalletFile
-        case SecretStorage.SecretFileError          => InvalidWalletFile
-        case SecretStorage.SecretFileAlreadyExists  => InvalidWalletFile
-        case SecretStorage.CannotDecryptSecret      => InvalidPassword
-        case SecretStorage.InvalidState             => UnexpectedError
-        case SecretStorage.UnknownKey               => UnexpectedError
-        case SecretStorage.SecretFileNotFound(file) => WalletNotFound(file)
+        case SecretStorage.Locked                    => WalletLocked
+        case SecretStorage.CannotDeriveKey           => UnexpectedError
+        case SecretStorage.CannotParseFile           => InvalidWalletFile
+        case SecretStorage.SecretFileError           => InvalidWalletFile
+        case SecretStorage.SecretFileAlreadyExists   => InvalidWalletFile
+        case SecretStorage.CannotDecryptSecret       => InvalidPassword
+        case SecretStorage.InvalidState              => UnexpectedError
+        case SecretStorage.UnknownKey                => UnexpectedError
+        case SecretStorage.SecretFileNotFound(file)  => WalletNotFound(file)
+        case SecretStorage.InvalidMnemonicPassphrase => InvalidMnemonicPassphrase
       }
   }
 
@@ -140,6 +141,10 @@ object WalletService {
 
   case object InvalidPassword extends WalletError {
     val message: String = s"Invalid password"
+  }
+
+  case object InvalidMnemonicPassphrase extends WalletError {
+    val message: String = "Invalid mnemonic passphrase"
   }
 
   case object MinerWalletRequired extends WalletError {
