@@ -25,7 +25,7 @@ import scala.collection.immutable.ArraySeq
 import akka.actor.ActorRef
 import akka.io.Tcp
 import akka.util.ByteString
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
@@ -352,7 +352,10 @@ object AlephiumConfig {
     }
 
   def load(env: Env, rootPath: Path, configPath: String): AlephiumConfig =
-    load(Configs.parseConfig(env, rootPath, overwrite = true), configPath)
+    load(
+      Configs.parseConfig(env, rootPath, overwrite = true, predefined = ConfigFactory.empty()),
+      configPath
+    )
   def load(rootPath: Path, configPath: String): AlephiumConfig =
     load(Env.currentEnv, rootPath, configPath)
   def load(config: Config, configPath: String): AlephiumConfig =

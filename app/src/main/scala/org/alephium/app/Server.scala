@@ -114,10 +114,12 @@ object Server {
       val apiConfig: ApiConfig,
       val executionContext: ExecutionContext
   ) extends Server {
+    val dbPath                = rootPath.resolve(config.network.networkId.nodeFolder)
     val storageFolder: String = "db"
     val writeOptions          = if (config.node.dbSyncWrite) Settings.syncWrite else Settings.writeOptions
+
     val storages: Storages =
-      Storages.createUnsafe(rootPath, storageFolder, writeOptions)(config.broker)
+      Storages.createUnsafe(dbPath, storageFolder, writeOptions)(config.broker)
 
     val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
   }

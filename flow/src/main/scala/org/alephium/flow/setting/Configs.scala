@@ -17,7 +17,7 @@
 package org.alephium.flow.setting
 
 import java.io.File
-import java.nio.file.Path
+import java.nio.file.{Files => JFiles, Path}
 
 import scala.util.control.Exception.allCatch
 
@@ -71,11 +71,11 @@ object Configs extends StrictLogging {
     path.toFile
   }
 
-  def getConfigNetwork(rootPath: Path, networkId: NetworkId, overwrite: Boolean): File =
-    getConfigTemplate(rootPath, "network", s"network_${networkId.networkType}", overwrite)
+  def getConfigNetwork(nodePath: Path, networkId: NetworkId, overwrite: Boolean): File =
+    getConfigTemplate(nodePath, "network", s"network_${networkId.networkType}", overwrite)
 
-  def getConfigSystem(env: Env, rootPath: Path, overwrite: Boolean): File = {
-    getConfigTemplate(rootPath, "system", s"system_${env.name}", overwrite)
+  def getConfigSystem(env: Env, nodePath: Path, overwrite: Boolean): File = {
+    getConfigTemplate(nodePath, "system", s"system_${env.name}", overwrite)
   }
 
   def getConfigUser(rootPath: Path): File = {
@@ -115,6 +115,14 @@ object Configs extends StrictLogging {
     }
   }
 
+  def getNodePath(rootPath: Path, networkId: NetworkId): Path = {
+    val nodePath = rootPath.resolve(networkId.nodeFolder)
+    if (!JFiles.exists(nodePath)) {
+      nodePath.toFile.mkdir()
+    }
+    nodePath
+  }
+
   def updateGenesis(networkId: NetworkId, networkConfig: Config): Config = {
     if (networkId == NetworkId.AlephiumMainNet) {
       val genesisResource = this.getClass.getResource("/mainnet_genesis.conf")
@@ -125,13 +133,14 @@ object Configs extends StrictLogging {
     }
   }
 
-  def parseConfig(env: Env, rootPath: Path, overwrite: Boolean): Config = {
+  def parseConfig(env: Env, rootPath: Path, overwrite: Boolean, predefined: Config): Config = {
     val resultEither = for {
-      userConfig     <- parseConfigFile(getConfigUser(rootPath))
-      systemConfig   <- parseConfigFile(getConfigSystem(env, rootPath, overwrite))
-      networkId      <- parseNetworkId(userConfig.withFallback(systemConfig).resolve())
-      _              <- checkRootPath(rootPath, networkId)
-      _networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkId, overwrite))
+      userConfig <- parseConfigFile(getConfigUser(rootPath)).map(predefined.withFallback(_))
+      networkId  <- parseNetworkId(userConfig)
+      _          <- checkRootPath(rootPath, networkId)
+      nodePath = getNodePath(rootPath, networkId)
+      systemConfig   <- parseConfigFile(getConfigSystem(env, nodePath, overwrite))
+      _networkConfig <- parseConfigFile(getConfigNetwork(nodePath, networkId, overwrite))
       networkConfig = updateGenesis(networkId, _networkConfig)
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
@@ -143,7 +152,7 @@ object Configs extends StrictLogging {
   }
 
   def parseConfigAndValidate(env: Env, rootPath: Path, overwrite: Boolean): Config = {
-    val config = parseConfig(env, rootPath, overwrite)
+    val config = parseConfig(env, rootPath, overwrite, ConfigFactory.empty())
     if (!config.hasPath("alephium.discovery.bootstrap")) {
       logger.error(s"""|The bootstrap nodes are not defined!
                        |

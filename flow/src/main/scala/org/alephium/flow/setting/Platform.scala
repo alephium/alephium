@@ -31,7 +31,7 @@ object Platform extends StrictLogging {
       case Env.Prod =>
         sys.env.get("ALEPHIUM_HOME") match {
           case Some(rawPath) => Paths.get(rawPath)
-          case None          => Files.homeDir.resolve(".alephium/mainnet")
+          case None          => Files.homeDir.resolve(".alephium")
         }
       case Env.Debug =>
         Files.homeDir.resolve(s".alephium-${env.name}")
