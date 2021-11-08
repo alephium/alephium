@@ -30,7 +30,7 @@ object ALPH {
   val GenesisHeight: Int          = 0
   val GenesisWeight: Weight       = Weight.zero
   val GenesisTimestamp: TimeStamp = TimeStamp.unsafe(1231006505000L) // BTC genesis timestamp
-  val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1636370406000L) // 2021-11-08T11:20:06+00:00
+  val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1636379973000L) // 2021-11-08T11:20:06+00:00
 
   val OneYear: Duration                         = Duration.ofDaysUnsafe(365)
   val DifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
