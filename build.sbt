@@ -173,7 +173,7 @@ lazy val app = mainProject("app")
         )
         workDir(alephiumHome)
 
-        copy(userConf, file(s"$alephiumHome/.alephium/mainnet/user.conf"))
+        copy(userConf, file(s"$alephiumHome/.alephium/user.conf"))
 
         copy(artifact, artifactTargetPath)
 

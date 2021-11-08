@@ -73,7 +73,7 @@ Use the following command to build a docker image:
 
 ## Configuration
 
-You can define user specific settings in the file `$ALEPHIUM_HOME/mainnet/user.conf`, where by default `$ALEPHIUM_HOME` points to `~/.alephium`.
+You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, where by default `$ALEPHIUM_HOME` points to `~/.alephium`.
 
 ## Testing
 
