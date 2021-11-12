@@ -175,10 +175,25 @@ trait DiscoveryServerState extends SessionManager {
     toRemove.foreach(unreachables.remove)
   }
 
+  def getCliqueNumPerIp(target: BrokerInfo): Int = {
+    table.values.view
+      .filter { peerStatus =>
+        peerStatus.info.intersect(target) &&
+        peerStatus.info.address.getAddress == target.address.getAddress
+      }
+      .map(_.info.cliqueId)
+      .toSet
+      .size
+  }
+
   def appendPeer(peerInfo: BrokerInfo): Unit = {
-    log.info(s"Adding a new peer: $peerInfo")
-    table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
-    publishNewPeer(peerInfo)
+    if (getCliqueNumPerIp(peerInfo) < discoveryConfig.maxCliqueFromSameIp) {
+      log.info(s"Adding a new peer: $peerInfo")
+      table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+      publishNewPeer(peerInfo)
+    } else {
+      log.debug(s"Too many cliques from a same IP: $peerInfo")
+    }
   }
 
   def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {

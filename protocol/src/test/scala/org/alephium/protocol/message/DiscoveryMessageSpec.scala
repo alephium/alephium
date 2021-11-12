@@ -59,6 +59,7 @@ class DiscoveryMessageSpec extends AlephiumSpec with NetworkConfigFixture.Defaul
       val scanFastFrequency: Duration = Duration.ofSecondsUnsafe(1)
       val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
       val neighborsPerGroup: Int      = 1
+      val maxCliqueFromSameIp: Int    = 2
     }
   }
 

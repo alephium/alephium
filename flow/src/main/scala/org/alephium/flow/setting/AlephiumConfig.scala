@@ -143,7 +143,8 @@ final case class DiscoverySetting(
     scanFrequency: Duration,
     scanFastFrequency: Duration,
     fastScanPeriod: Duration,
-    neighborsPerGroup: Int
+    neighborsPerGroup: Int,
+    maxCliqueFromSameIp: Int
 ) extends DiscoveryConfig
 
 final case class MemPoolSetting(
