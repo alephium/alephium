@@ -121,7 +121,11 @@ object Node {
       )
 
     val bootstrapper: ActorRefT[Bootstrapper.Command] =
-      ActorRefT.build(system, Bootstrapper.props(tcpController, cliqueManager), "Bootstrapper")
+      ActorRefT.build(
+        system,
+        Bootstrapper.props(tcpController, cliqueManager, storages.nodeStateStorage),
+        "Bootstrapper"
+      )
   }
 
   def buildBlockFlowUnsafe(storages: Storages)(implicit config: AlephiumConfig): BlockFlow = {

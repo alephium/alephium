@@ -20,12 +20,16 @@ import akka.testkit.{SocketUtil, TestProbe}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
+import org.alephium.protocol.SignatureSchema
 import org.alephium.util.ActorRefT
 
 class CliqueCoordinatorSpec extends AlephiumFlowActorSpec {
   it should "await all the brokers" in {
-    val bootstrapper = TestProbe()
-    val coordinator  = system.actorOf(CliqueCoordinator.props(ActorRefT(bootstrapper.ref)))
+    val bootstrapper                              = TestProbe()
+    val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
+    val coordinator = system.actorOf(
+      CliqueCoordinator.props(ActorRefT(bootstrapper.ref), discoveryPrivateKey, discoveryPublicKey)
+    )
 
     val probs = (0 until brokerConfig.brokerNum)
       .filter(_ != brokerConfig.brokerId)
@@ -39,7 +43,9 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec {
       }
       .toMap
 
-    probs.values.foreach(_.expectMsgType[BrokerConnector.Send])
+    probs.values.foreach(_.expectMsgPF() { case BrokerConnector.Send(intraCliqueInfo) =>
+      intraCliqueInfo.priKey is discoveryPrivateKey
+    })
 
     bootstrapper.expectMsg(Bootstrapper.ForwardConnection)
 
@@ -51,7 +57,9 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec {
     watch(coordinator)
     probs.values.foreach(p => system.stop(p.ref))
 
-    bootstrapper.expectMsgType[Bootstrapper.SendIntraCliqueInfo]
+    bootstrapper.expectMsgPF() { case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
+      intraCliqueInfo.priKey is discoveryPrivateKey
+    }
 
     expectTerminated(coordinator)
   }

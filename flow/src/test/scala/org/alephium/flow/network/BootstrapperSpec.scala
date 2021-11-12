@@ -19,9 +19,13 @@ package org.alephium.flow.network
 import akka.io.Tcp
 import akka.testkit.TestProbe
 
+import org.alephium.crypto.SecP256K1PrivateKey
+import org.alephium.flow.io.StoragesFixture
+import org.alephium.flow.model.BootstrapInfo
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.io.IOResult
+import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
 class BootstrapperSpec extends AlephiumActorSpec {
   it should "bootstrap a master" in new Fixture {
@@ -51,6 +55,7 @@ class BootstrapperSpec extends AlephiumActorSpec {
     //Answering IntraCliqueInfo request
     bootstrapper ! Bootstrapper.GetIntraCliqueInfo
     expectMsg(intraCliqueInfo)
+    getPersistedKey() isE Some(intraCliqueInfo.priKey)
   }
 
   it should "bootstrap a peer" in new Fixture {
@@ -66,6 +71,7 @@ class BootstrapperSpec extends AlephiumActorSpec {
       "alephium.broker.broker-num" -> 1
     )
 
+    storages.nodeStateStorage.getBootstrapInfo() isE None
     bootstrapper ! Bootstrapper.GetIntraCliqueInfo
     tcpControllerProbe.expectMsg(TcpController.WorkFor(cliqueManagerProbe.ref))
     val cliqueInfo1 = cliqueManagerProbe.expectMsgPF() { case CliqueManager.Start(cliqueInfo) =>
@@ -75,19 +81,44 @@ class BootstrapperSpec extends AlephiumActorSpec {
       intraCliqueInfo
     }
     intraCliqueInfo1.cliqueInfo is cliqueInfo1
+    getPersistedKey() isE Some(intraCliqueInfo1.priKey)
   }
 
-  trait Fixture extends AlephiumConfigFixture with InfoFixture {
+  it should "bootstrap with persisted discovery key" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.broker.broker-num" -> 1
+    )
+
+    val bootstrapInfo = BootstrapInfo(intraCliqueInfo.priKey, TimeStamp.now())
+    storages.nodeStateStorage.setBootstrapInfo(bootstrapInfo) isE ()
+    bootstrapper ! Bootstrapper.GetIntraCliqueInfo
+    cliqueManagerProbe.expectMsgPF() { case CliqueManager.Start(cliqueInfo) =>
+      cliqueInfo.priKey is intraCliqueInfo.priKey
+    }
+    storages.nodeStateStorage.getBootstrapInfo() isE Some(bootstrapInfo)
+  }
+
+  trait Fixture extends AlephiumConfigFixture with InfoFixture with StoragesFixture.Default {
     val tcpControllerProbe = TestProbe()
     val cliqueManagerProbe = TestProbe()
 
     lazy val intraCliqueInfo = genIntraCliqueInfo
     lazy val cliqueInfo      = intraCliqueInfo.cliqueInfo
     lazy val bootstrapper = {
-      val actor = system.actorOf(Bootstrapper.props(tcpControllerProbe.ref, cliqueManagerProbe.ref))
+      val actor = system.actorOf(
+        Bootstrapper.props(
+          tcpControllerProbe.ref,
+          cliqueManagerProbe.ref,
+          storages.nodeStateStorage
+        )
+      )
       tcpControllerProbe.expectMsg(TcpController.Start(actor))
       actor
     }
     lazy val connected = Tcp.Connected(socketAddressGen.sample.get, socketAddressGen.sample.get)
+
+    def getPersistedKey(): IOResult[Option[SecP256K1PrivateKey]] = {
+      storages.nodeStateStorage.getBootstrapInfo().map(_.map(_.key))
+    }
   }
 }
