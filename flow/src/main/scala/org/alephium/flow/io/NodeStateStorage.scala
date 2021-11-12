@@ -20,6 +20,7 @@ import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.core.BlockHashChain
+import org.alephium.flow.model.BootstrapInfo
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.Hash
@@ -45,6 +46,23 @@ trait NodeStateStorage extends RawKeyValueStorage {
       putRawUnsafe(isInitializedKey, ByteString(1))
     }
 
+  private def getByKeyOpt[V: Deserializer](key: ByteString): IOResult[Option[V]] =
+    IOUtils.tryExecute {
+      getOptRawUnsafe(key).map(deserialize[V](_) match {
+        case Left(e)  => throw e
+        case Right(v) => v
+      })
+    }
+
+  private val bootstrapInfoKey =
+    Hash.hash("bootstrapInfo").bytes ++ ByteString(Storages.bootstrapInfoPostFix)
+
+  def getBootstrapInfo(): IOResult[Option[BootstrapInfo]] = getByKeyOpt(bootstrapInfoKey)
+
+  def setBootstrapInfo(info: BootstrapInfo): IOResult[Unit] = {
+    IOUtils.tryExecute(putRawUnsafe(bootstrapInfoKey, serialize(info)))
+  }
+
   private val dbVersionKey =
     Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
 
@@ -53,13 +71,7 @@ trait NodeStateStorage extends RawKeyValueStorage {
       putRawUnsafe(dbVersionKey, serialize(version))
     }
 
-  def getDatabaseVersion(): IOResult[Option[DatabaseVersion]] =
-    IOUtils.tryExecute {
-      getOptRawUnsafe(dbVersionKey).map(deserialize[DatabaseVersion](_) match {
-        case Left(e)  => throw e
-        case Right(v) => v
-      })
-    }
+  def getDatabaseVersion(): IOResult[Option[DatabaseVersion]] = getByKeyOpt(dbVersionKey)
 
   def checkDatabaseCompatibility(): IOResult[Unit] = {
     getDatabaseVersion().flatMap {

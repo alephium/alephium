@@ -19,19 +19,23 @@ package org.alephium.flow.network.bootstrap
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 
+import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
 import org.alephium.flow.network.Bootstrapper
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.serde._
 import org.alephium.util.{ActorRefT, BaseActor}
 
 object CliqueCoordinator {
-  def props(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
+  def props(
+      bootstrapper: ActorRefT[Bootstrapper.Command],
+      privateKey: SecP256K1PrivateKey,
+      publicKey: SecP256K1PublicKey
+  )(implicit
       brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting
   ): Props =
-    Props(new CliqueCoordinator(bootstrapper))
+    Props(new CliqueCoordinator(bootstrapper, privateKey, publicKey))
 
   sealed trait Event
   case object Ready extends Event {
@@ -42,14 +46,16 @@ object CliqueCoordinator {
   }
 }
 
-class CliqueCoordinator(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
+class CliqueCoordinator(
+    bootstrapper: ActorRefT[Bootstrapper.Command],
+    val discoveryPrivateKey: SecP256K1PrivateKey,
+    val discoveryPublicKey: SecP256K1PublicKey
+)(implicit
     val brokerConfig: BrokerConfig,
     val networkSetting: NetworkSetting
 ) extends BaseActor
     with CliqueCoordinatorState {
   override def receive: Receive = awaitBrokers
-
-  val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
 
   def awaitBrokers: Receive = {
     case Tcp.Connected(remote, _) =>
