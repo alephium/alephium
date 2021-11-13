@@ -60,9 +60,10 @@ alephium {
     bootstrap = []
     bootstrap = ${?BOOTSTRAP}
 
-    scan-frequency = 30 minutes
-    scan-fast-frequency = 5.seconds
+    scan-frequency = 10 minutes
+    scan-fast-frequency = 2 seconds
     fast-scan-period = 1 minute
+    initial-discovery-period = 30 seconds
     neighbors-per-group = 20
     max-clique-from-same-ip = 2
   }

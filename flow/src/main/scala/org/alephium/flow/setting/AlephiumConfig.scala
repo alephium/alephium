@@ -144,6 +144,7 @@ final case class DiscoverySetting(
     scanFrequency: Duration,
     scanFastFrequency: Duration,
     fastScanPeriod: Duration,
+    initialDiscoveryPeriod: Duration,
     neighborsPerGroup: Int,
     maxCliqueFromSameIp: Int
 ) extends DiscoveryConfig

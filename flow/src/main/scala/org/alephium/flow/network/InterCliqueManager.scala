@@ -152,7 +152,9 @@ class InterCliqueManager(
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
 
   def handleNewClique: Receive = { case DiscoveryServer.NewPeer(peerInfo) =>
-    connect(peerInfo)
+    if (!containsBroker(peerInfo)) {
+      connect(peerInfo)
+    }
   }
 
   def handleConnection: Receive = {

@@ -78,11 +78,12 @@ class DiscoveryServerSpec
           val brokerNum: Int = clique.brokerNum
           val groups: Int    = fixture.groups
 
-          val scanFrequency: Duration     = Duration.ofMillisUnsafe(2000)
-          val scanFastFrequency: Duration = Duration.ofMillisUnsafe(2000)
-          val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
-          val neighborsPerGroup: Int      = 20
-          val maxCliqueFromSameIp: Int    = 100
+          val scanFrequency: Duration          = Duration.ofMillisUnsafe(2000)
+          val scanFastFrequency: Duration      = Duration.ofMillisUnsafe(2000)
+          val fastScanPeriod: Duration         = Duration.ofMinutesUnsafe(1)
+          val initialDiscoveryPeriod: Duration = Duration.ofSecondsUnsafe(2)
+          val neighborsPerGroup: Int           = 20
+          val maxCliqueFromSameIp: Int         = 100
         }
         (brokerInfo, config)
       }
@@ -312,11 +313,12 @@ object DiscoveryServerSpec {
     val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
-      val scanFrequency: Duration     = _scanFrequency
-      val scanFastFrequency: Duration = _scanFrequency
-      val fastScanPeriod: Duration    = _scanFastPeriod
-      val neighborsPerGroup: Int      = _peersPerGroup
-      val maxCliqueFromSameIp: Int    = 2
+      val scanFrequency: Duration          = _scanFrequency
+      val scanFastFrequency: Duration      = _scanFrequency
+      val fastScanPeriod: Duration         = _scanFastPeriod
+      val initialDiscoveryPeriod: Duration = Duration.ofSecondsUnsafe(2)
+      val neighborsPerGroup: Int           = _peersPerGroup
+      val maxCliqueFromSameIp: Int         = 2
 
       override lazy val expireDuration: Duration = _expireDuration
       override val peersTimeout: Duration        = _peersTimeout

@@ -26,9 +26,9 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.message.DiscoveryMessage._
+import org.alephium.protocol.message.DiscoveryMessage.*
 import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
-import org.alephium.util._
+import org.alephium.util.*
 
 object DiscoveryServer {
   def props(
@@ -73,6 +73,7 @@ object DiscoveryServer {
   final case class PeerDenied(peerInfo: BrokerInfo)                              extends Command
   final case class Unreachable(remote: InetSocketAddress)                        extends Command with EventStream.Event
   case object GetUnreachable                                                     extends Command
+  case object InitialDiscoveryDone                                               extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
@@ -122,6 +123,7 @@ class DiscoveryServer(
       unstashAll()
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
+      scheduleOnce(self, InitialDiscoveryDone, discoveryConfig.initialDiscoveryPeriod)
 
     case _ =>
       stash()
@@ -187,9 +189,10 @@ class DiscoveryServer(
       banPeer(peerInfo.peerId)
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
-    case Unreachable(remote) => setUnreachable(remote)
-    case GetUnreachable      => sender() ! getUnreachable()
-    case Unban(remotes)      => remotes.foreach(unsetUnreachable)
+    case Unreachable(remote)  => setUnreachable(remote)
+    case GetUnreachable       => sender() ! getUnreachable()
+    case Unban(remotes)       => remotes.foreach(unsetUnreachable)
+    case InitialDiscoveryDone => postInitialDiscovery()
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
@@ -219,12 +222,6 @@ class DiscoveryServer(
         }
     }
 
-  override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
-    if (mightReachableSlow(peerInfo.address)) {
-      publishEvent(NewPeer(peerInfo))
-    }
-  }
-
   private def scanAndSchedule(): Unit = {
     scan()
     scheduleScan()
@@ -244,5 +241,17 @@ class DiscoveryServer(
   def cancelScan(): Unit = {
     scanScheduled.foreach(_.cancel())
     scanScheduled = None
+  }
+
+  private var initialDiscoveryDone: Boolean = false
+  def postInitialDiscovery(): Unit = {
+    initialDiscoveryDone = true
+    getNeighbors(selfCliqueId).foreach(publishNewPeer)
+  }
+
+  override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
+    if (initialDiscoveryDone && mightReachableSlow(peerInfo.address)) {
+      publishEvent(NewPeer(peerInfo))
+    }
   }
 }

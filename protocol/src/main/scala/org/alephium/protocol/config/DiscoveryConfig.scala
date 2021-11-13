@@ -26,6 +26,8 @@ trait DiscoveryConfig {
 
   def fastScanPeriod: Duration
 
+  def initialDiscoveryPeriod: Duration
+
   /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
   def neighborsPerGroup: Int
 
