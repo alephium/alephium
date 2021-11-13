@@ -437,19 +437,34 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     }
   }
 
+  def getCliqueNumPerIp(target: BrokerInfo): Int = {
+    brokers.values.view
+      .filter { brokerState =>
+        brokerState.info.intersect(target) &&
+        brokerState.info.address.getAddress == target.address.getAddress
+      }
+      .map(_.info.cliqueId)
+      .toSet
+      .size
+  }
+
   def handleNewBroker(brokerInfo: BrokerInfo, connectionType: ConnectionType): Unit = {
-    val range = brokerConfig.calIntersection(brokerInfo)
-    if (range.nonEmpty) {
-      brokers.get(brokerInfo.peerId) match {
-        case None =>
-          handleNewConnection(brokerInfo, connectionType)
-        case Some(existedBroker) =>
-          handleDoubleConnection(brokerInfo, connectionType, existedBroker)
+    if (getCliqueNumPerIp(brokerInfo) < networkSetting.maxCliqueFromSameIp) {
+      val range = brokerConfig.calIntersection(brokerInfo)
+      if (range.nonEmpty) {
+        brokers.get(brokerInfo.peerId) match {
+          case None =>
+            handleNewConnection(brokerInfo, connectionType)
+          case Some(existedBroker) =>
+            handleDoubleConnection(brokerInfo, connectionType, existedBroker)
+        }
+      } else {
+        log.warning(s"New peer connection with invalid group info: $brokerInfo")
+        publishEvent(MisbehaviorManager.InvalidGroup(brokerInfo.address))
+        context.stop(sender())
       }
     } else {
-      log.warning(s"New peer connection with invalid group info: $brokerInfo")
-      publishEvent(MisbehaviorManager.InvalidGroup(brokerInfo.address))
-      context.stop(sender())
+      log.debug(s"Too many clique connection from the same IP: $brokerInfo")
     }
   }
 
