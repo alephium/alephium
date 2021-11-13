@@ -76,7 +76,7 @@ object DiscoveryServer {
   case object InitialDiscoveryDone                                               extends Command
 
   sealed trait Event
-  final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
+  final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event with EventStream.Event
   final case class NewPeer(info: BrokerInfo)                 extends Event with EventStream.Event
 }
 
@@ -246,7 +246,9 @@ class DiscoveryServer(
   private var initialDiscoveryDone: Boolean = false
   def postInitialDiscovery(): Unit = {
     initialDiscoveryDone = true
-    getNeighbors(selfCliqueId).foreach(publishNewPeer)
+    val neighbors = getNeighbors(selfCliqueId)
+    log.info(s"Initial P2P discovery is done: #${neighbors.length} neighbors")
+    publishEvent(NeighborPeers(neighbors))
   }
 
   override def publishNewPeer(peerInfo: BrokerInfo): Unit = {

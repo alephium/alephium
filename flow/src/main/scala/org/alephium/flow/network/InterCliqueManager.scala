@@ -143,8 +143,9 @@ class InterCliqueManager(
     super.preStart()
     updateNodeSyncedStatus()
     schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
-    discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
+    subscribeEvent(self, classOf[DiscoveryServer.NeighborPeers])
+    discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[InterCliqueManager.BroadCastTx])
     subscribeEvent(self, classOf[InterCliqueManager.BroadCastBlock])
   }
@@ -299,7 +300,7 @@ class InterCliqueManager(
   }
 
   def connect(broker: BrokerInfo): Unit = {
-    log.info(s"Try to connect ${broker.address}")
+    log.info(s"Try to connect ${broker.address}, ${broker.cliqueId}")
     if (checkForOutConnection(broker, networkSetting.maxOutboundConnectionsPerGroup)) {
       connectUnsafe(broker)
     }

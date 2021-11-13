@@ -25,11 +25,12 @@ import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
+import org.alephium.flow.network.DiscoveryServer.NeighborPeers
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.protocol._
-import org.alephium.protocol.config._
-import org.alephium.protocol.model._
-import org.alephium.util._
+import org.alephium.protocol.*
+import org.alephium.protocol.config.*
+import org.alephium.protocol.model.*
+import org.alephium.util.*
 
 class DiscoveryServerSpec
     extends AlephiumActorSpec
@@ -193,6 +194,13 @@ class DiscoveryServerSpec
         cliqueInfo0.interBrokers.get.head
       )
     }
+  }
+
+  it should "publish neighbors" in new Fixture {
+    val probe = TestProbe()
+    system.eventStream.subscribe(probe.ref, classOf[NeighborPeers])
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    probe.expectMsg(Duration.ofSecondsUnsafe(3).asScala, NeighborPeers(AVector.empty))
   }
 
   trait UnreachableFixture extends Fixture {

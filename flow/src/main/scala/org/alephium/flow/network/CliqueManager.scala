@@ -71,7 +71,7 @@ class CliqueManager(
 
   def awaitStart(): Receive = {
     case Start(cliqueInfo) =>
-      log.debug(s"Start intra and inter clique managers, cliqueId: ${cliqueInfo.id.toHexString}")
+      log.info(s"Start intra and inter clique managers, cliqueId: ${cliqueInfo.id.toHexString}")
       val intraCliqueManager =
         context.actorOf(
           IntraCliqueManager
