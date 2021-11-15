@@ -56,6 +56,11 @@ final case class BrokerInfo private (
 
   def interBrokerInfo: InterBrokerInfo =
     InterBrokerInfo.unsafe(cliqueId, brokerId, brokerNum)
+
+  def isFromSameIp(another: BrokerInfo): Boolean = {
+    this.intersect(another) &&
+    this.address.getAddress == another.address.getAddress
+  }
 }
 
 object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>

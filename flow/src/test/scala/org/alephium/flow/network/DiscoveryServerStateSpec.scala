@@ -100,7 +100,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
       state.isInTable(peerInfo.peerId) is true
     }
 
-    def modifyCliqueId(clique: CliqueInfo): CliqueInfo = {
+    def cliqueWithSameIp(clique: CliqueInfo): CliqueInfo = {
       CliqueInfo.unsafe(
         cliqueIdGen.sample.get,
         clique.externalAddresses,
@@ -136,7 +136,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     clique0Brokers.foreach(broker => state.appendPeer(broker))
     state.getActivePeers(None).length is 2
 
-    val peerClique1: CliqueInfo = modifyCliqueId(peerClique0)
+    val peerClique1: CliqueInfo = cliqueWithSameIp(peerClique0)
     val clique1Brokers          = peerClique1.interBrokers.get
     clique1Brokers.length is 2
     state.appendPeer(clique1Brokers(0))
@@ -144,10 +144,10 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     state.isInTable(clique1Brokers(0).peerId) is true
     state.isInTable(clique1Brokers(1).peerId) is false
 
-    val peerClique2: CliqueInfo = modifyCliqueId(peerClique0)
+    val peerClique2: CliqueInfo = cliqueWithSameIp(peerClique0)
     val clique2Brokers          = peerClique2.interBrokers.get
     clique2Brokers.length is 2
-    peerClique2.interBrokers.get.foreach(broker => state.appendPeer(broker))
+    clique2Brokers.foreach(broker => state.appendPeer(broker))
     state.getActivePeers(None).length is 4
     state.isInTable(clique2Brokers(0).peerId) is false
     state.isInTable(clique2Brokers(1).peerId) is true

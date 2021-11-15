@@ -442,10 +442,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def getCliqueNumPerIp(target: BrokerInfo): Int = {
     brokers.values.view
-      .filter { brokerState =>
-        brokerState.info.intersect(target) &&
-        brokerState.info.address.getAddress == target.address.getAddress
-      }
+      .filter(_.info.isFromSameIp(target))
       .map(_.info.cliqueId)
       .toSet
       .size

@@ -179,10 +179,7 @@ trait DiscoveryServerState extends SessionManager {
 
   def getCliqueNumPerIp(target: BrokerInfo): Int = {
     table.values.view
-      .filter { peerStatus =>
-        peerStatus.info.intersect(target) &&
-        peerStatus.info.address.getAddress == target.address.getAddress
-      }
+      .filter(_.info.isFromSameIp(target))
       .map(_.info.cliqueId)
       .toSet
       .size
