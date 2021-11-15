@@ -89,6 +89,7 @@ final case class NetworkSetting(
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
+    maxCliqueFromSameIp: Int,
     pingFrequency: Duration,
     retryTimeout: Duration,
     banDuration: Duration,
@@ -143,7 +144,9 @@ final case class DiscoverySetting(
     scanFrequency: Duration,
     scanFastFrequency: Duration,
     fastScanPeriod: Duration,
-    neighborsPerGroup: Int
+    initialDiscoveryPeriod: Duration,
+    neighborsPerGroup: Int,
+    maxCliqueFromSameIp: Int
 ) extends DiscoveryConfig
 
 final case class MemPoolSetting(
@@ -224,6 +227,7 @@ object AlephiumConfig {
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
+      maxCliqueFromSameIp: Int,
       pingFrequency: Duration,
       retryTimeout: Duration,
       banDuration: Duration,
@@ -256,6 +260,7 @@ object AlephiumConfig {
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
+        maxCliqueFromSameIp,
         pingFrequency,
         retryTimeout,
         banDuration: Duration,

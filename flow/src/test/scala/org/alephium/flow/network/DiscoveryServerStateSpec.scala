@@ -34,11 +34,11 @@ import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration, TimeStamp}
 
-class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenerators {
+class DiscoveryServerStateSpec extends AlephiumActorSpec {
   import DiscoveryMessage._
   import DiscoveryServerSpec._
 
-  trait Fixture extends NetworkConfigFixture.Default with Eventually { self =>
+  trait Fixture extends NetworkConfigFixture.Default with Eventually with Generators { self =>
     def groupSize: Int           = 4
     val udpPort: Int             = SocketUtil.temporaryLocalPort(udp = true)
     def peersPerGroup: Int       = 1
@@ -58,6 +58,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
         peersTimeout,
         scanFastPeriod
       )._2
+
+    implicit lazy val groupConfig: GroupConfig = config
 
     implicit override val patienceConfig =
       PatienceConfig(timeout = Span(10, Seconds))
@@ -97,6 +99,16 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
       expectPayload[FindNode]
       state.isInTable(peerInfo.peerId) is true
     }
+
+    def cliqueWithSameIp(clique: CliqueInfo): CliqueInfo = {
+      CliqueInfo.unsafe(
+        cliqueIdGen.sample.get,
+        clique.externalAddresses,
+        clique.internalAddresses,
+        clique.groupNumPerBroker,
+        clique.priKey
+      )
+    }
   }
 
   it should "add peer into pending list when just pinged the peer" in new Fixture {
@@ -107,6 +119,61 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec with NoIndexModelGenera
     expectPayload[Ping]
     state.isUnknown(peerInfo.peerId) is false
     state.isPending(peerInfo.peerId) is true
+  }
+
+  it should "append broker" in new Fixture {
+    state.getActivePeers(None).length is 0
+
+    groupConfig.groups is 4
+    val cliqueGen = cliqueInfoGen(2)
+
+    val peerClique0: CliqueInfo = cliqueGen.sample.get
+    val clique0Brokers          = peerClique0.interBrokers.get
+    clique0Brokers.length is 2
+    state.discoveryConfig.maxCliqueFromSameIp is 2
+    clique0Brokers.foreach(broker => state.appendPeer(broker))
+    state.getActivePeers(None).length is 2
+    clique0Brokers.foreach(broker => state.appendPeer(broker))
+    state.getActivePeers(None).length is 2
+
+    val peerClique1: CliqueInfo = cliqueWithSameIp(peerClique0)
+    val clique1Brokers          = peerClique1.interBrokers.get
+    clique1Brokers.length is 2
+    state.appendPeer(clique1Brokers(0))
+    state.getActivePeers(None).length is 3
+    state.isInTable(clique1Brokers(0).peerId) is true
+    state.isInTable(clique1Brokers(1).peerId) is false
+
+    val peerClique2: CliqueInfo = cliqueWithSameIp(peerClique0)
+    val clique2Brokers          = peerClique2.interBrokers.get
+    clique2Brokers.length is 2
+    clique2Brokers.foreach(broker => state.appendPeer(broker))
+    state.getActivePeers(None).length is 4
+    state.isInTable(clique2Brokers(0).peerId) is false
+    state.isInTable(clique2Brokers(1).peerId) is true
+  }
+
+  it should "get the number of cliques" in new Fixture {
+    groupConfig.groups is 4
+    val clique0        = cliqueInfoGen(2).sample.get
+    val clique0Brokers = clique0.interBrokers.get
+    val clique1 = CliqueInfo.unsafe(
+      cliqueIdGen.sample.get,
+      clique0.externalAddresses.init,
+      clique0.internalAddresses.init,
+      4,
+      clique0.priKey
+    )
+    val clique1Brokers = clique1.interBrokers.get
+
+    clique0Brokers.length is 2
+    clique1Brokers.length is 1
+    clique0Brokers.foreach(state.appendPeer)
+    state.getActivePeers(None).length is 2
+    state.getCliqueNumPerIp(clique1Brokers(0)) is 1
+    clique1Brokers.foreach(state.appendPeer)
+    state.getActivePeers(None).length is 3
+    state.getCliqueNumPerIp(clique1Brokers(0)) is 2
   }
 
   trait PingedFixture extends Fixture {

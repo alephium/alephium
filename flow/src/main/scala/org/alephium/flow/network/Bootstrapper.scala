@@ -19,38 +19,45 @@ package org.alephium.flow.network
 import akka.actor.{ActorRef, Props, Stash}
 import akka.io.Tcp
 
+import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
+import org.alephium.flow.handler.IOBaseActor
+import org.alephium.flow.io.NodeStateStorage
+import org.alephium.flow.model.BootstrapInfo
 import org.alephium.flow.network.bootstrap.{Broker, CliqueCoordinator, IntraCliqueInfo, PeerInfo}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.SignatureSchema
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.CliqueId
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 
 object Bootstrapper {
   def props(
       tcpController: ActorRefT[TcpController.Command],
-      cliqueManager: ActorRefT[CliqueManager.Command]
+      cliqueManager: ActorRefT[CliqueManager.Command],
+      nodeStateStorage: NodeStateStorage
   )(implicit
       brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting
   ): Props = {
     if (brokerConfig.brokerNum == 1) {
-      val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
       assume(brokerConfig.groupNumPerBroker == brokerConfig.groups)
-      val cliqueId  = CliqueId(discoveryPublicKey)
-      val peerInfos = AVector(PeerInfo.self)
-      val intraCliqueInfo =
-        IntraCliqueInfo.unsafe(
-          cliqueId,
-          peerInfos,
-          brokerConfig.groupNumPerBroker,
-          discoveryPrivateKey
+      Props(
+        new SingleNodeCliqueBootstrapper(
+          tcpController,
+          cliqueManager,
+          nodeStateStorage
         )
-      Props(new SingleNodeCliqueBootstrapper(tcpController, cliqueManager, intraCliqueInfo))
+      )
     } else if (networkSetting.isCoordinator) {
-      Props(new CliqueCoordinatorBootstrapper(tcpController, cliqueManager))
+      Props(
+        new CliqueCoordinatorBootstrapper(
+          tcpController,
+          cliqueManager,
+          nodeStateStorage
+        )
+      )
     } else {
-      Props(new BrokerBootstrapper(tcpController, cliqueManager))
+      Props(new BrokerBootstrapper(tcpController, cliqueManager, nodeStateStorage))
     }
   }
 
@@ -62,14 +69,19 @@ object Bootstrapper {
 
 class CliqueCoordinatorBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
-    val cliqueManager: ActorRefT[CliqueManager.Command]
+    val cliqueManager: ActorRefT[CliqueManager.Command],
+    val nodeStateStorage: NodeStateStorage
 )(implicit
     brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting
 ) extends BootstrapperHandler {
   log.debug("Start as CliqueCoordinator")
 
-  val cliqueCoordinator: ActorRef = context.actorOf(CliqueCoordinator.props(ActorRefT(self)))
+  private val (discoveryPrivateKey, discoveryPublicKey) = loadOrGenDiscoveryKey()
+  val cliqueCoordinator: ActorRef =
+    context.actorOf(
+      CliqueCoordinator.props(ActorRefT(self), discoveryPrivateKey, discoveryPublicKey)
+    )
 
   override def receive: Receive = {
     case c: Tcp.Connected =>
@@ -85,7 +97,8 @@ class CliqueCoordinatorBootstrapper(
 
 class BrokerBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
-    val cliqueManager: ActorRefT[CliqueManager.Command]
+    val cliqueManager: ActorRefT[CliqueManager.Command],
+    val nodeStateStorage: NodeStateStorage
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BootstrapperHandler {
   log.debug("Start as Broker")
@@ -97,26 +110,64 @@ class BrokerBootstrapper(
 class SingleNodeCliqueBootstrapper(
     val tcpController: ActorRefT[TcpController.Command],
     val cliqueManager: ActorRefT[CliqueManager.Command],
-    intraCliqueInfo: IntraCliqueInfo
-) extends BootstrapperHandler {
+    val nodeStateStorage: NodeStateStorage
+)(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
+    extends BootstrapperHandler {
   log.debug("Start as single node clique bootstrapper")
-  self ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)
+
+  private def createIntraCliqueInfo(): IntraCliqueInfo = {
+    val (discoveryPrivateKey, discoveryPublicKey) = loadOrGenDiscoveryKey()
+    IntraCliqueInfo.unsafe(
+      CliqueId(discoveryPublicKey),
+      AVector(PeerInfo.self),
+      brokerConfig.groupNumPerBroker,
+      discoveryPrivateKey
+    )
+  }
+
+  self ! Bootstrapper.SendIntraCliqueInfo(createIntraCliqueInfo())
 
   override def receive: Receive = awaitInfoWithForward
 }
 
-trait BootstrapperHandler extends BaseActor with Stash {
+trait BootstrapperHandler extends IOBaseActor with Stash {
   val tcpController: ActorRefT[TcpController.Command]
   val cliqueManager: ActorRefT[CliqueManager.Command]
+  val nodeStateStorage: NodeStateStorage
 
   override def preStart(): Unit = {
     tcpController ! TcpController.Start(self)
+  }
+
+  protected def loadOrGenDiscoveryKey(): (SecP256K1PrivateKey, SecP256K1PublicKey) = {
+    escapeIOError(
+      nodeStateStorage.getBootstrapInfo().map {
+        case Some(info) =>
+          log.info("Bootstrap with persisted discovery key")
+          (info.key, info.key.publicKey)
+        case None => SignatureSchema.secureGeneratePriPub()
+      },
+      SignatureSchema.secureGeneratePriPub()
+    )
+  }
+
+  private def persistBootstrapInfo(key: SecP256K1PrivateKey): Unit = {
+    escapeIOError(
+      nodeStateStorage.getBootstrapInfo().flatMap {
+        case Some(info) if info.key == key => Right(())
+        case _ =>
+          val bootstrapInfo = BootstrapInfo(key, TimeStamp.now())
+          nodeStateStorage.setBootstrapInfo(bootstrapInfo)
+      }
+    )
   }
 
   def awaitInfoWithForward: Receive = forwardConnection orElse awaitInfo
 
   private def awaitInfo: Receive = {
     case Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo) =>
+      persistBootstrapInfo(intraCliqueInfo.priKey)
+
       tcpController ! TcpController.WorkFor(cliqueManager.ref)
       cliqueManager ! CliqueManager.Start(intraCliqueInfo.cliqueInfo)
 

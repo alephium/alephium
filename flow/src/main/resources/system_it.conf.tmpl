@@ -19,6 +19,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
+    max-clique-from-same-ip = 3
 
     ping-frequency = 10 second
     retry-timeout = 10 second
@@ -57,10 +58,12 @@ alephium {
   discovery {
     bootstrap = []
 
-    scan-frequency = 30 minutes
-    scan-fast-frequency = 5.seconds
+    scan-frequency = 10 minutes
+    scan-fast-frequency = 2.seconds
     fast-scan-period = 1 minute
+    initial-discovery-period = 5 seconds
     neighbors-per-group = 50
+    max-clique-from-same-ip = 2
   }
 
   api {

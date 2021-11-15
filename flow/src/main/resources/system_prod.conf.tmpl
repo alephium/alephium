@@ -15,6 +15,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
+    max-clique-from-same-ip = 3
 
     # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
@@ -72,10 +73,12 @@ alephium {
   }
 
   discovery {
-    scan-frequency = 30 minutes
-    scan-fast-frequency = 5.seconds
+    scan-frequency = 10 minutes
+    scan-fast-frequency = 2.seconds
     fast-scan-period = 1 minute
+    initial-discovery-period = 30 seconds
     neighbors-per-group = 50
+    max-clique-from-same-ip = 2
   }
 
   mempool {

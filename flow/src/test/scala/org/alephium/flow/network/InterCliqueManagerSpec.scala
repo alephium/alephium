@@ -89,6 +89,32 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManagerActor.checkForInConnection(1) is true
   }
 
+  it should "not accept too many connections from a same IP" in new Fixture {
+    val broker0 = relevantBrokerInfo()
+    val broker1 = BrokerInfo.unsafe(
+      cliqueIdGen.sample.get,
+      broker0.brokerId,
+      broker0.brokerNum,
+      broker0.address
+    )
+    val broker2 = BrokerInfo.unsafe(
+      cliqueIdGen.sample.get,
+      broker0.brokerId,
+      broker0.brokerNum,
+      broker0.address
+    )
+    config.network.maxCliqueFromSameIp is 2
+    val connection = TestProbe().ref
+    interCliqueManager.tell(CliqueManager.HandShaked(broker0, InboundConnection), connection)
+    interCliqueManagerActor.brokers.size is 1
+    interCliqueManager.tell(CliqueManager.HandShaked(broker1, InboundConnection), connection)
+    interCliqueManagerActor.brokers.size is 2
+    EventFilter.debug(start = "Too many clique connection from the same IP").intercept {
+      interCliqueManager.tell(CliqueManager.HandShaked(broker2, InboundConnection), connection)
+    }
+    interCliqueManagerActor.brokers.size is 2
+  }
+
   it should "not include brokers that are not related to our groups" in new Fixture {
     val badBroker = irrelevantBrokerInfo()
     interCliqueManagerActor.checkForOutConnection(

@@ -143,8 +143,9 @@ class InterCliqueManager(
     super.preStart()
     updateNodeSyncedStatus()
     schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
-    discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
+    subscribeEvent(self, classOf[DiscoveryServer.NeighborPeers])
+    discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[InterCliqueManager.BroadCastTx])
     subscribeEvent(self, classOf[InterCliqueManager.BroadCastBlock])
   }
@@ -152,7 +153,9 @@ class InterCliqueManager(
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
 
   def handleNewClique: Receive = { case DiscoveryServer.NewPeer(peerInfo) =>
-    connect(peerInfo)
+    if (!containsBroker(peerInfo)) {
+      connect(peerInfo)
+    }
   }
 
   def handleConnection: Receive = {
@@ -297,7 +300,7 @@ class InterCliqueManager(
   }
 
   def connect(broker: BrokerInfo): Unit = {
-    log.info(s"Try to connect ${broker.address}")
+    log.info(s"Try to connect ${broker.address}, ${broker.cliqueId}")
     if (checkForOutConnection(broker, networkSetting.maxOutboundConnectionsPerGroup)) {
       connectUnsafe(broker)
     }
@@ -437,19 +440,31 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     }
   }
 
+  def getCliqueNumPerIp(target: BrokerInfo): Int = {
+    brokers.values.view
+      .filter(_.info.isFromSameIp(target))
+      .map(_.info.cliqueId)
+      .toSet
+      .size
+  }
+
   def handleNewBroker(brokerInfo: BrokerInfo, connectionType: ConnectionType): Unit = {
-    val range = brokerConfig.calIntersection(brokerInfo)
-    if (range.nonEmpty) {
-      brokers.get(brokerInfo.peerId) match {
-        case None =>
-          handleNewConnection(brokerInfo, connectionType)
-        case Some(existedBroker) =>
-          handleDoubleConnection(brokerInfo, connectionType, existedBroker)
+    if (getCliqueNumPerIp(brokerInfo) < networkSetting.maxCliqueFromSameIp) {
+      val range = brokerConfig.calIntersection(brokerInfo)
+      if (range.nonEmpty) {
+        brokers.get(brokerInfo.peerId) match {
+          case None =>
+            handleNewConnection(brokerInfo, connectionType)
+          case Some(existedBroker) =>
+            handleDoubleConnection(brokerInfo, connectionType, existedBroker)
+        }
+      } else {
+        log.warning(s"New peer connection with invalid group info: $brokerInfo")
+        publishEvent(MisbehaviorManager.InvalidGroup(brokerInfo.address))
+        context.stop(sender())
       }
     } else {
-      log.warning(s"New peer connection with invalid group info: $brokerInfo")
-      publishEvent(MisbehaviorManager.InvalidGroup(brokerInfo.address))
-      context.stop(sender())
+      log.debug(s"Too many clique connection from the same IP: $brokerInfo")
     }
   }
 

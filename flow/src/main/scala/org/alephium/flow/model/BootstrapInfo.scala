@@ -14,27 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.flow.model
 
-import org.alephium.util.Duration
+import org.alephium.crypto.SecP256K1PrivateKey
+import org.alephium.serde.Serde
+import org.alephium.util.TimeStamp
 
-trait DiscoveryConfig {
-  /* Wait time between two scan. */
-  def scanFrequency: Duration
+final case class BootstrapInfo(key: SecP256K1PrivateKey, timestamp: TimeStamp)
 
-  def scanFastFrequency: Duration
-
-  def fastScanPeriod: Duration
-
-  def initialDiscoveryPeriod: Duration
-
-  /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
-  def neighborsPerGroup: Int
-
-  def maxCliqueFromSameIp: Int
-
-  val peersTimeout: Duration        = Duration.ofSecondsUnsafe(5)
-  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(10)
-
-  val unreachableDuration = Duration.ofMinutesUnsafe(1)
+object BootstrapInfo {
+  implicit val serde: Serde[BootstrapInfo] =
+    Serde.forProduct2(BootstrapInfo(_, _), info => (info.key, info.timestamp))
 }
