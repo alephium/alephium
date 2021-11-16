@@ -20,7 +20,7 @@ import scala.util.Random
 
 import akka.actor.ActorRef
 import akka.io.{IO, Tcp}
-import akka.testkit.{EventFilter, TestActor, TestActorRef, TestProbe}
+import akka.testkit.{EventFilter, TestActor, TestProbe}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.AlephiumFlowActorSpec
@@ -35,7 +35,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val apiPort                         = generatePort()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     val minerApiController = EventFilter.info(start = "Miner API server bound").intercept {
-      TestActorRef[MinerApiController](
+      newTestActorRef[MinerApiController](
         MinerApiController.props(allHandlers)(
           brokerConfig,
           networkConfig.copy(minerApiPort = apiPort),
