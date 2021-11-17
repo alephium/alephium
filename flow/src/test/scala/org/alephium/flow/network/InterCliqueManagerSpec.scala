@@ -105,6 +105,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     )
     config.network.maxCliqueFromSameIp is 2
     val connection = TestProbe().ref
+    watch(connection)
     interCliqueManager.tell(CliqueManager.HandShaked(broker0, InboundConnection), connection)
     interCliqueManagerActor.brokers.size is 1
     interCliqueManager.tell(CliqueManager.HandShaked(broker1, InboundConnection), connection)
@@ -113,6 +114,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       interCliqueManager.tell(CliqueManager.HandShaked(broker2, InboundConnection), connection)
     }
     interCliqueManagerActor.brokers.size is 2
+    expectTerminated(connection)
   }
 
   it should "not include brokers that are not related to our groups" in new Fixture {
