@@ -128,8 +128,10 @@ trait DiscoveryServerState extends SessionManager {
 
   def cleanTable(now: TimeStamp): Unit = {
     table.filterInPlace { case (peerId, status) =>
-      now.deltaUnsafe(status.updateAt) < discoveryConfig.expireDuration ||
+      val keep = now.deltaUnsafe(status.updateAt) < discoveryConfig.expireDuration ||
         peerId.cliqueId == selfCliqueId
+      if (!keep) removeBrokerFromStorage(peerId)
+      keep
     }
     DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
@@ -194,26 +196,28 @@ trait DiscoveryServerState extends SessionManager {
     }
   }
 
-  @inline private def addBroker(peerInfo: BrokerInfo): Unit = {
+  @inline final def addBroker(peerInfo: BrokerInfo): Unit = {
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+    addBrokerToStorage(peerInfo)
     DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
   @inline private def removeBroker(peerId: PeerId): Unit = {
     table -= peerId
+    removeBrokerFromStorage(peerId)
     DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
   @inline private def removeBrokers(peerIds: Iterable[PeerId]): Unit = {
     table --= peerIds
+    peerIds.foreach(removeBrokerFromStorage)
     DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
-  def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
-    addBroker(peerInfo)
-  }
-
   def publishNewPeer(peerInfo: BrokerInfo): Unit
+  def addBrokerToStorage(peerInfo: BrokerInfo): Unit
+  def removeBrokerFromStorage(peerId: PeerId): Unit
+  override def onPingFailed(peerId: PeerId): Unit = removeBrokerFromStorage(peerId)
 
   def scan(): Unit = {
     val peerCandidates = table.values.filter(status => status.info.peerId != selfPeerId)
@@ -353,12 +357,16 @@ trait SessionManager {
     }
   }
 
+  def onPingFailed(peerId: PeerId): Unit
+
   def cleanSessions(now: TimeStamp): Unit = {
     sessions.removeIf { case (_, status) =>
       now.deltaUnsafe(status.requestAt) >= discoveryConfig.peersTimeout
     }
-    pendings.removeIf { case (_, timestamp) =>
-      now.deltaUnsafe(timestamp) >= discoveryConfig.peersTimeout
+    pendings.removeIf { case (peerId, timestamp) =>
+      val expired = now.deltaUnsafe(timestamp) >= discoveryConfig.peersTimeout
+      if (expired) onPingFailed(peerId)
+      expired
     }
   }
 

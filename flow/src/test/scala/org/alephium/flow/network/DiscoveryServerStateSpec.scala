@@ -19,6 +19,7 @@ package org.alephium.flow.network
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 
 import akka.event.LoggingAdapter
 import akka.testkit.{SocketUtil, TestProbe}
@@ -64,11 +65,17 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     implicit override val patienceConfig =
       PatienceConfig(timeout = Span(10, Seconds))
 
+    val storage = mutable.HashMap.empty[PeerId, BrokerInfo]
     lazy val state = new DiscoveryServerState {
       implicit def brokerConfig: BrokerConfig       = self.config
       implicit def discoveryConfig: DiscoveryConfig = self.config
       implicit def networkConfig: NetworkConfig     = self.networkConfig
       def log: LoggingAdapter                       = system.log
+
+      override def addBrokerToStorage(peerInfo: BrokerInfo): Unit =
+        storage += peerInfo.peerId -> peerInfo
+      override def removeBrokerFromStorage(peerId: PeerId): Unit =
+        storage -= peerId
 
       lazy val bootstrap: ArraySeq[InetSocketAddress] = ArraySeq(socketAddressGen.sample.get)
 
@@ -135,6 +142,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     state.getActivePeers(None).length is 2
     clique0Brokers.foreach(broker => state.appendPeer(broker))
     state.getActivePeers(None).length is 2
+    clique0Brokers.foreach(broker => storage.contains(broker.peerId) is true)
 
     val peerClique1: CliqueInfo = cliqueWithSameIp(peerClique0)
     val clique1Brokers          = peerClique1.interBrokers.get
@@ -143,6 +151,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     state.getActivePeers(None).length is 3
     state.isInTable(clique1Brokers(0).peerId) is true
     state.isInTable(clique1Brokers(1).peerId) is false
+    storage.contains(clique1Brokers(0).peerId) is true
+    storage.contains(clique1Brokers(1).peerId) is false
 
     val peerClique2: CliqueInfo = cliqueWithSameIp(peerClique0)
     val clique2Brokers          = peerClique2.interBrokers.get
@@ -151,6 +161,8 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     state.getActivePeers(None).length is 4
     state.isInTable(clique2Brokers(0).peerId) is false
     state.isInTable(clique2Brokers(1).peerId) is true
+    storage.contains(clique2Brokers(0).peerId) is false
+    storage.contains(clique2Brokers(1).peerId) is true
   }
 
   it should "get the number of cliques" in new Fixture {
@@ -194,17 +206,21 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   it should "clean up table if expiry is zero" in new Fixture {
     override def expireDuration: Duration = Duration.ofSecondsUnsafe(0)
     addToTable(peerInfo)
+    storage.contains(peerInfo.peerId) is true
     state.isInTable(peerInfo.peerId) is true
     state.cleanup()
     state.isInTable(peerInfo.peerId) is false
+    storage.contains(peerInfo.peerId) is false
   }
 
   it should "clean up everything if timeout is zero" in new Fixture {
     override def peersTimeout: Duration = Duration.ofSecondsUnsafe(0)
 
+    storage += peerInfo.peerId -> peerInfo
     state.tryPing(peerInfo)
     state.isPending(peerInfo.peerId) is true
     state.cleanup()
+    storage.contains(peerInfo.peerId) is false
     state.isPending(peerInfo.peerId) is false
   }
 
@@ -267,7 +283,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     override def expireDuration: Duration = Duration.ofMillisUnsafe(0)
     config.expireDuration is Duration.unsafe(0)
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
-      brokers.foreach(state.addSelfCliquePeer)
+      brokers.foreach(state.addBroker)
     }
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
       brokers.foreach(broker => state.isInTable(broker.peerId) is true)
@@ -281,7 +297,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   it should "detect when to scan fast" in new Fixture {
     override def scanFastPeriod: Duration = Duration.ofSecondsUnsafe(2)
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
-      brokers.foreach(state.addSelfCliquePeer)
+      brokers.foreach(state.addBroker)
     }
     state.tableInitialSize is state.getActivePeers(None).length
     state.shouldScanFast() is true

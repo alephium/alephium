@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.model
+package org.alephium.flow.model
+
+import java.net.InetSocketAddress
 
 import org.alephium.serde.Serde
 
-final case class PeerId(cliqueId: CliqueId, brokerId: Int)
+final case class BrokerState(address: InetSocketAddress, brokerNum: Int)
 
-object PeerId {
-  implicit val serde: Serde[PeerId] =
-    Serde.forProduct2(PeerId.apply, id => (id.cliqueId, id.brokerId))
+object BrokerState {
+  implicit val serde: Serde[BrokerState] =
+    Serde.forProduct2(BrokerState.apply, state => (state.address, state.brokerNum))
 }

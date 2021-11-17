@@ -23,36 +23,40 @@ import scala.collection.immutable.ArraySeq
 import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
 import io.prometheus.client.Gauge
 
+import org.alephium.flow.handler.IOBaseActor
+import org.alephium.flow.io.BrokerStorage
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage.*
-import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
+import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo, PeerId}
 import org.alephium.util.*
 
 object DiscoveryServer {
   def props(
       bindAddress: InetSocketAddress,
       misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+      brokerStorage: BrokerStorage,
       bootstrap: ArraySeq[InetSocketAddress]
   )(implicit
       brokerConfig: BrokerConfig,
       discoveryConfig: DiscoveryConfig,
       networkConfig: NetworkConfig
   ): Props =
-    Props(new DiscoveryServer(bindAddress, misbehaviorManager, bootstrap))
+    Props(new DiscoveryServer(bindAddress, misbehaviorManager, bootstrap, brokerStorage))
 
   def props(
       bindAddress: InetSocketAddress,
       misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
+      brokerStorage: BrokerStorage,
       peers: InetSocketAddress*
   )(implicit
       brokerConfig: BrokerConfig,
       discoveryConfig: DiscoveryConfig,
       networkConfig: NetworkConfig
   ): Props = {
-    props(bindAddress, misbehaviorManager, ArraySeq.from(peers))
+    props(bindAddress, misbehaviorManager, brokerStorage, ArraySeq.from(peers))
   }
 
   final case class PeerStatus(info: BrokerInfo, updateAt: TimeStamp)
@@ -101,12 +105,13 @@ object DiscoveryServer {
 class DiscoveryServer(
     val bindAddress: InetSocketAddress,
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
-    val bootstrap: ArraySeq[InetSocketAddress]
+    val bootstrap: ArraySeq[InetSocketAddress],
+    brokerStorage: BrokerStorage
 )(implicit
     val brokerConfig: BrokerConfig,
     val discoveryConfig: DiscoveryConfig,
     val networkConfig: NetworkConfig
-) extends BaseActor
+) extends IOBaseActor
     with Stash
     with DiscoveryServerState
     with EventStream {
@@ -124,7 +129,7 @@ class DiscoveryServer(
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
-      cliqueInfo.interBrokers.foreach { brokers => brokers.foreach(addSelfCliquePeer) }
+      cliqueInfo.interBrokers.foreach { brokers => brokers.foreach(addBroker) }
       unstashAll()
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
@@ -139,11 +144,23 @@ class DiscoveryServer(
     context become binding // binding will stash messages
   }
 
+  private def pingSeedBrokers(): Unit = {
+    escapeIOError(brokerStorage.activeBrokers().map { brokers =>
+      brokers.foreach(ping)
+    })
+  }
+
+  override def addBrokerToStorage(peerInfo: BrokerInfo): Unit =
+    escapeIOError(brokerStorage.addBroker(peerInfo))
+  override def removeBrokerFromStorage(peerId: PeerId): Unit =
+    escapeIOError(brokerStorage.delete(peerId))
+
   def binding: Receive = {
     case UdpServer.Bound(address) =>
       log.info(s"UDP server bound to $address")
       setSocket(ActorRefT[UdpServer.Command](sender()))
       context.watch(sender())
+      pingSeedBrokers()
       bootstrap.foreach(fetchNeighbors)
       scheduleScan()
       unstashAll()

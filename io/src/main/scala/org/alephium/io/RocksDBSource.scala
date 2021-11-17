@@ -37,12 +37,14 @@ object RocksDBSource {
 
     case object All       extends ColumnFamily("all")
     case object Block     extends ColumnFamily("block")
+    case object Broker    extends ColumnFamily("broker")
     case object Header    extends ColumnFamily("header")
-    case object Trie      extends ColumnFamily("trie")
     case object PendingTx extends ColumnFamily("pendingtx")
     case object ReadyTx   extends ColumnFamily("readytx")
+    case object Trie      extends ColumnFamily("trie")
 
-    val values: AVector[ColumnFamily] = AVector(All, Block, Header, PendingTx, ReadyTx, Trie)
+    val values: AVector[ColumnFamily] =
+      AVector(All, Block, Broker, Header, PendingTx, ReadyTx, Trie)
   }
 
   final case class Compaction(
