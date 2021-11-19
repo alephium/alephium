@@ -491,7 +491,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val tx         = block.nonCoinbase.head
     val output     = tx.unsigned.fixedOutputs.head
 
-    val n = ALPH.MaxTxInputNum + 1
+    val n = 3 * ALPH.MaxTxInputNum
 
     val outputs  = AVector.fill(n)(output.copy(amount = ALPH.oneAlph))
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
@@ -505,6 +505,11 @@ class TxUtilsSpec extends AlephiumSpec {
     utxos is n
   }
 
+  it should "get all available utxos" in new LargeUtxos {
+    val fetchedUtxos = blockFlow.getUsableUtxos(output.lockupScript).rightValue
+    fetchedUtxos.length is n
+  }
+
   it should "transfer with large amount of UTXOs" in new LargeUtxos {
     val txValidation = TxValidation.build
     val unsignedTx0 = blockFlow
@@ -512,14 +517,14 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        ALPH.alph((n - 2).toLong),
+        ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
         Some(GasBox.unsafe(600000)),
         defaultGasPrice
       )
       .rightValue
       .rightValue
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
-    tx0.unsigned.inputs.length is n - 1
+    tx0.unsigned.inputs.length is ALPH.MaxTxInputNum
     tx0.inputSignatures.length is 1
     txValidation.validateTxOnlyForTest(tx0, blockFlow) isE ()
 
@@ -528,7 +533,7 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        ALPH.alph((n - 1).toLong),
+        ALPH.alph(ALPH.MaxTxInputNum.toLong),
         None,
         defaultGasPrice
       )
