@@ -264,7 +264,8 @@ object ServerFixture {
         fromPublicKey: PublicKey,
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
-        gasPrice: GasPrice
+        gasPrice: GasPrice,
+        utxosLimit: Int
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
@@ -274,7 +275,8 @@ object ServerFixture {
         fromUnlockScript: UnlockScript,
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
-        gasPrice: GasPrice
+        gasPrice: GasPrice,
+        utxosLimit: Int
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
@@ -284,7 +286,8 @@ object ServerFixture {
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],
-        gasPrice: GasPrice
+        gasPrice: GasPrice,
+        utxosLimit: Int
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned))
     }

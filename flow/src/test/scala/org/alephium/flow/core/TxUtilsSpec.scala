@@ -43,7 +43,8 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         minimalGasFee / 2,
         None,
-        minimalGasPrice
+        minimalGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .isRight is true
@@ -73,7 +74,8 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.cent(50),
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -473,7 +475,8 @@ class TxUtilsSpec extends AlephiumSpec {
           output.lockupScript,
           None,
           None,
-          defaultGasPrice
+          defaultGasPrice,
+          defaultUtxoLimit
         )
         .rightValue
         .rightValue
@@ -506,7 +509,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get all available utxos" in new LargeUtxos {
-    val fetchedUtxos = blockFlow.getUsableUtxos(output.lockupScript).rightValue
+    val fetchedUtxos = blockFlow.getUsableUtxos(output.lockupScript, n).rightValue
     fetchedUtxos.length is n
   }
 
@@ -519,7 +522,8 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
         Some(GasBox.unsafe(600000)),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -535,7 +539,8 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.alph(ALPH.MaxTxInputNum.toLong),
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
@@ -549,7 +554,8 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue

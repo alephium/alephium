@@ -31,6 +31,7 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp
 
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
 
   trait ApiConfigFixture extends SocketUtil {
     val peerPort             = generatePort()
@@ -41,7 +42,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
       None,
-      ALPH.oneAlph
+      ALPH.oneAlph,
+      defaultUtxosLimit
     )
   }
 
@@ -354,7 +356,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         destinations,
         gasOpt = None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .rightValue
 
@@ -418,7 +421,8 @@ class ServerUtilsSpec extends AlephiumSpec {
           outputRefsOpt = Some(outputRefs),
           destinations,
           gasOpt = Some(minimalGas),
-          defaultGasPrice
+          defaultGasPrice,
+          defaultUtxosLimit
         )
         .rightValue
     }
@@ -437,7 +441,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .rightValue
 
@@ -504,7 +509,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Not enough balance"
@@ -518,7 +524,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(AVector.empty),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Empty UTXOs"
@@ -536,7 +543,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Invalid gas GasBox(100), minimal GasBox(20000)"
@@ -554,7 +562,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"

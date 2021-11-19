@@ -27,7 +27,8 @@ final case class BuildTransaction(
     destinations: AVector[Destination],
     utxos: Option[AVector[OutputRef]] = None,
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+    gasPrice: Option[GasPrice] = None,
+    utxosLimit: Option[Int] = None
 ) {
   def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
 }

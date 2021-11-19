@@ -832,7 +832,8 @@ trait RestServerFixture extends ServerFixture with HttpRouteFixture {
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
       apiConfig.apiKey,
-      ALPH.oneAlph
+      ALPH.oneAlph,
+      ALPH.MaxTxInputNum * 2
     )
 
     (peer, peerConf)

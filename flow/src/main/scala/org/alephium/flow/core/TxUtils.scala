@@ -32,11 +32,12 @@ trait TxUtils { Self: FlowUtils =>
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
   // In this way, we can guarantee that no concurrent utxos operations are making trouble
   def getUsableUtxos(
-      lockupScript: LockupScript.Asset
+      lockupScript: LockupScript.Asset,
+      maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     @tailrec
     def iter(lastTryOpt: Option[AVector[AssetOutputInfo]]): IOResult[AVector[AssetOutputInfo]] = {
-      getUsableUtxosOnce(lockupScript) match {
+      getUsableUtxosOnce(lockupScript, maxUtxosToRead) match {
         case Right(utxos) =>
           lastTryOpt match {
             case Some(lastTry) if isSame(utxos, lastTry) => Right(utxos)
@@ -49,13 +50,14 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getUsableUtxosOnce(
-      lockupScript: LockupScript.Asset
+      lockupScript: LockupScript.Asset,
+      maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
     for {
       groupView <- getImmutableGroupViewIncludePool(groupIndex)
-      outputs   <- groupView.getRelevantUtxos(lockupScript, maxUtxosToReadForTransfer)
+      outputs   <- groupView.getRelevantUtxos(lockupScript, maxUtxosToRead)
     } yield {
       val currentTs = TimeStamp.now()
       outputs.filter(_.output.lockTime <= currentTs)
@@ -95,13 +97,15 @@ trait TxUtils { Self: FlowUtils =>
       lockTimeOpt: Option[TimeStamp],
       amount: U256,
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxoLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     transfer(
       fromPublicKey,
       AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
       gasOpt,
-      gasPrice
+      gasPrice,
+      utxoLimit
     )
   }
 
@@ -109,11 +113,12 @@ trait TxUtils { Self: FlowUtils =>
       fromPublicKey: PublicKey,
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxoLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
-    transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice)
+    transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice, utxoLimit)
   }
 
   def transfer(
@@ -121,7 +126,8 @@ trait TxUtils { Self: FlowUtils =>
       fromUnlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(outputInfos)
@@ -140,7 +146,8 @@ trait TxUtils { Self: FlowUtils =>
           totalAmountPerToken,
           outputInfos.length,
           gasOpt,
-          gasPrice
+          gasPrice,
+          utxosLimit
         ).map {
           _.flatMap { selected =>
             UnsignedTransaction
@@ -214,12 +221,13 @@ trait TxUtils { Self: FlowUtils =>
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-    getUsableUtxos(fromLockupScript).map { allUtxos =>
+    getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
       val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
       for {
         _   <- checkWithMinimalGas(gasOpt, minimalGas)
@@ -396,9 +404,10 @@ trait TxUtils { Self: FlowUtils =>
       totalAmountPerToken: AVector[(TokenId, U256)],
       outputsLength: Int,
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxosLimit: Int
   ): IOResult[Either[String, UtxoUtils.Selected]] = {
-    getUsableUtxos(fromLockupScript).map { utxos =>
+    getUsableUtxos(fromLockupScript, utxosLimit).map { utxos =>
       UtxoUtils.select(
         utxos,
         totalAlphAmount,

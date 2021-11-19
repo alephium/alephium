@@ -43,7 +43,8 @@ trait FlowFixture
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NumericHelpers {
-  lazy val blockFlow: BlockFlow = genesisBlockFlow()
+  lazy val blockFlow: BlockFlow  = genesisBlockFlow()
+  lazy val defaultUtxoLimit: Int = ALPH.MaxTxInputNum * 2
 
   lazy val keyManager: mutable.Map[LockupScript, PrivateKey] = mutable.Map.empty
 
@@ -145,7 +146,7 @@ trait FlowFixture
       amount: U256
   ): Block = {
     val unsigned = blockFlow
-      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice)
+      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice, defaultUtxoLimit)
       .rightValue
       .rightValue
     val tx         = Transaction.from(unsigned, from)
@@ -185,7 +186,7 @@ trait FlowFixture
     }
     val unsignedTx =
       blockFlow
-        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice)
+        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice, defaultUtxoLimit)
         .rightValue
         .rightValue
     val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)
@@ -234,7 +235,8 @@ trait FlowFixture
         None,
         amount - defaultGasFee,
         Some(gasAmount),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -248,7 +250,7 @@ trait FlowFixture
     val unlockScript               = UnlockScript.p2pkh(publicKey)
 
     val balances = {
-      val balances = blockFlow.getUsableUtxos(fromLockupScript).rightValue
+      val balances = blockFlow.getUsableUtxos(fromLockupScript, defaultUtxoLimit).rightValue
       balances ++ balances
     }
     balances.length is 2 // this function is used in this particular case
@@ -288,7 +290,7 @@ trait FlowFixture
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
-    val balances     = blockFlow.getUsableUtxos(fromLockupScript).rightValue
+    val balances     = blockFlow.getUsableUtxos(fromLockupScript, defaultUtxoLimit).rightValue
     val inputs       = balances.map(_.ref).map(TxInput(_, unlockScript))
 
     val unsignedTx =
@@ -502,7 +504,7 @@ trait FlowFixture
     val address   = genesisKeys(groupIndex)._2
     val pubScript = LockupScript.p2pkh(address)
     blockFlow
-      .getUsableUtxos(pubScript)
+      .getUsableUtxos(pubScript, defaultUtxoLimit)
       .toOption
       .get
       .sumBy(_.output.amount.v: BigInt) is expected.toBigInt
@@ -513,7 +515,10 @@ trait FlowFixture
       pubScript: LockupScript.Asset,
       expected: U256
   ): Assertion = {
-    blockFlow.getUsableUtxos(pubScript).rightValue.sumBy(_.output.amount.v: BigInt) is expected.v
+    blockFlow
+      .getUsableUtxos(pubScript, defaultUtxoLimit)
+      .rightValue
+      .sumBy(_.output.amount.v: BigInt) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -539,7 +544,7 @@ trait FlowFixture
   def getBalance(blockFlow: BlockFlow, address: PublicKey): U256 = {
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
-    val query = blockFlow.getUsableUtxos(lockupScript)
+    val query = blockFlow.getUsableUtxos(lockupScript, defaultUtxoLimit)
     U256.unsafe(query.rightValue.sumBy(_.output.amount.v: BigInt).underlying())
   }
 
@@ -550,7 +555,7 @@ trait FlowFixture
 
     val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
-    val txOutputs = blockFlow.getUsableUtxos(pubScript).rightValue.map(_.output)
+    val txOutputs = blockFlow.getUsableUtxos(pubScript, defaultUtxoLimit).rightValue.map(_.output)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 

@@ -26,5 +26,6 @@ final case class BuildContract(
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     state: Option[String] = None,
-    issueTokenAmount: Option[Amount] = None
+    issueTokenAmount: Option[Amount] = None,
+    utxosLimit: Option[Int] = None
 )

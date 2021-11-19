@@ -24,5 +24,6 @@ final case class BuildScript(
     fromPublicKey: PublicKey,
     code: String,
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+    gasPrice: Option[GasPrice] = None,
+    utxosLimit: Option[Int] = None
 )
