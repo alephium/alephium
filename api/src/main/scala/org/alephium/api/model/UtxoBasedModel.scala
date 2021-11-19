@@ -16,19 +16,12 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromPublicKey: PublicKey,
-    destinations: AVector[Destination],
-    utxos: Option[AVector[OutputRef]] = None,
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
-) extends UtxoBasedModel {
-  def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
+trait UtxoBasedModel {
+  def gas: Option[GasBox]
+
+  def gasPrice: Option[GasPrice]
+
+  def utxosLimit: Option[Int]
 }

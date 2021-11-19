@@ -26,4 +26,4 @@ final case class BuildScript(
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
-)
+) extends UtxoBasedModel
