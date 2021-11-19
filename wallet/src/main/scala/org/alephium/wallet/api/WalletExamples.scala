@@ -29,7 +29,6 @@ import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 trait WalletExamples extends EndpointsExamples {
-
   private val password = "my-secret-password"
   private val mnemonic =
     Mnemonic
@@ -122,7 +121,12 @@ trait WalletExamples extends EndpointsExamples {
   implicit val transferExamples: List[Example[Transfer]] = List(
     defaultExample(Transfer(defaultDestinations)),
     moreSettingsExample(
-      Transfer(moreSettingsDestinations, Some(minimalGas), Some(defaultGasPrice))
+      Transfer(
+        moreSettingsDestinations,
+        Some(minimalGas),
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
+      )
     )
   )
 
@@ -133,7 +137,18 @@ trait WalletExamples extends EndpointsExamples {
     simpleExample(Sign.Result(signature))
 
   implicit val sweepAllExamples: List[Example[SweepAll]] =
-    simpleExample(SweepAll(address))
+    List(
+      defaultExample(SweepAll(address)),
+      moreSettingsExample(
+        SweepAll(
+          address,
+          Some(ts),
+          Some(minimalGas),
+          Some(defaultGasPrice),
+          Some(defaultUtxosLimit)
+        )
+      )
+    )
 
   implicit val transferResultExamples: List[Example[Transfer.Result]] =
     simpleExample(Transfer.Result(txId, fromGroup, toGroup))

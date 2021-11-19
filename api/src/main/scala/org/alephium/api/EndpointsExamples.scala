@@ -40,7 +40,7 @@ trait EndpointsExamples extends ErrorExamples {
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
-  private val defaultUtxosLimit: Int     = 1024
+  protected val defaultUtxosLimit: Int   = 512
   val address                            = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
@@ -73,8 +73,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val blockHash = BlockHash
     .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
     .get
-  val hexString  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
-  private val ts = TimeStamp.unsafe(1611041396892L)
+  val hexString    = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
   val contractId =
