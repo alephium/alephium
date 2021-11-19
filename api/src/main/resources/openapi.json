@@ -1049,7 +1049,7 @@
                     ],
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "utxosLimit": 1024
+                    "utxosLimit": 512
                   }
                 }
               }
@@ -1178,7 +1178,7 @@
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "utxosLimit": 1024
+                    "utxosLimit": 512
                   }
                 }
               }
@@ -3814,7 +3814,7 @@
                     ],
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "utxosLimit": 1024
+                    "utxosLimit": 512
                   }
                 }
               }
@@ -3936,7 +3936,7 @@
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "utxosLimit": 1024
+                    "utxosLimit": 512
                   }
                 }
               }
@@ -4533,7 +4533,7 @@
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "utxosLimit": 1024
+                    "utxosLimit": 512
                   }
                 }
               }
@@ -4758,7 +4758,7 @@
                     "issueTokenAmount": "2000000000000000000",
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "utxosLimit": 1024
+                    "utxosLimit": 512
                   }
                 }
               }

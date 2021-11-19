@@ -40,7 +40,7 @@ trait EndpointsExamples extends ErrorExamples {
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
-  private val defaultUtxosLimit: Int     = 1024
+  protected val defaultUtxosLimit: Int   = 512
   val address                            = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(

@@ -29,8 +29,7 @@ import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 trait WalletExamples extends EndpointsExamples {
-  private val defaultUtxosLimit: Int = 1024
-  private val password               = "my-secret-password"
+  private val password = "my-secret-password"
   private val mnemonic =
     Mnemonic
       .from(
