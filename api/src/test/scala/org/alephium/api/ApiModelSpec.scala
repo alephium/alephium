@@ -32,6 +32,7 @@ import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
+  val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
   def entryDummy(i: Int): BlockEntry =
@@ -332,7 +333,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
-        Some(GasPrice(1))
+        Some(GasPrice(1)),
+        Some(defaultUtxosLimit)
       )
       val jsonRaw = s"""
         |{
@@ -345,7 +347,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |    }
         |  ],
         |  "gas": 1,
-        |  "gasPrice": "1"
+        |  "gasPrice": "1",
+        |  "utxosLimit": 1024
         |}
         """.stripMargin
       checkData(transfer, jsonRaw)
@@ -601,20 +604,22 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val buildContract = BuildContract(
       fromPublicKey = publicKey,
       code = "0000",
+      state = Some("10u"),
+      issueTokenAmount = Some(Amount(1)),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
-      state = Some("10u"),
-      issueTokenAmount = Some(Amount(1))
+      utxosLimit = Some(defaultUtxosLimit)
     )
     val jsonRaw =
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "code": "0000",
+         |  "state": "10u",
+         |  "issueTokenAmount": "1",
          |  "gas": 1,
          |  "gasPrice": "1",
-         |  "state": "10u",
-         |  "issueTokenAmount": "1"
+         |  "utxosLimit": 1024
          |}
          |""".stripMargin
     checkData(buildContract, jsonRaw)
@@ -649,7 +654,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       fromPublicKey = publicKey,
       code = "0000",
       gas = Some(GasBox.unsafe(1)),
-      gasPrice = Some(GasPrice(1))
+      gasPrice = Some(GasPrice(1)),
+      utxosLimit = Some(defaultUtxosLimit)
     )
     val jsonRaw =
       s"""
@@ -657,7 +663,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "code": "0000",
          |  "gas": 1,
-         |  "gasPrice": "1"
+         |  "gasPrice": "1",
+         |  "utxosLimit": 1024
          |}
          |""".stripMargin
     checkData(buildScript, jsonRaw)
