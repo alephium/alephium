@@ -27,5 +27,6 @@ final case class BuildSweepAllTransaction(
     toAddress: Address.Asset,
     lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-)
+    gasPrice: Option[GasPrice] = None,
+    utxosLimit: Option[Int] = None
+) extends UtxoBasedModel

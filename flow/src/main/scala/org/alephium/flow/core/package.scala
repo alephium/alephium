@@ -16,10 +16,7 @@
 
 package org.alephium.flow
 
-import org.alephium.protocol.ALPH
-
 package object core {
-  val maxForkDepth: Int              = 100
-  val maxSyncBlocksPerChain: Int     = 50
-  val maxUtxosToReadForTransfer: Int = ALPH.MaxTxInputNum * 2
+  val maxForkDepth: Int          = 100
+  val maxSyncBlocksPerChain: Int = 50
 }

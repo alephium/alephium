@@ -33,13 +33,14 @@ import org.alephium.util._
 // scalastyle:off magic.number
 trait EndpointsExamples extends ErrorExamples {
 
-  private val networkId = NetworkId(0)
+  private val networkId = NetworkId.AlephiumMainNet
   private val lockupScript =
     LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
+  private val defaultUtxosLimit: Int     = 1024
   val address                            = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
@@ -244,10 +245,7 @@ trait EndpointsExamples extends ErrorExamples {
     defaultExample(
       BuildTransaction(
         publicKey,
-        defaultDestinations,
-        None,
-        None,
-        None
+        defaultDestinations
       )
     ),
     moreSettingsExample(
@@ -256,7 +254,8 @@ trait EndpointsExamples extends ErrorExamples {
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
       )
     )
   )
@@ -265,10 +264,7 @@ trait EndpointsExamples extends ErrorExamples {
     defaultExample(
       BuildSweepAllTransaction(
         publicKey,
-        address,
-        None,
-        None,
-        None
+        address
       )
     ),
     moreSettingsExample(
@@ -277,7 +273,8 @@ trait EndpointsExamples extends ErrorExamples {
         address,
         Some(ts),
         Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
       )
     )
   )
@@ -365,10 +362,11 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContract(
         publicKey,
         hexString,
+        Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
+        Some(twoAlph),
         Some(minimalGas),
         Some(defaultGasPrice),
-        Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
-        Some(twoAlph)
+        Some(defaultUtxosLimit)
       )
     )
   )
@@ -380,7 +378,8 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         hexString,
         Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
       )
     )
   )

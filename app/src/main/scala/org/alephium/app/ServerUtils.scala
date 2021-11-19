@@ -156,7 +156,8 @@ class ServerUtils(implicit
         query.utxos,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice)
+        query.gasPrice.getOrElse(defaultGasPrice),
+        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -176,7 +177,8 @@ class ServerUtils(implicit
         unlockScript,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice)
+        query.gasPrice.getOrElse(defaultGasPrice),
+        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -223,7 +225,8 @@ class ServerUtils(implicit
         query.toAddress,
         query.lockTime,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice)
+        query.gasPrice.getOrElse(defaultGasPrice),
+        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -402,7 +405,8 @@ class ServerUtils(implicit
       outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxosLimit: Int
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -416,7 +420,7 @@ class ServerUtils(implicit
           Right(Left("Selected UTXOs must be of asset type"))
         }
       case None =>
-        blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice)
+        blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice, utxosLimit)
     }
 
     transferResult match {
@@ -432,9 +436,17 @@ class ServerUtils(implicit
       toAddress: Address.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxosLimit: Int
   ): Try[UnsignedTransaction] = {
-    blockFlow.sweepAll(fromPublicKey, toAddress.lockupScript, lockTimeOpt, gasOpt, gasPrice) match {
+    blockFlow.sweepAll(
+      fromPublicKey,
+      toAddress.lockupScript,
+      lockTimeOpt,
+      gasOpt,
+      gasPrice,
+      utxosLimit
+    ) match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
@@ -447,11 +459,19 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      utxosLimit: Int
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
-    blockFlow.transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice) match {
+    blockFlow.transfer(
+      fromLockupScript,
+      fromUnlockScript,
+      outputInfos,
+      gasOpt,
+      gasPrice,
+      utxosLimit
+    ) match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
@@ -563,12 +583,14 @@ class ServerUtils(implicit
       script: StatefulScript,
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimitOpt: Option[Int]
   ): Try[UnsignedTransaction] = {
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
+    val utxosLimit   = utxosLimitOpt.getOrElse(apiConfig.defaultUtxosLimit)
     (for {
-      balances <- blockFlow.getUsableUtxos(lockupScript).left.map(e => failedInIO(e))
+      balances <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(e => failedInIO(e))
     } yield {
       val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
       UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
@@ -617,7 +639,8 @@ class ServerUtils(implicit
         script,
         query.fromPublicKey,
         query.gas,
-        query.gasPrice
+        query.gasPrice,
+        query.utxosLimit
       )
     } yield BuildContractResult.from(utx)
   }
@@ -638,7 +661,8 @@ class ServerUtils(implicit
         script,
         query.fromPublicKey,
         query.gas,
-        query.gasPrice
+        query.gasPrice,
+        query.utxosLimit
       )
     } yield BuildScriptResult.from(utx)
   }
