@@ -3797,7 +3797,8 @@
                       }
                     ],
                     "gas": 20000,
-                    "gasPrice": "100000000000"
+                    "gasPrice": "100000000000",
+                    "utxosLimit": 1024
                   }
                 }
               }
@@ -3918,7 +3919,8 @@
                     "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                     "lockTime": 1611041396892,
                     "gas": 20000,
-                    "gasPrice": "100000000000"
+                    "gasPrice": "100000000000",
+                    "utxosLimit": 1024
                   }
                 }
               }
@@ -4514,7 +4516,8 @@
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                     "gas": 20000,
-                    "gasPrice": "100000000000"
+                    "gasPrice": "100000000000",
+                    "utxosLimit": 1024
                   }
                 }
               }
@@ -4735,10 +4738,11 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
+                    "issueTokenAmount": "2000000000000000000",
                     "gas": 20000,
                     "gasPrice": "100000000000",
-                    "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
-                    "issueTokenAmount": "2000000000000000000"
+                    "utxosLimit": 1024
                   }
                 }
               }
@@ -6044,18 +6048,21 @@
           "code": {
             "type": "string"
           },
-          "gas": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
-          },
           "state": {
             "type": "string"
           },
           "issueTokenAmount": {
             "type": "string",
             "format": "uint256"
+          },
+          "gas": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
@@ -6129,6 +6136,9 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
@@ -6168,6 +6178,9 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
@@ -6216,6 +6229,9 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
@@ -6246,6 +6262,9 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
@@ -6972,6 +6991,9 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
@@ -7008,6 +7030,9 @@
           },
           "gasPrice": {
             "$ref": "#/components/schemas/GasPrice"
+          },
+          "utxosLimit": {
+            "type": "integer"
           }
         }
       },
