@@ -73,8 +73,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val blockHash = BlockHash
     .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
     .get
-  val hexString  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
-  private val ts = TimeStamp.unsafe(1611041396892L)
+  val hexString    = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
   val contractId =

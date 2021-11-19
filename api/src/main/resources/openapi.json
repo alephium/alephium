@@ -1048,7 +1048,8 @@
                       }
                     ],
                     "gas": 20000,
-                    "gasPrice": "100000000000"
+                    "gasPrice": "100000000000",
+                    "utxosLimit": 1024
                   }
                 }
               }
@@ -1163,8 +1164,23 @@
               "schema": {
                 "$ref": "#/components/schemas/SweepAll"
               },
-              "example": {
-                "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "lockTime": 1611041396892,
+                    "gas": 20000,
+                    "gasPrice": "100000000000",
+                    "utxosLimit": 1024
+                  }
+                }
               }
             }
           },
