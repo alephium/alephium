@@ -39,14 +39,16 @@ trait BlockFlowClient {
       fromPublicKey: PublicKey,
       destinations: AVector[Destination],
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def prepareSweepAllTransaction(
       fromPublicKey: PublicKey,
       address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
   def postTransaction(
       tx: String,
@@ -116,7 +118,8 @@ object BlockFlowClient {
         fromPublicKey: PublicKey,
         destinations: AVector[Destination],
         gas: Option[GasBox],
-        gasPrice: Option[GasPrice]
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
       val lockupScript = LockupScript.p2pkh(fromPublicKey)
       requestFromGroup(
@@ -127,7 +130,8 @@ object BlockFlowClient {
           destinations,
           None,
           gas,
-          gasPrice
+          gasPrice,
+          utxosLimit
         )
       )
     }
@@ -137,7 +141,8 @@ object BlockFlowClient {
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
-        gasPrice: Option[GasPrice]
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
     ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
       val lockupScript = LockupScript.p2pkh(fromPublicKey)
       requestFromGroup(
@@ -148,7 +153,8 @@ object BlockFlowClient {
           address,
           lockTime,
           gas,
-          gasPrice
+          gasPrice,
+          utxosLimit
         )
       )
     }

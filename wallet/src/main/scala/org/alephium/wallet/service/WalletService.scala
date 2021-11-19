@@ -80,14 +80,16 @@ trait WalletService extends Service {
       wallet: String,
       destinations: AVector[Destination],
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def sweepAll(
       wallet: String,
       address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def sign(
       wallet: String,
@@ -353,12 +355,13 @@ object WalletService {
         wallet: String,
         destinations: AVector[Destination],
         gas: Option[GasBox],
-        gasPrice: Option[GasPrice]
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareTransaction(pubKey, destinations, gas, gasPrice)
+          .prepareTransaction(pubKey, destinations, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>
@@ -376,12 +379,13 @@ object WalletService {
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
-        gasPrice: Option[GasPrice]
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice)
+          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>

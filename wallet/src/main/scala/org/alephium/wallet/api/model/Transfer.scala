@@ -25,7 +25,8 @@ import org.alephium.util.AVector
 final case class Transfer(
     destinations: AVector[Destination],
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+    gasPrice: Option[GasPrice] = None,
+    utxosLimit: Option[Int] = None
 )
 
 object Transfer {
