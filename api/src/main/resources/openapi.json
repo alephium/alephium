@@ -4757,7 +4757,6 @@
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                     "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
                     "issueTokenAmount": "2000000000000000000",
-                    "amount": "1000000000000",
                     "gas": 20000,
                     "gasPrice": "100000000000",
                     "utxosLimit": 512
@@ -6070,10 +6069,6 @@
             "type": "string"
           },
           "issueTokenAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "amount": {
             "type": "string",
             "format": "uint256"
           },
