@@ -610,6 +610,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildScript(
       fromPublicKey: String,
       code: String,
+      alphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ) = {
@@ -620,6 +621,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
            "code": "$code"
            ${gas.map(g => s""","gas": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+           ${alphAmount.map(a => s""","amount": "${a.value.v}"""").getOrElse("")}
          }
          """
     httpPost("/contracts/build-script", Some(query))
