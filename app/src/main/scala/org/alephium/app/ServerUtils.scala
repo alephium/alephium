@@ -25,7 +25,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model._
-import org.alephium.flow.core.{BlockFlow, BlockFlowState}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoUtils}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
@@ -581,6 +581,7 @@ class ServerUtils(implicit
   private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
+      amount: U256,
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
@@ -589,15 +590,21 @@ class ServerUtils(implicit
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
     val utxosLimit   = utxosLimitOpt.getOrElse(apiConfig.defaultUtxosLimit)
-    (for {
-      balances <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(e => failedInIO(e))
-    } yield {
-      val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
-      UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
-        gasAmount = gas.getOrElse(minimalGas),
-        gasPrice = gasPrice.getOrElse(defaultGasPrice)
-      )
-    }).flatMap(validateUnsignedTransaction)
+    for {
+      allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
+      unsignedTx <- UtxoUtils
+        .select(allUtxos, amount, gas, gasPrice, 0)
+        .map { selectedUtxos =>
+          val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
+          UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
+            gasAmount = gas.getOrElse(minimalGas),
+            gasPrice = gasPrice.getOrElse(defaultGasPrice)
+          )
+        }
+        .left
+        .map(badRequest)
+      validatedUnsignedTx <- validateUnsignedTransaction(unsignedTx)
+    } yield validatedUnsignedTx
   }
 
   private def validateStateLength(
@@ -626,17 +633,21 @@ class ServerUtils(implicit
       )
       state <- parseState(query.state).left.map(error => badRequest(error.message))
       _     <- validateStateLength(contract, state).left.map(badRequest)
-      address = Address.p2pkh(query.fromPublicKey)
+      address    = Address.p2pkh(query.fromPublicKey)
+      alphAmount = query.amount.map(_.value).getOrElse(dustUtxoAmount)
+      // Estimate a build contract cost
       script <- buildContract(
         query.code,
         address,
         state,
-        dustUtxoAmount,
+        alphAmount,
         query.issueTokenAmount.map(_.value)
       ).left.map(error => badRequest(error.message))
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
+        // this is not the right amount, a rough estimation of contract creation gas should be added here, perhaps the minimal one
+        alphAmount,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,
@@ -649,8 +660,10 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
+  // Here maybe we will ask user to double the gas when not enough gas
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
+    val alphAmount = query.amount.map(_.value).getOrElse(U256.Zero)
     for {
       codeByteString <- decodeCodeHexString(query.code)
       script <- deserialize[StatefulScript](codeByteString).left.map(serdeError =>
@@ -659,6 +672,7 @@ class ServerUtils(implicit
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
+        alphAmount,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,

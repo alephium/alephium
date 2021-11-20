@@ -62,6 +62,27 @@ object UtxoUtils {
   def select(
       utxos: AVector[Asset],
       totalAlphAmount: U256,
+      gasOpt: Option[GasBox],
+      gasPrice: Option[GasPrice],
+      numOutputs: Int
+  ): Either[String, Selected] = {
+    select(
+      utxos,
+      totalAlphAmount,
+      totalAmountPerToken = AVector.empty,
+      gasOpt,
+      gasPrice.getOrElse(defaultGasPrice),
+      defaultGasPerInput,
+      defaultGasPerOutput,
+      dustUtxoAmount,
+      numOutputs,
+      minimalGas
+    )
+  }
+
+  def select(
+      utxos: AVector[Asset],
+      totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
@@ -81,6 +102,9 @@ object UtxoUtils {
             Selected(selected, gas)
           }
       case None =>
+        // If there is no gas supplied, how do we estimate the amount of gas?
+        // here it is only for estimating the inputs and outputs
+        // we need a way to estimate contracts in general
         select(
           sortedUtxosByAlph,
           totalAlphAmount,

@@ -83,6 +83,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
+  // This is allocated 1 ALPH in the genensis block
   val address    = "14PqtYSSbwpUi2RJKUvv9yUwGafd6yHbEcke7ionuiE7w"
   val publicKey  = "03e75902fa24caff042b2b4c350e8f2ffeb3cb95f4263f0e109a2c2d7aa3dcae5c"
   val privateKey = "d24967efb7f1b558ad40a4d71593ceb5b3cecf46d17f0e68ef53def6b391c33d"
@@ -135,7 +136,17 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKey: String,
       restPort: Int
   ): TxResult = eventually {
-    val buildTx    = buildTransaction(fromPubKey, toAddress, amount)
+    val destinations = AVector(Destination(Address.asset(toAddress).get, Amount(amount)))
+    transfer(fromPubKey, destinations, privateKey, restPort)
+  }
+
+  def transfer(
+      fromPubKey: String,
+      destinations: AVector[Destination],
+      privateKey: String,
+      restPort: Int
+  ): TxResult = eventually {
+    val buildTx    = buildTransaction(fromPubKey, destinations)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[TxResult](submitTx, restPort)
@@ -372,22 +383,20 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def getChainInfo(fromGroup: Int, toGroup: Int) =
     httpGet(s"/blockflow/chain-info?fromGroup=$fromGroup&toGroup=$toGroup")
 
-  def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
+  def buildTransaction(
+      fromPubKey: String,
+      destinations: AVector[Destination]
+  ): Int => HttpRequest = {
     httpPost(
       "/transactions/build",
       Some(s"""
         |{
         |  "fromPublicKey": "$fromPubKey",
-        |  "destinations": [
-        |    {
-        |      "address": "$toAddress",
-        |      "amount": "$amount",
-        |      "tokens": []
-        |    }
-        |  ]
+        |  "destinations": ${write(destinations)}
         |}
         """.stripMargin)
     )
+  }
 
   def buildMultisigTransaction(
       fromAddress: String,
@@ -588,6 +597,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          }
          """
     httpPost("/contracts/build-script", Some(query))
+  }
+
+  def getUTXOs(address: String) = {
+    httpGet(s"/addresses/$address/utxos")
   }
 
   val startMining = httpPost("/miners?action=start-mining")
