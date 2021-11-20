@@ -29,7 +29,7 @@ import org.alephium.util._
 
 class SmartContractTest extends AlephiumActorSpec {
 
-  trait Fixture extends CliqueFixture {
+  trait SwapContractsFixture extends CliqueFixture {
     val clique = bootClique(nbOfNodes = 2)
     clique.start()
 
@@ -87,6 +87,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def script(
         code: String,
+        alphAmount: Option[Amount] = None,
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
     ) = {
@@ -95,6 +96,7 @@ class SmartContractTest extends AlephiumActorSpec {
         buildScript(
           fromPublicKey = publicKey,
           code = compileResult.code,
+          alphAmount,
           gas,
           gasPrice
         ),
@@ -114,6 +116,11 @@ class SmartContractTest extends AlephiumActorSpec {
     }
 
     def noTokens: AVector[Token] = AVector.empty
+
+    request[Balance](getBalance(address), restPort) is initialBalance
+    startWS(defaultWsMasterPort)
+    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
+    request[Balance](getBalance(address), restPort) is initialBalance
   }
 
   it should "compile contract failed when have invalid state length" in new CliqueFixture {
@@ -147,13 +154,61 @@ class SmartContractTest extends AlephiumActorSpec {
     clique.stop()
   }
 
-  it should "compile/execute smart contracts" in new Fixture {
-    request[Balance](getBalance(address), restPort) is initialBalance
-    startWS(defaultWsMasterPort)
+  it should "compile/execute the swap contracts successfully" in new SwapContractsFixture {
 
-    selfClique.nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
+    info("Create token contract")
+    val tokenContractBuildResult =
+      contract(
+        SwapContracts.tokenContract,
+        gas = Some(100000),
+        state = Some("[0u]"),
+        issueTokenAmount = Some(1024)
+      )
+    val tokenContractKey = tokenContractBuildResult.contractId
 
-    request[Balance](getBalance(address), restPort) is initialBalance
+    info("Transfer 1024 token back to self")
+    script(SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024)))
+
+    info("Create the ALPH/token swap contract")
+    val swapContractBuildResult = contract(
+      SwapContracts.swapContract,
+      Some(s"[#${tokenContractKey.toHexString},0,0]"),
+      issueTokenAmount = Some(10000)
+    )
+    val swapContractKey = swapContractBuildResult.contractId
+
+    info("Add liquidity to the swap contract")
+    script(
+      SwapContracts.addLiquidityTxScript(
+        address,
+        ALPH.alph(10),
+        tokenContractKey,
+        U256.unsafe(100),
+        swapContractKey
+      )
+    )
+
+    info("Swap ALPH with tokens")
+    script(SwapContracts.swapTokenForAlphTxScript(address, swapContractKey, ALPH.alph(10)))
+
+    info("Swap tokens with ALPH")
+    script(
+      SwapContracts.swapAlphForTokenTxScript(
+        address,
+        swapContractKey,
+        tokenContractKey,
+        U256.unsafe(50)
+      )
+    )
+
+    eventually {
+      request[Balance](getBalance(address), restPort) isnot initialBalance
+    }
+    selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
+    clique.stop()
+  }
+
+  it should "compile/execute the swap contracts successfully, and check the UTXOs" in new SwapContractsFixture {
 
     info("Transfer some ALPH to self, creating 5 UTXOs")
     val assetAddress                           = Address.asset(address).value
@@ -233,7 +288,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Transfer 1024 token back to self")
     val transferTokenScriptResult = script(
-      SwapContracts.tokenWithdrawTxScript(address, tokenContractKey)
+      SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
     )
 
     checkUTXOs { currentUTXOs =>
@@ -300,30 +355,44 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Add liquidity to the swap contract")
     val addLiquidityScriptBuildResult = script(
-      SwapContracts.addLiquidityTxScript(address, tokenContractKey, swapContractKey)
+      SwapContracts.addLiquidityTxScript(
+        address,
+        ALPH.alph(100),
+        tokenContractKey,
+        U256.unsafe(1000),
+        swapContractKey
+      ),
+      Some(Amount(ALPH.alph(100)))
     )
 
     checkUTXOs { currentUTXOs =>
       verifySpentUTXOs(
         addLiquidityScriptBuildResult.unsignedTx,
-        Set("8a28d6a00e58d5cab36b94b12119da550351f71a530842a0d7ca712633cc0b9d")
+        Set(
+          "8a28d6a00e58d5cab36b94b12119da550351f71a530842a0d7ca712633cc0b9d",
+          "0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced"
+        )
       )
 
       // Add liquidity through the swap contract
-      //   - 10 ALPH is sent out                    [ALPH.alph(10)]
-      //   - 100 tokens is sent out                 [token(100)]
+      //   - 100 ALPH is sent out                   [ALPH.alph(10)]
+      //   - 100 tokens is sent out                 [token(1000)]
       //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(99969998000L)
-        .subUnsafe(ALPH.alph(10))
+        .nanoAlph(
+          99969998000L
+        ) // from UTXO: 8a28d6a00e58d5cab36b94b12119da550351f71a530842a0d7ca712633cc0b9d
+        .addUnsafe(
+          ALPH.alph(1000)
+        ) // from UTXO: 0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced
+        .subUnsafe(ALPH.alph(100))
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(89959998000L)
+      updatedAmount is ALPH.nanoAlph(999959998000L)
 
       // format: off
       currentUTXOs is Set(
-        ("a4d40df75a5e74781bceb2fbafb15a49e5e6d704184086bbb0abca68447a77df", ALPH.nanoAlph(89959998000L), token(924)),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
+        ("87110a54f8032ed557372c23b2849204adc184d64b27789f1256692ed0eee0e5", ALPH.nanoAlph(999959998000L), token(24)),
         ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
         ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
         ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
@@ -333,30 +402,29 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Swap ALPH with tokens")
     val swapTokenScriptBuildResult = script(
-      SwapContracts.swapTokenForAlphTxScript(address, swapContractKey)
+      SwapContracts.swapTokenForAlphTxScript(address, swapContractKey, ALPH.alph(100))
     )
 
     checkUTXOs { currentUTXOs =>
       verifySpentUTXOs(
         swapTokenScriptBuildResult.unsignedTx,
-        Set("a4d40df75a5e74781bceb2fbafb15a49e5e6d704184086bbb0abca68447a77df")
+        Set("87110a54f8032ed557372c23b2849204adc184d64b27789f1256692ed0eee0e5")
       )
 
-      // Swap 10 ALPH with tokens through the swap contract
-      //   - 10 ALPH is sent out                    [ALPH.alph(10)]
-      //   - 50 tokens is received                  [token(50)]
+      // Swap 100 ALPH with tokens through the swap contract
+      //   - 100 ALPH is sent out                   [ALPH.alph(10)]
+      //   - 500 tokens is received                 [token(50)]
       //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(89959998000L)
-        .subUnsafe(ALPH.alph(10))
+        .nanoAlph(999959998000L)
+        .subUnsafe(ALPH.alph(100))
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(79949998000L)
+      updatedAmount is ALPH.nanoAlph(899949998000L)
 
       // format: off
       currentUTXOs is Set(
-        ("36dda83774354f5021823f13c92e070f03966a91534b99ef5aec4c007066451b", ALPH.nanoAlph(79949998000L), token(974)),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
+        ("3e1a02832d689f07fe05f3de42514ace5869cab6704f5d68a29739b051a35dce", ALPH.nanoAlph(899949998000L), token(524)),
         ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
         ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
         ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
@@ -366,30 +434,34 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Swap tokens with ALPH")
     val swapAlphScriptBuildResult = script(
-      SwapContracts.swapAlphForTokenTxScript(address, tokenContractKey, swapContractKey)
+      SwapContracts.swapAlphForTokenTxScript(
+        address,
+        swapContractKey,
+        tokenContractKey,
+        U256.unsafe(500)
+      )
     )
 
     checkUTXOs { currentUTXOs =>
       verifySpentUTXOs(
         swapAlphScriptBuildResult.unsignedTx,
-        Set("36dda83774354f5021823f13c92e070f03966a91534b99ef5aec4c007066451b")
+        Set("3e1a02832d689f07fe05f3de42514ace5869cab6704f5d68a29739b051a35dce")
       )
 
-      // Swap 50 tokens with ALPH through the swap contract
-      //   - 10 ALPH is received                    [ALPH.alph(10)]
-      //   - 50 tokens is sent out                  [token(50)]
-      //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
+      // Swap 500 tokens with ALPH through the swap contract
+      //   - 100 ALPH is received                    [ALPH.alph(10)]
+      //   - 500 tokens is sent out                  [token(50)]
+      //   - Gas fee: defaultGasPrice  * 100000      [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(79949998000L)
-        .addUnsafe(ALPH.alph(10))
+        .nanoAlph(899949998000L)
+        .addUnsafe(ALPH.alph(100))
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(89939998000L)
+      updatedAmount is ALPH.nanoAlph(999939998000L)
 
       // format: off
       currentUTXOs is Set(
-        ("896382d22bdb6d7dcde09ec71f19f7a25e5144f55048e2b4646d327940d10a5e", ALPH.nanoAlph(89939998000L), token(924)),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
+        ("60ed48f0188ad9d73d301475a8fb9233f9264051bb6117f912b304509193db99", ALPH.nanoAlph(999939998000L), token(24)),
         ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
         ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
         ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
@@ -400,7 +472,6 @@ class SmartContractTest extends AlephiumActorSpec {
     eventually {
       request[Balance](getBalance(address), restPort) isnot initialBalance
     }
-
     selfClique.nodes.foreach { peer => request[Boolean](stopMining, peer.restPort) is true }
     clique.stop()
   }
@@ -416,11 +487,11 @@ object SwapContracts {
     |}
     """.stripMargin
 
-  def tokenWithdrawTxScript(address: String, tokenContractKey: Hash) = s"""
+  def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) = s"""
     |TxScript Main {
     |  pub payable fn main() -> () {
     |    let token = Token(#${tokenContractKey.toHexString})
-    |    token.withdraw(@${address}, 1024)
+    |    token.withdraw(@${address}, $tokenAmount)
     |  }
     |}
     |
@@ -457,37 +528,48 @@ object SwapContracts {
     |}
     |""".stripMargin
 
-  def addLiquidityTxScript(address: String, tokenId: Hash, swapContractKey: Hash) = s"""
+  def addLiquidityTxScript(
+      address: String,
+      alphAmount: U256,
+      tokenId: Hash,
+      tokenAmount: U256,
+      swapContractKey: Hash
+  ) = s"""
     |TxScript Main {
     |  pub payable fn main() -> () {
-    |    approveAlph!(@${address}, 10000000000000000000)  // 10 ALPH
-    |    approveToken!(@${address}, #${tokenId.toHexString}, 100)
+    |    approveAlph!(@${address}, $alphAmount)
+    |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
     |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.addLiquidity(@${address}, 10000000000000000000, 100)
+    |    swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
     |  }
     |}
     |
     |$swapContract
     |""".stripMargin
 
-  def swapAlphForTokenTxScript(address: String, tokenId: Hash, swapContractKey: Hash) = s"""
+  def swapAlphForTokenTxScript(
+      address: String,
+      swapContractKey: Hash,
+      tokenId: Hash,
+      tokenAmount: U256
+  ) = s"""
     |TxScript Main {
     |  pub payable fn main() -> () {
-    |    approveToken!(@${address}, #${tokenId.toHexString}, 50)
+    |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
     |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.swapAlph(@${address}, 50)
+    |    swap.swapAlph(@${address}, $tokenAmount)
     |  }
     |}
     |
     |$swapContract
     |""".stripMargin
 
-  def swapTokenForAlphTxScript(address: String, swapContractKey: Hash) = s"""
+  def swapTokenForAlphTxScript(address: String, swapContractKey: Hash, alphAmount: U256) = s"""
     |TxScript Main {
     |  pub payable fn main() -> () {
-    |    approveAlph!(@${address}, 10000000000000000000)
+    |    approveAlph!(@${address}, $alphAmount)
     |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.swapToken(@${address}, 10000000000000000000)
+    |    swap.swapToken(@${address}, $alphAmount)
     |  }
     |}
     |
