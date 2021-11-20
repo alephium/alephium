@@ -23,6 +23,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 final case class BuildScript(
     fromPublicKey: PublicKey,
     code: String,
+    amount: Option[Amount] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
