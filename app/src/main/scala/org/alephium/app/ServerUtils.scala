@@ -645,7 +645,6 @@ class ServerUtils(implicit
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        // this is not the right amount, a rough estimation of contract creation gas should be added here, perhaps the minimal one
         dustUtxoAmount,
         query.fromPublicKey,
         query.gas,
