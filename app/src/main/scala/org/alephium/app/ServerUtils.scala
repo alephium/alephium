@@ -633,21 +633,20 @@ class ServerUtils(implicit
       )
       state <- parseState(query.state).left.map(error => badRequest(error.message))
       _     <- validateStateLength(contract, state).left.map(badRequest)
-      address    = Address.p2pkh(query.fromPublicKey)
-      alphAmount = query.amount.map(_.value).getOrElse(dustUtxoAmount)
+      address = Address.p2pkh(query.fromPublicKey)
       // Estimate a build contract cost
       script <- buildContract(
         query.code,
         address,
         state,
-        alphAmount,
+        dustUtxoAmount,
         query.issueTokenAmount.map(_.value)
       ).left.map(error => badRequest(error.message))
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
         // this is not the right amount, a rough estimation of contract creation gas should be added here, perhaps the minimal one
-        alphAmount,
+        dustUtxoAmount,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,

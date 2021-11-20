@@ -391,7 +391,6 @@ trait EndpointsExamples extends ErrorExamples {
         hexString,
         Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
         Some(twoAlph),
-        Some(Amount(dustUtxoAmount)),
         Some(minimalGas),
         Some(defaultGasPrice),
         Some(defaultUtxosLimit)
