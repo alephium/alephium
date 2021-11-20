@@ -21,8 +21,7 @@ import java.net.InetSocketAddress
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.UtxoUtils
+import org.alephium.flow.core.{BlockFlow, GasEstimation, UtxoUtils}
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -324,7 +323,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       // Spend 10 UTXOs and generate 1 output
       sweepAllTxTemplate.unsigned.fixedOutputs.length is 1
       sweepAllTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11, 1)
+      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * GasEstimation.sweepAll(11, 1)
 
       checkAddressBalance(
         sweepAllToAddress,

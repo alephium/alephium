@@ -607,7 +607,7 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .rightValue
       unsignedTx.fixedOutputs.length is 1
-      unsignedTx.gasAmount is UtxoUtils.estimateSweepAllTxGas(inputNum, 1)
+      unsignedTx.gasAmount is GasEstimation.sweepAll(inputNum, 1)
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
       txValidation.validateTxOnlyForTest(sweepTx, blockflow) isE ()
     }
@@ -656,7 +656,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("no tokens")
       Test(AVector.empty).success { case (outputs, gas) =>
         outputs.length is 1
-        gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
+        gas is GasEstimation.sweepAll(1, 1)
       }
     }
 
@@ -669,7 +669,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       Test(tokens).success { case (outputs, gas) =>
         outputs.length is 1
-        gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
+        gas is GasEstimation.sweepAll(1, 1)
       }
     }
 
@@ -691,7 +691,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         verifyExtraOutput(outputs(1))
 
-        gas is UtxoUtils.estimateSweepAllTxGas(1, 2)
+        gas is GasEstimation.sweepAll(1, 2)
       }
     }
 
@@ -714,7 +714,7 @@ class TxUtilsSpec extends AlephiumSpec {
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
 
-        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+        gas is GasEstimation.sweepAll(1, 3)
       }
     }
 
@@ -737,7 +737,7 @@ class TxUtilsSpec extends AlephiumSpec {
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
 
-        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+        gas is GasEstimation.sweepAll(1, 3)
       }
     }
 
@@ -761,7 +761,7 @@ class TxUtilsSpec extends AlephiumSpec {
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
 
-        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+        gas is GasEstimation.sweepAll(1, 3)
       }
 
       Test(tokens, alphAmount.subUnsafe(1))
