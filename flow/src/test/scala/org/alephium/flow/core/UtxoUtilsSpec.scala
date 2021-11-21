@@ -96,20 +96,28 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
     }
   }
 
+  // Gas is calculated using GasEstimation.estimateGasWithP2PKHOutputs
+  // 1 input:  22680
+  // 2 inputs: 24680
+  // 3 inputs: 26680
+  // 4 inputs: 28680
   it should "return the correct utxos when gas is considered" in new Fixture {
     {
       info("without tokens")
-      implicit val utxos = buildUtxos(20, 10, 30)
+      implicit val utxos = buildUtxos(40000, 23000, 55000)
 
-      UtxoSelection(7).verify(gas = 3, 1)
-      UtxoSelection(8).verify(gas = 4, 1, 0)
-      UtxoSelection(26).verify(gas = 4, 1, 0)
-      UtxoSelection(27).verify(gas = 5, 1, 0, 2)
-      UtxoSelection(55).verify(gas = 5, 1, 0, 2)
-      UtxoSelection(56).leftValueWithGas.startsWith("Not enough balance for fee") is true
+      UtxoSelection(7).verifyWithGas(1)
+      UtxoSelection(3000).verifyWithGas(1, 0)
+      UtxoSelection(30000).verifyWithGas(1, 0)
+      UtxoSelection(40000).verifyWithGas(1, 0, 2)
+      UtxoSelection(91320).verifyWithGas(1, 0, 2)
+      UtxoSelection(91321).leftValueWithGas.startsWith("Not enough balance for fee") is true
 
-      UtxoSelection(25).withDust(2).verify(gas = 5, 1, 0, 2)
-      UtxoSelection(26).withDust(2).verify(gas = 4, 1, 0)
+      UtxoSelection(91318).withDust(2).verifyWithGas(1, 0, 2)
+      UtxoSelection(91318)
+        .withDust(3)
+        .leftValueWithGas
+        .startsWith("Not enough balance for fee") is true
     }
 
     {
@@ -119,37 +127,37 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       val tokenId3 = Hash.hash("tokenId3")
 
       implicit val utxos = buildUtxosWithTokens(
-        (20, AVector((tokenId1, 10), (tokenId2, 20))),
-        (10, AVector.empty),
-        (30, AVector((tokenId1, 2), (tokenId3, 10))),
-        (31, AVector((tokenId1, 1)))
+        (40000, AVector((tokenId1, 10), (tokenId2, 20))),
+        (23000, AVector.empty),
+        (55000, AVector((tokenId1, 2), (tokenId3, 10))),
+        (55010, AVector((tokenId1, 1)))
       )
 
-      UtxoSelection(10).verify(gas = 4, 1, 0)
-      UtxoSelection(10, (tokenId1, 1)).verify(gas = 4, 1, 3)
-      UtxoSelection(10, (tokenId1, 2)).verify(gas = 5, 1, 3, 2)
-      UtxoSelection(10, (tokenId1, 5)).verify(gas = 6, 1, 3, 2, 0)
+      UtxoSelection(10).verifyWithGas(1)
+      UtxoSelection(10, (tokenId1, 1)).verifyWithGas(1, 3)
+      UtxoSelection(10, (tokenId1, 2)).verifyWithGas(1, 3, 2)
+      UtxoSelection(10, (tokenId1, 5)).verifyWithGas(1, 3, 2, 0)
 
-      UtxoSelection(20).verify(gas = 4, 1, 0)
-      UtxoSelection(20, (tokenId1, 10)).verify(gas = 4, 1, 0)
-      UtxoSelection(20, (tokenId1, 11)).verify(gas = 5, 1, 0, 3)
-      UtxoSelection(20, (tokenId1, 12)).verify(gas = 6, 1, 0, 3, 2)
-      UtxoSelection(20, (tokenId1, 14)).leftValueWithGas
+      UtxoSelection(23100).verifyWithGas(1, 0)
+      UtxoSelection(23100, (tokenId1, 10)).verifyWithGas(1, 0)
+      UtxoSelection(23100, (tokenId1, 11)).verifyWithGas(1, 0, 3)
+      UtxoSelection(23100, (tokenId1, 12)).verifyWithGas(1, 0, 3, 2)
+      UtxoSelection(23100, (tokenId1, 14)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(20, (tokenId2, 10)).verify(gas = 4, 1, 0)
-      UtxoSelection(20, (tokenId2, 15), (tokenId3, 5)).verify(gas = 5, 1, 0, 2)
-      UtxoSelection(20, (tokenId2, 15), (tokenId1, 11)).verify(gas = 5, 1, 0, 3)
-      UtxoSelection(20, (tokenId2, 15), (tokenId1, 13)).verify(gas = 6, 1, 0, 3, 2)
-      UtxoSelection(30, (tokenId2, 15), (tokenId1, 13)).verify(gas = 6, 1, 0, 3, 2)
-      UtxoSelection(30, (tokenId2, 21)).leftValueWithGas
+      UtxoSelection(23100, (tokenId2, 10)).verifyWithGas(1, 0)
+      UtxoSelection(23100, (tokenId2, 15), (tokenId3, 5)).verifyWithGas(1, 0, 2)
+      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 11)).verifyWithGas(1, 0, 3)
+      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 3, 2)
+      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 3, 2)
+      UtxoSelection(23100, (tokenId2, 21)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(85, (tokenId2, 15), (tokenId1, 13)).verify(gas = 6, 1, 0, 2, 3)
-      UtxoSelection(86, (tokenId2, 15), (tokenId1, 13)).leftValueWithGas
+      UtxoSelection(144330, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 2, 3)
+      UtxoSelection(144331, (tokenId2, 15), (tokenId1, 13)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
-      UtxoSelection(83, (tokenId2, 15), (tokenId1, 13)).withDust(2).verify(gas = 6, 1, 0, 2, 3)
-      UtxoSelection(84, (tokenId2, 15), (tokenId1, 13))
+      UtxoSelection(144328, (tokenId2, 15), (tokenId1, 13)).withDust(2).verifyWithGas(1, 0, 2, 3)
+      UtxoSelection(144329, (tokenId2, 15), (tokenId1, 13))
         .withDust(2)
         .leftValueWithGas
         .startsWith(s"Not enough balance") is true
@@ -159,10 +167,10 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
   it should "prefer persisted utxos" in new Fixture {
     {
       info("without tokens")
-      val utxos0          = buildUtxos(20, 10)
+      val utxos0          = buildUtxos(40000, 23000)
       implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
 
-      UtxoSelection(7).verify(gas = 3, 0)
+      UtxoSelection(7).verifyWithGas(0)
     }
 
     {
@@ -171,14 +179,14 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       val tokenId2 = Hash.hash("tokenId2")
 
       val utxos0 = buildUtxosWithTokens(
-        (20, AVector((tokenId1, 10))),
-        (10, AVector((tokenId2, 20)))
+        (40000, AVector((tokenId1, 10))),
+        (23000, AVector((tokenId2, 20)))
       )
       implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
 
-      UtxoSelection(7).verify(gas = 3, 0)
-      UtxoSelection(7, (tokenId1, 10)).verify(gas = 3, 0)
-      UtxoSelection(7, (tokenId2, 10)).verify(gas = 4, 0, 1)
+      UtxoSelection(7).verifyWithGas(0)
+      UtxoSelection(7, (tokenId1, 10)).verifyWithGas(0)
+      UtxoSelection(7, (tokenId2, 10)).verifyWithGas(0, 1)
     }
   }
 
@@ -187,8 +195,8 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       info("without tokens")
       implicit val utxos = buildUtxos(20, 10, 30)
 
-      UtxoSelection(7).withGas(1).verify(gas = 1, 1)
-      UtxoSelection(10).withGas(1).verify(gas = 1, 1, 0)
+      UtxoSelection(7).withGas(1).verifyWithGas(1)
+      UtxoSelection(10).withGas(1).verifyWithGas(1, 0)
     }
 
     {
@@ -203,41 +211,16 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         (30, AVector((tokenId1, 2), (tokenId3, 10)))
       )
 
-      UtxoSelection(7).withGas(1).verify(gas = 1, 1)
-      UtxoSelection(10).withGas(1).verify(gas = 1, 1, 0)
-      UtxoSelection(10, (tokenId2, 15), (tokenId1, 12)).withGas(1).verify(gas = 1, 1, 0, 2)
+      UtxoSelection(7).withGas(1).verifyWithGas(1)
+      UtxoSelection(10).withGas(1).verifyWithGas(1, 0)
+      UtxoSelection(10, (tokenId2, 15), (tokenId1, 12)).withGas(1).verifyWithGas(1, 0, 2)
       UtxoSelection(40, (tokenId2, 15), (tokenId1, 12), (tokenId3, 10))
         .withGas(1)
-        .verify(gas = 1, 1, 0, 2)
+        .verifyWithGas(1, 0, 2)
       UtxoSelection(10, (tokenId2, 15), (tokenId1, 13))
         .withGas(1)
         .leftValueWithGas
         .startsWith(s"Not enough balance") is true
-    }
-  }
-
-  it should "consider minimal gas" in new Fixture {
-    {
-      info("without tokens")
-      implicit val utxos = buildUtxos(20, 10, 30)
-
-      UtxoSelection(1).verify(gas = 3, 1)
-      UtxoSelection(1).withMinimalGas(40).verify(gas = 40, 1, 0, 2)
-    }
-
-    {
-      info("with tokens")
-      val tokenId1 = Hash.hash("tokenId1")
-
-      implicit val utxos = buildUtxosWithTokens(
-        (20, AVector((tokenId1, 10))),
-        (10, AVector.empty),
-        (30, AVector((tokenId1, 2)))
-      )
-
-      UtxoSelection(1).verify(gas = 3, 1)
-      UtxoSelection(1).withMinimalGas(40).verify(gas = 40, 1, 0, 2)
-      UtxoSelection(1, (tokenId1, 11)).withMinimalGas(40).verify(gas = 40, 1, 2, 0)
     }
   }
 
@@ -276,33 +259,40 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       val utxosSorted            = utxos.sorted(assetOrderByAlph)
       var dustAmount: U256       = U256.Zero
       var gasOpt: Option[GasBox] = None
-      var minimalGas: Int        = 1
+      val outputs = {
+        val lockupScript1 = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.value
+        val lockupScript2 = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.value
+        val lockupScript3 = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.value
+        AVector(lockupScript1, lockupScript2, lockupScript3)
+      }
 
       lazy val valueWithoutGas =
         findUtxosWithoutGas(utxosSorted, amount, AVector.from(tokens), dustAmount).map {
           case (_, selectedUtxos, _) => selectedUtxos
         }
 
-      lazy val valueWithGas = UtxoUtils.select(
-        utxos,
-        amount,
-        AVector.from(tokens),
-        gasOpt,
-        GasPrice(1),
-        GasBox.unsafe(1),
-        GasBox.unsafe(1),
-        dustAmount,
-        2,
-        GasBox.unsafe(minimalGas)
-      )
+      lazy val valueWithGas = {
+        UtxoUtils.select(
+          utxos,
+          outputs,
+          amount,
+          AVector.from(tokens),
+          gasOpt,
+          Some(GasPrice(1)),
+          dustAmount
+        )
+      }
 
       def verify(utxoIndexes: Int*): Assertion = {
         val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
         valueWithoutGas isE selectedUtxos
       }
 
-      def verify(gas: GasBox, utxoIndexes: Int*): Assertion = {
+      def verifyWithGas(utxoIndexes: Int*): Assertion = {
         val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
+        val gas = gasOpt.getOrElse(
+          GasEstimation.estimateGasWithP2PKHOutputs(selectedUtxos.length, outputs.length)
+        )
         valueWithGas isE Selected(selectedUtxos, gas)
       }
 
@@ -313,11 +303,6 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
       def withGas(gas: Int): UtxoSelection = {
         gasOpt = Some(GasBox.unsafe(gas))
-        this
-      }
-
-      def withMinimalGas(gas: Int): UtxoSelection = {
-        minimalGas = gas
         this
       }
 

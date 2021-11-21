@@ -23,7 +23,9 @@ import org.alephium.util._
 // Gas per input is fixed to GasSchedule.txInputBaseGas
 // Gas per output is charged ahead of time, depending on the type of the UnlockScript
 object GasEstimation {
-  def sweepAll(numInputs: Int, numOutputs: Int): GasBox = {
+  def sweepAll: (Int, Int) => GasBox = estimateGasWithP2PKHOutputs _
+
+  def estimateGasWithP2PKHOutputs(numInputs: Int, numOutputs: Int): GasBox = {
     val outputGas = GasSchedule.txOutputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
     estimateGas(numInputs, outputGas.mulUnsafe(numOutputs))
   }
