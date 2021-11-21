@@ -50,7 +50,7 @@ object GasEstimation {
       case p2mpkh: LockupScript.P2MPKH =>
         GasSchedule.txOutputBaseGas.addUnsafe(GasSchedule.p2mpkUnlockGas(p2mpkh.m))
       case _: LockupScript.P2SH =>
-        defaultGasPerInput // TODO: How to estimate the gas for P2SH script?
+        defaultGasPerOutput // TODO: How to estimate the gas for P2SH script?
     }
   }
 }

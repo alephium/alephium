@@ -20,7 +20,7 @@ import org.scalatest.Assertion
 import sttp.model.StatusCode
 
 import org.alephium.api.model._
-import org.alephium.flow.core.UtxoUtils
+import org.alephium.flow.core.GasEstimation
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -38,11 +38,11 @@ class SmartContractTest extends AlephiumActorSpec {
     val index      = group.group % selfClique.brokerNum
     val restPort   = selfClique.nodes(index).restPort
 
-    def checkUTXOs(check: Set[(String, U256, AVector[Token])] => Assertion) = {
+    def checkUTXOs(check: Set[(U256, AVector[Token])] => Assertion) = {
       val currentUTXOs = request[UTXOs](getUTXOs(address), restPort)
       check {
         currentUTXOs.utxos.map { utxo =>
-          (utxo.ref.key.toHexString, utxo.amount.value, utxo.tokens)
+          (utxo.amount.value, utxo.tokens)
         }.toSet
       }
     }
@@ -232,19 +232,17 @@ class SmartContractTest extends AlephiumActorSpec {
         .subUnsafe(ALPH.alph(1000))
         .subUnsafe(ALPH.alph(10000))
         .subUnsafe(ALPH.alph(100000))
-        .subUnsafe(defaultGasPrice * UtxoUtils.estimateGas(1, 5))
+        .subUnsafe(defaultGasPrice * GasEstimation.estimateGasWithP2PKHOutputs(1, 5))
 
-      changeAmount is ALPH.nanoAlph(888899996750000L)
+      changeAmount is ALPH.nanoAlph(888899996420000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("72ee610a89ceb6651c7e76c920db00de873af09ccbf2bd045ca8267f505ae31f", ALPH.alph(100), noTokens),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", changeAmount, noTokens)
+        (ALPH.alph(100), noTokens),
+        (ALPH.alph(1000), noTokens),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (changeAmount, noTokens)
       )
-      // format: on
     }
 
     info("Create token contract")
@@ -258,11 +256,6 @@ class SmartContractTest extends AlephiumActorSpec {
     val tokenContractKey = tokenContractBuildResult.contractId
 
     checkUTXOs { currentUTXOs =>
-      verifySpentUTXOs(
-        tokenContractBuildResult.unsignedTx,
-        Set("72ee610a89ceb6651c7e76c920db00de873af09ccbf2bd045ca8267f505ae31f")
-      )
-
       // Create the token contract
       //   - dustUtxoAmount of ALPH is sent out    [ALPH.nanoAlph(1000)]
       //   - Gas fee: defaultGasPrice  * 100000    [ALPH.nanoAlph(10000000)]
@@ -273,30 +266,23 @@ class SmartContractTest extends AlephiumActorSpec {
 
       updatedAmount is ALPH.nanoAlph(99989999000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("a05f1d268acd0bdf87c728b36119b2b45c778a34179ba2dcea7d16600d01e99b", updatedAmount, noTokens),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
+        (updatedAmount, noTokens),
+        (ALPH.alph(1000), noTokens),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (ALPH.nanoAlph(888899996420000L), noTokens)
       )
-      // format: on
     }
 
     def token(amount: Int) = AVector(Token(tokenContractKey, U256.unsafe(amount)))
 
     info("Transfer 1024 token back to self")
-    val transferTokenScriptResult = script(
+    script(
       SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
     )
 
     checkUTXOs { currentUTXOs =>
-      verifySpentUTXOs(
-        transferTokenScriptResult.unsignedTx,
-        Set("a05f1d268acd0bdf87c728b36119b2b45c778a34179ba2dcea7d16600d01e99b")
-      )
-
       // Withdraw 1024 tokens from the token contract
       //   - 0 ALPH is sent out                    [ALPH.nanoAlph(0)]
       //   - 1024 token is received                [token(1024)]
@@ -307,15 +293,13 @@ class SmartContractTest extends AlephiumActorSpec {
 
       updatedAmount is ALPH.nanoAlph(99979999000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("de02d79066ba0138a9f19312e94bf0205845b79733b56185c5c6149ee6bad83b", ALPH.nanoAlph(99979999000L), token(1024)),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
+        (ALPH.nanoAlph(99979999000L), token(1024)),
+        (ALPH.alph(1000), noTokens),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (ALPH.nanoAlph(888899996420000L), noTokens)
       )
-      // format: on
     }
 
     info("Create the ALPH/token swap contract")
@@ -327,11 +311,6 @@ class SmartContractTest extends AlephiumActorSpec {
     val swapContractKey = swapContractBuildResult.contractId
 
     checkUTXOs { currentUTXOs =>
-      verifySpentUTXOs(
-        swapContractBuildResult.unsignedTx,
-        Set("de02d79066ba0138a9f19312e94bf0205845b79733b56185c5c6149ee6bad83b")
-      )
-
       // Create the swap contract
       //   - dustUtxoAmount of ALPH is sent out     [ALPH.nanoAlph(1000)]
       //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
@@ -342,19 +321,17 @@ class SmartContractTest extends AlephiumActorSpec {
 
       updatedAmount is ALPH.nanoAlph(99969998000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("8a28d6a00e58d5cab36b94b12119da550351f71a530842a0d7ca712633cc0b9d", updatedAmount, token(1024)),
-        ("0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced", ALPH.alph(1000), noTokens),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
+        (updatedAmount, token(1024)),
+        (ALPH.alph(1000), noTokens),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (ALPH.nanoAlph(888899996420000L), noTokens)
       )
-      // format: on
     }
 
     info("Add liquidity to the swap contract")
-    val addLiquidityScriptBuildResult = script(
+    script(
       SwapContracts.addLiquidityTxScript(
         address,
         ALPH.alph(100),
@@ -366,14 +343,6 @@ class SmartContractTest extends AlephiumActorSpec {
     )
 
     checkUTXOs { currentUTXOs =>
-      verifySpentUTXOs(
-        addLiquidityScriptBuildResult.unsignedTx,
-        Set(
-          "8a28d6a00e58d5cab36b94b12119da550351f71a530842a0d7ca712633cc0b9d",
-          "0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced"
-        )
-      )
-
       // Add liquidity through the swap contract
       //   - 100 ALPH is sent out                   [ALPH.alph(10)]
       //   - 100 tokens is sent out                 [token(1000)]
@@ -390,27 +359,20 @@ class SmartContractTest extends AlephiumActorSpec {
 
       updatedAmount is ALPH.nanoAlph(999959998000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("87110a54f8032ed557372c23b2849204adc184d64b27789f1256692ed0eee0e5", ALPH.nanoAlph(999959998000L), token(24)),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
+        (ALPH.nanoAlph(999959998000L), token(24)),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (ALPH.nanoAlph(888899996420000L), noTokens)
       )
-      // format: on
     }
 
     info("Swap ALPH with tokens")
-    val swapTokenScriptBuildResult = script(
+    script(
       SwapContracts.swapTokenForAlphTxScript(address, swapContractKey, ALPH.alph(100))
     )
 
     checkUTXOs { currentUTXOs =>
-      verifySpentUTXOs(
-        swapTokenScriptBuildResult.unsignedTx,
-        Set("87110a54f8032ed557372c23b2849204adc184d64b27789f1256692ed0eee0e5")
-      )
-
       // Swap 100 ALPH with tokens through the swap contract
       //   - 100 ALPH is sent out                   [ALPH.alph(10)]
       //   - 500 tokens is received                 [token(50)]
@@ -422,18 +384,16 @@ class SmartContractTest extends AlephiumActorSpec {
 
       updatedAmount is ALPH.nanoAlph(899949998000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("3e1a02832d689f07fe05f3de42514ace5869cab6704f5d68a29739b051a35dce", ALPH.nanoAlph(899949998000L), token(524)),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
+        (ALPH.nanoAlph(899949998000L), token(524)),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (ALPH.nanoAlph(888899996420000L), noTokens)
       )
-      // format: on
     }
 
     info("Swap tokens with ALPH")
-    val swapAlphScriptBuildResult = script(
+    script(
       SwapContracts.swapAlphForTokenTxScript(
         address,
         swapContractKey,
@@ -443,11 +403,6 @@ class SmartContractTest extends AlephiumActorSpec {
     )
 
     checkUTXOs { currentUTXOs =>
-      verifySpentUTXOs(
-        swapAlphScriptBuildResult.unsignedTx,
-        Set("3e1a02832d689f07fe05f3de42514ace5869cab6704f5d68a29739b051a35dce")
-      )
-
       // Swap 500 tokens with ALPH through the swap contract
       //   - 100 ALPH is received                    [ALPH.alph(10)]
       //   - 500 tokens is sent out                  [token(50)]
@@ -459,14 +414,12 @@ class SmartContractTest extends AlephiumActorSpec {
 
       updatedAmount is ALPH.nanoAlph(999939998000L)
 
-      // format: off
       currentUTXOs is Set(
-        ("60ed48f0188ad9d73d301475a8fb9233f9264051bb6117f912b304509193db99", ALPH.nanoAlph(999939998000L), token(24)),
-        ("691a0abe3bf0fecdb4e2c9e1e6e14d7e78bc887993e3cab0c7ca58794b7b86a3", ALPH.alph(10000), noTokens),
-        ("12ee7a584bc9c5413f79e378a825a544de13a1878b9c45dfb2511f90a0f4a042", ALPH.alph(100000), noTokens),
-        ("dee2a1631f6d84604f5933ee90325180fe392c5e71757d38d1e2eebf52108f00", ALPH.nanoAlph(888899996750000L), noTokens)
+        (ALPH.nanoAlph(999939998000L), token(24)),
+        (ALPH.alph(10000), noTokens),
+        (ALPH.alph(100000), noTokens),
+        (ALPH.nanoAlph(888899996420000L), noTokens)
       )
-      // format: on
     }
 
     eventually {

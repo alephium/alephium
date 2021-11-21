@@ -200,19 +200,12 @@ trait TxUtils { Self: FlowUtils =>
           getImmutableGroupViewIncludePool(groupIndex)
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>
+              val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
+              val gas           = gasOpt.getOrElse(GasEstimation.estimateGas(utxoRefs.length, outputScripts))
               for {
                 utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
                 unsignedTx <- UnsignedTransaction
-                  .build(
-                    fromLockupScript,
-                    fromUnlockScript,
-                    utxos,
-                    outputInfos,
-                    gasOpt.getOrElse(
-                      GasEstimation.estimateGas(utxoRefs.length, outputInfos.map(_.lockupScript))
-                    ), // TODO: Think about change output
-                    gasPrice
-                  )
+                  .build(fromLockupScript, fromUnlockScript, utxos, outputInfos, gas, gasPrice)
               } yield unsignedTx
             }
         case Left(e) =>
@@ -434,11 +427,10 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice,
       utxosLimit: Int
   ): IOResult[Either[String, UtxoUtils.Selected]] = {
-    // TODO: Shall we consider the change output here
     getUsableUtxos(fromLockupScript, utxosLimit).map { utxos =>
       UtxoUtils.select(
         utxos,
-        outputLockupScripts,
+        fromLockupScript +: outputLockupScripts,
         totalAlphAmount,
         totalAmountPerToken,
         gasOpt,
