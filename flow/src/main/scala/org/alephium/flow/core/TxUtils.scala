@@ -146,7 +146,7 @@ trait TxUtils { Self: FlowUtils =>
           fromLockupScript,
           totalAmount,
           totalAmountPerToken,
-          outputInfos.length,
+          outputInfos.map(_.lockupScript),
           gasOpt,
           gasPrice,
           utxosLimit
@@ -197,8 +197,6 @@ trait TxUtils { Self: FlowUtils =>
 
       checkResult match {
         case Right(()) =>
-          val gas = gasOpt.getOrElse(UtxoUtils.estimateGas(utxoRefs.length, outputInfos.length + 1))
-
           getImmutableGroupViewIncludePool(groupIndex)
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>
@@ -210,7 +208,9 @@ trait TxUtils { Self: FlowUtils =>
                     fromUnlockScript,
                     utxos,
                     outputInfos,
-                    gas,
+                    gasOpt.getOrElse(
+                      GasEstimation.estimateGas(utxoRefs.length, outputInfos.map(_.lockupScript))
+                    ), // TODO: Think about change output
                     gasPrice
                   )
               } yield unsignedTx
@@ -428,23 +428,21 @@ trait TxUtils { Self: FlowUtils =>
       fromLockupScript: LockupScript.Asset,
       totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
-      outputsLength: Int,
+      outputLockupScripts: AVector[LockupScript.Asset],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int
   ): IOResult[Either[String, UtxoUtils.Selected]] = {
+    // TODO: Shall we consider the change output here
     getUsableUtxos(fromLockupScript, utxosLimit).map { utxos =>
       UtxoUtils.select(
         utxos,
+        outputLockupScripts,
         totalAlphAmount,
         totalAmountPerToken,
         gasOpt,
-        gasPrice,
-        defaultGasPerInput,
-        defaultGasPerOutput,
-        dustUtxoAmount,
-        outputsLength + 1,
-        minimalGas
+        Some(gasPrice),
+        dustUtxoAmount
       )
     }
   }

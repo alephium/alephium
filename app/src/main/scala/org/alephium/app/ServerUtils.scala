@@ -593,7 +593,7 @@ class ServerUtils(implicit
     for {
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       unsignedTx <- UtxoUtils
-        .select(allUtxos, amount, gas, gasPrice, 0)
+        .select(allUtxos, AVector.empty, amount, AVector.empty, gas, gasPrice, dustUtxoAmount)
         .map { selectedUtxos =>
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
