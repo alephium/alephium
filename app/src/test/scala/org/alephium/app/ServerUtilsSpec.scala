@@ -21,7 +21,7 @@ import java.net.InetSocketAddress
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{BlockFlow, GasEstimation, UtxoUtils}
+import org.alephium.flow.core.{BlockFlow, GasEstimation}
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -447,8 +447,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val fromAddressBalanceAfterTransfer = {
-      val defaultGas    = UtxoUtils.estimateGas(outputRefs.length, destinations.length + 1)
-      val defaultGasFee = defaultGasPrice * defaultGas
+      val outputLockupScripts = destinations.map(_.address.lockupScript)
+      val defaultGas          = GasEstimation.estimateGas(outputRefs.length, outputLockupScripts)
+      val defaultGasFee       = defaultGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
     }
 

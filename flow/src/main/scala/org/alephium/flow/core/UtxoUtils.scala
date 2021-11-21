@@ -83,11 +83,11 @@ object UtxoUtils {
         // we need a way to estimate contracts in general
         select(
           sortedUtxosByAlph,
+          outputLockupScripts,
           totalAlphAmount,
           totalAmountPerToken,
           gasPrice,
-          dustUtxoAmount,
-          outputLockupScripts
+          dustUtxoAmount
         )
     }
   }
@@ -135,18 +135,13 @@ object UtxoUtils {
     }
   }
 
-  // TODO: improve gas estimator
-  def estimateGas(numInputs: Int, numOutputs: Int): GasBox = {
-    estimateGas(defaultGasPerInput, defaultGasPerOutput, numInputs, numOutputs, minimalGas)
-  }
-
   private def select(
       sortedUtxos: AVector[Asset],
+      outputLockupScripts: AVector[LockupScript.Asset],
       totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
       gasPrice: GasPrice,
-      dustUtxoAmount: U256,
-      outputLockupScripts: AVector[LockupScript.Asset]
+      dustUtxoAmount: U256
   ): Either[String, Selected] = {
     for {
       resultWithoutGas <- findUtxosWithoutGas(
@@ -228,17 +223,6 @@ object UtxoUtils {
         case (sum, index) => Right((sum, sortedUtxos.take(index + 1), sortedUtxos.drop(index + 1)))
       }
     }
-  }
-
-  private def estimateGas(
-      gasPerInput: GasBox,
-      gasPerOutput: GasBox,
-      numInputs: Int,
-      numOutputs: Int,
-      minimalGas: GasBox
-  ): GasBox = {
-    val gas = GasBox.unsafe(gasPerInput.value * numInputs + gasPerOutput.value * numOutputs)
-    Math.max(gas, minimalGas)
   }
 
   private def findUtxosWithGas(
