@@ -26,13 +26,15 @@ sealed trait Type {
 object Type {
   val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def fromVal(tpe: Val.Type): Type = {
     tpe match {
-      case Val.Bool    => Bool
-      case Val.I256    => I256
-      case Val.U256    => U256
-      case Val.ByteVec => ByteVec
-      case Val.Address => Address
+      case Val.Bool                           => Bool
+      case Val.I256                           => I256
+      case Val.U256                           => U256
+      case Val.ByteVec                        => ByteVec
+      case Val.Address                        => Address
+      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
     }
   }
 
@@ -41,6 +43,16 @@ object Type {
   case object U256    extends Type { def toVal: Val.Type = Val.U256    }
   case object ByteVec extends Type { def toVal: Val.Type = Val.ByteVec }
   case object Address extends Type { def toVal: Val.Type = Val.Address }
+  final case class FixedSizeArray(baseType: Type, size: Int) extends Type {
+    override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, size)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def flattenSize(): Int = baseType match {
+      case baseType: FixedSizeArray =>
+        baseType.flattenSize() * size
+      case _ => size
+    }
+  }
 
   sealed trait Contract extends Type {
     def id: Ast.TypeId

@@ -54,11 +54,12 @@ object Val {
 
     private def _deserialize(tpe: Type, content: ByteString): SerdeResult[Staging[Val]] =
       tpe match {
-        case Bool    => decode[Boolean](content).map(_.mapValue(Bool(_)))
-        case I256    => decode[util.I256](content).map(_.mapValue(I256(_)))
-        case U256    => decode[util.U256](content).map(_.mapValue(U256(_)))
-        case ByteVec => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
-        case Address => decode[LockupScript](content).map(_.mapValue(Address(_)))
+        case Bool              => decode[Boolean](content).map(_.mapValue(Bool(_)))
+        case I256              => decode[util.I256](content).map(_.mapValue(I256(_)))
+        case U256              => decode[util.U256](content).map(_.mapValue(U256(_)))
+        case ByteVec           => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
+        case Address           => decode[LockupScript](content).map(_.mapValue(Address(_)))
+        case _: FixedSizeArray => Left(SerdeError.Other("Unexpected type"))
       }
   }
 
@@ -167,6 +168,12 @@ object Val {
     override def isNumeric: Boolean    = false
 
     override def toString: String = "Address"
+  }
+  final case class FixedSizeArray(baseType: Type, size: Int) extends Type {
+    override def id: scala.Byte     = throw new RuntimeException("FixedArray no type id")
+    override def default: Val       = throw new RuntimeException("FixedArray no default value")
+    override def isNumeric: Boolean = false
+    override def toString: String   = s"[$baseType; $size]"
   }
 
   val True: Bool  = Bool(true)

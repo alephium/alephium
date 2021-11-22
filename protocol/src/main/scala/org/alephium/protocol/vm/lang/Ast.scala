@@ -58,6 +58,36 @@ object Ast {
       }
     }
   }
+  final case class CreateArrayExpr[Ctx <: StatelessContext](
+      elements: Seq[Expr[Ctx]],
+      copyFromFirst: Boolean
+  ) extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      assume(elements.nonEmpty)
+      val baseType = elements(0).getType(state)
+      if (baseType.length != 1) {
+        throw Compiler.Error("Expect single type for array")
+      }
+      if (elements.drop(0).exists(_.getType(state) != baseType)) {
+        throw Compiler.Error(s"Array element should have same type")
+      }
+      Seq(Type.FixedSizeArray(baseType(0), elements.size))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq.empty
+  }
+  final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Int)
+      extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      array.getType(state) match {
+        case Seq(Type.FixedSizeArray(baseType, _)) => Seq(baseType)
+        case tpe =>
+          throw Compiler.Error(s"Expect array type, have: $tpe")
+      }
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq.empty
+  }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.getType(id))
 
@@ -214,6 +244,37 @@ object Ast {
         AVector.from(instrs)
       )
     }
+  }
+  final case class ArrayElementAssign[Ctx <: StatelessContext](
+      target: Ident,
+      indexes: Seq[Int],
+      rhs: Expr[Ctx]
+  ) extends Statement[Ctx] {
+    @scala.annotation.tailrec
+    private def elementType(indexes: Seq[Int], tpe: Type): Type = {
+      if (indexes.isEmpty) {
+        tpe
+      } else {
+        tpe match {
+          case arrayType: Type.FixedSizeArray =>
+            elementType(indexes.drop(1), arrayType.baseType)
+          case _ =>
+            throw Compiler.Error("Invalid array element assign statement")
+        }
+      }
+    }
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val varInfo = state.getVariable(target)
+      if (!varInfo.isMutable) throw Compiler.Error("Assign to immutable array")
+      val elementTpe = elementType(indexes, varInfo.tpe)
+      rhs.getType(state) match {
+        case Seq(`elementTpe`) =>
+        case tpe               => throw Compiler.Error(s"Assign $tpe to $elementTpe")
+      }
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq.empty
   }
   // TODO: handle multiple returns
   final case class Assign[Ctx <: StatelessContext](target: Ident, rhs: Expr[Ctx])

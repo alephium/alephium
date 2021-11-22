@@ -33,6 +33,13 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def const[_: P]: P[Ast.Const[Ctx]] =
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(Ast.Const.apply[Ctx])
+  def createArray1[_: P]: P[Ast.CreateArrayExpr[Ctx]] =
+    P("[" ~ expr.rep(1, ",") ~ "]").map(Ast.CreateArrayExpr.apply)
+  def createArray2[_: P]: P[Ast.CreateArrayExpr[Ctx]] =
+    P("[" ~ expr ~ ";" ~ positiveNum("array size") ~ "]").map { case (expr, size) =>
+      Ast.CreateArrayExpr(Seq.fill(size)(expr))
+    }
+  def arrayExpr[_: P]: P[Ast.Expr[Ctx]]    = P(createArray1 | createArray2)
   def variable[_: P]: P[Ast.Variable[Ctx]] = P(Lexer.ident).map(Ast.Variable.apply[Ctx])
   def callAbs[_: P]: P[(Ast.FuncId, Seq[Ast.Expr[Ctx]])] =
     P(Lexer.funcId ~ "(" ~ expr.rep(0, ",") ~ ")")
@@ -47,6 +54,15 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.Binop(op, acc, right)
       }
     }
+
+  def positiveNum[_: P](errorMsg: String): P[Int] = Lexer.num.map { value =>
+    val idx = value.intValue()
+    if (idx < 0) {
+      throw Compiler.Error(s"Invalid $errorMsg: $idx")
+    }
+    idx
+  }
+  def arrayIndex[_: P]: P[Int] = P("[" ~ positiveNum("array index") ~ "]")
 
   // Optimize chained comparisons
   def expr[_: P]: P[Ast.Expr[Ctx]]         = P(chain(andExpr, Lexer.opOr))
@@ -74,7 +90,15 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arithExpr0[_: P]: P[Ast.Expr[Ctx]] =
     P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def unaryExpr[_: P]: P[Ast.Expr[Ctx]] =
-    P(atom | (Lexer.opNot ~ atom).map { case (op, expr) => Ast.UnaryOp.apply[Ctx](op, expr) })
+    P(arrayElement | (Lexer.opNot ~ arrayElement).map { case (op, expr) =>
+      Ast.UnaryOp.apply[Ctx](op, expr)
+    })
+  def arrayElement[_: P]: P[Ast.Expr[Ctx]] = P(atom ~ arrayIndex.rep(0)).map {
+    case (expr, indexes) =>
+      indexes.foldLeft(expr) { case (acc, index) =>
+        Ast.ArrayElement(acc, index)
+      }
+  }
   def atom[_: P]: P[Ast.Expr[Ctx]]
 
   def parenExpr[_: P]: P[Ast.ParenExpr[Ctx]] = P("(" ~ expr ~ ")").map(Ast.ParenExpr.apply[Ctx])
@@ -86,21 +110,40 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map {
       case (isMutable, ident, expr) => Ast.VarDef(isMutable, ident, expr)
     }
-  def assign[_: P]: P[Ast.Assign[Ctx]] =
+  def varAssign[_: P]: P[Ast.Assign[Ctx]] =
     P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
       Ast.Assign(ident, expr)
     }
+  def arrayElementAssign[_: P]: P[Ast.ArrayElementAssign[Ctx]] =
+    P(Lexer.ident ~ arrayIndex.rep(1) ~ "=" ~ expr).map { case (ident, indexes, expr) =>
+      Ast.ArrayElementAssign(ident, indexes, expr)
+    }
+  def assign[_: P]: P[Ast.Statement[Ctx]] = P(varAssign | arrayElementAssign)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def parseType[_: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {
+    P(
+      Lexer.typeId.map(id => Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id))) |
+        arrayType(parseType(contractTypeCtor))
+    )
+  }
+
+  // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
+  def arrayType[_: P](baseType: => P[Type]): P[Type] = {
+    P("[" ~ baseType ~ ";" ~ positiveNum("array size") ~ "]").map { case (tpe, size) =>
+      Type.FixedSizeArray(tpe, size)
+    }
+  }
 
   def funcArgument[_: P]: P[Ast.Argument] =
-    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map { case (isMutable, ident, typeId) =>
-      val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.local(typeId, ident))
-      Ast.Argument(ident, tpe, isMutable)
+    P(Lexer.mut ~ Lexer.ident ~ ":").flatMap { case (isMutable, ident) =>
+      parseType(typeId => Type.Contract.local(typeId, ident)).map { tpe =>
+        Ast.Argument(ident, tpe, isMutable)
+      }
     }
   def funParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[_: P]: P[Seq[Type]] =
-    P("->" ~ "(" ~ Lexer.typeId.rep(0, ",") ~ ")").map {
-      _.map(typeId => Lexer.primTpes.getOrElse(typeId.name, Type.Contract.stack(typeId)))
-    }
+    P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(
       Lexer.funcModifier.rep(0) ~ Lexer
@@ -130,9 +173,10 @@ abstract class Parser[Ctx <: StatelessContext] {
   def statement[_: P]: P[Ast.Statement[Ctx]]
 
   def contractArgument[_: P]: P[Ast.Argument] =
-    P(Lexer.mut ~ Lexer.ident ~ ":" ~ Lexer.typeId).map { case (isMutable, ident, typeId) =>
-      val tpe = Lexer.primTpes.getOrElse(typeId.name, Type.Contract.global(typeId, ident))
-      Ast.Argument(ident, tpe, isMutable)
+    P(Lexer.mut ~ Lexer.ident ~ ":").flatMap { case (isMutable, ident) =>
+      parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
+        Ast.Argument(ident, tpe, isMutable)
+      }
     }
 }
 
@@ -145,7 +189,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[_: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | callExpr | contractConv | variable | parenExpr)
+    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr)
 
   def statement[_: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | funcCall | ifelse | whileStmt | ret)
@@ -164,7 +208,7 @@ object StatelessParser extends Parser[StatelessContext] {
 )
 object StatefulParser extends Parser[StatefulContext] {
   def atom[_: P]: P[Ast.Expr[StatefulContext]] =
-    P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr)
+    P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr)
 
   def contractCallExpr[_: P]: P[Ast.ContractCallExpr] =
     P((contractConv | variable) ~ "." ~ callAbs).map { case (obj, (callId, exprs)) =>

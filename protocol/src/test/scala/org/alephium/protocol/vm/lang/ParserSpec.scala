@@ -156,4 +156,77 @@ class ParserSpec extends AlephiumSpec {
       .get
       .value is a[ContractCall]
   }
+
+  it should "parse array types" in {
+    def check(str: String, arguments: Seq[Argument]) = {
+      fastparse.parse(str, StatelessParser.funParams(_)).get.value is arguments
+    }
+
+    val funcArgs = List(
+      "(mut a: [Bool; 2], b: [[Address; 3]; 2], c: [Foo; 4], d: U256)" ->
+        Seq(
+          Argument(Ident("a"), Type.FixedSizeArray(Type.Bool, 2), isMutable = true),
+          Argument(
+            Ident("b"),
+            Type.FixedSizeArray(Type.FixedSizeArray(Type.Address, 3), 2),
+            isMutable = false
+          ),
+          Argument(
+            Ident("c"),
+            Type.FixedSizeArray(Type.Contract.local(TypeId("Foo"), Ident("c")), 4),
+            isMutable = false
+          ),
+          Argument(Ident("d"), Type.U256, isMutable = false)
+        )
+    )
+
+    funcArgs.foreach { case (str, args) =>
+      check(str, args)
+    }
+  }
+
+  it should "parse array expression" in {
+    def check(str: String, expr: Ast.Expr[StatelessContext]) = {
+      fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
+    }
+
+    val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
+      "a[0][1]" -> Ast.ArrayElement(Ast.ArrayElement(Variable(Ast.Ident("a")), 0), 1),
+      "!a[0][1]" -> Ast.UnaryOp(
+        LogicalOperator.Not,
+        Ast.ArrayElement(Ast.ArrayElement(Variable(Ast.Ident("a")), 0), 1)
+      ),
+      "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
+      "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
+      "[[1, 1], [1, 1]]" -> Ast.CreateArrayExpr(
+        Seq.fill(2)(Ast.CreateArrayExpr(Seq.fill(2)(Ast.Const(Val.U256(U256.unsafe(1))))))
+      ),
+      "[[1; 2]; 2]" -> Ast.CreateArrayExpr(
+        Seq.fill(2)(Ast.CreateArrayExpr(Seq.fill(2)(Ast.Const(Val.U256(U256.unsafe(1))))))
+      )
+    )
+
+    exprs.foreach { case (str, expr) =>
+      check(str, expr)
+    }
+  }
+
+  it should "parse array assign" in {
+    def check(str: String, stat: Ast.Statement[StatelessContext]) = {
+      fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
+    }
+
+    val stats: List[(String, Ast.Statement[StatelessContext])] = List(
+      "a[0] = b" -> Ast.ArrayElementAssign(Ident("a"), Seq(0), Ast.Variable(Ast.Ident("b"))),
+      "a[0][1] = b[0]" -> Ast.ArrayElementAssign(
+        Ident("a"),
+        Seq(0, 1),
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), 0)
+      )
+    )
+
+    stats.foreach { case (str, expr) =>
+      check(str, expr)
+    }
+  }
 }
