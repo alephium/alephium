@@ -405,4 +405,322 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     test(contract, AVector.empty, AVector(Val.U256(U256.unsafe(6)), Val.True, Val.False))
   }
+
+  it should "compile array failed" in {
+    val codes = List(
+      s"""
+         |// duplicated variable name
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let x = 0
+         |    let x = [1, 2, 3]
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// duplicated variable name
+         |TxContract Foo(x: [U256; 2]) {
+         |  fn foo() -> () {
+         |    let x = [2; 3]
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// assign to immutable array element(contract field)
+         |TxContract Foo(x: [U256; 2]) {
+         |  fn set() -> () {
+         |    x[0] = 2
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// assign to immutable array element(local variable)
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let x = [2; 4]
+         |    x[0] = 3
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// out of index
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |    let x = [[2; 2]; 4]
+         |    return x[1][3]
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// out of index
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [2; 2]
+         |    x[2] = 3
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid array element assignment
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1, 2]
+         |    x[2] = 2
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid array element assignment
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1, 2]
+         |    x[0][0] = 2
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid array expression
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let x = [1, 2]
+         |    let y = x[0][0]
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid array expression
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let x = 2
+         |    let y = x[0]
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid binary expression(compare array)
+         |TxContract Foo() {
+         |  fn foo() -> (Bool) {
+         |    let x = [3; 2]
+         |    let y = [3; 2]
+         |    return x == y
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid binary expression(add array)
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let x = [2; 2] + [2; 2]
+         |    return
+         |  }
+         |}""".stripMargin,
+      s"""
+         |// assign array element with invalid type
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [3i; 2]
+         |    x[0] = 3
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    )
+    codes.foreach(code => Compiler.compileContract(code).isLeft is true)
+  }
+
+  trait ArrayTestFixture {
+    def code: String
+    def fields: AVector[Val]
+
+    lazy val contract       = Compiler.compileContract(code).rightValue
+    lazy val (obj, context) = prepareContract(contract, fields)
+
+    def test(methodIndex: Int, args: AVector[Val], result: AVector[Val]) = {
+      StatefulVM.executeWithOutputs(context, obj, args, methodIndex).rightValue is result
+    }
+  }
+
+  it should "test array" in new ArrayTestFixture {
+    val code =
+      s"""
+         |TxContract ArrayTest() {
+         |  pub fn test0() -> (Bool) {
+         |    let mut arr1 = [1, 2, 3]
+         |    arr1[0] = 2
+         |    return arr1[0] == 2 && arr1[1] == 2 && arr1[2] == 3
+         |  }
+         |
+         |  pub fn test1(x: U256) -> (U256) {
+         |    return [x; 4][0]
+         |  }
+         |
+         |  pub fn test2(mut x: [Bool; 4]) -> (Bool) {
+         |    x[1] = !x[1]
+         |    return x[1]
+         |  }
+         |
+         |  pub fn test3(mut x: [U256; 4]) -> (Bool) {
+         |    let mut y = x
+         |    y[0] = y[0] + 1
+         |    return y[0] == (x[0] + 1)
+         |  }
+         |
+         |  pub fn test4(x: U256) -> ([U256; 2]) {
+         |    let y = [[x; 2]; 5]
+         |    return y[0]
+         |  }
+         |
+         |  pub fn test5(value: U256) -> ([[U256; 2]; 2]) {
+         |    let x = [[value; 2]; 3]
+         |    let mut y = x
+         |    y[0][0] = y[0][0] + 1
+         |    y[0][1] = y[0][1] + 1
+         |    y[2][0] = y[2][0] + 2
+         |    y[2][1] = y[2][1] + 2
+         |    return [y[0], y[2]]
+         |  }
+         |
+         |  pub fn foo(x: U256) -> ([U256; 4]) {
+         |    return [x; 4]
+         |  }
+         |
+         |  pub fn test7(x: U256) -> (U256) {
+         |    return foo(x)[0]
+         |  }
+         |
+         |  pub fn bar(x: [U256; 4], y: [U256; 4]) -> (U256) {
+         |    return [x, y][0][0]
+         |  }
+         |
+         |  pub fn test9(x: U256) -> (U256) {
+         |    return bar(foo(x), foo(x))
+         |  }
+         |
+         |  pub fn test10() -> (Bool) {
+         |    let mut x = [[4; 2]; 2]
+         |    let y = [3; 2]
+         |    x[0] = y
+         |    return x[0][0] == 3 &&
+         |           x[0][1] == 3 &&
+         |           x[1][0] == 4 &&
+         |           x[1][1] == 4
+         |  }
+         |
+         |  pub fn test11() -> (Bool) {
+         |    let mut x = [[[4; 2]; 2]; 2]
+         |    let y = [3; 2]
+         |    x[1][1] = y
+         |    return x[0][0][0] == 4 &&
+         |           x[0][0][1] == 4 &&
+         |           x[1][1][0] == 3 &&
+         |           x[1][1][1] == 3
+         |  }
+         |
+         |  pub fn test12() -> (Bool) {
+         |    let mut x = [4; 2]
+         |    let y = [x, x]
+         |    x[0] = 3
+         |    return y[0][0] == 4 &&
+         |           y[0][1] == 4 &&
+         |           y[1][0] == 4 &&
+         |           y[1][1] == 4
+         |  }
+         |
+         |  pub fn test13() -> (Bool) {
+         |    let mut x = [[4; 2]; 2]
+         |    let y = [x[0], x[1]]
+         |    x[0] = [3; 2]
+         |    return y[0][0] == 4 &&
+         |           y[0][1] == 4 &&
+         |           y[1][0] == 4 &&
+         |           y[1][1] == 4 &&
+         |           x[0][0] == 3 &&
+         |           x[0][1] == 3
+         |  }
+         |}
+         |""".stripMargin
+
+    val fields: AVector[Val] = AVector.empty
+
+    test(0, AVector.empty, AVector(Val.Bool(true)))
+    test(1, AVector(Val.U256(3)), AVector(Val.U256(3)))
+    test(2, AVector.fill(4)(Val.Bool(true)), AVector(Val.Bool(false)))
+    test(3, AVector.fill(4)(Val.U256(10)), AVector(Val.Bool(true)))
+    test(4, AVector(Val.U256(4)), AVector.fill(2)(Val.U256(4)))
+    test(5, AVector(Val.U256(1)), AVector(Val.U256(2), Val.U256(2), Val.U256(3), Val.U256(3)))
+    test(7, AVector(Val.U256(3)), AVector(Val.U256(3)))
+    test(9, AVector(Val.U256(3)), AVector(Val.U256(3)))
+    test(10, AVector.empty, AVector(Val.Bool(true)))
+    test(11, AVector.empty, AVector(Val.Bool(true)))
+    test(12, AVector.empty, AVector(Val.Bool(true)))
+    test(13, AVector.empty, AVector(Val.Bool(true)))
+  }
+
+  it should "test contract array fields" in new ArrayTestFixture {
+    val code =
+      s"""
+         |TxContract Foo(
+         |  arr0: [U256; 2],
+         |  mut arr1: [[U256; 2]; 4],
+         |  mut x: U256
+         |) {
+         |  pub fn getArr0() -> ([U256; 2]) {
+         |    return arr0
+         |  }
+         |
+         |  pub fn getArr1() -> ([[U256; 2]; 4]) {
+         |    return arr1
+         |  }
+         |
+         |  pub fn setArr1(arr: [[U256; 2]; 4]) -> () {
+         |    arr1 = arr
+         |    return
+         |  }
+         |
+         |  pub fn add() -> ([U256; 4]) {
+         |    x = x + 1
+         |    return [x; 4]
+         |  }
+         |
+         |  pub fn addTest1() -> (U256) {
+         |    let res = [add(), add(), add(), add()]
+         |    return x
+         |  }
+         |
+         |  pub fn addTest2() -> (U256) {
+         |    let res = [add(), add(), add(), add()][2]
+         |    return x
+         |  }
+         |
+         |  pub fn addTest3() -> (U256) {
+         |    let res = [add(); 4]
+         |    return x
+         |  }
+         |
+         |  pub fn addTest4() -> (U256) {
+         |    let res = add()
+         |    return x
+         |  }
+         |}
+         |""".stripMargin
+
+    val fields: AVector[Val] = AVector.fill(11)(Val.U256(7))
+    test(0, AVector.empty, AVector.fill(2)(Val.U256(7)))
+    test(1, AVector.empty, AVector.fill(8)(Val.U256(7)))
+    test(2, AVector.fill(8)(Val.U256(3)), AVector.empty)
+    test(1, AVector.empty, AVector.fill(8)(Val.U256(3)))
+    test(4, AVector.empty, AVector(Val.U256(11)))
+    test(5, AVector.empty, AVector(Val.U256(15)))
+    test(6, AVector.empty, AVector(Val.U256(19)))
+    test(7, AVector.empty, AVector(Val.U256(20)))
+  }
 }

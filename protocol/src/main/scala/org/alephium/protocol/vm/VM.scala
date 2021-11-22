@@ -411,9 +411,18 @@ object StatefulVM {
   def executeWithOutputs(
       context: StatefulContext,
       obj: ContractObj[StatefulContext],
-      args: AVector[Val]
+      args: AVector[Val],
+      methodIndex: Int
   ): ExeResult[AVector[Val]] = {
     val vm = default(context)
-    vm.executeWithOutputs(obj, 0, args)
+    vm.executeWithOutputs(obj, methodIndex, args)
+  }
+
+  def executeWithOutputs(
+      context: StatefulContext,
+      obj: ContractObj[StatefulContext],
+      args: AVector[Val]
+  ): ExeResult[AVector[Val]] = {
+    executeWithOutputs(context, obj, args, 0)
   }
 }
