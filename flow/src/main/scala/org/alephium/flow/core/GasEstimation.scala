@@ -43,6 +43,19 @@ object GasEstimation {
     Math.max(gas, minimalGas)
   }
 
+  def estimateContractCreationGas(): GasBox = {
+    // estimate the cost of
+    // 1. execution of contract creation
+    // 2. contract code size
+    // 3. contract state size
+    ???
+  }
+
+  def estimateTxScriptGas(): GasBox = {
+    // based on code size?
+    ???
+  }
+
   private def estimateOutputGas(lockupScript: LockupScript.Asset): GasBox = {
     lockupScript match {
       case _: LockupScript.P2PKH =>

@@ -597,7 +597,7 @@ class ServerUtils(implicit
         .map { selectedUtxos =>
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
-            gasAmount = gas.getOrElse(minimalGas),
+            gasAmount = gas.getOrElse(selectedUtxos.gas),
             gasPrice = gasPrice.getOrElse(defaultGasPrice)
           )
         }

@@ -186,6 +186,8 @@ object GasSchedule {
   }
 
   def p2mpkUnlockGas(n: Int, m: Int): GasBox = {
-    GasBox.unsafe(GasHash.gas(PublicKey.length).mulUnsafe(n).value + GasSignature.gas.mulUnsafe(m).value)
+    GasBox.unsafe(
+      GasHash.gas(PublicKey.length).mulUnsafe(n).value + GasSignature.gas.mulUnsafe(m).value
+    )
   }
 }
