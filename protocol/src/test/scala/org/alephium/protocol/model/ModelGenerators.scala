@@ -54,6 +54,14 @@ trait LockupScriptGenerators extends Generators {
       threshold  <- Gen.choose(1, moreKeys.length + 1)
     } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, threshold).get
 
+  def p2mpkhLockupGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
+    assume(m <= n)
+    for {
+      publicKey0 <- publicKeyGen(groupIndex)
+      moreKeys   <- Gen.listOfN(n, publicKeyGen(groupIndex)).map(AVector.from)
+    } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, m).get
+  }
+
   def p2shLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
     hashGen
       .retryUntil { hash =>

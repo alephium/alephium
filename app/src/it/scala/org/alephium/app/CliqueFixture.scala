@@ -83,7 +83,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
-  // This is allocated 1 ALPH in the genensis block
+  // This address is allocated 1 ALPH in the genensis block
   val address    = "14PqtYSSbwpUi2RJKUvv9yUwGafd6yHbEcke7ionuiE7w"
   val publicKey  = "03e75902fa24caff042b2b4c350e8f2ffeb3cb95f4263f0e109a2c2d7aa3dcae5c"
   val privateKey = "d24967efb7f1b558ad40a4d71593ceb5b3cecf46d17f0e68ef53def6b391c33d"
