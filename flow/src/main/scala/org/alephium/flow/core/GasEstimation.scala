@@ -43,12 +43,14 @@ object GasEstimation {
     Math.max(gas, minimalGas)
   }
 
-  def estimateOutputGas(lockupScript: LockupScript.Asset): GasBox = {
+  private def estimateOutputGas(lockupScript: LockupScript.Asset): GasBox = {
     lockupScript match {
       case _: LockupScript.P2PKH =>
         GasSchedule.txOutputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
       case p2mpkh: LockupScript.P2MPKH =>
-        GasSchedule.txOutputBaseGas.addUnsafe(GasSchedule.p2mpkUnlockGas(p2mpkh.m))
+        GasSchedule.txOutputBaseGas.addUnsafe(
+          GasSchedule.p2mpkUnlockGas(p2mpkh.pkHashes.length, p2mpkh.m)
+        )
       case _: LockupScript.P2SH =>
         defaultGasPerOutput // TODO: How to estimate the gas for P2SH script?
     }
