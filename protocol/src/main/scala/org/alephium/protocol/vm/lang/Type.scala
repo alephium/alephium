@@ -21,6 +21,11 @@ import org.alephium.util.AVector
 
 sealed trait Type {
   def toVal: Val.Type
+
+  def isArrayType: Boolean = this match {
+    case _: Type.FixedSizeArray => true
+    case _                      => false
+  }
 }
 
 object Type {

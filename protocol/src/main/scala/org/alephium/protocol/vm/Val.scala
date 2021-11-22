@@ -170,8 +170,8 @@ object Val {
     override def toString: String = "Address"
   }
   final case class FixedSizeArray(baseType: Type, size: Int) extends Type {
-    override def id: scala.Byte     = throw new RuntimeException("FixedArray no type id")
-    override def default: Val       = throw new RuntimeException("FixedArray no default value")
+    override def id: scala.Byte     = throw new RuntimeException("FixedArray has no type id")
+    override def default: Val       = throw new RuntimeException("FixedArray has no default value")
     override def isNumeric: Boolean = false
     override def toString: String   = s"[$baseType; $size]"
   }
