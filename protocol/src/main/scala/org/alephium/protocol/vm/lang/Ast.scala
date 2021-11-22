@@ -250,9 +250,14 @@ object Ast {
       value.getType(state) match {
         case Seq(tpe: Type.FixedSizeArray) =>
           val (sourceArrayRef, codes) = state.getOrCreateArrayRef(value, isMutable)
-          val targetArrayRef          = ArrayTransformer.ArrayRef.from(state, tpe, ident.name, isMutable)
-          state.addArrayRef(ident, targetArrayRef)
-          codes ++ state.copyArrayRef(targetArrayRef, sourceArrayRef)
+          if (!isMutable && sourceArrayRef.vars.forall(!state.getVariable(_).isMutable)) {
+            state.addArrayRef(ident, sourceArrayRef)
+            codes
+          } else {
+            val targetArrayRef = ArrayTransformer.ArrayRef.from(state, tpe, ident.name, isMutable)
+            state.addArrayRef(ident, targetArrayRef)
+            codes ++ state.copyArrayRef(targetArrayRef, sourceArrayRef)
+          }
         case _ =>
           value.genCode(state) :+ state.genStoreCode(ident)
       }
