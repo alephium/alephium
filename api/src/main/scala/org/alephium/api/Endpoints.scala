@@ -16,6 +16,8 @@
 
 package org.alephium.api
 
+import java.net.InetAddress
+
 import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
@@ -25,7 +27,7 @@ import sttp.tapir.generic.auto._
 
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemasLike
-import org.alephium.api.UtilJson.avectorReadWriter
+import org.alephium.api.UtilJson.{avectorReadWriter, inetAddressRW}
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{ALPH, BlockHash, Hash}
@@ -146,6 +148,12 @@ trait Endpoints
       .in("misbehaviors")
       .in(jsonBody[MisbehaviorAction])
       .summary("Unban given peers")
+
+  val getUnreachableBrokers: BaseEndpoint[Unit, AVector[InetAddress]] =
+    infosEndpoint.get
+      .in("unreachable")
+      .out(jsonBody[AVector[InetAddress]])
+      .summary("Get the unreachable brokers")
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get

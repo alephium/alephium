@@ -70,6 +70,7 @@ class RestServer(
       getDiscoveredNeighborsLogic,
       getMisbehaviorsLogic,
       misbehaviorActionLogic,
+      getUnreachableBrokersLogic,
       getBlockflowLogic,
       getBlockLogic,
       getBalanceLogic,

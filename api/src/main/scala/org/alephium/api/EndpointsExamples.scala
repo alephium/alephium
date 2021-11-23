@@ -17,7 +17,7 @@
 package org.alephium.api
 
 import java.math.BigInteger
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.util.ByteString
 import sttp.tapir.EndpointIO.Example
@@ -193,6 +193,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val misbehaviorsExamples: List[Example[AVector[PeerMisbehavior]]] =
     simpleExample(AVector(PeerMisbehavior(inetAddress, PeerStatus.Penalty(42))))
+
+  implicit val unreachableBrokersExamples: List[Example[AVector[InetAddress]]] =
+    simpleExample(AVector(InetAddress.getByName("13.13.13.13")))
 
   implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
 

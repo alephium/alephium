@@ -17,6 +17,7 @@
 package org.alephium.app
 
 import java.io.{StringWriter, Writer}
+import java.net.InetAddress
 
 import scala.annotation.tailrec
 import scala.concurrent._
@@ -199,6 +200,13 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       node.misbehaviorManager ! MisbehaviorManager.Unban(peers)
       node.discoveryServer ! DiscoveryServer.Unban(peers)
       Future.successful(Right(()))
+  }
+
+  val getUnreachableBrokersLogic = serverLogic(getUnreachableBrokers) { _ =>
+    node.discoveryServer
+      .ask(DiscoveryServer.GetUnreachable)
+      .mapTo[AVector[InetAddress]]
+      .map(Right(_))
   }
 
   val getHashesAtHeightLogic = serverLogic(getHashesAtHeight) { case (chainIndex, height) =>
