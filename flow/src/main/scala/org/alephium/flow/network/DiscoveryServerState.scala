@@ -114,10 +114,9 @@ trait DiscoveryServerState extends SessionManager {
 
   def banPeer(peerId: PeerId): Unit = {
     table.get(peerId).foreach { status =>
-      table.remove(peerId)
+      removeBroker(peerId)
       setUnreachable(status.info.address)
     }
-    table -= peerId
   }
 
   def cleanup(): Unit = {
@@ -132,7 +131,7 @@ trait DiscoveryServerState extends SessionManager {
       now.deltaUnsafe(status.updateAt) < discoveryConfig.expireDuration ||
         peerId.cliqueId == selfCliqueId
     }
-    ()
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
   def getUnreachable(): AVector[InetAddress] = {
@@ -188,15 +187,30 @@ trait DiscoveryServerState extends SessionManager {
   def appendPeer(peerInfo: BrokerInfo): Unit = {
     if (getCliqueNumPerIp(peerInfo) < discoveryConfig.maxCliqueFromSameIp) {
       log.info(s"Adding a new peer: $peerInfo")
-      table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+      addBroker(peerInfo)
       publishNewPeer(peerInfo)
     } else {
       log.debug(s"Too many cliques from a same IP: $peerInfo")
     }
   }
 
-  def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
+  @inline private def addBroker(peerInfo: BrokerInfo): Unit = {
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  @inline private def removeBroker(peerId: PeerId): Unit = {
+    table -= peerId
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  @inline private def removeBrokers(peerIds: Iterable[PeerId]): Unit = {
+    table --= peerIds
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
+    addBroker(peerInfo)
   }
 
   def publishNewPeer(peerInfo: BrokerInfo): Unit
@@ -294,7 +308,7 @@ trait DiscoveryServerState extends SessionManager {
 
   def removeFromTable(peer: InetSocketAddress): Unit = {
     val peersToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
-    table --= peersToRemove
+    removeBrokers(peersToRemove)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -302,7 +316,7 @@ trait DiscoveryServerState extends SessionManager {
     val myself   = selfCliqueId
     val furthest = table.keys.maxBy(peerId => myself.hammingDist(peerId.cliqueId))
     if (myself.hammingDist(peerInfo.cliqueId) < myself.hammingDist(furthest.cliqueId)) {
-      table -= furthest
+      removeBroker(furthest)
       appendPeer(peerInfo)
     }
   }

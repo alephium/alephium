@@ -21,6 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.collection.immutable.ArraySeq
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
+import io.prometheus.client.Gauge
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
@@ -78,6 +79,10 @@ object DiscoveryServer {
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event with EventStream.Event
   final case class NewPeer(info: BrokerInfo)                 extends Event with EventStream.Event
+
+  val discoveredBrokerSize: Gauge = Gauge
+    .build("alephium_discovered_broker_size", "Number of discovered brokers")
+    .register()
 }
 
 /*
