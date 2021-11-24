@@ -18,6 +18,8 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import TxUtils._
+
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
 import org.alephium.io.{IOResult, IOUtils}
@@ -237,11 +239,9 @@ trait TxUtils { Self: FlowUtils =>
         getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
           val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
           for {
-            totalAmount <- checkTotalAlphAmount(utxos.map(_.output.amount))
             txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
               toLockupScript,
               lockTimeOpt,
-              totalAmount,
               utxos.map(_.output),
               gasOpt,
               gasPrice
@@ -260,61 +260,6 @@ trait TxUtils { Self: FlowUtils =>
 
       case Left(e) =>
         Right(Left(e))
-    }
-  }
-
-  // Normally there is one output for the `sweepAll` transaction. However, If there are more
-  // tokens than `maxTokenPerUtxo`, instead of failing the transaction validation, we will
-  // try to build a valid transaction by creating more outputs.
-  def buildSweepAllTxOutputsWithGas(
-      toLockupScript: LockupScript.Asset,
-      lockTimeOpt: Option[TimeStamp],
-      totalAmount: U256,
-      utxos: AVector[AssetOutput],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice
-  ): Either[String, (AVector[TxOutputInfo], GasBox)] = {
-    for {
-      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
-        utxos.flatMap(_.tokens)
-      )
-      groupsOfTokens    = Math.ceil(totalAmountPerToken.length / maxTokenPerUtxo.toDouble).toInt
-      extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
-      gas               = gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length, extraNumOfOutputs + 1))
-      totalAmountWithoutGas <- totalAmount
-        .sub(gasPrice * gas)
-        .toRight("Not enough balance for gas fee")
-      amountRequiredForExtraOutputs <- minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
-        .mul(U256.unsafe(extraNumOfOutputs))
-        .toRight("Too many tokens")
-      amountOfFirstOutput <- totalAmountWithoutGas
-        .sub(amountRequiredForExtraOutputs)
-        .toRight("Not enough ALPH balance for transaction outputs")
-    } yield {
-      val firstOutputTokensNum = {
-        val tokensNum = totalAmountPerToken.length
-        val remainder = tokensNum % maxTokenPerUtxo
-        if (tokensNum == 0) {
-          tokensNum
-        } else if (remainder == 0) {
-          maxTokenPerUtxo
-        } else {
-          remainder
-        }
-      }
-      val firstTokens  = totalAmountPerToken.take(firstOutputTokensNum)
-      val restOfTokens = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
-      val firstOutput  = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
-      val restOfOutputs = restOfTokens.map { tokens =>
-        TxOutputInfo(
-          toLockupScript,
-          minimalAlphAmountPerTxOutput(maxTokenPerUtxo),
-          tokens,
-          lockTimeOpt
-        )
-      }
-
-      (firstOutput +: restOfOutputs, gas)
     }
   }
 
@@ -417,20 +362,6 @@ trait TxUtils { Self: FlowUtils =>
     } yield failedTxs
   }
 
-  private def checkTotalAlphAmount(
-      amounts: AVector[U256]
-  ): Either[String, U256] = {
-    amounts.foldE(U256.Zero) { case (acc, amount) =>
-      acc.add(amount).toRight("Alph Amount overflow").flatMap { newAmount =>
-        if (newAmount > ALPH.MaxALPHValue) {
-          Left("ALPH amount overflow")
-        } else {
-          Right(newAmount)
-        }
-      }
-    }
-  }
-
   private def checkGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {
     for {
       _ <- checkGasAmount(gasOpt)
@@ -522,5 +453,78 @@ trait TxUtils { Self: FlowUtils =>
 object TxUtils {
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
+  }
+
+  // Normally there is one output for the `sweepAll` transaction. However, If there are more
+  // tokens than `maxTokenPerUtxo`, instead of failing the transaction validation, we will
+  // try to build a valid transaction by creating more outputs.
+  def buildSweepAllTxOutputsWithGas(
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      utxos: AVector[AssetOutput],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, (AVector[TxOutputInfo], GasBox)] = {
+    for {
+      totalAmount <- checkTotalAlphAmount(utxos.map(_.amount))
+      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
+        utxos.flatMap(_.tokens)
+      )
+      groupsOfTokens    = Math.ceil(totalAmountPerToken.length / maxTokenPerUtxo.toDouble).toInt
+      extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
+      gas               = gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length, extraNumOfOutputs + 1))
+      totalAmountWithoutGas <- totalAmount
+        .sub(gasPrice * gas)
+        .toRight("Not enough balance for gas fee")
+      amountRequiredForExtraOutputs <- minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
+        .mul(U256.unsafe(extraNumOfOutputs))
+        .toRight("Too many tokens")
+      amountOfFirstOutput <- totalAmountWithoutGas
+        .sub(amountRequiredForExtraOutputs)
+        .toRight("Not enough ALPH balance for transaction outputs")
+      _ <- amountOfFirstOutput
+        .sub(dustUtxoAmount)
+        .toRight("Not enough ALPH balance for transaction outputs")
+    } yield {
+      val firstOutputTokensNum = getFirstOutputTokensNum(totalAmountPerToken.length)
+      val firstTokens          = totalAmountPerToken.take(firstOutputTokensNum)
+      val restOfTokens         = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
+      val firstOutput          = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
+      val restOfOutputs = restOfTokens.map { tokens =>
+        TxOutputInfo(
+          toLockupScript,
+          minimalAlphAmountPerTxOutput(maxTokenPerUtxo),
+          tokens,
+          lockTimeOpt
+        )
+      }
+
+      (firstOutput +: restOfOutputs, gas)
+    }
+  }
+
+  private[core] def getFirstOutputTokensNum(tokensNum: Int) = {
+    val remainder = tokensNum % maxTokenPerUtxo
+    if (tokensNum == 0) {
+      tokensNum
+    } else if (remainder == 0) {
+      maxTokenPerUtxo
+    } else {
+      remainder
+    }
+  }
+
+  private[core] def checkTotalAlphAmount(
+      amounts: AVector[U256]
+  ): Either[String, U256] = {
+    amounts.foldE(U256.Zero) { case (acc, amount) =>
+      acc.add(amount).toRight("Alph Amount overflow").flatMap { newAmount =>
+        if (newAmount > ALPH.MaxALPHValue) {
+          Left("ALPH amount overflow")
+        } else {
+          Right(newAmount)
+        }
+      }
+    }
   }
 }

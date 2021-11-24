@@ -28,6 +28,7 @@ import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class TxUtilsSpec extends AlephiumSpec {
   it should "consider use minimal gas fee" in new FlowFixture {
     val chainIndex            = ChainIndex.unsafe(0, 0)
@@ -561,33 +562,34 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "create multiple outputs for sweep all tx if too many tokens" in new FlowFixture
     with LockupScriptGenerators {
-    def test(
-        tokens: AVector[(TokenId, U256)]
-    )(verify: ((AVector[TxOutputInfo], GasBox)) => Assertion) = {
-      val blockflow        = isolatedBlockFlow()
+    case class Test(tokens: AVector[(TokenId, U256)], alphAmount: U256 = ALPH.alph(3)) {
       val groupIndex       = groupIndexGen.sample.value
       val toLockupScript   = p2pkhLockupGen(groupIndex).sample.value
       val fromLockupScript = p2pkhLockupGen(groupIndex).sample.value
       val output = AssetOutput(
-        U256.One,
+        alphAmount,
         fromLockupScript,
         TimeStamp.unsafe(0),
         tokens,
         additionalData = ByteString(0)
       )
 
-      val result = blockflow
+      val result = TxUtils
         .buildSweepAllTxOutputsWithGas(
           toLockupScript,
           lockTimeOpt = None,
-          ALPH.alph(3),
           AVector(output),
           gasOpt = None,
           defaultGasPrice
         )
-        .rightValue
 
-      verify(result)
+      def success(verify: ((AVector[TxOutputInfo], GasBox)) => Assertion) = {
+        verify(result.rightValue)
+      }
+
+      def failed(verify: (String) => Assertion) = {
+        verify(result.leftValue)
+      }
     }
 
     def verifyExtraOutput(output: TxOutputInfo) = {
@@ -597,7 +599,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     {
       info("no tokens")
-      test(AVector.empty) { case (outputs, gas) =>
+      Test(AVector.empty).success { case (outputs, gas) =>
         outputs.length is 1
         gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
       }
@@ -610,7 +612,7 @@ class TxUtilsSpec extends AlephiumSpec {
         (tokenId, U256.unsafe(1))
       }
 
-      test(tokens) { case (outputs, gas) =>
+      Test(tokens).success { case (outputs, gas) =>
         outputs.length is 1
         gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
       }
@@ -623,7 +625,7 @@ class TxUtilsSpec extends AlephiumSpec {
         (tokenId, U256.unsafe(1))
       }
 
-      test(tokens) { case (outputs, gas) =>
+      Test(tokens).success { case (outputs, gas) =>
         outputs.length is 2
 
         outputs(0).alphAmount is ALPH
@@ -645,7 +647,7 @@ class TxUtilsSpec extends AlephiumSpec {
         (tokenId, U256.unsafe(1))
       }
 
-      test(tokens) { case (outputs, gas) =>
+      Test(tokens).success { case (outputs, gas) =>
         outputs.length is 3
 
         outputs(0).alphAmount is ALPH
@@ -668,7 +670,7 @@ class TxUtilsSpec extends AlephiumSpec {
         (tokenId, U256.unsafe(1))
       }
 
-      test(tokens) { case (outputs, gas) =>
+      Test(tokens).success { case (outputs, gas) =>
         outputs.length is 3
 
         outputs(0).alphAmount is ALPH
@@ -682,6 +684,33 @@ class TxUtilsSpec extends AlephiumSpec {
 
         gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
       }
+    }
+
+    {
+      info("The amount in the first output is below dustUtxoAmount")
+      val alphAmount = dustUtxoAmount
+        .addUnsafe(defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(1, 3))
+        .addUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+
+      val tokens = AVector.tabulate(3 * maxTokenPerUtxo) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      Test(tokens, alphAmount).success { case (outputs, gas) =>
+        outputs.length is 3
+
+        outputs(0).alphAmount is dustUtxoAmount
+        outputs(0).tokens.length is maxTokenPerUtxo
+
+        verifyExtraOutput(outputs(1))
+        verifyExtraOutput(outputs(2))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+      }
+
+      Test(tokens, alphAmount.subUnsafe(1))
+        .failed(_ is "Not enough ALPH balance for transaction outputs")
     }
   }
 
