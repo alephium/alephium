@@ -33,11 +33,21 @@ object Output {
   @upickle.implicits.key("asset")
   final case class Asset(
       amount: Amount,
-      address: Address,
+      address: Address.Asset,
       tokens: AVector[Token],
       lockTime: TimeStamp,
       additionalData: ByteString
-  ) extends Output
+  ) extends Output {
+    def toProtocol(): model.AssetOutput = {
+      model.AssetOutput(
+        amount.value,
+        address.lockupScript,
+        lockTime,
+        tokens.map { token => (token.id, token.amount) },
+        additionalData
+      )
+    }
+  }
 
   @upickle.implicits.key("contract")
   final case class Contract(
@@ -62,6 +72,17 @@ object Output {
           Address.Contract(o.lockupScript),
           o.tokens.map(Token.tupled)
         )
+    }
+  }
+  object Asset {
+    def fromProtocol(assetOutput: model.AssetOutput): Asset = {
+      Asset(
+        Amount(assetOutput.amount),
+        Address.Asset(assetOutput.lockupScript),
+        assetOutput.tokens.map(Token.tupled),
+        assetOutput.lockTime,
+        assetOutput.additionalData
+      )
     }
   }
 }

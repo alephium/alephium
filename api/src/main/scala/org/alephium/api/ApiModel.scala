@@ -170,13 +170,24 @@ trait ApiModelCodec {
 
   implicit val tokenRW: RW[Token] = macroRW
 
+  implicit val methodRW: RW[Method] = macroRW[Method]
+  implicit val scriptRW: RW[Script] = macroRW[Script]
+
+  implicit val outputAssetRW: RW[Output.Asset]       = macroRW[Output.Asset]
+  implicit val outputContractRW: RW[Output.Contract] = macroRW[Output.Contract]
+
   implicit val outputRW: RW[Output] =
-    RW.merge(macroRW[Output.Asset], macroRW[Output.Contract])
+    RW.merge(outputAssetRW, outputContractRW)
+
+  implicit val inputAssetRW: RW[Input.Asset]       = macroRW[Input.Asset]
+  implicit val inputContractRW: RW[Input.Contract] = macroRW[Input.Contract]
 
   implicit val inputRW: RW[Input] =
-    RW.merge(macroRW[Input.Asset], macroRW[Input.Contract])
+    RW.merge(inputAssetRW, inputContractRW)
 
   implicit val txRW: RW[Tx] = macroRW
+
+  implicit val unsignedTxRW: RW[UnsignedTx] = macroRW
 
   implicit val exportFileRW: RW[ExportFile] = macroRW
 

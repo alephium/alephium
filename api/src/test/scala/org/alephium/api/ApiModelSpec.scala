@@ -28,11 +28,17 @@ import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
 //scalastyle:off file.size.limit
-class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
+class ApiModelSpec
+    extends AlephiumSpec
+    with ApiModelFixture
+    with ApiModelCodec
+    with EitherValues
+    with NumericHelpers {
   val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
@@ -238,16 +244,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Output with big amount" in {
-    val address    = generateAddress()
-    val addressStr = address.toBase58
-    val amount     = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
-    val amountStr  = "15000000000000000000"
-    val tokenId1   = Hash.hash("token1")
-    val tokenId2   = Hash.hash("token2")
+    val amount    = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
+    val amountStr = "15000000000000000000"
+    val tokenId1  = Hash.hash("token1")
+    val tokenId2  = Hash.hash("token2")
     val tokens =
       AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
 
     {
+      val address         = generateContractAddress()
+      val addressStr      = address.toBase58
       val request: Output = Output.Contract(amount, address, tokens)
       val jsonRaw         = s"""
         |{
@@ -270,6 +276,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     }
 
     {
+      val address    = generateAddress()
+      val addressStr = address.toBase58
       val request: Output =
         Output.Asset(amount, address, AVector.empty, TimeStamp.unsafe(1234), ByteString.empty)
       val jsonRaw = s"""
@@ -816,5 +824,38 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       ApiError.BadRequest(s"Time span cannot be greater than ${timespan}")
     )
     TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
+  }
+
+  it should "encode/decode Method" in {
+    val jsonRaw = s"""
+       |{
+       |  "isPublic": ${method.isPublic},
+       |  "isPayable": ${method.isPayable},
+       |  "argsLength": ${method.argsLength},
+       |  "localsLength": ${method.localsLength},
+       |  "returnLength": ${method.returnLength},
+       |  "instrs": ${write(instrs.map { instr => Hex.toHexString(serialize(instr)) })}
+       |}""".stripMargin
+
+    checkData(Method.fromProtocol(method), jsonRaw)
+  }
+
+  it should "encode/decode UnsignedTx" in {
+    val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
+    val jsonRaw    = s"""
+       |{
+       |  "hash": "${unsignedTransaction.hash.toHexString}",
+       |  "version": ${unsignedTransaction.version},
+       |  "networkId": ${unsignedTransaction.networkId.id},
+       |  "scriptOpt": {
+       |    "methods": ${write(methods.map(Method.fromProtocol))}
+       |  },
+       |  "gasAmount": ${defaultGas.value},
+       |  "gasPrice": "${defaultGasPrice.value}",
+       |  "inputs": ${write(unsignedTx.inputs)},
+       |  "outputs": ${write(unsignedTx.outputs)}
+       |}""".stripMargin
+
+    checkData(unsignedTx, jsonRaw)
   }
 }

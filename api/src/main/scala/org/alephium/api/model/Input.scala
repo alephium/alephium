@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.model.{ContractOutputRef, TxInput, TxOutputRef}
 import org.alephium.protocol.vm.UnlockScript
-import org.alephium.serde.serialize
+import org.alephium.serde.{deserialize, serialize}
 
 sealed trait Input {
   def outputRef: OutputRef
@@ -29,7 +29,25 @@ sealed trait Input {
 object Input {
 
   @upickle.implicits.key("asset")
-  final case class Asset(outputRef: OutputRef, unlockScript: ByteString) extends Input
+  final case class Asset(outputRef: OutputRef, unlockScript: ByteString) extends Input {
+    def toProtocol(): Either[String, TxInput] = {
+      deserialize[UnlockScript](unlockScript)
+        .map { unlock =>
+          TxInput(
+            outputRef.unsafeToAssetOutputRef(),
+            unlock
+          )
+        }
+        .left
+        .map(_.getMessage)
+    }
+  }
+
+  object Asset {
+    def fromProtocol(txInput: TxInput): Input.Asset = {
+      Input.Asset(OutputRef.from(txInput.outputRef), serialize(txInput.unlockScript))
+    }
+  }
 
   @upickle.implicits.key("contract")
   final case class Contract(outputRef: OutputRef) extends Input
