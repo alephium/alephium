@@ -24,6 +24,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
+import org.alephium.api.model.{Transaction => ApiTransaction}
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
@@ -57,8 +58,7 @@ class ApiModelSpec
       Hash.zero,
       ByteString.empty
     )
-  val dummyAddress     = new InetSocketAddress("127.0.0.1", 9000)
-  val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
+  val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
     CliqueInfo.unsafe(
       CliqueId.generate,
@@ -857,5 +857,20 @@ class ApiModelSpec
        |}""".stripMargin
 
     checkData(unsignedTx, jsonRaw)
+  }
+
+  it should "encode/decode Transaction" in {
+    val tx      = ApiTransaction.fromProtocol(transaction)
+    val jsonRaw = s"""
+       |{
+       |  "unsigned": ${write(tx.unsigned)},
+       |  "scriptExecutionOk": ${tx.scriptExecutionOk},
+       |  "contractInputs": ${write(tx.contractInputs)},
+       |  "generatedOutputs": ${write(tx.generatedOutputs)},
+       |  "inputSignatures": ${write(tx.inputSignatures)},
+       |  "scriptSignatures": ${write(tx.scriptSignatures)}
+       |}""".stripMargin
+
+    checkData(tx, jsonRaw)
   }
 }

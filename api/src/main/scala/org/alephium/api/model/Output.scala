@@ -30,6 +30,13 @@ sealed trait Output {
 
 object Output {
 
+  def toProtocol(output: Output): TxOutput = {
+    output match {
+      case asset: Asset       => asset.toProtocol()
+      case contract: Contract => contract.toProtocol()
+    }
+  }
+
   @upickle.implicits.key("asset")
   final case class Asset(
       amount: Amount,
@@ -52,9 +59,17 @@ object Output {
   @upickle.implicits.key("contract")
   final case class Contract(
       amount: Amount,
-      address: Address,
+      address: Address.Contract,
       tokens: AVector[Token]
-  ) extends Output
+  ) extends Output {
+    def toProtocol(): model.ContractOutput = {
+      model.ContractOutput(
+        amount.value,
+        address.lockupScript,
+        tokens.map(token => (token.id, token.amount))
+      )
+    }
+  }
 
   def from(output: TxOutput): Output = {
     output match {

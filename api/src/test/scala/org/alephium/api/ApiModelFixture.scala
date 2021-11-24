@@ -39,6 +39,10 @@ trait ApiModelFixture
     Hint.unsafe(0),
     hashGen.sample.get
   )
+  val (priKey, pubKey) = keypairGen.sample.get
+
+  val sigature = SignatureSchema.sign(hashGen.sample.get.bytes, priKey)
+
   val scriptPair = p2pkScriptGen(GroupIndex.unsafe(0)).sample.get
 
   val txInput = TxInput(assetTxOutputRef, scriptPair.unlock)
@@ -48,11 +52,25 @@ trait ApiModelFixture
     scriptPair.lockup
   )
 
+  val contractOutput = TxOutput.contract(
+    ALPH.oneAlph,
+    p2cLockupGen(GroupIndex.unsafe(0)).sample.get
+  )
+
   val unsignedTransaction = UnsignedTransaction(
     Some(script),
     defaultGas,
     defaultGasPrice,
     AVector(txInput),
     AVector(assetOutput)
+  )
+
+  val transaction = Transaction(
+    unsignedTransaction,
+    scriptExecutionOk = true,
+    AVector(contractTxOutputRef),
+    AVector(assetOutput, contractOutput),
+    AVector(sigature),
+    AVector(sigature)
   )
 }

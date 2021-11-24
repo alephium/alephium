@@ -51,5 +51,9 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
       .leftValue is "Invalid hash"
   }
 
+  it should "convert Transaction" in new Fixture {
+    Transaction.fromProtocol(transaction).toProtocol() isE transaction
+  }
+
   trait Fixture extends ApiModelFixture
 }

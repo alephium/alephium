@@ -17,11 +17,14 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{AssetOutputRef, Hint, TxOutputRef}
+import org.alephium.protocol.model.{AssetOutputRef, ContractOutputRef, Hint, TxOutputRef}
 
 final case class OutputRef(hint: Int, key: Hash) {
   def unsafeToAssetOutputRef(): AssetOutputRef = {
     AssetOutputRef.unsafe(Hint.unsafe(hint), key)
+  }
+  def unsafeToContractOutputRef(): ContractOutputRef = {
+    ContractOutputRef.unsafe(Hint.unsafe(hint), key)
   }
 }
 
