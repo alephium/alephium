@@ -17,6 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.{NetworkId, UnsignedTransaction}
 import org.alephium.protocol.vm
 import org.alephium.util.{AVector, U256}
@@ -32,10 +33,11 @@ final case class UnsignedTx(
     inputs: AVector[Input.Asset],
     outputs: AVector[Output.Asset]
 ) {
-  def toProtocol(): Either[String, UnsignedTransaction] = {
+  def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
     val gas = vm.GasPrice(gasPrice)
     for {
       id          <- NetworkId.from(networkId.toInt).toRight("Invalid network id")
+      _           <- Either.cond(id == networkConfig.networkId, (), "Network id mismatch")
       script      <- scriptOpt.map(_.toProtocol().map(Some(_))).getOrElse(Right(None))
       assetInputs <- inputs.mapE(_.toProtocol())
       gasBox      <- vm.GasBox.from(gasAmount).toRight("Invalid gas amount")

@@ -20,6 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.{model => protocol}
 import org.alephium.protocol.Signature
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -31,7 +32,7 @@ final case class Transaction(
     inputSignatures: AVector[ByteString],
     scriptSignatures: AVector[ByteString]
 ) {
-  def toProtocol(): Either[String, protocol.Transaction] = {
+  def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, protocol.Transaction] = {
     for {
       unsignedTx <- unsigned.toProtocol()
       inputSig   <- inputSignatures.mapE(deserialize[Signature]).left.map(_.getMessage())
