@@ -9,7 +9,8 @@ services:
     runtime: nvidia
     privileged: true
     command:
-      - 'alephium'
+      - -a
+      - alephium
     deploy:
       resources:
         reservations:
