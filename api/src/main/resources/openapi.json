@@ -141,7 +141,16 @@
                   }
                 },
                 "Example1": {
-                  "summary": "More settings",
+                  "summary": "More Settings (w/o pass phrase)",
+                  "value": {
+                    "password": "my-secret-password",
+                    "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
+                    "walletName": "wallet-super-name",
+                    "isMiner": true
+                  }
+                },
+                "Example2": {
+                  "summary": "More Settings (with pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
@@ -258,7 +267,16 @@
                   }
                 },
                 "Example1": {
-                  "summary": "More settings",
+                  "summary": "More Settings (w/o pass phrase)",
+                  "value": {
+                    "password": "my-secret-password",
+                    "walletName": "wallet-super-name",
+                    "isMiner": true,
+                    "mnemonicSize": 24
+                  }
+                },
+                "Example2": {
+                  "summary": "More Settings (with pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "walletName": "wallet-super-name",
@@ -677,7 +695,7 @@
                   }
                 },
                 "Example1": {
-                  "summary": "More settings",
+                  "summary": "More Settings (with pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "mnemonicPassphrase": "optional-mnemonic-passphrase"

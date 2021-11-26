@@ -58,9 +58,20 @@ trait WalletExamples extends EndpointsExamples {
         password,
         walletName,
         Some(true),
+        None,
+        Some(Mnemonic.Size.list.last)
+      ),
+      "More Settings (w/o pass phrase)"
+    ),
+    moreSettingsExample(
+      WalletCreation(
+        password,
+        walletName,
+        Some(true),
         Some(mnemonicPassphrase),
         Some(Mnemonic.Size.list.last)
-      )
+      ),
+      "More Settings (with pass phrase)"
     )
   )
   implicit val walletCreationResultExamples: List[Example[WalletCreation.Result]] =
@@ -72,7 +83,12 @@ trait WalletExamples extends EndpointsExamples {
         WalletRestore(password, mnemonic, walletName, None, None)
       ),
       moreSettingsExample(
-        WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase))
+        WalletRestore(password, mnemonic, walletName, Some(true), None),
+        "More Settings (w/o pass phrase)"
+      ),
+      moreSettingsExample(
+        WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase)),
+        "More Settings (with pass phrase)"
       )
     )
 
@@ -88,7 +104,10 @@ trait WalletExamples extends EndpointsExamples {
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
     List(
       defaultExample(WalletUnlock(password, None)),
-      moreSettingsExample(WalletUnlock(password, Some(mnemonicPassphrase)))
+      moreSettingsExample(
+        WalletUnlock(password, Some(mnemonicPassphrase)),
+        "More Settings (with pass phrase)"
+      )
     )
 
   implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
