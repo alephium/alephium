@@ -52,7 +52,7 @@ trait WalletExamples extends EndpointsExamples {
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
-    defaultExample(WalletCreation(password, walletName, None, None, None)),
+    moreSettingsExample(WalletCreation(password, walletName, None, None, None), "User"),
     moreSettingsExample(
       WalletCreation(
         password,
@@ -61,7 +61,7 @@ trait WalletExamples extends EndpointsExamples {
         None,
         Some(Mnemonic.Size.list.last)
       ),
-      "More Settings (w/o pass phrase)"
+      "Miner (w/o pass phrase)"
     ),
     moreSettingsExample(
       WalletCreation(
@@ -71,7 +71,7 @@ trait WalletExamples extends EndpointsExamples {
         Some(mnemonicPassphrase),
         Some(Mnemonic.Size.list.last)
       ),
-      "More Settings (with pass phrase)"
+      "Miner (with pass phrase)"
     )
   )
   implicit val walletCreationResultExamples: List[Example[WalletCreation.Result]] =
@@ -79,16 +79,17 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
     List(
-      defaultExample(
-        WalletRestore(password, mnemonic, walletName, None, None)
+      moreSettingsExample(
+        WalletRestore(password, mnemonic, walletName, None, None),
+        "User"
       ),
       moreSettingsExample(
         WalletRestore(password, mnemonic, walletName, Some(true), None),
-        "More Settings (w/o pass phrase)"
+        "Miner (w/o pass phrase)"
       ),
       moreSettingsExample(
         WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase)),
-        "More Settings (with pass phrase)"
+        "Miner (with pass phrase)"
       )
     )
 

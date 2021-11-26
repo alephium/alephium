@@ -133,7 +133,7 @@
               },
               "examples": {
                 "Example0": {
-                  "summary": "Default",
+                  "summary": "User",
                   "value": {
                     "password": "my-secret-password",
                     "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
@@ -141,7 +141,7 @@
                   }
                 },
                 "Example1": {
-                  "summary": "More Settings (w/o pass phrase)",
+                  "summary": "Miner (w/o pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
@@ -150,7 +150,7 @@
                   }
                 },
                 "Example2": {
-                  "summary": "More Settings (with pass phrase)",
+                  "summary": "Miner (with pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava",
@@ -260,14 +260,14 @@
               },
               "examples": {
                 "Example0": {
-                  "summary": "Default",
+                  "summary": "User",
                   "value": {
                     "password": "my-secret-password",
                     "walletName": "wallet-super-name"
                   }
                 },
                 "Example1": {
-                  "summary": "More Settings (w/o pass phrase)",
+                  "summary": "Miner (w/o pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "walletName": "wallet-super-name",
@@ -276,7 +276,7 @@
                   }
                 },
                 "Example2": {
-                  "summary": "More Settings (with pass phrase)",
+                  "summary": "Miner (with pass phrase)",
                   "value": {
                     "password": "my-secret-password",
                     "walletName": "wallet-super-name",
