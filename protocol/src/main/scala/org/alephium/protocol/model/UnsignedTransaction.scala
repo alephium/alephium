@@ -313,7 +313,7 @@ object UnsignedTransaction {
     }
   }
 
-  private def check(failCondition: Boolean, errorMessage: String): Either[String, Unit] = {
+  @inline private def check(failCondition: Boolean, errorMessage: String): Either[String, Unit] = {
     Either.cond(!failCondition, (), errorMessage)
   }
 

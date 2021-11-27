@@ -470,7 +470,7 @@ object TxUtils {
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         utxos.flatMap(_.tokens)
       )
-      groupsOfTokens    = Math.ceil(totalAmountPerToken.length / maxTokenPerUtxo.toDouble).toInt
+      groupsOfTokens    = (totalAmountPerToken.length + maxTokenPerUtxo - 1) / maxTokenPerUtxo
       extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
       gas               = gasOpt.getOrElse(UtxoUtils.estimateSweepAllTxGas(utxos.length, extraNumOfOutputs + 1))
       totalAmountWithoutGas <- totalAmount
@@ -482,14 +482,14 @@ object TxUtils {
       amountOfFirstOutput <- totalAmountWithoutGas
         .sub(amountRequiredForExtraOutputs)
         .toRight("Not enough ALPH balance for transaction outputs")
+      firstOutputTokensNum = getFirstOutputTokensNum(totalAmountPerToken.length)
       _ <- amountOfFirstOutput
-        .sub(dustUtxoAmount)
+        .sub(minimalAlphAmountPerTxOutput(firstOutputTokensNum))
         .toRight("Not enough ALPH balance for transaction outputs")
     } yield {
-      val firstOutputTokensNum = getFirstOutputTokensNum(totalAmountPerToken.length)
-      val firstTokens          = totalAmountPerToken.take(firstOutputTokensNum)
-      val restOfTokens         = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
-      val firstOutput          = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
+      val firstTokens  = totalAmountPerToken.take(firstOutputTokensNum)
+      val restOfTokens = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
+      val firstOutput  = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
       val restOfOutputs = restOfTokens.map { tokens =>
         TxOutputInfo(
           toLockupScript,
@@ -503,7 +503,7 @@ object TxUtils {
     }
   }
 
-  private[core] def getFirstOutputTokensNum(tokensNum: Int) = {
+  private[core] def getFirstOutputTokensNum(tokensNum: Int): Int = {
     val remainder = tokensNum % maxTokenPerUtxo
     if (tokensNum == 0) {
       tokensNum

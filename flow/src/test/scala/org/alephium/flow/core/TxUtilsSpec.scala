@@ -687,12 +687,12 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     {
-      info("The amount in the first output is below dustUtxoAmount")
-      val alphAmount = dustUtxoAmount
+      info("The amount in the first output is below minimalAlphAmountPerTxOutput(tokens)")
+      val alphAmount = minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
         .addUnsafe(defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(1, 3))
         .addUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
 
-      val tokens = AVector.tabulate(3 * maxTokenPerUtxo) { i =>
+      val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
         val tokenId = Hash.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -700,8 +700,8 @@ class TxUtilsSpec extends AlephiumSpec {
       Test(tokens, alphAmount).success { case (outputs, gas) =>
         outputs.length is 3
 
-        outputs(0).alphAmount is dustUtxoAmount
-        outputs(0).tokens.length is maxTokenPerUtxo
+        outputs(0).alphAmount is minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
+        outputs(0).tokens.length is maxTokenPerUtxo - 1
 
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
@@ -712,6 +712,15 @@ class TxUtilsSpec extends AlephiumSpec {
       Test(tokens, alphAmount.subUnsafe(1))
         .failed(_ is "Not enough ALPH balance for transaction outputs")
     }
+  }
+
+  "TxUtils.getFirstOutputTokensNum" should "return the number of tokens for the first output of the sweepAll transaction" in {
+    TxUtils.getFirstOutputTokensNum(0) is 0
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo) is maxTokenPerUtxo
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 1) is 1
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 10
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + maxTokenPerUtxo - 1) is maxTokenPerUtxo - 1
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo * 10) is maxTokenPerUtxo
   }
 
   trait LargeUtxos extends FlowFixture {
