@@ -688,7 +688,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |
          |  pub fn add() -> ([U256; 4]) {
          |    x = x + 1
-         |    return [x; 4]
+         |    return [x + 1, x + 2, x + 3, x + 4]
          |  }
          |
          |  pub fn addTest1() -> (U256) {
@@ -710,6 +710,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let res = add()
          |    return x
          |  }
+         |
+         |  pub fn test8() -> (U256) {
+         |    let a = add()[1]
+         |    return a
+         |  }
          |}
          |""".stripMargin
 
@@ -722,5 +727,39 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(5, AVector.empty, AVector(Val.U256(15)))
     test(6, AVector.empty, AVector(Val.U256(19)))
     test(7, AVector.empty, AVector(Val.U256(20)))
+    test(8, AVector.empty, AVector(Val.U256(23)))
+  }
+
+  it should "generate efficient code for arrays" in {
+    val code =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    let mut x = [1, 2, 3, 4]
+         |    let y = x[0]
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code).rightValue.methods.head is
+      Method[StatefulContext](
+        isPublic = true,
+        isPayable = false,
+        argsLength = 0,
+        localsLength = 5,
+        returnLength = 0,
+        instrs = AVector[Instr[StatefulContext]](
+          U256Const1,
+          U256Const2,
+          U256Const3,
+          U256Const4,
+          StoreLocal(4),
+          StoreLocal(3),
+          StoreLocal(2),
+          StoreLocal(1),
+          LoadLocal(1),
+          StoreLocal(0)
+        )
+      )
   }
 }
