@@ -192,7 +192,7 @@ object Compiler {
         case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)
         case _ =>
           val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
-          val arrayRef  = ArrayTransformer.ArrayRef.from(this, arrayType, freshName(), isMutable)
+          val arrayRef  = ArrayTransformer.ArrayRef.init(this, arrayType, freshName(), isMutable)
           val codes     = expr.genCode(this) ++ arrayRef.vars.reverse.map(genStoreCode)
           (arrayRef, codes)
       }

@@ -224,8 +224,7 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       value.getType(state) match {
         case Seq(tpe: Type.FixedSizeArray) =>
-          val targetArrayRef = ArrayTransformer.ArrayRef.from(state, tpe, ident.name, isMutable)
-          state.addArrayRef(ident, targetArrayRef)
+          val targetArrayRef = ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable)
           value.genCode(state) ++ state.copyArrayRef(targetArrayRef)
         case _ =>
           value.genCode(state) :+ state.genStoreCode(ident)
@@ -241,7 +240,7 @@ object Ast {
       body: Seq[Statement[Ctx]]
   ) {
     def check(state: Compiler.State[Ctx]): Unit = {
-      ArrayTransformer.flattenArgVars(state, args)
+      ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
     }
 
@@ -429,7 +428,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
-      ArrayTransformer.flattenArgVars(state, fields)
+      ArrayTransformer.initArgVars(state, fields)
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]

@@ -17,11 +17,12 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.vm.StatelessContext
+import org.alephium.protocol.vm.lang.Ast.Ident
 
 object ArrayTransformer {
   @inline def arrayVarName(baseName: String, idx: Int): String = s"_$baseName-$idx"
 
-  def flattenArgVars[Ctx <: StatelessContext](
+  def initArgVars[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       args: Seq[Ast.Argument]
   ): Unit = {
@@ -30,7 +31,7 @@ object ArrayTransformer {
         case tpe: Type.FixedSizeArray =>
           state.addVariable(ident, tpe, isMutable)
           val arrayRef =
-            ArrayRef(tpe, flattenArrayVars(state, tpe, ident.name, isMutable))
+            ArrayRef(tpe, initArrayVars(state, tpe, ident.name, isMutable))
           state.addArrayRef(ident, arrayRef)
         case _ =>
           state.addVariable(ident, tpe, isMutable)
@@ -39,7 +40,7 @@ object ArrayTransformer {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def flattenArrayVars[Ctx <: StatelessContext](
+  private def initArrayVars[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       tpe: Type.FixedSizeArray,
       baseName: String,
@@ -49,7 +50,7 @@ object ArrayTransformer {
       case baseType: Type.FixedSizeArray =>
         (0 until tpe.size).flatMap { idx =>
           val newBaseName = arrayVarName(baseName, idx)
-          flattenArrayVars(state, baseType, newBaseName, isMutable)
+          initArrayVars(state, baseType, newBaseName, isMutable)
         }
       case baseType =>
         (0 until tpe.size).map { idx =>
@@ -116,13 +117,15 @@ object ArrayTransformer {
   }
 
   object ArrayRef {
-    def from[Ctx <: StatelessContext](
+    def init[Ctx <: StatelessContext](
         state: Compiler.State[Ctx],
         tpe: Type.FixedSizeArray,
         baseName: String,
         isMutable: Boolean
     ): ArrayRef = {
-      ArrayRef(tpe, flattenArrayVars(state, tpe, baseName, isMutable))
+      val ref = ArrayRef(tpe, initArrayVars(state, tpe, baseName, isMutable))
+      state.addArrayRef(Ident(baseName), ref)
+      ref
     }
   }
 }
