@@ -188,15 +188,13 @@ object Compiler {
           val (arrayRef, codes) = getOrCreateArrayRef(array, isMutable)
           val subArrayRef       = arrayRef.subArray(index)
           (subArrayRef, codes)
-        case Ast.Variable(ident)            => (getArrayRef(ident), Seq.empty)
-        case expr: Ast.CreateArrayExpr[Ctx] => expr.createArrayRef(this, isMutable)
-        case _: Ast.CallExpr[Ctx] | _: Ast.ContractCallExpr =>
+        case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
+        case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)
+        case _ =>
           val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
           val arrayRef  = ArrayTransformer.ArrayRef.from(this, arrayType, freshName(), isMutable)
           val codes     = expr.genCode(this) ++ arrayRef.vars.reverse.map(genStoreCode)
           (arrayRef, codes)
-        case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)
-        case _                    => throw Error(s"Invalid array expr: $expr")
       }
     }
 
@@ -226,13 +224,9 @@ object Compiler {
     }
 
     def copyArrayRef(
-        target: ArrayTransformer.ArrayRef,
-        source: ArrayTransformer.ArrayRef
+        target: ArrayTransformer.ArrayRef
     ): Seq[Instr[Ctx]] = {
-      assume(target.tpe == source.tpe)
-      source.vars.zipWithIndex.flatMap { case (ident, index) =>
-        Seq(genLoadCode(ident), genStoreCode(target.vars(index)))
-      }
+      target.vars.map(genStoreCode).reverse
     }
 
     def setFuncScope(funcId: Ast.FuncId): Unit = {
@@ -244,7 +238,7 @@ object Compiler {
       addVariable(ident, expectOneType(ident, tpe), isMutable)
     }
 
-    private def scopedName(name: String): String = {
+    protected def scopedName(name: String): String = {
       if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
 
@@ -290,7 +284,7 @@ object Compiler {
         .sortBy(_.index)
     }
 
-    def genLoadCode(ident: Ast.Ident): Instr[Ctx]
+    def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
     def genStoreCode(ident: Ast.Ident): Instr[Ctx]
 
@@ -356,12 +350,16 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
-    def genLoadCode(ident: Ast.Ident): Instr[StatelessContext] = {
+    def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) {
-        throw Error(s"Loading state by ${ident.name} in a stateless context")
+      if (varInfo.index == -1) { // variable for array
+        getArrayRef(ident).vars.flatMap(genLoadCode)
       } else {
-        LoadLocal(varInfo.index)
+        if (isField(ident)) {
+          throw Error(s"Loading state by ${ident.name} in a stateless context")
+        } else {
+          Seq(LoadLocal(varInfo.index))
+        }
       }
     }
 
@@ -387,12 +385,16 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
-    def genLoadCode(ident: Ast.Ident): Instr[StatefulContext] = {
+    def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) {
-        LoadField(varInfo.index)
+      if (varInfo.index == -1) { // variable for array
+        getArrayRef(ident).vars.flatMap(genLoadCode)
       } else {
-        LoadLocal(varInfo.index)
+        if (isField(ident)) {
+          Seq(LoadField(varInfo.index))
+        } else {
+          Seq(LoadLocal(varInfo.index))
+        }
       }
     }
 

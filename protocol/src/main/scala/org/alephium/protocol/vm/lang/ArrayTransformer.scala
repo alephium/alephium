@@ -16,25 +16,10 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.{Instr, StatelessContext}
+import org.alephium.protocol.vm.StatelessContext
 
 object ArrayTransformer {
   @inline def arrayVarName(baseName: String, idx: Int): String = s"_$baseName-$idx"
-
-  def flattenArrayExprs[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      exprs: Seq[Ast.Expr[Ctx]]
-  ): Seq[Instr[Ctx]] = {
-    exprs.flatMap(expr =>
-      expr.getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          val (arrayRef, codes) = state.getOrCreateArrayRef(expr, isMutable = false)
-          val loadCodes         = arrayRef.vars.map(state.genLoadCode)
-          codes ++ loadCodes
-        case _ => expr.genCode(state)
-      }
-    )
-  }
 
   def flattenArgVars[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
@@ -91,6 +76,8 @@ object ArrayTransformer {
   }
 
   final case class ArrayRef(tpe: Type.FixedSizeArray, vars: Seq[Ast.Ident]) {
+    def isMultiDim(): Boolean = tpe.size != tpe.flattenSize()
+
     def subArray(index: Int): ArrayRef = {
       tpe.baseType match {
         case baseType: Type.FixedSizeArray =>
