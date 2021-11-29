@@ -143,11 +143,11 @@ object UtxoUtils {
     estimateGas(defaultGasPerInput, defaultGasPerOutput, numInputs, numOutputs, minimalGas)
   }
 
-  def estimateSweepAllTxGas(numInputs: Int): GasBox = {
+  def estimateSweepAllTxGas(numInputs: Int, numOutputs: Int): GasBox = {
+    val outputGas = GasSchedule.txOutputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
     val gas = GasSchedule.txBaseGas
       .addUnsafe(GasSchedule.txInputBaseGas.mulUnsafe(numInputs))
-      .addUnsafe(GasSchedule.txOutputBaseGas)
-      .addUnsafe(GasSchedule.p2pkUnlockGas)
+      .addUnsafe(outputGas.mulUnsafe(numOutputs))
     Math.max(gas, minimalGas)
   }
 
@@ -210,8 +210,8 @@ object UtxoUtils {
       } yield result
 
       foundResult match {
-        case Right((_, foundUtxos, otherUtxos)) =>
-          findUtxosForTokens(currentUtxos ++ foundUtxos, otherUtxos, totalAmountPerToken.tail)
+        case Right((_, foundUtxos, remainingUtxos)) =>
+          findUtxosForTokens(currentUtxos ++ foundUtxos, remainingUtxos, totalAmountPerToken.tail)
         case Left(e) =>
           Left(e)
       }
