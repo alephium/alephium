@@ -132,14 +132,18 @@ class ParserSpec extends AlephiumSpec {
   it should "parser contract initial states" in {
     val bytes    = Hash.generate
     val address  = Address.p2pkh(PublicKey.generate)
-    val stateRaw = s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}]"
+    val stateRaw = s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}, [[1, 2], [1, 2]]]"
     val expected =
       Seq[Val](
         Val.U256(U256.One),
         Val.I256(I256.Two),
         Val.True,
         Val.Address(address.lockupScript),
-        Val.ByteVec.from(bytes)
+        Val.ByteVec.from(bytes),
+        Val.U256(U256.One),
+        Val.U256(U256.Two),
+        Val.U256(U256.One),
+        Val.U256(U256.Two)
       )
     fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
     Compiler.compileState(stateRaw).rightValue is AVector.from(expected)
