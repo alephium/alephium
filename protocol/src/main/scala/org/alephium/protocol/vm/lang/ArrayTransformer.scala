@@ -16,27 +16,13 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.{Instr, StatelessContext}
+import org.alephium.protocol.vm.StatelessContext
+import org.alephium.protocol.vm.lang.Ast.Ident
 
 object ArrayTransformer {
   @inline def arrayVarName(baseName: String, idx: Int): String = s"_$baseName-$idx"
 
-  def flattenArrayExprs[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      exprs: Seq[Ast.Expr[Ctx]]
-  ): Seq[Instr[Ctx]] = {
-    exprs.flatMap(expr =>
-      expr.getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          val (arrayRef, codes) = state.getOrCreateArrayRef(expr, isMutable = false)
-          val loadCodes         = arrayRef.vars.map(state.genLoadCode)
-          codes ++ loadCodes
-        case _ => expr.genCode(state)
-      }
-    )
-  }
-
-  def flattenArgVars[Ctx <: StatelessContext](
+  def initArgVars[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       args: Seq[Ast.Argument]
   ): Unit = {
@@ -45,7 +31,7 @@ object ArrayTransformer {
         case tpe: Type.FixedSizeArray =>
           state.addVariable(ident, tpe, isMutable)
           val arrayRef =
-            ArrayRef(tpe, flattenArrayVars(state, tpe, ident.name, isMutable))
+            ArrayRef(tpe, initArrayVars(state, tpe, ident.name, isMutable))
           state.addArrayRef(ident, arrayRef)
         case _ =>
           state.addVariable(ident, tpe, isMutable)
@@ -54,7 +40,7 @@ object ArrayTransformer {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def flattenArrayVars[Ctx <: StatelessContext](
+  private def initArrayVars[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       tpe: Type.FixedSizeArray,
       baseName: String,
@@ -64,7 +50,7 @@ object ArrayTransformer {
       case baseType: Type.FixedSizeArray =>
         (0 until tpe.size).flatMap { idx =>
           val newBaseName = arrayVarName(baseName, idx)
-          flattenArrayVars(state, baseType, newBaseName, isMutable)
+          initArrayVars(state, baseType, newBaseName, isMutable)
         }
       case baseType =>
         (0 until tpe.size).map { idx =>
@@ -91,6 +77,8 @@ object ArrayTransformer {
   }
 
   final case class ArrayRef(tpe: Type.FixedSizeArray, vars: Seq[Ast.Ident]) {
+    def isMultiDim(): Boolean = tpe.size != tpe.flattenSize()
+
     def subArray(index: Int): ArrayRef = {
       tpe.baseType match {
         case baseType: Type.FixedSizeArray =>
@@ -129,13 +117,15 @@ object ArrayTransformer {
   }
 
   object ArrayRef {
-    def from[Ctx <: StatelessContext](
+    def init[Ctx <: StatelessContext](
         state: Compiler.State[Ctx],
         tpe: Type.FixedSizeArray,
         baseName: String,
         isMutable: Boolean
     ): ArrayRef = {
-      ArrayRef(tpe, flattenArrayVars(state, tpe, baseName, isMutable))
+      val ref = ArrayRef(tpe, initArrayVars(state, tpe, baseName, isMutable))
+      state.addArrayRef(Ident(baseName), ref)
+      ref
     }
   }
 }

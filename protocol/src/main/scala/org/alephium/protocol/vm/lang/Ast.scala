@@ -72,31 +72,8 @@ object Ast {
       Seq(Type.FixedSizeArray(baseType(0), elements.size))
     }
 
-    def createArrayRef(
-        state: Compiler.State[Ctx],
-        isMutable: Boolean
-    ): (ArrayTransformer.ArrayRef, Seq[Instr[Ctx]]) = {
-      val (vars, codes) = elements
-        .foldLeft((Seq.empty[Ident], Seq.empty[Instr[Ctx]])) { case ((vars, codes), expr) =>
-          expr.getType(state) match {
-            case Seq(_: Type.FixedSizeArray) =>
-              val (subArrayRef, instrs) = state.getOrCreateArrayRef(expr, isMutable)
-              (vars ++ subArrayRef.vars, codes ++ instrs)
-            case tpe =>
-              val variable = Ident(state.freshName())
-              state.addVariable(variable, tpe, isMutable)
-              val instrs = expr.genCode(state) :+ state.genStoreCode(variable)
-              (vars :+ variable, codes ++ instrs)
-          }
-        }
-      val arrayType = _getType(state)(0)
-      val arrayRef  = ArrayTransformer.ArrayRef(arrayType, vars)
-      (arrayRef, codes)
-    }
-
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val (arrayRef, codes) = createArrayRef(state, isMutable = false)
-      codes ++ arrayRef.vars.map(state.genLoadCode)
+      elements.flatMap(_.genCode(state))
     }
   }
   // TODO: support runtime variable index
@@ -111,13 +88,12 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      array.getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          val (arrayRef, codes) = state.getOrCreateArrayRef(array, isMutable = false)
-          val ident             = arrayRef.getVariable(index)
-          codes :+ state.genLoadCode(ident)
-        case tpe =>
-          throw Compiler.Error(s"Expect array type, have: $tpe")
+      val (arrayRef, codes) = state.getOrCreateArrayRef(array, isMutable = false)
+      if (arrayRef.isMultiDim()) {
+        codes ++ arrayRef.subArray(index).vars.flatMap(state.genLoadCode)
+      } else {
+        val ident = arrayRef.getVariable(index)
+        codes ++ state.genLoadCode(ident)
       }
     }
   }
@@ -125,7 +101,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.getType(id))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      Seq(state.genLoadCode(id))
+      state.genLoadCode(id)
     }
   }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
@@ -171,8 +147,7 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      ArrayTransformer.flattenArrayExprs(state, args) ++
-        state.getFunc(id).genCode(args.flatMap(_.getType(state)))
+      args.flatMap(_.genCode(state)) ++ state.getFunc(id).genCode(args.flatMap(_.getType(state)))
     }
   }
 
@@ -208,7 +183,7 @@ object Ast {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val contract = obj.getType(state)(0).asInstanceOf[Type.Contract]
-      ArrayTransformer.flattenArrayExprs(state, args) ++ obj.genCode(state) ++
+      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
         state.getFunc(contract.id, callId).genExternalCallCode(contract.id)
     }
   }
@@ -249,15 +224,8 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       value.getType(state) match {
         case Seq(tpe: Type.FixedSizeArray) =>
-          val (sourceArrayRef, codes) = state.getOrCreateArrayRef(value, isMutable)
-          if (!isMutable && sourceArrayRef.vars.forall(!state.getVariable(_).isMutable)) {
-            state.addArrayRef(ident, sourceArrayRef)
-            codes
-          } else {
-            val targetArrayRef = ArrayTransformer.ArrayRef.from(state, tpe, ident.name, isMutable)
-            state.addArrayRef(ident, targetArrayRef)
-            codes ++ state.copyArrayRef(targetArrayRef, sourceArrayRef)
-          }
+          val targetArrayRef = ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable)
+          value.genCode(state) ++ state.copyArrayRef(targetArrayRef)
         case _ =>
           value.genCode(state) :+ state.genStoreCode(ident)
       }
@@ -272,7 +240,7 @@ object Ast {
       body: Seq[Statement[Ctx]]
   ) {
     def check(state: Compiler.State[Ctx]): Unit = {
-      ArrayTransformer.flattenArgVars(state, args)
+      ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
     }
 
@@ -324,9 +292,8 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       rhs.getType(state) match {
         case Seq(_: Type.FixedSizeArray) =>
-          val (sourceArrayRef, codes) = state.getOrCreateArrayRef(rhs, isMutable = false)
-          val targetArrayRef          = state.getArrayRef(target).subArray(indexes)
-          codes ++ state.copyArrayRef(targetArrayRef, sourceArrayRef)
+          val targetArrayRef = state.getArrayRef(target).subArray(indexes)
+          rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
         case _ =>
           val targetArrayRef = state.getArrayRef(target)
           val ident          = targetArrayRef.getVariable(indexes)
@@ -345,9 +312,8 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       rhs.getType(state) match {
         case Seq(_: Type.FixedSizeArray) =>
-          val (sourceArrayRef, codes) = state.getOrCreateArrayRef(rhs, isMutable = false)
-          val targetArrayRef          = state.getArrayRef(target)
-          codes ++ state.copyArrayRef(targetArrayRef, sourceArrayRef)
+          val targetArrayRef = state.getArrayRef(target)
+          rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
         case _ =>
           rhs.genCode(state) :+ state.genStoreCode(target)
       }
@@ -365,9 +331,8 @@ object Ast {
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      ArrayTransformer.flattenArrayExprs(state, args) ++ func.genCode(argsType) ++ Seq.fill(
-        ArrayTransformer.flattenTypeLength(returnType)
-      )(Pop)
+      args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++
+        Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
   final case class ContractCall(
@@ -387,7 +352,7 @@ object Ast {
       val func       = state.getFunc(contract.id, callId)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      ArrayTransformer.flattenArrayExprs(state, args) ++ obj.genCode(state) ++
+      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
         func.genExternalCallCode(contract.id) ++
         Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
@@ -445,8 +410,7 @@ object Ast {
       state.checkReturn(exprs.flatMap(_.getType(state)))
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
-      ArrayTransformer.flattenArrayExprs(state, exprs) ++
-        (if (exprs.isEmpty) Seq() else Seq(Return))
+      exprs.flatMap(_.genCode(state)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
   }
 
   trait Contract[Ctx <: StatelessContext] {
@@ -464,7 +428,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
-      ArrayTransformer.flattenArgVars(state, fields)
+      ArrayTransformer.initArgVars(state, fields)
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
