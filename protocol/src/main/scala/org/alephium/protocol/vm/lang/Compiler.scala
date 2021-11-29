@@ -193,7 +193,7 @@ object Compiler {
         case _ =>
           val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
           val arrayRef  = ArrayTransformer.ArrayRef.init(this, arrayType, freshName(), isMutable)
-          val codes     = expr.genCode(this) ++ arrayRef.vars.reverse.map(genStoreCode)
+          val codes     = expr.genCode(this) ++ copyArrayRef(arrayRef)
           (arrayRef, codes)
       }
     }
@@ -202,17 +202,6 @@ object Compiler {
       val sname = scopedName(ident.name)
       assume(!arrayRefs.contains(sname))
       arrayRefs(sname) = arrayRef
-    }
-
-    def updateArrayRef(ident: Ast.Ident, arrayRef: ArrayTransformer.ArrayRef): Unit = {
-      val sname = scopedName(ident.name)
-      if (arrayRefs.contains(ident.name)) {
-        arrayRefs(ident.name) = arrayRef
-      } else if (arrayRefs.contains(sname)) {
-        arrayRefs(sname) = arrayRef
-      } else {
-        throw Error(s"Array $ident does not exist")
-      }
     }
 
     def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef = {
