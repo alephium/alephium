@@ -350,6 +350,7 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
       val varInfo = getVariable(ident)
       if (varInfo.index == -1) { // variable for array
@@ -385,6 +386,7 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
       if (varInfo.index == -1) { // variable for array
