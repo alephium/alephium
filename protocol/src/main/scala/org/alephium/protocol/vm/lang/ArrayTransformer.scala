@@ -30,9 +30,7 @@ object ArrayTransformer {
       tpe match {
         case tpe: Type.FixedSizeArray =>
           state.addVariable(ident, tpe, isMutable)
-          val arrayRef =
-            ArrayRef(tpe, initArrayVars(state, tpe, ident.name, isMutable))
-          state.addArrayRef(ident, arrayRef)
+          ArrayRef.init(state, tpe, ident.name, isMutable)
         case _ =>
           state.addVariable(ident, tpe, isMutable)
       }
