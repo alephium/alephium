@@ -58,11 +58,50 @@ object Ast {
       }
     }
   }
+  final case class CreateArrayExpr[Ctx <: StatelessContext](elements: Seq[Expr[Ctx]])
+      extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
+      assume(elements.nonEmpty)
+      val baseType = elements(0).getType(state)
+      if (baseType.length != 1) {
+        throw Compiler.Error("Expect single type for array element")
+      }
+      if (elements.drop(0).exists(_.getType(state) != baseType)) {
+        throw Compiler.Error(s"Array elements should have same type")
+      }
+      Seq(Type.FixedSizeArray(baseType(0), elements.size))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      elements.flatMap(_.genCode(state))
+    }
+  }
+  // TODO: support runtime variable index
+  final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Int)
+      extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      array.getType(state) match {
+        case Seq(Type.FixedSizeArray(baseType, _)) => Seq(baseType)
+        case tpe =>
+          throw Compiler.Error(s"Expect array type, have: $tpe")
+      }
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val (arrayRef, codes) = state.getOrCreateArrayRef(array, isMutable = false)
+      if (arrayRef.isMultiDim()) {
+        codes ++ arrayRef.subArray(index).vars.flatMap(state.genLoadCode)
+      } else {
+        val ident = arrayRef.getVariable(index)
+        codes ++ state.genLoadCode(ident)
+      }
+    }
+  }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.getType(id))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      Seq(state.genLoadCode(id))
+      state.genLoadCode(id)
     }
   }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
@@ -183,7 +222,13 @@ object Ast {
       state.addVariable(ident, value.getType(state), isMutable)
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.genCode(state) :+ state.genStoreCode(ident)
+      value.getType(state) match {
+        case Seq(tpe: Type.FixedSizeArray) =>
+          val targetArrayRef = ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable)
+          value.genCode(state) ++ state.copyArrayRef(targetArrayRef)
+        case _ =>
+          value.genCode(state) :+ state.genStoreCode(ident)
+      }
     }
   }
   final case class FuncDef[Ctx <: StatelessContext](
@@ -195,7 +240,7 @@ object Ast {
       body: Seq[Statement[Ctx]]
   ) {
     def check(state: Compiler.State[Ctx]): Unit = {
-      args.foreach(arg => state.addVariable(arg.ident, arg.tpe, arg.isMutable))
+      ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
     }
 
@@ -203,16 +248,57 @@ object Ast {
       state.setFuncScope(id)
       check(state)
 
-      val localVars = state.getLocalVars(id)
       val instrs    = body.flatMap(_.genCode(state))
+      val localVars = state.getLocalVars(id)
       Method[Ctx](
         isPublic,
         isPayable,
-        argsLength = args.length,
+        argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
-        returnLength = rtypes.length,
+        returnLength = ArrayTransformer.flattenTypeLength(rtypes),
         AVector.from(instrs)
       )
+    }
+  }
+  final case class ArrayElementAssign[Ctx <: StatelessContext](
+      target: Ident,
+      indexes: Seq[Int],
+      rhs: Expr[Ctx]
+  ) extends Statement[Ctx] {
+    @scala.annotation.tailrec
+    private def elementType(indexes: Seq[Int], tpe: Type): Type = {
+      if (indexes.isEmpty) {
+        tpe
+      } else {
+        tpe match {
+          case arrayType: Type.FixedSizeArray =>
+            elementType(indexes.drop(1), arrayType.baseType)
+          case _ =>
+            throw Compiler.Error("Invalid array element assign statement")
+        }
+      }
+    }
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val varInfo = state.getVariable(target)
+      if (!varInfo.isMutable) throw Compiler.Error("Assign to immutable array")
+      val elementTpe = elementType(indexes, varInfo.tpe)
+      rhs.getType(state) match {
+        case Seq(tpe) if tpe == elementTpe =>
+        case tpe                           => throw Compiler.Error(s"Assign $tpe to $elementTpe")
+      }
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      rhs.getType(state) match {
+        case Seq(_: Type.FixedSizeArray) =>
+          val targetArrayRef = state.getArrayRef(target).subArray(indexes)
+          rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
+        case _ =>
+          val targetArrayRef = state.getArrayRef(target)
+          val ident          = targetArrayRef.getVariable(indexes)
+          rhs.genCode(state) :+ state.genStoreCode(ident)
+      }
     }
   }
   // TODO: handle multiple returns
@@ -222,8 +308,15 @@ object Ast {
       state.checkAssign(target, rhs.getType(state))
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      rhs.genCode(state) :+ state.genStoreCode(target)
+      rhs.getType(state) match {
+        case Seq(_: Type.FixedSizeArray) =>
+          val targetArrayRef = state.getArrayRef(target)
+          rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
+        case _ =>
+          rhs.genCode(state) :+ state.genStoreCode(target)
+      }
     }
   }
   final case class FuncCall[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])
@@ -238,7 +331,8 @@ object Ast {
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++ Seq.fill(returnType.length)(Pop)
+      args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++
+        Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
   final case class ContractCall(
@@ -260,7 +354,7 @@ object Ast {
       val returnType = func.getReturnType(argsType)
       args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
         func.genExternalCallCode(contract.id) ++
-        Seq.fill[Instr[StatefulContext]](returnType.length)(Pop)
+        Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
   final case class IfElse[Ctx <: StatelessContext](
@@ -334,7 +428,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
-      fields.foreach(field => state.addVariable(field.ident, field.tpe, field.isMutable))
+      ArrayTransformer.initArgVars(state, fields)
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
@@ -378,7 +472,7 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
-      StatefulContract(fields.length, methods)
+      StatefulContract(ArrayTransformer.flattenTypeLength(fields.map(_.tpe)), methods)
     }
   }
 
