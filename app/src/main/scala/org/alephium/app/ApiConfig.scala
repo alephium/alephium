@@ -31,7 +31,8 @@ final case class ApiConfig(
     blockflowFetchMaxAge: Duration,
     askTimeout: Duration,
     apiKey: Option[ApiKey],
-    gasFeeCap: U256
+    gasFeeCap: U256,
+    defaultUtxosLimit: Int
 )
 
 object ApiConfig {
@@ -51,7 +52,8 @@ object ApiConfig {
         as[Duration]("blockflowFetchMaxAge"),
         as[Duration]("askTimeout"),
         as[Option[ApiKey]]("apiKey"),
-        as[U256]("gasFeeCap")
+        as[U256]("gasFeeCap"),
+        as[Int]("defaultUtxosLimit")
       )
     }
 

@@ -33,13 +33,14 @@ import org.alephium.util._
 // scalastyle:off magic.number
 trait EndpointsExamples extends ErrorExamples {
 
-  private val networkId = NetworkId(0)
+  private val networkId = NetworkId.AlephiumMainNet
   private val lockupScript =
     LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
+  protected val defaultUtxosLimit: Int   = 512
   val address                            = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
@@ -55,11 +56,11 @@ trait EndpointsExamples extends ErrorExamples {
   private val inetAddress       = inetSocketAddress.getAddress
   private val peerAddress       = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers             = AVector(peerAddress)
-  private val twoAlf            = Amount(ALF.oneAlf.mulUnsafe(U256.Two))
-  private def alf(value: Int)   = Amount(ALF.oneAlf.mulUnsafe(U256.unsafe(value)))
+  private val twoAlph           = Amount(ALPH.oneAlph.mulUnsafe(U256.Two))
+  private def alph(value: Int)  = Amount(ALPH.oneAlph.mulUnsafe(U256.unsafe(value)))
   private val height            = 42
-  val balance                   = alf(10)
-  val halfBalance               = alf(5)
+  val balance                   = alph(10)
+  val halfBalance               = alph(5)
   val signature = Signature
     .from(
       Hex.unsafe(
@@ -72,19 +73,19 @@ trait EndpointsExamples extends ErrorExamples {
   private val blockHash = BlockHash
     .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
     .get
-  val hexString  = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
-  private val ts = TimeStamp.unsafe(1611041396892L)
+  val hexString    = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
   val contractId =
     Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
   private val tokens = AVector(
-    Token(Hash.hash("token1"), alf(42).value),
-    Token(Hash.hash("token2"), alf(1000).value)
+    Token(Hash.hash("token1"), alph(42).value),
+    Token(Hash.hash("token2"), alph(1000).value)
   )
-  val defaultDestinations = AVector(Destination(address, twoAlf, None, None))
+  val defaultDestinations = AVector(Destination(address, twoAlph, None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, twoAlf, Some(tokens), Some(ts))
+    Destination(address, twoAlph, Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
@@ -244,10 +245,7 @@ trait EndpointsExamples extends ErrorExamples {
     defaultExample(
       BuildTransaction(
         publicKey,
-        defaultDestinations,
-        None,
-        None,
-        None
+        defaultDestinations
       )
     ),
     moreSettingsExample(
@@ -256,7 +254,8 @@ trait EndpointsExamples extends ErrorExamples {
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
       )
     )
   )
@@ -265,10 +264,7 @@ trait EndpointsExamples extends ErrorExamples {
     defaultExample(
       BuildSweepAllTransaction(
         publicKey,
-        address,
-        None,
-        None,
-        None
+        address
       )
     ),
     moreSettingsExample(
@@ -277,7 +273,8 @@ trait EndpointsExamples extends ErrorExamples {
         address,
         Some(ts),
         Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
       )
     )
   )
@@ -365,10 +362,11 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContract(
         publicKey,
         hexString,
+        Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
+        Some(twoAlph),
         Some(minimalGas),
         Some(defaultGasPrice),
-        Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
-        Some(twoAlf)
+        Some(defaultUtxosLimit)
       )
     )
   )
@@ -380,7 +378,8 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         hexString,
         Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
       )
     )
   )

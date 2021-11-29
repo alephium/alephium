@@ -43,7 +43,8 @@ trait FlowFixture
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NumericHelpers {
-  lazy val blockFlow: BlockFlow = genesisBlockFlow()
+  lazy val blockFlow: BlockFlow  = genesisBlockFlow()
+  lazy val defaultUtxoLimit: Int = ALPH.MaxTxInputNum * 2
 
   lazy val keyManager: mutable.Map[LockupScript, PrivateKey] = mutable.Map.empty
 
@@ -82,7 +83,7 @@ trait FlowFixture
   def transferOnlyForIntraGroup(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      amount: U256 = ALF.alf(1)
+      amount: U256 = ALPH.alph(1)
   ): Block = {
     if (chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from)) {
       transfer(blockFlow, chainIndex, amount)
@@ -103,7 +104,7 @@ trait FlowFixture
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
     mine(blockFlow, chainIndex)(
-      transferTxs(_, _, ALF.alf(1), 1, Some(txScript), true, scriptGas = gas)
+      transferTxs(_, _, ALPH.alph(1), 1, Some(txScript), true, scriptGas = gas)
     )
   }
 
@@ -117,13 +118,13 @@ trait FlowFixture
     val zipped = invokers.mapWithIndex { case (invoker, index) =>
       invoker -> txScripts(index)
     }
-    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALF.alf(1) / 100))
+    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
   }
 
   def transfer(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      amount: U256 = ALF.alf(1),
+      amount: U256 = ALPH.alph(1),
       numReceivers: Int = 1,
       gasFeeInTheAmount: Boolean = true,
       lockTimeOpt: Option[TimeStamp] = None
@@ -145,7 +146,7 @@ trait FlowFixture
       amount: U256
   ): Block = {
     val unsigned = blockFlow
-      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice)
+      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice, defaultUtxoLimit)
       .rightValue
       .rightValue
     val tx         = Transaction.from(unsigned, from)
@@ -185,7 +186,7 @@ trait FlowFixture
     }
     val unsignedTx =
       blockFlow
-        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice)
+        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice, defaultUtxoLimit)
         .rightValue
         .rightValue
     val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)
@@ -234,7 +235,8 @@ trait FlowFixture
         None,
         amount - defaultGasFee,
         Some(gasAmount),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -248,13 +250,13 @@ trait FlowFixture
     val unlockScript               = UnlockScript.p2pkh(publicKey)
 
     val balances = {
-      val balances = blockFlow.getUsableUtxos(fromLockupScript).rightValue
+      val balances = blockFlow.getUsableUtxos(fromLockupScript, defaultUtxoLimit).rightValue
       balances ++ balances
     }
     balances.length is 2 // this function is used in this particular case
 
     val total  = balances.fold(U256.Zero)(_ addUnsafe _.output.amount)
-    val amount = ALF.alf(1)
+    val amount = ALPH.alph(1)
 
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
@@ -288,7 +290,7 @@ trait FlowFixture
     val privateKey   = keyManager.getOrElse(fromLockupScript, genesisKeys(chainIndex.from.value)._1)
     val publicKey    = privateKey.publicKey
     val unlockScript = UnlockScript.p2pkh(publicKey)
-    val balances     = blockFlow.getUsableUtxos(fromLockupScript).rightValue
+    val balances     = blockFlow.getUsableUtxos(fromLockupScript, defaultUtxoLimit).rightValue
     val inputs       = balances.map(_.ref).map(TxInput(_, unlockScript))
 
     val unsignedTx =
@@ -502,7 +504,7 @@ trait FlowFixture
     val address   = genesisKeys(groupIndex)._2
     val pubScript = LockupScript.p2pkh(address)
     blockFlow
-      .getUsableUtxos(pubScript)
+      .getUsableUtxos(pubScript, defaultUtxoLimit)
       .toOption
       .get
       .sumBy(_.output.amount.v: BigInt) is expected.toBigInt
@@ -513,7 +515,10 @@ trait FlowFixture
       pubScript: LockupScript.Asset,
       expected: U256
   ): Assertion = {
-    blockFlow.getUsableUtxos(pubScript).rightValue.sumBy(_.output.amount.v: BigInt) is expected.v
+    blockFlow
+      .getUsableUtxos(pubScript, defaultUtxoLimit)
+      .rightValue
+      .sumBy(_.output.amount.v: BigInt) is expected.v
   }
 
   def show(blockFlow: BlockFlow): String = {
@@ -539,7 +544,7 @@ trait FlowFixture
   def getBalance(blockFlow: BlockFlow, address: PublicKey): U256 = {
     val lockupScript = LockupScript.p2pkh(address)
     brokerConfig.contains(lockupScript.groupIndex) is true
-    val query = blockFlow.getUsableUtxos(lockupScript)
+    val query = blockFlow.getUsableUtxos(lockupScript, defaultUtxoLimit)
     U256.unsafe(query.rightValue.sumBy(_.output.amount.v: BigInt).underlying())
   }
 
@@ -550,7 +555,7 @@ trait FlowFixture
 
     val address   = genesisKeys(brokerConfig.brokerId)._2
     val pubScript = LockupScript.p2pkh(address)
-    val txOutputs = blockFlow.getUsableUtxos(pubScript).rightValue.map(_.output)
+    val txOutputs = blockFlow.getUsableUtxos(pubScript, defaultUtxoLimit).rightValue.map(_.output)
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 
@@ -613,7 +618,7 @@ trait FlowFixture
       code: StatefulContract,
       initialState: AVector[Val],
       lockupScript: LockupScript.Asset,
-      alfAmount: U256,
+      alphAmount: U256,
       newTokenAmount: Option[U256] = None
   ): StatefulScript = {
     val address  = Address.Asset(lockupScript)
@@ -627,7 +632,7 @@ trait FlowFixture
       s"""
          |TxScript Foo {
          |  pub payable fn main() -> () {
-         |    approveAlf!(@${address.toBase58}, ${alfAmount.v})
+         |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
          |    $creation
          |  }
          |}
@@ -647,7 +652,7 @@ trait FlowFixture
          |""".stripMargin
     val contract = Compiler.compileContract(input).rightValue
     val txScript =
-      contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALF.alf(1))
+      contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALPH.alph(1))
     payableCallTxTemplate(
       blockFlow,
       chainIndex,

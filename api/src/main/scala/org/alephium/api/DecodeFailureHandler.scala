@@ -21,13 +21,13 @@ import sttp.tapir._
 import sttp.tapir.server.interceptor._
 import sttp.tapir.server.interceptor.decodefailure.DefaultDecodeFailureHandler._
 
-import org.alephium.api.{alfJsonBody, ApiError}
+import org.alephium.api.{alphJsonBody, ApiError}
 
 trait DecodeFailureHandler {
 
   def failureResponse(c: StatusCode, hs: List[Header], m: String): ValuedEndpointOutput[_] = {
     ValuedEndpointOutput(
-      statusCode.and(headers).and(alfJsonBody[ApiError.BadRequest]),
+      statusCode.and(headers).and(alphJsonBody[ApiError.BadRequest]),
       (c, hs, ApiError.BadRequest(m))
     )
   }

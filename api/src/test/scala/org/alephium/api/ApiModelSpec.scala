@@ -32,6 +32,7 @@ import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
+  val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
   def entryDummy(i: Int): BlockEntry =
@@ -89,14 +90,14 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Amount.Hint" in {
-    checkData(Amount.Hint(ALF.oneAlf), """"1 ALPH"""", dropWhiteSpace = false)
-    read[Amount.Hint](""""1000000000000000000"""") is Amount.Hint(ALF.oneAlf)
+    checkData(Amount.Hint(ALPH.oneAlph), """"1 ALPH"""", dropWhiteSpace = false)
+    read[Amount.Hint](""""1000000000000000000"""") is Amount.Hint(ALPH.oneAlph)
 
-    val alph = ALF.alf(1234) / 1000
+    val alph = ALPH.alph(1234) / 1000
     checkData(Amount.Hint(alph), """"1.234 ALPH"""", dropWhiteSpace = false)
     read[Amount.Hint](""""1234000000000000000"""") is Amount.Hint(alph)
 
-    val small = ALF.alf(1234) / 1000000000
+    val small = ALPH.alph(1234) / 1000000000
     checkData(Amount.Hint(small), """"0.000001234 ALPH"""", dropWhiteSpace = false)
     read[Amount.Hint](""""1234000000000"""") is Amount.Hint(small)
 
@@ -206,7 +207,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
 
   it should "encode/decode Token" in {
     val id     = Hash.generate
-    val amount = ALF.oneAlf
+    val amount = ALPH.oneAlph
 
     val token: Token = Token(id, amount)
     val jsonRaw =
@@ -283,8 +284,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode Balance" in {
-    val amount   = Amount(ALF.alf(100))
-    val locked   = Amount(ALF.alf(50))
+    val amount   = Amount(ALPH.alph(100))
+    val locked   = Amount(ALPH.alph(50))
     val response = Balance(amount, amount.hint, locked, locked.hint, 1)
     val jsonRaw =
       """{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","utxoNum":1}"""
@@ -332,7 +333,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
-        Some(GasPrice(1))
+        Some(GasPrice(1)),
+        Some(defaultUtxosLimit)
       )
       val jsonRaw = s"""
         |{
@@ -345,7 +347,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |    }
         |  ],
         |  "gas": 1,
-        |  "gasPrice": "1"
+        |  "gasPrice": "1",
+        |  "utxosLimit": 1024
         |}
         """.stripMargin
       checkData(transfer, jsonRaw)
@@ -601,20 +604,22 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val buildContract = BuildContract(
       fromPublicKey = publicKey,
       code = "0000",
+      state = Some("10u"),
+      issueTokenAmount = Some(Amount(1)),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
-      state = Some("10u"),
-      issueTokenAmount = Some(Amount(1))
+      utxosLimit = Some(defaultUtxosLimit)
     )
     val jsonRaw =
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "code": "0000",
+         |  "state": "10u",
+         |  "issueTokenAmount": "1",
          |  "gas": 1,
          |  "gasPrice": "1",
-         |  "state": "10u",
-         |  "issueTokenAmount": "1"
+         |  "utxosLimit": 1024
          |}
          |""".stripMargin
     checkData(buildContract, jsonRaw)
@@ -649,7 +654,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       fromPublicKey = publicKey,
       code = "0000",
       gas = Some(GasBox.unsafe(1)),
-      gasPrice = Some(GasPrice(1))
+      gasPrice = Some(GasPrice(1)),
+      utxosLimit = Some(defaultUtxosLimit)
     )
     val jsonRaw =
       s"""
@@ -657,7 +663,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "code": "0000",
          |  "gas": 1,
-         |  "gasPrice": "1"
+         |  "gasPrice": "1",
+         |  "utxosLimit": 1024
          |}
          |""".stripMargin
     checkData(buildScript, jsonRaw)

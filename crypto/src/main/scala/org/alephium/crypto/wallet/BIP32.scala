@@ -39,7 +39,7 @@ object BIP32 {
 
   def btcMasterKey(seed: ByteString): ExtendedPrivateKey = masterKey("Bitcoin seed", seed)
 
-  def alfMasterKey(seed: ByteString): ExtendedPrivateKey = masterKey("Alephium seed", seed)
+  def alphMasterKey(seed: ByteString): ExtendedPrivateKey = masterKey("Alephium seed", seed)
 
   def isHardened(index: Int): Boolean = index < 0
 

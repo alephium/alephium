@@ -14,18 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol
+package org.alephium.flow.model
 
-import org.alephium.util.{AlephiumSpec, U256}
+import org.alephium.crypto.SecP256K1PrivateKey
+import org.alephium.serde.Serde
+import org.alephium.util.TimeStamp
 
-class ALFSpec extends AlephiumSpec {
-  it should "use correct unit" in {
-    ALF.alf(1) is ALF.nanoAlf(1).mul(U256.Billion).get
-    ALF.alf(1).toBigInt.longValue() is math.pow(10, 18).longValue()
-    ALF.cent(1).mulUnsafe(U256.unsafe(100)) is ALF.alf(1)
+final case class BootstrapInfo(key: SecP256K1PrivateKey, timestamp: TimeStamp)
 
-    ALF.oneAlf is ALF.alf(1)
-    ALF.oneNanoAlf is ALF.nanoAlf(1)
-    ALF.oneAlf is (ALF.oneNanoAlf.mulUnsafe(U256.unsafe(1000000000)))
-  }
+object BootstrapInfo {
+  implicit val serde: Serde[BootstrapInfo] =
+    Serde.forProduct2(BootstrapInfo(_, _), info => (info.key, info.timestamp))
 }

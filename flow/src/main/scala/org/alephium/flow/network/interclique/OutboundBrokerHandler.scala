@@ -43,7 +43,7 @@ object OutboundBrokerHandler {
     Props(
       new OutboundBrokerHandler(
         selfCliqueInfo,
-        remoteBroker.address,
+        remoteBroker,
         blockflow,
         allHandlers,
         cliqueManager,
@@ -55,11 +55,24 @@ object OutboundBrokerHandler {
 
 class OutboundBrokerHandler(
     val selfCliqueInfo: CliqueInfo,
-    val remoteAddress: InetSocketAddress,
+    val expectedRemoteBroker: BrokerInfo,
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseOutboundBrokerHandler
-    with BrokerHandler
+    with BrokerHandler {
+  val remoteAddress: InetSocketAddress = expectedRemoteBroker.address
+
+  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
+    if (remoteBrokerInfo == expectedRemoteBroker) {
+      super.handleHandshakeInfo(remoteBrokerInfo)
+    } else {
+      log.debug(
+        s"Remote broker has different broker info: expected: $expectedRemoteBroker, actual: $remoteBrokerInfo"
+      )
+      context.stop(self)
+    }
+  }
+}

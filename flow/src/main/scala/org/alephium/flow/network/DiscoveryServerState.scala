@@ -29,7 +29,7 @@ import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfi
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Cache, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait DiscoveryServerState extends SessionManager {
@@ -142,8 +142,10 @@ trait DiscoveryServerState extends SessionManager {
   def setUnreachable(remote: InetSocketAddress): Unit = {
     val remoteInet = remote.getAddress
     unreachables.get(remoteInet) match {
-      case Some(until) => unreachables.put(remoteInet, until + Duration.ofMinutesUnsafe(1))
-      case None        => unreachables.put(remoteInet, TimeStamp.now().plusMinutesUnsafe(1))
+      case Some(until) =>
+        unreachables.put(remoteInet, until + discoveryConfig.unreachableDuration)
+      case None =>
+        unreachables.put(remoteInet, TimeStamp.now() + discoveryConfig.unreachableDuration)
     }
     remove(remote)
   }
@@ -175,10 +177,22 @@ trait DiscoveryServerState extends SessionManager {
     toRemove.foreach(unreachables.remove)
   }
 
+  def getCliqueNumPerIp(target: BrokerInfo): Int = {
+    table.values.view
+      .filter(_.info.isFromSameIp(target))
+      .map(_.info.cliqueId)
+      .toSet
+      .size
+  }
+
   def appendPeer(peerInfo: BrokerInfo): Unit = {
-    log.info(s"Adding a new peer: $peerInfo")
-    table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
-    publishNewPeer(peerInfo)
+    if (getCliqueNumPerIp(peerInfo) < discoveryConfig.maxCliqueFromSameIp) {
+      log.info(s"Adding a new peer: $peerInfo")
+      table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+      publishNewPeer(peerInfo)
+    } else {
+      log.debug(s"Too many cliques from a same IP: $peerInfo")
+    }
   }
 
   def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {

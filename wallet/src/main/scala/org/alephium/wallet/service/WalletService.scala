@@ -80,14 +80,16 @@ trait WalletService extends Service {
       wallet: String,
       destinations: AVector[Destination],
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def sweepAll(
       wallet: String,
       address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
   ): Future[Either[WalletError, (Hash, Int, Int)]]
   def sign(
       wallet: String,
@@ -110,15 +112,16 @@ object WalletService {
   object WalletError {
     def from(error: SecretStorage.Error): WalletError =
       error match {
-        case SecretStorage.Locked                   => WalletLocked
-        case SecretStorage.CannotDeriveKey          => UnexpectedError
-        case SecretStorage.CannotParseFile          => InvalidWalletFile
-        case SecretStorage.SecretFileError          => InvalidWalletFile
-        case SecretStorage.SecretFileAlreadyExists  => InvalidWalletFile
-        case SecretStorage.CannotDecryptSecret      => InvalidPassword
-        case SecretStorage.InvalidState             => UnexpectedError
-        case SecretStorage.UnknownKey               => UnexpectedError
-        case SecretStorage.SecretFileNotFound(file) => WalletNotFound(file)
+        case SecretStorage.Locked                    => WalletLocked
+        case SecretStorage.CannotDeriveKey           => UnexpectedError
+        case SecretStorage.CannotParseFile           => InvalidWalletFile
+        case SecretStorage.SecretFileError           => InvalidWalletFile
+        case SecretStorage.SecretFileAlreadyExists   => InvalidWalletFile
+        case SecretStorage.CannotDecryptSecret       => InvalidPassword
+        case SecretStorage.InvalidState              => UnexpectedError
+        case SecretStorage.UnknownKey                => UnexpectedError
+        case SecretStorage.SecretFileNotFound(file)  => WalletNotFound(file)
+        case SecretStorage.InvalidMnemonicPassphrase => InvalidMnemonicPassphrase
       }
   }
 
@@ -140,6 +143,10 @@ object WalletService {
 
   case object InvalidPassword extends WalletError {
     val message: String = s"Invalid password"
+  }
+
+  case object InvalidMnemonicPassphrase extends WalletError {
+    val message: String = "Invalid mnemonic passphrase"
   }
 
   case object MinerWalletRequired extends WalletError {
@@ -348,12 +355,13 @@ object WalletService {
         wallet: String,
         destinations: AVector[Destination],
         gas: Option[GasBox],
-        gasPrice: Option[GasPrice]
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareTransaction(pubKey, destinations, gas, gasPrice)
+          .prepareTransaction(pubKey, destinations, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>
@@ -371,12 +379,13 @@ object WalletService {
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
-        gasPrice: Option[GasPrice]
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
     ): Future[Either[WalletError, (Hash, Int, Int)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
-          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice)
+          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
             case Right(buildTxResult) =>

@@ -17,13 +17,12 @@
 package org.alephium.flow.network.udp
 
 import java.net.InetSocketAddress
-import java.nio.channels.UnresolvedAddressException
 
-import akka.testkit.{SocketUtil, TestActorRef}
+import akka.testkit.{EventFilter, SocketUtil, TestActorRef}
 import akka.util.ByteString
 
 import org.alephium.crypto.Blake2b
-import org.alephium.util.AlephiumActorSpec
+import org.alephium.util.{AlephiumActorSpec}
 
 class UdpServerSpec extends AlephiumActorSpec {
   it should "read and write messages" in new Fixture {
@@ -45,11 +44,16 @@ class UdpServerSpec extends AlephiumActorSpec {
     val message        = ByteString.fromString("alephium")
     val remote         = new InetSocketAddress(s"www.${Blake2b.generate.toHexString}.io", 9973)
     val send           = UdpServer.Send(message, remote)
-    udpServer ! send
-    expectMsgPF() { case UdpServer.SendFailed(command, e) =>
-      command is send
-      e is a[UnresolvedAddressException]
-    }
+
+    EventFilter
+      .warning(
+        message =
+          s"Failed in sending data to $remote: java.nio.channels.UnresolvedAddressException",
+        occurrences = 1
+      )
+      .intercept {
+        udpServer ! send
+      }
   }
 
   trait Fixture {

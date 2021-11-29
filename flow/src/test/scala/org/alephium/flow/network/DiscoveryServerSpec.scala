@@ -25,11 +25,12 @@ import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
+import org.alephium.flow.network.DiscoveryServer.NeighborPeers
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.protocol._
-import org.alephium.protocol.config._
-import org.alephium.protocol.model._
-import org.alephium.util._
+import org.alephium.protocol.*
+import org.alephium.protocol.config.*
+import org.alephium.protocol.model.*
+import org.alephium.util.*
 
 class DiscoveryServerSpec
     extends AlephiumActorSpec
@@ -78,10 +79,12 @@ class DiscoveryServerSpec
           val brokerNum: Int = clique.brokerNum
           val groups: Int    = fixture.groups
 
-          val scanFrequency: Duration     = Duration.ofMillisUnsafe(2000)
-          val scanFastFrequency: Duration = Duration.ofMillisUnsafe(2000)
-          val fastScanPeriod: Duration    = Duration.ofMinutesUnsafe(1)
-          val neighborsPerGroup: Int      = 20
+          val scanFrequency: Duration          = Duration.ofMillisUnsafe(2000)
+          val scanFastFrequency: Duration      = Duration.ofMillisUnsafe(2000)
+          val fastScanPeriod: Duration         = Duration.ofMinutesUnsafe(1)
+          val initialDiscoveryPeriod: Duration = Duration.ofSecondsUnsafe(2)
+          val neighborsPerGroup: Int           = 20
+          val maxCliqueFromSameIp: Int         = 100
         }
         (brokerInfo, config)
       }
@@ -191,6 +194,13 @@ class DiscoveryServerSpec
         cliqueInfo0.interBrokers.get.head
       )
     }
+  }
+
+  it should "publish neighbors" in new Fixture {
+    val probe = TestProbe()
+    system.eventStream.subscribe(probe.ref, classOf[NeighborPeers])
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    probe.expectMsg(Duration.ofSecondsUnsafe(3).asScala, NeighborPeers(AVector.empty))
   }
 
   trait UnreachableFixture extends Fixture {
@@ -311,10 +321,12 @@ object DiscoveryServerSpec {
     val publicAddress: InetSocketAddress = new InetSocketAddress("127.0.0.1", port)
     val discoveryConfig = new DiscoveryConfig with BrokerConfig {
 
-      val scanFrequency: Duration     = _scanFrequency
-      val scanFastFrequency: Duration = _scanFrequency
-      val fastScanPeriod: Duration    = _scanFastPeriod
-      val neighborsPerGroup: Int      = _peersPerGroup
+      val scanFrequency: Duration          = _scanFrequency
+      val scanFastFrequency: Duration      = _scanFrequency
+      val fastScanPeriod: Duration         = _scanFastPeriod
+      val initialDiscoveryPeriod: Duration = Duration.ofSecondsUnsafe(2)
+      val neighborsPerGroup: Int           = _peersPerGroup
+      val maxCliqueFromSameIp: Int         = 2
 
       override lazy val expireDuration: Duration = _expireDuration
       override val peersTimeout: Duration        = _peersTimeout

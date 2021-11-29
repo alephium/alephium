@@ -76,12 +76,12 @@ class BlockHeaderSpec
   }
 
   it should "handle version properly" in {
-    defaultBlockVersion is 0.toByte
+    DefaultBlockVersion is 0.toByte
 
     val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
     genesis.version is 0.toByte
 
-    val header = genesis.copy(version = defaultBlockVersion)
+    val header = genesis.copy(version = DefaultBlockVersion)
     header.version is 0.toByte
   }
 
@@ -96,7 +96,7 @@ class BlockHeaderSpec
 
     val nonce1 = Nonce.zero
     val header1 = BlockHeader(
-      version = defaultBlockVersion,
+      version = DefaultBlockVersion,
       blockDeps = BlockDeps.unsafe(AVector.fill(groupConfig.depsNum)(BlockHash.zero)),
       depStateHash =
         Hash.unsafe(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9"),
@@ -116,7 +116,7 @@ class BlockHeaderSpec
 
     val nonce2 = Nonce.unsafe(U256.Two.toBytes.takeRight(Nonce.byteLength))
     val header2 = BlockHeader(
-      version = defaultBlockVersion,
+      version = DefaultBlockVersion,
       blockDeps = BlockDeps.build(
         deps = AVector(
           Blake3.unsafe(hex"1b08f56d011b4d1ad498064e21cdcb07ac6a28bc3831be97d96034708de50e07"),

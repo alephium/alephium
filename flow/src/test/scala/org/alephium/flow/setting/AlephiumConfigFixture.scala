@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import org.alephium.protocol.{ALF, PrivateKey, PublicKey}
+import org.alephium.protocol.{ALPH, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.{AVector, Duration, Env, Number, U256}
@@ -29,16 +29,21 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
 
   val configValues: Map[String, Any] = Map.empty
 
-  val genesisBalance: U256 = ALF.alf(Number.million)
+  val genesisBalance: U256 = ALPH.alph(Number.million)
 
   lazy val env      = Env.resolve()
   lazy val rootPath = Platform.getRootPath(env)
 
-  lazy val newConfig = ConfigFactory
-    .parseMap(
-      (configPortsValues ++ configValues).view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava
-    )
-    .withFallback(Configs.parseConfig(rootPath, overwrite = true))
+  lazy val newConfig = {
+    val predefined = ConfigFactory
+      .parseMap(
+        (configPortsValues ++ configValues).view
+          .mapValues(ConfigValueFactory.fromAnyRef)
+          .toMap
+          .asJava
+      )
+    Configs.parseConfig(Env.currentEnv, rootPath, overwrite = true, predefined)
+  }
 
   lazy val groups0 = newConfig.getInt("alephium.broker.groups")
 
@@ -56,7 +61,7 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
       .load(newConfig)
 
     val allocations = genesisKeys.map { case (_, pubKey, amount) =>
-      Allocation(Address.p2pkh(pubKey), amount, Duration.zero)
+      Allocation(Address.p2pkh(pubKey), Allocation.Amount(amount), Duration.zero)
     }
     tmp.copy(genesis = GenesisSetting(allocations))
   }

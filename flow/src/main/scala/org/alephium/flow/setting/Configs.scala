@@ -17,7 +17,7 @@
 package org.alephium.flow.setting
 
 import java.io.File
-import java.nio.file.Path
+import java.nio.file.{Files => JFiles, Path}
 
 import scala.util.control.Exception.allCatch
 
@@ -71,12 +71,11 @@ object Configs extends StrictLogging {
     path.toFile
   }
 
-  def getConfigNetwork(rootPath: Path, networkId: NetworkId, overwrite: Boolean): File =
-    getConfigTemplate(rootPath, "network", s"network_${networkId.networkType}", overwrite)
+  def getConfigNetwork(nodePath: Path, networkId: NetworkId, overwrite: Boolean): File =
+    getConfigTemplate(nodePath, "network", s"network_${networkId.networkType}", overwrite)
 
-  def getConfigSystem(rootPath: Path, overwrite: Boolean): File = {
-    val env = Env.currentEnv.name
-    getConfigTemplate(rootPath, "system", s"system_$env", overwrite)
+  def getConfigSystem(env: Env, nodePath: Path, overwrite: Boolean): File = {
+    getConfigTemplate(nodePath, "system", s"system_${env.name}", overwrite)
   }
 
   def getConfigUser(rootPath: Path): File = {
@@ -87,33 +86,62 @@ object Configs extends StrictLogging {
 
   def parseConfigFile(file: File): Either[String, Config] =
     try {
-      Right(ConfigFactory.parseFile(file))
+      if (file.exists()) {
+        Right(ConfigFactory.parseFile(file))
+      } else {
+        Right(ConfigFactory.empty())
+      }
     } catch {
       case e: ConfigException =>
         Left(s"Cannot parse config file: $file, exception: $e")
     }
 
-  def parseNetworkId(rootPath: Path, config: Config): Either[String, NetworkId] = {
-    if (!config.hasPath("alephium.network.network-id")) {
-      Left(s"""|The network-id isn't configed!
-               |
-               |Please set the network-id in your $rootPath/user.conf and try again.
-               |
-               |Example:
-               |alephium.network.network-id = 1 // 0 for alepium mainnet, 1 for alephium testnet
-          """.stripMargin)
+  def parseNetworkId(config: Config): Either[String, NetworkId] = {
+    val keyPath = "alephium.network.network-id"
+    if (!config.hasPath(keyPath)) {
+      Right(NetworkId.AlephiumMainNet)
     } else {
-      val id = config.getInt("alephium.network.network-id")
+      val id = config.getInt(keyPath)
       NetworkId.from(id).toRight(s"Invalid chain id: $id")
     }
   }
 
-  def parseConfig(rootPath: Path, overwrite: Boolean): Config = {
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def checkRootPath(rootPath: Path, networkId: NetworkId): Either[String, Unit] = {
+    if (rootPath.toString.contains("mainnet") && networkId != NetworkId.AlephiumMainNet) {
+      Left("The network is not mainnet, but the path contains mainnet")
+    } else {
+      Right(())
+    }
+  }
+
+  def getNodePath(rootPath: Path, networkId: NetworkId): Path = {
+    val nodePath = rootPath.resolve(networkId.nodeFolder)
+    if (!JFiles.exists(nodePath)) {
+      nodePath.toFile.mkdir()
+    }
+    nodePath
+  }
+
+  def updateGenesis(networkId: NetworkId, networkConfig: Config): Config = {
+    if (networkId == NetworkId.AlephiumMainNet) {
+      val genesisResource = this.getClass.getResource("/mainnet_genesis.conf")
+      val genesis         = ConfigFactory.parseURL(genesisResource)
+      networkConfig.withFallback(genesis)
+    } else {
+      networkConfig
+    }
+  }
+
+  def parseConfig(env: Env, rootPath: Path, overwrite: Boolean, predefined: Config): Config = {
     val resultEither = for {
-      userConfig    <- parseConfigFile(getConfigUser(rootPath))
-      systemConfig  <- parseConfigFile(getConfigSystem(rootPath, overwrite))
-      networkType   <- parseNetworkId(rootPath, userConfig.withFallback(systemConfig).resolve())
-      networkConfig <- parseConfigFile(getConfigNetwork(rootPath, networkType, overwrite))
+      userConfig <- parseConfigFile(getConfigUser(rootPath)).map(predefined.withFallback(_))
+      networkId  <- parseNetworkId(userConfig)
+      _          <- checkRootPath(rootPath, networkId)
+      nodePath = getNodePath(rootPath, networkId)
+      systemConfig   <- parseConfigFile(getConfigSystem(env, nodePath, overwrite))
+      _networkConfig <- parseConfigFile(getConfigNetwork(nodePath, networkId, overwrite))
+      networkConfig = updateGenesis(networkId, _networkConfig)
     } yield userConfig.withFallback(networkConfig.withFallback(systemConfig)).resolve()
     resultEither match {
       case Right(config) => config
@@ -123,8 +151,8 @@ object Configs extends StrictLogging {
     }
   }
 
-  def parseConfigAndValidate(rootPath: Path, overwrite: Boolean): Config = {
-    val config = parseConfig(rootPath, overwrite)
+  def parseConfigAndValidate(env: Env, rootPath: Path, overwrite: Boolean): Config = {
+    val config = parseConfig(env, rootPath, overwrite, ConfigFactory.empty())
     if (!config.hasPath("alephium.discovery.bootstrap")) {
       logger.error(s"""|The bootstrap nodes are not defined!
                        |
@@ -165,7 +193,7 @@ object Configs extends StrictLogging {
         val balancesOI = balances
           .filter(_.address.lockupScript.groupIndex.value == from)
           .map(allocation =>
-            (allocation.address.lockupScript, allocation.amount, allocation.lockDuration)
+            (allocation.address.lockupScript, allocation.amount.value, allocation.lockDuration)
           )
         val transaction = Transaction.genesis(balancesOI, networkConfig.noPreMineProof)
         AVector(transaction)

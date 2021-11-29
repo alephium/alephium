@@ -29,6 +29,10 @@ final case class HashRate private (value: BigInteger) extends AnyVal with Ordere
   def multiply(n: Long): HashRate = HashRate.unsafe(value.multiply(BigInteger.valueOf(n)))
 
   def subtractUnsafe(another: HashRate): HashRate = HashRate.unsafe(value.subtract(another.value))
+
+  // scalastyle:off magic.number
+  def MHs: String = s"${value.divide(BigInteger.valueOf(1000000))} MH/s"
+  // scalastyle:on magic.number
 }
 
 object HashRate {

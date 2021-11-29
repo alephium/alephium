@@ -16,7 +16,7 @@
 
 package org.alephium.flow.setting
 
-import org.alephium.util.SocketUtil
+import org.alephium.util.{Env, SocketUtil}
 
 trait RandomPortsConfigFixture extends SocketUtil {
   private val publicPort   = generatePort()
@@ -25,13 +25,21 @@ trait RandomPortsConfigFixture extends SocketUtil {
   private val wsPort       = generatePort()
   private val minerApiPort = generatePort()
 
-  lazy val configPortsValues: Map[String, Any] = Map(
-    ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
-    ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
-    ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
-    ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
-    ("alephium.network.rest-port", restPort),
-    ("alephium.network.ws-port", wsPort),
-    ("alephium.network.miner-api-port", minerApiPort)
-  )
+  lazy val configPortsValues: Map[String, Any] = {
+    val networkId = Env.currentEnv match {
+      case Env.Integration => 1
+      case Env.Test        => 2
+      case _               => throw new RuntimeException("Invalid test env")
+    }
+    Map(
+      ("alephium.network.network-id", networkId),
+      ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
+      ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
+      ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
+      ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
+      ("alephium.network.rest-port", restPort),
+      ("alephium.network.ws-port", wsPort),
+      ("alephium.network.miner-api-port", minerApiPort)
+    )
+  }
 }

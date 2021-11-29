@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.minimalGasPrice
 import org.alephium.util.{AlephiumSpec, NumericHelpers}
 
@@ -24,7 +24,7 @@ class GasPriceSpec extends AlephiumSpec with NumericHelpers {
   it should "validate gas price bounds" in {
     GasPrice.validate(minimalGasPrice) is true
     GasPrice.validate(GasPrice(minimalGasPrice.value - 1)) is false
-    GasPrice.validate(GasPrice(ALF.MaxALFValue)) is false
-    GasPrice.validate(GasPrice(ALF.MaxALFValue - 1)) is true
+    GasPrice.validate(GasPrice(ALPH.MaxALPHValue)) is false
+    GasPrice.validate(GasPrice(ALPH.MaxALPHValue - 1)) is true
   }
 }

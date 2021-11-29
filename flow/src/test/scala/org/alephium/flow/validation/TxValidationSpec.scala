@@ -26,7 +26,7 @@ import org.scalatest.EitherValues._
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALF, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -79,11 +79,14 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def prepareOutput(lockup: LockupScript.Asset, unlock: UnlockScript) = {
       val group                 = lockup.groupIndex
       val (genesisPriKey, _, _) = genesisKeys(group.value)
-      val block                 = transfer(blockFlow, genesisPriKey, lockup, ALF.alf(2))
-      val output                = AVector(TxOutputInfo(lockup, ALF.alf(1), AVector.empty, None))
+      val block                 = transfer(blockFlow, genesisPriKey, lockup, ALPH.alph(2))
+      val output                = AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
       addAndCheck(blockFlow, block)
 
-      blockFlow.transfer(lockup, unlock, output, None, defaultGasPrice).rightValue.rightValue
+      blockFlow
+        .transfer(lockup, unlock, output, None, defaultGasPrice, defaultUtxoLimit)
+        .rightValue
+        .rightValue
     }
 
     def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
@@ -116,15 +119,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
 
     implicit class RichTx(tx: Transaction) {
-      def addAlfAmount(delta: U256): Transaction = {
-        updateAlfAmount(_ + delta)
+      def addAlphAmount(delta: U256): Transaction = {
+        updateAlphAmount(_ + delta)
       }
 
-      def zeroAlfAmount(): Transaction = {
-        updateAlfAmount(_ => 0)
+      def zeroAlphAmount(): Transaction = {
+        updateAlphAmount(_ => 0)
       }
 
-      def updateAlfAmount(f: U256 => U256): Transaction = {
+      def updateAlphAmount(f: U256 => U256): Transaction = {
         updateRandomFixedOutputs(output => output.copy(amount = f(output.amount)))
       }
 
@@ -237,8 +240,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   behavior of "Stateless Validation"
 
+  it should "check tx version" in new Fixture {
+    implicit val validator = nestedValidator(checkVersion)
+
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    val block      = transfer(blockFlow, chainIndex)
+    val tx         = block.nonCoinbase.head
+    tx.pass()
+
+    tx.unsigned.version is DefaultTxVersion
+    tx.unsigned.version isnot Byte.MaxValue
+    val invalidTx = tx.updateUnsigned(_.copy(version = Byte.MaxValue))
+    invalidTx.fail(InvalidTxVersion)
+  }
+
   it should "check network Id" in new Fixture {
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = nestedValidator(checkVersion)
 
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     val block      = transfer(blockFlow, chainIndex)
@@ -254,11 +271,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx    = transactionGen().sample.get
     val input = tx.unsigned.inputs.head
 
-    val modified0         = tx.inputs(AVector.fill(ALF.MaxTxInputNum)(input))
-    val modified1         = tx.inputs(AVector.fill(ALF.MaxTxInputNum + 1)(input))
+    val modified0         = tx.inputs(AVector.fill(ALPH.MaxTxInputNum)(input))
+    val modified1         = tx.inputs(AVector.fill(ALPH.MaxTxInputNum + 1)(input))
     val contractOutputRef = ContractOutputRef.unsafe(Hint.unsafe(1), Hash.zero)
     val modified2         = tx.copy(contractInputs = AVector(contractOutputRef))
-    val modified3         = tx.copy(contractInputs = AVector.fill(ALF.MaxTxInputNum + 1)(contractOutputRef))
+    val modified3 =
+      tx.copy(contractInputs = AVector.fill(ALPH.MaxTxInputNum + 1)(contractOutputRef))
 
     {
       implicit val validator = checkInputNum(_, isIntraGroup = false)
@@ -293,10 +311,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val output = tx.unsigned.fixedOutputs.head
     tx.generatedOutputs.isEmpty is true
 
-    val maxGeneratedOutputsNum = ALF.MaxTxOutputNum - tx.outputsLength
+    val maxGeneratedOutputsNum = ALPH.MaxTxOutputNum - tx.outputsLength
 
-    val modified0 = tx.fixedOutputs(AVector.fill(ALF.MaxTxOutputNum)(output))
-    val modified1 = tx.fixedOutputs(AVector.fill(ALF.MaxTxOutputNum + 1)(output))
+    val modified0 = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNum)(output))
+    val modified1 = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNum + 1)(output))
     val modified2 = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputsNum)(output))
     val modified3 = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputsNum + 1)(output))
 
@@ -319,6 +337,28 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
+  it should "check the number of script signatures" in new Fixture {
+    val tx        = transactionGen().sample.get
+    val signature = Signature.generate
+    val modified0 = tx.copy(scriptSignatures = AVector.empty)
+    val modified1 = tx.copy(scriptSignatures = AVector.fill(ALPH.MaxScriptSigNum)(signature))
+    val modified2 = tx.copy(scriptSignatures = AVector.fill(ALPH.MaxScriptSigNum + 1)(signature))
+
+    {
+      implicit val validator = checkScriptSigNum(_, isIntraGroup = true)
+      modified0.pass()
+      modified1.pass()
+      modified2.fail(TooManyScriptSignatures)
+    }
+
+    {
+      implicit val validator = checkScriptSigNum(_, isIntraGroup = false)
+      modified0.pass()
+      modified1.fail(UnexpectedScriptSignatures)
+      modified2.fail(UnexpectedScriptSignatures)
+    }
+  }
+
   it should "check gas bounds" in new Fixture {
     implicit val validator = checkGasBound
 
@@ -335,25 +375,25 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
     tx.gasPrice(minimalGasPrice).pass()
     tx.gasPrice(GasPrice(minimalGasPrice.value - 1)).fail(InvalidGasPrice)
-    tx.gasPrice(GasPrice(ALF.MaxALFValue - 1)).pass()
-    tx.gasPrice(GasPrice(ALF.MaxALFValue)).fail(InvalidGasPrice)
+    tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
+    tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
   }
 
-  it should "check ALF balance stats" in new Fixture {
+  it should "check ALPH balance stats" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, _) =>
       implicit val validator = checkOutputStats
 
       // balance overflow
-      val alfAmount = tx.alfAmountInOutputs.value
-      val delta     = U256.MaxValue - alfAmount + 1
-      tx.addAlfAmount(delta).fail(BalanceOverFlow)
+      val alphAmount = tx.alphAmountInOutputs.value
+      val delta      = U256.MaxValue - alphAmount + 1
+      tx.addAlphAmount(delta).fail(BalanceOverFlow)
 
       // zero amount
-      tx.zeroAlfAmount().fail(InvalidOutputStats)
+      tx.zeroAlphAmount().fail(InvalidOutputStats)
 
       // dust amount
-      tx.updateAlfAmount(_ => dustUtxoAmount).pass()
-      tx.updateAlfAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
+      tx.updateAlphAmount(_ => dustUtxoAmount).pass()
+      tx.updateAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
     }
   }
 
@@ -427,8 +467,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check output data size" in new Fixture {
-    val oversizedData = ByteString.fromArrayUnsafe(Array.fill(ALF.MaxOutputDataSize + 1)(0))
-    oversizedData.length is ALF.MaxOutputDataSize + 1
+    val oversizedData = ByteString.fromArrayUnsafe(Array.fill(ALPH.MaxOutputDataSize + 1)(0))
+    oversizedData.length is ALPH.MaxOutputDataSize + 1
 
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       implicit val validator = nestedValidator(checkOutputDataSize, preOutputs)
@@ -473,22 +513,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
-  it should "test both ALF and token balances" in new Fixture {
+  it should "test both ALPH and token balances" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      checkAlfBalance(tx, preOutputs.map(_.referredOutput), None).pass()
+      checkAlphBalance(tx, preOutputs.map(_.referredOutput), None).pass()
       checkTokenBalance(tx, preOutputs.map(_.referredOutput)).pass()
       checkBlockTx(tx, preOutputs).pass()
     }
   }
 
-  it should "validate ALF balances" in new Fixture {
+  it should "validate ALPH balances" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       implicit val validator = nestedValidator(
-        checkAlfBalance(_, preOutputs.map(_.referredOutput), None),
+        checkAlphBalance(_, preOutputs.map(_.referredOutput), None),
         preOutputs
       )
 
-      tx.addAlfAmount(1).fail(InvalidAlfBalance)
+      tx.addAlphAmount(1).fail(InvalidAlphBalance)
     }
   }
 
@@ -581,7 +621,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
       val signaturesNew    = tx.inputSignatures.replace(sampleIndex, Signature.generate)
       tx.copy(inputSignatures = signaturesNew).fail(InvalidSignature)
-      tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures).fail(TooManySignatures)
+      tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures)
+        .fail(TooManyInputSignatures)
       tx.copy(inputSignatures = tx.inputSignatures.init).fail(NotEnoughSignature)
     }
   }
@@ -607,7 +648,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx2 = tx1.copy(inputSignatures = tx1.inputSignatures ++ tx1.inputSignatures)
     tx2.unsigned.inputs.length is 2
     tx2.inputSignatures.length is 2
-    tx2.fail(TooManySignatures)
+    tx2.fail(TooManyInputSignatures)
   }
 
   behavior of "lockup script"

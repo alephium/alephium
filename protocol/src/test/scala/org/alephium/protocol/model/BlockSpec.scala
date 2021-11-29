@@ -135,7 +135,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         U256.Zero,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
-        ALF.LaunchTimestamp
+        ALPH.LaunchTimestamp
       )
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
@@ -272,7 +272,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
          |TxScript Main {
          | pub payable fn main() -> () {
          |   verifyTxSignature!(#${pubKey2.toHexString})
-         |   transferAlfFromSelf!(@$address, 5)
+         |   transferAlphFromSelf!(@$address, 5)
          | }
          |}
          |""".stripMargin

@@ -48,7 +48,7 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
   it should "serde message" in {
 
     payload.length is 2
-    header.length is 2
+    header.length is 4
 
     serialized.length is (payload.length + header.length + additionalLength)
 

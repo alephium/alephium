@@ -23,7 +23,7 @@ import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.{ALF, BlockHash}
+import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.Weight
 import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
@@ -61,11 +61,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   protected def addGenesis(hash: BlockHash): IOResult[Unit] = {
     assume(hash == genesisHash)
-    val genesisState = BlockState(ALF.GenesisHeight, ALF.GenesisWeight)
+    val genesisState = BlockState(ALPH.GenesisHeight, ALPH.GenesisWeight)
     for {
       _ <- blockStateStorage.put(genesisHash, genesisState)
-      _ <- updateHeightIndex(genesisHash, ALF.GenesisHeight, true)
-      _ <- setGenesisState(genesisHash, ALF.GenesisTimestamp)
+      _ <- updateHeightIndex(genesisHash, ALPH.GenesisHeight, true)
+      _ <- setGenesisState(genesisHash, ALPH.GenesisTimestamp)
     } yield ()
   }
 
@@ -104,11 +104,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def maxHeightUnsafe: Int = {
     val (maxHeight, _) =
-      tips.keys().foldLeft((ALF.GenesisHeight, ALF.GenesisWeight)) { case ((height, weight), tip) =>
-        getStateUnsafe(tip) match {
-          case BlockState(tipHeight, tipWeight) =>
-            if (tipWeight > weight) (tipHeight, tipWeight) else (height, weight)
-        }
+      tips.keys().foldLeft((ALPH.GenesisHeight, ALPH.GenesisWeight)) {
+        case ((height, weight), tip) =>
+          getStateUnsafe(tip) match {
+            case BlockState(tipHeight, tipWeight) =>
+              if (tipWeight > weight) (tipHeight, tipWeight) else (height, weight)
+          }
       }
 
     maxHeight
@@ -199,7 +200,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def getPredecessor(hash: BlockHash, height: Int): IOResult[BlockHash] = {
-    assume(height >= ALF.GenesisHeight)
+    assume(height >= ALPH.GenesisHeight)
     @tailrec
     def iter(currentHash: BlockHash, currentHeight: Int): IOResult[BlockHash] = {
       if (currentHeight == height) {
@@ -233,7 +234,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       oldHash: BlockHash,
       oldHeight: Int
   ): IOResult[AVector[BlockHash]] = {
-    assume(oldHeight >= ALF.GenesisHeight)
+    assume(oldHeight >= ALPH.GenesisHeight)
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def iter(
         acc: AVector[BlockHash],

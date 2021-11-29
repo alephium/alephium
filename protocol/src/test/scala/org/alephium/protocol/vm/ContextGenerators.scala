@@ -62,15 +62,13 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       signatures: AVector[Signature] = AVector.empty
   ): StatefulContext = {
     val txEnv = genTxEnv(scriptOpt, signatures)
-    StatefulContext
-      .build(
-        genBlockEnv(),
-        txEnv.tx,
-        gasLimit,
-        cachedWorldState.staging(),
-        Some(txEnv.prevOutputs)
-      )
-      .rightValue
+    StatefulContext(
+      genBlockEnv(),
+      txEnv,
+      cachedWorldState.staging(),
+      txEnv.prevOutputs,
+      gasLimit
+    )
   }
 
   def prepareStatefulScript(

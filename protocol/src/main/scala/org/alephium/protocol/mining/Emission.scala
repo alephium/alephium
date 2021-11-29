@@ -18,7 +18,7 @@ package org.alephium.protocol.mining
 
 import java.math.BigInteger
 
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{Duration, Math, TimeStamp, U256}
@@ -45,7 +45,7 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
 
   val yearlyCentsDropUntilStable: Long = initialMaxRewardPerChain
     .subUnsafe(stableMaxRewardPerChain)
-    .divUnsafe(ALF.cent(1))
+    .divUnsafe(ALPH.cent(1))
     .divUnsafe(U256.unsafe(yearsUntilStable))
     .toBigInt
     .longValue()
@@ -56,7 +56,7 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
     amount.divUnsafe(U256.unsafe(groupConfig.chainNum))
 
   def reward(header: BlockHeader): Emission.RewardType =
-    reward(header.target, header.timestamp, ALF.LaunchTimestamp)
+    reward(header.target, header.timestamp, ALPH.LaunchTimestamp)
 
   def reward(powTarget: Target, blockTs: TimeStamp, launchTs: TimeStamp): Emission.RewardType = {
     val timeBasedReward = rewardWrtTime(blockTs, launchTs)
@@ -82,7 +82,7 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
     } else if (elapsed >= durationToStableMaxReward) {
       stableMaxRewardPerChain
     } else {
-      val reducedCents = ALF.cent(elapsed.millis / durationToDropAboutOnceCent.millis)
+      val reducedCents = ALPH.cent(elapsed.millis / durationToDropAboutOnceCent.millis)
       initialMaxRewardPerChain.subUnsafe(reducedCents)
     }
   }
@@ -178,10 +178,10 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
   // scalastyle:off magic.number
   def rewardsWrtTime(): IndexedSeq[(Int, U256)] = {
     (0 to yearsUntilNoReward).map { k =>
-      val time0          = ALF.LaunchTimestamp.plusHoursUnsafe((k * 24 * 365).toLong)
-      val time1          = ALF.LaunchTimestamp.plusHoursUnsafe(((k + 1) * 24 * 365).toLong)
-      val reward0        = rewardWrtTime(time0, ALF.LaunchTimestamp)
-      val reward1        = rewardWrtTime(time1, ALF.LaunchTimestamp)
+      val time0          = ALPH.LaunchTimestamp.plusHoursUnsafe((k * 24 * 365).toLong)
+      val time1          = ALPH.LaunchTimestamp.plusHoursUnsafe(((k + 1) * 24 * 365).toLong)
+      val reward0        = rewardWrtTime(time0, ALPH.LaunchTimestamp)
+      val reward1        = rewardWrtTime(time1, ALPH.LaunchTimestamp)
       val rewardPerChain = reward0.addUnsafe(reward1).divUnsafe(U256.Two)
       val rewardsPerYear = calRewardsPerYear(rewardPerChain)
       (k + 1) -> rewardsPerYear
@@ -205,8 +205,8 @@ object Emission {
     new Emission(blockTargetTime)(groupConfig)
 
   //scalastyle:off magic.number
-  private[mining] val initialMaxReward: U256         = ALF.alf(60)
-  private[mining] val stableMaxReward: U256          = ALF.alf(20)
+  private[mining] val initialMaxReward: U256         = ALPH.alph(60)
+  private[mining] val stableMaxReward: U256          = ALPH.alph(20)
   private[mining] val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
 
   val yearsUntilStable: Int   = 4

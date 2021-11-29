@@ -27,7 +27,7 @@ import akka.actor.Props
 import akka.dispatch.{RequiresMessageQueue, UnboundedMessageQueueSemantics}
 import akka.util.ByteString
 
-import org.alephium.util.{ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
 
 object UdpServer {
   def props(): Props = Props(new UdpServer())
@@ -41,7 +41,6 @@ object UdpServer {
   final case class Bound(address: InetSocketAddress)                     extends Event
   final case class Received(data: ByteString, sender: InetSocketAddress) extends Event
   case object BindFailed                                                 extends Event
-  final case class SendFailed(send: Send, reason: Throwable)             extends Event
 }
 
 class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQueueSemantics] {
@@ -76,7 +75,7 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
 
   val buffer: ByteBuffer = ByteBuffer.allocateDirect(128 * 1024) // 128KB
   def listening: Receive = {
-    case send @ Send(message, remote) =>
+    case Send(message, remote) =>
       try {
         buffer.clear()
         message.copyToBuffer(buffer)
@@ -85,7 +84,7 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
         ()
       } catch {
         case NonFatal(e) =>
-          sender() ! SendFailed(send, e)
+          logUdpFailure(s"Failed in sending data to ${remote}: $e")
         case e: Throwable =>
           log.warning(s"Fatal error: $e, closing UDP server")
           context.stop(self)
@@ -121,5 +120,23 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
         case e: Throwable => log.error(s"Failure in shutdown UdpServer: $e")
       }
     }
+  }
+
+  private var silentDuration: Duration = Duration.ofSecondsUnsafe(1)
+  private var unsilentPoint: TimeStamp = TimeStamp.now()
+  private var lastFailureTs: TimeStamp = TimeStamp.zero
+  def logUdpFailure(message: String): Unit = {
+    val currentTs = TimeStamp.now()
+    if (currentTs > lastFailureTs + Duration.ofMinutesUnsafe(2)) {
+      silentDuration = Duration.ofSecondsUnsafe(1)
+    }
+    if (currentTs > unsilentPoint) {
+      log.warning(message)
+      silentDuration = silentDuration.timesUnsafe(2)
+      unsilentPoint = unsilentPoint + silentDuration
+    } else {
+      log.debug(message)
+    }
+    lastFailureTs = currentTs
   }
 }

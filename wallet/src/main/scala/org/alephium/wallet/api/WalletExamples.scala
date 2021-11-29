@@ -29,7 +29,6 @@ import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 trait WalletExamples extends EndpointsExamples {
-
   private val password = "my-secret-password"
   private val mnemonic =
     Mnemonic
@@ -53,7 +52,17 @@ trait WalletExamples extends EndpointsExamples {
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 
   implicit val walletCreationExamples: List[Example[WalletCreation]] = List(
-    defaultExample(WalletCreation(password, walletName, None, None, None)),
+    moreSettingsExample(WalletCreation(password, walletName, None, None, None), "User"),
+    moreSettingsExample(
+      WalletCreation(
+        password,
+        walletName,
+        Some(true),
+        None,
+        Some(Mnemonic.Size.list.last)
+      ),
+      "Miner (w/o pass phrase)"
+    ),
     moreSettingsExample(
       WalletCreation(
         password,
@@ -61,7 +70,8 @@ trait WalletExamples extends EndpointsExamples {
         Some(true),
         Some(mnemonicPassphrase),
         Some(Mnemonic.Size.list.last)
-      )
+      ),
+      "Miner (with pass phrase)"
     )
   )
   implicit val walletCreationResultExamples: List[Example[WalletCreation.Result]] =
@@ -69,11 +79,17 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
     List(
-      defaultExample(
-        WalletRestore(password, mnemonic, walletName, None, None)
+      moreSettingsExample(
+        WalletRestore(password, mnemonic, walletName, None, None),
+        "User"
       ),
       moreSettingsExample(
-        WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase))
+        WalletRestore(password, mnemonic, walletName, Some(true), None),
+        "Miner (w/o pass phrase)"
+      ),
+      moreSettingsExample(
+        WalletRestore(password, mnemonic, walletName, Some(true), Some(mnemonicPassphrase)),
+        "Miner (with pass phrase)"
       )
     )
 
@@ -89,7 +105,10 @@ trait WalletExamples extends EndpointsExamples {
   implicit val walletUnlockExamples: List[Example[WalletUnlock]] =
     List(
       defaultExample(WalletUnlock(password, None)),
-      moreSettingsExample(WalletUnlock(password, Some(mnemonicPassphrase)))
+      moreSettingsExample(
+        WalletUnlock(password, Some(mnemonicPassphrase)),
+        "More Settings (with pass phrase)"
+      )
     )
 
   implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
@@ -122,7 +141,12 @@ trait WalletExamples extends EndpointsExamples {
   implicit val transferExamples: List[Example[Transfer]] = List(
     defaultExample(Transfer(defaultDestinations)),
     moreSettingsExample(
-      Transfer(moreSettingsDestinations, Some(minimalGas), Some(defaultGasPrice))
+      Transfer(
+        moreSettingsDestinations,
+        Some(minimalGas),
+        Some(defaultGasPrice),
+        Some(defaultUtxosLimit)
+      )
     )
   )
 
@@ -133,7 +157,18 @@ trait WalletExamples extends EndpointsExamples {
     simpleExample(Sign.Result(signature))
 
   implicit val sweepAllExamples: List[Example[SweepAll]] =
-    simpleExample(SweepAll(address))
+    List(
+      defaultExample(SweepAll(address)),
+      moreSettingsExample(
+        SweepAll(
+          address,
+          Some(ts),
+          Some(minimalGas),
+          Some(defaultGasPrice),
+          Some(defaultUtxosLimit)
+        )
+      )
+    )
 
   implicit val transferResultExamples: List[Example[Transfer.Result]] =
     simpleExample(Transfer.Result(txId, fromGroup, toGroup))

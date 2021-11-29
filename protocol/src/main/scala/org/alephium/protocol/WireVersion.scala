@@ -16,10 +16,7 @@
 
 package org.alephium.protocol
 
-import akka.util.ByteString
-
 import org.alephium.serde.Serde
-import org.alephium.util.Bytes
 
 final case class WireVersion(value: Int) extends AnyVal
 
@@ -27,6 +24,6 @@ object WireVersion {
   implicit val serde: Serde[WireVersion] = Serde.forProduct1(apply, _.value)
 
   // scalastyle:off magic.number
-  val currentWireVersion: WireVersion = WireVersion(Bytes.toIntUnsafe(ByteString(0, 0, 11, 0)))
+  val currentWireVersion: WireVersion = CurrentWireVersion
   // scalastyle:on
 }

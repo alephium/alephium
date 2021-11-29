@@ -89,9 +89,10 @@ object WalletServer {
       case WalletNotFound(file)         => notFound(file.getName())
       case _: OtherError                => badRequest
 
-      case WalletLocked        => unauthorized
-      case InvalidPassword     => unauthorized
-      case MinerWalletRequired => unauthorized
+      case WalletLocked              => unauthorized
+      case InvalidPassword           => unauthorized
+      case InvalidMnemonicPassphrase => unauthorized
+      case MinerWalletRequired       => unauthorized
     }
   }
 }

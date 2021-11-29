@@ -25,18 +25,19 @@ import scala.collection.immutable.ArraySeq
 import akka.actor.ActorRef
 import akka.io.Tcp
 import akka.util.ByteString
-import com.typesafe.config.Config
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import com.typesafe.config.{Config, ConfigFactory}
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.conf._
+import org.alephium.conf.*
+import org.alephium.flow.core.maxForkDepth
 import org.alephium.flow.network.nat.Upnp
-import org.alephium.protocol.Hash
-import org.alephium.protocol.config._
+import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.config.*
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
-import org.alephium.util.{ActorRefT, AVector, Duration, U256}
+import org.alephium.util.{ActorRefT, AVector, Duration, Env, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
   override lazy val groupNumPerBroker: Int = groups / brokerNum
@@ -48,7 +49,6 @@ final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
     numZerosAtLeastInHash: Int,
-    tipsPruneInterval: Int,
     blockCacheCapacityPerChain: Int,
     emission: Emission
 ) extends ConsensusConfig {
@@ -70,7 +70,7 @@ final case class ConsensusSetting(
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
 
-  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(tipsPruneInterval.toLong)
+  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(maxForkDepth.toLong)
   val conflictCacheKeepDuration: Duration =
     expectedTimeSpan timesUnsafe blockCacheCapacityPerChain.toLong
 }
@@ -89,6 +89,7 @@ final case class NetworkSetting(
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
+    maxCliqueFromSameIp: Int,
     pingFrequency: Duration,
     retryTimeout: Duration,
     banDuration: Duration,
@@ -143,7 +144,9 @@ final case class DiscoverySetting(
     scanFrequency: Duration,
     scanFastFrequency: Duration,
     fastScanPeriod: Duration,
-    neighborsPerGroup: Int
+    initialDiscoveryPeriod: Duration,
+    neighborsPerGroup: Int,
+    maxCliqueFromSameIp: Int
 ) extends DiscoveryConfig
 
 final case class MemPoolSetting(
@@ -164,7 +167,19 @@ object WalletSetting {
 
 final case class NodeSetting(dbSyncWrite: Boolean)
 
-final case class Allocation(address: Address.Asset, amount: U256, lockDuration: Duration)
+final case class Allocation(
+    address: Address.Asset,
+    amount: Allocation.Amount,
+    lockDuration: Duration
+)
+object Allocation {
+  final case class Amount(value: U256)
+  object Amount {
+    def from(string: String): Option[Amount] =
+      ALPH.alphFromString(string).map(Amount(_))
+  }
+}
+
 final case class GenesisSetting(allocations: AVector[Allocation])
 
 final case class AlephiumConfig(
@@ -193,7 +208,6 @@ object AlephiumConfig {
       blockTargetTime: Duration,
       uncleDependencyGapTime: Option[Duration],
       numZerosAtLeastInHash: Int,
-      tipsPruneInterval: Int,
       blockCacheCapacityPerChain: Int
   ) {
     def toConsensusSetting(groupConfig: GroupConfig): ConsensusSetting = {
@@ -202,7 +216,6 @@ object AlephiumConfig {
         blockTargetTime,
         uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
         numZerosAtLeastInHash,
-        tipsPruneInterval,
         blockCacheCapacityPerChain,
         emission
       )
@@ -214,6 +227,7 @@ object AlephiumConfig {
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
+      maxCliqueFromSameIp: Int,
       pingFrequency: Duration,
       retryTimeout: Duration,
       banDuration: Duration,
@@ -246,6 +260,7 @@ object AlephiumConfig {
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
+        maxCliqueFromSameIp,
         pingFrequency,
         retryTimeout,
         banDuration: Duration,
@@ -341,8 +356,14 @@ object AlephiumConfig {
       ).toAlephiumConfig
     }
 
-  def load(rootPath: Path, path: String): AlephiumConfig =
-    load(Configs.parseConfig(rootPath, overwrite = true), path)
-  def load(config: Config, path: String): AlephiumConfig = config.as[AlephiumConfig](path)
-  def load(config: Config): AlephiumConfig               = config.as[AlephiumConfig]("alephium")
+  def load(env: Env, rootPath: Path, configPath: String): AlephiumConfig =
+    load(
+      Configs.parseConfig(env, rootPath, overwrite = true, predefined = ConfigFactory.empty()),
+      configPath
+    )
+  def load(rootPath: Path, configPath: String): AlephiumConfig =
+    load(Env.currentEnv, rootPath, configPath)
+  def load(config: Config, configPath: String): AlephiumConfig =
+    config.as[AlephiumConfig](configPath)
+  def load(config: Config): AlephiumConfig = load(config, "alephium")
 }

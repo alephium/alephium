@@ -4,7 +4,7 @@ Alephium
 [![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/4BEUkc9zpA)
 
 This repository contains the reference implementation of Alephium, a sharded
-blockchain that makes programmable money scalable and secure.
+blockchain that makes programmable money scalable and secure. For more information, please visit the [wiki](https://github.com/alephium/alephium/wiki).
 
 ## Overview
 
@@ -26,11 +26,6 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 * PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
   * Adaptive rewards based on hashrate and timestamp are designed and implemented
   * Internal mining cost through burning will be added when hashrate and energy consumption is significantly high
-
-## Development Status
-
-This project is currently under heavy development. You can try out our testnet using the
-[Testnet Guide](https://github.com/alephium/alephium/wiki/Testnet-Guide).
 
 ## Installation
 

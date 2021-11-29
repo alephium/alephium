@@ -1,6 +1,5 @@
 alephium {
   consensus {
-    tips-prune-interval = 10
     block-cache-capacity-per-chain = 16
   }
 
@@ -16,6 +15,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
+    max-clique-from-same-ip = 2
 
     # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
@@ -73,10 +73,12 @@ alephium {
   }
 
   discovery {
-    scan-frequency = 30 minutes
-    scan-fast-frequency = 5.seconds
+    scan-frequency = 10 minutes
+    scan-fast-frequency = 2.seconds
     fast-scan-period = 1 minute
+    initial-discovery-period = 30 seconds
     neighbors-per-group = 50
+    max-clique-from-same-ip = 2
   }
 
   mempool {
@@ -96,6 +98,7 @@ alephium {
     api-key = null
     api-key = ${?ALEPHIUM_API_KEY}
     gas-fee-cap = "1000000000000000000"// 1 ALPH
+    default-utxos-limit = 512
   }
 
   wallet {

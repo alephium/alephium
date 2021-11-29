@@ -158,14 +158,14 @@ trait WalletEndpointsLogic extends WalletEndpoints {
 
   val transferLogic = serverLogic(transfer) { case (wallet, tr) =>
     walletService
-      .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice)
+      .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice, tr.utxosLimit)
       .map(_.map { case (txId, fromGroup, toGroup) =>
         model.Transfer.Result(txId, fromGroup, toGroup)
       }.left.map(toApiError))
   }
   val sweepAllLogic = serverLogic(sweepAll) { case (wallet, sa) =>
     walletService
-      .sweepAll(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice)
+      .sweepAll(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice, sa.utxosLimit)
       .map(_.map { case (txId, fromGroup, toGroup) =>
         model.Transfer.Result(txId, fromGroup, toGroup)
       }.left.map(toApiError))

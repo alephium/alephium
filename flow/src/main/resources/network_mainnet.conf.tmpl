@@ -2,43 +2,30 @@ alephium {
   broker {
     broker-id = 0
     broker-num = 1
-    groups = 2
+    groups = 4
   }
 
   consensus {
     block-target-time = 64 seconds
-    num-zeros-at-least-in-hash = 18
+    num-zeros-at-least-in-hash = 37
   }
 
   network {
+    network-id = 0
     no-pre-mine-proof = [
-      "00000000000000000001b3a4df896d60492f0041a1cfe3b9dccd4e6b83ff57f3", # BTC 697677 block hash
-      "cf874fe2276967ab4d514a4e59b2d2a60b9fc810a3763b188f0b122368004deb"  # ETH 13100948 block hash
+      "0000000000000000000ccf523e4fdd7bb414eee8d70bd993df317691302313df", # BTC 708794 block hash
+      "a7f069215d1390b7f6af3f961030bb0957a31f7ad2315b35334841794d0c329d"  # ETH 13576188 block hash
     ]
   }
 
-  genesis {
-    allocations = [
-      {
-        address = "15uBaW8WhKURyB4auu5HokdNd2CSUY6r1UHJcWe1u4dDN",
-        amount = "1000000000000000000000000",
-        lock-duration = 0 seconds
-      },
-      {
-        address = "1BLj6uPYbL9hmFza7gwgVyAhNmejFwEgEWYvNnrFo5LdM",
-        amount = "1000000000000000000000000",
-        lock-duration = 0 seconds
-      },
-      {
-        address = "14uZkwvBUhdCKgExc1Uj2TuH61d4kZPm2sQv98muamYq5",
-        amount = "1000000000000000000000000",
-        lock-duration = 0 seconds
-      },
-      {
-        address = "1HsLHhtw4PNicRVqWKHVdro7fvkbeDHtQyRjbVpSnNMmH",
-        amount = "1000000000000000000000000",
-        lock-duration = 0 seconds
-      }
+  discovery {
+    bootstrap = [
+      "bootstrap0.alephium.org:9973",
+      "bootstrap1.alephium.org:9973",
+      "bootstrap2.alephium.org:9973",
+      "bootstrap3.alephium.org:9973",
+      "bootstrap4.alephium.org:9973",
+      "bootstrap5.alephium.org:9973"
     ]
   }
 }

@@ -23,7 +23,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Duration}
 
@@ -70,10 +70,10 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis version" in new GenesisFixture {
-    genesis.version is genesisBlockVersion
+    genesis.version is DefaultBlockVersion
 
     forAll { byte: Byte =>
-      whenever(byte != genesisBlockVersion) {
+      whenever(byte != DefaultBlockVersion) {
         val header = genesis.copy(version = byte)
         failValidation(headerValidator.validateGenesisHeader(header), InvalidGenesisVersion)
       }
@@ -81,9 +81,9 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis timestamp" in new GenesisFixture {
-    genesis.timestamp is ALF.GenesisTimestamp
+    genesis.timestamp is ALPH.GenesisTimestamp
 
-    val modified = genesis.copy(timestamp = ALF.GenesisTimestamp.plusMillisUnsafe(1))
+    val modified = genesis.copy(timestamp = ALPH.GenesisTimestamp.plusMillisUnsafe(1))
     failValidation(modified, InvalidGenesisTimeStamp)
   }
 
@@ -186,7 +186,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check header version" in new HeaderFixture {
-    val modified0 = updateNonce(header.copy(version = defaultBlockVersion))
+    val modified0 = updateNonce(header.copy(version = DefaultBlockVersion))
     passValidation(modified0)
   }
 
@@ -194,7 +194,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     val modified0 = updateNonce(header.copy(timestamp = header0.timestamp))
     failValidation(modified0, NoIncreasingTimeStamp)
 
-    val modified1 = updateNonce(header.copy(timestamp = ALF.LaunchTimestamp.plusMillisUnsafe(-1)))
+    val modified1 = updateNonce(header.copy(timestamp = ALPH.LaunchTimestamp.plusMillisUnsafe(-1)))
     failValidation(modified1, EarlierThanLaunchTimeStamp)
   }
 

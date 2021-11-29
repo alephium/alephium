@@ -30,7 +30,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
@@ -74,7 +74,8 @@ object TxHandler {
   // scalastyle:on magic.number
 
   // scalastyle:off magic.number
-  private val highPriceUntil: TimeStamp = ALF.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(365))
+  private val highPriceUntil: TimeStamp =
+    ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(365))
   // scalastyle:off magic.number
   def checkHighGasPrice(tx: TransactionTemplate): Boolean = {
     checkHighGasPrice(TimeStamp.now(), tx)

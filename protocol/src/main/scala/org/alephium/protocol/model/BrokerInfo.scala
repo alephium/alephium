@@ -56,6 +56,11 @@ final case class BrokerInfo private (
 
   def interBrokerInfo: InterBrokerInfo =
     InterBrokerInfo.unsafe(cliqueId, brokerId, brokerNum)
+
+  def isFromSameIp(another: BrokerInfo): Boolean = {
+    this.intersect(another) &&
+    this.address.getAddress == another.address.getAddress
+  }
 }
 
 object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
@@ -115,8 +120,8 @@ object InterBrokerInfo extends SafeSerdeImpl[InterBrokerInfo, GroupConfig] {
   val unsafeSerde: Serde[InterBrokerInfo] =
     Serde.forProduct3(unsafe, t => (t.cliqueId, t.brokerId, t.brokerNum))
 
-  def unsafe(cliqueId: CliqueId, brokerId: Int, groupNumPerBroker: Int): InterBrokerInfo =
-    new InterBrokerInfo(cliqueId, brokerId, groupNumPerBroker)
+  def unsafe(cliqueId: CliqueId, brokerId: Int, brokerNum: Int): InterBrokerInfo =
+    new InterBrokerInfo(cliqueId, brokerId, brokerNum)
 
   def validate(info: InterBrokerInfo)(implicit config: GroupConfig): Either[String, Unit] = {
     BrokerInfo.validate(info.brokerId, info.brokerNum)

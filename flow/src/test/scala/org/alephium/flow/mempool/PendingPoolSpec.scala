@@ -17,7 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.ALF
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{GroupIndex, NoIndexModelGeneratorsLike, TransactionTemplate}
 import org.alephium.util.{AVector, LockFixture, TimeStamp}
 
@@ -79,13 +79,13 @@ class PendingPoolSpec
     val (privKey1, pubKey1)    = groupIndex.generateKey
 
     val blockFlow0 = isolatedBlockFlow()
-    val block0     = transfer(blockFlow0, privKey0, pubKey1, ALF.alf(4))
+    val block0     = transfer(blockFlow0, privKey0, pubKey1, ALPH.alph(4))
     val tx0        = block0.nonCoinbase.head.toTemplate
     addAndCheck(blockFlow0, block0)
-    val block1 = transfer(blockFlow0, privKey1, pubKey0, ALF.alf(1))
+    val block1 = transfer(blockFlow0, privKey1, pubKey0, ALPH.alph(1))
     val tx1    = block1.nonCoinbase.head.toTemplate
     addAndCheck(blockFlow0, block1)
-    val block2 = transfer(blockFlow0, privKey1, pubKey0, ALF.alf(1))
+    val block2 = transfer(blockFlow0, privKey1, pubKey0, ALPH.alph(1))
     val tx2    = block2.nonCoinbase.head.toTemplate
     addAndCheck(blockFlow0, block2)
 

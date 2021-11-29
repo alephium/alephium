@@ -26,9 +26,9 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.message.DiscoveryMessage._
+import org.alephium.protocol.message.DiscoveryMessage.*
 import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
-import org.alephium.util._
+import org.alephium.util.*
 
 object DiscoveryServer {
   def props(
@@ -73,9 +73,10 @@ object DiscoveryServer {
   final case class PeerDenied(peerInfo: BrokerInfo)                              extends Command
   final case class Unreachable(remote: InetSocketAddress)                        extends Command with EventStream.Event
   case object GetUnreachable                                                     extends Command
+  case object InitialDiscoveryDone                                               extends Command
 
   sealed trait Event
-  final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event
+  final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event with EventStream.Event
   final case class NewPeer(info: BrokerInfo)                 extends Event with EventStream.Event
 }
 
@@ -122,6 +123,7 @@ class DiscoveryServer(
       unstashAll()
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
+      scheduleOnce(self, InitialDiscoveryDone, discoveryConfig.initialDiscoveryPeriod)
 
     case _ =>
       stash()
@@ -166,8 +168,6 @@ class DiscoveryServer(
           log.warning(s"Received corrupted UDP data from $remote (${data.size} bytes): $error")
           misbehaviorManager ! MisbehaviorManager.SerdeError(remote)
       }
-    case UdpServer.SendFailed(send, reason) =>
-      logUdpFailure(s"Failed in sending data to ${send.remote}: $reason")
     case Terminated(_) =>
       log.error(s"Udp listener stopped, there might be network issue")
       unsetSocket()
@@ -189,9 +189,10 @@ class DiscoveryServer(
       banPeer(peerInfo.peerId)
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
-    case Unreachable(remote) => setUnreachable(remote)
-    case GetUnreachable      => sender() ! getUnreachable()
-    case Unban(remotes)      => remotes.foreach(unsetUnreachable)
+    case Unreachable(remote)  => setUnreachable(remote)
+    case GetUnreachable       => sender() ! getUnreachable()
+    case Unban(remotes)       => remotes.foreach(unsetUnreachable)
+    case InitialDiscoveryDone => postInitialDiscovery()
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>
@@ -221,12 +222,6 @@ class DiscoveryServer(
         }
     }
 
-  override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
-    if (mightReachableSlow(peerInfo.address)) {
-      publishEvent(NewPeer(peerInfo))
-    }
-  }
-
   private def scanAndSchedule(): Unit = {
     scan()
     scheduleScan()
@@ -248,21 +243,17 @@ class DiscoveryServer(
     scanScheduled = None
   }
 
-  private var silentDuration: Duration = Duration.ofSecondsUnsafe(1)
-  private var unsilentPoint: TimeStamp = TimeStamp.now()
-  private var lastFailureTs: TimeStamp = TimeStamp.zero
-  def logUdpFailure(message: String): Unit = {
-    val currentTs = TimeStamp.now()
-    if (currentTs > lastFailureTs + Duration.ofMinutesUnsafe(2)) {
-      silentDuration = Duration.ofSecondsUnsafe(1)
+  private var initialDiscoveryDone: Boolean = false
+  def postInitialDiscovery(): Unit = {
+    initialDiscoveryDone = true
+    val neighbors = getNeighbors(selfCliqueId)
+    log.info(s"Initial P2P discovery is done: #${neighbors.length} neighbors")
+    publishEvent(NeighborPeers(neighbors))
+  }
+
+  override def publishNewPeer(peerInfo: BrokerInfo): Unit = {
+    if (initialDiscoveryDone && mightReachableSlow(peerInfo.address)) {
+      publishEvent(NewPeer(peerInfo))
     }
-    if (currentTs > unsilentPoint) {
-      log.warning(message)
-      silentDuration = silentDuration.timesUnsafe(2)
-      unsilentPoint = unsilentPoint + silentDuration
-    } else {
-      log.debug(message)
-    }
-    lastFailureTs = currentTs
   }
 }

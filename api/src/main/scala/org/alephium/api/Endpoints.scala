@@ -28,7 +28,7 @@ import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -337,7 +337,7 @@ trait Endpoints
   val metrics: BaseEndpoint[Unit, String] =
     baseEndpoint.get
       .in("metrics")
-      .out(alfPlainTextBody)
+      .out(alphPlainTextBody)
       .summary("Exports all prometheus metrics")
 
   val getBlockHeaderEntry: BaseEndpoint[BlockHash, BlockHeaderEntry] =
@@ -372,16 +372,16 @@ object Endpoints {
   def jsonBody[T: ReadWriter: Schema](implicit
       examples: List[Example[T]]
   ): EndpointIO.Body[String, T] = {
-    alfJsonBody[T].examples(examples)
+    alphJsonBody[T].examples(examples)
   }
 
   def jsonBodyWithAlph[T: ReadWriter: Schema](implicit
       examples: List[Example[T]]
   ): EndpointIO.Body[String, T] = {
-    alfJsonBody[T]
+    alphJsonBody[T]
       .examples(examples)
       .description(
-        s"""Format 1: `${ALF.oneAlf}`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = ${ALF.oneAlf}`"""
+        s"""Format 1: `${ALPH.oneAlph}`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = ${ALPH.oneAlph}`"""
       )
   }
 }

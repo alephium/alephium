@@ -27,6 +27,12 @@ final case class NetworkId(id: Byte) extends AnyVal {
   }
 
   def verboseName: String = s"${networkType.name}-$id"
+
+  def nodeFolder: String = id match {
+    case 0 => "mainnet"
+    case 1 => "testnet"
+    case _ => s"network-$id"
+  }
 }
 
 object NetworkId {

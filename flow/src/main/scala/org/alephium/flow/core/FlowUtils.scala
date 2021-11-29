@@ -380,7 +380,7 @@ object FlowUtils {
       AVector.empty,
       AVector.empty,
       txTemplate.inputSignatures,
-      txTemplate.contractSignatures
+      txTemplate.scriptSignatures
     )
   }
 
@@ -394,7 +394,7 @@ object FlowUtils {
       result.contractInputs,
       result.generatedOutputs,
       txTemplate.inputSignatures,
-      txTemplate.contractSignatures
+      txTemplate.scriptSignatures
     )
   }
 
@@ -406,7 +406,7 @@ object FlowUtils {
     if (script.entryMethod.isPayable) {
       for {
         balances0 <- Balances.from(preOutputs, txTemplate.unsigned.fixedOutputs)
-        _         <- balances0.subAlf(preOutputs.head.lockupScript, txTemplate.gasFeeUnsafe)
+        _         <- balances0.subAlph(preOutputs.head.lockupScript, txTemplate.gasFeeUnsafe)
         outputs   <- balances0.toOutputs()
       } yield {
         Transaction(
@@ -415,7 +415,7 @@ object FlowUtils {
           AVector.empty,
           generatedOutputs = outputs,
           txTemplate.inputSignatures,
-          txTemplate.contractSignatures
+          txTemplate.scriptSignatures
         )
       }
     } else {
@@ -426,7 +426,7 @@ object FlowUtils {
           contractInputs = AVector.empty,
           generatedOutputs = AVector.empty,
           txTemplate.inputSignatures,
-          txTemplate.contractSignatures
+          txTemplate.scriptSignatures
         )
       )
     }

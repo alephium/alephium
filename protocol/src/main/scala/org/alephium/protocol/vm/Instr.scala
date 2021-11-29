@@ -115,10 +115,10 @@ object Instr {
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
-    ApproveAlf, ApproveToken, AlfRemaining, TokenRemaining, IsPaying,
-    TransferAlf, TransferAlfFromSelf, TransferAlfToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
+    ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
+    TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, ContractInitialStateHash
+    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
   )
   // format: on
 
@@ -936,7 +936,7 @@ case object VerifyED25519
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance
 
-object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
+object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -950,7 +950,7 @@ object ApproveAlf extends AssetInstr with StatefulInstrCompanion0 {
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <- balanceState
-        .approveALF(address.lockupScript, amount.v)
+        .approveALPH(address.lockupScript, amount.v)
         .toRight(Right(NotEnoughBalance))
     } yield ()
   }
@@ -978,14 +978,14 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
   }
 }
 
-object AlfRemaining extends AssetInstr with StatefulInstrCompanion0 {
+object AlphRemaining extends AssetInstr with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       amount <- balanceState
-        .alfRemaining(address.lockupScript)
-        .toRight(Right(NoAlfBalanceForTheAddress))
+        .alphRemaining(address.lockupScript)
+        .toRight(Right(NoAlphBalanceForTheAddress))
       _ <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
@@ -1022,7 +1022,7 @@ sealed trait Transfer extends AssetInstr {
     frame.obj.getContractId().map(LockupScript.p2c)
   }
 
-  def transferAlf[C <: StatefulContext](
+  def transferAlph[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
       toThunk: => ExeResult[LockupScript]
@@ -1032,9 +1032,9 @@ sealed trait Transfer extends AssetInstr {
       to           <- toThunk
       from         <- fromThunk
       balanceState <- frame.getBalanceState()
-      _            <- balanceState.useAlf(from, amount.v).toRight(Right(NotEnoughBalance))
+      _            <- balanceState.useAlph(from, amount.v).toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.outputBalances
-        .addAlf(to, amount.v)
+        .addAlph(to, amount.v)
         .toRight(Right(BalanceOverflow))
     } yield ()
   }
@@ -1061,9 +1061,9 @@ sealed trait Transfer extends AssetInstr {
   }
 }
 
-object TransferAlf extends Transfer with StatefulInstrCompanion0 {
+object TransferAlph extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferAlf(
+    transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
       frame.popOpStackAddress().map(_.lockupScript)
@@ -1071,9 +1071,9 @@ object TransferAlf extends Transfer with StatefulInstrCompanion0 {
   }
 }
 
-object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
+object TransferAlphFromSelf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferAlf(
+    transferAlph(
       frame,
       getContractLockupScript(frame),
       frame.popOpStackAddress().map(_.lockupScript)
@@ -1081,9 +1081,9 @@ object TransferAlfFromSelf extends Transfer with StatefulInstrCompanion0 {
   }
 }
 
-object TransferAlfToSelf extends Transfer with StatefulInstrCompanion0 {
+object TransferAlphToSelf extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    transferAlf(
+    transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
       getContractLockupScript(frame)
@@ -1248,27 +1248,47 @@ object IsCalledFromTxScript extends ContractInstr with GasLow {
   }
 }
 
-object CallerInitialStateHash extends ContractInstr with GasLow {
+sealed trait CallerStateInstr extends ContractInstr with GasLow {
+  def extractVal(callerObj: StatefulContractObject): Val
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       callerFrame <- frame.getCallerFrame()
-      statefulObj <- callerFrame.obj match {
+      callerObj <- callerFrame.obj match {
         case obj: StatefulContractObject => Right(obj)
         case _                           => failed(ExpectStatefulContractObj)
       }
-      _ <- frame.pushOpStack(statefulObj.getInitialStateHash())
+      _ <- frame.pushOpStack(extractVal(callerObj))
     } yield ()
   }
 }
 
-object ContractInitialStateHash extends ContractInstr with GasLow {
+object CallerInitialStateHash extends CallerStateInstr {
+  def extractVal(callerObj: StatefulContractObject): Val = callerObj.getInitialStateHash()
+}
+
+object CallerCodeHash extends CallerStateInstr {
+  def extractVal(callerObj: StatefulContractObject): Val = callerObj.getCodeHash()
+}
+
+sealed trait ContractStateInstr extends ContractInstr with GasLow {
+  def extractVal(contractObj: StatefulContractObject): Val
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
-      _           <- frame.pushOpStack(contractObj.getInitialStateHash())
+      _           <- frame.pushOpStack(extractVal(contractObj))
     } yield ()
   }
+}
+
+object ContractInitialStateHash extends ContractStateInstr {
+  def extractVal(contractObj: StatefulContractObject): Val = contractObj.getInitialStateHash()
+}
+
+object ContractCodeHash extends ContractStateInstr {
+  def extractVal(contractObj: StatefulContractObject): Val = contractObj.getCodeHash()
 }
 
 sealed trait BlockInstr

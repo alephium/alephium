@@ -123,6 +123,7 @@ object ValidationStatus {
 
 sealed trait InvalidTxStatus extends InvalidStatus
 
+final case object InvalidTxVersion                              extends InvalidTxStatus
 final case object InvalidNetworkId                              extends InvalidTxStatus
 final case object TooManyInputs                                 extends InvalidTxStatus
 final case object ContractInputForInterGroupTx                  extends InvalidTxStatus
@@ -139,14 +140,16 @@ final case object TxDoubleSpending                              extends InvalidT
 final case object OutputDataSizeExceeded                        extends InvalidTxStatus
 final case object NonExistInput                                 extends InvalidTxStatus
 final case object TimeLockedTx                                  extends InvalidTxStatus
-final case object InvalidAlfBalance                             extends InvalidTxStatus
+final case object InvalidAlphBalance                            extends InvalidTxStatus
 final case object InvalidTokenBalance                           extends InvalidTxStatus
 final case object BalanceOverFlow                               extends InvalidTxStatus
 final case object InvalidWitnessLength                          extends InvalidTxStatus
 final case object InvalidPublicKeyHash                          extends InvalidTxStatus
 final case object InvalidScriptHash                             extends InvalidTxStatus
 final case object InvalidSignature                              extends InvalidTxStatus
-final case object TooManySignatures                             extends InvalidTxStatus
+final case object TooManyInputSignatures                        extends InvalidTxStatus
+final case object TooManyScriptSignatures                       extends InvalidTxStatus
+final case object UnexpectedScriptSignatures                    extends InvalidTxStatus
 final case object InvalidNumberOfPublicKey                      extends InvalidTxStatus
 final case object InvalidP2mpkhUnlockScript                     extends InvalidTxStatus
 final case object OutOfGas                                      extends InvalidTxStatus

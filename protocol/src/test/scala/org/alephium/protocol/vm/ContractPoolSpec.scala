@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{ALF, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
@@ -38,7 +38,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         fieldLength: Int = 0
     ): (StatefulContract, ContractOutputRef, ContractOutput) = {
       val contractId = Hash.generate
-      val output     = ContractOutput(ALF.alf(n), LockupScript.p2c(contractId), AVector.empty)
+      val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
       val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
       val method = Method[StatefulContext](
         isPublic = true,

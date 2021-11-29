@@ -26,9 +26,15 @@ trait DiscoveryConfig {
 
   def fastScanPeriod: Duration
 
+  def initialDiscoveryPeriod: Duration
+
   /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
   def neighborsPerGroup: Int
 
+  def maxCliqueFromSameIp: Int
+
   val peersTimeout: Duration        = Duration.ofSecondsUnsafe(5)
   lazy val expireDuration: Duration = scanFrequency.timesUnsafe(10)
+
+  val unreachableDuration = Duration.ofMinutesUnsafe(1)
 }

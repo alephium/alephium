@@ -23,7 +23,7 @@ import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALF, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{Block, Weight}
 import org.alephium.protocol.vm.WorldState
@@ -103,11 +103,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       fromTs: TimeStamp,
       toTs: TimeStamp
   ): IOResult[AVector[(Block, Int)]] = {
-    locateTimeRangedHeight(fromTs, toTs, ALF.GenesisHeight, maxHeight).flatMap {
+    locateTimeRangedHeight(fromTs, toTs, ALPH.GenesisHeight, maxHeight).flatMap {
       case None => Right(AVector.empty)
       case Some((height, init)) => {
         for {
-          previous <- getLowerBlocks(ALF.GenesisHeight, height - 1, fromTs, toTs)
+          previous <- getLowerBlocks(ALPH.GenesisHeight, height - 1, fromTs, toTs)
           later    <- getUpperBlocks(maxHeight, height + 1, fromTs, toTs)
         } yield {
           (previous.reverse :+ ((init, height))) ++ later
@@ -262,7 +262,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getLatestHashesUnsafe(): AVector[BlockHash] = {
     val toHeight   = maxHeightUnsafe
-    val fromHeight = math.max(ALF.GenesisHeight + 1, toHeight - 20)
+    val fromHeight = math.max(ALPH.GenesisHeight + 1, toHeight - 20)
     (fromHeight to toHeight).foldLeft(AVector.empty[BlockHash]) { case (acc, height) =>
       acc ++ Utils.unsafe(getHashes(height))
     }
