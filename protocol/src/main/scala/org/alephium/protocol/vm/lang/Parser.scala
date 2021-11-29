@@ -241,6 +241,10 @@ object StatefulParser extends Parser[StatefulContext] {
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def constOrArray[_: P]: P[Seq[Ast.Const[StatefulContext]]] = P(
-    const.map(Seq(_)) | P("[" ~ constOrArray.rep(0, ",").map(_.flatten) ~ "]")
+    const.map(Seq(_)) |
+      P("[" ~ constOrArray.rep(0, ",").map(_.flatten) ~ "]") |
+      P("[" ~ constOrArray ~ ";" ~ positiveNum("array size") ~ "]").map { case (consts, size) =>
+        (0 until size).flatMap(_ => consts)
+      }
   )
 }
