@@ -190,6 +190,7 @@ trait DiscoveryServerState extends SessionManager {
     if (getCliqueNumPerIp(peerInfo) < discoveryConfig.maxCliqueFromSameIp) {
       log.info(s"Adding a new peer: $peerInfo")
       addBroker(peerInfo)
+      addBrokerToStorage(peerInfo)
       publishNewPeer(peerInfo)
     } else {
       log.debug(s"Too many cliques from a same IP: $peerInfo")
@@ -198,7 +199,6 @@ trait DiscoveryServerState extends SessionManager {
 
   @inline final def addBroker(peerInfo: BrokerInfo): Unit = {
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
-    addBrokerToStorage(peerInfo)
     DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
@@ -217,7 +217,6 @@ trait DiscoveryServerState extends SessionManager {
   def publishNewPeer(peerInfo: BrokerInfo): Unit
   def addBrokerToStorage(peerInfo: BrokerInfo): Unit
   def removeBrokerFromStorage(peerId: PeerId): Unit
-  override def onPingFailed(peerId: PeerId): Unit = removeBrokerFromStorage(peerId)
 
   def scan(): Unit = {
     val peerCandidates = table.values.filter(status => status.info.peerId != selfPeerId)
@@ -357,16 +356,12 @@ trait SessionManager {
     }
   }
 
-  def onPingFailed(peerId: PeerId): Unit
-
   def cleanSessions(now: TimeStamp): Unit = {
     sessions.removeIf { case (_, status) =>
       now.deltaUnsafe(status.requestAt) >= discoveryConfig.peersTimeout
     }
-    pendings.removeIf { case (peerId, timestamp) =>
-      val expired = now.deltaUnsafe(timestamp) >= discoveryConfig.peersTimeout
-      if (expired) onPingFailed(peerId)
-      expired
+    pendings.removeIf { case (_, timestamp) =>
+      now.deltaUnsafe(timestamp) >= discoveryConfig.peersTimeout
     }
   }
 

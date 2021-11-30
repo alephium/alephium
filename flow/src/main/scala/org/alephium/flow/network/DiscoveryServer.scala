@@ -144,9 +144,9 @@ class DiscoveryServer(
     context become binding // binding will stash messages
   }
 
-  private def pingSeedBrokers(): Unit = {
+  private def loadPersistedBrokers(): Unit = {
     escapeIOError(brokerStorage.activeBrokers().map { brokers =>
-      brokers.foreach(ping)
+      brokers.foreach(appendPeer)
     })
   }
 
@@ -160,7 +160,7 @@ class DiscoveryServer(
       log.info(s"UDP server bound to $address")
       setSocket(ActorRefT[UdpServer.Command](sender()))
       context.watch(sender())
-      pingSeedBrokers()
+      loadPersistedBrokers()
       bootstrap.foreach(fetchNeighbors)
       scheduleScan()
       unstashAll()

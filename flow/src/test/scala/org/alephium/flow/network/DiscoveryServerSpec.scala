@@ -137,6 +137,15 @@ class DiscoveryServerSpec
     storages.brokerStorage.exists(cliqueInfo1.selfInterBrokerInfo.peerId) isE true
   }
 
+  it should "load brokers from storage at startup" in new Fixture {
+    val peer = cliqueInfo1.selfBrokerInfo.get
+    storages.brokerStorage.addBroker(peer) isE ()
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    withPeers(server0) { peers =>
+      peers.length is groups + 1
+    }
+  }
+
   it should "refuse to discover a banned clique" in new Fixture {
 
     server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)

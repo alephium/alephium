@@ -216,11 +216,9 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   it should "clean up everything if timeout is zero" in new Fixture {
     override def peersTimeout: Duration = Duration.ofSecondsUnsafe(0)
 
-    storage += peerInfo.peerId -> peerInfo
     state.tryPing(peerInfo)
     state.isPending(peerInfo.peerId) is true
     state.cleanup()
-    storage.contains(peerInfo.peerId) is false
     state.isPending(peerInfo.peerId) is false
   }
 
