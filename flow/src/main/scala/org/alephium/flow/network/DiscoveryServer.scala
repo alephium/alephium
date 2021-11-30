@@ -146,7 +146,7 @@ class DiscoveryServer(
 
   private def loadPersistedBrokers(): Unit = {
     escapeIOError(brokerStorage.activeBrokers().map { brokers =>
-      brokers.foreach(appendPeer)
+      brokers.foreach(addBroker)
     })
   }
 
