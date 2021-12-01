@@ -24,7 +24,7 @@ import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model._
+import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -162,7 +162,7 @@ class ServerUtils(implicit
             blockFlow
               .getMemPool(chainIndex)
               .getAll(chainIndex)
-              .map(Tx.fromTemplate(_))
+              .map(model.TransactionTemplate.fromProtocol(_))
           )
         }
         .filter(_.unconfirmedTransactions.nonEmpty)

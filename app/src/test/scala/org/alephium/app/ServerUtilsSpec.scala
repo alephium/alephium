@@ -18,8 +18,9 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
+import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
-import org.alephium.api.model._
+import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.gasestimation._
@@ -767,7 +768,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       UnconfirmedTransactions(
         chainIndex.from.value,
         chainIndex.to.value,
-        AVector(Tx.fromTemplate(txTemplate))
+        AVector(api.TransactionTemplate.fromProtocol(txTemplate))
       )
     )
   }

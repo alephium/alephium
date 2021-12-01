@@ -24,9 +24,8 @@ import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.model._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
-import org.alephium.serde._
+import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -39,9 +38,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
-  private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
-  protected val defaultUtxosLimit: Int   = 512
-  val address                            = Address.Asset(lockupScript)
+  protected val defaultUtxosLimit: Int = 512
+  val address                          = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
       Hash.unsafe(Hex.unsafe("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"))
@@ -89,12 +87,30 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
-  private val tx = Tx(
-    txId,
-    AVector(Input.Asset(outputRef, serialize(unlockScript))),
-    AVector(Output.Asset(amount = balance, address, tokens, ts, ByteString.empty)),
-    minimalGas.value,
-    defaultGasPrice.value
+  private val unsignedTx = UnsignedTx(
+    Some(hash),
+    1,
+    1,
+    None,
+    defaultGas.value,
+    defaultGasPrice.value,
+    AVector.empty,
+    AVector.empty
+  )
+
+  private val transaction = Transaction(
+    unsignedTx,
+    true,
+    AVector.empty,
+    AVector.empty,
+    AVector(signature.bytes),
+    AVector(signature.bytes)
+  )
+
+  private val transactionTemplate = TransactionTemplate(
+    unsignedTx,
+    AVector(signature.bytes),
+    AVector(signature.bytes)
   )
 
   private val utxo = UTXO(
@@ -112,7 +128,7 @@ trait EndpointsExamples extends ErrorExamples {
     chainTo = 2,
     height,
     deps = AVector(blockHash, blockHash),
-    transactions = AVector(tx),
+    transactions = AVector(transaction),
     ByteString.empty,
     1.toByte,
     hash,
@@ -226,7 +242,13 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val unreachableBrokersExamples: List[Example[AVector[InetAddress]]] =
     simpleExample(AVector(inetAddress))
 
-  implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
+  implicit val unsignedTxExamples: List[Example[UnsignedTx]] = List(
+    defaultExample(unsignedTx)
+  )
+
+  implicit val transactionExamples: List[Example[Transaction]] = List(
+    defaultExample(transaction)
+  )
 
   implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
     simpleExample(HashRateResponse("100 MH/s"))
@@ -235,7 +257,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(FetchResponse(AVector(AVector(blockEntry))))
 
   implicit val unconfirmedTransactionsExamples: List[Example[AVector[UnconfirmedTransactions]]] =
-    simpleExample(AVector(UnconfirmedTransactions(0, 1, AVector(tx))))
+    simpleExample(AVector(UnconfirmedTransactions(0, 1, AVector(transactionTemplate))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)

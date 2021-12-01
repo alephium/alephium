@@ -22,8 +22,8 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
-import org.alephium.api.UtilJson._
 import org.alephium.api.{model => api}
+import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol._
@@ -292,14 +292,6 @@ class ApiModelSpec
         """.stripMargin
       checkData(request, jsonRaw)
     }
-  }
-
-  it should "encode/decode Tx" in {
-    val hash = Hash.generate
-    val tx   = Tx(hash, AVector.empty, AVector.empty, 1, U256.unsafe(100))
-    val jsonRaw =
-      s"""{"id":"${hash.toHexString}","inputs":[],"outputs":[],"gasAmount":1,"gasPrice":"100"}"""
-    checkData(tx, jsonRaw)
   }
 
   it should "encode/decode GetGroup" in {
