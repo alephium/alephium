@@ -11,7 +11,7 @@ Make sure you installed `docker` and `docker-compose` before proceeding further.
 If you prefer running `docker` or `docker-compose` command without `sudo`, add your use name
 in the `docker` group by running the following command.
 
-```
+```shell
 sudo usermod -aG docker $USER
 ```
 
@@ -19,8 +19,8 @@ sudo usermod -aG docker $USER
 
 The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
 
-```
-docker-compose up -d
+```shell
+docker-compose down && docker-compose build --pull && docker-compose up -d
 ```
 
 The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs):
@@ -53,7 +53,7 @@ In order to persist your data (blocks, wallets, ...), two volumes/mounts can be 
 
 Create these folders on the host:
 
-```
+```shell
 mkdir ./alephium-data ./alephium-wallets && chown nobody ./alephium-data ./alephium-wallets
 ```
 
@@ -67,7 +67,7 @@ Mount them as volumes inside the container:
 
 All good, your data will survive accross restarts!
 
-For more configuration, check the [Testnet Guide](https://github.com/alephium/alephium/wiki/Testnet-Guide) on the wiki.
+For more configuration, check the [Mainnet Guide](https://wiki.alephium.org/Mainnet-Guide.html) on the wiki.
 
 ## GPU Miner (Optional)
 
@@ -78,18 +78,20 @@ Install [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/containe
 which enables the docker runtime to access the Nvidia graphics card on the host machine.
 
 Restart docker daemon and run
-```
+```shell
 docker run --rm --gpus all --privileged --entrypoint nvidia-smi alephium/gpu-miner:latest
 ```
 to verify the setup is successful. It should have the same output as running `nvidia-smi` on the host machine.
 
 To start the GPU miner docker container, either run the following `docker-compose` command (requires version [v1.28.0+](https://docs.docker.com/compose/gpu-support/#enabling-gpu-access-to-service-containers))
 
-```
-docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
+```shell
+docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml down && \
+  docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml build --pull && \
+  docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
 ```
 
 or run the following docker command:
-```
+```shell
 docker run --network="docker_default" --gpus all --privileged --name gpu-miner -d alephium/gpu-miner:latest alephium
 ```
