@@ -465,6 +465,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       }
     } else {
       log.debug(s"Too many clique connection from the same IP: $brokerInfo")
+      context.stop(sender())
     }
   }
 

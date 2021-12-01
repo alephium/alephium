@@ -138,6 +138,8 @@ object Compiler {
   }
 
   object State {
+    private val maxVarIndex: Int = 0xff
+
     def buildFor(script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
         mutable.HashMap.empty,
@@ -165,6 +167,56 @@ object Compiler {
     var varIndex: Int
     def funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]]
+    private var freshNameIndex: Int                               = 0
+    val arrayRefs: mutable.Map[String, ArrayTransformer.ArrayRef] = mutable.Map.empty
+
+    @inline final def freshName(): String = {
+      val name = s"_generated#$freshNameIndex"
+      freshNameIndex += 1
+      name
+    }
+
+    @SuppressWarnings(
+      Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Recursion")
+    )
+    def getOrCreateArrayRef(
+        expr: Ast.Expr[Ctx],
+        isMutable: Boolean
+    ): (ArrayTransformer.ArrayRef, Seq[Instr[Ctx]]) = {
+      expr match {
+        case Ast.ArrayElement(array, index) =>
+          val (arrayRef, codes) = getOrCreateArrayRef(array, isMutable)
+          val subArrayRef       = arrayRef.subArray(index)
+          (subArrayRef, codes)
+        case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
+        case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)
+        case _ =>
+          val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
+          val arrayRef  = ArrayTransformer.ArrayRef.init(this, arrayType, freshName(), isMutable)
+          val codes     = expr.genCode(this) ++ copyArrayRef(arrayRef)
+          (arrayRef, codes)
+      }
+    }
+
+    def addArrayRef(ident: Ast.Ident, arrayRef: ArrayTransformer.ArrayRef): Unit = {
+      val sname = scopedName(ident.name)
+      assume(!arrayRefs.contains(sname))
+      arrayRefs(sname) = arrayRef
+    }
+
+    def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef = {
+      val sname = scopedName(ident.name)
+      arrayRefs.getOrElse(
+        ident.name,
+        arrayRefs.getOrElse(sname, throw Error(s"Array $ident does not exist"))
+      )
+    }
+
+    def copyArrayRef(
+        target: ArrayTransformer.ArrayRef
+    ): Seq[Instr[Ctx]] = {
+      target.vars.map(genStoreCode).reverse
+    }
 
     def setFuncScope(funcId: Ast.FuncId): Unit = {
       scope = funcId
@@ -175,11 +227,10 @@ object Compiler {
       addVariable(ident, expectOneType(ident, tpe), isMutable)
     }
 
-    private def scopedName(name: String): String = {
+    protected def scopedName(name: String): String = {
       if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
 
-    // scalastyle:off magic.number
     def addVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {
       val name  = ident.name
       val sname = scopedName(name)
@@ -187,18 +238,22 @@ object Compiler {
         throw Error(s"Global variable has the same name as local variable: $name")
       } else if (varTable.contains(sname)) {
         throw Error(s"Local variables have the same name: $name")
-      } else if (varIndex >= 0xff) {
-        throw Error(s"Number of variables more than ${0xff}")
+      } else if (varIndex >= State.maxVarIndex) {
+        throw Error(s"Number of variables more than ${State.maxVarIndex}")
       } else {
-        val varType = tpe match {
-          case c: Type.Contract => Type.Contract.local(c.id, ident)
-          case _                => tpe
+        tpe match {
+          case _: Type.FixedSizeArray =>
+            varTable(sname) = VarInfo(tpe, isMutable, State.maxVarIndex.toByte)
+          case c: Type.Contract =>
+            val varType = Type.Contract.local(c.id, ident)
+            varTable(sname) = VarInfo(varType, isMutable, varIndex.toByte)
+            varIndex += 1
+          case _ =>
+            varTable(sname) = VarInfo(tpe, isMutable, varIndex.toByte)
+            varIndex += 1
         }
-        varTable(sname) = VarInfo(varType, isMutable, varIndex.toByte)
-        varIndex += 1
       }
     }
-    // scalastyle:on magic.number
 
     def getVariable(ident: Ast.Ident): VarInfo = {
       val name  = ident.name
@@ -210,10 +265,15 @@ object Compiler {
     }
 
     def getLocalVars(func: Ast.FuncId): Seq[VarInfo] = {
-      varTable.view.filterKeys(_.startsWith(func.name)).values.toSeq.sortBy(_.index)
+      varTable.view
+        .filterKeys(_.startsWith(func.name))
+        .values
+        .filter(_.index != State.maxVarIndex.toByte)
+        .toSeq
+        .sortBy(_.index)
     }
 
-    def genLoadCode(ident: Ast.Ident): Instr[Ctx]
+    def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
     def genStoreCode(ident: Ast.Ident): Instr[Ctx]
 
@@ -261,7 +321,7 @@ object Compiler {
     def checkReturn(returnType: Seq[Type]): Unit = {
       val rtype = funcIdents(scope).returnType
       if (returnType != rtype) {
-        throw Compiler.Error(s"Invalid return types: expected $rtype, got $returnType")
+        throw Error(s"Invalid return types: expected $rtype, got $returnType")
       }
     }
   }
@@ -279,12 +339,17 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
-    def genLoadCode(ident: Ast.Ident): Instr[StatelessContext] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) {
-        throw Error(s"Loading state by ${ident.name} in a stateless context")
+      if (varInfo.index == -1) { // variable for array
+        getArrayRef(ident).vars.flatMap(genLoadCode)
       } else {
-        LoadLocal(varInfo.index)
+        if (isField(ident)) {
+          throw Error(s"Loading state by ${ident.name} in a stateless context")
+        } else {
+          Seq(LoadLocal(varInfo.index))
+        }
       }
     }
 
@@ -310,12 +375,17 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
-    def genLoadCode(ident: Ast.Ident): Instr[StatefulContext] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
-      if (isField(ident)) {
-        LoadField(varInfo.index)
+      if (varInfo.index == -1) { // variable for array
+        getArrayRef(ident).vars.flatMap(genLoadCode)
       } else {
-        LoadLocal(varInfo.index)
+        if (isField(ident)) {
+          Seq(LoadField(varInfo.index))
+        } else {
+          Seq(LoadLocal(varInfo.index))
+        }
       }
     }
 

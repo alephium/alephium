@@ -17,15 +17,18 @@
 package org.alephium.flow.core
 
 import akka.util.ByteString
+import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash}
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class TxUtilsSpec extends AlephiumSpec {
   it should "consider use minimal gas fee" in new FlowFixture {
     val chainIndex            = ChainIndex.unsafe(0, 0)
@@ -43,7 +46,8 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         minimalGasFee / 2,
         None,
-        minimalGasPrice
+        minimalGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .isRight is true
@@ -73,7 +77,8 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.cent(50),
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -296,8 +301,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGas,
         defaultGasPrice
       )
-      .leftValue
-      .startsWith("New tokens found in outputs") is true
+      .leftValue is s"New tokens found in outputs: ${Set(tokenId1)}"
   }
 
   it should "fail without enough tokens" in new UnsignedTransactionFixture {
@@ -324,8 +328,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGas,
         defaultGasPrice
       )
-      .leftValue
-      .startsWith("Not enough balance for token") is true
+      .leftValue is s"Not enough balance for token $tokenId2"
   }
 
   it should "fail when outputs doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
@@ -356,8 +359,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for transaction output") is true
+        .leftValue is "Not enough ALPH for transaction output"
     }
 
     {
@@ -383,8 +385,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for transaction output") is true
+        .leftValue is "Not enough ALPH for transaction output"
     }
   }
 
@@ -422,8 +423,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for change output") is true
+        .leftValue is "Not enough ALPH for change output"
     }
 
     {
@@ -450,9 +450,82 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           defaultGasPrice
         )
-        .leftValue
-        .startsWith("Not enough Alph for change output") is true
+        .leftValue is "Not enough ALPH for change output"
     }
+  }
+
+  it should "fail when inputs are not unique" in new UnsignedTransactionFixture {
+    val inputs = {
+      val input1 = input("input1", ALPH.alph(4), fromLockupScript)
+      val input2 = input("input1", ALPH.alph(3), fromLockupScript)
+      AVector(input1, input2)
+    }
+
+    val outputs = AVector(output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph))
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue is "Inputs not unique"
+  }
+
+  it should "fail when there are too many tokens in the transaction output" in new UnsignedTransactionFixture {
+    val inputs = AVector(input("input", ALPH.alph(3), fromLockupScript))
+    val outputs = {
+      val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph, tokens.toSeq: _*)
+      AVector(output1)
+    }
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue is "Too many tokens in the transaction output, maximal number 64"
+  }
+
+  it should "fail when there are tokens with zero value in the transaction output" in new UnsignedTransactionFixture {
+    val tokenId1 = Hash.hash("tokenId1")
+    val tokenId2 = Hash.hash("tokenId2")
+    val inputs = AVector(
+      input("input", ALPH.alph(3), fromLockupScript, (tokenId1, U256.Zero), (tokenId2, U256.Two))
+    )
+    val outputs = {
+      val output1 = output(
+        LockupScript.p2pkh(toPubKey),
+        ALPH.alph(1),
+        (tokenId1, U256.Zero),
+        (tokenId2, U256.Two)
+      )
+      val output2 = output(LockupScript.p2pkh(toPubKey), ALPH.alph(2), (tokenId1, U256.One))
+      AVector(output1, output2)
+    }
+
+    UnsignedTransaction
+      .build(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        defaultGasPrice
+      )
+      .leftValue is "Value is Zero for one or many tokens in the transaction output"
   }
 
   it should "estimate gas for sweep all tx" in new FlowFixture {
@@ -473,16 +546,181 @@ class TxUtilsSpec extends AlephiumSpec {
           output.lockupScript,
           None,
           None,
-          defaultGasPrice
+          defaultGasPrice,
+          defaultUtxoLimit
         )
         .rightValue
         .rightValue
-      unsignedTx.gasAmount is UtxoUtils.estimateSweepAllTxGas(inputNum)
+      unsignedTx.fixedOutputs.length is 1
+      unsignedTx.gasAmount is UtxoUtils.estimateSweepAllTxGas(inputNum, 1)
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
       txValidation.validateTxOnlyForTest(sweepTx, blockflow) isE ()
     }
 
     (1 to 10).foreach(test)
+  }
+
+  it should "create multiple outputs for sweep all tx if too many tokens" in new FlowFixture
+    with LockupScriptGenerators {
+    case class Test(tokens: AVector[(TokenId, U256)], alphAmount: U256 = ALPH.alph(3)) {
+      val groupIndex       = groupIndexGen.sample.value
+      val toLockupScript   = p2pkhLockupGen(groupIndex).sample.value
+      val fromLockupScript = p2pkhLockupGen(groupIndex).sample.value
+      val output = AssetOutput(
+        alphAmount,
+        fromLockupScript,
+        TimeStamp.unsafe(0),
+        tokens,
+        additionalData = ByteString(0)
+      )
+
+      val result = TxUtils
+        .buildSweepAllTxOutputsWithGas(
+          toLockupScript,
+          lockTimeOpt = None,
+          AVector(output),
+          gasOpt = None,
+          defaultGasPrice
+        )
+
+      def success(verify: ((AVector[TxOutputInfo], GasBox)) => Assertion) = {
+        verify(result.rightValue)
+      }
+
+      def failed(verify: (String) => Assertion) = {
+        verify(result.leftValue)
+      }
+    }
+
+    def verifyExtraOutput(output: TxOutputInfo) = {
+      output.alphAmount is minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
+      output.tokens.length is maxTokenPerUtxo
+    }
+
+    {
+      info("no tokens")
+      Test(AVector.empty).success { case (outputs, gas) =>
+        outputs.length is 1
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
+      }
+    }
+
+    {
+      info("token amount not more than `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(maxTokenPerUtxo) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      Test(tokens).success { case (outputs, gas) =>
+        outputs.length is 1
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 1)
+      }
+    }
+
+    {
+      info("token amount more than `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      Test(tokens).success { case (outputs, gas) =>
+        outputs.length is 2
+
+        outputs(0).alphAmount is ALPH
+          .alph(3)
+          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo))
+          .subUnsafe(defaultGasPrice * gas)
+        outputs(0).tokens.length is 1
+
+        verifyExtraOutput(outputs(1))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 2)
+      }
+    }
+
+    {
+      info("token amount a bit more than two times of `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(2 * maxTokenPerUtxo + 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      Test(tokens).success { case (outputs, gas) =>
+        outputs.length is 3
+
+        outputs(0).alphAmount is ALPH
+          .alph(3)
+          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(defaultGasPrice * gas)
+        outputs(0).tokens.length is 1
+
+        verifyExtraOutput(outputs(1))
+        verifyExtraOutput(outputs(2))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+      }
+    }
+
+    {
+      info("token amount three times of `maxTokenPerUtxo`")
+      val tokens = AVector.tabulate(3 * maxTokenPerUtxo) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      Test(tokens).success { case (outputs, gas) =>
+        outputs.length is 3
+
+        outputs(0).alphAmount is ALPH
+          .alph(3)
+          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(defaultGasPrice * gas)
+        outputs(0).tokens.length is maxTokenPerUtxo
+
+        verifyExtraOutput(outputs(1))
+        verifyExtraOutput(outputs(2))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+      }
+    }
+
+    {
+      info("The amount in the first output is below minimalAlphAmountPerTxOutput(tokens)")
+      val alphAmount = minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
+        .addUnsafe(defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(1, 3))
+        .addUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+
+      val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
+        val tokenId = Hash.hash(s"tokenId$i")
+        (tokenId, U256.unsafe(1))
+      }
+
+      Test(tokens, alphAmount).success { case (outputs, gas) =>
+        outputs.length is 3
+
+        outputs(0).alphAmount is minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
+        outputs(0).tokens.length is maxTokenPerUtxo - 1
+
+        verifyExtraOutput(outputs(1))
+        verifyExtraOutput(outputs(2))
+
+        gas is UtxoUtils.estimateSweepAllTxGas(1, 3)
+      }
+
+      Test(tokens, alphAmount.subUnsafe(1))
+        .failed(_ is "Not enough ALPH balance for transaction outputs")
+    }
+  }
+
+  "TxUtils.getFirstOutputTokensNum" should "return the number of tokens for the first output of the sweepAll transaction" in {
+    TxUtils.getFirstOutputTokensNum(0) is 0
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo) is maxTokenPerUtxo
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 1) is 1
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 10
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + maxTokenPerUtxo - 1) is maxTokenPerUtxo - 1
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo * 10) is maxTokenPerUtxo
   }
 
   trait LargeUtxos extends FlowFixture {
@@ -491,7 +729,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val tx         = block.nonCoinbase.head
     val output     = tx.unsigned.fixedOutputs.head
 
-    val n = ALPH.MaxTxInputNum + 1
+    val n = 3 * ALPH.MaxTxInputNum
 
     val outputs  = AVector.fill(n)(output.copy(amount = ALPH.oneAlph))
     val newTx    = Transaction.from(tx.unsigned.inputs, outputs, tx.inputSignatures)
@@ -505,6 +743,11 @@ class TxUtilsSpec extends AlephiumSpec {
     utxos is n
   }
 
+  it should "get all available utxos" in new LargeUtxos {
+    val fetchedUtxos = blockFlow.getUsableUtxos(output.lockupScript, n).rightValue
+    fetchedUtxos.length is n
+  }
+
   it should "transfer with large amount of UTXOs" in new LargeUtxos {
     val txValidation = TxValidation.build
     val unsignedTx0 = blockFlow
@@ -512,14 +755,15 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        ALPH.alph((n - 2).toLong),
+        ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
         Some(GasBox.unsafe(600000)),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
-    tx0.unsigned.inputs.length is n - 1
+    tx0.unsigned.inputs.length is ALPH.MaxTxInputNum
     tx0.inputSignatures.length is 1
     txValidation.validateTxOnlyForTest(tx0, blockFlow) isE ()
 
@@ -528,12 +772,13 @@ class TxUtilsSpec extends AlephiumSpec {
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,
-        ALPH.alph((n - 1).toLong),
+        ALPH.alph(ALPH.MaxTxInputNum.toLong),
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
-      .leftValue is s"Too many inputs for the transfer, consider to reduce the amount to send"
+      .leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-all` endpoint to consolidate the inputs first"
   }
 
   it should "sweep as much as we can" in new LargeUtxos {
@@ -544,7 +789,8 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue

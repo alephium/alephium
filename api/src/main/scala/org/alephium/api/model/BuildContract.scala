@@ -23,8 +23,9 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 final case class BuildContract(
     fromPublicKey: PublicKey,
     code: String,
+    state: Option[String] = None,
+    issueTokenAmount: Option[Amount] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
-    state: Option[String] = None,
-    issueTokenAmount: Option[Amount] = None
-)
+    utxosLimit: Option[Int] = None
+) extends UtxoBasedModel

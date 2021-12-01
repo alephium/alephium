@@ -83,7 +83,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val output                = AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
       addAndCheck(blockFlow, block)
 
-      blockFlow.transfer(lockup, unlock, output, None, defaultGasPrice).rightValue.rightValue
+      blockFlow
+        .transfer(lockup, unlock, output, None, defaultGasPrice, defaultUtxoLimit)
+        .rightValue
+        .rightValue
     }
 
     def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {

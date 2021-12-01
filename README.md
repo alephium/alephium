@@ -1,10 +1,10 @@
 Alephium
 =========
 [![codecov](https://codecov.io/gh/polarker/alephium/branch/master/graph/badge.svg?token=TAMKL8CWO3)](https://codecov.io/gh/polarker/alephium)
-[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/4BEUkc9zpA)
+[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/JErgRBfRSB)
 
 This repository contains the reference implementation of Alephium, a sharded
-blockchain that makes programmable money scalable and secure. For more information, please visit the [wiki](https://github.com/alephium/alephium/wiki).
+blockchain that makes programmable money scalable and secure. For more information, please visit the [wiki](https://wiki.alephium.org/).
 
 ## Overview
 
@@ -25,7 +25,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 * `Front-running mitigation` through random execution of transactions (see code, wiki to come)
 * PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
   * Adaptive rewards based on hashrate and timestamp are designed and implemented
-  * Internal mining cost through burning will be added when hashrate and energy consumption is significantly high
+  * Internal mining cost through burning will be activated when hashrate and energy consumption is significantly high
 
 ## Installation
 
@@ -33,7 +33,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 
 The following dependencies must be installed in order to run the JAR deliverable:
 
-- java (>= 8, 11 is recommended)
+- java (11, 17 are recommended)
 
 ### Running
 
@@ -46,7 +46,7 @@ You can obtain our latest single JAR distribution from the GitHub releases and s
 ### Requirements
 
 In order to build the project from source the following dependencies must be installed on your system:
-- java (>= 8, 11 is recommended)
+- java (11, 17 are recommended)
 - [SBT](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html)
 
 ### Single JAR

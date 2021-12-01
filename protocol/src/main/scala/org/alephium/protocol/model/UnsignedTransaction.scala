@@ -149,7 +149,10 @@ object UnsignedTransaction {
     val gasFee = gasPrice * gas
     for {
       _               <- checkWithMaxTxInputNum(inputs)
+      _               <- checkUniqueInputs(inputs)
       _               <- checkMinimalAlphPerOutput(outputs)
+      _               <- checkMaximumTokenNumPerOutput(outputs)
+      _               <- checkTokenValuesNonZero(outputs)
       alphRemainder   <- calculateAlphRemainder(inputs, outputs, gasFee)
       tokensRemainder <- calculateTokensRemainder(inputs, outputs)
       changeOutputOpt <- calculateChangeOutput(alphRemainder, tokensRemainder, fromLockupScript)
@@ -177,14 +180,22 @@ object UnsignedTransaction {
     }
   }
 
+  def checkUniqueInputs(
+      assets: AVector[(AssetOutputRef, AssetOutput)]
+  ): Either[String, Unit] = {
+    check(
+      failCondition = assets.length > assets.map(_._1).toSet.size,
+      "Inputs not unique"
+    )
+  }
+
   def checkWithMaxTxInputNum(
       assets: AVector[(AssetOutputRef, AssetOutput)]
   ): Either[String, Unit] = {
-    if (assets.length > ALPH.MaxTxInputNum) {
-      Left(s"Too many inputs for the transfer, consider to reduce the amount to send")
-    } else {
-      Right(())
-    }
+    check(
+      failCondition = assets.length > ALPH.MaxTxInputNum,
+      "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-all` endpoint to consolidate the inputs first"
+    )
   }
 
   def calculateAlphRemainder(
@@ -214,6 +225,8 @@ object UnsignedTransaction {
     }
   }
 
+  // TODO: Here if we have too many tokens in the change output, we could split it into
+  //       several change outputs so that the built transaction can still be valid
   def calculateChangeOutput(
       alphRemainder: U256,
       tokensRemainder: AVector[(TokenId, U256)],
@@ -221,11 +234,13 @@ object UnsignedTransaction {
   ): Either[String, Option[AssetOutput]] = {
     if (alphRemainder == U256.Zero && tokensRemainder.isEmpty) {
       Right(None)
+    } else if (tokensRemainder.length > maxTokenPerUtxo) {
+      Left(s"Too many tokens in the change output, maximal number $maxTokenPerUtxo")
     } else {
       if (alphRemainder > minimalAlphAmountPerTxOutput(tokensRemainder.length)) {
         Right(Some(TxOutput.asset(alphRemainder, tokensRemainder, fromLockupScript)))
       } else {
-        Left("Not enough Alph for change output")
+        Left("Not enough ALPH for change output")
       }
     }
   }
@@ -233,15 +248,30 @@ object UnsignedTransaction {
   private def checkMinimalAlphPerOutput(
       outputs: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
-    val notOk = outputs.exists { output =>
-      output.alphAmount < minimalAlphAmountPerTxOutput(output.tokens.length)
-    }
+    check(
+      failCondition = outputs.exists { output =>
+        output.alphAmount < minimalAlphAmountPerTxOutput(output.tokens.length)
+      },
+      "Not enough ALPH for transaction output"
+    )
+  }
 
-    if (notOk) {
-      Left("Not enough Alph for transaction output")
-    } else {
-      Right(())
-    }
+  private def checkMaximumTokenNumPerOutput(
+      outputs: AVector[TxOutputInfo]
+  ): Either[String, Unit] = {
+    check(
+      failCondition = outputs.exists(_.tokens.length > maxTokenPerUtxo),
+      s"Too many tokens in the transaction output, maximal number $maxTokenPerUtxo"
+    )
+  }
+
+  private def checkTokenValuesNonZero(
+      outputs: AVector[TxOutputInfo]
+  ): Either[String, Unit] = {
+    check(
+      failCondition = outputs.exists(_.tokens.exists(_._2.isZero)),
+      "Value is Zero for one or many tokens in the transaction output"
+    )
   }
 
   def calculateTotalAmountPerToken(
@@ -264,11 +294,10 @@ object UnsignedTransaction {
       outputs: AVector[(TokenId, U256)]
   ): Either[String, Unit] = {
     val newTokens = outputs.map(_._1).toSet -- inputs.map(_._1).toSet
-    if (newTokens.nonEmpty) {
-      Left(s"New tokens found in outputs: $newTokens")
-    } else {
-      Right(())
-    }
+    check(
+      failCondition = newTokens.nonEmpty,
+      s"New tokens found in outputs: $newTokens"
+    )
   }
 
   private def calculateRemainingTokens(
@@ -282,6 +311,10 @@ object UnsignedTransaction {
           acc :+ (inputId -> remainder)
       }
     }
+  }
+
+  @inline private def check(failCondition: Boolean, errorMessage: String): Either[String, Unit] = {
+    Either.cond(!failCondition, (), errorMessage)
   }
 
   final case class TxOutputInfo(

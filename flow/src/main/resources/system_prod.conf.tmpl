@@ -15,7 +15,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
-    max-clique-from-same-ip = 3
+    max-clique-from-same-ip = 2
 
     # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
@@ -98,11 +98,15 @@ alephium {
     api-key = null
     api-key = ${?ALEPHIUM_API_KEY}
     gas-fee-cap = "1000000000000000000"// 1 ALPH
+    default-utxos-limit = 512
   }
 
   wallet {
+    home-dir = ${user.home}
+    home-dir = ${?ALEPHIUM_WALLET_HOME}
+
     port = 15973
-    secret-dir = ${HOME}"/.alephium-wallets"
+    secret-dir = ${alephium.wallet.home-dir}"/.alephium-wallets"
     locking-timeout = 10 minutes
   }
 

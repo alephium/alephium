@@ -29,8 +29,10 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
 
   trait ApiConfigFixture extends SocketUtil {
     val peerPort             = generatePort()
@@ -41,7 +43,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
       None,
-      ALPH.oneAlph
+      ALPH.oneAlph,
+      defaultUtxosLimit
     )
   }
 
@@ -321,7 +324,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       // Spend 10 UTXOs and generate 1 output
       sweepAllTxTemplate.unsigned.fixedOutputs.length is 1
       sweepAllTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11)
+      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11, 1)
 
       checkAddressBalance(
         sweepAllToAddress,
@@ -354,7 +357,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         destinations,
         gasOpt = None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .rightValue
 
@@ -418,7 +422,8 @@ class ServerUtilsSpec extends AlephiumSpec {
           outputRefsOpt = Some(outputRefs),
           destinations,
           gasOpt = Some(minimalGas),
-          defaultGasPrice
+          defaultGasPrice,
+          defaultUtxosLimit
         )
         .rightValue
     }
@@ -437,7 +442,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .rightValue
 
@@ -504,10 +510,33 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Not enough balance"
+  }
+
+  it should "not create transaction with provided UTXOs, if they are not from the same group" in new MultipleUtxos {
+    utxos.length is 2
+
+    val outputRefs = AVector(
+      OutputRef(3, utxos(1).ref.key),
+      OutputRef(1, utxos(0).ref.key)
+    )
+
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        defaultGasPrice,
+        defaultUtxosLimit
+      )
+      .leftValue
+      .detail is "Selected UTXOs are not from the same group"
   }
 
   it should "not create transaction with empty provided UTXOs" in new MultipleUtxos {
@@ -518,17 +547,19 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(AVector.empty),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Empty UTXOs"
   }
 
-  it should "not create transaction without enough gas" in new MultipleUtxos {
+  it should "not create transaction with invalid gas amount" in new MultipleUtxos {
     val outputRefs = utxos.map { utxo =>
       OutputRef(utxo.ref.hint, utxo.ref.key)
     }
 
+    info("Gas amount too small")
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
@@ -536,10 +567,98 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
-      .detail is "Invalid gas GasBox(100), minimal GasBox(20000)"
+      .detail is "Gas GasBox(100) too small, minimal GasBox(20000)"
+
+    info("Gas amount too large")
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(GasBox.unsafe(625001)),
+        defaultGasPrice,
+        defaultUtxosLimit
+      )
+      .leftValue
+      .detail is "Gas GasBox(625001) too large, maximal GasBox(625000)"
+  }
+
+  it should "not create transaction with invalid gas price" in new MultipleUtxos {
+    val outputRefs = utxos.map { utxo =>
+      OutputRef(utxo.ref.hint, utxo.ref.key)
+    }
+
+    info("Gas price too small")
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        GasPrice(minimalGasPrice.value - 1),
+        defaultUtxosLimit
+      )
+      .leftValue
+      .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
+
+    info("Gas price too large")
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = Some(outputRefs),
+        destinations,
+        gasOpt = Some(minimalGas),
+        GasPrice(ALPH.MaxALPHValue),
+        defaultUtxosLimit
+      )
+      .leftValue
+      .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
+  }
+
+  it should "not create transaction with overflowing ALPH amount" in new MultipleUtxos {
+    val alphAmountOverflowDestinations = AVector(
+      destination1,
+      destination2.copy(amount = Amount(ALPH.MaxALPHValue))
+    )
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = None,
+        alphAmountOverflowDestinations,
+        gasOpt = Some(minimalGas),
+        defaultGasPrice,
+        defaultUtxosLimit
+      )
+      .leftValue
+      .detail is "ALPH amount overflow"
+  }
+
+  it should "not create transaction when with token amount overflow" in new MultipleUtxos {
+    val tokenId = Hash.hash("token1")
+    val tokenAmountOverflowDestinations = AVector(
+      destination1.copy(tokens = Some(AVector(Token(tokenId, U256.MaxValue)))),
+      destination2.copy(tokens = Some(AVector(Token(tokenId, U256.One))))
+    )
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        fromPublicKey,
+        outputRefsOpt = None,
+        tokenAmountOverflowDestinations,
+        gasOpt = Some(minimalGas),
+        defaultGasPrice,
+        defaultUtxosLimit
+      )
+      .leftValue
+      .detail is s"Amount overflow for token $tokenId"
   }
 
   it should "not create transaction when not all utxos are of asset type" in new MultipleUtxos {
@@ -554,27 +673,38 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxosLimit
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"
   }
 
-  "ServerUtils.buildTransaction" should "fail when there is no output" in new FlowFixtureWithApi {
+  "ServerUtils.buildTransaction" should "fail with invalid number of outputs" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
-    val destinations          = AVector.empty[Destination]
+    val emptyDestinations     = AVector.empty[Destination]
 
-    val buildTransaction = serverUtils
+    info("Output number is zero")
+    serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, destinations)
+        BuildTransaction(fromPublicKey, emptyDestinations)
       )
       .leftValue
+      .detail is "Zero transaction outputs"
 
-    buildTransaction.detail is "Zero transaction outputs"
+    info("Too many outputs")
+    val tooManyDestinations = AVector.fill(ALPH.MaxTxOutputNum + 1)(generateDestination(chainIndex))
+    serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey, tooManyDestinations)
+      )
+      .leftValue
+      .detail is "Too many transaction outputs, maximal value: 256"
   }
 
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {

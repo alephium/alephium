@@ -576,7 +576,15 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val unsigned =
         blockFlow
-          .transfer(publicKey, toLockupScript, lockTimeOpt, ALPH.alph(1), None, defaultGasPrice)
+          .transfer(
+            publicKey,
+            toLockupScript,
+            lockTimeOpt,
+            ALPH.alph(1),
+            None,
+            defaultGasPrice,
+            defaultUtxoLimit
+          )
           .rightValue
           .rightValue
       unsigned.fixedOutputs.length is 2
@@ -606,7 +614,8 @@ class BlockFlowSpec extends AlephiumSpec {
         None,
         ALPH.nanoAlph(1000),
         None,
-        defaultGasPrice
+        defaultGasPrice,
+        defaultUtxoLimit
       )
       .rightValue
       .leftValue
@@ -619,7 +628,8 @@ class BlockFlowSpec extends AlephiumSpec {
           None,
           ALPH.nanoAlph(1000),
           None,
-          defaultGasPrice
+          defaultGasPrice,
+          defaultUtxoLimit
         )
         .rightValue
         .isRight is true
@@ -642,7 +652,15 @@ class BlockFlowSpec extends AlephiumSpec {
       val (_, toPubKey)  = toGroup.generateKey
       val toLockupScript = LockupScript.p2pkh(toPubKey)
       val unsignedTx = blockFlow
-        .transfer(fromPubKey, toLockupScript, None, ALPH.oneAlph, None, defaultGasPrice)
+        .transfer(
+          fromPubKey,
+          toLockupScript,
+          None,
+          ALPH.oneAlph,
+          None,
+          defaultGasPrice,
+          defaultUtxoLimit
+        )
         .rightValue
         .rightValue
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)

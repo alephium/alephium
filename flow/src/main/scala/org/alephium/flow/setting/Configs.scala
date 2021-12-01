@@ -134,8 +134,9 @@ object Configs extends StrictLogging {
   }
 
   def parseConfig(env: Env, rootPath: Path, overwrite: Boolean, predefined: Config): Config = {
+    val initialConfig = ConfigFactory.systemProperties().withFallback(predefined)
     val resultEither = for {
-      userConfig <- parseConfigFile(getConfigUser(rootPath)).map(predefined.withFallback(_))
+      userConfig <- parseConfigFile(getConfigUser(rootPath)).map(initialConfig.withFallback(_))
       networkId  <- parseNetworkId(userConfig)
       _          <- checkRootPath(rootPath, networkId)
       nodePath = getNodePath(rootPath, networkId)
