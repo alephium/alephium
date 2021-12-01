@@ -52,7 +52,7 @@ In order to build the project from source the following dependencies must be ins
 ### Single JAR
 
 Use the following command to build a single runnable JAR :
-  
+
     make assembly
 
 The resulting assembly file will appear in `/app/target/scala-2.13/` directory.
@@ -81,3 +81,7 @@ There are two kinds of tests:
 
 1) Unit tests and property based tests, which can be run with the `make test` command.
 2) Integration tests, which can be run with the `make itest` command.
+
+## Contribution
+
+Have a look at our contribution guide described in [CONTRIBUTING.md](CONTRIBUTING.md)
