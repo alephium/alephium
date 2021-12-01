@@ -22,32 +22,20 @@ jobs:
           echo ::set-output name=VERSION::$version
         shell: bash
       - run: make assembly
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Generate checksums (Release prep)
+        run: |
+             cd app/target/scala-2.13/
+             sha256sum "alephium-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-${{ steps.get_version.outputs.VERSION }}.jar.checksum"
+             cd ../../../wallet/target/scala-2.13/
+             sha256sum "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.checksum"
+             cd ../../../
+      
+      - name: Release
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          release_name: v${{ steps.get_version.outputs.VERSION }}
-          body: Some solid code
-          draft: false
-          prerelease: false
-      - name: Upload Alephium App Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar
-          asset_name: alephium-${{ steps.get_version.outputs.VERSION }}.jar
-          asset_content_type: application/java-archive
-      - name: Upload Alephium Wallet Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
-          asset_name: alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
-          asset_content_type: application/java-archive
+          files: |
+            app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar
+            app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar.checksum
+            wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
+            wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.checksum
