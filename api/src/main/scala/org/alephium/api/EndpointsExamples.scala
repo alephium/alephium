@@ -129,11 +129,11 @@ trait EndpointsExamples extends ErrorExamples {
     height,
     deps = AVector(blockHash, blockHash),
     transactions = AVector(transaction),
-    ByteString.empty,
+    hash.bytes,
     1.toByte,
     hash,
     hash,
-    ByteString.empty
+    hash.bytes
   )
 
   private val blockCandidate = BlockCandidate(
