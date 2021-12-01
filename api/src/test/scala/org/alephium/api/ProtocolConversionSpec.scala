@@ -55,5 +55,9 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
     Transaction.fromProtocol(transaction).toProtocol() isE transaction
   }
 
+  it should "convert TransactionTemplate" in new Fixture {
+    TransactionTemplate.fromProtocol(transactionTemplate).toProtocol() isE transactionTemplate
+  }
+
   trait Fixture extends ApiModelFixture
 }

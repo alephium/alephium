@@ -23,8 +23,8 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.UtilJson._
+import org.alephium.api.{model => api}
 import org.alephium.api.model._
-import org.alephium.api.model.{Transaction => ApiTransaction}
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
@@ -860,13 +860,25 @@ class ApiModelSpec
   }
 
   it should "encode/decode Transaction" in {
-    val tx      = ApiTransaction.fromProtocol(transaction)
+    val tx      = api.Transaction.fromProtocol(transaction)
     val jsonRaw = s"""
        |{
        |  "unsigned": ${write(tx.unsigned)},
        |  "scriptExecutionOk": ${tx.scriptExecutionOk},
        |  "contractInputs": ${write(tx.contractInputs)},
        |  "generatedOutputs": ${write(tx.generatedOutputs)},
+       |  "inputSignatures": ${write(tx.inputSignatures)},
+       |  "scriptSignatures": ${write(tx.scriptSignatures)}
+       |}""".stripMargin
+
+    checkData(tx, jsonRaw)
+  }
+
+  it should "encode/decode TransactionTemplate" in {
+    val tx      = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val jsonRaw = s"""
+       |{
+       |  "unsigned": ${write(tx.unsigned)},
        |  "inputSignatures": ${write(tx.inputSignatures)},
        |  "scriptSignatures": ${write(tx.scriptSignatures)}
        |}""".stripMargin

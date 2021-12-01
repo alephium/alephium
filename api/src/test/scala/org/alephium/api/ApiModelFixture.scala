@@ -73,4 +73,10 @@ trait ApiModelFixture
     AVector(sigature),
     AVector(sigature)
   )
+
+  val transactionTemplate = TransactionTemplate(
+    unsignedTransaction,
+    AVector(sigature),
+    AVector(sigature)
+  )
 }

@@ -30,7 +30,7 @@ import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Transaction => _, _}
+import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.RandomBytes
 import org.alephium.util._
@@ -188,6 +188,8 @@ trait ApiModelCodec {
   implicit val txRW: RW[Tx] = macroRW
 
   implicit val unsignedTxRW: RW[UnsignedTx] = macroRW
+
+  implicit val transactionTemplateRW: RW[TransactionTemplate] = macroRW
 
   implicit val transactionRW: RW[Transaction] = macroRW
 
