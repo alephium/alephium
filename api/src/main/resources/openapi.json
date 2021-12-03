@@ -1014,7 +1014,7 @@
         "tags": [
           "Wallets"
         ],
-        "summary": "Transfer ALPH",
+        "summary": "Transfer ALPH from the active address",
         "operationId": "postWalletsWallet_nameTransfer",
         "parameters": [
           {
@@ -1164,7 +1164,7 @@
         "tags": [
           "Wallets"
         ],
-        "summary": "Transfer all ALPH to an address",
+        "summary": "Transfer all unlocked ALPH from the active address to another address",
         "operationId": "postWalletsWallet_nameSweep-all",
         "parameters": [
           {
