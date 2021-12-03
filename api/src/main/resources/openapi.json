@@ -4432,7 +4432,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "string"
+                "$ref": "#/components/schemas/Script"
               },
               "example": {
                 "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n, 1024) } }"
@@ -4655,7 +4655,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "string"
+                "$ref": "#/components/schemas/Contract2"
               },
               "example": {
                 "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
@@ -6430,6 +6430,17 @@
           }
         }
       },
+      "Contract2": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
       "ContractStateResult": {
         "required": [
           "fields"
@@ -6906,6 +6917,17 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          }
+        }
+      },
+      "Script": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
             "type": "string"
           }
         }

@@ -110,7 +110,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def request[T: Reader](request: Int => HttpRequest, port: Int): T = {
     eventually {
       val response = request(port).send(backend).futureValue
-
       val body = response.body match {
         case Right(r) => r
         case Left(l)  => l
@@ -369,8 +368,14 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def getBalance(address: String) =
     httpGet(s"/addresses/$address/balance")
 
+  def getUTXOs(address: String) =
+    httpGet(s"/addresses/$address/utxos")
+
   def getChainInfo(fromGroup: Int, toGroup: Int) =
     httpGet(s"/blockflow/chain-info?fromGroup=$fromGroup&toGroup=$toGroup")
+
+  def getBlockHash(blockHash: String) =
+    httpGet(s"/blockflow/blocks/$blockHash")
 
   def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
     httpPost(
@@ -414,10 +419,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def createWallet(password: String, walletName: String) =
+  def createWallet(password: String, walletName: String, isMiner: Boolean = false) =
     httpPost(
       s"/wallets",
-      Some(s"""{"password":"${password}","walletName":"$walletName"}""")
+      Some(s"""{"password":"${password}","walletName":"$walletName", "isMiner": ${isMiner}}""")
     )
 
   def restoreWallet(password: String, mnemonic: String, walletName: String) =
@@ -426,10 +431,23 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       Some(s"""{"password":"${password}","mnemonic":"${mnemonic}","walletName":"$walletName"}""")
     )
 
+  def unlockWallet(password: String, walletName: String) =
+    httpPost(
+      s"/wallets/${walletName}/unlock",
+      Some(s"""{"password": "${password}"}""")
+    )
+
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
       Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}","tokens":[]}]}""")
+    )
+  }
+
+  def postWalletChangeActiveAddress(walletName: String, address: String) = {
+    httpPost(
+      s"/wallets/${walletName}/change-active-address",
+      Some(s"""{"address": "${address}"}""")
     )
   }
 
@@ -531,6 +549,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(s"/contracts/compile-contract", Some(contract))
   }
 
+  def getContractState(address: String, group: Int) = {
+    httpGet(s"/contracts/${address}/state?group=${group}")
+  }
+
   def multisig(keys: AVector[String], mrequired: Int) = {
     val body = s"""
         |{
@@ -548,6 +570,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         |}
         """.stripMargin
     httpPost(s"/transactions/decode", maybeBody = Some(body))
+  }
+
+  def getMinerAddresses(walletName: String) = {
+    httpGet(s"/wallets/${walletName}/miner-addresses")
   }
 
   def buildContract(
