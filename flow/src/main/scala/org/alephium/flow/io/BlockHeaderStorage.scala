@@ -16,15 +16,19 @@
 
 package org.alephium.flow.io
 
-import org.rocksdb.{ReadOptions, WriteOptions}
-
 import org.alephium.io._
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BlockHeader
-import org.alephium.storage.{ColumnFamily, KeyValueStorage}
-import org.alephium.storage.rocksdb.{RocksDBKeyValueCompanion, RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
 
-trait BlockHeaderStorage extends KeyValueStorage[BlockHash, BlockHeader] {
+object BlockHeaderStorage {
+  def apply(storage: KeyValueSource, cf: ColumnFamily): BlockHeaderStorage = {
+    new BlockHeaderStorage(storage, cf)
+  }
+}
+
+class BlockHeaderStorage(val storage: KeyValueSource, cf: ColumnFamily)
+    extends KeyValueStorage[BlockHash, BlockHeader](storage, cf) {
   def put(blockHeader: BlockHeader): IOResult[Unit] = put(blockHeader.hash, blockHeader)
 
   def putUnsafe(blockHeader: BlockHeader): Unit = putUnsafe(blockHeader.hash, blockHeader)
@@ -37,22 +41,3 @@ trait BlockHeaderStorage extends KeyValueStorage[BlockHash, BlockHeader] {
 
   def deleteUnsafe(blockHeader: BlockHeader): Unit = deleteUnsafe(blockHeader.hash)
 }
-
-object BlockHeaderRockDBStorage extends RocksDBKeyValueCompanion[BlockHeaderRockDBStorage] {
-  def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): BlockHeaderRockDBStorage = {
-    new BlockHeaderRockDBStorage(storage, cf, writeOptions, readOptions)
-  }
-}
-
-class BlockHeaderRockDBStorage(
-    val storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[BlockHash, BlockHeader](storage, cf, writeOptions, readOptions)
-    with BlockHeaderStorage {}

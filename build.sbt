@@ -95,7 +95,18 @@ lazy val storage = project("storage")
   .dependsOn(util % "test->test;compile->compile", io)
 
 lazy val cache = project("cache")
-  .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
+  .dependsOn(
+    util % "test->test;compile->compile",
+    serde,
+    crypto,
+    storage,
+    activeStorageEngine % Test
+  )
+
+/** Sets the target storage engine to use for the build.
+  * Choose either [[storageRocksDB]] or [[storageSwayDB]]
+  */
+lazy val activeStorageEngine = storageRocksDB
 
 lazy val storageRocksDB = project("storage-rocksdb")
   .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
@@ -278,8 +289,7 @@ lazy val flow = project("flow")
     ),
     publish / skip := true
   )
-  //fixme - storageRocksDB should be storage
-  .dependsOn(protocol % "test->test;compile->compile", storageRocksDB)
+  .dependsOn(protocol % "test->test;compile->compile", activeStorageEngine)
 
 lazy val protocol = project("protocol")
   .enablePlugins(BuildInfoPlugin)
@@ -288,7 +298,14 @@ lazy val protocol = project("protocol")
     buildInfoPackage := "org.alephium.protocol",
     buildInfoUsePackageAsPath := true
   )
-  .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test", cache)
+  .dependsOn(
+    crypto,
+    io % "compile->compile;test->test",
+    serde,
+    util % "test->test",
+    cache,
+    activeStorageEngine % Test
+  )
   .settings(
     libraryDependencies ++= Seq(
       `prometheus-simple-client`,

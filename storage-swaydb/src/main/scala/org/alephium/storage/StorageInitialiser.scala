@@ -14,26 +14,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.io
+package org.alephium.storage
 
-import org.alephium.io._
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.Block
-import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
+import java.nio.file.Path
 
-object BlockStorage {
-  def apply(storage: KeyValueSource, cf: ColumnFamily): BlockStorage = {
-    new BlockStorage(storage, cf)
-  }
-}
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.storage.setting.StorageSetting
+import org.alephium.storage.swaydb.SwayDBSource
 
-class BlockStorage(val storage: KeyValueSource, cf: ColumnFamily)
-    extends KeyValueStorage[BlockHash, Block](storage, cf) {
-  def put(block: Block): IOResult[Unit] = put(block.hash, block)
+object StorageInitialiser extends KeyValueStorageInitialiser {
 
-  def putUnsafe(block: Block): Unit = putUnsafe(block.hash, block)
+  override def open(
+      path: Path,
+      setting: StorageSetting,
+      columns: Iterable[ColumnFamily]
+  ): IOResult[KeyValueSource] =
+    IOUtils.tryOpenStorage(SwayDBSource.defaultUnsafe(path))
 
-  override def delete(key: BlockHash): IOResult[Unit] = ???
-
-  override def deleteUnsafe(key: BlockHash): Unit = ???
+  override def openUnsafe(
+      path: Path,
+      setting: StorageSetting,
+      columns: Iterable[ColumnFamily]
+  ): KeyValueSource =
+    SwayDBSource.defaultUnsafe(path)
 }

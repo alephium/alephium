@@ -19,18 +19,18 @@ package org.alephium.flow.io
 import org.alephium.io.IOError
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
-import org.alephium.storage.ColumnFamily
-import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.{ColumnFamily, KeyValueSource, StorageInitialiser}
+import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.AlephiumSpec
 
 class BlockHeaderStorageSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
-    with StorageSpec[BlockHeaderRockDBStorage] {
+    with StorageSpec[BlockHeaderStorage] {
 
   override val dbname: String = "block-header-storage-spec"
-  override val builder: RocksDBSource => BlockHeaderRockDBStorage =
-    source => BlockHeaderRockDBStorage(source, ColumnFamily.All)
+  override val builder: KeyValueSource => BlockHeaderStorage =
+    source => BlockHeaderStorage(source, ColumnFamily.All)
 
   def generate(): BlockHeader = {
     val block = blockGen.sample.get
@@ -38,7 +38,12 @@ class BlockHeaderStorageSpec
   }
 
   it should "create database" in {
-    RocksDBSource.open(dbPath, RocksDBSource.Compaction.HDD).isLeft is true
+    StorageInitialiser
+      .open(
+        path = dbPath,
+        setting = StorageSetting.syncWriteHDD(),
+        columns = ColumnFamily.values.toIterable
+      ).isLeft is true
   }
 
   it should "check existence" in {

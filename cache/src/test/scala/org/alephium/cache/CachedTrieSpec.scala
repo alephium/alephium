@@ -23,7 +23,6 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.io.IOError
-import org.alephium.storage.StorageFixture
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.Bytes.byteStringOrdering
 

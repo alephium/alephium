@@ -16,14 +16,32 @@
 
 package org.alephium.storage
 
-import org.alephium.io.IOResult
+/** Unsafe trait for target storage-engine access.
+  *
+  * This API is restricted for storages projects only since it's unsafe.
+  *
+  * Use [[KeyValueStorage]] instead for safer public APIs per [[ColumnFamily]].
+  */
+trait KeyValueSource extends KeyValueSourceDestroyable {
 
-trait KeyValueSource {
-  def close(): IOResult[Unit]
+  type COLUMN
 
-  def closeUnsafe(): Unit
+  private[storage] def getColumnUnsafe(column: ColumnFamily): COLUMN
 
-  def dESTROY(): IOResult[Unit]
+  private[storage] def getUnsafe(column: COLUMN, key: Array[Byte]): Option[Array[Byte]]
 
-  def dESTROYUnsafe(): Unit
+  private[storage] def existsUnsafe(column: COLUMN, key: Array[Byte]): Boolean
+
+  private[storage] def putUnsafe(column: COLUMN, key: Array[Byte], value: Array[Byte]): Unit
+
+  private[storage] def deleteUnsafe(column: COLUMN, key: Array[Byte]): Unit
+
+  private[storage] def deleteRangeUnsafe(
+      column: COLUMN,
+      fromKey: Array[Byte],
+      toKey: Array[Byte]
+  ): Unit
+
+  private[storage] def iterateUnsafe(column: COLUMN, f: (Array[Byte], Array[Byte]) => Unit): Unit
+
 }

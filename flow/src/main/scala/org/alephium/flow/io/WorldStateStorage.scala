@@ -17,18 +17,28 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.cache.SparseMerkleTrie
 import org.alephium.io._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.vm.WorldState
-import org.alephium.storage.{ColumnFamily, KeyValueStorage}
-import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.storage.rocksdb.RocksDBSource.Settings
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
 
-trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
-  val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
+object WorldStateStorage {
+  def apply(
+      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      storage: KeyValueSource,
+      cf: ColumnFamily
+  ): WorldStateStorage = {
+    new WorldStateStorage(trieStorage, storage, cf)
+  }
+}
+
+class WorldStateStorage(
+    val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+    storage: KeyValueSource,
+    cf: ColumnFamily
+) extends KeyValueStorage[BlockHash, WorldState.Hashes](storage, cf) {
 
   override def storageKey(key: BlockHash): ByteString =
     key.bytes ++ ByteString(Storages.trieHashPostfix)
@@ -49,38 +59,3 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
     put(hash, worldState.toHashes)
   }
 }
-
-object WorldStateRockDBStorage {
-  def apply(
-      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions
-  ): WorldStateRockDBStorage = {
-    new WorldStateRockDBStorage(trieStorage, storage, cf, writeOptions, Settings.readOptions)
-  }
-
-  def apply(
-      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): WorldStateRockDBStorage = {
-    new WorldStateRockDBStorage(trieStorage, storage, cf, writeOptions, readOptions)
-  }
-}
-
-class WorldStateRockDBStorage(
-    val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-    storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[BlockHash, WorldState.Hashes](
-      storage,
-      cf,
-      writeOptions,
-      readOptions
-    )
-    with WorldStateStorage

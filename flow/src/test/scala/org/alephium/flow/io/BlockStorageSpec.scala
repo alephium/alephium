@@ -17,18 +17,17 @@
 package org.alephium.flow.io
 
 import org.alephium.protocol.model.NoIndexModelGenerators
-import org.alephium.storage.ColumnFamily
-import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.{ColumnFamily, KeyValueSource}
 import org.alephium.util.AlephiumSpec
 
 class BlockStorageSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
-    with StorageSpec[BlockRockDBStorage] {
+    with StorageSpec[BlockStorage] {
 
   override val dbname: String = "block-storage-spec"
-  override val builder: RocksDBSource => BlockRockDBStorage =
-    source => BlockRockDBStorage(source, ColumnFamily.All)
+  override val builder: KeyValueSource => BlockStorage =
+    source => BlockStorage(source, ColumnFamily.All)
 
   it should "save and read blocks" in {
     forAll(blockGen) { block =>

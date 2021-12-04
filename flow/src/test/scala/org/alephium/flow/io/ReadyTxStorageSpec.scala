@@ -20,18 +20,17 @@ import org.alephium.flow.model.ReadyTxInfo
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{Generators, Hash}
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.storage.ColumnFamily
-import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.{ColumnFamily, KeyValueSource}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ReadyTxStorageSpec
     extends AlephiumSpec
-    with StorageSpec[ReadyTxRocksDBStorage]
+    with StorageSpec[ReadyTxStorage]
     with AlephiumConfigFixture {
 
   override val dbname: String = "ready-tx-storage-spec"
-  override val builder: RocksDBSource => ReadyTxRocksDBStorage =
-    source => ReadyTxRocksDBStorage(source, ColumnFamily.PendingTx)
+  override val builder: KeyValueSource => ReadyTxStorage =
+    source => ReadyTxStorage(source, ColumnFamily.PendingTx)
 
   it should "exists/put/get/remove for tx id" in new Generators {
     forAll(hashGen, chainIndexGen) { (hash, chainIndex) =>

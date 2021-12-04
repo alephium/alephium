@@ -17,38 +17,19 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.model.BlockState
 import org.alephium.protocol.BlockHash
-import org.alephium.storage.KeyValueStorage
-import org.alephium.storage.rocksdb.{
-  RocksDBKeyValueCompanion,
-  RocksDBKeyValueStorage,
-  RocksDBSource
-}
-import org.alephium.storage.ColumnFamily
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
 
-trait BlockStateStorage extends KeyValueStorage[BlockHash, BlockState] {
-  override def storageKey(key: BlockHash): ByteString =
-    key.bytes ++ ByteString(Storages.blockStatePostfix)
-}
-
-object BlockStateRockDBStorage extends RocksDBKeyValueCompanion[BlockStateRockDBStorage] {
-  def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): BlockStateRockDBStorage = {
-    new BlockStateRockDBStorage(storage, cf, writeOptions, readOptions)
+object BlockStateStorage {
+  def apply(storage: KeyValueSource, cf: ColumnFamily): BlockStateStorage = {
+    new BlockStateStorage(storage, cf)
   }
 }
 
-class BlockStateRockDBStorage(
-    storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[BlockHash, BlockState](storage, cf, writeOptions, readOptions)
-    with BlockStateStorage
+class BlockStateStorage(storage: KeyValueSource, cf: ColumnFamily)
+    extends KeyValueStorage[BlockHash, BlockState](storage, cf) {
+  override def storageKey(key: BlockHash): ByteString =
+    key.bytes ++ ByteString(Storages.blockStatePostfix)
+}

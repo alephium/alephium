@@ -16,47 +16,19 @@
 
 package org.alephium.flow.io
 
-import org.rocksdb.{ReadOptions, WriteOptions}
-
 import org.alephium.flow.model.ReadyTxInfo
 import org.alephium.io._
 import org.alephium.protocol.Hash
-import org.alephium.storage.{ColumnFamily, KeyValueStorage}
-import org.alephium.storage.rocksdb.{
-  RocksDBKeyValueCompanion,
-  RocksDBKeyValueStorage,
-  RocksDBSource
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
+
+object ReadyTxStorage {
+  def apply(storage: KeyValueSource, cf: ColumnFamily): ReadyTxStorage =
+    new ReadyTxStorage(storage, cf)
 }
 
-trait ReadyTxStorage extends KeyValueStorage[Hash, ReadyTxInfo] {
-  def iterateE(f: (Hash, ReadyTxInfo) => IOResult[Unit]): IOResult[Unit]
-  def iterate(f: (Hash, ReadyTxInfo) => Unit): IOResult[Unit]
-  def clear(): IOResult[Unit]
-}
-
-object ReadyTxRocksDBStorage extends RocksDBKeyValueCompanion[ReadyTxRocksDBStorage] {
-  def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): ReadyTxRocksDBStorage =
-    new ReadyTxRocksDBStorage(storage, cf, writeOptions, readOptions)
-}
-
-class ReadyTxRocksDBStorage(
-    val storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, ReadyTxInfo](
-      storage,
-      cf,
-      writeOptions,
-      readOptions
-    )
-    with ReadyTxStorage {
-  override def clear(): IOResult[Unit] = {
+class ReadyTxStorage(val storage: KeyValueSource, cf: ColumnFamily)
+    extends KeyValueStorage[Hash, ReadyTxInfo](storage, cf) {
+  def clear(): IOResult[Unit] = {
     iterateE((key, _) => delete(key))
   }
 }

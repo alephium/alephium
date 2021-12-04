@@ -16,9 +16,8 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.cache.SparseMerkleTrie
+import org.alephium.cache.{SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
-import org.alephium.storage.StorageFixture
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {

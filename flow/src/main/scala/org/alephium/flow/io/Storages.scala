@@ -18,15 +18,13 @@ package org.alephium.flow.io
 
 import java.nio.file.Path
 
-import org.rocksdb.WriteOptions
-
 import org.alephium.cache.SparseMerkleTrie.Node
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.WorldState
-import org.alephium.storage.{ColumnFamily, KeyValueSource}
-import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.storage._
+import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.AVector
 
 object Storages {
@@ -38,20 +36,20 @@ object Storages {
   val dbVersionPostfix: Byte     = 5
   val bootstrapInfoPostFix: Byte = 6
 
-  def createUnsafe(rootPath: Path, dbFolder: String, writeOptions: WriteOptions)(implicit
+  def createUnsafe(rootPath: Path, dbFolder: String, settings: StorageSetting)(implicit
       config: GroupConfig
   ): Storages = {
-    val db                = createRocksDBUnsafe(rootPath, dbFolder)
-    val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
-    val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
-    val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
-    val txStorage         = TxRocksDBStorage(db, ColumnFamily.All, writeOptions)
-    val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
-    val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
-    val trieHashStorage   = WorldStateRockDBStorage(trieStorage, db, ColumnFamily.All, writeOptions)
+    val db                = createStorageUnsafe(rootPath, dbFolder, settings)
+    val blockStorage      = BlockStorage(db, ColumnFamily.Block)
+    val headerStorage     = BlockHeaderStorage(db, ColumnFamily.Header)
+    val blockStateStorage = BlockStateStorage(db, ColumnFamily.All)
+    val txStorage         = TxStorage(db, ColumnFamily.All)
+    val nodeStateStorage  = NodeStateStorage(db, ColumnFamily.All)
+    val trieStorage       = KeyValueStorage[Hash, Node](db, ColumnFamily.Trie)
+    val trieHashStorage   = WorldStateStorage(trieStorage, db, ColumnFamily.All)
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage)
-    val pendingTxStorage  = PendingTxRocksDBStorage(db, ColumnFamily.PendingTx, writeOptions)
-    val readyTxStorage    = ReadyTxRocksDBStorage(db, ColumnFamily.ReadyTx, writeOptions)
+    val pendingTxStorage  = PendingTxStorage(db, ColumnFamily.PendingTx)
+    val readyTxStorage    = ReadyTxStorage(db, ColumnFamily.ReadyTx)
 
     Storages(
       AVector(db),
@@ -67,9 +65,13 @@ object Storages {
     )
   }
 
-  private def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
+  private def createStorageUnsafe(
+      rootPath: Path,
+      dbFolder: String,
+      settings: StorageSetting
+  ): KeyValueSource = {
     val dbPath = rootPath.resolve(dbFolder)
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    StorageInitialiser.openUnsafe(dbPath, settings, ColumnFamily.values.toIterable)
   }
 }
 
@@ -84,12 +86,9 @@ final case class Storages(
     nodeStateStorage: NodeStateStorage,
     pendingTxStorage: PendingTxStorage,
     readyTxStorage: ReadyTxStorage
-) extends KeyValueSource {
-  def close(): IOResult[Unit] = sources.foreachE(_.close())
+) extends KeyValueSourceDestroyable {
 
   def closeUnsafe(): Unit = sources.foreach(_.close())
-
-  def dESTROY(): IOResult[Unit] = sources.foreachE(_.dESTROY())
 
   def dESTROYUnsafe(): Unit = sources.foreach(_.dESTROYUnsafe())
 }

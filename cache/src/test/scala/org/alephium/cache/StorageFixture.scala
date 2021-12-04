@@ -1,0 +1,41 @@
+// Copyright 2018 The Alephium Authors
+// This file is part of the alephium project.
+//
+// The library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the library. If not, see <http://www.gnu.org/licenses/>.
+
+package org.alephium.cache
+
+import org.scalatest.Assertion
+
+import org.alephium.crypto.Keccak256
+import org.alephium.serde.Serde
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage, StorageInitialiser}
+import org.alephium.storage.setting.StorageSetting
+import org.alephium.util.{AlephiumFixture, Files}
+
+trait StorageFixture extends AlephiumFixture {
+  private lazy val tmpdir = Files.tmpDir
+  private lazy val dbname = s"test-db-${Keccak256.generate.toHexString}"
+  private lazy val dbPath = tmpdir.resolve(dbname)
+
+  private lazy val storage: KeyValueSource =
+    StorageInitialiser.openUnsafe(dbPath, StorageSetting.syncWriteHDD(), ColumnFamily.values.toIterable)
+
+  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] =
+    KeyValueStorage[K, V](storage, ColumnFamily.All)
+
+  protected def postTest(): Assertion = {
+    storage.dESTROY().isRight is true
+  }
+}

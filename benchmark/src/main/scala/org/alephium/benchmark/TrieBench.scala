@@ -23,8 +23,8 @@ import org.openjdk.jmh.annotations._
 import org.alephium.cache.SparseMerkleTrie
 import org.alephium.cache.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
-import org.alephium.storage.{ColumnFamily, KeyValueStorage}
-import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage, StorageInitialiser}
+import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -36,15 +36,19 @@ class TrieBench {
   private val dbname = "trie"
   private val dbPath = tmpdir.resolve(dbname)
 
-  val dbStorage: RocksDBSource = {
+  val dbStorage: KeyValueSource = {
     val files = dbPath.toFile.listFiles
     if (files != null) {
       files.foreach(_.delete)
     }
 
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
+    StorageInitialiser.openUnsafe(
+      path = dbPath,
+      setting = StorageSetting.syncWriteHDD(),
+      columns = ColumnFamily.values.toIterable
+    )
   }
-  val db: KeyValueStorage[Hash, Node]    = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
+  val db: KeyValueStorage[Hash, Node]    = KeyValueStorage(dbStorage, ColumnFamily.Trie)
   val trie: SparseMerkleTrie[Hash, Hash] = SparseMerkleTrie.build(db, Hash.zero, Hash.zero)
   val genesisHash: Hash                  = trie.rootHash
 

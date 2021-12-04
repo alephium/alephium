@@ -17,26 +17,19 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
-import org.alephium.storage.ColumnFamily
-import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
 import org.alephium.util.{AVector, Bytes}
 
 object HeightIndexStorage {
   implicit val hashesSerde: Serde[AVector[BlockHash]] = avectorSerde[BlockHash]
 }
 
-class HeightIndexStorage(
-    chainIndex: ChainIndex,
-    storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Int, AVector[BlockHash]](storage, cf, writeOptions, readOptions) {
+class HeightIndexStorage(chainIndex: ChainIndex, storage: KeyValueSource, cf: ColumnFamily)
+    extends KeyValueStorage[Int, AVector[BlockHash]](storage, cf) {
   private val postFix =
     ByteString(chainIndex.from.value.toByte, chainIndex.to.value.toByte, Storages.heightPostfix)
 

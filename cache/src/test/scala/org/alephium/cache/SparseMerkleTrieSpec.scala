@@ -25,7 +25,6 @@ import org.scalatest.Assertion
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.io.IOError
 import org.alephium.serde._
-import org.alephium.storage.StorageFixture
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class SparseMerkleTrieSpec extends AlephiumSpec {

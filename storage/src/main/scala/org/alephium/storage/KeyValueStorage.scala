@@ -18,77 +18,121 @@ package org.alephium.storage
 
 import akka.util.ByteString
 
-import org.alephium.io.IOResult
-import org.alephium.io.IOUtils
-import org.alephium.serde.*
+import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOUtils.tryExecute
+import org.alephium.serde.{deserialize, serialize, Serde}
 
-trait AbstractKeyValueStorage[K, V] {
+/** Storage-engine agnostic implementation per [[ColumnFamily]]
+  *
+  * @param source Target storage engine.
+  * @param columnFamily Target [[ColumnFamily]]
+  */
+abstract class KeyValueStorage[K: Serde, V: Serde](
+    source: KeyValueSource,
+    columnFamily: ColumnFamily
+) {
 
-  implicit def keySerde: Serde[K]
-  implicit def valueSerde: Serde[V]
+  private val column = source.getColumnUnsafe(columnFamily)
 
-  def get(key: K): IOResult[V]
+  def storageKey(key: K): ByteString = serialize(key)
 
-  def getUnsafe(key: K): V
-
-  def getOpt(key: K): IOResult[Option[V]]
-
-  def getOptUnsafe(key: K): Option[V]
-
-  def put(key: K, value: V): IOResult[Unit]
-
-  def putUnsafe(key: K, value: V): Unit
-
-  def exists(key: K): IOResult[Boolean]
-
-  def existsUnsafe(key: K): Boolean
-
-  def delete(key: K): IOResult[Unit]
-
-  def deleteUnsafe(key: K): Unit
-}
-
-trait KeyValueStorage[K, V] extends AbstractKeyValueStorage[K, V] with RawKeyValueStorage {
-
-  protected def storageKey(key: K): ByteString = serialize(key)
-
-  def get(key: K): IOResult[V] = IOUtils.tryExecute(getUnsafe(key))
+  def get(key: K): IOResult[V] = {
+    tryExecute(getUnsafe(key))
+  }
 
   def getUnsafe(key: K): V = {
-    val data = getRawUnsafe(storageKey(key))
-    deserialize[V](data) match {
-      case Left(e)  => throw e
-      case Right(v) => v
+    source.getUnsafe(column, storageKey(key).toArray) match {
+      case Some(value) =>
+        deserialize[V](ByteString.fromArrayUnsafe(value)) match {
+          case Left(error)  => throw error
+          case Right(value) => value
+        }
+
+      case None =>
+        throw IOError.keyNotFound(key, s"${this.getClass.getSimpleName}.getUnsafe")
     }
   }
 
-  def getOpt(key: K): IOResult[Option[V]] = IOUtils.tryExecute(getOptUnsafe(key))
-
   def getOptUnsafe(key: K): Option[V] = {
-    getOptRawUnsafe(storageKey(key)) map { data =>
-      deserialize[V](data) match {
-        case Left(e)  => throw e
-        case Right(v) => v
+    source.getUnsafe(column, storageKey(key).toArray) map { value =>
+      deserialize[V](ByteString.fromArrayUnsafe(value)) match {
+        case Left(error)  => throw error
+        case Right(value) => value
       }
     }
   }
 
-  def put(key: K, value: V): IOResult[Unit] = IOUtils.tryExecute(putUnsafe(key, value))
-
-  def putUnsafe(key: K, value: V): Unit = {
-    putRawUnsafe(storageKey(key), serialize(value))
+  def getOpt(key: K): IOResult[Option[V]] = {
+    tryExecute(getOptUnsafe(key))
   }
 
-  def exists(key: K): IOResult[Boolean] = IOUtils.tryExecute(existsUnsafe(key))
+  def exists(key: K): IOResult[Boolean] = {
+    tryExecute(existsUnsafe(key))
+  }
 
   def existsUnsafe(key: K): Boolean = {
-    existsRawUnsafe(storageKey(key))
+    source.existsUnsafe(column, storageKey(key).toArray)
   }
 
-  def delete(key: K): IOResult[Unit] = IOUtils.tryExecute(deleteUnsafe(key))
+  def put(key: K, value: V): IOResult[Unit] = {
+    tryExecute(putUnsafe(key, value))
+  }
+
+  def putUnsafe(key: K, value: V): Unit = {
+    source.putUnsafe(column, storageKey(key).toArray, serialize(value).toArray)
+  }
+
+  def iterateUnsafe(f: (K, V) => Unit): Unit = {
+    source.iterateUnsafe(
+      column,
+      (key, value) => {
+        val result =
+          for {
+            typedKey   <- deserialize[K](ByteString.fromArrayUnsafe(key))
+            typedValue <- deserialize[V](ByteString.fromArrayUnsafe(value))
+          } yield f(typedKey, typedValue)
+
+        result.left.foreach(error => throw error)
+      }
+    )
+  }
+
+  def iterate(f: (K, V) => Unit): IOResult[Unit] = {
+    tryExecute(iterateUnsafe(f))
+  }
+
+  def iterateE(f: (K, V) => IOResult[Unit]): IOResult[Unit] = {
+    tryExecute {
+      iterateUnsafe { case (key, value) =>
+        f(key, value) match {
+          case Left(error)  => throw error
+          case Right(value) => value
+        }
+      }
+    }
+  }
+
+  def delete(key: K): IOResult[Unit] = {
+    tryExecute(deleteUnsafe(key))
+  }
 
   def deleteUnsafe(key: K): Unit = {
-    deleteRawUnsafe(storageKey(key))
+    source.deleteUnsafe(column, storageKey(key).toArray)
   }
 
+  def deleteRangeUnsafe(fromKey: K, toKey: K): Unit = {
+    source.deleteRangeUnsafe(column, storageKey(fromKey).toArray, storageKey(toKey).toArray)
+  }
+
+  def deleteRange(fromKey: K, toKey: K): IOResult[Unit] = {
+    tryExecute(deleteRangeUnsafe(fromKey, toKey))
+  }
+}
+
+object KeyValueStorage {
+  def apply[K: Serde, V: Serde](
+      storage: KeyValueSource,
+      storageName: ColumnFamily
+  ): KeyValueStorage[K, V] =
+    new KeyValueStorage[K, V](storage, storageName) {}
 }

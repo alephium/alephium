@@ -16,16 +16,24 @@
 
 package org.alephium.storage
 
-import akka.util.ByteString
+import java.nio.file.Path
 
-trait RawKeyValueStorage {
-  def getRawUnsafe(key: ByteString): ByteString
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.setting.StorageSetting
 
-  def getOptRawUnsafe(key: ByteString): Option[ByteString]
+object StorageInitialiser extends KeyValueStorageInitialiser {
+  override def open(
+      path: Path,
+      setting: StorageSetting,
+      columns: Iterable[ColumnFamily]
+  ): IOResult[KeyValueSource] =
+    IOUtils.tryOpenStorage(RocksDBSource.default(path, columns))
 
-  def putRawUnsafe(key: ByteString, value: ByteString): Unit
-
-  def existsRawUnsafe(key: ByteString): Boolean
-
-  def deleteRawUnsafe(key: ByteString): Unit
+  override def openUnsafe(
+      path: Path,
+      setting: StorageSetting,
+      columns: Iterable[ColumnFamily]
+  ): KeyValueSource =
+    RocksDBSource.default(path, columns)
 }

@@ -20,7 +20,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.Storages
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
-import org.alephium.storage.rocksdb.RocksDBSource.Settings
+import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -35,7 +35,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
 
     def buildGenesis(): BlockChainWithState = {
       val dbFolder = "db-" + Hash.random.toHexString
-      val storages = Storages.createUnsafe(rootPath, dbFolder, Settings.syncWrite)
+      val storages = Storages.createUnsafe(rootPath, dbFolder, StorageSetting.syncWriteHDD())
       BlockChainWithState.createUnsafe(
         genesis,
         storages,

@@ -18,19 +18,24 @@ package org.alephium.flow.io
 
 import org.scalatest.BeforeAndAfterEach
 
-import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.{ColumnFamily, KeyValueSource, StorageInitialiser}
+import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.{AlephiumSpec, Files}
 
 trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {
   val dbname: String
-  val builder: RocksDBSource => S
-  lazy val dbPath           = Files.tmpDir.resolve(dbname)
-  var source: RocksDBSource = _
-  var storage: S            = _
+  val builder: KeyValueSource => S
+  lazy val dbPath            = Files.tmpDir.resolve(dbname)
+  var source: KeyValueSource = _
+  var storage: S             = _
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    source = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    source = StorageInitialiser.openUnsafe(
+      path = dbPath,
+      setting = StorageSetting.syncWriteHDD(),
+      columns = ColumnFamily.values.toIterable
+    )
     storage = builder(source)
   }
 

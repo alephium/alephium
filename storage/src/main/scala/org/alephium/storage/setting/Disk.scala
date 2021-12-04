@@ -14,24 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.storage.rocksdb
+package org.alephium.storage.setting
 
-import org.rocksdb.{ReadOptions, WriteOptions}
-
-import org.alephium.storage.ColumnFamily
-import org.alephium.storage.rocksdb.RocksDBSource.Settings
-
-trait RocksDBKeyValueCompanion[S <: RocksDBKeyValueStorage[_, _]] {
-  def apply(storage: RocksDBSource, cf: ColumnFamily): S =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
-
-  def apply(storage: RocksDBSource, cf: ColumnFamily, writeOptions: WriteOptions): S =
-    apply(storage, cf, writeOptions, Settings.readOptions)
-
-  def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): S
+sealed trait Disk
+object Disk {
+  case object HDD extends Disk
+  case object SSD extends Disk
 }

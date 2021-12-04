@@ -17,7 +17,6 @@
 package org.alephium.flow.io
 
 import akka.util.ByteString
-import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.core.BlockHashChain
 import org.alephium.flow.model.BootstrapInfo
@@ -26,31 +25,36 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
-import org.alephium.storage.{ColumnFamily, RawKeyValueStorage}
-import org.alephium.storage.rocksdb.{RocksDBColumn, RocksDBSource}
-import org.alephium.storage.rocksdb.RocksDBSource.Settings
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
 import org.alephium.util.AVector
 
-trait NodeStateStorage extends RawKeyValueStorage {
+object NodeStateStorage {
+  def apply(
+      storage: KeyValueSource,
+      cf: ColumnFamily
+  )(implicit config: GroupConfig): NodeStateStorage = {
+    new NodeStateStorage(storage, cf)
+  }
+}
 
-  def config: GroupConfig
+class NodeStateStorage(
+    val storage: KeyValueSource,
+    val cf: ColumnFamily
+)(implicit val config: GroupConfig)
+    extends KeyValueStorage[ByteString, ByteString](storage, cf) {
 
   private val isInitializedKey =
     Hash.hash("isInitialized").bytes ++ ByteString(Storages.isInitializedPostfix)
 
   def isInitialized(): IOResult[Boolean] =
-    IOUtils.tryExecute {
-      existsRawUnsafe(isInitializedKey)
-    }
+    exists(isInitializedKey)
 
   def setInitialized(): IOResult[Unit] =
-    IOUtils.tryExecute {
-      putRawUnsafe(isInitializedKey, ByteString(1))
-    }
+    put(isInitializedKey, ByteString(1))
 
   private def getByKeyOpt[V: Deserializer](key: ByteString): IOResult[Option[V]] =
     IOUtils.tryExecute {
-      getOptRawUnsafe(key).map(deserialize[V](_) match {
+      getOptUnsafe(key).map(deserialize[V](_) match {
         case Left(e)  => throw e
         case Right(v) => v
       })
@@ -62,16 +66,14 @@ trait NodeStateStorage extends RawKeyValueStorage {
   def getBootstrapInfo(): IOResult[Option[BootstrapInfo]] = getByKeyOpt(bootstrapInfoKey)
 
   def setBootstrapInfo(info: BootstrapInfo): IOResult[Unit] = {
-    IOUtils.tryExecute(putRawUnsafe(bootstrapInfoKey, serialize(info)))
+    put(bootstrapInfoKey, serialize(info))
   }
 
   private val dbVersionKey =
     Hash.hash("databaseVersion").bytes ++ ByteString(Storages.dbVersionPostfix)
 
   def setDatabaseVersion(version: DatabaseVersion): IOResult[Unit] =
-    IOUtils.tryExecute {
-      putRawUnsafe(dbVersionKey, serialize(version))
-    }
+    put(dbVersionKey, serialize(version))
 
   def getDatabaseVersion(): IOResult[Option[DatabaseVersion]] = getByKeyOpt(dbVersionKey)
 
@@ -103,59 +105,20 @@ trait NodeStateStorage extends RawKeyValueStorage {
       private val chainStateKey = chainStateKeys(chainIndex.from.value)(chainIndex.to.value)
 
       override def updateState(state: BlockHashChain.State): IOResult[Unit] =
-        IOUtils.tryExecute {
-          putRawUnsafe(chainStateKey, serialize(state))
-        }
+        put(chainStateKey, serialize(state))
 
       override def loadState(): IOResult[BlockHashChain.State] =
         IOUtils.tryExecute {
-          deserialize[BlockHashChain.State](getRawUnsafe(chainStateKey)) match {
+          deserialize[BlockHashChain.State](getUnsafe(chainStateKey)) match {
             case Left(e)  => throw e
             case Right(v) => v
           }
         }
 
       override def clearState(): IOResult[Unit] =
-        IOUtils.tryExecute {
-          deleteRawUnsafe(chainStateKey)
-        }
+        delete(chainStateKey)
     }
 
-  def heightIndexStorage(chainIndex: ChainIndex): HeightIndexStorage
-}
-
-object NodeStateRockDBStorage {
-  def apply(storage: RocksDBSource, cf: ColumnFamily)(implicit
-      config: GroupConfig
-  ): NodeStateRockDBStorage =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
-
-  def apply(storage: RocksDBSource, cf: ColumnFamily, writeOptions: WriteOptions)(implicit
-      config: GroupConfig
-  ): NodeStateRockDBStorage =
-    apply(storage, cf, writeOptions, Settings.readOptions)
-
-  def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  )(implicit config: GroupConfig): NodeStateRockDBStorage = {
-    new NodeStateRockDBStorage(storage, cf, writeOptions, readOptions)
-  }
-}
-
-class NodeStateRockDBStorage(
-    val storage: RocksDBSource,
-    val cf: ColumnFamily,
-    val writeOptions: WriteOptions,
-    val readOptions: ReadOptions
-)(implicit val config: GroupConfig)
-    extends RocksDBColumn
-    with NodeStateStorage {
-  protected val db: RocksDB                = storage.db
-  protected val handle: ColumnFamilyHandle = storage.handle(cf)
-
   def heightIndexStorage(chainIndex: ChainIndex): HeightIndexStorage =
-    new HeightIndexStorage(chainIndex, storage, cf, writeOptions, readOptions)
+    new HeightIndexStorage(chainIndex, storage, cf)
 }

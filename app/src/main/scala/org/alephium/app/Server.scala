@@ -27,7 +27,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
-import org.alephium.storage.rocksdb.RocksDBSource.Settings
+import org.alephium.storage.setting.{Disk, StorageSetting}
 import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
@@ -116,10 +116,10 @@ object Server {
   ) extends Server {
     val dbPath                = rootPath.resolve(config.network.networkId.nodeFolder)
     val storageFolder: String = "db"
-    val writeOptions          = if (config.node.dbSyncWrite) Settings.syncWrite else Settings.writeOptions
+    val storageSetting        = StorageSetting(Disk.HDD, config.node.dbSyncWrite)
 
     val storages: Storages =
-      Storages.createUnsafe(dbPath, storageFolder, writeOptions)(config.broker)
+      Storages.createUnsafe(dbPath, storageFolder, storageSetting)(config.broker)
 
     val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
   }

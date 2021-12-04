@@ -19,10 +19,13 @@ package org.alephium.io
 object IOException {
 
   object StorageException {
+    @inline def apply(message: String): StorageException =
+      new StorageException(new Exception(message))
+
     @inline def apply(cause: Throwable): StorageException =
       new StorageException(cause)
   }
 
-  class StorageException(val cause: Throwable) extends Exception(cause)
+  class StorageException(cause: Throwable) extends Exception(cause)
 
 }

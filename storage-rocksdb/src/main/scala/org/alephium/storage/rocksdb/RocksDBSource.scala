@@ -18,173 +18,151 @@ package org.alephium.storage.rocksdb
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import java.util
 
-import org.rocksdb._
-import org.rocksdb.util.SizeUnit
+import org.rocksdb.{
+  ColumnFamilyDescriptor,
+  ColumnFamilyHandle,
+  DBOptions,
+  Options,
+  ReadOptions,
+  RocksDB
+}
 
-import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.io.IOUtils.tryExecute
+import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOException.StorageException
 import org.alephium.storage.{ColumnFamily, KeyValueSource}
-import org.alephium.util.AVector
 
+/** [[KeyValueSource]] implementation for RocksDB.
+  *
+  * Restricted to this storage package.
+  */
 object RocksDBSource {
-  import org.alephium.io.IOUtils.tryExecute
 
-  {
-    RocksDB.loadLibrary()
-  }
-
-  final case class Compaction(
-      initialFileSize: Long,
-      blockSize: Long,
-      writeRateLimit: Option[Long]
-  )
-
-  object Compaction {
-    import SizeUnit._
-
-    val SSD: Compaction = Compaction(
-      initialFileSize = 64 * MB,
-      blockSize = 16 * KB,
-      writeRateLimit = None
-    )
-
-    val HDD: Compaction = Compaction(
-      initialFileSize = 256 * MB,
-      blockSize = 64 * KB,
-      writeRateLimit = Some(16 * MB)
-    )
-  }
-
-  object Settings {
+  /** RocksDB's default configuration. Not optimised.
+    *
+    * @param path Full path for the database directory
+    */
+  def default(path: Path, columns: Iterable[ColumnFamily]): KeyValueSource = {
     RocksDB.loadLibrary()
 
-    // TODO All options should become part of configuration
-    val MaxOpenFiles: Int           = 512
-    val BytesPerSync: Long          = 1 * SizeUnit.MB
-    val MemoryBudget: Long          = 128 * SizeUnit.MB
-    val WriteBufferMemoryRatio: Int = 2
-    val BlockCacheMemoryRatio: Int  = 3
-    val CPURatio: Int               = 2
-
-    val readOptions: ReadOptions   = (new ReadOptions).setVerifyChecksums(false)
-    val writeOptions: WriteOptions = new WriteOptions
-    val syncWrite: WriteOptions    = (new WriteOptions).setSync(true)
-
-    val columns: Int             = ColumnFamily.values.length
-    val memoryBudgetPerCol: Long = MemoryBudget / columns
-
-    def databaseOptions(compaction: Compaction): DBOptions =
-      databaseOptionsForBudget(compaction, memoryBudgetPerCol)
-
-    def databaseOptionsForBudget(compaction: Compaction, memoryBudgetPerCol: Long): DBOptions = {
-      val options = new DBOptions()
-        .setUseFsync(false)
+    val dbOptions: DBOptions =
+      new DBOptions()
         .setCreateIfMissing(true)
         .setCreateMissingColumnFamilies(true)
-        .setMaxOpenFiles(MaxOpenFiles)
-        .setKeepLogFileNum(1)
-        .setBytesPerSync(BytesPerSync)
-        .setDbWriteBufferSize(memoryBudgetPerCol / WriteBufferMemoryRatio)
-        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime.availableProcessors() / CPURatio))
 
-      compaction.writeRateLimit match {
-        case Some(rateLimit) => options.setRateLimiter(new RateLimiter(rateLimit))
-        case None            => options
+    //create java instance required by RocksDB instance
+    val handles     = new util.ArrayList[ColumnFamilyHandle]()
+    val descriptors = new util.ArrayList[ColumnFamilyDescriptor]()
+
+    (columns.map(_.name) ++ Seq("default")) foreach { name =>
+      descriptors.add(new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8)))
+    }
+
+    val rocksDB =
+      RocksDB.open(dbOptions, path.toString, descriptors, handles)
+
+    val tableHandleMap =
+      columns.zipWithIndex.map { case (table, index) =>
+        table -> handles.get(index)
+      }.toMap
+
+    val defaultReadOptions: ReadOptions = new ReadOptions().setVerifyChecksums(false)
+
+    new RocksDBSource(
+      path = path,
+      handles = tableHandleMap,
+      db = rocksDB,
+      readOptions = defaultReadOptions
+    )
+  }
+
+}
+
+protected class RocksDBSource(
+    val path: Path,
+    handles: Map[ColumnFamily, ColumnFamilyHandle],
+    db: RocksDB,
+    readOptions: ReadOptions
+) extends KeyValueSource {
+
+  override type COLUMN = ColumnFamilyHandle
+
+  def getColumnUnsafe(column: ColumnFamily): ColumnFamilyHandle = {
+    handles.get(column) match {
+      case Some(handle) =>
+        handle
+
+      case None =>
+        throw StorageException(
+          s"${classOf[ColumnFamilyHandle].getSimpleName} not found for $column"
+        )
+    }
+  }
+
+  /** Returns the handle for a column name which should be stored
+    * in target [[org.alephium.storage.column.StorageColumn]]
+    * so there no need to re-fetch this for each read request.
+    */
+  def getColumn(column: ColumnFamily): IOResult[ColumnFamilyHandle] = {
+    handles.get(column) match {
+      case Some(handle) =>
+        Right(handle)
+
+      case None =>
+        //Column family not created for RocksDB. Report this on boot-up.
+        Left(
+          IOError.Storage(
+            StorageException(s"${classOf[ColumnFamilyHandle].getSimpleName} not found for $column")
+          )
+        )
+    }
+  }
+
+  override def getUnsafe(column: ColumnFamilyHandle, key: Array[Byte]): Option[Array[Byte]] =
+    Option(db.get(column, readOptions, key))
+
+  override def existsUnsafe(column: ColumnFamilyHandle, key: Array[Byte]): Boolean = {
+    val result = db.get(column, readOptions, key)
+    result != null
+  }
+
+  override def putUnsafe(column: ColumnFamilyHandle, key: Array[Byte], value: Array[Byte]): Unit =
+    db.put(column, key, value)
+
+  override def deleteUnsafe(column: ColumnFamilyHandle, key: Array[Byte]): Unit =
+    db.delete(column, key)
+
+  override def deleteRangeUnsafe(
+      column: ColumnFamilyHandle,
+      fromKey: Array[Byte],
+      toKey: Array[Byte]
+  ): Unit =
+    db.deleteRange(column, fromKey, toKey)
+
+  def iterateUnsafe(column: ColumnFamilyHandle, f: (Array[Byte], Array[Byte]) => Unit): Unit = {
+    val iterator = db.newIterator(column)
+    iterator.seekToFirst()
+
+    while (iterator.isValid()) {
+      try {
+        f(iterator.key(), iterator.value())
+        iterator.next()
+      } catch {
+        case throwable: Throwable =>
+          iterator.close()
+          throw throwable
       }
     }
 
-    def columnOptions(compaction: Compaction): ColumnFamilyOptions =
-      columnOptionsForBudget(compaction, memoryBudgetPerCol)
-
-    def columnOptionsForBudget(
-        compaction: Compaction,
-        memoryBudgetPerCol: Long
-    ): ColumnFamilyOptions = {
-      import scala.jdk.CollectionConverters._
-
-      (new ColumnFamilyOptions)
-        .setLevelCompactionDynamicLevelBytes(true)
-        .setTableFormatConfig(
-          new BlockBasedTableConfig()
-            .setBlockSize(compaction.blockSize)
-            .setBlockCache(new LRUCache(MemoryBudget / BlockCacheMemoryRatio))
-            .setCacheIndexAndFilterBlocks(true)
-            .setPinL0FilterAndIndexBlocksInCache(true)
-        )
-        .optimizeLevelStyleCompaction(memoryBudgetPerCol)
-        .setTargetFileSizeBase(compaction.initialFileSize)
-        .setCompressionPerLevel(Nil.asJava)
-    }
+    iterator.close()
   }
-
-  def createUnsafe(rootPath: Path, dbFolder: String, dbName: String): RocksDBSource = {
-    val path = {
-      val path = rootPath.resolve(dbFolder)
-      IOUtils.createDirUnsafe(path)
-      path
-    }
-    val dbPath = path.resolve(dbName)
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
-  }
-
-  def open(path: Path, compaction: Compaction): IOResult[RocksDBSource] =
-    tryExecute {
-      openUnsafe(path, compaction)
-    }
-
-  def openUnsafe(path: Path, compaction: Compaction): RocksDBSource =
-    openUnsafeWithOptions(
-      path,
-      Settings.databaseOptions(compaction),
-      Settings.columnOptions(compaction)
-    )
-
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def openUnsafeWithOptions(
-      path: Path,
-      databaseOptions: DBOptions,
-      columnOptions: ColumnFamilyOptions
-  ): RocksDBSource = {
-    import scala.jdk.CollectionConverters._
-
-    val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
-    val descriptors = (ColumnFamily.values.map(_.name) :+ "default").map { name =>
-      new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8), columnOptions)
-    }
-
-    val db = RocksDB.open(
-      databaseOptions,
-      path.toString,
-      descriptors.toIterable.toList.asJava,
-      handles.asJava
-    )
-
-    new RocksDBSource(path, db, AVector.from(handles))
-  }
-}
-
-class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle])
-    extends KeyValueSource {
-  import RocksDBSource._
-
-  def handle(cf: ColumnFamily): ColumnFamilyHandle =
-    cfHandles(ColumnFamily.values.indexWhere(_ == cf))
-
-  def close(): IOResult[Unit] =
-    tryExecute {
-      db.close()
-    }
 
   def closeUnsafe(): Unit = {
-    cfHandles.foreach(_.close())
+    //TODO - is this safe? What if closing handles fail? Should db.close() be in a final block?
+    handles.values.foreach(_.close())
     db.close()
   }
-
-  def dESTROY(): IOResult[Unit] =
-    tryExecute {
-      dESTROYUnsafe()
-    }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def dESTROYUnsafe(): Unit = {

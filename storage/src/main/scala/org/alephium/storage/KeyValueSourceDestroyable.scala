@@ -16,27 +16,19 @@
 
 package org.alephium.storage
 
-import org.scalatest.Assertion
+import org.alephium.io.IOResult
+import org.alephium.io.IOUtils._
 
-import org.alephium.crypto.Keccak256
-import org.alephium.serde.Serde
-import org.alephium.util.AlephiumFixture
-import org.alephium.util.Files
+trait KeyValueSourceDestroyable {
 
-trait StorageFixture extends AlephiumFixture {
-  private lazy val tmpdir = Files.tmpDir
-  private lazy val dbname = s"test-db-${Keccak256.generate.toHexString}"
-  private lazy val dbPath = tmpdir.resolve(dbname)
+  def closeUnsafe(): Unit
 
-  private lazy val storage: KeyValueSource =
-    ??? //RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+  def dESTROYUnsafe(): Unit
 
-  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] =
-//    RocksDBKeyValueStorage[K, V](storage, ColumnFamily.All)
-    ???
+  def close(): IOResult[Unit] =
+    tryExecute(closeUnsafe())
 
-  protected def postTest(): Assertion = {
-//    storage.dESTROY().isRight is true
-    ???
-  }
+  def dESTROY(): IOResult[Unit] =
+    tryExecute(dESTROYUnsafe())
+
 }

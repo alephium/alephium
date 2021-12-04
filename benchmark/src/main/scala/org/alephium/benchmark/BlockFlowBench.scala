@@ -25,7 +25,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Platform}
 import org.alephium.protocol.model.{BlockDeps, GroupIndex}
-import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.setting.StorageSetting
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -36,7 +36,7 @@ class BlockFlowBench {
   implicit val config: AlephiumConfig = AlephiumConfig.load(rootPath, "alephium")
   private val storages: Storages = {
     val dbFolder = "db"
-    Storages.createUnsafe(rootPath, dbFolder, RocksDBSource.Settings.writeOptions)(config.broker)
+    Storages.createUnsafe(rootPath, dbFolder, StorageSetting.syncWriteHDD())(config.broker)
   }
   val blockFlow: BlockFlow = BlockFlow.fromGenesisUnsafe(config, storages)
 

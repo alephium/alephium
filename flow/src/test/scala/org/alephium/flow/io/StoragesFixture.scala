@@ -20,7 +20,7 @@ import java.nio.file.{Files, Path}
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.setting.StorageSetting
 
 trait StoragesFixture {
   def storages: Storages
@@ -34,10 +34,9 @@ object StoragesFixture {
   def buildStorages(rootPath: Path)(implicit groupConfig: GroupConfig): Storages = {
     if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
 
-    val postFix   = Hash.random.toHexString
-    val dbFolders = s"db-$postFix"
-    val storages: Storages =
-      Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.Settings.syncWrite)
+    val postFix            = Hash.random.toHexString
+    val dbFolders          = s"db-$postFix"
+    val storages: Storages = Storages.createUnsafe(rootPath, dbFolders, StorageSetting.syncWriteHDD())
     storages
   }
 

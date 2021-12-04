@@ -60,6 +60,26 @@ object IOUtils {
     catch error
   }
 
+  /** Used by storage engines during initialisation.
+    */
+  @inline
+  def tryOpenStorage[T](f: => T): IOResult[T] = {
+    try Right(f)
+    catch {
+      case throwable: Throwable =>
+        val pf = IOUtils.error
+        if (pf.isDefinedAt(throwable)) {
+          pf(throwable)
+        } else {
+          Left(
+            IOError.Storage(
+              new StorageException(throwable)
+            )
+          )
+        }
+    }
+  }
+
   @inline
   def error[T]: PartialFunction[Throwable, IOResult[T]] = {
     case e: IOException       => Left(IOError.JavaIO(e))
@@ -68,4 +88,5 @@ object IOUtils {
     case e: SerdeError        => Left(IOError.Serde(e))
     case e: KeyNotFound       => Left(e)
   }
+
 }

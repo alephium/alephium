@@ -16,21 +16,21 @@
 
 package org.alephium.flow.io
 
-import org.rocksdb.{ReadOptions, WriteOptions}
-
 import org.alephium.flow.core.BlockChain
 import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes}
 import org.alephium.io._
 import org.alephium.protocol.Hash
-import org.alephium.storage.{ColumnFamily, KeyValueStorage}
-import org.alephium.storage.rocksdb.{
-  RocksDBKeyValueCompanion,
-  RocksDBKeyValueStorage,
-  RocksDBSource
-}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage}
 import org.alephium.util.AVector
 
-trait TxStorage extends KeyValueStorage[Hash, TxIndexes] {
+object TxStorage {
+  def apply(storage: KeyValueSource, cf: ColumnFamily): TxStorage =
+    new TxStorage(storage, cf)
+}
+
+class TxStorage(val storage: KeyValueSource, cf: ColumnFamily)
+    extends KeyValueStorage[Hash, BlockChain.TxIndexes](storage, cf) {
+
   def add(txId: Hash, txIndex: TxIndex): IOResult[Unit] = {
     getOpt(txId).flatMap {
       case Some(txIndexes) => put(txId, TxIndexes(txIndexes.indexes :+ txIndex))
@@ -44,30 +44,7 @@ trait TxStorage extends KeyValueStorage[Hash, TxIndexes] {
       case None            => putUnsafe(txId, TxIndexes(AVector(txIndex)))
     }
   }
-}
 
-object TxRocksDBStorage extends RocksDBKeyValueCompanion[TxRocksDBStorage] {
-  override def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): TxRocksDBStorage =
-    new TxRocksDBStorage(storage, cf, writeOptions, readOptions)
-}
-
-class TxRocksDBStorage(
-    val storage: RocksDBSource,
-    cf: ColumnFamily,
-    writeOptions: WriteOptions,
-    readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockChain.TxIndexes](
-      storage,
-      cf,
-      writeOptions,
-      readOptions
-    )
-    with TxStorage {
   override def delete(key: Hash): IOResult[Unit] = ???
 
   override def deleteUnsafe(key: Hash): Unit = ???
