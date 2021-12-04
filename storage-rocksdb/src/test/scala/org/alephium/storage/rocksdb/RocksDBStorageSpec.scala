@@ -17,11 +17,10 @@
 package org.alephium.storage.rocksdb
 
 import org.alephium.macros.EnumerationMacros
-import org.alephium.util.AlephiumSpec
-import org.alephium.util.AVector
+import org.alephium.storage.ColumnFamily
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class RocksDBStorageSpec extends AlephiumSpec {
-  import RocksDBSource.ColumnFamily
 
   behavior of "RocksDBStorage"
 

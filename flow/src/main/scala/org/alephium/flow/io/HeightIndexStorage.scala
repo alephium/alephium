@@ -22,8 +22,8 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
+import org.alephium.storage.ColumnFamily
 import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
 import org.alephium.util.{AVector, Bytes}
 
 object HeightIndexStorage {

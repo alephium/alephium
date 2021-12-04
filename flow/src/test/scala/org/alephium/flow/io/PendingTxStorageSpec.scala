@@ -20,6 +20,7 @@ import scala.util.Random
 
 import org.alephium.flow.model.PersistedTxId
 import org.alephium.protocol.model.{NoIndexModelGenerators, TransactionTemplate}
+import org.alephium.storage.ColumnFamily
 import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
@@ -27,7 +28,6 @@ class PendingTxStorageSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
     with StorageSpec[PendingTxRocksDBStorage] {
-  import RocksDBSource.ColumnFamily
 
   override val dbname: String = "pending-tx-storage-spec"
   override val builder: RocksDBSource => PendingTxRocksDBStorage =

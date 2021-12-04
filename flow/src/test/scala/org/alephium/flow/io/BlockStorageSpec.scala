@@ -17,6 +17,7 @@
 package org.alephium.flow.io
 
 import org.alephium.protocol.model.NoIndexModelGenerators
+import org.alephium.storage.ColumnFamily
 import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.AlephiumSpec
 
@@ -24,7 +25,6 @@ class BlockStorageSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
     with StorageSpec[BlockRockDBStorage] {
-  import RocksDBSource.ColumnFamily
 
   override val dbname: String = "block-storage-spec"
   override val builder: RocksDBSource => BlockRockDBStorage =

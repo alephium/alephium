@@ -14,24 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.storage.rocksdb
+package org.alephium.storage
 
-import org.rocksdb.{ReadOptions, WriteOptions}
+import org.alephium.util.AVector
 
-import org.alephium.storage.ColumnFamily
-import org.alephium.storage.rocksdb.RocksDBSource.Settings
+sealed abstract class ColumnFamily(val name: String)
 
-trait RocksDBKeyValueCompanion[S <: RocksDBKeyValueStorage[_, _]] {
-  def apply(storage: RocksDBSource, cf: ColumnFamily): S =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+object ColumnFamily {
 
-  def apply(storage: RocksDBSource, cf: ColumnFamily, writeOptions: WriteOptions): S =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+  case object All       extends ColumnFamily("all")
+  case object Block     extends ColumnFamily("block")
+  case object Header    extends ColumnFamily("header")
+  case object Trie      extends ColumnFamily("trie")
+  case object PendingTx extends ColumnFamily("pendingtx")
+  case object ReadyTx   extends ColumnFamily("readytx")
 
-  def apply(
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): S
+  val values: AVector[ColumnFamily] = AVector(All, Block, Header, PendingTx, ReadyTx, Trie)
 }

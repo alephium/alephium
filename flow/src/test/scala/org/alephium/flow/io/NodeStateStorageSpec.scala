@@ -18,6 +18,7 @@ package org.alephium.flow.io
 
 import org.alephium.io.IOError
 import org.alephium.protocol.config.GroupConfigFixture
+import org.alephium.storage.ColumnFamily
 import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.AlephiumSpec
 
@@ -28,7 +29,7 @@ class NodeStateStorageSpec
 
   override val dbname: String = "node-state-storage-spec"
   override val builder: RocksDBSource => NodeStateRockDBStorage =
-    source => NodeStateRockDBStorage(source, RocksDBSource.ColumnFamily.All)
+    source => NodeStateRockDBStorage(source, ColumnFamily.All)
 
   it should "check database compatibility" in {
     storage.setDatabaseVersion(DatabaseVersion.currentDBVersion) isE ()

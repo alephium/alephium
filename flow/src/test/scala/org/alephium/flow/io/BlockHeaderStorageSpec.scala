@@ -19,6 +19,7 @@ package org.alephium.flow.io
 import org.alephium.io.IOError
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
+import org.alephium.storage.ColumnFamily
 import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.AlephiumSpec
 
@@ -26,7 +27,6 @@ class BlockHeaderStorageSpec
     extends AlephiumSpec
     with NoIndexModelGenerators
     with StorageSpec[BlockHeaderRockDBStorage] {
-  import RocksDBSource.ColumnFamily
 
   override val dbname: String = "block-header-storage-spec"
   override val builder: RocksDBSource => BlockHeaderRockDBStorage =

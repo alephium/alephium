@@ -26,6 +26,7 @@ import org.rocksdb.util.SizeUnit
 
 import org.alephium.crypto.Keccak256
 import org.alephium.protocol.Hash
+import org.alephium.storage.ColumnFamily
 import org.alephium.storage.rocksdb.{RocksDBColumn, RocksDBSource}
 import org.alephium.util.Files
 
@@ -34,7 +35,7 @@ import org.alephium.util.Files
 @State(Scope.Thread)
 // scalastyle:off
 class RocksDBBench {
-  import RocksDBSource.{ColumnFamily, Compaction, Settings}
+  import RocksDBSource.{Compaction, Settings}
 
   {
     RocksDB.loadLibrary()

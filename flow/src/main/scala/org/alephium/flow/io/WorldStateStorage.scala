@@ -23,9 +23,9 @@ import org.alephium.cache.SparseMerkleTrie
 import org.alephium.io._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.vm.WorldState
-import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.{ColumnFamily, KeyValueStorage}
 import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.storage.rocksdb.RocksDBSource.{ColumnFamily, Settings}
+import org.alephium.storage.rocksdb.RocksDBSource.Settings
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]

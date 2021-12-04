@@ -27,7 +27,7 @@ import org.alephium.storage.rocksdb.{
   RocksDBKeyValueStorage,
   RocksDBSource
 }
-import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
+import org.alephium.storage.ColumnFamily
 
 trait BlockStateStorage extends KeyValueStorage[BlockHash, BlockState] {
   override def storageKey(key: BlockHash): ByteString =

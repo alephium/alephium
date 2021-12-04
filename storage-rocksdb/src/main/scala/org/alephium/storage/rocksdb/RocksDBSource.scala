@@ -24,7 +24,7 @@ import org.rocksdb.util.SizeUnit
 
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.io.IOUtils.tryExecute
-import org.alephium.storage.KeyValueSource
+import org.alephium.storage.{ColumnFamily, KeyValueSource}
 import org.alephium.util.AVector
 
 object RocksDBSource {
@@ -32,20 +32,6 @@ object RocksDBSource {
 
   {
     RocksDB.loadLibrary()
-  }
-
-  sealed abstract class ColumnFamily(val name: String)
-
-  object ColumnFamily {
-
-    case object All       extends ColumnFamily("all")
-    case object Block     extends ColumnFamily("block")
-    case object Header    extends ColumnFamily("header")
-    case object Trie      extends ColumnFamily("trie")
-    case object PendingTx extends ColumnFamily("pendingtx")
-    case object ReadyTx   extends ColumnFamily("readytx")
-
-    val values: AVector[ColumnFamily] = AVector(All, Block, Header, PendingTx, ReadyTx, Trie)
   }
 
   final case class Compaction(

@@ -20,24 +20,24 @@ import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.io.IOError
-import org.alephium.storage.RawKeyValueStorage
+import org.alephium.storage.{ColumnFamily, RawKeyValueStorage}
 
 object RocksDBColumn {
   import RocksDBSource.Settings
 
-  def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): RocksDBColumn =
+  def apply(storage: RocksDBSource, cf: ColumnFamily): RocksDBColumn =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
   def apply(
       storage: RocksDBSource,
-      cf: RocksDBSource.ColumnFamily,
+      cf: ColumnFamily,
       writeOptions: WriteOptions
   ): RocksDBColumn =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
   def apply(
       storage: RocksDBSource,
-      cf: RocksDBSource.ColumnFamily,
+      cf: ColumnFamily,
       _writeOptions: WriteOptions,
       _readOptions: ReadOptions
   ): RocksDBColumn =

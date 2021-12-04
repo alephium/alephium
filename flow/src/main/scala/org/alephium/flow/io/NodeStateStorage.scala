@@ -26,9 +26,9 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
-import org.alephium.storage.RawKeyValueStorage
+import org.alephium.storage.{ColumnFamily, RawKeyValueStorage}
 import org.alephium.storage.rocksdb.{RocksDBColumn, RocksDBSource}
-import org.alephium.storage.rocksdb.RocksDBSource.{ColumnFamily, Settings}
+import org.alephium.storage.rocksdb.RocksDBSource.Settings
 import org.alephium.util.AVector
 
 trait NodeStateStorage extends RawKeyValueStorage {

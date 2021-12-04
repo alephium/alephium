@@ -16,17 +16,13 @@
 
 package org.alephium.flow.io
 
-import org.rocksdb.ReadOptions
-import org.rocksdb.WriteOptions
+import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BlockHeader
-import org.alephium.storage.KeyValueStorage
-import org.alephium.storage.rocksdb.RocksDBKeyValueCompanion
-import org.alephium.storage.rocksdb.RocksDBKeyValueStorage
-import org.alephium.storage.rocksdb.RocksDBSource
-import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
+import org.alephium.storage.{ColumnFamily, KeyValueStorage}
+import org.alephium.storage.rocksdb.{RocksDBKeyValueCompanion, RocksDBKeyValueStorage, RocksDBSource}
 
 trait BlockHeaderStorage extends KeyValueStorage[BlockHash, BlockHeader] {
   def put(blockHeader: BlockHeader): IOResult[Unit] = put(blockHeader.hash, blockHeader)

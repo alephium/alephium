@@ -23,7 +23,7 @@ import org.openjdk.jmh.annotations._
 import org.alephium.cache.SparseMerkleTrie
 import org.alephium.cache.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
-import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.{ColumnFamily, KeyValueStorage}
 import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.util.Files
 
@@ -31,7 +31,6 @@ import org.alephium.util.Files
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 class TrieBench {
-  import RocksDBSource.ColumnFamily
 
   private val tmpdir = Files.tmpDir
   private val dbname = "trie"

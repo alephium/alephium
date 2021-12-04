@@ -17,32 +17,32 @@
 package org.alephium.storage.rocksdb
 
 import akka.util.ByteString
-import org.rocksdb.*
+import org.rocksdb._
 
 import org.alephium.io.IOResult
 import org.alephium.io.IOUtils
-import org.alephium.serde.*
-import org.alephium.storage.KeyValueStorage
+import org.alephium.serde._
+import org.alephium.storage.{ColumnFamily, KeyValueStorage}
 
 object RocksDBKeyValueStorage {
   import RocksDBSource.Settings
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
-      cf: RocksDBSource.ColumnFamily
+      cf: ColumnFamily
   ): KeyValueStorage[K, V] =
     apply(storage, cf, Settings.writeOptions, Settings.readOptions)
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
-      cf: RocksDBSource.ColumnFamily,
+      cf: ColumnFamily,
       writeOptions: WriteOptions
   ): KeyValueStorage[K, V] =
     apply(storage, cf, writeOptions, Settings.readOptions)
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
-      cf: RocksDBSource.ColumnFamily,
+      cf: ColumnFamily,
       writeOptions: WriteOptions,
       readOptions: ReadOptions
   ): KeyValueStorage[K, V] =
@@ -51,7 +51,7 @@ object RocksDBKeyValueStorage {
 
 class RocksDBKeyValueStorage[K, V](
     storage: RocksDBSource,
-    cf: RocksDBSource.ColumnFamily,
+    cf: ColumnFamily,
     val writeOptions: WriteOptions,
     val readOptions: ReadOptions
 )(implicit val keySerde: Serde[K], val valueSerde: Serde[V])
