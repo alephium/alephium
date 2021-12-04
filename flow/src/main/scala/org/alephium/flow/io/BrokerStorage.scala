@@ -20,13 +20,13 @@ import scala.collection.mutable
 
 import org.rocksdb.{ReadOptions, WriteOptions}
 
-import org.alephium.flow.model.BrokerState
+import org.alephium.flow.model.BrokerDiscoveryState
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.model.{BrokerInfo, PeerId}
 import org.alephium.util.AVector
 
-trait BrokerStorage extends KeyValueStorage[PeerId, BrokerState] {
+trait BrokerStorage extends KeyValueStorage[PeerId, BrokerDiscoveryState] {
   def addBroker(brokerInfo: BrokerInfo): IOResult[Unit]
   def activeBrokers(): IOResult[AVector[BrokerInfo]]
 }
@@ -47,10 +47,15 @@ class BrokerRocksDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[PeerId, BrokerState](storage, cf, writeOptions, readOptions)
+) extends RocksDBKeyValueStorage[PeerId, BrokerDiscoveryState](
+      storage,
+      cf,
+      writeOptions,
+      readOptions
+    )
     with BrokerStorage {
   override def addBroker(brokerInfo: BrokerInfo): IOResult[Unit] = {
-    val state = BrokerState(brokerInfo.address, brokerInfo.brokerNum)
+    val state = BrokerDiscoveryState(brokerInfo.address, brokerInfo.brokerNum)
     put(brokerInfo.peerId, state)
   }
 

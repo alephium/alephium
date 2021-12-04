@@ -190,7 +190,6 @@ trait DiscoveryServerState extends SessionManager {
     if (getCliqueNumPerIp(peerInfo) < discoveryConfig.maxCliqueFromSameIp) {
       log.info(s"Adding a new peer: $peerInfo")
       addBroker(peerInfo)
-      addBrokerToStorage(peerInfo)
       publishNewPeer(peerInfo)
     } else {
       log.debug(s"Too many cliques from a same IP: $peerInfo")
@@ -198,7 +197,13 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   @inline final def addBroker(peerInfo: BrokerInfo): Unit = {
+    addBrokerToStorage(peerInfo)
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  @inline final def cacheBrokers(peers: AVector[BrokerInfo]): Unit = {
+    peers.foreach(peer => table += peer.peerId -> PeerStatus.fromInfo(peer))
     DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 

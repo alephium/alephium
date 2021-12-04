@@ -20,9 +20,9 @@ import java.net.InetSocketAddress
 
 import org.alephium.serde.Serde
 
-final case class BrokerState(address: InetSocketAddress, brokerNum: Int)
+final case class BrokerDiscoveryState(address: InetSocketAddress, brokerNum: Int)
 
-object BrokerState {
-  implicit val serde: Serde[BrokerState] =
-    Serde.forProduct2(BrokerState.apply, state => (state.address, state.brokerNum))
+object BrokerDiscoveryState {
+  implicit val serde: Serde[BrokerDiscoveryState] =
+    Serde.forProduct2(BrokerDiscoveryState.apply, state => (state.address, state.brokerNum))
 }

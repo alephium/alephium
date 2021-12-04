@@ -129,7 +129,7 @@ class DiscoveryServer(
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
-      cliqueInfo.interBrokers.foreach { brokers => brokers.foreach(addBroker) }
+      cliqueInfo.interBrokers.foreach(cacheBrokers)
       unstashAll()
       log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
       startBinding()
@@ -145,9 +145,7 @@ class DiscoveryServer(
   }
 
   private def loadPersistedBrokers(): Unit = {
-    escapeIOError(brokerStorage.activeBrokers().map { brokers =>
-      brokers.foreach(addBroker)
-    })
+    escapeIOError(brokerStorage.activeBrokers().map(cacheBrokers))
   }
 
   override def addBrokerToStorage(peerInfo: BrokerInfo): Unit =
