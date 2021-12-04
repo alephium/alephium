@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.cache
 
 import org.alephium.crypto.{Blake2b => Hash}
+import org.alephium.io.IOError
 import org.alephium.util.AlephiumSpec
 
 class StagingSMTSpec extends AlephiumSpec {

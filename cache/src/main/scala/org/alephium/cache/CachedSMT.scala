@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.cache
 
 import scala.collection.mutable
 
+import org.alephium.io.IOResult
 import org.alephium.util.EitherF
 
 final class CachedSMT[K, V](

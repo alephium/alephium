@@ -18,9 +18,9 @@ package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.Storages
-import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
+import org.alephium.storage.rocksdb.RocksDBSource.Settings
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {

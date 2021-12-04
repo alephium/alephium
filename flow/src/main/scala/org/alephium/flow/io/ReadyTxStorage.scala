@@ -20,8 +20,14 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.model.ReadyTxInfo
 import org.alephium.io._
-import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.Hash
+import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.rocksdb.{
+  RocksDBKeyValueCompanion,
+  RocksDBKeyValueStorage,
+  RocksDBSource
+}
+import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
 
 trait ReadyTxStorage extends KeyValueStorage[Hash, ReadyTxInfo] {
   def iterateE(f: (Hash, ReadyTxInfo) => IOResult[Unit]): IOResult[Unit]

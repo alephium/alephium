@@ -14,12 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.storage.rocksdb
 
 import akka.util.ByteString
-import org.rocksdb._
+import org.rocksdb.*
 
-import org.alephium.serde._
+import org.alephium.io.IOResult
+import org.alephium.io.IOUtils
+import org.alephium.serde.*
+import org.alephium.storage.KeyValueStorage
 
 object RocksDBKeyValueStorage {
   import RocksDBSource.Settings

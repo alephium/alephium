@@ -16,8 +16,9 @@
 
 package org.alephium.flow.io
 
-import org.alephium.io.{IOError, RocksDBSource}
+import org.alephium.io.IOError
 import org.alephium.protocol.config.GroupConfigFixture
+import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.AlephiumSpec
 
 class NodeStateStorageSpec

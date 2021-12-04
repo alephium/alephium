@@ -16,8 +16,8 @@
 
 package org.alephium.flow.io
 
-import org.alephium.io._
 import org.alephium.protocol.model.NoIndexModelGenerators
+import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.AlephiumSpec
 
 class BlockStorageSpec

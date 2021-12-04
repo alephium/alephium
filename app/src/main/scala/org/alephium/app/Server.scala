@@ -27,7 +27,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.storage.rocksdb.RocksDBSource.Settings
 import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig

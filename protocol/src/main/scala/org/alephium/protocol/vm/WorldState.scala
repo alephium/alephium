@@ -18,10 +18,12 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
+import org.alephium.cache.{CachedSMT, MutableTrie, SparseMerkleTrie, StagingSMT}
 import org.alephium.io._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.serde.{Serde, SerdeError}
+import org.alephium.storage.KeyValueStorage
 import org.alephium.util.AVector
 
 trait WorldState[T, R1, R2, R3] {

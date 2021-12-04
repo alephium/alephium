@@ -20,9 +20,11 @@ import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 
-import org.alephium.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource, SparseMerkleTrie}
-import org.alephium.io.SparseMerkleTrie.Node
+import org.alephium.cache.SparseMerkleTrie
+import org.alephium.cache.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
+import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
 import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.AverageTime))

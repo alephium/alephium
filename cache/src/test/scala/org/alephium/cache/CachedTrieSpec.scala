@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.cache
 
 import scala.collection.mutable
 import scala.util.Random
@@ -22,6 +22,8 @@ import scala.util.Random
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b => Hash}
+import org.alephium.io.IOError
+import org.alephium.storage.StorageFixture
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.Bytes.byteStringOrdering
 

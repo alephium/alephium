@@ -18,10 +18,10 @@ package org.alephium.flow.io
 
 import org.alephium.flow.model.ReadyTxInfo
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.io.RocksDBSource
-import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.{Generators, Hash}
 import org.alephium.protocol.model.ChainIndex
+import org.alephium.storage.rocksdb.RocksDBSource
+import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ReadyTxStorageSpec

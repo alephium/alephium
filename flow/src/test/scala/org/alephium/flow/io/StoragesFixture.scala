@@ -18,9 +18,9 @@ package org.alephium.flow.io
 
 import java.nio.file.{Files, Path}
 
-import org.alephium.io.RocksDBSource
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.storage.rocksdb.RocksDBSource
 
 trait StoragesFixture {
   def storages: Storages

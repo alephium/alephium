@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.storage.rocksdb
 
-import org.rocksdb.{ReadOptions, WriteOptions}
+import org.rocksdb.ReadOptions
+import org.rocksdb.WriteOptions
 
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.storage.rocksdb.RocksDBSource.Settings
 
 trait RocksDBKeyValueCompanion[S <: RocksDBKeyValueStorage[_, _]] {
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): S =

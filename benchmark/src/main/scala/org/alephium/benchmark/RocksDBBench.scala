@@ -25,8 +25,8 @@ import org.rocksdb.{ColumnFamilyOptions, DBOptions, RocksDB}
 import org.rocksdb.util.SizeUnit
 
 import org.alephium.crypto.Keccak256
-import org.alephium.io.{RocksDBColumn, RocksDBSource}
 import org.alephium.protocol.Hash
+import org.alephium.storage.rocksdb.{RocksDBColumn, RocksDBSource}
 import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.SingleShotTime))

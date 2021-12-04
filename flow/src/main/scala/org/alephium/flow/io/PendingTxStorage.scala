@@ -20,8 +20,10 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.model.PersistedTxId
 import org.alephium.io._
-import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.model.TransactionTemplate
+import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.rocksdb.{RocksDBKeyValueCompanion, RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
 
 trait PendingTxStorage extends KeyValueStorage[PersistedTxId, TransactionTemplate] {
   def iterateE(f: (PersistedTxId, TransactionTemplate) => IOResult[Unit]): IOResult[Unit]

@@ -20,9 +20,14 @@ import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.model.BlockState
-import org.alephium.io._
-import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.BlockHash
+import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.rocksdb.{
+  RocksDBKeyValueCompanion,
+  RocksDBKeyValueStorage,
+  RocksDBSource
+}
+import org.alephium.storage.rocksdb.RocksDBSource.ColumnFamily
 
 trait BlockStateStorage extends KeyValueStorage[BlockHash, BlockState] {
   override def storageKey(key: BlockHash): ByteString =

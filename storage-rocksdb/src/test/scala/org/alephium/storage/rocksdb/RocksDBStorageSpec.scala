@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.storage.rocksdb
 
 import org.alephium.macros.EnumerationMacros
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.AlephiumSpec
+import org.alephium.util.AVector
 
 class RocksDBStorageSpec extends AlephiumSpec {
   import RocksDBSource.ColumnFamily

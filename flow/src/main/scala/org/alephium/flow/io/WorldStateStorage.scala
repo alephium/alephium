@@ -19,10 +19,13 @@ package org.alephium.flow.io
 import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
+import org.alephium.cache.SparseMerkleTrie
 import org.alephium.io._
-import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.vm.WorldState
+import org.alephium.storage.KeyValueStorage
+import org.alephium.storage.rocksdb.{RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.storage.rocksdb.RocksDBSource.{ColumnFamily, Settings}
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]

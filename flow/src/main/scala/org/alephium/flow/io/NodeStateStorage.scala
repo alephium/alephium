@@ -22,11 +22,13 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 import org.alephium.flow.core.BlockHashChain
 import org.alephium.flow.model.BootstrapInfo
 import org.alephium.io._
-import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde._
+import org.alephium.storage.RawKeyValueStorage
+import org.alephium.storage.rocksdb.{RocksDBColumn, RocksDBSource}
+import org.alephium.storage.rocksdb.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.util.AVector
 
 trait NodeStateStorage extends RawKeyValueStorage {

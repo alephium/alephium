@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.cache
 
 import scala.collection.mutable
 
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.util.discard
 
 abstract class CachedTrie[K, V, C >: Modified[V] <: Cache[V]] extends MutableTrie[K, V, Unit] {

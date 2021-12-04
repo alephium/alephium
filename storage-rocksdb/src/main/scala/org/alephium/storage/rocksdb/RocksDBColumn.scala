@@ -14,10 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.storage.rocksdb
 
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
+
+import org.alephium.io.IOError
+import org.alephium.storage.RawKeyValueStorage
 
 object RocksDBColumn {
   import RocksDBSource.Settings

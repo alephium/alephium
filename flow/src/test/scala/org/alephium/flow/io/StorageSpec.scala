@@ -18,7 +18,7 @@ package org.alephium.flow.io
 
 import org.scalatest.BeforeAndAfterEach
 
-import org.alephium.io.RocksDBSource
+import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.{AlephiumSpec, Files}
 
 trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {

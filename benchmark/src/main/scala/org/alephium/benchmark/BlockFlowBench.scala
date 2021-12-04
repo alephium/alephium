@@ -24,8 +24,8 @@ import org.openjdk.jmh.annotations._
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Platform}
-import org.alephium.io.RocksDBSource
 import org.alephium.protocol.model.{BlockDeps, GroupIndex}
+import org.alephium.storage.rocksdb.RocksDBSource
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

@@ -16,9 +16,10 @@
 
 package org.alephium.flow.io
 
-import org.alephium.io.{IOError, RocksDBSource}
+import org.alephium.io.IOError
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
+import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.AlephiumSpec
 
 class BlockHeaderStorageSpec

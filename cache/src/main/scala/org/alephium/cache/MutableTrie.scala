@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.cache
+
+import org.alephium.io.IOResult
 
 trait MutableTrie[K, V, T] extends ReadableTrie[K, V] {
   def remove(key: K): IOResult[T]

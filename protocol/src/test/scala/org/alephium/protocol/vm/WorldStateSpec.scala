@@ -18,8 +18,9 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
-import org.alephium.io.{IOResult, StorageFixture}
-import org.alephium.protocol.model._
+import org.alephium.io.IOResult
+import org.alephium.protocol.model.*
+import org.alephium.storage.StorageFixture
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {

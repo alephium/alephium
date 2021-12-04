@@ -19,8 +19,8 @@ package org.alephium.flow.io
 import scala.util.Random
 
 import org.alephium.flow.model.PersistedTxId
-import org.alephium.io.RocksDBSource
 import org.alephium.protocol.model.{NoIndexModelGenerators, TransactionTemplate}
+import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class PendingTxStorageSpec

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.storage.rocksdb
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
@@ -22,10 +22,13 @@ import java.nio.file.Path
 import org.rocksdb._
 import org.rocksdb.util.SizeUnit
 
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.IOUtils.tryExecute
+import org.alephium.storage.KeyValueSource
 import org.alephium.util.AVector
 
 object RocksDBSource {
-  import IOUtils.tryExecute
+  import org.alephium.io.IOUtils.tryExecute
 
   {
     RocksDB.loadLibrary()
@@ -177,7 +180,6 @@ object RocksDBSource {
 
 class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle])
     extends KeyValueSource {
-  import IOUtils.tryExecute
   import RocksDBSource._
 
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
