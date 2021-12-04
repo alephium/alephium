@@ -1,2 +1,8 @@
 target
 log
+
+#Intellij
+.idea
+
+#jevn local terminal java version
+.java-version
