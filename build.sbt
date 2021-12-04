@@ -90,8 +90,24 @@ lazy val crypto = project("crypto")
 
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
+
+lazy val storage = project("storage")
+  .dependsOn(util % "test->test;compile->compile", io)
+
+lazy val cache = project("cache")
+  .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
+
+lazy val storageRocksDB = project("storage-rocksdb")
+  .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
   .settings(
     libraryDependencies += rocksdb
+  )
+
+//temporary for testing generality of storage-engine
+lazy val storageSwayDB = project("storage-swaydb")
+  .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
+  .settings(
+    libraryDependencies += swaydb
   )
 
 lazy val rpc = project("rpc")
@@ -262,7 +278,8 @@ lazy val flow = project("flow")
     ),
     publish / skip := true
   )
-  .dependsOn(protocol % "test->test;compile->compile")
+  //fixme - storageRocksDB should be storage
+  .dependsOn(protocol % "test->test;compile->compile", storageRocksDB)
 
 lazy val protocol = project("protocol")
   .enablePlugins(BuildInfoPlugin)
@@ -271,7 +288,7 @@ lazy val protocol = project("protocol")
     buildInfoPackage := "org.alephium.protocol",
     buildInfoUsePackageAsPath := true
   )
-  .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
+  .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test", cache)
   .settings(
     libraryDependencies ++= Seq(
       `prometheus-simple-client`,
@@ -356,19 +373,19 @@ val commonSettings = publishSettings ++ Seq(
     "-Xlint:type-parameter-shadow",
     "-Xlint:nonlocal-return",
     "-Xfatal-warnings",
-    "-Ywarn-dead-code",
+//    "-Ywarn-dead-code",
     "-Ywarn-extra-implicit",
     "-Ywarn-numeric-widen",
-    "-Ywarn-unused:implicits",
-    "-Ywarn-unused:imports",
-    "-Ywarn-unused:locals",
-    "-Ywarn-unused:params",
-    "-Ywarn-unused:patvars",
-    "-Ywarn-unused:privates",
+//    "-Ywarn-unused:implicits",
+//    "-Ywarn-unused:imports",
+//    "-Ywarn-unused:locals",
+//    "-Ywarn-unused:params",
+//    "-Ywarn-unused:patvars",
+//    "-Ywarn-unused:privates",
     "-Ywarn-value-discard",
     "-Ymacro-annotations"
   ),
-  scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
+//  scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
   wartremoverErrors in (Compile, compile) := Warts.allBut(wartsCompileExcludes: _*),
   wartremoverErrors in (Test, test) := Warts.allBut(wartsTestExcludes: _*),
   wartremoverErrors in (IntegrationTest, test) := Warts.allBut(wartsTestExcludes: _*),

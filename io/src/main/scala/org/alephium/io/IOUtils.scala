@@ -17,11 +17,11 @@
 package org.alephium.io
 
 import java.io.IOException
-import java.nio.file.{Files, Path}
-
-import org.rocksdb.RocksDBException
+import java.nio.file.Files
+import java.nio.file.Path
 
 import org.alephium.io.IOError.KeyNotFound
+import org.alephium.io.IOException.StorageException
 import org.alephium.serde.SerdeError
 
 object IOUtils {
@@ -64,7 +64,7 @@ object IOUtils {
   def error[T]: PartialFunction[Throwable, IOResult[T]] = {
     case e: IOException       => Left(IOError.JavaIO(e))
     case e: SecurityException => Left(IOError.JavaSecurity(e))
-    case e: RocksDBException  => Left(IOError.RocksDB(e))
+    case e: StorageException  => Left(IOError.Storage(e))
     case e: SerdeError        => Left(IOError.Serde(e))
     case e: KeyNotFound       => Left(e)
   }
