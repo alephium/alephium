@@ -23,7 +23,10 @@ import org.alephium.protocol.model.ContractId
 import org.alephium.serde.SerdeError
 
 // scalastyle:off number.of.types
-trait ExeFailure
+trait ExeFailure extends Product {
+  def name: String = productPrefix
+}
+
 final case object CodeSizeTooLarge                             extends ExeFailure
 final case object FieldsSizeTooLarge                           extends ExeFailure
 case object ExpectStatefulFrame                                extends ExeFailure
@@ -91,8 +94,9 @@ case object NoCaller                                           extends ExeFailur
 final case class NegativeTimeStamp(millis: Long)               extends ExeFailure
 final case class InvalidTarget(value: BigInteger)              extends ExeFailure
 
-sealed trait IOFailure {
+sealed trait IOFailure extends Product {
   def error: IOError
+  def name: String = productPrefix
 }
 final case class IOErrorUpdateState(error: IOError)    extends IOFailure
 final case class IOErrorRemoveContract(error: IOError) extends IOFailure

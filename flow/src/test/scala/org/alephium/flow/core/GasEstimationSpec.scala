@@ -30,13 +30,13 @@ class GasEstimationSpec extends AlephiumSpec with LockupScriptGenerators {
   }
 
   "GasEstimation.estimateGasWithP2PKHOutputs" should "estimate the gas for P2PKH outputs" in {
-    GasEstimation.estimateGasWithP2PKHOutputs(0, 0) is minimalGas
-    GasEstimation.estimateGasWithP2PKHOutputs(1, 0) is minimalGas
-    GasEstimation.estimateGasWithP2PKHOutputs(0, 1) is minimalGas
-    GasEstimation.estimateGasWithP2PKHOutputs(1, 1) is minimalGas
-    GasEstimation.estimateGasWithP2PKHOutputs(2, 3) is GasBox.unsafe(24680)
-    GasEstimation.estimateGasWithP2PKHOutputs(3, 3) is GasBox.unsafe(26680)
-    GasEstimation.estimateGasWithP2PKHOutputs(5, 10) is GasBox.unsafe(76600)
+    GasEstimation.estimateWithP2PKHOutputs(0, 0) is minimalGas
+    GasEstimation.estimateWithP2PKHOutputs(1, 0) is minimalGas
+    GasEstimation.estimateWithP2PKHOutputs(0, 1) is minimalGas
+    GasEstimation.estimateWithP2PKHOutputs(1, 1) is minimalGas
+    GasEstimation.estimateWithP2PKHOutputs(2, 3) is GasBox.unsafe(24680)
+    GasEstimation.estimateWithP2PKHOutputs(3, 3) is GasBox.unsafe(26680)
+    GasEstimation.estimateWithP2PKHOutputs(5, 10) is GasBox.unsafe(76600)
   }
 
   "GasEstimation.sweepAll" should "behave the same as GasEstimation.estimateGasWithP2PKHOutputs" in {
@@ -45,7 +45,7 @@ class GasEstimationSpec extends AlephiumSpec with LockupScriptGenerators {
 
     forAll(inputNumGen, outputNumGen) { case (inputNum, outputNum) =>
       val sweepAllGas = GasEstimation.sweepAll(inputNum, outputNum)
-      sweepAllGas is GasEstimation.estimateGasWithP2PKHOutputs(inputNum, outputNum)
+      sweepAllGas is GasEstimation.estimateWithP2PKHOutputs(inputNum, outputNum)
     }
   }
 
@@ -54,21 +54,21 @@ class GasEstimationSpec extends AlephiumSpec with LockupScriptGenerators {
     val p2pkhLockupScripts =
       Gen.listOfN(3, p2pkhLockupGen(groupIndex)).map(AVector.from).sample.value
 
-    GasEstimation.estimateGas(2, p2pkhLockupScripts) is GasBox.unsafe(24680)
+    GasEstimation.estimate(2, p2pkhLockupScripts) is GasBox.unsafe(24680)
 
     val p2mphkLockupScript1 = p2mpkhLockupGen(3, 2, groupIndex).sample.value
-    GasEstimation.estimateGas(
+    GasEstimation.estimate(
       2,
       p2mphkLockupScript1 +: p2pkhLockupScripts
     ) is GasBox.unsafe(33420)
 
     val p2mphkLockupScript2 = p2mpkhLockupGen(5, 3, groupIndex).sample.value
-    GasEstimation.estimateGas(
+    GasEstimation.estimate(
       2,
       p2mphkLockupScript2 +: p2pkhLockupScripts
     ) is GasBox.unsafe(35540)
 
-    GasEstimation.estimateGas(
+    GasEstimation.estimate(
       2,
       p2mphkLockupScript1 +: p2mphkLockupScript2 +: p2pkhLockupScripts
     ) is GasBox.unsafe(44280)

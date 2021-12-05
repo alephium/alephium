@@ -25,7 +25,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model._
-import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoUtils}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, GasEstimation, UtxoUtils}
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
@@ -592,8 +592,10 @@ class ServerUtils(implicit
     val utxosLimit   = utxosLimitOpt.getOrElse(apiConfig.defaultUtxosLimit)
     for {
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
+      allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
+      scriptGas = GasEstimation.estimate(script, allInputs, blockFlow)
       unsignedTx <- UtxoUtils
-        .select(allUtxos, AVector.empty, amount, AVector.empty, gas, gasPrice, dustUtxoAmount)
+        .select(allUtxos, AVector.empty, amount, AVector.empty, gas, gasPrice, Some(scriptGas))
         .map { selectedUtxos =>
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(

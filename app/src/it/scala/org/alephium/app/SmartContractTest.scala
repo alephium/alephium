@@ -232,7 +232,7 @@ class SmartContractTest extends AlephiumActorSpec {
         .subUnsafe(ALPH.alph(1000))
         .subUnsafe(ALPH.alph(10000))
         .subUnsafe(ALPH.alph(100000))
-        .subUnsafe(defaultGasPrice * GasEstimation.estimateGasWithP2PKHOutputs(1, 5))
+        .subUnsafe(defaultGasPrice * GasEstimation.estimateWithP2PKHOutputs(1, 5))
 
       changeAmount is ALPH.nanoAlph(888899996420000L)
 
