@@ -18,6 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.ApiError
 import org.alephium.api.model._
+import org.alephium.flow.core.GasEstimation
 import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
@@ -109,8 +110,11 @@ class MultisigTest extends AlephiumActorSpec {
 
     confirmTx(multisigTx, restPort)
 
+    val multiSigTxOutputs = unsignedTx.fixedOutputs.map(_.lockupScript)
+    val estimatedGas      = GasEstimation.estimate(unsignedTx.inputs.length, multiSigTxOutputs)
+    val gasFee            = defaultGasPrice * estimatedGas
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
-      Balance.from(Amount(transferAmount.mulUnsafe(2) - amount - defaultGasFee), Amount.Zero, 1)
+      Balance.from(Amount(transferAmount.mulUnsafe(2) - amount - gasFee), Amount.Zero, 1)
 
     clique.stopMining()
     clique.stop()
