@@ -24,4 +24,7 @@ object StorageSetting {
     new StorageSetting(disk, syncWrite)
 
 }
+
+/** Contains all settings needed by storage-engine for optimisations.
+  */
 class StorageSetting(val disk: Disk, val syncWrite: Boolean)

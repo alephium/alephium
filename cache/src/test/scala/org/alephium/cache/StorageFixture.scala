@@ -20,7 +20,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.Keccak256
 import org.alephium.serde.Serde
-import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage, StorageInitialiser}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage, StorageInitializer}
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.{AlephiumFixture, Files}
 
@@ -30,7 +30,11 @@ trait StorageFixture extends AlephiumFixture {
   private lazy val dbPath = tmpdir.resolve(dbname)
 
   private lazy val storage: KeyValueSource =
-    StorageInitialiser.openUnsafe(dbPath, StorageSetting.syncWriteHDD(), ColumnFamily.values.toIterable)
+    StorageInitializer.openUnsafe(
+      path = dbPath,
+      setting = StorageSetting.syncWriteHDD(),
+      columns = ColumnFamily.values.toIterable
+    )
 
   def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] =
     KeyValueStorage[K, V](storage, ColumnFamily.All)

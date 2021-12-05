@@ -23,7 +23,7 @@ import org.openjdk.jmh.annotations._
 import org.alephium.cache.SparseMerkleTrie
 import org.alephium.cache.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
-import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage, StorageInitialiser}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, KeyValueStorage, StorageInitializer}
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.Files
 
@@ -42,7 +42,7 @@ class TrieBench {
       files.foreach(_.delete)
     }
 
-    StorageInitialiser.openUnsafe(
+    StorageInitializer.openUnsafe(
       path = dbPath,
       setting = StorageSetting.syncWriteHDD(),
       columns = ColumnFamily.values.toIterable

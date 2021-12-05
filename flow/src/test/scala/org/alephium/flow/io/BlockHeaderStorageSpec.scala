@@ -19,7 +19,7 @@ package org.alephium.flow.io
 import org.alephium.io.IOError
 import org.alephium.protocol.config.ConsensusConfigFixture
 import org.alephium.protocol.model.{BlockHeader, NoIndexModelGenerators}
-import org.alephium.storage.{ColumnFamily, KeyValueSource, StorageInitialiser}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, StorageInitializer}
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.AlephiumSpec
 
@@ -38,7 +38,7 @@ class BlockHeaderStorageSpec
   }
 
   it should "create database" in {
-    StorageInitialiser
+    StorageInitializer
       .open(
         path = dbPath,
         setting = StorageSetting.syncWriteHDD(),

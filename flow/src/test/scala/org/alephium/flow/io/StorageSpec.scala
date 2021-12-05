@@ -18,7 +18,7 @@ package org.alephium.flow.io
 
 import org.scalatest.BeforeAndAfterEach
 
-import org.alephium.storage.{ColumnFamily, KeyValueSource, StorageInitialiser}
+import org.alephium.storage.{ColumnFamily, KeyValueSource, StorageInitializer}
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.{AlephiumSpec, Files}
 
@@ -31,7 +31,7 @@ trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    source = StorageInitialiser.openUnsafe(
+    source = StorageInitializer.openUnsafe(
       path = dbPath,
       setting = StorageSetting.syncWriteHDD(),
       columns = ColumnFamily.values.toIterable

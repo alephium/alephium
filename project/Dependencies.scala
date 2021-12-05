@@ -32,12 +32,11 @@ object Dependencies {
 
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.3.8"
 
-  lazy val ficus     = "com.iheart"      %% "ficus"           % "1.5.0"
-  lazy val bcprov    = "org.bouncycastle" % "bcprov-jdk15on"  % "1.68"
-  lazy val fastparse = "com.lihaoyi"     %% "fastparse"       % "2.3.1"
-  lazy val logback   = "ch.qos.logback"   % "logback-classic" % "1.2.3"
-  lazy val rocksdb   = "org.rocksdb"      % "rocksdbjni"      % "5.18.4"
-  //temporary for testing generality of storage-engine
+  lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.0"
+  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk15on"  % "1.68"
+  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.1"
+  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.2.3"
+  lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "5.18.4"
   lazy val swaydb          = "io.swaydb"                  %% "swaydb"          % "0.16.2"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.2"
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.15.3"  % Test

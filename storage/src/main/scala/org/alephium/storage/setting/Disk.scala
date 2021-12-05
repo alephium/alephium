@@ -16,6 +16,9 @@
 
 package org.alephium.storage.setting
 
+/** Setting used to target storage-engines to optimise
+  * for either spinning-disks drives or solid-state-drives.
+  */
 sealed trait Disk
 object Disk {
   case object HDD extends Disk

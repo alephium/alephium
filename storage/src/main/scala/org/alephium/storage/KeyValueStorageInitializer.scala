@@ -21,7 +21,10 @@ import java.nio.file.Path
 import org.alephium.io.IOResult
 import org.alephium.storage.setting.StorageSetting
 
-trait KeyValueStorageInitialiser {
+/** Each storage-engine implement this to allow
+  * core projects to create storage-engine instances.
+  */
+trait KeyValueStorageInitializer {
 
   def open(
       path: Path,

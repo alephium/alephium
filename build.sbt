@@ -29,6 +29,9 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     util,
     serde,
     io,
+    cache,
+    storage,
+    storageInThisBuild,
     crypto,
     api,
     rpc,
@@ -100,22 +103,21 @@ lazy val cache = project("cache")
     serde,
     crypto,
     storage,
-    activeStorageEngine % Test
+    storageInThisBuild % Test
   )
 
-/** Sets the target storage engine to use for the build.
-  * Choose either [[storageRocksDB]] or [[storageSwayDB]]
+/** Sets the storage engine to use in this build.
+  * Choose either [[`storage-rocksdb`]] or [[`storage-swaydb`]]
   */
-lazy val activeStorageEngine = storageRocksDB
+lazy val storageInThisBuild = `storage-rocksdb`
 
-lazy val storageRocksDB = project("storage-rocksdb")
+lazy val `storage-rocksdb` = project("storage-rocksdb")
   .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
   .settings(
     libraryDependencies += rocksdb
   )
 
-//temporary for testing generality of storage-engine
-lazy val storageSwayDB = project("storage-swaydb")
+lazy val `storage-swaydb` = project("storage-swaydb")
   .dependsOn(util % "test->test;compile->compile", serde, crypto, storage)
   .settings(
     libraryDependencies += swaydb
@@ -289,7 +291,7 @@ lazy val flow = project("flow")
     ),
     publish / skip := true
   )
-  .dependsOn(protocol % "test->test;compile->compile", activeStorageEngine)
+  .dependsOn(protocol % "test->test;compile->compile", storageInThisBuild)
 
 lazy val protocol = project("protocol")
   .enablePlugins(BuildInfoPlugin)
@@ -304,7 +306,7 @@ lazy val protocol = project("protocol")
     serde,
     util % "test->test",
     cache,
-    activeStorageEngine % Test
+    storageInThisBuild % Test
   )
   .settings(
     libraryDependencies ++= Seq(
@@ -390,19 +392,19 @@ val commonSettings = publishSettings ++ Seq(
     "-Xlint:type-parameter-shadow",
     "-Xlint:nonlocal-return",
     "-Xfatal-warnings",
-//    "-Ywarn-dead-code",
+    "-Ywarn-dead-code",
     "-Ywarn-extra-implicit",
     "-Ywarn-numeric-widen",
-//    "-Ywarn-unused:implicits",
-//    "-Ywarn-unused:imports",
-//    "-Ywarn-unused:locals",
-//    "-Ywarn-unused:params",
-//    "-Ywarn-unused:patvars",
-//    "-Ywarn-unused:privates",
+    "-Ywarn-unused:implicits",
+    "-Ywarn-unused:imports",
+    "-Ywarn-unused:locals",
+    "-Ywarn-unused:params",
+    "-Ywarn-unused:patvars",
+    "-Ywarn-unused:privates",
     "-Ywarn-value-discard",
     "-Ymacro-annotations"
   ),
-//  scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
+  scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
   wartremoverErrors in (Compile, compile) := Warts.allBut(wartsCompileExcludes: _*),
   wartremoverErrors in (Test, test) := Warts.allBut(wartsTestExcludes: _*),
   wartremoverErrors in (IntegrationTest, test) := Warts.allBut(wartsTestExcludes: _*),

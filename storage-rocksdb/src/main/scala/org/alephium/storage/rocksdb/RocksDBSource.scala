@@ -20,18 +20,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util
 
-import org.rocksdb.{
-  ColumnFamilyDescriptor,
-  ColumnFamilyHandle,
-  DBOptions,
-  Options,
-  ReadOptions,
-  RocksDB
-}
+import org.rocksdb._
 
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.io.IOException.StorageException
 import org.alephium.storage.{ColumnFamily, KeyValueSource}
+import org.alephium.storage.rocksdb.RocksDBSource._
 
 /** [[KeyValueSource]] implementation for RocksDB.
   *
@@ -39,42 +33,53 @@ import org.alephium.storage.{ColumnFamily, KeyValueSource}
   */
 object RocksDBSource {
 
+  /** Core projects has no dependency on RocksDB and do not know of [[RocksDBException]].
+    * These exceptions should get converted to [[StorageException]].
+    */
+  @inline def convertException[T](f: => T): T =
+    try f
+    catch {
+      case rocksDBException: RocksDBException =>
+        throw StorageException(rocksDBException)
+    }
+
   /** RocksDB's default configuration. Not optimised.
     *
     * @param path Full path for the database directory
     */
-  def default(path: Path, columns: Iterable[ColumnFamily]): KeyValueSource = {
-    RocksDB.loadLibrary()
+  def openUnsafe(path: Path, columns: Iterable[ColumnFamily]): KeyValueSource = {
+    convertException {
+      RocksDB.loadLibrary()
 
-    val dbOptions: DBOptions =
-      new DBOptions()
-        .setCreateIfMissing(true)
-        .setCreateMissingColumnFamilies(true)
+      val dbOptions: DBOptions =
+        new DBOptions()
+          .setCreateIfMissing(true)
+          .setCreateMissingColumnFamilies(true)
 
-    //create java instance required by RocksDB instance
-    val handles     = new util.ArrayList[ColumnFamilyHandle]()
-    val descriptors = new util.ArrayList[ColumnFamilyDescriptor]()
+      //create java instance required by RocksDB instance
+      val handles     = new util.ArrayList[ColumnFamilyHandle]()
+      val descriptors = new util.ArrayList[ColumnFamilyDescriptor]()
 
-    (columns.map(_.name) ++ Seq("default")) foreach { name =>
-      descriptors.add(new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8)))
+      (columns.map(_.name) ++ Seq("default")) foreach { name =>
+        descriptors.add(new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8)))
+      }
+
+      val rocksDB =
+        RocksDB.open(dbOptions, path.toString, descriptors, handles)
+
+      val tableHandleMap =
+        columns.zipWithIndex.map { case (table, index) =>
+          table -> handles.get(index)
+        }.toMap
+
+      new RocksDBSource(
+        path = path,
+        handles = tableHandleMap,
+        db = rocksDB,
+        readOptions = new ReadOptions().setVerifyChecksums(false),
+        writeOptions = new WriteOptions()
+      )
     }
-
-    val rocksDB =
-      RocksDB.open(dbOptions, path.toString, descriptors, handles)
-
-    val tableHandleMap =
-      columns.zipWithIndex.map { case (table, index) =>
-        table -> handles.get(index)
-      }.toMap
-
-    val defaultReadOptions: ReadOptions = new ReadOptions().setVerifyChecksums(false)
-
-    new RocksDBSource(
-      path = path,
-      handles = tableHandleMap,
-      db = rocksDB,
-      readOptions = defaultReadOptions
-    )
   }
 
 }
@@ -83,13 +88,14 @@ protected class RocksDBSource(
     val path: Path,
     handles: Map[ColumnFamily, ColumnFamilyHandle],
     db: RocksDB,
-    readOptions: ReadOptions
+    readOptions: ReadOptions,
+    writeOptions: WriteOptions
 ) extends KeyValueSource {
 
   override type COLUMN = ColumnFamilyHandle
 
   def getColumnUnsafe(column: ColumnFamily): ColumnFamilyHandle = {
-    handles.get(column) match {
+    convertException(handles.get(column)) match {
       case Some(handle) =>
         handle
 
@@ -105,7 +111,7 @@ protected class RocksDBSource(
     * so there no need to re-fetch this for each read request.
     */
   def getColumn(column: ColumnFamily): IOResult[ColumnFamilyHandle] = {
-    handles.get(column) match {
+    convertException(handles.get(column)) match {
       case Some(handle) =>
         Right(handle)
 
@@ -120,53 +126,59 @@ protected class RocksDBSource(
   }
 
   override def getUnsafe(column: ColumnFamilyHandle, key: Array[Byte]): Option[Array[Byte]] =
-    Option(db.get(column, readOptions, key))
+    Option(convertException(db.get(column, readOptions, key)))
 
   override def existsUnsafe(column: ColumnFamilyHandle, key: Array[Byte]): Boolean = {
-    val result = db.get(column, readOptions, key)
+    val result = convertException(db.get(column, readOptions, key))
     result != null
   }
 
   override def putUnsafe(column: ColumnFamilyHandle, key: Array[Byte], value: Array[Byte]): Unit =
-    db.put(column, key, value)
+    convertException(db.put(column, writeOptions, key, value))
 
   override def deleteUnsafe(column: ColumnFamilyHandle, key: Array[Byte]): Unit =
-    db.delete(column, key)
+    convertException(db.delete(column, writeOptions, key))
 
   override def deleteRangeUnsafe(
       column: ColumnFamilyHandle,
       fromKey: Array[Byte],
       toKey: Array[Byte]
   ): Unit =
-    db.deleteRange(column, fromKey, toKey)
+    convertException(db.deleteRange(column, writeOptions, fromKey, toKey))
 
   def iterateUnsafe(column: ColumnFamilyHandle, f: (Array[Byte], Array[Byte]) => Unit): Unit = {
-    val iterator = db.newIterator(column)
-    iterator.seekToFirst()
+    convertException {
+      val iterator = db.newIterator(column)
+      iterator.seekToFirst()
 
-    while (iterator.isValid()) {
-      try {
-        f(iterator.key(), iterator.value())
-        iterator.next()
-      } catch {
-        case throwable: Throwable =>
-          iterator.close()
-          throw throwable
+      while (iterator.isValid()) {
+        try {
+          f(iterator.key(), iterator.value())
+          iterator.next()
+        } catch {
+          case throwable: Throwable =>
+            iterator.close()
+            throw throwable
+        }
       }
-    }
 
-    iterator.close()
+      iterator.close()
+    }
   }
 
   def closeUnsafe(): Unit = {
-    //TODO - is this safe? What if closing handles fail? Should db.close() be in a final block?
-    handles.values.foreach(_.close())
-    db.close()
+    convertException {
+      //TODO - is this safe? What if closing handles fail? Should db.close() be in a final block?
+      handles.values.foreach(_.close())
+      db.close()
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def dESTROYUnsafe(): Unit = {
-    closeUnsafe()
-    RocksDB.destroyDB(path.toString, new Options())
+    convertException {
+      closeUnsafe()
+      RocksDB.destroyDB(path.toString, new Options())
+    }
   }
 }

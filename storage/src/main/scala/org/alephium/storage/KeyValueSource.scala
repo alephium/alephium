@@ -16,14 +16,18 @@
 
 package org.alephium.storage
 
-/** Unsafe trait for target storage-engine access.
+/** Unsafe trait for storage-engine access.
   *
-  * This API is restricted for storages projects only since it's unsafe.
+  * Being unsafe this trait is implemented by storage projects only.
   *
-  * Use [[KeyValueStorage]] instead for safer public APIs per [[ColumnFamily]].
+  * Use [[KeyValueStorage]] instead for safer APIs per [[ColumnFamily]].
   */
 trait KeyValueSource extends KeyValueSourceDestroyable {
 
+  /** Type used by storage-engine to identify a column.
+    *  - In RocksDB this is `ColumnFamilyHandle`
+    *  - In SwayDB this is `MultiMap`
+    */
   type COLUMN
 
   private[storage] def getColumnUnsafe(column: ColumnFamily): COLUMN

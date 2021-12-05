@@ -19,11 +19,10 @@ package org.alephium.flow.io
 import java.nio.file.Path
 
 import org.alephium.cache.SparseMerkleTrie.Node
-import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.WorldState
-import org.alephium.storage._
+import org.alephium.storage.*
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.util.AVector
 
@@ -71,7 +70,7 @@ object Storages {
       settings: StorageSetting
   ): KeyValueSource = {
     val dbPath = rootPath.resolve(dbFolder)
-    StorageInitialiser.openUnsafe(dbPath, settings, ColumnFamily.values.toIterable)
+    StorageInitializer.openUnsafe(dbPath, settings, ColumnFamily.values.toIterable)
   }
 }
 

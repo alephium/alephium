@@ -26,6 +26,8 @@ object IOException {
       new StorageException(cause)
   }
 
+  /** Exceptions that occur in storage-engines.
+    */
   class StorageException(cause: Throwable) extends Exception(cause)
 
 }

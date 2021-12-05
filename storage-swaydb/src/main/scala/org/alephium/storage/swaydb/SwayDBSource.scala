@@ -18,7 +18,7 @@ package org.alephium.storage.swaydb
 
 import java.nio.file.Path
 
-import swaydb.Glass
+import swaydb._
 import swaydb.serializers.Default.{ByteArraySerializer, StringSerializer}
 
 import org.alephium.storage.{ColumnFamily, KeyValueSource}
@@ -29,7 +29,8 @@ object SwayDBSource {
   type MultiMap = swaydb.MultiMap[String, Array[Byte], Array[Byte], Nothing, Glass]
 
   def defaultUnsafe(path: Path): KeyValueSource = {
-    val root = swaydb.persistent.MultiMap[String, Array[Byte], Array[Byte], Nothing, Glass](path)
+    implicit val bag: Bag.Sync[Glass] = GlassBag.bag
+    val root                          = persistent.MultiMap[String, Array[Byte], Array[Byte], Nothing, Glass](path)
     new SwayDBSource(root)
   }
 }

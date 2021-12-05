@@ -18,19 +18,18 @@ package org.alephium.storage
 
 import java.nio.file.Path
 
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.storage.swaydb.SwayDBSource
-import org.alephium.storage.util.StorageIOUtil
 
-object StorageInitialiser extends KeyValueStorageInitialiser {
+object StorageInitializer extends KeyValueStorageInitializer {
 
   override def open(
       path: Path,
       setting: StorageSetting,
       columns: Iterable[ColumnFamily]
   ): IOResult[KeyValueSource] =
-    StorageIOUtil.tryOpen(SwayDBSource.defaultUnsafe(path))
+    IOUtils.tryExecute(openUnsafe(path, setting, columns))
 
   override def openUnsafe(
       path: Path,
