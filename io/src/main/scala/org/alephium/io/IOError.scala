@@ -16,6 +16,7 @@
 
 package org.alephium.io
 
+import org.alephium.io.IOException.StorageException
 import org.alephium.serde.SerdeError
 import org.alephium.util.AppException
 
@@ -29,7 +30,7 @@ object IOError {
 
   final case class JavaIO(e: java.io.IOException)     extends IOError(e)
   final case class JavaSecurity(e: SecurityException) extends IOError(e)
-  final case class Storage(e: IOException.StorageException)    extends IOError(e)
+  final case class Storage(e: StorageException)       extends IOError(e)
   final case class Other(e: Throwable)                extends IOError(e)
 
   def keyNotFound[K](key: K, action: String): KeyNotFound = {

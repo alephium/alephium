@@ -18,9 +18,10 @@ package org.alephium.storage
 
 import java.nio.file.Path
 
-import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.IOResult
 import org.alephium.storage.rocksdb.RocksDBSource
 import org.alephium.storage.setting.StorageSetting
+import org.alephium.storage.util.StorageIOUtil
 
 object StorageInitialiser extends KeyValueStorageInitialiser {
   override def open(
@@ -28,7 +29,7 @@ object StorageInitialiser extends KeyValueStorageInitialiser {
       setting: StorageSetting,
       columns: Iterable[ColumnFamily]
   ): IOResult[KeyValueSource] =
-    IOUtils.tryOpenStorage(RocksDBSource.default(path, columns))
+    StorageIOUtil.tryOpen(RocksDBSource.default(path, columns))
 
   override def openUnsafe(
       path: Path,

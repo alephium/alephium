@@ -18,9 +18,10 @@ package org.alephium.storage
 
 import java.nio.file.Path
 
-import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.IOResult
 import org.alephium.storage.setting.StorageSetting
 import org.alephium.storage.swaydb.SwayDBSource
+import org.alephium.storage.util.StorageIOUtil
 
 object StorageInitialiser extends KeyValueStorageInitialiser {
 
@@ -29,7 +30,7 @@ object StorageInitialiser extends KeyValueStorageInitialiser {
       setting: StorageSetting,
       columns: Iterable[ColumnFamily]
   ): IOResult[KeyValueSource] =
-    IOUtils.tryOpenStorage(SwayDBSource.defaultUnsafe(path))
+    StorageIOUtil.tryOpen(SwayDBSource.defaultUnsafe(path))
 
   override def openUnsafe(
       path: Path,

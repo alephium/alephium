@@ -17,8 +17,7 @@
 package org.alephium.io
 
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 
 import org.alephium.io.IOError.KeyNotFound
 import org.alephium.io.IOException.StorageException
@@ -58,26 +57,6 @@ object IOUtils {
   def tryExecuteF[T](f: => IOResult[T]): IOResult[T] = {
     try f
     catch error
-  }
-
-  /** Used by storage engines during initialisation.
-    */
-  @inline
-  def tryOpenStorage[T](f: => T): IOResult[T] = {
-    try Right(f)
-    catch {
-      case throwable: Throwable =>
-        val pf = IOUtils.error
-        if (pf.isDefinedAt(throwable)) {
-          pf(throwable)
-        } else {
-          Left(
-            IOError.Storage(
-              new StorageException(throwable)
-            )
-          )
-        }
-    }
   }
 
   @inline
