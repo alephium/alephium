@@ -142,27 +142,30 @@ trait TxUtils { Self: FlowUtils =>
 
     totalAmountsE match {
       case Right((totalAmount, totalAmountPerToken)) =>
-        selectUTXOs(
-          fromLockupScript,
-          totalAmount,
-          totalAmountPerToken,
-          outputInfos.map(_.lockupScript),
-          gasOpt,
-          gasPrice,
-          utxosLimit
-        ).map {
-          _.flatMap { selected =>
-            UnsignedTransaction
-              .build(
-                fromLockupScript,
-                fromUnlockScript,
-                selected.assets.map(asset => (asset.ref, asset.output)),
-                outputInfos,
-                selected.gas,
-                gasPrice
-              )
+        getUsableUtxos(fromLockupScript, utxosLimit)
+          .map { utxos =>
+            UtxoUtils.select(
+              utxos,
+              fromLockupScript +: outputInfos.map(_.lockupScript),
+              totalAmount,
+              totalAmountPerToken,
+              gasOpt,
+              Some(gasPrice)
+            )
           }
-        }
+          .map {
+            _.flatMap { selected =>
+              UnsignedTransaction
+                .build(
+                  fromLockupScript,
+                  fromUnlockScript,
+                  selected.assets.map(asset => (asset.ref, asset.output)),
+                  outputInfos,
+                  selected.gas,
+                  gasPrice
+                )
+            }
+          }
 
       case Left(e) =>
         Right(Left(e))
@@ -201,7 +204,7 @@ trait TxUtils { Self: FlowUtils =>
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>
               val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
-              val gas           = gasOpt.getOrElse(GasEstimation.estimateGas(utxoRefs.length, outputScripts))
+              val gas           = gasOpt.getOrElse(GasEstimation.estimate(utxoRefs.length, outputScripts))
               for {
                 utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
                 unsignedTx <- UnsignedTransaction
@@ -416,28 +419,6 @@ trait TxUtils { Self: FlowUtils =>
       (),
       "Selected UTXOs are not from the same group"
     )
-  }
-
-  private def selectUTXOs(
-      fromLockupScript: LockupScript.Asset,
-      totalAlphAmount: U256,
-      totalAmountPerToken: AVector[(TokenId, U256)],
-      outputLockupScripts: AVector[LockupScript.Asset],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
-  ): IOResult[Either[String, UtxoUtils.Selected]] = {
-    getUsableUtxos(fromLockupScript, utxosLimit).map { utxos =>
-      UtxoUtils.select(
-        utxos,
-        fromLockupScript +: outputLockupScripts,
-        totalAlphAmount,
-        totalAmountPerToken,
-        gasOpt,
-        Some(gasPrice),
-        dustUtxoAmount
-      )
-    }
   }
 }
 

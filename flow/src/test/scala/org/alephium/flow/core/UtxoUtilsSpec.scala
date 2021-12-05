@@ -279,6 +279,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
           AVector.from(tokens),
           gasOpt,
           Some(GasPrice(1)),
+          estimatedScriptGas = None,
           dustAmount
         )
       }
@@ -291,7 +292,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       def verifyWithGas(utxoIndexes: Int*): Assertion = {
         val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
         val gas = gasOpt.getOrElse(
-          GasEstimation.estimateGasWithP2PKHOutputs(selectedUtxos.length, outputs.length)
+          GasEstimation.estimateWithP2PKHOutputs(selectedUtxos.length, outputs.length)
         )
         valueWithGas isE Selected(selectedUtxos, gas)
       }

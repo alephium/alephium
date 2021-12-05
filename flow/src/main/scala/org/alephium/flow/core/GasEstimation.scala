@@ -16,26 +16,30 @@
 
 package org.alephium.flow.core
 
+import com.typesafe.scalalogging.StrictLogging
+
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasSchedule, LockupScript}
+import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
 // Gas per input is fixed to GasSchedule.txInputBaseGas
 // Gas per output is charged ahead of time, depending on the type of the UnlockScript
-object GasEstimation {
-  def sweepAll: (Int, Int) => GasBox = estimateGasWithP2PKHOutputs _
+object GasEstimation extends StrictLogging {
+  def sweepAll: (Int, Int) => GasBox = estimateWithP2PKHOutputs _
 
-  def estimateGasWithP2PKHOutputs(numInputs: Int, numOutputs: Int): GasBox = {
+  def estimateWithP2PKHOutputs(numInputs: Int, numOutputs: Int): GasBox = {
     val outputGas = GasSchedule.txOutputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
-    estimateGas(numInputs, outputGas.mulUnsafe(numOutputs))
+    estimate(numInputs, outputGas.mulUnsafe(numOutputs))
   }
 
-  def estimateGas(numInputs: Int, outputs: AVector[LockupScript.Asset]): GasBox = {
+  def estimate(numInputs: Int, outputs: AVector[LockupScript.Asset]): GasBox = {
     val outputGas = outputs.fold(GasBox.zero)(_ addUnsafe estimateOutputGas(_))
-    estimateGas(numInputs, outputGas)
+    estimate(numInputs, outputGas)
   }
 
-  def estimateGas(numInputs: Int, outputGas: GasBox): GasBox = {
+  def estimate(numInputs: Int, outputGas: GasBox): GasBox = {
     val gas = GasSchedule.txBaseGas
       .addUnsafe(GasSchedule.txInputBaseGas.mulUnsafe(numInputs))
       .addUnsafe(outputGas)
@@ -43,17 +47,65 @@ object GasEstimation {
     Math.max(gas, minimalGas)
   }
 
-  def estimateContractCreationGas(): GasBox = {
-    // estimate the cost of
-    // 1. execution of contract creation
-    // 2. contract code size
-    // 3. contract state size
-    ???
+  def estimate(
+      script: StatefulScript,
+      inputs: AVector[TxInput],
+      flow: BlockFlow
+  )(implicit networkConfig: NetworkConfig, config: GroupConfig): GasBox = {
+    estimateTxScript(script, inputs, flow) match {
+      case Left(error) =>
+        logger.info(s"Estimating gas for TxScript with error $error, fall back to $maximalGasPerTx")
+        maximalGasPerTx
+      case Right(value) =>
+        value
+    }
   }
 
-  def estimateTxScriptGas(): GasBox = {
-    // based on code size?
-    ???
+  private[core] def estimateTxScript(
+      script: StatefulScript,
+      inputs: AVector[TxInput],
+      flow: BlockFlow
+  )(implicit networkConfig: NetworkConfig, config: GroupConfig): Either[String, GasBox] = {
+    val chainIndexOpt = inputs.headOption.map(input => ChainIndex(input.fromGroup, input.fromGroup))
+
+    def runScript(
+        blockEnv: BlockEnv,
+        groupView: BlockFlowGroupView[WorldState.Cached],
+        preOutputs: Option[AVector[AssetOutput]]
+    ): Either[String, TxScriptExecution] = {
+      val txTemplate = TransactionTemplate(
+        UnsignedTransaction(Some(script), inputs, AVector.empty),
+        inputSignatures = AVector.empty,
+        scriptSignatures = AVector.empty
+      )
+
+      val result = VM.checkCodeSize(maximalGasPerTx, script.bytes).flatMap { remainingGas =>
+        StatefulVM.runTxScript(
+          groupView.worldState.staging(),
+          blockEnv,
+          txTemplate,
+          preOutputs,
+          script,
+          remainingGas
+        )
+      }
+
+      result match {
+        case Right(value)       => Right(value)
+        case Left(Right(error)) => Left(error.name)
+        case Left(Left(error))  => Left(error.name)
+      }
+    }
+
+    for {
+      chainIndex <- chainIndexOpt.toRight("No UTXO found.")
+      blockEnv   <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
+      groupView  <- flow.getMutableGroupView(chainIndex.from).left.map(_.toString())
+      preOutputs <- groupView.getPreOutputs(inputs).left.map(_.toString())
+      result     <- runScript(blockEnv, groupView, preOutputs)
+    } yield {
+      maximalGasPerTx.subUnsafe(result.gasBox)
+    }
   }
 
   private def estimateOutputGas(lockupScript: LockupScript.Asset): GasBox = {

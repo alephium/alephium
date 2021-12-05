@@ -58,6 +58,7 @@ object UtxoUtils {
   type Asset = FlowUtils.AssetOutputInfo
   final case class Selected(assets: AVector[Asset], gas: GasBox)
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def select(
       utxos: AVector[Asset],
       outputLockupScripts: AVector[LockupScript.Asset],
@@ -65,7 +66,8 @@ object UtxoUtils {
       totalAmountPerToken: AVector[(TokenId, U256)],
       gasOpt: Option[GasBox],
       gasPriceOpt: Option[GasPrice],
-      dustUtxoAmount: U256
+      estimatedScriptGas: Option[GasBox] = None,
+      dustUtxoAmount: U256 = dustUtxoAmount
   ): Either[String, Selected] = {
     val sortedUtxosByAlph = utxos.sorted(assetOrderByAlph)
     val gasPrice          = gasPriceOpt.getOrElse(defaultGasPrice)
@@ -78,14 +80,12 @@ object UtxoUtils {
             Selected(selected, gas)
           }
       case None =>
-        // If there is no gas supplied, how do we estimate the amount of gas?
-        // here it is only for estimating the inputs and outputs
-        // we need a way to estimate contracts in general
         select(
           sortedUtxosByAlph,
           outputLockupScripts,
           totalAlphAmount,
           totalAmountPerToken,
+          estimatedScriptGas.getOrElse(GasBox.zero),
           gasPrice,
           dustUtxoAmount
         )
@@ -140,13 +140,18 @@ object UtxoUtils {
       outputLockupScripts: AVector[LockupScript.Asset],
       totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
+      scriptGas: GasBox,
       gasPrice: GasPrice,
       dustUtxoAmount: U256
   ): Either[String, Selected] = {
+    val scriptGasFee = gasPrice * scriptGas
     for {
+      alphAmountWithScriptGasFee <- scriptGasFee
+        .add(totalAlphAmount)
+        .toRight("ALPH balance overflow with estimated script gas")
       resultWithoutGas <- findUtxosWithoutGas(
         sortedUtxos,
-        totalAlphAmount,
+        alphAmountWithScriptGasFee,
         totalAmountPerToken,
         dustUtxoAmount
       )
@@ -155,7 +160,7 @@ object UtxoUtils {
         restOfUtxos,
         amountWithoutGas,
         utxosWithoutGas.length,
-        totalAlphAmount,
+        alphAmountWithScriptGasFee,
         gasPrice,
         dustUtxoAmount,
         outputLockupScripts
@@ -163,8 +168,8 @@ object UtxoUtils {
     } yield {
       val (_, extraUtxosForGas, _) = resultForGas
       val utxos                    = utxosWithoutGas ++ extraUtxosForGas
-      val gas                      = GasEstimation.estimateGas(utxos.length, outputLockupScripts)
-      Selected(utxos, gas)
+      val gas                      = GasEstimation.estimate(utxos.length, outputLockupScripts)
+      Selected(utxos, gas.addUnsafe(scriptGas))
     }
   }
 
@@ -236,7 +241,7 @@ object UtxoUtils {
   ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
-      val gas    = GasEstimation.estimateGas(sizeOfSelectedUTXOs + index, outputLockupScripts)
+      val gas    = GasEstimation.estimate(sizeOfSelectedUTXOs + index, outputLockupScripts)
       val gasFee = gasPrice * gas
       if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustUtxoAmount)) {
         (sum, index)

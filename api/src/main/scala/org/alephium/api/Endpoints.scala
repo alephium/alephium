@@ -49,7 +49,7 @@ trait Endpoints
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
       .and(query[TimeStamp]("toTs"))
-      .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
+      .map { case (from, to) => TimeInterval(from, to) }(timeInterval =>
         (timeInterval.from, timeInterval.to)
       )
       .validate(Validator.custom { timeInterval =>
@@ -63,7 +63,7 @@ trait Endpoints
   private lazy val chainIndexQuery: EndpointInput[ChainIndex] =
     query[GroupIndex]("fromGroup")
       .and(query[GroupIndex]("toGroup"))
-      .map({ case (from, to) => ChainIndex(from, to) })(chainIndex =>
+      .map { case (from, to) => ChainIndex(from, to) }(chainIndex =>
         (chainIndex.from, chainIndex.to)
       )
 

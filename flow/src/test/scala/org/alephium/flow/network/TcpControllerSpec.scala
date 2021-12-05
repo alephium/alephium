@@ -137,8 +137,8 @@ class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
   it should "forward connection failure" in new Fixture with PatienceConfiguration {
     implicit override val patienceConfig: PatienceConfig =
       PatienceConfig(
-        timeout = (Span(15, Seconds)),
-        interval = (Span(150, Millis))
+        timeout = Span(15, Seconds),
+        interval = Span(150, Millis)
       )
 
     val freeAddress = SocketUtil.temporaryServerAddress()

@@ -448,7 +448,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val fromAddressBalanceAfterTransfer = {
       val outputLockupScripts = destinations.map(_.address.lockupScript)
-      val defaultGas          = GasEstimation.estimateGas(outputRefs.length, outputLockupScripts)
+      val defaultGas          = GasEstimation.estimate(outputRefs.length, outputLockupScripts)
       val defaultGasFee       = defaultGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
     }
