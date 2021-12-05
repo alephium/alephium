@@ -25,7 +25,7 @@ import org.alephium.flow.core.{BlockFlow, GasEstimation}
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -447,7 +447,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val fromAddressBalanceAfterTransfer = {
-      val outputLockupScripts = destinations.map(_.address.lockupScript)
+      val fromLockupScript    = LockupScript.p2pkh(fromPublicKey)
+      val outputLockupScripts = fromLockupScript +: destinations.map(_.address.lockupScript)
       val defaultGas          = GasEstimation.estimate(outputRefs.length, outputLockupScripts)
       val defaultGasFee       = defaultGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
