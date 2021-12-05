@@ -5461,13 +5461,13 @@
         }
       }
     },
-    "/miners": {
+    "/miners/cpu-mining": {
       "post": {
         "tags": [
           "Miners"
         ],
-        "summary": "Execute an action on miners",
-        "operationId": "postMiners",
+        "summary": "Execute an action on CPU miner. !!! for test only !!!",
+        "operationId": "postMinersCpu-mining",
         "parameters": [
           {
             "name": "action",
@@ -5660,7 +5660,7 @@
         "tags": [
           "Miners"
         ],
-        "summary": "Update miner's addresses",
+        "summary": "Update miner's addresses, but better to use user.conf instead",
         "operationId": "putMinersAddresses",
         "requestBody": {
           "content": {
