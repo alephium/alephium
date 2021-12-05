@@ -508,7 +508,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
       }
     )
 
-    Post(s"/miners?action=start-mining") check { response =>
+    Post(s"/miners/cpu-mining?action=start-mining") check { response =>
       minerProbe.expectNoMessage()
       response.code is StatusCode.InternalServerError
       response.as[ApiError.InternalServerError] is
@@ -526,13 +526,13 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
       }
     )
 
-    Post(s"/miners?action=start-mining") check { response =>
+    Post(s"/miners/cpu-mining?action=start-mining") check { response =>
       minerProbe.expectMsg(Miner.Start)
       response.code is StatusCode.Ok
       response.as[Boolean] is true
     }
 
-    Post(s"/miners?action=stop-mining") check { response =>
+    Post(s"/miners/cpu-mining?action=stop-mining") check { response =>
       minerProbe.expectMsg(Miner.Stop)
       response.code is StatusCode.Ok
       response.as[Boolean] is true
@@ -540,7 +540,7 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
 
     interCliqueSynced = false
 
-    Post(s"/miners?action=start-mining") check { response =>
+    Post(s"/miners/cpu-mining?action=start-mining") check { response =>
       response.code is StatusCode.ServiceUnavailable
       response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
         "The clique is not synced"
