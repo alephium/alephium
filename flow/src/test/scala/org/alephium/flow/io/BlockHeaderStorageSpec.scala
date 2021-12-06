@@ -43,7 +43,8 @@ class BlockHeaderStorageSpec
         path = dbPath,
         setting = StorageSetting.syncWriteHDD(),
         columns = ColumnFamily.values.toIterable
-      ).isLeft is true
+      )
+      .isLeft is true
   }
 
   it should "check existence" in {

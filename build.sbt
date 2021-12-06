@@ -302,10 +302,10 @@ lazy val protocol = project("protocol")
   )
   .dependsOn(
     crypto,
-    io % "compile->compile;test->test",
+    io    % "compile->compile;test->test",
+    cache % "compile->compile;test->test",
     serde,
-    util % "test->test",
-    cache,
+    util               % "test->test",
     storageInThisBuild % Test
   )
   .settings(

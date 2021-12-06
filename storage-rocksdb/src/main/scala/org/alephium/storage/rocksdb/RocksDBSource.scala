@@ -27,14 +27,14 @@ import org.alephium.io.IOException.StorageException
 import org.alephium.storage.{ColumnFamily, KeyValueSource}
 import org.alephium.storage.rocksdb.RocksDBSource._
 
-/** [[KeyValueSource]] implementation for RocksDB.
+/** `KeyValueSource` implementation for RocksDB.
   *
   * Restricted to this storage package.
   */
 object RocksDBSource {
 
-  /** Core projects has no dependency on RocksDB and do not know of [[RocksDBException]].
-    * These exceptions should get converted to [[StorageException]].
+  /** Core projects has no dependency on RocksDB and do not know of `RocksDBException`.
+    * These exceptions should get converted to `StorageException`.
     */
   @inline def convertException[T](f: => T): T =
     try f
@@ -64,6 +64,7 @@ object RocksDBSource {
         descriptors.add(new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8)))
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.ToString"))
       val rocksDB =
         RocksDB.open(dbOptions, path.toString, descriptors, handles)
 
@@ -106,10 +107,6 @@ protected class RocksDBSource(
     }
   }
 
-  /** Returns the handle for a column name which should be stored
-    * in target [[org.alephium.storage.column.StorageColumn]]
-    * so there no need to re-fetch this for each read request.
-    */
   def getColumn(column: ColumnFamily): IOResult[ColumnFamilyHandle] = {
     convertException(handles.get(column)) match {
       case Some(handle) =>

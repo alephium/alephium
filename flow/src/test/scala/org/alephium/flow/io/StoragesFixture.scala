@@ -34,9 +34,10 @@ object StoragesFixture {
   def buildStorages(rootPath: Path)(implicit groupConfig: GroupConfig): Storages = {
     if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
 
-    val postFix            = Hash.random.toHexString
-    val dbFolders          = s"db-$postFix"
-    val storages: Storages = Storages.createUnsafe(rootPath, dbFolders, StorageSetting.syncWriteHDD())
+    val postFix   = Hash.random.toHexString
+    val dbFolders = s"db-$postFix"
+    val storages: Storages =
+      Storages.createUnsafe(rootPath, dbFolders, StorageSetting.syncWriteHDD())
     storages
   }
 
