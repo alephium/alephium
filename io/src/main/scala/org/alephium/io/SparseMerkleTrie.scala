@@ -590,6 +590,8 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       trie   <- applyActions(result)
     } yield trie
   }
+
+  def inMemory(): InMemorySparseMerkleTrie[K, V] = SparseMerkleTrie.inMemory(rootHash, storage)
 }
 
 final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
@@ -628,5 +630,29 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
   def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = {
     val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
     put(rootHash, nibbles, value).map(applyActions)
+  }
+
+  def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def iter(hash: Hash, accumulatePut: (Hash, Node) => Unit): Unit = {
+      cache.get(hash) match {
+        case Some(node: BranchNode) =>
+          accumulatePut(hash, node)
+          node.children.foreach { childOpt =>
+            childOpt.foreach(iter(_, accumulatePut))
+          }
+        case Some(node: LeafNode) =>
+          accumulatePut(hash, node)
+        case None => ()
+      }
+    }
+
+    storage
+      .putBatch { accumulatePut =>
+        iter(rootHash, accumulatePut)
+      }
+      .map { _ =>
+        SparseMerkleTrie(rootHash, storage)
+      }
   }
 }

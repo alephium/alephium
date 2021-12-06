@@ -117,7 +117,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   trait TrieFixture extends StorageFixture {
     val db        = newDB[Hash, SparseMerkleTrie.Node]
     var trie      = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
-    var inMemTrie = SparseMerkleTrie.inMemory[Hash, Hash](db, genesisKey, genesisValue)
+    var inMemTrie = trie.inMemory()
   }
 
   def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
@@ -266,6 +266,38 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     trie5.rootHash is trie1.rootHash
     val trie6 = trie5.remove(key0).rightValue
     trie6.rootHash is trie0.rootHash
+  }
+
+  it should "write in batch" in withTrieFixture { fixture =>
+    import fixture.{inMemTrie, trie}
+
+    trie.rootHash is inMemTrie.rootHash
+
+    info("Insert 2000 random key-value pairs")
+    val keys = AVector.tabulate(2000) { _ =>
+      val (key, value) = generateKV()
+      trie = trie.put(key, value).rightValue
+      inMemTrie.put(key, value)
+      key
+    }
+
+    info("Remove 500 key-value pairs")
+    keys.take(500).foreach { key =>
+      trie = trie.remove(key).rightValue
+      inMemTrie.remove(key)
+    }
+
+    info("Persist the merkle tree in batch")
+    val persisted = inMemTrie.persistInBatch().rightValue
+    persisted.rootHash is trie.rootHash
+
+    info("Verify the final persisted merkle tree")
+    keys.take(500).foreach { key =>
+      persisted.exist(key) isE false
+    }
+    keys.drop(500).foreach { key =>
+      persisted.exist(key) isE true
+    }
   }
 }
 

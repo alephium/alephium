@@ -77,6 +77,14 @@ trait KeyValueStorage[K, V] extends AbstractKeyValueStorage[K, V] with RawKeyVal
     putRawUnsafe(storageKey(key), serialize(value))
   }
 
+  def putBatch(f: ((K, V) => Unit) => Unit): IOResult[Unit] = {
+    IOUtils.tryExecute(putBatchUnsafe(f))
+  }
+
+  def putBatchUnsafe(f: ((K, V) => Unit) => Unit): Unit = {
+    putBatchRawUnsafe(g => f((k, v) => g(storageKey(k), serialize(v))))
+  }
+
   def exists(key: K): IOResult[Boolean] = IOUtils.tryExecute(existsUnsafe(key))
 
   def existsUnsafe(key: K): Boolean = {
@@ -88,5 +96,4 @@ trait KeyValueStorage[K, V] extends AbstractKeyValueStorage[K, V] with RawKeyVal
   def deleteUnsafe(key: K): Unit = {
     deleteRawUnsafe(storageKey(key))
   }
-
 }
