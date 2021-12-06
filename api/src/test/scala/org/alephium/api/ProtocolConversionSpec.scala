@@ -16,12 +16,18 @@
 
 package org.alephium.api
 
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+
+import akka.util.ByteString
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{model => protocol}
 import org.alephium.protocol.vm
+import org.alephium.serde.deserialize
 import org.alephium.util._
 
 class ProtocolConversionSpec extends AlephiumSpec with EitherValues with NumericHelpers {
@@ -91,6 +97,36 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
     )
   }
 
+  it should "convert serialized Transaction spnapshot" in new Fixture {
+    val dir = new File("../protocol/src/test/resources/models/transaction")
+
+    dir.listFiles.filter(_.getName().endsWith(".serialized.txt")).foreach { file =>
+      val content = readFile(file)
+      val tx      = deserialize[protocol.Transaction](content).value
+
+      checkData[Transaction, protocol.Transaction](
+        tx,
+        Transaction.fromProtocol,
+        _.toProtocol().rightValue
+      )
+    }
+  }
+
+  it should "convert serialized Block spnapshot" in new Fixture {
+    val dir = new File("../protocol/src/test/resources/models/block")
+
+    dir.listFiles.filter(_.getName().endsWith(".serialized.txt")).foreach { file =>
+      val content = readFile(file)
+      val block   = deserialize[protocol.Block](content).value
+
+      checkData[BlockEntry, protocol.Block](
+        block,
+        BlockEntry.from(_, 0), //height not needed for protocol
+        _.toProtocol().rightValue
+      )
+    }
+  }
+
   trait Fixture extends ApiModelFixture {
     def checkData[T: Reader: Writer, P](
         protocol: P,
@@ -99,5 +135,15 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
     ): Assertion = {
       convertToProtocol(read[T](write(convertToApi(protocol)))) is protocol
     }
+
+    def readFile(file: File): ByteString = {
+      Hex
+        .from(
+          (new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8))
+            .filterNot(_.isWhitespace)
+        )
+        .value
+    }
+
   }
 }
