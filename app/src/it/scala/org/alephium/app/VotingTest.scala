@@ -55,7 +55,7 @@ class VotingTest extends AlephiumActorSpec {
           getContractState(contractAddress.toBase58, activeAddressesGroup),
           restPort
         )
-      contractState.fields.head is Val.U256(U256.unsafe(nbYes))
+      contractState.fields.get(0).get is Val.U256(U256.unsafe(nbYes))
       contractState.fields.get(1).get is Val.U256(U256.unsafe(nbNo))
       contractState.fields.get(2).get is Val.Bool(isClosed)
       contractState.fields.get(3).get is Val.Bool(isInitialized)
@@ -75,7 +75,7 @@ trait VotingFixture extends WalletFixture {
           |transferAlph!(admin, voters[$i], $utxoFee)
           |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
       }
-      .reduce((a, b) => s"$a\n$b")
+      .mkString("\n")
     // scalastyle:off no.equal
     val votingContract = s"""
         |TxContract Voting(
@@ -115,7 +115,7 @@ trait VotingFixture extends WalletFixture {
       """.stripMargin
     // scalastyle:on no.equal
     val votersList: String =
-      voters.map(wallet => s"@${wallet.activeAddress}").reduce((w1, w2) => s"$w1, $w2")
+      voters.map(wallet => s"@${wallet.activeAddress}").mkString(",")
     val state = s"[ 0, 0, false, false, @${admin.activeAddress}, [${votersList}]]"
     contract(admin, votingContract, Some(state), Some(tokenAmount))
   }
@@ -130,7 +130,7 @@ trait VotingFixture extends WalletFixture {
         |TxScript TokenAllocation {
         |    pub payable fn main() -> () {
         |      let voting = Voting(#${contractId})
-        |      let caller = txCaller!(txCallerSize!() - 1)
+        |      let caller = txCaller!(0)
         |      approveAlph!(caller, $utxoFee * ${votersWallets.size})
         |      voting.allocateTokens()
         |    }
@@ -214,7 +214,7 @@ trait WalletFixture extends CliqueFixture {
     val txResult = submitTx(buildResult.unsignedTx, buildResult.hash, wallet.creation.walletName)
     val Confirmed(blockHash, _, _, _, _) =
       request[TxStatus](getTransactionStatus(txResult), restPort)
-    val block = request[BlockEntry](getBlockHash(blockHash.toHexString), restPort)
+    val block = request[BlockEntry](getBlock(blockHash.toHexString), restPort)
 
     // scalastyle:off no.equal
     val tx: Tx = block.transactions.find(_.id == txResult.txId).get
