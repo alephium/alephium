@@ -36,7 +36,7 @@ final case class Transaction(
     for {
       unsignedTx <- unsigned.toProtocol()
       inputSig   <- inputSignatures.mapE(deserialize[Signature]).left.map(_.getMessage())
-      scriptSig  <- inputSignatures.mapE(deserialize[Signature]).left.map(_.getMessage())
+      scriptSig  <- scriptSignatures.mapE(deserialize[Signature]).left.map(_.getMessage())
     } yield {
       protocol.Transaction(
         unsignedTx,
