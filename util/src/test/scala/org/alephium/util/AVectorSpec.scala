@@ -326,11 +326,11 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   it should "exists" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
-      arr.foreach { elem => vc.exists(_ == elem) is vc.contains(elem) }
-      vc.exists(_ == a) is vc.contains(a)
+      arr.foreach { elem => vc.exists(_ equals elem) is vc.contains(elem) }
+      vc.exists(_ equals a) is vc.contains(a)
       vc.foreachWithIndex { (elem, index) =>
-        vc.existsWithIndex((e, i) => (e == elem) && (i equals index)) is true
-        vc.existsWithIndex((e, i) => (e == elem) && (i equals -1)) is false
+        vc.existsWithIndex((e, i) => (e equals elem) && (i equals index)) is true
+        vc.existsWithIndex((e, i) => (e equals elem) && (i equals -1)) is false
       }
     }
   }
@@ -377,7 +377,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.find(_ == elem) is arr.find(_ == elem)
+        vc.find(_ equals elem) is arr.find(_ equals elem)
         vc.find(_ => false) is arr.find(_ => false)
       }
     }
@@ -387,7 +387,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.indexWhere(_ == elem) is arr.indexWhere(_ == elem)
+        vc.indexWhere(_ equals elem) is arr.indexWhere(_ equals elem)
         vc.indexWhere(_ => false) is arr.indexWhere(_ => false)
       }
     }
