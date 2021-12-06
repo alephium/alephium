@@ -2714,6 +2714,114 @@
         }
       }
     },
+    "/infos/discovery": {
+      "post": {
+        "tags": [
+          "Infos"
+        ],
+        "summary": "Set brokers to be unreachable/reachable",
+        "operationId": "postInfosDiscovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoveryAction"
+              },
+              "examples": {
+                "Example0": {
+                  "value": {
+                    "type": "unreachable",
+                    "peers": [
+                      "1.2.3.4"
+                    ]
+                  }
+                },
+                "Example1": {
+                  "value": {
+                    "type": "reachable",
+                    "peers": [
+                      "1.2.3.4"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/blockflow": {
       "get": {
         "tags": [
@@ -6573,6 +6681,16 @@
           }
         }
       },
+      "DiscoveryAction": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Reachable"
+          },
+          {
+            "$ref": "#/components/schemas/Unreachable"
+          }
+        ]
+      },
       "FetchResponse": {
         "required": [
           "blocks"
@@ -6880,6 +6998,20 @@
         "properties": {
           "value": {
             "type": "integer"
+          }
+        }
+      },
+      "Reachable": {
+        "required": [
+          "peers"
+        ],
+        "type": "object",
+        "properties": {
+          "peers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -7332,6 +7464,20 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Tx"
+            }
+          }
+        }
+      },
+      "Unreachable": {
+        "required": [
+          "peers"
+        ],
+        "type": "object",
+        "properties": {
+          "peers": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }

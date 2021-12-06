@@ -367,6 +367,37 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     state.getActivePeers(None).length is 0
   }
 
+  it should "remove unreachable brokers based on inet address" in new Fixture {
+    def createPeer(address: InetSocketAddress): BrokerInfo = {
+      BrokerInfo.unsafe(
+        cliqueIdGen.sample.get,
+        brokerId = config.brokerId,
+        brokerNum = config.brokerNum,
+        address = address
+      )
+    }
+
+    val address1  = socketAddressGen.sample.get
+    val address2  = new InetSocketAddress(address1.getAddress, address1.getPort + 1)
+    val peerInfo1 = createPeer(address1)
+    val peerInfo2 = createPeer(address2)
+    state.getActivePeers(None).length is 0
+    state.appendPeer(peerInfo1)
+    state.appendPeer(peerInfo2)
+    state.getActivePeers(None).length is 2
+
+    state.sessions.size is 0
+    state.ping(peerInfo1)
+    state.ping(peerInfo2)
+    state.sessions.size is 2
+
+    state.unreachables.size is 0
+    state.setUnreachable(address1.getAddress)
+    state.unreachables.size is 1
+    state.sessions.size is 0
+    state.getActivePeers(None).length is 0
+  }
+
   it should "clean unreachable peers in mightReachableSlow" in new Fixture {
     val address = peerInfo.address.getAddress
     state.unreachables.put(peerInfo.address.getAddress, TimeStamp.now().plusSecondsUnsafe(2))

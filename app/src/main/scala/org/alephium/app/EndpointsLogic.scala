@@ -209,6 +209,15 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       .map(Right(_))
   }
 
+  val discoveryActionLogic = serverLogic(discoveryAction) {
+    case DiscoveryAction.Unreachable(peers) =>
+      node.discoveryServer ! DiscoveryServer.UnreachablePeers(peers)
+      Future.successful(Right(()))
+    case DiscoveryAction.Reachable(peers) =>
+      node.discoveryServer ! DiscoveryServer.Unban(peers)
+      Future.successful(Right(()))
+  }
+
   val getHashesAtHeightLogic = serverLogic(getHashesAtHeight) { case (chainIndex, height) =>
     Future.successful(
       serverUtils.getHashesAtHeight(

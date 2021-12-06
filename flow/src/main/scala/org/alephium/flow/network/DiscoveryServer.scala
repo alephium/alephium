@@ -71,6 +71,7 @@ object DiscoveryServer {
   sealed trait Command
   final case class GetNeighborPeers(targetGroupInfoOpt: Option[BrokerGroupInfo]) extends Command
   final case class Remove(peer: InetSocketAddress)                               extends Command
+  final case class UnreachablePeers(peers: AVector[InetAddress])                 extends Command
   final case class Unban(peers: AVector[InetAddress])                            extends Command
   case object Scan                                                               extends Command
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                        extends Command
@@ -209,10 +210,11 @@ class DiscoveryServer(
       banPeer(peerInfo.peerId)
     case PeerConfirmed(peerInfo) =>
       tryPing(peerInfo)
-    case Unreachable(remote)  => setUnreachable(remote)
-    case GetUnreachable       => sender() ! getUnreachable()
-    case Unban(remotes)       => remotes.foreach(unsetUnreachable)
-    case InitialDiscoveryDone => postInitialDiscovery()
+    case Unreachable(remote)     => setUnreachable(remote)
+    case GetUnreachable          => sender() ! getUnreachable()
+    case Unban(remotes)          => remotes.foreach(unsetUnreachable)
+    case InitialDiscoveryDone    => postInitialDiscovery()
+    case UnreachablePeers(peers) => peers.foreach(setUnreachable)
   }
 
   def handleBanning: Receive = { case MisbehaviorManager.PeerBanned(peer) =>

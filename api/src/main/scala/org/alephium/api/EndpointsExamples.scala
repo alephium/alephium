@@ -147,6 +147,20 @@ trait EndpointsExamples extends ErrorExamples {
       MisbehaviorAction.Unban(AVector(inetAddress))
     )
 
+  implicit val discoveryActionExamples: List[Example[DiscoveryAction]] =
+    List(
+      Example[DiscoveryAction](
+        DiscoveryAction.Unreachable(AVector(inetAddress)),
+        None,
+        Some("Set unreachable")
+      ),
+      Example[DiscoveryAction](
+        DiscoveryAction.Reachable(AVector(inetAddress)),
+        None,
+        Some("Set reachable")
+      )
+    )
+
   implicit val nodeInfoExamples: List[Example[NodeInfo]] =
     simpleExample(
       NodeInfo(

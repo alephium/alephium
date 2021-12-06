@@ -140,14 +140,22 @@ trait DiscoveryServerState extends SessionManager {
     AVector.from(unreachables.keys())
   }
 
-  def setUnreachable(remote: InetSocketAddress): Unit = {
-    val remoteInet = remote.getAddress
-    unreachables.get(remoteInet) match {
+  def updateUnreachable(remote: InetAddress): Unit = {
+    unreachables.get(remote) match {
       case Some(until) =>
-        unreachables.put(remoteInet, until + discoveryConfig.unreachableDuration)
+        unreachables.put(remote, until + discoveryConfig.unreachableDuration)
       case None =>
-        unreachables.put(remoteInet, TimeStamp.now() + discoveryConfig.unreachableDuration)
+        unreachables.put(remote, TimeStamp.now() + discoveryConfig.unreachableDuration)
     }
+  }
+
+  def setUnreachable(remote: InetSocketAddress): Unit = {
+    updateUnreachable(remote.getAddress)
+    remove(remote)
+  }
+
+  def setUnreachable(remote: InetAddress): Unit = {
+    updateUnreachable(remote)
     remove(remote)
   }
 
@@ -310,12 +318,17 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   def remove(peer: InetSocketAddress): Unit = {
-    removeFromTable(peer)
-    removeFromSession(peer)
+    removeFromTable(_.address == peer)
+    removeFromSession(_.remote == peer)
   }
 
-  def removeFromTable(peer: InetSocketAddress): Unit = {
-    val peersToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
+  def remove(peer: InetAddress): Unit = {
+    removeFromTable(_.address.getAddress == peer)
+    removeFromSession(_.remote.getAddress == peer)
+  }
+
+  def removeFromTable(func: BrokerInfo => Boolean): Unit = {
+    val peersToRemove = table.values.filter(peer => func(peer.info)).map(_.info.peerId)
     removeBrokers(peersToRemove)
   }
 
@@ -370,9 +383,9 @@ trait SessionManager {
     }
   }
 
-  def removeFromSession(peer: InetSocketAddress): Unit = {
+  def removeFromSession(func: AwaitReply => Boolean): Unit = {
     sessions.removeIf { case (_, awaitReply: AwaitReply) =>
-      awaitReply.remote == peer
+      func(awaitReply)
     }
   }
 }

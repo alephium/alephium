@@ -155,6 +155,12 @@ trait Endpoints
       .out(jsonBody[AVector[InetAddress]])
       .summary("Get the unreachable brokers")
 
+  val discoveryAction: BaseEndpoint[DiscoveryAction, Unit] =
+    infosEndpoint.post
+      .in("discovery")
+      .in(jsonBody[DiscoveryAction])
+      .summary("Set brokers to be unreachable/reachable")
+
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get
       .in(timeIntervalQuery)
