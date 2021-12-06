@@ -83,8 +83,17 @@ trait DiscoveryServerState extends SessionManager {
     }
   }
 
+  // select a number of random peers based on a random clique id
+  def getBootstrapNeighbors(): AVector[BrokerInfo] = {
+    getNeighbors(selfCliqueId, CliqueId.generate)
+  }
+
   def getNeighbors(target: CliqueId): AVector[BrokerInfo] = {
-    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != target))
+    getNeighbors(target, target)
+  }
+
+  def getNeighbors(filterId: CliqueId, target: CliqueId): AVector[BrokerInfo] = {
+    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != filterId))
     candidates
       .sortBy(info => target.hammingDist(info.cliqueId))
       .takeUpto(maxSentPeers)

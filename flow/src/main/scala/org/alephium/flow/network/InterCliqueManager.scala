@@ -231,8 +231,8 @@ class InterCliqueManager(
       removeBroker(peer)
       moreOutConnections()
 
-    case DiscoveryServer.NeighborPeers(sortedPeers) =>
-      extractPeersToConnect(sortedPeers, networkSetting.maxOutboundConnectionsPerGroup)
+    case DiscoveryServer.NeighborPeers(randomPeers) =>
+      extractPeersToConnect(randomPeers, networkSetting.maxOutboundConnectionsPerGroup)
         .foreach(connectUnsafe)
   }
 
@@ -529,14 +529,14 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def extractPeersToConnect(
-      sortedPeers: AVector[BrokerInfo],
+      randomPeers: AVector[BrokerInfo],
       maxOutboundConnectionsPerGroup: Int
   ): AVector[BrokerInfo] = {
     val peerPerGroupCount = Array.fill[Int](brokerConfig.groups)(maxOutboundConnectionsPerGroup)
     brokerConfig.groupRange.foreach { group =>
       peerPerGroupCount(group) = getOutConnectionPerGroup(GroupIndex.unsafe(group))
     }
-    sortedPeers.filter { brokerInfo =>
+    randomPeers.filter { brokerInfo =>
       val range = brokerConfig.calIntersection(brokerInfo)
       val ok = {
         (brokerInfo.peerId.cliqueId != selfCliqueId) &&
