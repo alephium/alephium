@@ -29,9 +29,9 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.udp.UdpServer
 import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfig}
 import org.alephium.protocol.message.DiscoveryMessage
-import org.alephium.protocol.message.DiscoveryMessage.*
+import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo, PeerId}
-import org.alephium.util.*
+import org.alephium.util._
 
 object DiscoveryServer {
   def props(

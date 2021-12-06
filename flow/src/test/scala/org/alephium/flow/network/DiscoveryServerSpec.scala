@@ -29,10 +29,10 @@ import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.network.DiscoveryServer.NeighborPeers
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.Platform
-import org.alephium.protocol.*
-import org.alephium.protocol.config.*
-import org.alephium.protocol.model.*
-import org.alephium.util.*
+import org.alephium.protocol._
+import org.alephium.protocol.config._
+import org.alephium.protocol.model._
+import org.alephium.util._
 
 class DiscoveryServerSpec
     extends AlephiumActorSpec
