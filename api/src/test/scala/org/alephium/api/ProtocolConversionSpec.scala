@@ -16,34 +16,58 @@
 
 package org.alephium.api
 
-import org.scalatest.EitherValues
+import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.model._
+import org.alephium.json.Json._
+import org.alephium.protocol.{model => protocol}
+import org.alephium.protocol.vm
 import org.alephium.util._
 
 class ProtocolConversionSpec extends AlephiumSpec with EitherValues with NumericHelpers {
   it should "convert Method" in new Fixture {
-    Method.fromProtocol(method).toProtocol() isE method
+    checkData[Method, vm.Method[vm.StatefulContext]](
+      method,
+      Method.fromProtocol,
+      _.toProtocol().rightValue
+    )
   }
 
   it should "convert Script" in new Fixture {
-    Script.fromProtocol(script).toProtocol() isE script
+    checkData[Script, vm.StatefulScript](script, Script.fromProtocol, _.toProtocol().rightValue)
   }
 
   it should "convert TxOutputRef" in new Fixture {
-    OutputRef.from(assetTxOutputRef).unsafeToAssetOutputRef() is assetTxOutputRef
+    checkData[OutputRef, protocol.TxOutputRef](
+      assetTxOutputRef,
+      OutputRef.from,
+      _.unsafeToAssetOutputRef()
+    )
   }
 
   it should "convert TxInput" in new Fixture {
-    Input.Asset.fromProtocol(txInput).toProtocol() isE txInput
+    checkData[Input.Asset, protocol.TxInput](
+      txInput,
+      Input.Asset.fromProtocol,
+      _.toProtocol().rightValue
+    )
   }
 
   it should "convert AssetOutput" in new Fixture {
-    Output.Asset.fromProtocol(assetOutput).toProtocol() is assetOutput
+    checkData[Output.Asset, protocol.AssetOutput](
+      assetOutput,
+      Output.Asset.fromProtocol,
+      _.toProtocol()
+    )
   }
 
   it should "convert UnsignedTransaction" in new Fixture {
-    UnsignedTx.fromProtocol(unsignedTransaction).toProtocol() isE unsignedTransaction
+    checkData[UnsignedTx, protocol.UnsignedTransaction](
+      unsignedTransaction,
+      UnsignedTx.fromProtocol,
+      _.toProtocol().rightValue
+    )
+
     UnsignedTx
       .fromProtocol(unsignedTransaction)
       .copy(hash = Some(hashGen.sample.get))
@@ -52,12 +76,28 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   }
 
   it should "convert Transaction" in new Fixture {
-    Transaction.fromProtocol(transaction).toProtocol() isE transaction
+    checkData[Transaction, protocol.Transaction](
+      transaction,
+      Transaction.fromProtocol,
+      _.toProtocol().rightValue
+    )
   }
 
   it should "convert TransactionTemplate" in new Fixture {
-    TransactionTemplate.fromProtocol(transactionTemplate).toProtocol() isE transactionTemplate
+    checkData[TransactionTemplate, protocol.TransactionTemplate](
+      transactionTemplate,
+      TransactionTemplate.fromProtocol,
+      _.toProtocol().rightValue
+    )
   }
 
-  trait Fixture extends ApiModelFixture
+  trait Fixture extends ApiModelFixture {
+    def checkData[T: Reader: Writer, P](
+        protocol: P,
+        convertToApi: P => T,
+        convertToProtocol: T => P
+    ): Assertion = {
+      convertToProtocol(read[T](write(convertToApi(protocol)))) is protocol
+    }
+  }
 }

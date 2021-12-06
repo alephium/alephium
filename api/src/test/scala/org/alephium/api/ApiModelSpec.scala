@@ -34,12 +34,7 @@ import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
 //scalastyle:off file.size.limit
-class ApiModelSpec
-    extends AlephiumSpec
-    with ApiModelFixture
-    with ApiModelCodec
-    with EitherValues
-    with NumericHelpers {
+class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues with NumericHelpers {
   val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
@@ -68,8 +63,6 @@ class ApiModelSpec
       priKey
     )
   val dummyPeerInfo = BrokerInfo.unsafe(CliqueId.generate, 1, 3, dummyAddress)
-
-  val blockflowFetchMaxAge = Duration.unsafe(1000)
 
   val apiKey = Hash.generate.toHexString
 
