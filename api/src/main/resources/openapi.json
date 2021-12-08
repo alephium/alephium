@@ -2640,7 +2640,7 @@
                   }
                 },
                 "example": [
-                  "13.13.13.13"
+                  "1.2.3.4"
                 ]
               }
             }
@@ -2729,6 +2729,7 @@
               },
               "examples": {
                 "Example0": {
+                  "summary": "Set unreachable",
                   "value": {
                     "type": "unreachable",
                     "peers": [
@@ -2737,6 +2738,7 @@
                   }
                 },
                 "Example1": {
+                  "summary": "Set reachable",
                   "value": {
                     "type": "reachable",
                     "peers": [

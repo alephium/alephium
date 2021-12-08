@@ -209,7 +209,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(AVector(PeerMisbehavior(inetAddress, PeerStatus.Penalty(42))))
 
   implicit val unreachableBrokersExamples: List[Example[AVector[InetAddress]]] =
-    simpleExample(AVector(InetAddress.getByName("13.13.13.13")))
+    simpleExample(AVector(inetAddress))
 
   implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
 
