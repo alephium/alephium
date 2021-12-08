@@ -62,18 +62,7 @@ class RocksDBKeyValueStorage[K, V](
       val iterator = db.newIterator(handle)
       iterator.seekToFirst()
       while (iterator.isValid()) {
-        val keyBytes = ByteString.fromArrayUnsafe(iterator.key())
-        val valBytes = ByteString.fromArrayUnsafe(iterator.value())
-        (for {
-          key   <- keySerde.deserialize(keyBytes)
-          value <- valueSerde.deserialize(valBytes)
-          _     <- f(key, value)
-        } yield ()) match {
-          case Left(err) =>
-            iterator.close()
-            throw err
-          case _ => iterator.next()
-        }
+        process(iterator, f)
       }
       iterator.close()
     }
@@ -81,5 +70,43 @@ class RocksDBKeyValueStorage[K, V](
 
   def iterate(f: (K, V) => Unit): IOResult[Unit] = {
     iterateE((k, v) => Right(f(k, v)))
+  }
+
+  def iterateWithPrefixE(prefix: Array[Byte], f: (K, V) => IOResult[Unit]): IOResult[Unit] = {
+    IOUtils.tryExecute {
+      val iterator = db.newIterator(handle)
+      var continue = true
+      iterator.seek(prefix)
+      while (iterator.isValid() && continue) {
+        val keyBytes = ByteString.fromArrayUnsafe(iterator.key())
+        if (keyBytes.startsWith(prefix)) {
+          process(iterator, f)
+        } else {
+          continue = false
+        }
+      }
+      iterator.close()
+    }
+  }
+
+  def iterateWithPrefix(prefix: Array[Byte], f: (K, V) => Unit): IOResult[Unit] = {
+    iterateWithPrefixE(prefix, (k, v) => Right(f(k, v)))
+  }
+
+  protected def extractKey(bytes: Array[Byte]): SerdeResult[K] =
+    keySerde.deserialize(ByteString.fromArrayUnsafe(bytes))
+
+  private def process(iterator: RocksIterator, f: (K, V) => IOResult[Unit]): Unit = {
+    val valBytes = ByteString.fromArrayUnsafe(iterator.value())
+    (for {
+      key   <- extractKey(iterator.key())
+      value <- valueSerde.deserialize(valBytes)
+      _     <- f(key, value)
+    } yield ()) match {
+      case Left(err) =>
+        iterator.close()
+        throw err
+      case _ => iterator.next()
+    }
   }
 }

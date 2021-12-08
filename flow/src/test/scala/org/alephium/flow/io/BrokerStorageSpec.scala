@@ -20,7 +20,7 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.RocksDBSource
 import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.Generators
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.model.{BrokerInfo, NoIndexModelGenerators}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class BrokerStorageSpec
@@ -30,7 +30,7 @@ class BrokerStorageSpec
 
   override val dbname: String = "broker-storage-spec"
   override val builder: RocksDBSource => BrokerRocksDBStorage =
-    source => BrokerRocksDBStorage(source, ColumnFamily.Broker)
+    source => BrokerRocksDBStorage(source, ColumnFamily.All)
 
   it should "add/get/delete for BrokerState" in {
     val brokerInfos = AVector.fill(10)(Generators.brokerInfoGen.sample.get)
@@ -38,5 +38,21 @@ class BrokerStorageSpec
     storage.activeBrokers().rightValue.toSet is brokerInfos.toSet
     brokerInfos.foreach(info => storage.delete(info.peerId) isE ())
     storage.activeBrokers().rightValue is AVector.empty[BrokerInfo]
+  }
+
+  it should "get all active brokers" in new NoIndexModelGenerators {
+    val brokerInfos = AVector.fill(10)(Generators.brokerInfoGen.sample.get)
+    brokerInfos.foreach(storage.addBroker(_) isE ())
+
+    val kvs = AVector.fill(20)((dataGen.sample.get, dataGen.sample.get)).toSeq.toMap
+    kvs.foreach { case (k, v) =>
+      storage.putRawUnsafe(k, v)
+    }
+
+    kvs.foreach { case (k, v) =>
+      storage.getRawUnsafe(k) is v
+    }
+
+    storage.activeBrokers().rightValue.toSet is brokerInfos.toSet
   }
 }
