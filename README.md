@@ -1,7 +1,7 @@
 Alephium
 =========
-[![codecov](https://codecov.io/gh/polarker/alephium/branch/master/graph/badge.svg?token=TAMKL8CWO3)](https://codecov.io/gh/polarker/alephium)
-[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/JErgRBfRSB)
+[![codecov][codecov-badge]][codecov-link]
+[![Discord][discord-badge]][discord-link]
 
 This repository contains the reference implementation of Alephium, a sharded
 blockchain that makes programmable money scalable and secure. For more information, please visit the [wiki](https://wiki.alephium.org/).
@@ -85,3 +85,8 @@ There are two kinds of tests:
 ## Contribution
 
 Have a look at our contribution guide described in [CONTRIBUTING.md](CONTRIBUTING.md)
+
+[codecov-badge]: https://codecov.io/gh/polarker/alephium/branch/master/graph/badge.svg?token=TAMKL8CWO3
+[codecov-link]: https://codecov.io/gh/polarker/alephium
+[discord-badge]: https://img.shields.io/discord/747741246667227157?logo=discord
+[discord-link]: https://discord.gg/JErgRBfRSB

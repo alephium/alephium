@@ -20,7 +20,7 @@ sudo usermod -aG docker $USER
 The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
 
 ```shell
-docker-compose down && docker-compose build --pull && docker-compose up -d
+docker-compose stop && docker-compose rm -f && docker-compose pull && docker-compose up -d
 ```
 
 The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs):
@@ -86,8 +86,9 @@ to verify the setup is successful. It should have the same output as running `nv
 To start the GPU miner docker container, either run the following `docker-compose` command (requires version [v1.28.0+](https://docs.docker.com/compose/gpu-support/#enabling-gpu-access-to-service-containers))
 
 ```shell
-docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml down && \
-  docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml build --pull && \
+docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml stop && \
+  docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml rm -f && \
+  docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml pull && \
   docker-compose -f docker-compose.yml -f docker-compose.gpu-miner.yml up -d
 ```
 
