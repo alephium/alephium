@@ -22,7 +22,7 @@ import org.scalatest.Assertion
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALPH, Generators, Hash}
+import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
@@ -63,7 +63,19 @@ class TxUtilsSpec extends AlephiumSpec {
     defaultGasFee is ALPH.nanoAlph(20000 * 100)
   }
 
-  it should "consider outputs for inter-group blocks" in new FlowFixture {
+  trait UnsignedTxFixture extends FlowFixture {
+    def testUnsignedTx(unsignedTx: UnsignedTransaction, genesisPriKey: PrivateKey) = {
+      val tx         = TransactionTemplate.from(unsignedTx, genesisPriKey)
+      val chainIndex = tx.chainIndex
+      TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
+      blockFlow
+        .getMemPool(chainIndex)
+        .addNewTx(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToSharedPool
+      TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+    }
+  }
+
+  it should "consider outputs for inter-group blocks" in new UnsignedTxFixture {
     val chainIndex            = ChainIndex.unsafe(0, 1)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (_, toPubKey)         = chainIndex.to.generateKey
@@ -82,12 +94,55 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    val tx = TransactionTemplate.from(unsignedTx, genesisPriKey)
-    TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
-    blockFlow
-      .getMemPool(chainIndex)
-      .addNewTx(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToSharedPool
-    TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+    testUnsignedTx(unsignedTx, genesisPriKey)
+  }
+
+  trait PredefinedTxFixture extends UnsignedTxFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    def chainIndex: ChainIndex
+
+    lazy val (_, toPubKey) = chainIndex.to.generateKey
+    lazy val toLockup      = LockupScript.p2pkh(toPubKey)
+    lazy val output0       = TxOutputInfo(toLockup, ALPH.alph(1), AVector.empty, None)
+
+    lazy val (genesisPriKey, genesisPubKey, _) = genesisKeys(chainIndex.from.value)
+    lazy val genesisLockup                     = LockupScript.p2pkh(genesisPubKey)
+    lazy val genesisChange                     = genesisBalance - ALPH.alph(1) - defaultGasFee
+    lazy val output1                           = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
+    lazy val unsignedTx = blockFlow
+      .transfer(
+        genesisPriKey.publicKey,
+        AVector(output0, output1),
+        Some(defaultGas),
+        defaultGasPrice,
+        defaultUtxoLimit
+      )
+      .rightValue
+      .rightValue
+
+    def test() = {
+      unsignedTx.fixedOutputs.length is 2
+      blockFlow
+        .getBalance(genesisLockup, defaultUtxoLimit)
+        .rightValue
+        ._1 is genesisBalance
+      testUnsignedTx(unsignedTx, genesisPriKey)
+    }
+  }
+
+  it should "transfer ALPH with predefined value for intra-group txs" in new PredefinedTxFixture {
+    override def chainIndex: ChainIndex =
+      Generators.chainIndexGen.retryUntil(_.isIntraGroup).sample.get
+    chainIndex.isIntraGroup is true
+    test()
+  }
+
+  it should "transfer ALPH with predefined value for inter-group txs" in new PredefinedTxFixture {
+    override def chainIndex: ChainIndex =
+      Generators.chainIndexGen.retryUntil(!_.isIntraGroup).sample.get
+    chainIndex.isIntraGroup is false
+    test()
   }
 
   it should "calculate preOutputs for txs in new blocks" in new FlowFixture with Generators {
