@@ -18,6 +18,6 @@ package org.alephium.api.model
 
 object Compile {
   // use different type to avoid ambiguous implicit values in endpoint examples
-  final case class Script(code: String)   extends AnyVal
-  final case class Contract(code: String) extends AnyVal
+  final case class Script(code: String)
+  final case class Contract(code: String)
 }
