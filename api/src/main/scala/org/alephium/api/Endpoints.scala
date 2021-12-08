@@ -290,9 +290,10 @@ trait Endpoints
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post
+      .in("cpu-mining")
       .in(query[MinerAction]("action").examples(minerActionExamples))
       .out(jsonBody[Boolean])
-      .summary("Execute an action on miners")
+      .summary("Execute an action on CPU miner. !!! for test only !!!")
 
   val minerListAddresses: BaseEndpoint[Unit, MinerAddresses] =
     minersEndpoint.get
@@ -304,7 +305,7 @@ trait Endpoints
     minersEndpoint.put
       .in("addresses")
       .in(jsonBody[MinerAddresses])
-      .summary("Update miner's addresses")
+      .summary("Update miner's addresses, but better to use user.conf instead")
 
   val compileScript: BaseEndpoint[Compile.Script, CompileResult] =
     contractsEndpoint.post

@@ -590,8 +590,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost("/contracts/build-script", Some(query))
   }
 
-  val startMining = httpPost("/miners?action=start-mining")
-  val stopMining  = httpPost("/miners?action=stop-mining")
+  val startMining = httpPost("/miners/cpu-mining?action=start-mining")
+  val stopMining  = httpPost("/miners/cpu-mining?action=stop-mining")
 
   def exportBlocks(filename: String) =
     httpPost(s"/export-blocks", Some(s"""{"filename": "${filename}"}"""))
