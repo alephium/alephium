@@ -184,7 +184,7 @@ class InterCliqueManager(
     case CliqueManager.Synced(brokerInfo) =>
       log.debug(s"No new blocks from $brokerInfo")
       setSynced(brokerInfo)
-    case _: Tcp.ConnectionClosed => ()
+    case _: Tcp.ConnectionClosed => () // response for Tcp.Close above
   }
 
   def handleMessage: Receive = {
