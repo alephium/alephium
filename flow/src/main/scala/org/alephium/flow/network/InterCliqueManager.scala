@@ -288,6 +288,10 @@ class InterCliqueManager(
         if (nodeSyncStatus != lastStatus) {
           publishNodeStatus(SyncedResult(nodeSyncStatus))
         } // else we don't do anything
+
+        if (lastStatus && !nodeSyncStatus) { // Get more connections as the node is not synced
+          moreOutConnections()
+        }
     }
     lastNodeSyncedStatus = Some(nodeSyncStatus)
   }

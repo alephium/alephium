@@ -379,6 +379,10 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
     noPublish()
+
+    interCliqueManagerActor.brokers.clear()
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    eventually(discoveryServer.expectMsgType[DiscoveryServer.GetNeighborPeers])
   }
 
   it should "send block to peers" in new BroadCastFixture {
