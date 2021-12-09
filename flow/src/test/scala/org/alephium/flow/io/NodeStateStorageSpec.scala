@@ -38,6 +38,12 @@ class NodeStateStorageSpec
     storage.setDatabaseVersion(invalidDBVersion) isE ()
     storage.getDatabaseVersion() isE Some(invalidDBVersion)
     storage.checkDatabaseCompatibility().leftValue is a[IOError.Other]
+
+    val validDBVersion = DatabaseVersion(DatabaseVersion.currentDBVersion.value - 1)
+    storage.setDatabaseVersion(validDBVersion) isE ()
+    storage.getDatabaseVersion() isE Some(validDBVersion)
+    storage.checkDatabaseCompatibility() isE ()
+    storage.getDatabaseVersion() isE Some(DatabaseVersion.currentDBVersion)
   }
 
   it should "update database version when init" in {
