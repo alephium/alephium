@@ -132,7 +132,7 @@ trait TxUtils { Self: FlowUtils =>
       utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
-      _               <- checkOutputInfos(outputInfos)
+      _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
       _               <- checkGas(gasOpt, gasPrice)
       totalAlphAmount <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
@@ -187,7 +187,7 @@ trait TxUtils { Self: FlowUtils =>
 
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
-        _ <- checkOutputInfos(outputInfos)
+        _ <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
         _ <- checkGas(gasOpt, gasPrice)
         _ <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
         _ <- UnsignedTransaction.calculateTotalAmountPerToken(
@@ -395,6 +395,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkOutputInfos(
+      fromGroup: GroupIndex,
       outputInfos: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
     if (outputInfos.isEmpty) {
@@ -402,7 +403,7 @@ trait TxUtils { Self: FlowUtils =>
     } else if (outputInfos.length > ALPH.MaxTxOutputNum) {
       Left(s"Too many transaction outputs, maximal value: ${ALPH.MaxTxOutputNum}")
     } else {
-      val groupIndexes = outputInfos.map(_.lockupScript.groupIndex)
+      val groupIndexes = outputInfos.map(_.lockupScript.groupIndex).filter(_ != fromGroup)
 
       if (groupIndexes.forall(_ == groupIndexes.head)) {
         Right(())

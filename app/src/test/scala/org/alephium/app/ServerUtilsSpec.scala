@@ -710,8 +710,8 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
-    val chainIndex1           = ChainIndex.unsafe(0, 0)
-    val chainIndex2           = ChainIndex.unsafe(0, 1)
+    val chainIndex1           = ChainIndex.unsafe(0, 1)
+    val chainIndex2           = ChainIndex.unsafe(0, 2)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex1.from.value)
     val destination1          = generateDestination(chainIndex1)
     val destination2          = generateDestination(chainIndex2)
