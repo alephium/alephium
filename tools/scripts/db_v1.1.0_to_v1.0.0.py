@@ -5,7 +5,7 @@
 # 1. remove `broker` column family
 # 2. change database version
 
-# python3 ./v1.1.0_to_v1.0.0.py
+# python3 ./db_v1.1.0_to_v1.0.0.py
 
 from pathlib import Path
 from hashlib import blake2b
