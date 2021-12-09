@@ -51,7 +51,7 @@ object Storages {
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage)
     val pendingTxStorage  = PendingTxRocksDBStorage(db, ColumnFamily.PendingTx, writeOptions)
     val readyTxStorage    = ReadyTxRocksDBStorage(db, ColumnFamily.ReadyTx, writeOptions)
-    val brokerStorage     = BrokerRocksDBStorage(db, ColumnFamily.All, writeOptions)
+    val brokerStorage     = BrokerRocksDBStorage(db, ColumnFamily.Broker, writeOptions)
 
     Storages(
       AVector(db),

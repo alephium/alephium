@@ -18,15 +18,12 @@ package org.alephium.flow.io
 
 import scala.collection.mutable
 
-import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.model.BrokerDiscoveryState
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{BrokerInfo, PeerId}
-import org.alephium.serde.{deserialize, SerdeResult}
 import org.alephium.util.AVector
 
 trait BrokerStorage extends KeyValueStorage[PeerId, BrokerDiscoveryState] {
@@ -35,8 +32,6 @@ trait BrokerStorage extends KeyValueStorage[PeerId, BrokerDiscoveryState] {
 }
 
 object BrokerRocksDBStorage extends RocksDBKeyValueCompanion[BrokerRocksDBStorage] {
-  val prefix: ByteString = Hash.hash("discoveredBrokers").bytes
-
   override def apply(
       storage: RocksDBSource,
       cf: ColumnFamily,
@@ -59,12 +54,6 @@ class BrokerRocksDBStorage(
       readOptions
     )
     with BrokerStorage {
-  override def storageKey(key: PeerId): ByteString =
-    BrokerRocksDBStorage.prefix ++ keySerde.serialize(key)
-
-  override def extractKey(bytes: Array[Byte]): SerdeResult[PeerId] =
-    deserialize(ByteString.fromArrayUnsafe(bytes.drop(BrokerRocksDBStorage.prefix.length)))
-
   override def addBroker(brokerInfo: BrokerInfo): IOResult[Unit] = {
     val state = BrokerDiscoveryState(brokerInfo.address, brokerInfo.brokerNum)
     put(brokerInfo.peerId, state)
@@ -72,17 +61,14 @@ class BrokerRocksDBStorage(
 
   override def activeBrokers(): IOResult[AVector[BrokerInfo]] = {
     val buffer = mutable.ArrayBuffer.empty[BrokerInfo]
-    iterateWithPrefix(
-      BrokerRocksDBStorage.prefix.toArray,
-      (peerId, state) => {
-        val brokerInfo = BrokerInfo.unsafe(
-          peerId.cliqueId,
-          peerId.brokerId,
-          state.brokerNum,
-          state.address
-        )
-        buffer += brokerInfo
-      }
-    ).map(_ => AVector.from(buffer))
+    iterate((peerId, state) => {
+      val brokerInfo = BrokerInfo.unsafe(
+        peerId.cliqueId,
+        peerId.brokerId,
+        state.brokerNum,
+        state.address
+      )
+      buffer += brokerInfo
+    }).map(_ => AVector.from(buffer))
   }
 }
