@@ -177,7 +177,7 @@ object RocksDBSource {
   }
 }
 
-class RocksDBSource(val path: Path, val db: RocksDB, cfHandles: AVector[ColumnFamilyHandle])
+class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[ColumnFamilyHandle])
     extends KeyValueSource {
   import IOUtils.tryExecute
   import RocksDBSource._
