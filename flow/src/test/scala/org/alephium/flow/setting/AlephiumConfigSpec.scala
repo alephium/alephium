@@ -21,15 +21,15 @@ import java.net.InetSocketAddress
 import java.nio.file.Paths
 
 import scala.collection.immutable.ArraySeq
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import com.typesafe.config.ConfigValueFactory
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.conf.*
+import org.alephium.conf._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate

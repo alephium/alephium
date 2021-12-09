@@ -184,7 +184,7 @@ class InterCliqueManager(
     case CliqueManager.Synced(brokerInfo) =>
       log.debug(s"No new blocks from $brokerInfo")
       setSynced(brokerInfo)
-    case _: Tcp.ConnectionClosed => ()
+    case _: Tcp.ConnectionClosed => () // response for Tcp.Close above
   }
 
   def handleMessage: Receive = {
@@ -231,14 +231,14 @@ class InterCliqueManager(
       removeBroker(peer)
       moreOutConnections()
 
-    case DiscoveryServer.NeighborPeers(sortedPeers) =>
-      extractPeersToConnect(sortedPeers, networkSetting.maxOutboundConnectionsPerGroup)
+    case DiscoveryServer.NeighborPeers(randomPeers) =>
+      extractPeersToConnect(randomPeers, networkSetting.maxOutboundConnectionsPerGroup)
         .foreach(connectUnsafe)
   }
 
   def moreOutConnections(): Unit = {
     if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
-      discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
+      discoveryServer ! DiscoveryServer.GetMorePeers(brokerConfig)
     }
   }
 
@@ -288,6 +288,10 @@ class InterCliqueManager(
         if (nodeSyncStatus != lastStatus) {
           publishNodeStatus(SyncedResult(nodeSyncStatus))
         } // else we don't do anything
+
+        if (lastStatus && !nodeSyncStatus) { // Get more connections as the node is not synced
+          moreOutConnections()
+        }
     }
     lastNodeSyncedStatus = Some(nodeSyncStatus)
   }
@@ -305,10 +309,6 @@ class InterCliqueManager(
       connectUnsafe(broker)
     }
   }
-
-  val connecting: Cache[InetSocketAddress, Unit] = Cache.fifo(
-    networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups
-  )
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
     if (!connecting.contains(brokerInfo.address)) {
       log.info(s"Try to connect to $brokerInfo")
@@ -322,7 +322,7 @@ class InterCliqueManager(
           blockFlowSynchronizer
         )
       val out = context.actorOf(props)
-      connecting.put(brokerInfo.address, ())
+      connecting.put(brokerInfo.address, brokerInfo)
       context.watchWith(out, PeerDisconnected(brokerInfo.address))
       ()
     }
@@ -341,6 +341,10 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   // The key is (CliqueId, BrokerId)
   val brokers = collection.mutable.HashMap.empty[PeerId, BrokerState]
+  // Pending outbound connections
+  val connecting: Cache[InetSocketAddress, BrokerInfo] = Cache.fifo(
+    networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups
+  )
 
   def addBroker(
       brokerInfo: BrokerInfo,
@@ -391,7 +395,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def getOutConnectionPerGroup(groupIndex: GroupIndex): Int = {
-    brokers.foldLeft(0) { case (count, (_, brokerState)) =>
+    val connectedCount = brokers.foldLeft(0) { case (count, (_, brokerState)) =>
       if (
         brokerState.connectionType == OutboundConnection &&
         brokerState.info.contains(groupIndex)
@@ -400,6 +404,9 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       } else {
         count
       }
+    }
+    connecting.values().foldLeft(connectedCount) { case (count, brokerInfo) =>
+      if (brokerInfo.contains(groupIndex)) count + 1 else count
     }
   }
 
@@ -529,14 +536,14 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def extractPeersToConnect(
-      sortedPeers: AVector[BrokerInfo],
+      randomPeers: AVector[BrokerInfo],
       maxOutboundConnectionsPerGroup: Int
   ): AVector[BrokerInfo] = {
     val peerPerGroupCount = Array.fill[Int](brokerConfig.groups)(maxOutboundConnectionsPerGroup)
     brokerConfig.groupRange.foreach { group =>
       peerPerGroupCount(group) = getOutConnectionPerGroup(GroupIndex.unsafe(group))
     }
-    sortedPeers.filter { brokerInfo =>
+    randomPeers.filter { brokerInfo =>
       val range = brokerConfig.calIntersection(brokerInfo)
       val ok = {
         (brokerInfo.peerId.cliqueId != selfCliqueId) &&

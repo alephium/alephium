@@ -64,15 +64,26 @@ trait DiscoveryServerState extends SessionManager {
     socketOpt = None
   }
 
-  def getActivePeers(targetGroupInfoOpt: Option[BrokerGroupInfo]): AVector[BrokerInfo] = {
-    val candidates = AVector
+  def getActivePeers(): AVector[BrokerInfo] = {
+    AVector
       .from(table.values.map(_.info))
       .filter(info => mightReachable(info.address))
       .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
-    targetGroupInfoOpt match {
-      case Some(groupInfo) => candidates.filter(_.interBrokerInfo.intersect(groupInfo))
-      case None            => candidates
-    }
+  }
+
+  def getMorePeers(targetGroupInfo: BrokerGroupInfo): AVector[BrokerInfo] = {
+    val candidates = table.values
+      .map(_.info)
+      .filter { info =>
+        targetGroupInfo.intersect(info) &&
+        mightReachable(info.address) &&
+        info.cliqueId != selfCliqueId
+      }
+    val randomCliqueId = CliqueId.generate
+    AVector
+      .from(candidates)
+      .sortBy(info => randomCliqueId.hammingDist(info.cliqueId))
+      .takeUpto(maxSentPeers)
   }
 
   def getPeersNum: Int = table.size
@@ -83,8 +94,17 @@ trait DiscoveryServerState extends SessionManager {
     }
   }
 
+  // select a number of random peers based on a random clique id
+  def getBootstrapNeighbors(): AVector[BrokerInfo] = {
+    getNeighbors(selfCliqueId, CliqueId.generate)
+  }
+
   def getNeighbors(target: CliqueId): AVector[BrokerInfo] = {
-    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != target))
+    getNeighbors(target, target)
+  }
+
+  def getNeighbors(filterId: CliqueId, target: CliqueId): AVector[BrokerInfo] = {
+    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != filterId))
     candidates
       .sortBy(info => target.hammingDist(info.cliqueId))
       .takeUpto(maxSentPeers)

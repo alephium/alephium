@@ -122,7 +122,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val getDiscoveredNeighborsLogic = serverLogic(getDiscoveredNeighbors) { _ =>
     node.discoveryServer
-      .ask(DiscoveryServer.GetNeighborPeers(None))
+      .ask(DiscoveryServer.GetNeighborPeers)
       .mapTo[DiscoveryServer.NeighborPeers]
       .map(response => Right(response.peers))
   }

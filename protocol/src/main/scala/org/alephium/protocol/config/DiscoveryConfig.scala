@@ -36,5 +36,5 @@ trait DiscoveryConfig {
   val peersTimeout: Duration        = Duration.ofSecondsUnsafe(5)
   lazy val expireDuration: Duration = scanFrequency.timesUnsafe(10)
 
-  val unreachableDuration = Duration.ofMinutesUnsafe(1)
+  val unreachableDuration = Duration.ofSecondsUnsafe(8)
 }

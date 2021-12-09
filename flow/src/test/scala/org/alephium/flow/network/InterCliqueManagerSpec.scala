@@ -53,7 +53,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       system.stop(connection.ref)
     }
 
-    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
+    discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
 
     getPeers() is Seq.empty
   }
@@ -78,7 +78,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     }
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
+    discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
     interCliqueManagerActor.connecting.contains(peerInfo.address) is false
 
     getPeers() is Seq.empty
@@ -173,6 +173,37 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       watch(probe.ref)
       probe.send(interCliqueManager, CliqueManager.HandShaked(newBroker, OutboundConnection))
       expectTerminated(probe.ref)
+    }
+  }
+
+  it should "not accept outbound connection when the number of pending outbound connections is large" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.max-outbound-connections-per-group", 1)
+    )
+
+    val broker = relevantBrokerInfo()
+    interCliqueManagerActor.connecting.put(broker.address, broker)
+
+    val newBroker = newBrokerInfo(broker)
+    EventFilter.info(start = "Too many outbound connections", occurrences = 1).intercept {
+      val probe = TestProbe()
+      watch(probe.ref)
+      probe.send(interCliqueManager, CliqueManager.HandShaked(newBroker, OutboundConnection))
+      expectTerminated(probe.ref)
+    }
+  }
+
+  it should "not start outbound connection when the number of pending outbound connections is large" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.max-outbound-connections-per-group", 1)
+    )
+
+    val broker = relevantBrokerInfo()
+    interCliqueManagerActor.connecting.put(broker.address, broker)
+
+    val newBroker = newBrokerInfo(broker)
+    EventFilter.info(start = "Try to connect to", occurrences = 0).intercept {
+      interCliqueManager ! DiscoveryServer.NeighborPeers(AVector(newBroker))
     }
   }
 
@@ -308,6 +339,13 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManagerActor.extractPeersToConnect(AVector(testBroker), 1) is AVector(testBroker)
   }
 
+  it should "not return any peers when there are enough pending connections" in new Fixture {
+    val broker0 = relevantBrokerInfo()
+    val broker1 = relevantBrokerInfo()
+    interCliqueManagerActor.connecting.put(broker0.address, broker0)
+    interCliqueManagerActor.extractPeersToConnect(AVector(broker1), 1).isEmpty is true
+  }
+
   behavior of "Sync"
 
   trait SyncFixture extends Fixture {
@@ -379,6 +417,10 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManagerActor.updateNodeSyncedStatus()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(true)
     noPublish()
+
+    interCliqueManagerActor.brokers.clear()
+    interCliqueManagerActor.updateNodeSyncedStatus()
+    eventually(discoveryServer.expectMsgType[DiscoveryServer.GetMorePeers])
   }
 
   it should "send block to peers" in new BroadCastFixture {
