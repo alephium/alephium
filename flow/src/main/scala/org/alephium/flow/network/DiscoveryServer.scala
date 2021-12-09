@@ -268,7 +268,7 @@ class DiscoveryServer(
   private var initialDiscoveryDone: Boolean = false
   def postInitialDiscovery(): Unit = {
     initialDiscoveryDone = true
-    val neighbors = getNeighbors(selfCliqueId)
+    val neighbors = getBootstrapNeighbors()
     log.info(s"Initial P2P discovery is done: #${neighbors.length} neighbors")
     publishEvent(NeighborPeers(neighbors))
   }
