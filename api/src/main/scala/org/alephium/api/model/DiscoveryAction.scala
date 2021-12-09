@@ -14,27 +14,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.api.model
 
-import org.alephium.util.Duration
+import java.net.InetAddress
 
-trait DiscoveryConfig {
-  /* Wait time between two scan. */
-  def scanFrequency: Duration
+import org.alephium.util.AVector
 
-  def scanFastFrequency: Duration
-
-  def fastScanPeriod: Duration
-
-  def initialDiscoveryPeriod: Duration
-
-  /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
-  def neighborsPerGroup: Int
-
-  def maxCliqueFromSameIp: Int
-
-  val peersTimeout: Duration        = Duration.ofSecondsUnsafe(5)
-  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(10)
-
-  val unreachableDuration = Duration.ofSecondsUnsafe(8)
+sealed trait DiscoveryAction
+object DiscoveryAction {
+  @upickle.implicits.key("unreachable")
+  final case class Unreachable(peers: AVector[InetAddress]) extends DiscoveryAction
+  @upickle.implicits.key("reachable")
+  final case class Reachable(peers: AVector[InetAddress]) extends DiscoveryAction
 }

@@ -25,12 +25,14 @@ import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
+import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.network.DiscoveryServer.NeighborPeers
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.protocol.*
-import org.alephium.protocol.config.*
-import org.alephium.protocol.model.*
-import org.alephium.util.*
+import org.alephium.flow.setting.Platform
+import org.alephium.protocol._
+import org.alephium.protocol.config._
+import org.alephium.protocol.model._
+import org.alephium.util._
 
 class DiscoveryServerSpec
     extends AlephiumActorSpec
@@ -130,6 +132,18 @@ class DiscoveryServerSpec
         cliqueInfo0.interBrokers.get.head
       )
     }
+
+    storages.brokerStorage.exists(cliqueInfo0.selfInterBrokerInfo.peerId) isE true
+    storages.brokerStorage.exists(cliqueInfo1.selfInterBrokerInfo.peerId) isE true
+  }
+
+  it should "load brokers from storage at startup" in new Fixture {
+    val peer = cliqueInfo1.selfBrokerInfo.get
+    storages.brokerStorage.addBroker(peer) isE ()
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    withPeers(server0) { peers =>
+      peers.length is groups + 1
+    }
   }
 
   it should "refuse to discover a banned clique" in new Fixture {
@@ -167,7 +181,11 @@ class DiscoveryServerSpec
     lazy val server2 =
       newTestActorRef[DiscoveryServer](
         DiscoveryServer
-          .props(address1, misbehaviorManager)(brokerConfig, config1, networkConfig)
+          .props(address1, misbehaviorManager, storages.brokerStorage)(
+            brokerConfig,
+            config1,
+            networkConfig
+          )
       )
 
     server2 ! DiscoveryServer.PeerConfirmed(cliqueInfo0.selfBrokerInfo.get)
@@ -208,7 +226,11 @@ class DiscoveryServerSpec
     lazy val server2 =
       newTestActorRef[DiscoveryServer](
         DiscoveryServer
-          .props(address1, misbehaviorManager)(brokerConfig, config1, networkConfig)
+          .props(address1, misbehaviorManager, storages.brokerStorage)(
+            brokerConfig,
+            config1,
+            networkConfig
+          )
       )
     server2 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
   }
@@ -229,22 +251,35 @@ class DiscoveryServerSpec
     self =>
     val groups = 4
 
+    val groupConfig = new GroupConfig {
+      def groups: Int = self.groups
+    }
     val cliqueNum = 16
     val cliques   = AVector.fill(cliqueNum)(generateClique())
     val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
       infos.map { case (brokerInfo, config) =>
+        val storages           = StoragesFixture.buildStorages(Platform.getRootPath())(groupConfig)
         val misbehaviorManager = buildMisbehaviorManager(system)
         val server = {
           if (index equals 0) {
             TestActorRef[DiscoveryServer](
               DiscoveryServer
-                .props(brokerInfo.address, misbehaviorManager)(config, config, networkConfig)
+                .props(brokerInfo.address, misbehaviorManager, storages.brokerStorage)(
+                  config,
+                  config,
+                  networkConfig
+                )
             )
           } else {
             val bootstrapAddress = cliques(index / 2)._2.sample()._1.address
             TestActorRef[DiscoveryServer](
               DiscoveryServer
-                .props(brokerInfo.address, misbehaviorManager, bootstrapAddress)(
+                .props(
+                  brokerInfo.address,
+                  misbehaviorManager,
+                  storages.brokerStorage,
+                  bootstrapAddress
+                )(
                   config,
                   config,
                   networkConfig
@@ -269,6 +304,7 @@ class DiscoveryServerSpec
     override val groups = Gen.choose(2, 10).sample.get
 
     val port0               = generatePort()
+    val storages            = StoragesFixture.buildStorages(Platform.getRootPath())
     val (address0, config0) = createConfig(groups, port0, 2)
     val cliqueInfo0         = generateCliqueInfo(address0, config0)
     val port1               = generatePort()
@@ -279,14 +315,22 @@ class DiscoveryServerSpec
 
     lazy val server0 =
       TestActorRef[DiscoveryServer](
-        DiscoveryServer.props(address0, misbehaviorManager0)(brokerConfig, config0, networkConfig)
+        DiscoveryServer.props(address0, misbehaviorManager0, storages.brokerStorage)(
+          brokerConfig,
+          config0,
+          networkConfig
+        )
       )(system)
 
     val system1 = createSystem()
     lazy val server1 =
       TestActorRef[DiscoveryServer](
         DiscoveryServer
-          .props(address1, misbehaviorManager1, address0)(brokerConfig, config1, networkConfig)
+          .props(address1, misbehaviorManager1, storages.brokerStorage, address0)(
+            brokerConfig,
+            config1,
+            networkConfig
+          )
       )(system1)
 
     val misbehaviorProbe = TestProbe()
@@ -298,7 +342,7 @@ class DiscoveryServerSpec
   )(check: AVector[BrokerInfo] => T): Unit = {
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
       probe0.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
         check(peers)
       }

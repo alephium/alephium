@@ -19,6 +19,7 @@ package org.alephium.flow.network
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 
 import akka.event.LoggingAdapter
 import akka.testkit.{SocketUtil, TestProbe}
@@ -64,11 +65,17 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     implicit override val patienceConfig =
       PatienceConfig(timeout = Span(10, Seconds))
 
+    val storage = mutable.HashMap.empty[PeerId, BrokerInfo]
     lazy val state = new DiscoveryServerState {
       implicit def brokerConfig: BrokerConfig       = self.config
       implicit def discoveryConfig: DiscoveryConfig = self.config
       implicit def networkConfig: NetworkConfig     = self.networkConfig
       def log: LoggingAdapter                       = system.log
+
+      override def addBrokerToStorage(peerInfo: BrokerInfo): Unit =
+        storage += peerInfo.peerId -> peerInfo
+      override def removeBrokerFromStorage(peerId: PeerId): Unit =
+        storage -= peerId
 
       lazy val bootstrap: ArraySeq[InetSocketAddress] = ArraySeq(socketAddressGen.sample.get)
 
@@ -112,7 +119,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   }
 
   it should "add peer into pending list when just pinged the peer" in new Fixture {
-    state.getActivePeers(None).length is 0
+    state.getActivePeers().length is 0
     state.isUnknown(peerInfo.peerId) is true
     state.isPending(peerInfo.peerId) is false
     state.tryPing(peerInfo)
@@ -122,7 +129,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   }
 
   it should "append broker" in new Fixture {
-    state.getActivePeers(None).length is 0
+    state.getActivePeers().length is 0
 
     groupConfig.groups is 4
     val cliqueGen = cliqueInfoGen(2)
@@ -132,25 +139,30 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     clique0Brokers.length is 2
     state.discoveryConfig.maxCliqueFromSameIp is 2
     clique0Brokers.foreach(broker => state.appendPeer(broker))
-    state.getActivePeers(None).length is 2
+    state.getActivePeers().length is 2
     clique0Brokers.foreach(broker => state.appendPeer(broker))
-    state.getActivePeers(None).length is 2
+    state.getActivePeers().length is 2
+    clique0Brokers.foreach(broker => storage.contains(broker.peerId) is true)
 
     val peerClique1: CliqueInfo = cliqueWithSameIp(peerClique0)
     val clique1Brokers          = peerClique1.interBrokers.get
     clique1Brokers.length is 2
     state.appendPeer(clique1Brokers(0))
-    state.getActivePeers(None).length is 3
+    state.getActivePeers().length is 3
     state.isInTable(clique1Brokers(0).peerId) is true
     state.isInTable(clique1Brokers(1).peerId) is false
+    storage.contains(clique1Brokers(0).peerId) is true
+    storage.contains(clique1Brokers(1).peerId) is false
 
     val peerClique2: CliqueInfo = cliqueWithSameIp(peerClique0)
     val clique2Brokers          = peerClique2.interBrokers.get
     clique2Brokers.length is 2
     clique2Brokers.foreach(broker => state.appendPeer(broker))
-    state.getActivePeers(None).length is 4
+    state.getActivePeers().length is 4
     state.isInTable(clique2Brokers(0).peerId) is false
     state.isInTable(clique2Brokers(1).peerId) is true
+    storage.contains(clique2Brokers(0).peerId) is false
+    storage.contains(clique2Brokers(1).peerId) is true
   }
 
   it should "get the number of cliques" in new Fixture {
@@ -169,10 +181,10 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     clique0Brokers.length is 2
     clique1Brokers.length is 1
     clique0Brokers.foreach(state.appendPeer)
-    state.getActivePeers(None).length is 2
+    state.getActivePeers().length is 2
     state.getCliqueNumPerIp(clique1Brokers(0)) is 1
     clique1Brokers.foreach(state.appendPeer)
-    state.getActivePeers(None).length is 3
+    state.getActivePeers().length is 3
     state.getCliqueNumPerIp(clique1Brokers(0)) is 2
   }
 
@@ -194,9 +206,11 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   it should "clean up table if expiry is zero" in new Fixture {
     override def expireDuration: Duration = Duration.ofSecondsUnsafe(0)
     addToTable(peerInfo)
+    storage.contains(peerInfo.peerId) is true
     state.isInTable(peerInfo.peerId) is true
     state.cleanup()
     state.isInTable(peerInfo.peerId) is false
+    storage.contains(peerInfo.peerId) is false
   }
 
   it should "clean up everything if timeout is zero" in new Fixture {
@@ -219,7 +233,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   it should "sort neighbors with respect to target" in new Fixture {
     override def peersPerGroup: Int = 4
 
-    state.getActivePeers(None).length is 0
+    state.getActivePeers().length is 0
     val toAdds = Gen.listOfN(peersPerGroup, peerInfoGen).sample.get
     toAdds.foreach(addToTable)
 
@@ -231,12 +245,13 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   }
 
   it should "return neighbors" in new Fixture {
-    state.getActivePeers(None).length is 0
+    state.getActivePeers().length is 0
     val toAdds = Gen.listOfN(peersPerGroup, peerInfoGen).sample.get
     toAdds.foreach(addToTable)
 
-    state.getActivePeers(None).length is toAdds.length
-    state.getActivePeers(Some(peerInfo)).foreach(_.intersect(peerInfo) is true)
+    state.getActivePeers().length is toAdds.length
+    state.getMorePeers(peerInfo).foreach(_.intersect(peerInfo) is true)
+    state.getMorePeers(peerInfo).foreach(_.cliqueId != state.selfCliqueId is true)
   }
 
   it should "clean up a banned peer" in new Fixture {
@@ -267,7 +282,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     override def expireDuration: Duration = Duration.ofMillisUnsafe(0)
     config.expireDuration is Duration.unsafe(0)
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
-      brokers.foreach(state.addSelfCliquePeer)
+      brokers.foreach(state.addBroker)
     }
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
       brokers.foreach(broker => state.isInTable(broker.peerId) is true)
@@ -281,9 +296,9 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   it should "detect when to scan fast" in new Fixture {
     override def scanFastPeriod: Duration = Duration.ofSecondsUnsafe(2)
     state.selfCliqueInfo.interBrokers.foreach { brokers =>
-      brokers.foreach(state.addSelfCliquePeer)
+      brokers.foreach(state.addBroker)
     }
-    state.tableInitialSize is state.getActivePeers(None).length
+    state.tableInitialSize is state.getActivePeers().length
     state.shouldScanFast() is true
     state.atLeastOnePeerPerGroup() is false
 
@@ -342,15 +357,46 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
   }
 
   it should "set unreachables based on inet address" in new Fixture {
-    state.getActivePeers(None).length is 0
+    state.getActivePeers().length is 0
     state.appendPeer(peerInfo)
-    state.getActivePeers(None).length is 1
+    state.getActivePeers().length is 1
     state.mightReachable(peerInfo.address) is true
 
     val newPeer = new InetSocketAddress(peerInfo.address.getAddress, peerInfo.address.getPort + 1)
     state.setUnreachable(newPeer)
     state.mightReachable(peerInfo.address) is false
-    state.getActivePeers(None).length is 0
+    state.getActivePeers().length is 0
+  }
+
+  it should "remove unreachable brokers based on inet address" in new Fixture {
+    def createPeer(address: InetSocketAddress): BrokerInfo = {
+      BrokerInfo.unsafe(
+        cliqueIdGen.sample.get,
+        brokerId = config.brokerId,
+        brokerNum = config.brokerNum,
+        address = address
+      )
+    }
+
+    val address1  = socketAddressGen.sample.get
+    val address2  = new InetSocketAddress(address1.getAddress, address1.getPort + 1)
+    val peerInfo1 = createPeer(address1)
+    val peerInfo2 = createPeer(address2)
+    state.getActivePeers().length is 0
+    state.appendPeer(peerInfo1)
+    state.appendPeer(peerInfo2)
+    state.getActivePeers().length is 2
+
+    state.sessions.size is 0
+    state.ping(peerInfo1)
+    state.ping(peerInfo2)
+    state.sessions.size is 2
+
+    state.unreachables.size is 0
+    state.setUnreachable(address1.getAddress)
+    state.unreachables.size is 1
+    state.sessions.size is 0
+    state.getActivePeers().length is 0
   }
 
   it should "clean unreachable peers in mightReachableSlow" in new Fixture {

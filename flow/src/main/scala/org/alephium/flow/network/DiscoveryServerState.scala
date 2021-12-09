@@ -64,15 +64,26 @@ trait DiscoveryServerState extends SessionManager {
     socketOpt = None
   }
 
-  def getActivePeers(targetGroupInfoOpt: Option[BrokerGroupInfo]): AVector[BrokerInfo] = {
-    val candidates = AVector
+  def getActivePeers(): AVector[BrokerInfo] = {
+    AVector
       .from(table.values.map(_.info))
       .filter(info => mightReachable(info.address))
       .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
-    targetGroupInfoOpt match {
-      case Some(groupInfo) => candidates.filter(_.interBrokerInfo.intersect(groupInfo))
-      case None            => candidates
-    }
+  }
+
+  def getMorePeers(targetGroupInfo: BrokerGroupInfo): AVector[BrokerInfo] = {
+    val candidates = table.values
+      .map(_.info)
+      .filter { info =>
+        targetGroupInfo.intersect(info) &&
+        mightReachable(info.address) &&
+        info.cliqueId != selfCliqueId
+      }
+    val randomCliqueId = CliqueId.generate
+    AVector
+      .from(candidates)
+      .sortBy(info => randomCliqueId.hammingDist(info.cliqueId))
+      .takeUpto(maxSentPeers)
   }
 
   def getPeersNum: Int = table.size
@@ -83,8 +94,17 @@ trait DiscoveryServerState extends SessionManager {
     }
   }
 
+  // select a number of random peers based on a random clique id
+  def getBootstrapNeighbors(): AVector[BrokerInfo] = {
+    getNeighbors(selfCliqueId, CliqueId.generate)
+  }
+
   def getNeighbors(target: CliqueId): AVector[BrokerInfo] = {
-    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != target))
+    getNeighbors(target, target)
+  }
+
+  def getNeighbors(filterId: CliqueId, target: CliqueId): AVector[BrokerInfo] = {
+    val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != filterId))
     candidates
       .sortBy(info => target.hammingDist(info.cliqueId))
       .takeUpto(maxSentPeers)
@@ -114,10 +134,9 @@ trait DiscoveryServerState extends SessionManager {
 
   def banPeer(peerId: PeerId): Unit = {
     table.get(peerId).foreach { status =>
-      table.remove(peerId)
+      removeBroker(peerId)
       setUnreachable(status.info.address)
     }
-    table -= peerId
   }
 
   def cleanup(): Unit = {
@@ -129,24 +148,34 @@ trait DiscoveryServerState extends SessionManager {
 
   def cleanTable(now: TimeStamp): Unit = {
     table.filterInPlace { case (peerId, status) =>
-      now.deltaUnsafe(status.updateAt) < discoveryConfig.expireDuration ||
+      val keep = now.deltaUnsafe(status.updateAt) < discoveryConfig.expireDuration ||
         peerId.cliqueId == selfCliqueId
+      if (!keep) removeBrokerFromStorage(peerId)
+      keep
     }
-    ()
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
   def getUnreachable(): AVector[InetAddress] = {
     AVector.from(unreachables.keys())
   }
 
-  def setUnreachable(remote: InetSocketAddress): Unit = {
-    val remoteInet = remote.getAddress
-    unreachables.get(remoteInet) match {
+  def updateUnreachable(remote: InetAddress): Unit = {
+    unreachables.get(remote) match {
       case Some(until) =>
-        unreachables.put(remoteInet, until + discoveryConfig.unreachableDuration)
+        unreachables.put(remote, until + discoveryConfig.unreachableDuration)
       case None =>
-        unreachables.put(remoteInet, TimeStamp.now() + discoveryConfig.unreachableDuration)
+        unreachables.put(remote, TimeStamp.now() + discoveryConfig.unreachableDuration)
     }
+  }
+
+  def setUnreachable(remote: InetSocketAddress): Unit = {
+    updateUnreachable(remote.getAddress)
+    remove(remote)
+  }
+
+  def setUnreachable(remote: InetAddress): Unit = {
+    updateUnreachable(remote)
     remove(remote)
   }
 
@@ -188,18 +217,39 @@ trait DiscoveryServerState extends SessionManager {
   def appendPeer(peerInfo: BrokerInfo): Unit = {
     if (getCliqueNumPerIp(peerInfo) < discoveryConfig.maxCliqueFromSameIp) {
       log.info(s"Adding a new peer: $peerInfo")
-      table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+      addBroker(peerInfo)
       publishNewPeer(peerInfo)
     } else {
       log.debug(s"Too many cliques from a same IP: $peerInfo")
     }
   }
 
-  def addSelfCliquePeer(peerInfo: BrokerInfo): Unit = {
+  @inline final def addBroker(peerInfo: BrokerInfo): Unit = {
+    addBrokerToStorage(peerInfo)
     table += peerInfo.peerId -> PeerStatus.fromInfo(peerInfo)
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  @inline final def cacheBrokers(peers: AVector[BrokerInfo]): Unit = {
+    peers.foreach(peer => table += peer.peerId -> PeerStatus.fromInfo(peer))
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  @inline private def removeBroker(peerId: PeerId): Unit = {
+    table -= peerId
+    removeBrokerFromStorage(peerId)
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
+  }
+
+  @inline private def removeBrokers(peerIds: Iterable[PeerId]): Unit = {
+    table --= peerIds
+    peerIds.foreach(removeBrokerFromStorage)
+    DiscoveryServer.discoveredBrokerSize.set(table.size.toDouble)
   }
 
   def publishNewPeer(peerInfo: BrokerInfo): Unit
+  def addBrokerToStorage(peerInfo: BrokerInfo): Unit
+  def removeBrokerFromStorage(peerId: PeerId): Unit
 
   def scan(): Unit = {
     val peerCandidates = table.values.filter(status => status.info.peerId != selfPeerId)
@@ -288,13 +338,18 @@ trait DiscoveryServerState extends SessionManager {
   }
 
   def remove(peer: InetSocketAddress): Unit = {
-    removeFromTable(peer)
-    removeFromSession(peer)
+    removeFromTable(_.address == peer)
+    removeFromSession(_.remote == peer)
   }
 
-  def removeFromTable(peer: InetSocketAddress): Unit = {
-    val peersToRemove = table.values.filter(_.info.address == peer).map(_.info.peerId)
-    table --= peersToRemove
+  def remove(peer: InetAddress): Unit = {
+    removeFromTable(_.address.getAddress == peer)
+    removeFromSession(_.remote.getAddress == peer)
+  }
+
+  def removeFromTable(func: BrokerInfo => Boolean): Unit = {
+    val peersToRemove = table.values.filter(peer => func(peer.info)).map(_.info.peerId)
+    removeBrokers(peersToRemove)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -302,7 +357,7 @@ trait DiscoveryServerState extends SessionManager {
     val myself   = selfCliqueId
     val furthest = table.keys.maxBy(peerId => myself.hammingDist(peerId.cliqueId))
     if (myself.hammingDist(peerInfo.cliqueId) < myself.hammingDist(furthest.cliqueId)) {
-      table -= furthest
+      removeBroker(furthest)
       appendPeer(peerInfo)
     }
   }
@@ -348,9 +403,9 @@ trait SessionManager {
     }
   }
 
-  def removeFromSession(peer: InetSocketAddress): Unit = {
+  def removeFromSession(func: AwaitReply => Boolean): Unit = {
     sessions.removeIf { case (_, awaitReply: AwaitReply) =>
-      awaitReply.remote == peer
+      func(awaitReply)
     }
   }
 }

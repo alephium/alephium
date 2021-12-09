@@ -18,7 +18,7 @@ package org.alephium
 
 import akka.util.ByteString
 
-import org.alephium.crypto.*
+import org.alephium.crypto._
 import org.alephium.util.Bytes
 
 package object protocol {

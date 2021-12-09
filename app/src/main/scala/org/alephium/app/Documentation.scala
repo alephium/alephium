@@ -34,6 +34,8 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getDiscoveredNeighbors,
     getMisbehaviors,
     misbehaviorAction,
+    getUnreachableBrokers,
+    discoveryAction,
     getBlockflow,
     getBlock,
     getBalance,

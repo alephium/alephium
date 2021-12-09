@@ -87,6 +87,7 @@ object Node {
       DiscoveryServer.props(
         networkSetting.bindAddress,
         misbehaviorManager,
+        storages.brokerStorage,
         config.discovery.bootstrap
       )
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =

@@ -71,8 +71,8 @@
         "thresholdMarkers": true
       },
       "gridPos": {
-        "h": 5,
-        "w": 5,
+        "h": 4,
+        "w": 4,
         "x": 0,
         "y": 3
       },
@@ -174,9 +174,9 @@
         "thresholdMarkers": true
       },
       "gridPos": {
-        "h": 3,
-        "w": 6,
-        "x": 5,
+        "h": 2,
+        "w": 5,
+        "x": 4,
         "y": 3
       },
       "id": 4,
@@ -275,9 +275,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 11,
+        "h": 4,
+        "w": 5,
+        "x": 9,
         "y": 3
       },
       "id": 6,
@@ -340,9 +340,9 @@
         "thresholdMarkers": true
       },
       "gridPos": {
-        "h": 3,
-        "w": 7,
-        "x": 17,
+        "h": 2,
+        "w": 6,
+        "x": 14,
         "y": 3
       },
       "id": 13,
@@ -406,6 +406,51 @@
       "valueName": "current"
     },
     {
+      "datasource": "$datasource",
+      "description": "Number of discovered brokers",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 3
+      },
+      "id": 79,
+      "interval": null,
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "7.2.1",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "alephium_discovered_broker_size{app=\"alephium\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Number of Discovered Brokers",
+      "type": "stat"
+    },
+    {
       "cacheTimeout": null,
       "colorBackground": false,
       "colorValue": true,
@@ -432,9 +477,9 @@
       },
       "gridPos": {
         "h": 2,
-        "w": 6,
-        "x": 5,
-        "y": 6
+        "w": 5,
+        "x": 4,
+        "y": 5
       },
       "id": 45,
       "interval": "",
@@ -521,9 +566,9 @@
       },
       "gridPos": {
         "h": 2,
-        "w": 7,
-        "x": 17,
-        "y": 6
+        "w": 6,
+        "x": 14,
+        "y": 5
       },
       "id": 2,
       "options": {

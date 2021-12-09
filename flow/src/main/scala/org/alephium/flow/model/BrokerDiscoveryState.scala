@@ -14,27 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.flow.model
 
-import org.alephium.util.Duration
+import java.net.InetSocketAddress
 
-trait DiscoveryConfig {
-  /* Wait time between two scan. */
-  def scanFrequency: Duration
+import org.alephium.serde.Serde
 
-  def scanFastFrequency: Duration
+final case class BrokerDiscoveryState(address: InetSocketAddress, brokerNum: Int)
 
-  def fastScanPeriod: Duration
-
-  def initialDiscoveryPeriod: Duration
-
-  /* Maximum number of peers returned from a query (`k` in original kademlia paper). */
-  def neighborsPerGroup: Int
-
-  def maxCliqueFromSameIp: Int
-
-  val peersTimeout: Duration        = Duration.ofSecondsUnsafe(5)
-  lazy val expireDuration: Duration = scanFrequency.timesUnsafe(10)
-
-  val unreachableDuration = Duration.ofSecondsUnsafe(8)
+object BrokerDiscoveryState {
+  implicit val serde: Serde[BrokerDiscoveryState] =
+    Serde.forProduct2(BrokerDiscoveryState.apply, state => (state.address, state.brokerNum))
 }

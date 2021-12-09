@@ -16,4 +16,11 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.serde.Serde
+
 final case class PeerId(cliqueId: CliqueId, brokerId: Int)
+
+object PeerId {
+  implicit val serde: Serde[PeerId] =
+    Serde.forProduct2(PeerId.apply, id => (id.cliqueId, id.brokerId))
+}

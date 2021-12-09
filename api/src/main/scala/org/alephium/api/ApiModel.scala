@@ -266,6 +266,12 @@ trait ApiModelCodec {
 
   implicit val misbehaviorActionRW: RW[MisbehaviorAction] = macroRW
 
+  implicit val discoveryActionUnreachableRW: RW[DiscoveryAction.Unreachable] = macroRW
+
+  implicit val discoveryActionReachableRW: RW[DiscoveryAction.Reachable] = macroRW
+
+  implicit val discoveryActionRW: RW[DiscoveryAction] = macroRW
+
   implicit val minerAddressesRW: RW[MinerAddresses] = macroRW
 
   implicit val peerInfoRW: ReadWriter[BrokerInfo] = {

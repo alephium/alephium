@@ -17,6 +17,7 @@
 package org.alephium.app
 
 import java.io.{StringWriter, Writer}
+import java.net.InetAddress
 
 import scala.annotation.tailrec
 import scala.concurrent._
@@ -121,7 +122,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val getDiscoveredNeighborsLogic = serverLogic(getDiscoveredNeighbors) { _ =>
     node.discoveryServer
-      .ask(DiscoveryServer.GetNeighborPeers(None))
+      .ask(DiscoveryServer.GetNeighborPeers)
       .mapTo[DiscoveryServer.NeighborPeers]
       .map(response => Right(response.peers))
   }
@@ -197,6 +198,22 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   val misbehaviorActionLogic = serverLogic(misbehaviorAction) {
     case MisbehaviorAction.Unban(peers) =>
       node.misbehaviorManager ! MisbehaviorManager.Unban(peers)
+      node.discoveryServer ! DiscoveryServer.Unban(peers)
+      Future.successful(Right(()))
+  }
+
+  val getUnreachableBrokersLogic = serverLogic(getUnreachableBrokers) { _ =>
+    node.discoveryServer
+      .ask(DiscoveryServer.GetUnreachable)
+      .mapTo[AVector[InetAddress]]
+      .map(Right(_))
+  }
+
+  val discoveryActionLogic = serverLogic(discoveryAction) {
+    case DiscoveryAction.Unreachable(peers) =>
+      node.discoveryServer ! DiscoveryServer.UnreachablePeers(peers)
+      Future.successful(Right(()))
+    case DiscoveryAction.Reachable(peers) =>
       node.discoveryServer ! DiscoveryServer.Unban(peers)
       Future.successful(Right(()))
   }

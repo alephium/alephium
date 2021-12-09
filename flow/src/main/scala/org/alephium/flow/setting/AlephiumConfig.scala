@@ -26,15 +26,15 @@ import akka.actor.ActorRef
 import akka.io.Tcp
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
-import net.ceedubs.ficus.Ficus.*
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
 
-import org.alephium.conf.*
+import org.alephium.conf._
 import org.alephium.flow.core.maxForkDepth
 import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.*
+import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
 import org.alephium.util.{ActorRefT, AVector, Duration, Env, U256}

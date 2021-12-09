@@ -21,10 +21,12 @@ import akka.util.ByteString
 import org.alephium.serde.Serde
 import org.alephium.util.Bytes
 
-final case class DatabaseVersion(value: Int) extends AnyVal
+final case class DatabaseVersion(value: Int) extends AnyVal with Ordered[DatabaseVersion] {
+  override def compare(that: DatabaseVersion): Int = value.compare(that.value)
+}
 
 object DatabaseVersion {
   implicit val serde: Serde[DatabaseVersion] = Serde.forProduct1(apply, _.value)
 
-  val currentDBVersion: DatabaseVersion = DatabaseVersion(Bytes.toIntUnsafe(ByteString(0, 1, 0, 0)))
+  val currentDBVersion: DatabaseVersion = DatabaseVersion(Bytes.toIntUnsafe(ByteString(0, 1, 1, 0)))
 }

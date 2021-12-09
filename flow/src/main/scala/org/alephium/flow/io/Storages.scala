@@ -51,6 +51,7 @@ object Storages {
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage)
     val pendingTxStorage  = PendingTxRocksDBStorage(db, ColumnFamily.PendingTx, writeOptions)
     val readyTxStorage    = ReadyTxRocksDBStorage(db, ColumnFamily.ReadyTx, writeOptions)
+    val brokerStorage     = BrokerRocksDBStorage(db, ColumnFamily.Broker, writeOptions)
 
     Storages(
       AVector(db),
@@ -62,11 +63,12 @@ object Storages {
       blockStateStorage,
       nodeStateStorage,
       pendingTxStorage,
-      readyTxStorage
+      readyTxStorage,
+      brokerStorage
     )
   }
 
-  private def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
+  def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
     val dbPath = rootPath.resolve(dbFolder)
     RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
   }
@@ -82,7 +84,8 @@ final case class Storages(
     blockStateStorage: BlockStateStorage,
     nodeStateStorage: NodeStateStorage,
     pendingTxStorage: PendingTxStorage,
-    readyTxStorage: ReadyTxStorage
+    readyTxStorage: ReadyTxStorage,
+    brokerStorage: BrokerStorage
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 

@@ -25,8 +25,8 @@ import org.scalatest.Assertion
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.minimalGas
-import org.alephium.serde.*
-import org.alephium.util.*
+import org.alephium.serde._
+import org.alephium.util._
 
 class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
   trait BaseFixture[Ctx <: StatelessContext] {

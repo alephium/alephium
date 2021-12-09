@@ -76,7 +76,7 @@ trait NodeStateStorage extends RawKeyValueStorage {
   def checkDatabaseCompatibility(): IOResult[Unit] = {
     getDatabaseVersion().flatMap {
       case Some(dbVersion) =>
-        if (dbVersion != DatabaseVersion.currentDBVersion) {
+        if (dbVersion > DatabaseVersion.currentDBVersion) {
           Left(
             IOError.Other(
               new RuntimeException(
@@ -84,6 +84,8 @@ trait NodeStateStorage extends RawKeyValueStorage {
               )
             )
           )
+        } else if (dbVersion < DatabaseVersion.currentDBVersion) {
+          setDatabaseVersion(DatabaseVersion.currentDBVersion)
         } else {
           Right(())
         }
