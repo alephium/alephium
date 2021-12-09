@@ -342,7 +342,7 @@ class DiscoveryServerSpec
   )(check: AVector[BrokerInfo] => T): Unit = {
     eventually {
       val probe0 = TestProbe()
-      server0.tell(DiscoveryServer.GetNeighborPeers(None), probe0.ref)
+      server0.tell(DiscoveryServer.GetNeighborPeers, probe0.ref)
       probe0.expectMsgPF() { case DiscoveryServer.NeighborPeers(peers) =>
         check(peers)
       }

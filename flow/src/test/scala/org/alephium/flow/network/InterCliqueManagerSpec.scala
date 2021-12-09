@@ -53,7 +53,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       system.stop(connection.ref)
     }
 
-    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
+    discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
 
     getPeers() is Seq.empty
   }
@@ -78,7 +78,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     }
 
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
-    discoveryServer.expectMsg(DiscoveryServer.GetNeighborPeers(Some(brokerConfig)))
+    discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
     interCliqueManagerActor.connecting.contains(peerInfo.address) is false
 
     getPeers() is Seq.empty
@@ -420,7 +420,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     interCliqueManagerActor.brokers.clear()
     interCliqueManagerActor.updateNodeSyncedStatus()
-    eventually(discoveryServer.expectMsgType[DiscoveryServer.GetNeighborPeers])
+    eventually(discoveryServer.expectMsgType[DiscoveryServer.GetMorePeers])
   }
 
   it should "send block to peers" in new BroadCastFixture {

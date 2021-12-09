@@ -238,7 +238,7 @@ class InterCliqueManager(
 
   def moreOutConnections(): Unit = {
     if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
-      discoveryServer ! DiscoveryServer.GetNeighborPeers(Some(brokerConfig))
+      discoveryServer ! DiscoveryServer.GetMorePeers(brokerConfig)
     }
   }
 

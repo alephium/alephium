@@ -69,17 +69,18 @@ object DiscoveryServer {
   final case class AwaitReply(remote: InetSocketAddress, requestAt: TimeStamp)
 
   sealed trait Command
-  final case class GetNeighborPeers(targetGroupInfoOpt: Option[BrokerGroupInfo]) extends Command
-  final case class Remove(peer: InetSocketAddress)                               extends Command
-  final case class UnreachablePeers(peers: AVector[InetAddress])                 extends Command
-  final case class Unban(peers: AVector[InetAddress])                            extends Command
-  case object Scan                                                               extends Command
-  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)                        extends Command
-  final case class PeerConfirmed(peerInfo: BrokerInfo)                           extends Command
-  final case class PeerDenied(peerInfo: BrokerInfo)                              extends Command
-  final case class Unreachable(remote: InetSocketAddress)                        extends Command with EventStream.Event
-  case object GetUnreachable                                                     extends Command
-  case object InitialDiscoveryDone                                               extends Command
+  final case object GetNeighborPeers                              extends Command
+  final case class GetMorePeers(targetGroupInfo: BrokerGroupInfo) extends Command
+  final case class Remove(peer: InetSocketAddress)                extends Command
+  final case class UnreachablePeers(peers: AVector[InetAddress])  extends Command
+  final case class Unban(peers: AVector[InetAddress])             extends Command
+  case object Scan                                                extends Command
+  final case class SendCliqueInfo(cliqueInfo: CliqueInfo)         extends Command
+  final case class PeerConfirmed(peerInfo: BrokerInfo)            extends Command
+  final case class PeerDenied(peerInfo: BrokerInfo)               extends Command
+  final case class Unreachable(remote: InetSocketAddress)         extends Command with EventStream.Event
+  case object GetUnreachable                                      extends Command
+  case object InitialDiscoveryDone                                extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event with EventStream.Event
@@ -201,8 +202,10 @@ class DiscoveryServer(
       cleanup()
       log.debug(s"Scanning peers: $getPeersNum in total")
       scanAndSchedule()
-    case GetNeighborPeers(targetGroupInfoOpt) =>
-      sender() ! NeighborPeers(getActivePeers(targetGroupInfoOpt))
+    case GetNeighborPeers =>
+      sender() ! NeighborPeers(getActivePeers())
+    case GetMorePeers(targetGroupInfo) =>
+      sender() ! NeighborPeers(getMorePeers(targetGroupInfo))
 
     case Remove(peer) => remove(peer)
     case PeerDenied(peerInfo) =>

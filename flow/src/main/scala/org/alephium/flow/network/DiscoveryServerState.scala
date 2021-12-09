@@ -64,15 +64,26 @@ trait DiscoveryServerState extends SessionManager {
     socketOpt = None
   }
 
-  def getActivePeers(targetGroupInfoOpt: Option[BrokerGroupInfo]): AVector[BrokerInfo] = {
-    val candidates = AVector
+  def getActivePeers(): AVector[BrokerInfo] = {
+    AVector
       .from(table.values.map(_.info))
       .filter(info => mightReachable(info.address))
       .sortBy(broker => selfCliqueId.hammingDist(broker.cliqueId))
-    targetGroupInfoOpt match {
-      case Some(groupInfo) => candidates.filter(_.interBrokerInfo.intersect(groupInfo))
-      case None            => candidates
-    }
+  }
+
+  def getMorePeers(targetGroupInfo: BrokerGroupInfo): AVector[BrokerInfo] = {
+    val candidates = table.values
+      .map(_.info)
+      .filter { info =>
+        targetGroupInfo.intersect(info) &&
+        mightReachable(info.address) &&
+        info.cliqueId != selfCliqueId
+      }
+    val randomCliqueId = CliqueId.generate
+    AVector
+      .from(candidates)
+      .sortBy(info => randomCliqueId.hammingDist(info.cliqueId))
+      .takeUpto(maxSentPeers)
   }
 
   def getPeersNum: Int = table.size
