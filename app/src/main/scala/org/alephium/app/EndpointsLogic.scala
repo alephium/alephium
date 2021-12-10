@@ -20,7 +20,7 @@ import java.io.{StringWriter, Writer}
 import java.net.InetAddress
 
 import scala.annotation.tailrec
-import scala.concurrent.*
+import scala.concurrent._
 
 import akka.pattern.ask
 import akka.util.Timeout
@@ -31,7 +31,7 @@ import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
 import org.alephium.api.{ApiError, Endpoints}
-import org.alephium.api.model.*
+import org.alephium.api.model._
 import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
@@ -46,10 +46,10 @@ import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.*
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.*
-import org.alephium.util.*
+import org.alephium.serde._
+import org.alephium.util._
 
 // scalastyle:off method.length
 trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterpreter {
