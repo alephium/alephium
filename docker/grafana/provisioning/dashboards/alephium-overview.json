@@ -15,8 +15,7 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 11,
-  "iteration": 1631822972612,
+  "iteration": 1639150726407,
   "links": [],
   "panels": [
     {
@@ -383,7 +382,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "label_join(jvm_info{app=\"alephium\"}, \"jdk\", \", \", \"vendor\", \"runtime\", \"version\")",
+          "expr": "label_join(jvm_info{app=\"alephium\"}, \"jdk\", \", \", \"vendor\", \"version\")",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -408,6 +407,26 @@
     {
       "datasource": "$datasource",
       "description": "Number of discovered brokers",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 4,
         "w": 4,
@@ -615,7 +634,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 7
       },
       "id": 37,
       "options": {
@@ -648,7 +667,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 11
+        "y": 10
       },
       "hiddenSeries": false,
       "id": 9,
@@ -747,7 +766,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 11
+        "y": 10
       },
       "hiddenSeries": false,
       "id": 15,
@@ -847,7 +866,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 18
       },
       "hiddenSeries": false,
       "id": 8,
@@ -947,7 +966,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 18
       },
       "hiddenSeries": false,
       "id": 17,
@@ -1040,7 +1059,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 26
       },
       "id": 41,
       "options": {
@@ -1074,7 +1093,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 30
+        "y": 29
       },
       "hiddenSeries": false,
       "id": 19,
@@ -1173,7 +1192,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 30
+        "y": 29
       },
       "hiddenSeries": false,
       "id": 21,
@@ -1272,7 +1291,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 38
+        "y": 37
       },
       "hiddenSeries": false,
       "id": 23,
@@ -1369,7 +1388,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 37
       },
       "hiddenSeries": false,
       "id": 25,
@@ -1461,7 +1480,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 45
       },
       "id": 43,
       "options": {
@@ -1496,7 +1515,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 48
       },
       "hiddenSeries": false,
       "id": 27,
@@ -1596,7 +1615,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 48
       },
       "hiddenSeries": false,
       "id": 29,
@@ -1696,7 +1715,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 58
+        "y": 57
       },
       "hiddenSeries": false,
       "id": 31,
@@ -1795,7 +1814,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 58
+        "y": 57
       },
       "hiddenSeries": false,
       "id": 35,
@@ -1921,7 +1940,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 67
+        "y": 66
       },
       "hiddenSeries": false,
       "id": 33,
@@ -2033,7 +2052,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 75
       },
       "id": 49,
       "options": {
@@ -2078,7 +2097,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 79
+        "y": 78
       },
       "id": 73,
       "options": {
@@ -2141,7 +2160,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 79
+        "y": 78
       },
       "id": 75,
       "options": {
@@ -2203,7 +2222,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 88
+        "y": 87
       },
       "id": 57,
       "options": {
@@ -2260,7 +2279,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 88
+        "y": 87
       },
       "id": 59,
       "options": {
@@ -2312,7 +2331,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 97
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 53,
@@ -2414,7 +2433,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 97
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 55,
@@ -2516,7 +2535,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 106
+        "y": 105
       },
       "hiddenSeries": false,
       "id": 47,
@@ -2618,7 +2637,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 106
+        "y": 105
       },
       "hiddenSeries": false,
       "id": 51,
@@ -2720,7 +2739,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 115
+        "y": 114
       },
       "hiddenSeries": false,
       "id": 63,
@@ -2847,7 +2866,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 124
+        "y": 123
       },
       "id": 65,
       "options": {
@@ -2904,7 +2923,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 124
+        "y": 123
       },
       "id": 67,
       "options": {
@@ -2969,7 +2988,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 133
+        "y": 132
       },
       "hiddenSeries": false,
       "id": 69,
@@ -3069,7 +3088,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 133
+        "y": 132
       },
       "hiddenSeries": false,
       "id": 71,
@@ -3156,9 +3175,11 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "description": "Target Hash Rate Per Chain",
+      "description": "Average hashrate over all chains over 10 minutes",
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {}
+        },
         "overrides": []
       },
       "fill": 1,
@@ -3167,7 +3188,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 142
+        "y": 141
       },
       "hiddenSeries": false,
       "id": 77,
@@ -3187,7 +3208,106 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.5.10",
+      "pluginVersion": "7.2.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(sum_over_time(alephium_target_hash_rate_hertz[10m])) / sum(count_over_time(alephium_target_hash_rate_hertz[10m]))",
+          "interval": "",
+          "legendFormat": "HashRate",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Estimated Network HashRate",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:181",
+          "format": "Hs",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:182",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "description": "Target Hash Rate Per Chain",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 141
+      },
+      "hiddenSeries": false,
+      "id": 80,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3282,5 +3402,5 @@
   "timezone": "",
   "title": "Alephium Overview",
   "uid": "S3eJTo3Mk",
-  "version": 20
+  "version": 21
 }
