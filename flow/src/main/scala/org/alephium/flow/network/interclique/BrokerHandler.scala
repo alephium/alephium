@@ -40,9 +40,9 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   def allHandlers: AllHandlers
 
-  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
-    super.handleHandshakeInfo(remoteBrokerInfo)
-    cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
+  override def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+    remoteBrokerInfo = _remoteBrokerInfo
+    cliqueManager ! CliqueManager.HandShaked(_remoteBrokerInfo, connectionType, clientInfo)
   }
 
   override def handleNewBlock(block: Block): Unit = {

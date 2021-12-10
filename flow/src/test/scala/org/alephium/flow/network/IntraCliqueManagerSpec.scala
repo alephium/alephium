@@ -56,13 +56,14 @@ class IntraCliqueManagerSpec extends AlephiumActorSpec {
 
     val inboundConnection  = TestProbe()
     val outboundConnection = TestProbe()
+    val clientInfo: String = "v0.0.0"
     inboundConnection.send(
       intraCliqueManager,
-      CliqueManager.HandShaked(brokerInfos(0), InboundConnection)
+      CliqueManager.HandShaked(brokerInfos(0), InboundConnection, clientInfo)
     )
     outboundConnection.send(
       intraCliqueManager,
-      CliqueManager.HandShaked(brokerInfos(2), OutboundConnection)
+      CliqueManager.HandShaked(brokerInfos(2), OutboundConnection, clientInfo)
     )
     cliqueManagerProbe.expectMsg(IntraCliqueManager.Ready)
 

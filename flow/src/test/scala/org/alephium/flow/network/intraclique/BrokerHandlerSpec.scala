@@ -38,6 +38,8 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo, GroupIndex, ModelGen
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
+  val clientInfo: String = "v0.0.0"
+
   it should "terminated when received invalid broker info" in new Fixture {
     config.broker.brokerNum is 3
     config.broker.groupNumPerBroker is 1
@@ -50,7 +52,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       Generators.socketAddressGen.sample.get
     )
     watch(brokerHandler)
-    brokerHandlerActor.handleHandshakeInfo(invalidBrokerInfo)
+    brokerHandlerActor.handleHandshakeInfo(invalidBrokerInfo, clientInfo)
     expectTerminated(brokerHandler)
   }
 
@@ -67,7 +69,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       config.broker.brokerNum,
       Generators.socketAddressGen.sample.get
     )
-    brokerHandlerActor.handleHandshakeInfo(brokerInfo)
+    brokerHandlerActor.handleHandshakeInfo(brokerInfo, clientInfo)
 
     val blocks0 = AVector.tabulate(groups0) { _ =>
       blockGenOf(GroupIndex.unsafe(0)).sample.get
