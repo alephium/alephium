@@ -247,6 +247,15 @@ class DiscoveryServerSpec
     }
   }
 
+  it should "ban addresses" in new UnreachableFixture {
+    val remote = Generators.socketAddressGen.sample.get.getAddress
+    eventually {
+      system.eventStream.publish(MisbehaviorManager.PeerBanned(remote))
+      val bannedUntil = server2.underlyingActor.unreachables.get(remote).get
+      (bannedUntil > TimeStamp.now() + Duration.ofHoursUnsafe(12)) is true
+    }
+  }
+
   it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
     self =>
     val groups = 4

@@ -268,6 +268,9 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
 
     state.banPeerFromAddress(peerInfo.address.getAddress)
     state.isInTable(peerInfo.peerId) is false
+
+    val bannedUntil = state.unreachables.get(peerInfo.address.getAddress).get
+    (bannedUntil > TimeStamp.now() + Duration.ofHoursUnsafe(12)) is true
   }
 
   it should "remove peer" in new Fixture {

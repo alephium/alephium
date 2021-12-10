@@ -47,6 +47,7 @@ object MisbehaviorManager {
 
   case object GetPeers                                extends Command
   final case class Unban(peers: AVector[InetAddress]) extends Command
+  final case class Ban(peers: AVector[InetAddress])   extends Command
 
   final case class PeerBanned(remote: InetAddress) extends EventStream.Event
 
@@ -166,6 +167,9 @@ class MisbehaviorManager(
 
     case Unban(peers) =>
       peers.foreach(misbehaviorStorage.remove)
+
+    case Ban(peers) =>
+      peers.foreach(banAndPublish)
 
     case GetPeers =>
       sender() ! Peers(misbehaviorStorage.list())

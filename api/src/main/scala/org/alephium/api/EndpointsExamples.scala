@@ -143,8 +143,15 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   implicit val misbehaviorActionExamples: List[Example[MisbehaviorAction]] =
-    simpleExample(
-      MisbehaviorAction.Unban(AVector(inetAddress))
+    List[Example[MisbehaviorAction]](
+      moreSettingsExample(
+        MisbehaviorAction.Unban(AVector(inetAddress)),
+        "Unban"
+      ),
+      moreSettingsExample(
+        MisbehaviorAction.Ban(AVector(inetAddress)),
+        "Ban"
+      )
     )
 
   implicit val discoveryActionExamples: List[Example[DiscoveryAction]] =
