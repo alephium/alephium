@@ -2052,6 +2052,11 @@
                   "buildInfo": {
                     "releaseVersion": "1.2.3",
                     "commit": "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
+                  },
+                  "upnp": true,
+                  "externalAddress": {
+                    "addr": "1.2.3.4",
+                    "port": 12344
                   }
                 }
               }
@@ -2255,7 +2260,8 @@
                       "addr": "1.2.3.4",
                       "port": 12344
                     },
-                    "isSynced": true
+                    "isSynced": true,
+                    "clientVersion": "v1.0.0"
                   }
                 ]
               }
@@ -6840,7 +6846,8 @@
           "brokerId",
           "groupNumPerBroker",
           "address",
-          "isSynced"
+          "isSynced",
+          "clientVersion"
         ],
         "type": "object",
         "properties": {
@@ -6858,6 +6865,9 @@
           },
           "isSynced": {
             "type": "boolean"
+          },
+          "clientVersion": {
+            "type": "string"
           }
         }
       },
@@ -6931,7 +6941,8 @@
       "NodeInfo": {
         "required": [
           "version",
-          "buildInfo"
+          "buildInfo",
+          "upnp"
         ],
         "type": "object",
         "properties": {
@@ -6940,6 +6951,12 @@
           },
           "buildInfo": {
             "$ref": "#/components/schemas/BuildInfo"
+          },
+          "upnp": {
+            "type": "boolean"
+          },
+          "externalAddress": {
+            "type": "string"
           }
         }
       },
