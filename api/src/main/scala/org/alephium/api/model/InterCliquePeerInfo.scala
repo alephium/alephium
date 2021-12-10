@@ -25,5 +25,6 @@ final case class InterCliquePeerInfo(
     brokerId: Int,
     groupNumPerBroker: Int,
     address: InetSocketAddress,
-    isSynced: Boolean
+    isSynced: Boolean,
+    clientVersion: String
 )

@@ -639,7 +639,8 @@ object EndpointsLogic {
       peerId.brokerId,
       syncStatus.groupNumPerBroker,
       syncStatus.address,
-      syncStatus.isSynced
+      syncStatus.isSynced,
+      syncStatus.clientInfo
     )
   }
 

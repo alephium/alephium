@@ -65,9 +65,9 @@ class OutboundBrokerHandler(
     with BrokerHandler {
   val remoteAddress: InetSocketAddress = expectedRemoteBroker.address
 
-  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
+  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
     if (remoteBrokerInfo == expectedRemoteBroker) {
-      super.handleHandshakeInfo(remoteBrokerInfo)
+      super.handleHandshakeInfo(remoteBrokerInfo, clientInfo)
     } else {
       log.debug(
         s"Remote broker has different broker info: expected: $expectedRemoteBroker, actual: $remoteBrokerInfo"

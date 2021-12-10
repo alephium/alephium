@@ -98,7 +98,7 @@ trait BrokerHandler extends FlowDataHandler {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
         cancelHandshakeTick()
-        handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo))
+        handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
 
         pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
         context become (exchanging orElse pingPong)
@@ -112,9 +112,7 @@ trait BrokerHandler extends FlowDataHandler {
     receive
   }
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo): Unit = {
-    remoteBrokerInfo = _remoteBrokerInfo
-  }
+  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit
 
   @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit =
     f match {

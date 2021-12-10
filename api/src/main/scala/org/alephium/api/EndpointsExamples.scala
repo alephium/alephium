@@ -206,7 +206,8 @@ trait EndpointsExamples extends ErrorExamples {
           brokerId = 1,
           groupNumPerBroker = 1,
           inetSocketAddress,
-          isSynced = true
+          isSynced = true,
+          clientVersion = "v1.0.0"
         )
       )
     )
