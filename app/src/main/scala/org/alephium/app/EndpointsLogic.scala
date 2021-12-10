@@ -196,6 +196,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val misbehaviorActionLogic = serverLogic(misbehaviorAction) {
+    case MisbehaviorAction.Ban(peers) =>
+      node.misbehaviorManager ! MisbehaviorManager.Ban(peers)
+      Future.successful(Right(()))
     case MisbehaviorAction.Unban(peers) =>
       node.misbehaviorManager ! MisbehaviorManager.Unban(peers)
       node.discoveryServer ! DiscoveryServer.Unban(peers)

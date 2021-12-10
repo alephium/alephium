@@ -29,7 +29,7 @@ import org.alephium.protocol.config.{BrokerConfig, DiscoveryConfig, NetworkConfi
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.message.DiscoveryMessage._
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Cache, Duration, TimeStamp}
 
 // scalastyle:off number.of.methods
 trait DiscoveryServerState extends SessionManager {
@@ -130,6 +130,7 @@ trait DiscoveryServerState extends SessionManager {
         banPeer(status.info.peerId)
       }
     }
+    setUnreachableForBan(address)
   }
 
   def banPeer(peerId: PeerId): Unit = {
@@ -160,23 +161,30 @@ trait DiscoveryServerState extends SessionManager {
     AVector.from(unreachables.keys())
   }
 
-  def updateUnreachable(remote: InetAddress): Unit = {
+  def updateUnreachable(remote: InetAddress, duration: Duration): Unit = {
     unreachables.get(remote) match {
       case Some(until) =>
-        unreachables.put(remote, until + discoveryConfig.unreachableDuration)
+        unreachables.put(remote, until + duration)
       case None =>
-        unreachables.put(remote, TimeStamp.now() + discoveryConfig.unreachableDuration)
+        unreachables.put(remote, TimeStamp.now() + duration)
     }
   }
 
+  def updateUnreachable(remote: InetAddress): Unit = {
+    updateUnreachable(remote, discoveryConfig.unreachableDuration)
+  }
+
   def setUnreachable(remote: InetSocketAddress): Unit = {
-    updateUnreachable(remote.getAddress)
-    remove(remote)
+    setUnreachable(remote.getAddress)
   }
 
   def setUnreachable(remote: InetAddress): Unit = {
     updateUnreachable(remote)
     remove(remote)
+  }
+
+  def setUnreachableForBan(remote: InetAddress): Unit = {
+    updateUnreachable(remote, Duration.ofDaysUnsafe(1))
   }
 
   def unsetUnreachable(remote: InetAddress): Unit = {

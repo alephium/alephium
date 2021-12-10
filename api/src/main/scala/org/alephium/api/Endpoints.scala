@@ -147,7 +147,7 @@ trait Endpoints
     infosEndpoint.post
       .in("misbehaviors")
       .in(jsonBody[MisbehaviorAction])
-      .summary("Unban given peers")
+      .summary("Ban/Unban given peers")
 
   val getUnreachableBrokers: BaseEndpoint[Unit, AVector[InetAddress]] =
     infosEndpoint.get

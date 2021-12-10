@@ -512,12 +512,15 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode PeerStatus" in {
-
     checkData(MemPooled: TxStatus, s"""{"type":"mem-pooled"}""")
     checkData(NotFound: TxStatus, s"""{"type":"not-found"}""")
   }
 
   it should "encode/decode MisbehaviorAction" in {
+    checkData(
+      MisbehaviorAction.Ban(AVector(inetAddress)),
+      s"""{"type":"ban","peers":["127.0.0.1"]}"""
+    )
     checkData(
       MisbehaviorAction.Unban(AVector(inetAddress)),
       s"""{"type":"unban","peers":["127.0.0.1"]}"""

@@ -262,9 +262,9 @@ trait ApiModelCodec {
     }
   )
 
-  implicit val misbehaviorActionBanRW: RW[MisbehaviorAction.Unban] = macroRW
-
-  implicit val misbehaviorActionRW: RW[MisbehaviorAction] = macroRW
+  implicit val misbehaviorActionUnBanRW: RW[MisbehaviorAction.Unban] = macroRW
+  implicit val misbehaviorActionBanRW: RW[MisbehaviorAction.Ban]     = macroRW
+  implicit val misbehaviorActionRW: RW[MisbehaviorAction]            = macroRW
 
   implicit val discoveryActionUnreachableRW: RW[DiscoveryAction.Unreachable] = macroRW
 

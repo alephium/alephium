@@ -22,6 +22,8 @@ import org.alephium.util.AVector
 
 sealed trait MisbehaviorAction
 object MisbehaviorAction {
+  @upickle.implicits.key("ban")
+  final case class Ban(peers: AVector[InetAddress]) extends MisbehaviorAction
   @upickle.implicits.key("unban")
   final case class Unban(peers: AVector[InetAddress]) extends MisbehaviorAction
 }

@@ -2531,7 +2531,7 @@
         "tags": [
           "Infos"
         ],
-        "summary": "Unban given peers",
+        "summary": "Ban/Unban given peers",
         "operationId": "postInfosMisbehaviors",
         "requestBody": {
           "content": {
@@ -2539,11 +2539,25 @@
               "schema": {
                 "$ref": "#/components/schemas/MisbehaviorAction"
               },
-              "example": {
-                "type": "unban",
-                "peers": [
-                  "1.2.3.4"
-                ]
+              "examples": {
+                "Example0": {
+                  "summary": "Unban",
+                  "value": {
+                    "type": "unban",
+                    "peers": [
+                      "1.2.3.4"
+                    ]
+                  }
+                },
+                "Example1": {
+                  "summary": "Ban",
+                  "value": {
+                    "type": "ban",
+                    "peers": [
+                      "1.2.3.4"
+                    ]
+                  }
+                }
               }
             }
           },
@@ -6148,6 +6162,20 @@
           }
         }
       },
+      "Ban": {
+        "required": [
+          "peers"
+        ],
+        "type": "object",
+        "properties": {
+          "peers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Banned": {
         "required": [
           "until"
@@ -6892,6 +6920,9 @@
       },
       "MisbehaviorAction": {
         "oneOf": [
+          {
+            "$ref": "#/components/schemas/Ban"
+          },
           {
             "$ref": "#/components/schemas/Unban"
           }
