@@ -20,7 +20,7 @@ import java.io.{StringWriter, Writer}
 import java.net.InetAddress
 
 import scala.annotation.tailrec
-import scala.concurrent._
+import scala.concurrent.*
 
 import akka.pattern.ask
 import akka.util.Timeout
@@ -31,7 +31,7 @@ import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
 import org.alephium.api.{ApiError, Endpoints}
-import org.alephium.api.model._
+import org.alephium.api.model.*
 import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
@@ -42,14 +42,14 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.*
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde._
-import org.alephium.util._
+import org.alephium.serde.*
+import org.alephium.util.*
 
 // scalastyle:off method.length
 trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterpreter {
@@ -64,9 +64,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
-  implicit lazy val groupConfig: GroupConfig     = brokerConfig
-  implicit lazy val networkConfig: NetworkConfig = node.config.network
-  implicit lazy val askTimeout: Timeout          = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig      = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting = node.config.network
+  implicit lazy val askTimeout: Timeout           = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -101,7 +101,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       Right(
         NodeInfo(
           ReleaseVersion.current,
-          NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId)
+          NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId),
+          networkConfig.upnp.enabled,
+          networkConfig.externalAddressInferred
         )
       )
     )
