@@ -112,6 +112,11 @@ class SerdeSpec extends AlephiumSpec {
     }
   }
 
+  it should "fail for negative length" in {
+    deserialize[ByteString](serialize[Int](-1)).leftValue is
+      SerdeError.validation(s"Negative byte string length: -1")
+  }
+
   "Serde for String" should "serialize correctly" in {
     forAll { s: String => deserialize[String](serialize(s)) isE s }
   }
