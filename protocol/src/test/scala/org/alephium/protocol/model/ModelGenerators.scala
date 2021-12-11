@@ -190,6 +190,19 @@ trait TxInputGenerators extends Generators {
       val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
+
+  def p2pkhUnlockGen(groupIndex: GroupIndex): Gen[UnlockScript] =
+    publicKeyGen(groupIndex).map(UnlockScript.p2pkh)
+
+  def p2mpkhUnlockGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[UnlockScript] = {
+    for {
+      publicKey0 <- publicKeyGen(groupIndex)
+      moreKeys   <- Gen.listOfN(n, publicKeyGen(groupIndex))
+      indexedKey <- Gen.pick(m, (publicKey0 +: moreKeys).zipWithIndex).map(AVector.from)
+    } yield {
+      UnlockScript.p2mpkh(indexedKey.sortBy(_._2))
+    }
+  }
 }
 
 trait TokenGenerators extends Generators with NumericHelpers {

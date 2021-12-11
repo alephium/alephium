@@ -20,7 +20,7 @@ import org.scalatest.Assertion
 import sttp.model.StatusCode
 
 import org.alephium.api.model._
-import org.alephium.flow.core.GasEstimation
+import org.alephium.flow.gasestimation._
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -232,9 +232,9 @@ class SmartContractTest extends AlephiumActorSpec {
         .subUnsafe(ALPH.alph(1000))
         .subUnsafe(ALPH.alph(10000))
         .subUnsafe(ALPH.alph(100000))
-        .subUnsafe(defaultGasPrice * GasEstimation.estimateWithP2PKHOutputs(1, 5))
+        .subUnsafe(defaultGasPrice * GasEstimation.estimateWithP2PKHInputs(1, 5))
 
-      changeAmount is ALPH.nanoAlph(888899996420000L)
+      changeAmount is ALPH.nanoAlph(888899997244000L)
 
       currentUTXOs is Set(
         (ALPH.alph(100), noTokens),
@@ -271,7 +271,7 @@ class SmartContractTest extends AlephiumActorSpec {
         (ALPH.alph(1000), noTokens),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
-        (ALPH.nanoAlph(888899996420000L), noTokens)
+        (ALPH.nanoAlph(888899997244000L), noTokens)
       )
     }
 
@@ -298,7 +298,7 @@ class SmartContractTest extends AlephiumActorSpec {
         (ALPH.alph(1000), noTokens),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
-        (ALPH.nanoAlph(888899996420000L), noTokens)
+        (ALPH.nanoAlph(888899997244000L), noTokens)
       )
     }
 
@@ -326,7 +326,7 @@ class SmartContractTest extends AlephiumActorSpec {
         (ALPH.alph(1000), noTokens),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
-        (ALPH.nanoAlph(888899996420000L), noTokens)
+        (ALPH.nanoAlph(888899997244000L), noTokens)
       )
     }
 
@@ -363,7 +363,7 @@ class SmartContractTest extends AlephiumActorSpec {
         (ALPH.nanoAlph(999959998000L), token(24)),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
-        (ALPH.nanoAlph(888899996420000L), noTokens)
+        (ALPH.nanoAlph(888899997244000L), noTokens)
       )
     }
 
@@ -388,7 +388,7 @@ class SmartContractTest extends AlephiumActorSpec {
         (ALPH.nanoAlph(899949998000L), token(524)),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
-        (ALPH.nanoAlph(888899996420000L), noTokens)
+        (ALPH.nanoAlph(888899997244000L), noTokens)
       )
     }
 
@@ -418,7 +418,7 @@ class SmartContractTest extends AlephiumActorSpec {
         (ALPH.nanoAlph(999939998000L), token(24)),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
-        (ALPH.nanoAlph(888899996420000L), noTokens)
+        (ALPH.nanoAlph(888899997244000L), noTokens)
       )
     }
 

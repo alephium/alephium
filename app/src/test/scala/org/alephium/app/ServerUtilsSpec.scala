@@ -21,7 +21,8 @@ import java.net.InetSocketAddress
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{BlockFlow, GasEstimation}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.gasestimation._
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
@@ -449,8 +450,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fromAddressBalanceAfterTransfer = {
       val fromLockupScript    = LockupScript.p2pkh(fromPublicKey)
       val outputLockupScripts = fromLockupScript +: destinations.map(_.address.lockupScript)
-      val defaultGas          = GasEstimation.estimate(outputRefs.length, outputLockupScripts)
-      val defaultGasFee       = defaultGasPrice * defaultGas
+      val defaultGas =
+        GasEstimation.estimateWithP2PKHInputs(outputRefs.length, outputLockupScripts.length)
+      val defaultGasFee = defaultGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
     }
 

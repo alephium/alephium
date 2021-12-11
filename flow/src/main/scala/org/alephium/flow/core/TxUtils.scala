@@ -22,6 +22,7 @@ import TxUtils._
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
+import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model._
@@ -145,6 +146,7 @@ trait TxUtils { Self: FlowUtils =>
         getUsableUtxos(fromLockupScript, utxosLimit)
           .map { utxos =>
             UtxoUtils.select(
+              fromUnlockScript,
               utxos,
               fromLockupScript +: outputInfos.map(_.lockupScript),
               totalAmount,
@@ -204,7 +206,13 @@ trait TxUtils { Self: FlowUtils =>
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>
               val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
-              val gas           = gasOpt.getOrElse(GasEstimation.estimate(utxoRefs.length, outputScripts))
+              val gas = gasOpt.getOrElse(
+                GasEstimation.estimateWithInputScript(
+                  fromUnlockScript,
+                  utxoRefs.length,
+                  outputScripts.length
+                )
+              )
               for {
                 utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
                 unsignedTx <- UnsignedTransaction
@@ -233,7 +241,8 @@ trait TxUtils { Self: FlowUtils =>
     checkResult match {
       case Right(()) =>
         getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
-          val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum) // sweep as much as we can
+          // sweep as much as we can, considering gas (1044860 for ALPH.MaxTxInputNum)
+          val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum / 2)
           for {
             txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
               toLockupScript,

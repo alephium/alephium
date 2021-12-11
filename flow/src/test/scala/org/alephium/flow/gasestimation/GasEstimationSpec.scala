@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.core
+package org.alephium.flow.gasestimation
 
 import org.scalacheck.Gen
 
@@ -24,19 +24,19 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasBox
 import org.alephium.util._
 
-class GasEstimationSpec extends AlephiumSpec with LockupScriptGenerators {
+class GasEstimationSpec extends AlephiumSpec with TxInputGenerators {
   implicit val groupConfig = new GroupConfig {
     override def groups: Int = 2
   }
 
   "GasEstimation.estimateGasWithP2PKHOutputs" should "estimate the gas for P2PKH outputs" in {
-    GasEstimation.estimateWithP2PKHOutputs(0, 0) is minimalGas
-    GasEstimation.estimateWithP2PKHOutputs(1, 0) is minimalGas
-    GasEstimation.estimateWithP2PKHOutputs(0, 1) is minimalGas
-    GasEstimation.estimateWithP2PKHOutputs(1, 1) is minimalGas
-    GasEstimation.estimateWithP2PKHOutputs(2, 3) is GasBox.unsafe(24680)
-    GasEstimation.estimateWithP2PKHOutputs(3, 3) is GasBox.unsafe(26680)
-    GasEstimation.estimateWithP2PKHOutputs(5, 10) is GasBox.unsafe(76600)
+    GasEstimation.estimateWithP2PKHInputs(0, 0) is minimalGas
+    GasEstimation.estimateWithP2PKHInputs(1, 0) is minimalGas
+    GasEstimation.estimateWithP2PKHInputs(0, 1) is minimalGas
+    GasEstimation.estimateWithP2PKHInputs(1, 1) is minimalGas
+    GasEstimation.estimateWithP2PKHInputs(2, 3) is GasBox.unsafe(22620)
+    GasEstimation.estimateWithP2PKHInputs(3, 3) is GasBox.unsafe(26680)
+    GasEstimation.estimateWithP2PKHInputs(5, 10) is GasBox.unsafe(66300)
   }
 
   "GasEstimation.sweepAll" should "behave the same as GasEstimation.estimateGasWithP2PKHOutputs" in {
@@ -45,32 +45,32 @@ class GasEstimationSpec extends AlephiumSpec with LockupScriptGenerators {
 
     forAll(inputNumGen, outputNumGen) { case (inputNum, outputNum) =>
       val sweepAllGas = GasEstimation.sweepAll(inputNum, outputNum)
-      sweepAllGas is GasEstimation.estimateWithP2PKHOutputs(inputNum, outputNum)
+      sweepAllGas is GasEstimation.estimateWithP2PKHInputs(inputNum, outputNum)
     }
   }
 
   "GasEstimation.estimateGas" should "take output lockup script into consideration" in {
     val groupIndex = groupIndexGen.sample.value
-    val p2pkhLockupScripts =
-      Gen.listOfN(3, p2pkhLockupGen(groupIndex)).map(AVector.from).sample.value
+    val p2pkhUnlockScripts =
+      Gen.listOfN(3, p2pkhUnlockGen(groupIndex)).map(AVector.from).sample.value
 
-    GasEstimation.estimate(2, p2pkhLockupScripts) is GasBox.unsafe(24680)
+    GasEstimation.estimate(p2pkhUnlockScripts, 2) is GasBox.unsafe(22180)
 
-    val p2mphkLockupScript1 = p2mpkhLockupGen(3, 2, groupIndex).sample.value
+    val p2mphkUnlockScript1 = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
     GasEstimation.estimate(
-      2,
-      p2mphkLockupScript1 +: p2pkhLockupScripts
-    ) is GasBox.unsafe(33420)
+      p2mphkUnlockScript1 +: p2pkhUnlockScripts,
+      2
+    ) is GasBox.unsafe(28300)
 
-    val p2mphkLockupScript2 = p2mpkhLockupGen(5, 3, groupIndex).sample.value
+    val p2mphkUnlockScript2 = p2mpkhUnlockGen(5, 3, groupIndex).sample.value
     GasEstimation.estimate(
-      2,
-      p2mphkLockupScript2 +: p2pkhLockupScripts
-    ) is GasBox.unsafe(35540)
+      p2mphkUnlockScript2 +: p2pkhUnlockScripts,
+      2
+    ) is GasBox.unsafe(30360)
 
     GasEstimation.estimate(
-      2,
-      p2mphkLockupScript1 +: p2mphkLockupScript2 +: p2pkhLockupScripts
-    ) is GasBox.unsafe(44280)
+      p2mphkUnlockScript1 +: p2mphkUnlockScript2 +: p2pkhUnlockScripts,
+      2
+    ) is GasBox.unsafe(36480)
   }
 }

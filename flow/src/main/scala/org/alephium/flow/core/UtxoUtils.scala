@@ -18,8 +18,9 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import org.alephium.flow.gasestimation._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util._
 
 /*
@@ -60,6 +61,7 @@ object UtxoUtils {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def select(
+      fromUnlockScript: UnlockScript,
       utxos: AVector[Asset],
       outputLockupScripts: AVector[LockupScript.Asset],
       totalAlphAmount: U256,
@@ -81,6 +83,7 @@ object UtxoUtils {
           }
       case None =>
         select(
+          fromUnlockScript,
           sortedUtxosByAlph,
           outputLockupScripts,
           totalAlphAmount,
@@ -136,6 +139,7 @@ object UtxoUtils {
   }
 
   private def select(
+      fromUnlockScript: UnlockScript,
       sortedUtxos: AVector[Asset],
       outputLockupScripts: AVector[LockupScript.Asset],
       totalAlphAmount: U256,
@@ -157,6 +161,7 @@ object UtxoUtils {
       )
       (amountWithoutGas, utxosWithoutGas, restOfUtxos) = resultWithoutGas
       resultForGas <- findUtxosWithGas(
+        fromUnlockScript,
         restOfUtxos,
         amountWithoutGas,
         utxosWithoutGas.length,
@@ -168,7 +173,7 @@ object UtxoUtils {
     } yield {
       val (_, extraUtxosForGas, _) = resultForGas
       val utxos                    = utxosWithoutGas ++ extraUtxosForGas
-      val gas                      = GasEstimation.estimate(utxos.length, outputLockupScripts)
+      val gas                      = GasEstimation.estimateWithInputScript(fromUnlockScript, utxos.length, outputLockupScripts.length)
       Selected(utxos, gas.addUnsafe(scriptGas))
     }
   }
@@ -231,6 +236,7 @@ object UtxoUtils {
   }
 
   private def findUtxosWithGas(
+      fromUnlockScript: UnlockScript,
       restOfUtxos: AVector[Asset],
       currentAlphSum: U256,
       sizeOfSelectedUTXOs: Int,
@@ -241,7 +247,11 @@ object UtxoUtils {
   ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
-      val gas    = GasEstimation.estimate(sizeOfSelectedUTXOs + index, outputLockupScripts)
+      val gas = GasEstimation.estimateWithInputScript(
+        fromUnlockScript,
+        sizeOfSelectedUTXOs + index,
+        outputLockupScripts.length
+      )
       val gasFee = gasPrice * gas
       if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustUtxoAmount)) {
         (sum, index)

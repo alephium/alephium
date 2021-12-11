@@ -21,6 +21,7 @@ import org.scalatest.compatible.Assertion
 
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
 import org.alephium.flow.core.UtxoUtils._
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -97,19 +98,21 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
   }
 
   // Gas is calculated using GasEstimation.estimateGasWithP2PKHOutputs
-  // 1 input:  22680
-  // 2 inputs: 24680
+  // 1 input:  20000
+  // 2 inputs: 22620
   // 3 inputs: 26680
-  // 4 inputs: 28680
+  // 4 inputs: 30740
   it should "return the correct utxos when gas is considered" in new Fixture {
     {
       info("without tokens")
       implicit val utxos = buildUtxos(40000, 23000, 55000)
 
       UtxoSelection(7).verifyWithGas(1)
-      UtxoSelection(3000).verifyWithGas(1, 0)
+      UtxoSelection(3000).verifyWithGas(1)
+      UtxoSelection(3001).verifyWithGas(1, 0)
       UtxoSelection(30000).verifyWithGas(1, 0)
-      UtxoSelection(40000).verifyWithGas(1, 0, 2)
+      UtxoSelection(40380).verifyWithGas(1, 0)
+      UtxoSelection(40381).verifyWithGas(1, 0, 2)
       UtxoSelection(91320).verifyWithGas(1, 0, 2)
       UtxoSelection(91321).leftValueWithGas.startsWith("Not enough balance for fee") is true
 
@@ -139,7 +142,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(10, (tokenId1, 5)).verifyWithGas(1, 3, 2, 0)
 
       UtxoSelection(23100).verifyWithGas(1, 0)
-      UtxoSelection(23100, (tokenId1, 10)).verifyWithGas(1, 0)
+      UtxoSelection(23010, (tokenId1, 10)).verifyWithGas(1, 0)
       UtxoSelection(23100, (tokenId1, 11)).verifyWithGas(1, 0, 3)
       UtxoSelection(23100, (tokenId1, 12)).verifyWithGas(1, 0, 3, 2)
       UtxoSelection(23100, (tokenId1, 14)).leftValueWithGas
@@ -153,11 +156,11 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(23100, (tokenId2, 21)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(144330, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 2, 3)
-      UtxoSelection(144331, (tokenId2, 15), (tokenId1, 13)).leftValueWithGas
+      UtxoSelection(142270, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 2, 3)
+      UtxoSelection(142271, (tokenId2, 15), (tokenId1, 13)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
-      UtxoSelection(144328, (tokenId2, 15), (tokenId1, 13)).withDust(2).verifyWithGas(1, 0, 2, 3)
-      UtxoSelection(144329, (tokenId2, 15), (tokenId1, 13))
+      UtxoSelection(142268, (tokenId2, 15), (tokenId1, 13)).withDust(2).verifyWithGas(1, 0, 2, 3)
+      UtxoSelection(142269, (tokenId2, 15), (tokenId1, 13))
         .withDust(2)
         .leftValueWithGas
         .startsWith(s"Not enough balance") is true
@@ -237,7 +240,9 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       AssetOutputInfo(ref, output, PersistedOutput)
     }
 
-    val defaultLockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
+    val scriptPair = p2pkScriptGen(GroupIndex.unsafe(0)).sample.get
+    val defaultLockupScript = scriptPair.lockup
+    val defaultUnlockScript = scriptPair.unlock
 
     def buildUtxos(amounts: Int*): AVector[AssetOutputInfo] = {
       AVector.from(amounts.map { amount =>
@@ -273,6 +278,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
 
       lazy val valueWithGas = {
         UtxoUtils.select(
+          defaultUnlockScript,
           utxos,
           outputs,
           amount,
@@ -292,7 +298,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       def verifyWithGas(utxoIndexes: Int*): Assertion = {
         val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
         val gas = gasOpt.getOrElse(
-          GasEstimation.estimateWithP2PKHOutputs(selectedUtxos.length, outputs.length)
+          GasEstimation.estimateWithP2PKHInputs(selectedUtxos.length, outputs.length)
         )
         valueWithGas isE Selected(selectedUtxos, gas)
       }

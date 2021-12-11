@@ -20,6 +20,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey}
