@@ -148,7 +148,7 @@ trait TxUtils { Self: FlowUtils =>
             UtxoUtils.select(
               fromUnlockScript,
               utxos,
-              fromLockupScript +: outputInfos.map(_.lockupScript),
+              outputInfos.length + 1,
               totalAmount,
               totalAmountPerToken,
               gasOpt,

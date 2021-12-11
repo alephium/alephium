@@ -240,7 +240,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       AssetOutputInfo(ref, output, PersistedOutput)
     }
 
-    val scriptPair = p2pkScriptGen(GroupIndex.unsafe(0)).sample.get
+    val scriptPair          = p2pkScriptGen(GroupIndex.unsafe(0)).sample.get
     val defaultLockupScript = scriptPair.lockup
     val defaultUnlockScript = scriptPair.unlock
 
@@ -280,7 +280,7 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         UtxoUtils.select(
           defaultUnlockScript,
           utxos,
-          outputs,
+          outputs.length,
           amount,
           AVector.from(tokens),
           gasOpt,

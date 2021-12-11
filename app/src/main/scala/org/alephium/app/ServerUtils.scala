@@ -602,7 +602,7 @@ class ServerUtils(implicit
         .select(
           unlockScript,
           allUtxos,
-          AVector.empty,
+          0,
           amount,
           AVector.empty,
           gas,

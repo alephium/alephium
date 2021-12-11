@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 
 import org.alephium.flow.gasestimation._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, UnlockScript}
 import org.alephium.util._
 
 /*
@@ -63,7 +63,7 @@ object UtxoUtils {
   def select(
       fromUnlockScript: UnlockScript,
       utxos: AVector[Asset],
-      outputLockupScripts: AVector[LockupScript.Asset],
+      txOutputsLength: Int,
       totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
       gasOpt: Option[GasBox],
@@ -85,7 +85,7 @@ object UtxoUtils {
         select(
           fromUnlockScript,
           sortedUtxosByAlph,
-          outputLockupScripts,
+          txOutputsLength,
           totalAlphAmount,
           totalAmountPerToken,
           estimatedScriptGas.getOrElse(GasBox.zero),
@@ -141,7 +141,7 @@ object UtxoUtils {
   private def select(
       fromUnlockScript: UnlockScript,
       sortedUtxos: AVector[Asset],
-      outputLockupScripts: AVector[LockupScript.Asset],
+      txOutputsLength: Int,
       totalAlphAmount: U256,
       totalAmountPerToken: AVector[(TokenId, U256)],
       scriptGas: GasBox,
@@ -163,17 +163,21 @@ object UtxoUtils {
       resultForGas <- findUtxosWithGas(
         fromUnlockScript,
         restOfUtxos,
+        txOutputsLength,
         amountWithoutGas,
         utxosWithoutGas.length,
         alphAmountWithScriptGasFee,
         gasPrice,
-        dustUtxoAmount,
-        outputLockupScripts
+        dustUtxoAmount
       )
     } yield {
       val (_, extraUtxosForGas, _) = resultForGas
       val utxos                    = utxosWithoutGas ++ extraUtxosForGas
-      val gas                      = GasEstimation.estimateWithInputScript(fromUnlockScript, utxos.length, outputLockupScripts.length)
+      val gas = GasEstimation.estimateWithInputScript(
+        fromUnlockScript,
+        utxos.length,
+        txOutputsLength
+      )
       Selected(utxos, gas.addUnsafe(scriptGas))
     }
   }
@@ -238,19 +242,19 @@ object UtxoUtils {
   private def findUtxosWithGas(
       fromUnlockScript: UnlockScript,
       restOfUtxos: AVector[Asset],
+      txOutputsLength: Int,
       currentAlphSum: U256,
       sizeOfSelectedUTXOs: Int,
       totalAlphAmount: U256,
       gasPrice: GasPrice,
-      dustUtxoAmount: U256,
-      outputLockupScripts: AVector[LockupScript.Asset]
+      dustUtxoAmount: U256
   ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
       val gas = GasEstimation.estimateWithInputScript(
         fromUnlockScript,
         sizeOfSelectedUTXOs + index,
-        outputLockupScripts.length
+        txOutputsLength
       )
       val gasFee = gasPrice * gas
       if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustUtxoAmount)) {

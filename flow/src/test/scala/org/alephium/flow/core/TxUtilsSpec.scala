@@ -745,7 +745,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("The amount in the first output is below minimalAlphAmountPerTxOutput(tokens)")
       val alphAmount = minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
-        .addUnsafe(defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(1, 3))
+        .addUnsafe(defaultGasPrice * GasEstimation.sweepAll(1, 3))
         .addUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
 
       val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
