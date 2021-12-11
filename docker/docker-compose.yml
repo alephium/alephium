@@ -44,7 +44,7 @@ services:
       - ./nginx/htpasswd:/etc/nginx/.htpasswd  #generated on the fly using env on bootstrap first startup
       - ./nginx/alephium-selfsigned.crt:/etc/ssl/certs/alephium-selfsigned.crt #generated on the fly using env on bootstrap first startup
       - ./nginx/alephium-selfsigned.key:/etc/ssl/certs/alephium-selfsigned.key #generated on the fly using env on bootstrap first startup
-    #command : ['tail', '-f', '/dev/null']    
+    
     ports:
       - 8030:8030
 
