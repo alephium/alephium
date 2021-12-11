@@ -194,9 +194,9 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
 
   implicit private val stringSerde: Serde[String] = new Serde[String] {
     override def _deserialize(input: ByteString): SerdeResult[Staging[String]] = {
-      byteSerde._deserialize(input).flatMap { case Staging(size, rest) =>
-        if (size < 0) {
-          Left(SerdeError.validation(s"Negative string length: $size"))
+      intSerde._deserialize(input).flatMap { case Staging(size, rest) =>
+        if (size < 0 || size > 256) {
+          Left(SerdeError.validation(s"Invalid client info length: $size"))
         } else if (rest.size >= size) {
           Right(rest.splitAt(size.toInt) match {
             case (value, rest) => Staging(value.utf8String, rest)
@@ -208,7 +208,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
     }
 
     override def serialize(input: String): ByteString =
-      ByteString(input.length.toByte) ++ ByteString.fromString(input)
+      intSerde.serialize(input.length) ++ ByteString.fromString(input)
   }
   implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.unsafeSerde
   val serde: Serde[T] =
