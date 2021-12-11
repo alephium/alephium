@@ -225,4 +225,8 @@ class TestBrokerHandler(
   override def exchanging: Receive = exchangingCommon orElse flowEvents
 
   override def dataOrigin: DataOrigin = DataOrigin.Local
+
+  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+    remoteBrokerInfo = _remoteBrokerInfo
+  }
 }

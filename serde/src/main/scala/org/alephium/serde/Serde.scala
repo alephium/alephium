@@ -200,7 +200,9 @@ object Serde extends ProductSerde {
 
     override def _deserialize(input: ByteString): SerdeResult[Staging[ByteString]] = {
       IntSerde._deserialize(input).flatMap { case Staging(size, rest) =>
-        if (rest.size >= size) {
+        if (size < 0) {
+          Left(SerdeError.validation(s"Negative byte string length: $size"))
+        } else if (rest.size >= size) {
           Right(rest.splitAt(size) match { case (value, rest) => Staging(value, rest) })
         } else {
           Left(SerdeError.incompleteData(size, rest.size))

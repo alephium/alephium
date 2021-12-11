@@ -192,6 +192,24 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
     unsafe(ReleaseVersion.clientId, TimeStamp.now(), brokerInfo, signature)
   }
 
+  implicit private val stringSerde: Serde[String] = new Serde[String] {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[String]] = {
+      byteSerde._deserialize(input).flatMap { case Staging(size, rest) =>
+        if (size < 0) {
+          Left(SerdeError.validation(s"Negative string length: $size"))
+        } else if (rest.size >= size) {
+          Right(rest.splitAt(size.toInt) match {
+            case (value, rest) => Staging(value.utf8String, rest)
+          })
+        } else {
+          Left(SerdeError.incompleteData(size.toInt, rest.size))
+        }
+      }
+    }
+
+    override def serialize(input: String): ByteString =
+      ByteString(input.length.toByte) ++ ByteString.fromString(input)
+  }
   implicit private val brokerSerde: Serde[InterBrokerInfo] = InterBrokerInfo.unsafeSerde
   val serde: Serde[T] =
     Serde.forProduct4(unsafe, t => (t.clientId, t.timestamp, t.brokerInfo, t.signature))

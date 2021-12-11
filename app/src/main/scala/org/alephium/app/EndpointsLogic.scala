@@ -42,7 +42,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
@@ -64,9 +64,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
-  implicit lazy val groupConfig: GroupConfig     = brokerConfig
-  implicit lazy val networkConfig: NetworkConfig = node.config.network
-  implicit lazy val askTimeout: Timeout          = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig      = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting = node.config.network
+  implicit lazy val askTimeout: Timeout           = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -101,7 +101,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       Right(
         NodeInfo(
           ReleaseVersion.current,
-          NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId)
+          NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId),
+          networkConfig.upnp.enabled,
+          networkConfig.externalAddressInferred
         )
       )
     )
@@ -637,7 +639,8 @@ object EndpointsLogic {
       peerId.brokerId,
       syncStatus.groupNumPerBroker,
       syncStatus.address,
-      syncStatus.isSynced
+      syncStatus.isSynced,
+      syncStatus.clientInfo
     )
   }
 

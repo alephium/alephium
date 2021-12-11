@@ -639,7 +639,12 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
 
     Get(s"/infos/node") check { response =>
       response.code is StatusCode.Ok
-      response.as[NodeInfo] is NodeInfo(ReleaseVersion.current, buildInfo)
+      response.as[NodeInfo] is NodeInfo(
+        ReleaseVersion.current,
+        buildInfo,
+        networkConfig.upnp.enabled,
+        networkConfig.externalAddressInferred
+      )
     }
   }
 

@@ -175,7 +175,9 @@ trait EndpointsExamples extends ErrorExamples {
         NodeInfo.BuildInfo(
           "1.2.3",
           "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
-        )
+        ),
+        true,
+        Some(inetSocketAddress)
       )
     )
 
@@ -204,7 +206,8 @@ trait EndpointsExamples extends ErrorExamples {
           brokerId = 1,
           groupNumPerBroker = 1,
           inetSocketAddress,
-          isSynced = true
+          isSynced = true,
+          clientVersion = "v1.0.0"
         )
       )
     )

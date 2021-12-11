@@ -33,10 +33,10 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
-  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo): Unit = {
-    if (remoteBrokerInfo.cliqueId == selfCliqueInfo.id) {
-      super.handleHandshakeInfo(remoteBrokerInfo)
-      cliqueManager ! CliqueManager.HandShaked(remoteBrokerInfo, connectionType)
+  override def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+    if (_remoteBrokerInfo.cliqueId == selfCliqueInfo.id) {
+      remoteBrokerInfo = _remoteBrokerInfo
+      cliqueManager ! CliqueManager.HandShaked(_remoteBrokerInfo, connectionType, clientInfo)
     } else {
       log.warning(s"Invalid intra cliqueId")
       context stop self
