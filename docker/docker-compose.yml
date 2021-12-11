@@ -29,6 +29,26 @@ services:
       - ./user-mainnet.conf:/alephium-home/.alephium/user.conf
 #      - ./alephium-wallets:/alephium-home/.alephium-wallets
 
+  nginx_reverse_api:
+    image: nginx:1.21.0-alpine
+    restart: unless-stopped
+    environment:
+      - AUTH_LOGIN=${LOGIN}
+      - AUTH_PASSWORD=${PASSWORD}
+    volumes:
+      - ./nginx/ConfigBootstrap.sh:/docker-entrypoint.d/ConfigBootstrap.sh
+      - ./nginx/GenerateCertificate.sh:/etc/ssl/certs/GenerateCertificate.sh
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/virtualhost.conf:/etc/nginx/virtualhost/virtualhost.conf
+      - ./nginx/index.html:/etc/nginx/html/index.html
+      - ./nginx/htpasswd:/etc/nginx/.htpasswd  #generated on the fly using env on bootstrap first startup
+      - ./nginx/alephium-selfsigned.crt:/etc/ssl/certs/alephium-selfsigned.crt #generated on the fly using env on bootstrap first startup
+      - ./nginx/alephium-selfsigned.key:/etc/ssl/certs/alephium-selfsigned.key #generated on the fly using env on bootstrap first startup
+    #command : ['tail', '-f', '/dev/null']    
+    ports:
+      - 8030:8030
+
+
   grafana:
     image: grafana/grafana:7.2.1
     depends_on:

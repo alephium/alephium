@@ -17,6 +17,12 @@ sudo usermod -aG docker $USER
 
 # Run
 
+copy env-example to .env and change your credentials with a strong password
+```shell
+cp env-example .env
+```
+
+
 The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
 
 ```shell
@@ -28,6 +34,16 @@ The default config connects your container to the mainnet, and makes the API ava
 ```
 curl http://127.0.0.1:12973/infos/self-clique
 ```
+
+## Using Public Swagger Endpoint
+- the Secured Endpoint link is : https://Public_IP:8030/docs
+- Ignore the Certificate Message and use your credentials to login
+- change Server variables : 
+  - protocol : https
+  - host : your_public_ip
+  - port : 8030
+
+use https://login:password@public_IP:8030 on sweep-all.sh to access the swagger api endpoint using your credentials
 
 ## Monitoring
 
