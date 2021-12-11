@@ -111,8 +111,12 @@ class MultisigTest extends AlephiumActorSpec {
     confirmTx(multisigTx, restPort)
 
     val inputUnlockScripts = unsignedTx.inputs.map(_.unlockScript)
-    val estimatedGas       = GasEstimation.estimate(inputUnlockScripts, unsignedTx.fixedOutputs.length)
-    val gasFee             = defaultGasPrice * estimatedGas
+    val estimatedGas = GasEstimation.estimate(
+      inputUnlockScripts,
+      unsignedTx.fixedOutputs.length,
+      AssetScriptGasEstimator.Mock
+    )
+    val gasFee = defaultGasPrice * estimatedGas
     request[Balance](getBalance(multisigAddress.address.toBase58), restPort) is
       Balance.from(Amount(transferAmount.mulUnsafe(2) - amount - gasFee), Amount.Zero, 1)
 

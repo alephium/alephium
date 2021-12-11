@@ -18,6 +18,7 @@ package org.alephium.flow.gasestimation
 
 import org.alephium.flow.core._
 import org.alephium.protocol.Signature
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatelessVM.AssetScriptExecution
@@ -29,10 +30,10 @@ trait AssetScriptGasEstimator {
 
 object AssetScriptGasEstimator {
   class Default(
-      chainIndex: ChainIndex,
       unsignedTx: UnsignedTransaction,
       flow: BlockFlow
-  ) extends AssetScriptGasEstimator {
+  )(implicit config: GroupConfig)
+      extends AssetScriptGasEstimator {
     def estimate(
         p2sh: UnlockScript.P2SH
     ): Either[String, GasBox] = {
@@ -66,6 +67,7 @@ object AssetScriptGasEstimator {
       }
 
       for {
+        chainIndex <- getChainIndex(unsignedTx)
         blockEnv   <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
         groupView  <- flow.getMutableGroupView(chainIndex.from).left.map(_.toString())
         preOutputs <- groupView.getPreOutputs(unsignedTx.inputs).left.map(_.toString())
@@ -84,6 +86,28 @@ object AssetScriptGasEstimator {
   object Mock extends AssetScriptGasEstimator {
     def estimate(script: UnlockScript.P2SH): Either[String, GasBox] = {
       Right(defaultGasPerInput)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def getChainIndex(
+      tx: UnsignedTransaction
+  )(implicit config: GroupConfig): Either[String, ChainIndex] = {
+    val inputIndexes = tx.inputs.map(_.fromGroup).toSet
+    if (inputIndexes.size != 1) {
+      Left("Invalid group index for inputs")
+    } else {
+      val fromIndex = inputIndexes.head
+      val outputIndexes =
+        (0 until tx.fixedOutputs.length).view
+          .map(index => tx.fixedOutputs(index).toGroup)
+          .filter(_ != fromIndex)
+          .toSet
+      outputIndexes.size match {
+        case 0 => Right(ChainIndex(fromIndex, fromIndex))
+        case 1 => Right(ChainIndex(fromIndex, outputIndexes.head))
+        case _ => Left("Invalid group index for outputs")
+      }
     }
   }
 }

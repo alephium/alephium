@@ -173,10 +173,12 @@ object UtxoUtils {
     } yield {
       val (_, extraUtxosForGas, _) = resultForGas
       val utxos                    = utxosWithoutGas ++ extraUtxosForGas
+      val assetScriptGasEstimator  = AssetScriptGasEstimator.Mock
       val gas = GasEstimation.estimateWithInputScript(
         fromUnlockScript,
         utxos.length,
-        txOutputsLength
+        txOutputsLength,
+        assetScriptGasEstimator
       )
       Selected(utxos, gas.addUnsafe(scriptGas))
     }
@@ -249,12 +251,14 @@ object UtxoUtils {
       gasPrice: GasPrice,
       dustUtxoAmount: U256
   ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
+    val assetScriptGasEstimator = AssetScriptGasEstimator.Mock
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
       val gas = GasEstimation.estimateWithInputScript(
         fromUnlockScript,
         sizeOfSelectedUTXOs + index,
-        txOutputsLength
+        txOutputsLength,
+        assetScriptGasEstimator
       )
       val gasFee = gasPrice * gas
       if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustUtxoAmount)) {

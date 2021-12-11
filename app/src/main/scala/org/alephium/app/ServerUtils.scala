@@ -602,9 +602,9 @@ class ServerUtils(implicit
         .select(
           unlockScript,
           allUtxos,
-          0,
-          amount,
-          AVector.empty,
+          txOutputsLength = 0,
+          totalAlphAmount = amount,
+          totalAmountPerToken = AVector.empty,
           gas,
           gasPrice,
           Some(scriptGas)

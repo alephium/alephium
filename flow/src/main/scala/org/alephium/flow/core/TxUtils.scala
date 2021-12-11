@@ -210,7 +210,8 @@ trait TxUtils { Self: FlowUtils =>
                 GasEstimation.estimateWithInputScript(
                   fromUnlockScript,
                   utxoRefs.length,
-                  outputScripts.length
+                  outputScripts.length,
+                  AssetScriptGasEstimator.Mock // Not P2SH
                 )
               )
               for {

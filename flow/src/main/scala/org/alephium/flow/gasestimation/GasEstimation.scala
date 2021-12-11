@@ -34,16 +34,20 @@ object GasEstimation extends StrictLogging {
     estimate(inputGas.mulUnsafe(numInputs), numOutputs)
   }
 
-  def estimateWithInputScript(script: UnlockScript, numInputs: Int, numOutputs: Int): GasBox = {
+  def estimateWithInputScript(
+      script: UnlockScript,
+      numInputs: Int,
+      numOutputs: Int,
+      assetScriptGasEstimator: AssetScriptGasEstimator
+  ): GasBox = {
     val inputs = AVector.fill(numInputs)(script)
-    estimate(inputs, numOutputs)
+    estimate(inputs, numOutputs, assetScriptGasEstimator)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def estimate(
       inputs: AVector[UnlockScript],
       numOutputs: Int,
-      assetScriptGasEstimator: AssetScriptGasEstimator = AssetScriptGasEstimator.Mock
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): GasBox = {
     val inputGas =
       inputs.fold(GasBox.zero)(_ addUnsafe estimateInputGas(_, assetScriptGasEstimator))

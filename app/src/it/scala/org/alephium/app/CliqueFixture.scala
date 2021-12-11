@@ -627,10 +627,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost("/contracts/build-script", Some(query))
   }
 
-  def getUTXOs(address: String) = {
-    httpGet(s"/addresses/$address/utxos")
-  }
-
   val startMining = httpPost("/miners/cpu-mining?action=start-mining")
   val stopMining  = httpPost("/miners/cpu-mining?action=stop-mining")
 

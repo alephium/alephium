@@ -54,23 +54,28 @@ class GasEstimationSpec extends AlephiumSpec with TxInputGenerators {
     val p2pkhUnlockScripts =
       Gen.listOfN(3, p2pkhUnlockGen(groupIndex)).map(AVector.from).sample.value
 
-    GasEstimation.estimate(p2pkhUnlockScripts, 2) is GasBox.unsafe(22180)
+    GasEstimation.estimate(p2pkhUnlockScripts, 2, AssetScriptGasEstimator.Mock) is GasBox.unsafe(
+      22180
+    )
 
     val p2mphkUnlockScript1 = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
     GasEstimation.estimate(
       p2mphkUnlockScript1 +: p2pkhUnlockScripts,
-      2
+      2,
+      AssetScriptGasEstimator.Mock
     ) is GasBox.unsafe(28300)
 
     val p2mphkUnlockScript2 = p2mpkhUnlockGen(5, 3, groupIndex).sample.value
     GasEstimation.estimate(
       p2mphkUnlockScript2 +: p2pkhUnlockScripts,
-      2
+      2,
+      AssetScriptGasEstimator.Mock
     ) is GasBox.unsafe(30360)
 
     GasEstimation.estimate(
       p2mphkUnlockScript1 +: p2mphkUnlockScript2 +: p2pkhUnlockScripts,
-      2
+      2,
+      AssetScriptGasEstimator.Mock
     ) is GasBox.unsafe(36480)
   }
 }
