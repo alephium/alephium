@@ -23,11 +23,17 @@ The provided [docker-compose.yml](./docker-compose.yml) file will be used to run
 docker-compose stop && docker-compose rm -f alephium && docker-compose pull && docker-compose up -d
 ```
 
-The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs):
+The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs).
+
+By default an API key with the value of `0000000000000000000000000000000000000000000000000000000000000000` is configured to protect the APIs exposed by
+the full node. To call an API endpoint, `X-API-KEY` header needs to be provided. Here is an example:
 
 ```
-curl http://127.0.0.1:12973/infos/self-clique
+curl -H "X-API-KEY: 0000000000000000000000000000000000000000000000000000000000000000" http://127.0.0.1:12973/infos/self-clique
 ```
+
+To disable the API key, remove the `ALEPHIUM_API_KEY` environment variable from the [docker-compose.yml](docker-compose.yml) file.
+To update the API key, update the value of the `ALEPHIUM_API_KEY` environment variable from the [docker-compose.yml](docker-compose.yml) file.
 
 ## Monitoring
 
