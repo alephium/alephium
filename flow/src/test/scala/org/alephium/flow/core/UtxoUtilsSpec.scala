@@ -286,7 +286,8 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
           gasOpt,
           Some(GasPrice(1)),
           estimatedScriptGas = None,
-          dustAmount
+          dustAmount,
+          AssetScriptGasEstimator.Mock
         )
       }
 

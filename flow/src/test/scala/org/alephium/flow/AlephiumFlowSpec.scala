@@ -24,6 +24,7 @@ import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -146,7 +147,16 @@ trait FlowFixture
       amount: U256
   ): Block = {
     val unsigned = blockFlow
-      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice, defaultUtxoLimit)
+      .transfer(
+        from.publicKey,
+        to,
+        None,
+        amount,
+        None,
+        defaultGasPrice,
+        defaultUtxoLimit,
+        AssetScriptGasEstimator.Default(blockFlow)
+      )
       .rightValue
       .rightValue
     val tx         = Transaction.from(unsigned, from)
@@ -186,7 +196,14 @@ trait FlowFixture
     }
     val unsignedTx =
       blockFlow
-        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice, defaultUtxoLimit)
+        .transfer(
+          publicKey,
+          outputInfos,
+          Some(gasAmount),
+          defaultGasPrice,
+          defaultUtxoLimit,
+          AssetScriptGasEstimator.Default(blockFlow)
+        )
         .rightValue
         .rightValue
     val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)
@@ -236,7 +253,8 @@ trait FlowFixture
         amount - defaultGasFee,
         Some(gasAmount),
         defaultGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        AssetScriptGasEstimator.Default(blockFlow)
       )
       .rightValue
       .rightValue

@@ -18,35 +18,57 @@ package org.alephium.flow.gasestimation
 
 import org.alephium.flow.core._
 import org.alephium.protocol.Signature
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatelessVM.AssetScriptExecution
 import org.alephium.util._
 
 trait AssetScriptGasEstimator {
+  var txInputsOpt: Option[AVector[TxInput]] = None
+
   def estimate(script: UnlockScript.P2SH): Either[String, GasBox]
+  def setInputs(inputs: AVector[TxInput]): AssetScriptGasEstimator = {
+    txInputsOpt = Some(inputs)
+    this
+  }
+
+  protected def getUnsignedTx()(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, UnsignedTransaction] = {
+    txInputsOpt.toRight("Error estimating gas for P2SH script").map { txInputs =>
+      UnsignedTransaction(None, txInputs, AVector.empty)
+    }
+  }
 }
 
 object AssetScriptGasEstimator {
-  class Default(
-      unsignedTx: UnsignedTransaction,
+
+  final case class Default(
       flow: BlockFlow
-  )(implicit config: GroupConfig)
+  )(implicit networkConfig: NetworkConfig, config: GroupConfig)
       extends AssetScriptGasEstimator {
     def estimate(
         p2sh: UnlockScript.P2SH
     ): Either[String, GasBox] = {
-      val txTemplate = TransactionTemplate(
-        unsignedTx,
-        inputSignatures = AVector.empty,
-        scriptSignatures = AVector.empty
-      )
 
       def runScript(
           blockEnv: BlockEnv,
-          txEnv: TxEnv
+          unsignedTx: UnsignedTransaction,
+          preOutputs: Option[AVector[AssetOutput]]
       ): Either[String, AssetScriptExecution] = {
+        val txTemplate = TransactionTemplate(
+          unsignedTx,
+          inputSignatures = AVector.empty,
+          scriptSignatures = AVector.empty
+        )
+
+        val txEnv = TxEnv(
+          txTemplate,
+          preOutputs.getOrElse(AVector.empty),
+          Stack.popOnly(AVector.empty[Signature])
+        )
+
         val result = for {
           remaining0 <- VM.checkCodeSize(maximalGasPerTx, p2sh.script.bytes)
           remaining1 <- remaining0.use(GasHash.gas(p2sh.script.bytes.length))
@@ -67,16 +89,12 @@ object AssetScriptGasEstimator {
       }
 
       for {
+        unsignedTx <- getUnsignedTx()
         chainIndex <- getChainIndex(unsignedTx)
         blockEnv   <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
         groupView  <- flow.getMutableGroupView(chainIndex.from).left.map(_.toString())
         preOutputs <- groupView.getPreOutputs(unsignedTx.inputs).left.map(_.toString())
-        txEnv = TxEnv(
-          txTemplate,
-          preOutputs.getOrElse(AVector.empty),
-          Stack.popOnly(AVector.empty[Signature])
-        )
-        result <- runScript(blockEnv, txEnv)
+        result     <- runScript(blockEnv, unsignedTx, preOutputs)
       } yield {
         maximalGasPerTx.subUnsafe(result.gasRemaining)
       }
@@ -90,7 +108,7 @@ object AssetScriptGasEstimator {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def getChainIndex(
+  private def getChainIndex(
       tx: UnsignedTransaction
   )(implicit config: GroupConfig): Either[String, ChainIndex] = {
     val inputIndexes = tx.inputs.map(_.fromGroup).toSet

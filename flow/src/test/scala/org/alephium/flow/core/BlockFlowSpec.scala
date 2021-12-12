@@ -25,6 +25,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALPH, BlockHash, Generators}
@@ -583,7 +584,8 @@ class BlockFlowSpec extends AlephiumSpec {
             ALPH.alph(1),
             None,
             defaultGasPrice,
-            defaultUtxoLimit
+            defaultUtxoLimit,
+            AssetScriptGasEstimator.Default(blockFlow)
           )
           .rightValue
           .rightValue
@@ -615,7 +617,8 @@ class BlockFlowSpec extends AlephiumSpec {
         ALPH.nanoAlph(1000),
         None,
         defaultGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        AssetScriptGasEstimator.Default(blockFlow)
       )
       .rightValue
       .leftValue
@@ -629,7 +632,8 @@ class BlockFlowSpec extends AlephiumSpec {
           ALPH.nanoAlph(1000),
           None,
           defaultGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          AssetScriptGasEstimator.Default(blockFlow)
         )
         .rightValue
         .isRight is true
@@ -659,7 +663,8 @@ class BlockFlowSpec extends AlephiumSpec {
           ALPH.oneAlph,
           None,
           defaultGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          AssetScriptGasEstimator.Default(blockFlow)
         )
         .rightValue
         .rightValue

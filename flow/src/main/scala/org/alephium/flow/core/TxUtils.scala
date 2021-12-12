@@ -101,14 +101,16 @@ trait TxUtils { Self: FlowUtils =>
       amount: U256,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxoLimit: Int
+      utxoLimit: Int,
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): IOResult[Either[String, UnsignedTransaction]] = {
     transfer(
       fromPublicKey,
       AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
       gasOpt,
       gasPrice,
-      utxoLimit
+      utxoLimit,
+      assetScriptGasEstimator
     )
   }
 
@@ -117,20 +119,31 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxoLimit: Int
+      utxoLimit: Int,
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
-    transfer(fromLockupScript, fromUnlockScript, outputInfos, gasOpt, gasPrice, utxoLimit)
+    transfer(
+      fromLockupScript,
+      fromUnlockScript,
+      outputInfos,
+      gasOpt,
+      gasPrice,
+      utxoLimit,
+      assetScriptGasEstimator
+    )
   }
 
+  // scalastyle:off method.length
   def transfer(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxosLimit: Int
+      utxosLimit: Int,
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
@@ -152,7 +165,10 @@ trait TxUtils { Self: FlowUtils =>
               totalAmount,
               totalAmountPerToken,
               gasOpt,
-              Some(gasPrice)
+              Some(gasPrice),
+              estimatedScriptGas = None,
+              dustUtxoAmount,
+              assetScriptGasEstimator
             )
           }
           .map {
@@ -173,6 +189,7 @@ trait TxUtils { Self: FlowUtils =>
         Right(Left(e))
     }
   }
+  // scalastyle:on method.length
 
   def transfer(
       fromPublicKey: PublicKey,

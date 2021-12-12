@@ -421,7 +421,14 @@ class ServerUtils(implicit
           Right(Left("Selected UTXOs must be of asset type"))
         }
       case None =>
-        blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice, utxosLimit)
+        blockFlow.transfer(
+          fromPublicKey,
+          outputInfos,
+          gasOpt,
+          gasPrice,
+          utxosLimit,
+          AssetScriptGasEstimator.Default(blockFlow)
+        )
     }
 
     transferResult match {
@@ -471,7 +478,8 @@ class ServerUtils(implicit
       outputInfos,
       gasOpt,
       gasPrice,
-      utxosLimit
+      utxosLimit,
+      AssetScriptGasEstimator.Default(blockFlow)
     ) match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
@@ -607,7 +615,9 @@ class ServerUtils(implicit
           totalAmountPerToken = AVector.empty,
           gas,
           gasPrice,
-          Some(scriptGas)
+          Some(scriptGas),
+          dustUtxoAmount,
+          AssetScriptGasEstimator.Default(blockFlow)
         )
         .map { selectedUtxos =>
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))

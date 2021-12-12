@@ -69,7 +69,8 @@ object UtxoUtils {
       gasOpt: Option[GasBox],
       gasPriceOpt: Option[GasPrice],
       estimatedScriptGas: Option[GasBox] = None,
-      dustUtxoAmount: U256 = dustUtxoAmount
+      dustUtxoAmount: U256 = dustUtxoAmount,
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, Selected] = {
     val sortedUtxosByAlph = utxos.sorted(assetOrderByAlph)
     val gasPrice          = gasPriceOpt.getOrElse(defaultGasPrice)
@@ -90,7 +91,8 @@ object UtxoUtils {
           totalAmountPerToken,
           estimatedScriptGas.getOrElse(GasBox.zero),
           gasPrice,
-          dustUtxoAmount
+          dustUtxoAmount,
+          assetScriptGasEstimator
         )
     }
   }
@@ -146,7 +148,8 @@ object UtxoUtils {
       totalAmountPerToken: AVector[(TokenId, U256)],
       scriptGas: GasBox,
       gasPrice: GasPrice,
-      dustUtxoAmount: U256
+      dustUtxoAmount: U256,
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, Selected] = {
     val scriptGasFee = gasPrice * scriptGas
     for {
@@ -165,10 +168,11 @@ object UtxoUtils {
         restOfUtxos,
         txOutputsLength,
         amountWithoutGas,
-        utxosWithoutGas.length,
+        utxosWithoutGas,
         alphAmountWithScriptGasFee,
         gasPrice,
-        dustUtxoAmount
+        dustUtxoAmount,
+        assetScriptGasEstimator
       )
     } yield {
       val (_, extraUtxosForGas, _) = resultForGas
@@ -246,19 +250,22 @@ object UtxoUtils {
       restOfUtxos: AVector[Asset],
       txOutputsLength: Int,
       currentAlphSum: U256,
-      sizeOfSelectedUTXOs: Int,
+      selectedUTXOs: AVector[Asset],
       totalAlphAmount: U256,
       gasPrice: GasPrice,
-      dustUtxoAmount: U256
+      dustUtxoAmount: U256,
+      assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
-    val assetScriptGasEstimator = AssetScriptGasEstimator.Mock
+    val sizeOfSelectedUTXOs = selectedUTXOs.length
     @tailrec
     def iter(sum: U256, index: Int): (U256, Int) = {
+      val utxos  = selectedUTXOs ++ restOfUtxos.take(index)
+      val inputs = utxos.map(_.ref).map(TxInput(_, fromUnlockScript))
       val gas = GasEstimation.estimateWithInputScript(
         fromUnlockScript,
         sizeOfSelectedUTXOs + index,
         txOutputsLength,
-        assetScriptGasEstimator
+        assetScriptGasEstimator.setInputs(inputs)
       )
       val gasFee = gasPrice * gas
       if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustUtxoAmount)) {
