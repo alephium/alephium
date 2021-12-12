@@ -73,7 +73,7 @@ object UtxoUtils {
       txOutputsLength: Int,
       providedGas: ProvidedGas,
       estimatedTxScriptGas: Option[GasBox],
-      dustUtxoAmount: U256,
+      dustAmount: U256,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ) {
     def select(amounts: Amounts): Either[String, Selected] = {
@@ -84,7 +84,7 @@ object UtxoUtils {
         case Some(gas) =>
           val amountsWithGas = amounts.copy(alph = amounts.alph.addUnsafe(gasPrice * gas))
           SelectionWithoutGasEstimation
-            .select(sortedUtxos, amountsWithGas, dustUtxoAmount)
+            .select(sortedUtxos, amountsWithGas, dustAmount)
             .map { selectedSoFar =>
               Selected(selectedSoFar.selected, gas)
             }
@@ -100,7 +100,7 @@ object UtxoUtils {
             resultWithoutGas <- SelectionWithoutGasEstimation.select(
               sortedUtxos,
               amountsWithScriptGas,
-              dustUtxoAmount
+              dustAmount
             )
             resultForGas <- SelectionWithGasEstimation.select(
               unlockScript,
@@ -108,6 +108,7 @@ object UtxoUtils {
               resultWithoutGas,
               totalAlphAmount,
               gasPrice,
+              dustAmount,
               assetScriptGasEstimator
             )
           } yield {
@@ -129,10 +130,10 @@ object UtxoUtils {
     def select(
         sortedUtxos: AVector[Asset],
         amounts: Amounts,
-        dustUtxoAmount: U256
+        dustAmount: U256
     ): Either[String, SelectedSoFar] = {
       for {
-        alphFoundResult <- selectForAlph(sortedUtxos, amounts.alph, dustUtxoAmount)(asset =>
+        alphFoundResult <- selectForAlph(sortedUtxos, amounts.alph, dustAmount)(asset =>
           Some(asset.output.amount)
         )
         (alphAmountWithoutGas, utxosForAlph, remainingUtxos) = alphFoundResult
@@ -147,7 +148,7 @@ object UtxoUtils {
     private def selectForAlph(
         sortedUtxos: AVector[Asset],
         amount: U256,
-        dustUtxoAmount: U256
+        dustAmount: U256
     )(getAmount: Asset => Option[U256]): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
       @tailrec
       def iter(sum: U256, index: Int): (U256, Int) = {
@@ -155,7 +156,7 @@ object UtxoUtils {
           (sum, -1)
         } else {
           val newSum = sum.addUnsafe(getAmount(sortedUtxos(index)).getOrElse(U256.Zero))
-          if (validate(newSum, amount, dustUtxoAmount)) {
+          if (validate(newSum, amount, dustAmount)) {
             (newSum, index)
           } else {
             iter(newSum, index + 1)
@@ -231,6 +232,7 @@ object UtxoUtils {
         selectedSoFar: SelectedSoFar,
         totalAlphAmount: U256,
         gasPrice: GasPrice,
+        dustAmount: U256,
         assetScriptGasEstimator: AssetScriptGasEstimator
     ): Either[String, SelectedSoFar] = {
       val selectedUTXOs       = selectedSoFar.selected
@@ -248,7 +250,7 @@ object UtxoUtils {
           assetScriptGasEstimator.setInputs(inputs)
         )
         val gasFee = gasPrice * gas
-        if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustUtxoAmount)) {
+        if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustAmount)) {
           (sum, index)
         } else {
           if (index == restOfUtxos.length) {
