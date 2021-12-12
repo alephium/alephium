@@ -258,10 +258,10 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       })
     }
 
-    case class UtxoSelection(amount: U256, tokens: (TokenId, U256)*)(implicit
+    case class UtxoSelection(alph: U256, tokens: (TokenId, U256)*)(implicit
         utxos: AVector[AssetOutputInfo]
     ) {
-      val utxosSorted            = utxos.sorted(assetOrderByAlph)
+      val utxosSorted            = utxos.sorted(AssetAscendingOrder.byAlph)
       var dustAmount: U256       = U256.Zero
       var gasOpt: Option[GasBox] = None
       val outputs = {
@@ -271,24 +271,24 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
         AVector(lockupScript1, lockupScript2, lockupScript3)
       }
 
-      lazy val valueWithoutGas =
-        findUtxosWithoutGas(utxosSorted, amount, AVector.from(tokens), dustAmount).map {
-          case (_, selectedUtxos, _) => selectedUtxos
-        }
+      lazy val valueWithoutGas = {
+        SelectionWithoutGasEstimation
+          .select(utxosSorted, Amounts(alph, AVector.from(tokens)), dustAmount)
+          .map(_.selected)
+      }
 
       lazy val valueWithGas = {
-        UtxoUtils.select(
-          defaultUnlockScript,
-          utxos,
-          outputs.length,
-          amount,
-          AVector.from(tokens),
-          gasOpt,
-          Some(GasPrice(1)),
-          estimatedScriptGas = None,
-          dustAmount,
-          AssetScriptGasEstimator.Mock
-        )
+        UtxoUtils
+          .Selection(
+            defaultUnlockScript,
+            utxos,
+            outputs.length,
+            ProvidedGas(gasOpt, Some(GasPrice(1))),
+            estimatedTxScriptGas = None,
+            dustAmount,
+            AssetScriptGasEstimator.Mock
+          )
+          .select(Amounts(alph, AVector.from(tokens)))
       }
 
       def verify(utxoIndexes: Int*): Assertion = {

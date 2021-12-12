@@ -22,6 +22,7 @@ import TxUtils._
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
+import org.alephium.flow.core.UtxoUtils.{Amounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
@@ -158,18 +159,17 @@ trait TxUtils { Self: FlowUtils =>
       case Right((totalAmount, totalAmountPerToken)) =>
         getUsableUtxos(fromLockupScript, utxosLimit)
           .map { utxos =>
-            UtxoUtils.select(
-              fromUnlockScript,
-              utxos,
-              outputInfos.length + 1,
-              totalAmount,
-              totalAmountPerToken,
-              gasOpt,
-              Some(gasPrice),
-              estimatedScriptGas = None,
-              dustUtxoAmount,
-              assetScriptGasEstimator
-            )
+            UtxoUtils
+              .Selection(
+                fromUnlockScript,
+                utxos,
+                outputInfos.length + 1,
+                ProvidedGas(gasOpt, Some(gasPrice)),
+                estimatedTxScriptGas = None,
+                dustUtxoAmount,
+                assetScriptGasEstimator
+              )
+              .select(Amounts(totalAmount, totalAmountPerToken))
           }
           .map {
             _.flatMap { selected =>
@@ -259,7 +259,8 @@ trait TxUtils { Self: FlowUtils =>
     checkResult match {
       case Right(()) =>
         getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
-          // sweep as much as we can, considering gas (1044860 for ALPH.MaxTxInputNum)
+          // Sweep as much as we can, taking maximalGasPerTx into consideration
+          // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx (1044860)
           val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum / 2)
           for {
             txOutputsWithGas <- buildSweepAllTxOutputsWithGas(

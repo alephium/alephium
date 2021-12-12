@@ -22,10 +22,9 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
 
-// Some gas for the output and some gas for the input
-// Does it make sense to estimate the gas when we unlock?
-// Gas per output is charged ahead of time, depending on the type of the UnlockScript
-// Output is fixed, it is only when we do input we execute
+// Estimate gas based on execution
+//   - UnlockScript, including P2PKH, P2MPKH and P2SH
+//   - TxScript
 object GasEstimation extends StrictLogging {
   def sweepAll: (Int, Int) => GasBox = estimateWithP2PKHInputs _
 
@@ -35,22 +34,22 @@ object GasEstimation extends StrictLogging {
   }
 
   def estimateWithInputScript(
-      script: UnlockScript,
+      unlockScript: UnlockScript,
       numInputs: Int,
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): GasBox = {
-    val inputs = AVector.fill(numInputs)(script)
+    val inputs = AVector.fill(numInputs)(unlockScript)
     estimate(inputs, numOutputs, assetScriptGasEstimator)
   }
 
   def estimate(
-      inputs: AVector[UnlockScript],
+      unlockScripts: AVector[UnlockScript],
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): GasBox = {
     val inputGas =
-      inputs.fold(GasBox.zero)(_ addUnsafe estimateInputGas(_, assetScriptGasEstimator))
+      unlockScripts.fold(GasBox.zero)(_ addUnsafe estimateInputGas(_, assetScriptGasEstimator))
     estimate(inputGas, numOutputs)
   }
 

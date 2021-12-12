@@ -28,7 +28,7 @@ trait TxScriptGasEstimator {
 }
 
 object TxScriptGasEstimator {
-  class Default(
+  final case class Default(
       inputs: AVector[TxInput],
       flow: BlockFlow
   )(implicit networkConfig: NetworkConfig, config: GroupConfig)
