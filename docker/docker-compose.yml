@@ -24,7 +24,7 @@ services:
     # Hint: mounts must be chown'ed to nobody:
     # mkdir ./alephium-data ./alephium-wallets && chown nobody ./alephium-data ./alephium-wallets
     volumes:
-      # The provided file user-mainnet.conf is a minimal default config to connect your container to the mainnet.
+      # The provided file user.conf is a minimal default config to connect your container to the mainnet.
       - alephium-data:/alephium-home/.alephium
       - ./user.conf:/alephium-home/.alephium/user.conf
 #      - ./alephium-wallets:/alephium-home/.alephium-wallets
