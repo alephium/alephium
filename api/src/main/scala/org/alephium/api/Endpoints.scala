@@ -349,8 +349,8 @@ trait Endpoints
       .in(jsonBody[ExportFile])
       .summary("Exports all the blocks")
 
-  val metrics: BaseEndpoint[Unit, String] =
-    baseEndpoint.get
+  val metrics: BaseEndpointWithoutApi[Unit, String] =
+    baseEndpointWithoutApiKey.get
       .in("metrics")
       .out(alphPlainTextBody)
       .summary("Exports all prometheus metrics")

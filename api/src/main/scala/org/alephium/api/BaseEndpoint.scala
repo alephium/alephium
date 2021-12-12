@@ -33,22 +33,26 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
 
   def maybeApiKey: Option[ApiKey]
 
+  type BaseEndpointWithoutApi[I, O] =
+    Endpoint[I, ApiError[_ <: StatusCode], O, Any]
+
   type BaseEndpoint[I, O] =
     PartialServerEndpoint[Option[ApiKey], Unit, I, ApiError[_ <: StatusCode], O, Any, Future]
 
-  val baseEndpoint: BaseEndpoint[Unit, Unit] =
-    endpoint
-      .errorOut(
-        oneOf[ApiError[_ <: StatusCode]](
-          error(BadRequest, { case BadRequest(_) => true }),
-          error(InternalServerError, { case InternalServerError(_) => true }),
-          error(NotFound, { case NotFound(_) => true }),
-          error(ServiceUnavailable, { case ServiceUnavailable(_) => true }),
-          error(Unauthorized, { case Unauthorized(_) => true })
-        )
+  val baseEndpointWithoutApiKey: BaseEndpointWithoutApi[Unit, Unit] = endpoint
+    .errorOut(
+      oneOf[ApiError[_ <: StatusCode]](
+        error(BadRequest, { case BadRequest(_) => true }),
+        error(InternalServerError, { case InternalServerError(_) => true }),
+        error(NotFound, { case NotFound(_) => true }),
+        error(ServiceUnavailable, { case ServiceUnavailable(_) => true }),
+        error(Unauthorized, { case Unauthorized(_) => true })
       )
-      .in(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
-      .serverLogicForCurrent { apiKey => Future.successful(checkApiKey(apiKey)) }
+    )
+
+  val baseEndpoint: BaseEndpoint[Unit, Unit] = baseEndpointWithoutApiKey
+    .in(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
+    .serverLogicForCurrent { apiKey => Future.successful(checkApiKey(apiKey)) }
 
   private def checkApiKey(
       maybeToCheck: Option[ApiKey]
