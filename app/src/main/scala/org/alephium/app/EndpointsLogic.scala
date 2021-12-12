@@ -531,7 +531,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  val metricsLogic = serverLogic(metrics) { _ =>
+  val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
       val writer: Writer = new StringWriter()
       try {

@@ -349,7 +349,7 @@ trait Endpoints
       .in(jsonBody[ExportFile])
       .summary("Exports all the blocks")
 
-  val metrics: BaseEndpoint[Unit, String] =
+  val metrics: BaseEndpointWithoutApi[Unit, String] =
     baseEndpointWithoutApiKey.get
       .in("metrics")
       .out(alphPlainTextBody)
