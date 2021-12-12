@@ -350,7 +350,7 @@ trait Endpoints
       .summary("Exports all the blocks")
 
   val metrics: BaseEndpoint[Unit, String] =
-    baseEndpoint.get
+    baseEndpointWithoutApiKey.get
       .in("metrics")
       .out(alphPlainTextBody)
       .summary("Exports all prometheus metrics")
