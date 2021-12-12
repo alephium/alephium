@@ -34,7 +34,7 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
   def maybeApiKey: Option[ApiKey]
 
   type BaseEndpointWithoutApi[I, O] =
-    Endpoint[I, ApiError[_ <: sttp.model.StatusCode], O, Any]
+    Endpoint[I, ApiError[_ <: StatusCode], O, Any]
 
   type BaseEndpoint[I, O] =
     PartialServerEndpoint[Option[ApiKey], Unit, I, ApiError[_ <: StatusCode], O, Any, Future]

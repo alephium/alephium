@@ -32,8 +32,9 @@ the full node. To call an API endpoint, `X-API-KEY` header needs to be provided.
 curl -H "X-API-KEY: 0000000000000000000000000000000000000000000000000000000000000000" http://127.0.0.1:12973/infos/self-clique
 ```
 
-To disable the API key, remove the `ALEPHIUM_API_KEY` environment variable from the [docker-compose.yml](docker-compose.yml) file.
-To update the API key, update the value of the `ALEPHIUM_API_KEY` environment variable from the [docker-compose.yml](docker-compose.yml) file.
+To disable the API key, remove the `ALEPHIUM_API_KEY` environment variable from the [docker-compose](docker-compose.yml) file.
+To update the API key, update the value of the `ALEPHIUM_API_KEY` environment variable from the [docker-compose](docker-compose.yml) file.
+Note that the API key must have at least 32 alphanumeric characters.
 
 ## Monitoring
 
