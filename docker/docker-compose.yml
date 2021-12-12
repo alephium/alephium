@@ -20,15 +20,13 @@ services:
       - 127.0.0.1:12973:12973
     security_opt:
       - no-new-privileges:true
-    environment:
-      - ALEPHIUM_API_KEY=0000000000000000000000000000000000000000000000000000000000000000
     # Set volumes or mounts to avoid loosing data/wallets.
     # Hint: mounts must be chown'ed to nobody:
     # mkdir ./alephium-data ./alephium-wallets && chown nobody ./alephium-data ./alephium-wallets
     volumes:
       # The provided file user-mainnet.conf is a minimal default config to connect your container to the mainnet.
       - alephium-data:/alephium-home/.alephium
-      - ./user-mainnet.conf:/alephium-home/.alephium/user.conf
+      - ./user.conf:/alephium-home/.alephium/user.conf
 #      - ./alephium-wallets:/alephium-home/.alephium-wallets
 
   grafana:

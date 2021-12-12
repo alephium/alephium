@@ -1,9 +1,9 @@
-Docker setup
+Docker Stack Setup
 ====
 
 This folder container all the necessary material to build and run Alephium via docker container.
 
-# Prerequisites
+## Prerequisites
 
 We're using [docker-compose](https://docs.docker.com/compose/) to run Alephium here.
 Make sure you installed `docker` and `docker-compose` before proceeding further.
@@ -15,7 +15,7 @@ in the `docker` group by running the following command.
 sudo usermod -aG docker $USER
 ```
 
-# Run
+## Run
 
 The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
 
@@ -24,17 +24,6 @@ docker-compose stop && docker-compose rm -f alephium && docker-compose pull && d
 ```
 
 The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs).
-
-By default an API key with the value of `0000000000000000000000000000000000000000000000000000000000000000` is configured to protect the APIs exposed by
-the full node. To call an API endpoint, `X-API-KEY` header needs to be provided. Here is an example:
-
-```
-curl -H "X-API-KEY: 0000000000000000000000000000000000000000000000000000000000000000" http://127.0.0.1:12973/infos/self-clique
-```
-
-To disable the API key, remove the `ALEPHIUM_API_KEY` environment variable from the [docker-compose](docker-compose.yml) file.
-To update the API key, update the value of the `ALEPHIUM_API_KEY` environment variable from the [docker-compose](docker-compose.yml) file.
-Note that the API key must have at least 32 alphanumeric characters.
 
 ## Monitoring
 
@@ -51,7 +40,20 @@ and `Alephium Overview`:
 http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 ```
 
-# Configuration
+## Advanced Configuration
+
+### API Key
+
+By default, API key is not setup as Swagger APIs are bound to `127.0.0.0` interface and are not accessible from public network.
+However, if you modified `docker-compose.yml` to expose `12973`, then you'd better to setup API key for the sake of security.
+
+You could setup API key as follows:
+1. remove the `# ` before `alephium.api.api-key` in `user.conf`
+2. replace the default key `0000...000` with your own key. The key must have at least 32 alphanumeric characters.
+
+For more information about using API key, please follow this wiki [API Key](https://wiki.alephium.org/Full-Node-More.html#api-key)
+
+### Persistence
 
 In order to persist your data (blocks, wallets, ...), two volumes/mounts can be used.
 
@@ -72,9 +74,7 @@ Mount them as volumes inside the container:
       - ./alephium-wallets:/alephium-home/.alephium-wallets
 ```
 
-All good, your data will survive accross restarts!
-
-For more configuration, check the [Mainnet Guide](https://wiki.alephium.org/Mainnet-Guide.html) on the wiki.
+All good, your data will survive across restarts!
 
 ## GPU Miner (Optional)
 
