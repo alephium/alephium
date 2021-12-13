@@ -25,8 +25,8 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model._
-import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoUtils}
-import org.alephium.flow.core.UtxoUtils._
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
@@ -607,17 +607,16 @@ class ServerUtils(implicit
         script,
         TxScriptGasEstimator.Default(allInputs, blockFlow)
       )
-      unsignedTx <- UtxoUtils
-        .Selection(
+      unsignedTx <- UtxoSelectionAlgo
+        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice))
+        .select(
+          AssetAmounts(amount, AVector.empty),
           unlockScript,
           allUtxos,
           txOutputsLength = 0,
-          ProvidedGas(gas, gasPrice),
           Some(scriptGas),
-          dustUtxoAmount,
           AssetScriptGasEstimator.Default(blockFlow)
         )
-        .select(Amounts(amount, AVector.empty))
         .map { selectedUtxos =>
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(

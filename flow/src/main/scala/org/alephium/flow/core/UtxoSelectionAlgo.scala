@@ -30,8 +30,13 @@ import org.alephium.util._
  *   - the above logic applies to both ALPH and tokens.
  */
 // scalastyle:off parameter.number
-object UtxoUtils {
-  object AssetAscendingOrder {
+object UtxoSelectionAlgo {
+  trait AssetOrder {
+    def byAlph: Ordering[Asset]
+    def byToken(id: TokenId): Ordering[Asset]
+  }
+
+  object AssetAscendingOrder extends AssetOrder {
     val byAlph: Ordering[Asset] = (x: Asset, y: Asset) => {
       val compare1 = x.outputType.cachedLevel.compareTo(y.outputType.cachedLevel)
       if (compare1 != 0) {
@@ -65,26 +70,30 @@ object UtxoUtils {
       gasOpt: Option[GasBox],
       gasPriceOpt: Option[GasPrice]
   )
-  final case class Amounts(alph: U256, tokens: AVector[(TokenId, U256)])
+  final case class AssetAmounts(alph: U256, tokens: AVector[(TokenId, U256)])
 
-  final case class Selection(
-      unlockScript: UnlockScript,
-      utxos: AVector[Asset],
-      txOutputsLength: Int,
-      providedGas: ProvidedGas,
-      estimatedTxScriptGas: Option[GasBox],
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  final case class Build(
       dustAmount: U256,
-      assetScriptGasEstimator: AssetScriptGasEstimator
+      providedGas: ProvidedGas,
+      assetOrder: AssetOrder = AssetAscendingOrder
   ) {
-    def select(amounts: Amounts): Either[String, Selected] = {
-      val sortedUtxos = utxos.sorted(AssetAscendingOrder.byAlph)
+    def select(
+        amounts: AssetAmounts,
+        unlockScript: UnlockScript,
+        utxos: AVector[Asset],
+        txOutputsLength: Int,
+        estimatedTxScriptGas: Option[GasBox],
+        assetScriptGasEstimator: AssetScriptGasEstimator
+    ): Either[String, Selected] = {
+      val sortedUtxos = utxos.sorted(assetOrder.byAlph)
       val gasPrice    = providedGas.gasPriceOpt.getOrElse(defaultGasPrice)
 
       providedGas.gasOpt match {
         case Some(gas) =>
           val amountsWithGas = amounts.copy(alph = amounts.alph.addUnsafe(gasPrice * gas))
-          SelectionWithoutGasEstimation
-            .select(sortedUtxos, amountsWithGas, dustAmount)
+          SelectionWithoutGasEstimation(assetOrder)
+            .select(amountsWithGas, sortedUtxos, dustAmount)
             .map { selectedSoFar =>
               Selected(selectedSoFar.selected, gas)
             }
@@ -96,48 +105,68 @@ object UtxoUtils {
             totalAlphAmount <- scriptGasFee
               .add(amounts.alph)
               .toRight("ALPH balance overflow with estimated script gas")
-            amountsWithScriptGas = Amounts(totalAlphAmount, amounts.tokens)
-            resultWithoutGas <- SelectionWithoutGasEstimation.select(
-              sortedUtxos,
+            amountsWithScriptGas = AssetAmounts(totalAlphAmount, amounts.tokens)
+            utxos <- selectUtxos(
               amountsWithScriptGas,
-              dustAmount
-            )
-            resultForGas <- SelectionWithGasEstimation.select(
+              sortedUtxos,
               unlockScript,
               txOutputsLength,
-              resultWithoutGas,
-              totalAlphAmount,
               gasPrice,
               dustAmount,
               assetScriptGasEstimator
             )
           } yield {
-            val utxos = resultWithoutGas.selected ++ resultForGas.selected
+            val inputs = utxos.map(_.ref).map(TxInput(_, unlockScript))
             val gas = GasEstimation.estimateWithInputScript(
               unlockScript,
               utxos.length,
               txOutputsLength,
-              assetScriptGasEstimator
+              assetScriptGasEstimator.setInputs(inputs)
             )
             Selected(utxos, gas.addUnsafe(scriptGas))
           }
       }
     }
+
+    private def selectUtxos(
+        assetAmounts: AssetAmounts,
+        sortedUtxos: AVector[Asset],
+        unlockScript: UnlockScript,
+        txOutputsLength: Int,
+        gasPrice: GasPrice,
+        dustAmount: U256,
+        assetScriptGasEstimator: AssetScriptGasEstimator
+    ): Either[String, AVector[Asset]] = {
+      for {
+        resultWithoutGas <- SelectionWithoutGasEstimation(assetOrder).select(
+          assetAmounts,
+          sortedUtxos,
+          dustAmount
+        )
+        resultForGas <- SelectionWithGasEstimation(gasPrice, dustAmount).select(
+          unlockScript,
+          txOutputsLength,
+          resultWithoutGas,
+          assetAmounts.alph,
+          assetScriptGasEstimator
+        )
+      } yield resultWithoutGas.selected ++ resultForGas.selected
+    }
   }
 
-  object SelectionWithoutGasEstimation {
+  final case class SelectionWithoutGasEstimation(assetOrder: AssetOrder) {
 
     def select(
+        amounts: AssetAmounts,
         sortedUtxos: AVector[Asset],
-        amounts: Amounts,
         dustAmount: U256
     ): Either[String, SelectedSoFar] = {
       for {
-        alphFoundResult <- selectForAlph(sortedUtxos, amounts.alph, dustAmount)(asset =>
+        alphFoundResult <- selectForAlph(amounts.alph, sortedUtxos, dustAmount)(asset =>
           Some(asset.output.amount)
         )
         (alphAmountWithoutGas, utxosForAlph, remainingUtxos) = alphFoundResult
-        tokensFoundResult <- selectForTokens(utxosForAlph, remainingUtxos, amounts.tokens)
+        tokensFoundResult <- selectForTokens(amounts.tokens, utxosForAlph, remainingUtxos)
       } yield {
         val (foundUtxos, restOfUtxos, _) = tokensFoundResult
         val alphAmountWithoutGas         = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
@@ -146,8 +175,8 @@ object UtxoUtils {
     }
 
     private def selectForAlph(
-        sortedUtxos: AVector[Asset],
         amount: U256,
+        sortedUtxos: AVector[Asset],
         dustAmount: U256
     )(getAmount: Asset => Option[U256]): Either[String, (U256, AVector[Asset], AVector[Asset])] = {
       @tailrec
@@ -177,26 +206,26 @@ object UtxoUtils {
 
     @tailrec
     private def selectForTokens(
+        totalAmountPerToken: AVector[(TokenId, U256)],
         currentUtxos: AVector[Asset],
-        restOfUtxos: AVector[Asset],
-        totalAmountPerToken: AVector[(TokenId, U256)]
+        restOfUtxos: AVector[Asset]
     ): Either[String, (AVector[Asset], AVector[Asset], AVector[(TokenId, U256)])] = {
       if (totalAmountPerToken.isEmpty) {
         Right((currentUtxos, restOfUtxos, totalAmountPerToken))
       } else {
         val (tokenId, amount) = totalAmountPerToken.head
-        val sortedUtxos       = restOfUtxos.sorted(AssetAscendingOrder.byToken(tokenId))
+        val sortedUtxos       = restOfUtxos.sorted(assetOrder.byToken(tokenId))
 
         val foundResult = for {
           remainingTokenAmount <- calculateRemainingTokensAmount(currentUtxos, tokenId, amount)
-          result <- selectForAlph(sortedUtxos, remainingTokenAmount, U256.Zero)(
+          result <- selectForAlph(remainingTokenAmount, sortedUtxos, U256.Zero)(
             _.output.tokens.find(_._1 == tokenId).map(_._2)
           )
         } yield result
 
         foundResult match {
           case Right((_, foundUtxos, remainingUtxos)) =>
-            selectForTokens(currentUtxos ++ foundUtxos, remainingUtxos, totalAmountPerToken.tail)
+            selectForTokens(totalAmountPerToken.tail, currentUtxos ++ foundUtxos, remainingUtxos)
           case Left(e) =>
             Left(e)
         }
@@ -224,15 +253,13 @@ object UtxoUtils {
     }
   }
 
-  object SelectionWithGasEstimation {
+  final case class SelectionWithGasEstimation(gasPrice: GasPrice, dustAmount: U256) {
 
     def select(
         unlockScript: UnlockScript,
         txOutputsLength: Int,
         selectedSoFar: SelectedSoFar,
         totalAlphAmount: U256,
-        gasPrice: GasPrice,
-        dustAmount: U256,
         assetScriptGasEstimator: AssetScriptGasEstimator
     ): Either[String, SelectedSoFar] = {
       val selectedUTXOs       = selectedSoFar.selected

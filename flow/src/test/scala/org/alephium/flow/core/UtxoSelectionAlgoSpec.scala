@@ -20,7 +20,7 @@ import akka.util.ByteString
 import org.scalatest.compatible.Assertion
 
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
-import org.alephium.flow.core.UtxoUtils._
+import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.Hash
@@ -30,7 +30,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
+class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
   implicit val groupConfig = new GroupConfig {
     override def groups: Int = 2
@@ -272,23 +272,22 @@ class UtxoUtilsSpec extends AlephiumSpec with LockupScriptGenerators {
       }
 
       lazy val valueWithoutGas = {
-        SelectionWithoutGasEstimation
-          .select(utxosSorted, Amounts(alph, AVector.from(tokens)), dustAmount)
+        new SelectionWithoutGasEstimation(AssetAscendingOrder)
+          .select(AssetAmounts(alph, AVector.from(tokens)), utxosSorted, dustAmount)
           .map(_.selected)
       }
 
       lazy val valueWithGas = {
-        UtxoUtils
-          .Selection(
+        UtxoSelectionAlgo
+          .Build(dustAmount, ProvidedGas(gasOpt, Some(GasPrice(1))))
+          .select(
+            AssetAmounts(alph, AVector.from(tokens)),
             defaultUnlockScript,
             utxos,
             outputs.length,
-            ProvidedGas(gasOpt, Some(GasPrice(1))),
             estimatedTxScriptGas = None,
-            dustAmount,
             AssetScriptGasEstimator.Mock
           )
-          .select(Amounts(alph, AVector.from(tokens)))
       }
 
       def verify(utxoIndexes: Int*): Assertion = {

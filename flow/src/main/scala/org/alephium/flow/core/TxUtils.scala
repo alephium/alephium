@@ -22,7 +22,7 @@ import TxUtils._
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
 import org.alephium.flow.core.FlowUtils._
-import org.alephium.flow.core.UtxoUtils.{Amounts, ProvidedGas}
+import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
@@ -159,17 +159,16 @@ trait TxUtils { Self: FlowUtils =>
       case Right((totalAmount, totalAmountPerToken)) =>
         getUsableUtxos(fromLockupScript, utxosLimit)
           .map { utxos =>
-            UtxoUtils
-              .Selection(
+            UtxoSelectionAlgo
+              .Build(dustUtxoAmount, ProvidedGas(gasOpt, Some(gasPrice)))
+              .select(
+                AssetAmounts(totalAmount, totalAmountPerToken),
                 fromUnlockScript,
                 utxos,
                 outputInfos.length + 1,
-                ProvidedGas(gasOpt, Some(gasPrice)),
                 estimatedTxScriptGas = None,
-                dustUtxoAmount,
                 assetScriptGasEstimator
               )
-              .select(Amounts(totalAmount, totalAmountPerToken))
           }
           .map {
             _.flatMap { selected =>
