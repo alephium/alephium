@@ -220,7 +220,7 @@ class WalletAppSpec
     }
 
     deriveNextAddress() check { response =>
-      address = response.as[model.DeriveNextAddress.Result].address
+      address = response.as[model.AddressInfo].address
       addresses = model.Addresses(
         address,
         addresses.addresses :+ model.Addresses.Info(address, address.groupIndex.value)

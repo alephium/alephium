@@ -96,7 +96,7 @@ trait WalletService extends Service {
       wallet: String,
       data: String
   ): Either[WalletError, Signature]
-  def deriveNextAddress(wallet: String): Either[WalletError, Address.Asset]
+  def deriveNextAddress(wallet: String): Either[WalletError, (Address.Asset, PublicKey)]
   def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[Address.Asset]]
   def changeActiveAddress(wallet: String, address: Address.Asset): Either[WalletError, Unit]
   def listWallets(): Either[WalletError, AVector[(String, Boolean)]]
@@ -433,11 +433,15 @@ object WalletService {
       }
     }
 
-    override def deriveNextAddress(wallet: String): Either[WalletError, Address.Asset] = {
+    override def deriveNextAddress(
+        wallet: String
+    ): Either[WalletError, (Address.Asset, PublicKey)] = {
       withUserWallet(wallet) { secretStorage =>
         secretStorage
           .deriveNextKey()
-          .map(privateKey => Address.p2pkh(privateKey.extendedPublicKey.publicKey))
+          .map(privateKey =>
+            (Address.p2pkh(privateKey.extendedPublicKey.publicKey), privateKey.publicKey)
+          )
           .left
           .map(WalletError.from)
       }

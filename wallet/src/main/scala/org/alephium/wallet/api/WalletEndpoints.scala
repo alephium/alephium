@@ -134,10 +134,10 @@ trait WalletEndpoints
       .out(jsonBody[AddressInfo])
       .summary("Get address' info")
 
-  val deriveNextAddress: BaseEndpoint[String, DeriveNextAddress.Result] =
+  val deriveNextAddress: BaseEndpoint[String, AddressInfo] =
     wallet.post
       .in("derive-next-address")
-      .out(jsonBody[DeriveNextAddress.Result])
+      .out(jsonBody[AddressInfo])
       .summary("Derive your next address")
       .description("Cannot be called from a miner wallet")
 

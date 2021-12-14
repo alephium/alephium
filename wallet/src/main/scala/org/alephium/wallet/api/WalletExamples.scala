@@ -190,7 +190,4 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val changeActiveAddressExamples: List[Example[ChangeActiveAddress]] =
     simpleExample(ChangeActiveAddress(address))
-
-  implicit val deriveNextAddressResultExamples: List[Example[DeriveNextAddress.Result]] =
-    simpleExample(DeriveNextAddress.Result(address))
 }

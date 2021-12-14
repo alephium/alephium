@@ -1747,10 +1747,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result5"
+                  "$ref": "#/components/schemas/AddressInfo"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                  "group": 0
                 }
               }
             }
@@ -5347,7 +5349,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result6"
+                  "$ref": "#/components/schemas/Result5"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
@@ -7329,17 +7331,6 @@
         }
       },
       "Result5": {
-        "required": [
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "Result6": {
         "required": [
           "address"
         ],

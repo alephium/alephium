@@ -41,8 +41,6 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val changeActiveAddressRW: RW[ChangeActiveAddress] = macroRW
 
-  implicit val deriveNextAddressResultRW: RW[DeriveNextAddress.Result] = macroRW
-
   implicit val transferRW: RW[Transfer] = macroRW
 
   implicit val signTransactionRW: RW[Sign] = macroRW

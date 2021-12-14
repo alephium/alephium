@@ -187,7 +187,9 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     Future.successful(
       walletService
         .deriveNextAddress(wallet)
-        .map(model.DeriveNextAddress.Result(_))
+        .map { case (address, publicKey) =>
+          model.AddressInfo(address, publicKey, address.groupIndex.value)
+        }
         .left
         .map(toApiError)
     )
