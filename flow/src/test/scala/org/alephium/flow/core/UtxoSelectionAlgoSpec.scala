@@ -272,7 +272,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       }
 
       lazy val valueWithoutGas = {
-        new SelectionWithoutGasEstimation(AssetAscendingOrder)
+        SelectionWithoutGasEstimation(AssetAscendingOrder)
           .select(AssetAmounts(alph, AVector.from(tokens)), utxosSorted, dustAmount)
           .map(_.selected)
       }

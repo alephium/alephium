@@ -40,7 +40,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, ReleaseVersion, TxGenerators}
+import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
