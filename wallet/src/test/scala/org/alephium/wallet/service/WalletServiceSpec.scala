@@ -114,7 +114,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.getAddresses(walletName).isRight is true
   }
 
-  it should "show double unlock edge case" in new Fixture {
+  it should "prevent double unlock edge case (see previous commit's comment)" in new Fixture {
     override val lockingTimeout = Duration.ofMillisUnsafe(200)
 
     walletService.createWallet(password, mnemonicSize, true, walletName, None).rightValue
@@ -122,10 +122,6 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.getAddresses(walletName).isRight is true
 
     Thread.sleep(201)
-
-    walletService.unlockWallet(walletName, password, None).isRight is true
-
-    walletService.getAddresses(walletName).isRight is false
 
     walletService.unlockWallet(walletName, password, None).isRight is true
 

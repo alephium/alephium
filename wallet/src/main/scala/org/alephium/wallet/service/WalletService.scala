@@ -203,11 +203,12 @@ object WalletService {
         storages.get(wallet).map { storageTs =>
           val lockNeeded = TimeStamp.now().deltaUnsafe(storageTs.lastAccess) > lockingTimeout &&
             !storageTs.secretStorage.isLocked()
+
           if (lockNeeded) {
             storageTs.secretStorage.lock()
-          } else {
-            storages.update(wallet, storageTs.copy(lastAccess = TimeStamp.now()))
           }
+
+          storages.update(wallet, storageTs.copy(lastAccess = TimeStamp.now()))
           storageTs.secretStorage
         }
       }
