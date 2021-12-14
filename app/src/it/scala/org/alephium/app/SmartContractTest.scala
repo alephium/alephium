@@ -22,9 +22,10 @@ import sttp.model.StatusCode
 import org.alephium.api.model._
 import org.alephium.flow.gasestimation._
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.serde.deserialize
 import org.alephium.util._
 
 class SmartContractTest extends AlephiumActorSpec {
@@ -106,6 +107,33 @@ class SmartContractTest extends AlephiumActorSpec {
       buildResult
     }
 
+    def estimateBuildContractGas(
+        code: String,
+        state: Option[String],
+        issueTokenAmount: Option[U256]
+    ): GasBox = {
+      val unlockScript = UnlockScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
+      val lockupScript = LockupScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
+
+      val compileResult = request[CompileResult](compileContract(code), restPort)
+      val script = ServerUtils
+        .buildContract(
+          compileResult.code,
+          Address.fromBase58(address).value,
+          state,
+          dustUtxoAmount,
+          issueTokenAmount
+        )
+        .rightValue
+
+      val blockFlow    = clique.servers(group.group % 2).node.blockFlow
+      val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 100).rightValue
+      val allInputs    = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
+      val gasEstimator = TxScriptGasEstimator.Default(allInputs, blockFlow)
+
+      GasEstimation.estimate(script, gasEstimator)
+    }
+
     def decodeTx(str: String): Tx = {
       request[Tx](decodeUnsignedTransaction(str), restPort)
     }
@@ -150,6 +178,30 @@ class SmartContractTest extends AlephiumActorSpec {
       restPort,
       StatusCode.BadRequest
     )
+
+    clique.stop()
+  }
+
+  it should "estimate gas for build contract correctly" in new SwapContractsFixture {
+    val tokenContractBuildResult =
+      contract(
+        SwapContracts.tokenContract,
+        gas = None,
+        state = Some("[0u]"),
+        issueTokenAmount = Some(1024)
+      )
+
+    val rawUnsignedTx = Hex.from(tokenContractBuildResult.unsignedTx).value
+    val unsignedTx    = deserialize[UnsignedTransaction](rawUnsignedTx).rightValue
+
+    val scriptGas = estimateBuildContractGas(SwapContracts.tokenContract, Some("[0u]"), Some(1024))
+    val gasWithoutScript = GasEstimation.estimateWithP2PKHInputs(
+      unsignedTx.inputs.length,
+      unsignedTx.fixedOutputs.length
+    )
+
+    gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
+    unsignedTx.gasAmount is GasBox.unsafe(57062)
 
     clique.stop()
   }

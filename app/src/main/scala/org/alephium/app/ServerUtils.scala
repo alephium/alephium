@@ -539,15 +539,6 @@ class ServerUtils(implicit
       Right(true)
     }
 
-  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
-    str match {
-      case None => Right(AVector.empty[vm.Val])
-      case Some(state) =>
-        val res = Compiler.compileState(state)
-        res
-    }
-  }
-
   def buildMultisigAddress(
       keys: AVector[PublicKey],
       mrequired: Int
@@ -561,31 +552,6 @@ class ServerUtils(implicit
         )
       case None => Left(s"Invalid m-of-n multisig")
     }
-  }
-
-  private def buildContract(
-      codeRaw: String,
-      address: Address,
-      initialState: AVector[vm.Val],
-      alphAmount: U256,
-      newTokenAmount: Option[U256]
-  ): Either[Compiler.Error, StatefulScript] = {
-
-    val stateRaw = Hex.toHexString(serialize(initialState))
-    val creation = newTokenAmount match {
-      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
-    }
-
-    val scriptRaw = s"""
-      |TxScript Main {
-      |  pub payable fn main() -> () {
-      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
-      |    $creation
-      |  }
-      |}
-      |""".stripMargin
-    Compiler.compileTxScript(scriptRaw)
   }
 
   private def unsignedTxFromScript(
@@ -657,7 +623,7 @@ class ServerUtils(implicit
       state <- parseState(query.state).left.map(error => badRequest(error.message))
       _     <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
-      script <- buildContract(
+      script <- buildContractWithParsedState(
         query.code,
         address,
         state,
@@ -777,4 +743,49 @@ object ServerUtils {
     } yield unsignedTx
   }
 
+  def buildContract(
+      codeRaw: String,
+      address: Address,
+      initialState: Option[String],
+      alphAmount: U256,
+      newTokenAmount: Option[U256]
+  ): Either[Compiler.Error, StatefulScript] = {
+    parseState(initialState).flatMap { state =>
+      buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
+    }
+  }
+
+  def buildContractWithParsedState(
+      codeRaw: String,
+      address: Address,
+      initialState: AVector[vm.Val],
+      alphAmount: U256,
+      newTokenAmount: Option[U256]
+  ): Either[Compiler.Error, StatefulScript] = {
+    val stateRaw = Hex.toHexString(serialize(initialState))
+    val creation = newTokenAmount match {
+      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
+      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
+    }
+
+    val scriptRaw = s"""
+      |TxScript Main {
+      |  pub payable fn main() -> () {
+      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
+      |    $creation
+      |  }
+      |}
+      |""".stripMargin
+
+    Compiler.compileTxScript(scriptRaw)
+  }
+
+  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
+    str match {
+      case None => Right(AVector.empty[vm.Val])
+      case Some(state) =>
+        val res = Compiler.compileState(state)
+        res
+    }
+  }
 }
