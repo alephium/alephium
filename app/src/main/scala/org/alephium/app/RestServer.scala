@@ -74,6 +74,7 @@ class RestServer(
       discoveryActionLogic,
       getBlockflowLogic,
       getBlockLogic,
+      isBlockInMainChainLogic,
       getBalanceLogic,
       getUTXOsLogic,
       getGroupLogic,
