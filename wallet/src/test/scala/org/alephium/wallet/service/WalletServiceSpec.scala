@@ -99,15 +99,33 @@ class WalletServiceSpec extends AlephiumFutureSpec {
   }
 
   it should "lock the wallet if inactive" in new Fixture {
-    override val lockingTimeout = Duration.ofSecondsUnsafe(1)
+    override val lockingTimeout = Duration.ofMillisUnsafe(200)
 
     walletService.createWallet(password, mnemonicSize, true, walletName, None).rightValue
 
     walletService.getAddresses(walletName).isRight is true
 
-    Thread.sleep(1001)
+    Thread.sleep(201)
 
     walletService.getAddresses(walletName).leftValue is WalletService.WalletLocked
+
+    walletService.unlockWallet(walletName, password, None).isRight is true
+
+    walletService.getAddresses(walletName).isRight is true
+  }
+
+  it should "show double unlock edge case" in new Fixture {
+    override val lockingTimeout = Duration.ofMillisUnsafe(200)
+
+    walletService.createWallet(password, mnemonicSize, true, walletName, None).rightValue
+
+    walletService.getAddresses(walletName).isRight is true
+
+    Thread.sleep(201)
+
+    walletService.unlockWallet(walletName, password, None).isRight is true
+
+    walletService.getAddresses(walletName).isRight is false
 
     walletService.unlockWallet(walletName, password, None).isRight is true
 
