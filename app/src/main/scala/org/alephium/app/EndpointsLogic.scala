@@ -140,7 +140,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val isBlockInMainChainLogic = serverLogic(isBlockInMainChain) { hash =>
-    Future.successful(Right(serverUtils.isBlockInMainChain(blockFlow, hash)))
+    Future.successful(serverUtils.isBlockInMainChain(blockFlow, hash))
   }
 
   val getBlockHeaderEntryLogic = serverLogic(getBlockHeaderEntry) { hash =>

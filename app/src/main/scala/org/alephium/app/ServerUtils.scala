@@ -334,14 +334,17 @@ class ServerUtils(implicit
         .map(failedInIO)
     } yield BlockEntry.from(block, height)
 
-  def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Boolean = {
-    val result = for {
-      height <- blockFlow.getHeight(blockHash)
-      hashes <- blockFlow.getHashes(ChainIndex.from(blockHash), height)
-    } yield {
-      hashes.headOption.contains(blockHash)
-    }
-    result.getOrElse(false)
+  def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
+    for {
+      height <- blockFlow
+        .getHeight(blockHash)
+        .left
+        .map(_ => failed(s"Fail fetching block height with hash ${blockHash.toHexString}"))
+      hashes <- blockFlow
+        .getHashes(ChainIndex.from(blockHash), height)
+        .left
+        .map(failedInIO)
+    } yield hashes.headOption.contains(blockHash)
   }
 
   def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =
