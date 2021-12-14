@@ -19,6 +19,7 @@ package org.alephium.wallet.service
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.{Timer, TimerTask}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -180,15 +181,24 @@ object WalletService {
     new Impl(blockFlowClient, secretDir, lockingTimeout)
   }
 
-  final private case class StorageState(secretStorage: SecretStorage, lastAccess: TimeStamp)
+  final private case class StorageState(secretStorage: SecretStorage, timerTask: TimerTask)
 
   final private case class Storages(
       storages: mutable.Map[String, StorageState],
       lockingTimeout: Duration
   ) {
+    private val isDaemon = true
+    private val timer    = new Timer(isDaemon)
+
+    private def lockTimerTask(storage: SecretStorage): TimerTask = new TimerTask {
+      override def run(): Unit = storage.lock()
+    }
+
     def addOne(filename: String, storage: SecretStorage): Unit = {
       discard(storages.synchronized {
-        storages.addOne(filename -> StorageState(storage, TimeStamp.now()))
+        val timerTask = lockTimerTask(storage)
+        timer.schedule(timerTask, lockingTimeout.millis)
+        storages.addOne(filename -> StorageState(storage, timerTask))
       })
     }
 
@@ -201,14 +211,11 @@ object WalletService {
     def get(wallet: String): Option[SecretStorage] = {
       storages.synchronized {
         storages.get(wallet).map { storageTs =>
-          val lockNeeded = TimeStamp.now().deltaUnsafe(storageTs.lastAccess) > lockingTimeout &&
-            !storageTs.secretStorage.isLocked()
-
-          if (lockNeeded) {
-            storageTs.secretStorage.lock()
-          }
-
-          storages.update(wallet, storageTs.copy(lastAccess = TimeStamp.now()))
+          storageTs.timerTask.cancel()
+          val timerTask = lockTimerTask(storageTs.secretStorage)
+          timer.purge()
+          timer.schedule(timerTask, lockingTimeout.millis)
+          storages.update(wallet, storageTs.copy(timerTask = timerTask))
           storageTs.secretStorage
         }
       }
@@ -222,7 +229,6 @@ object WalletService {
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
       extends WalletService {
-
     private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
 
     private val path: AVector[Int] = Constants.path
