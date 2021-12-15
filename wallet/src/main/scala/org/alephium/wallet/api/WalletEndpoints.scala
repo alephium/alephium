@@ -160,10 +160,10 @@ trait WalletEndpoints
       .out(jsonBody[AVector[MinerAddressesInfo]])
       .summary("List all miner addresses per group")
 
-  val deriveNextMinerAddresses: BaseEndpoint[String, AVector[MinerAddressInfo]] =
+  val deriveNextMinerAddresses: BaseEndpoint[String, AVector[AddressInfo]] =
     minerWallet.post
       .in("derive-next-miner-addresses")
-      .out(jsonBody[AVector[MinerAddressInfo]])
+      .out(jsonBody[AVector[AddressInfo]])
       .summary("Derive your next miner addresses for each group")
       .description(s"Your wallet need to have been created with the miner flag set to true")
 

@@ -1429,7 +1429,7 @@
                   "addresses": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                      "group": 0
+                      "group": 2
                     }
                   ]
                 }
@@ -1540,7 +1540,8 @@
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                   "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "group": 0
+                  "group": 0,
+                  "path": "m/44'/1234'/O'/O/O"
                 }
               }
             }
@@ -1647,7 +1648,9 @@
                     "addresses": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                        "group": 2
+                        "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "group": 0,
+                        "path": "m/44'/1234'/O'/O/O"
                       }
                     ]
                   }
@@ -1752,7 +1755,8 @@
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
                   "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "group": 0
+                  "group": 0,
+                  "path": "m/44'/1234'/O'/O/O"
                 }
               }
             }
@@ -1851,13 +1855,15 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MinerAddressInfo"
+                    "$ref": "#/components/schemas/AddressInfo"
                   }
                 },
                 "example": [
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "group": 2
+                    "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "group": 0,
+                    "path": "m/44'/1234'/O'/O/O"
                   }
                 ]
               }
@@ -6127,7 +6133,8 @@
         "required": [
           "address",
           "publicKey",
-          "group"
+          "group",
+          "path"
         ],
         "type": "object",
         "properties": {
@@ -6139,6 +6146,9 @@
           },
           "group": {
             "type": "integer"
+          },
+          "path": {
+            "type": "string"
           }
         }
       },
@@ -7028,21 +7038,6 @@
           }
         }
       },
-      "MinerAddressInfo": {
-        "required": [
-          "address",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "group": {
-            "type": "integer"
-          }
-        }
-      },
       "MinerAddresses": {
         "required": [
           "addresses"
@@ -7066,7 +7061,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MinerAddressInfo"
+              "$ref": "#/components/schemas/AddressInfo"
             }
           }
         }

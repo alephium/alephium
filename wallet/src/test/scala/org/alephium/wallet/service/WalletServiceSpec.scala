@@ -29,6 +29,7 @@ import org.alephium.protocol.{Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex}
+import org.alephium.wallet.api.model.AddressInfo
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -44,8 +45,8 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     val minerAddressesWithGroup = walletService.getMinerAddresses(walletName).rightValue
 
-    val groups         = minerAddressesWithGroup.flatMap(_.map { case (groups, _) => groups.value })
-    val minerAddresses = minerAddressesWithGroup.flatMap(_.map { case (_, addresses) => addresses })
+    val groups         = minerAddressesWithGroup.flatMap(_.map(_.group.value))
+    val minerAddresses = minerAddressesWithGroup.flatMap(_.map(_.address))
 
     groups.length is groupNum
     minerAddresses.length is addresses.length
@@ -59,7 +60,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     val minerAddressesWithGroup2 = walletService.getMinerAddresses(walletName).rightValue
 
-    val minerAddresses2 = minerAddressesWithGroup2.tail.head.map { case (_, address) => address }
+    val minerAddresses2 = minerAddressesWithGroup2.tail.head
 
     minerAddresses2.length is newMinerAddresses.length
     minerAddresses2.foreach(address => newMinerAddresses.contains(address))
@@ -199,9 +200,14 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .leftValue is WalletService.InvalidPassword
   }
 
-  it should "get publicKey" in new UserWallet {
+  it should "get address info" in new UserWallet {
     walletService
-      .getPublicKey(walletName, address) isE publicKey
+      .getAddressInfo(walletName, address) isE AddressInfo(
+      address,
+      publicKey,
+      address.groupIndex,
+      path
+    )
   }
 
   it should "sign a transaction" in new UserWallet with TxGenerators {
@@ -273,6 +279,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .from(Hex.unsafe("18d3d0d2f72db3675db48cd38efd334eb10241c73b5df80b716f2905ff340d33"))
       .get
 
+    val path = "m/44'/1234'/0'/0/0"
     walletService.restoreWallet(password, mnemonic, false, walletName, None).rightValue
   }
 }

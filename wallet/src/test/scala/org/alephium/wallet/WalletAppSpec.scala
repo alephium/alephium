@@ -223,7 +223,7 @@ class WalletAppSpec
       address = response.as[model.AddressInfo].address
       addresses = model.Addresses(
         address,
-        addresses.addresses :+ model.Addresses.Info(address, address.groupIndex.value)
+        addresses.addresses :+ model.Addresses.Info(address, address.groupIndex)
       )
       response.code is StatusCode.Ok
     }
@@ -340,7 +340,7 @@ class WalletAppSpec
       val addressInfo = response.as[model.AddressInfo]
       addressInfo.address is address
       addressInfo.publicKey is publicKey
-      addressInfo.group is 2
+      addressInfo.group.value is 2
       response.code is StatusCode.Ok
     }
 
@@ -375,7 +375,7 @@ class WalletAppSpec
     }
 
     deriveNextMinerAddress() check { response =>
-      val result = response.as[AVector[model.MinerAddressInfo]]
+      val result = response.as[AVector[model.AddressInfo]]
       result.length is groupConfig.groups
       response.code is StatusCode.Ok
     }
