@@ -24,7 +24,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm._
 import org.alephium.serde.deserialize
 import org.alephium.util._
 
@@ -92,8 +92,19 @@ class SmartContractTest extends AlephiumActorSpec {
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
     ) = {
+      val buildResult = buildScript(code, alphAmount, gas, gasPrice)
+      submitTx(buildResult.unsignedTx, buildResult.hash)
+      buildResult
+    }
+
+    def buildScript(
+        code: String,
+        alphAmount: Option[Amount],
+        gas: Option[Int],
+        gasPrice: Option[GasPrice]
+    ): BuildScriptResult = {
       val compileResult = request[CompileResult](compileScript(code), restPort)
-      val buildResult = request[BuildScriptResult](
+      request[BuildScriptResult](
         buildScript(
           fromPublicKey = publicKey,
           code = compileResult.code,
@@ -103,8 +114,6 @@ class SmartContractTest extends AlephiumActorSpec {
         ),
         restPort
       )
-      submitTx(buildResult.unsignedTx, buildResult.hash)
-      buildResult
     }
 
     def estimateBuildContractGas(
@@ -128,6 +137,23 @@ class SmartContractTest extends AlephiumActorSpec {
 
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
       val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 100).rightValue
+      val allInputs    = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
+      val gasEstimator = TxScriptGasEstimator.Default(allInputs, blockFlow)
+
+      GasEstimation.estimate(script, gasEstimator)
+    }
+
+    def estimateTxScriptGas(
+        code: String
+    ): GasBox = {
+      val unlockScript = UnlockScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
+      val lockupScript = LockupScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
+
+      val compileResult = request[CompileResult](compileScript(code), restPort)
+      val script        = deserialize[StatefulScript](Hex.from(compileResult.code).value).rightValue
+
+      val blockFlow    = clique.servers(group.group % 2).node.blockFlow
+      val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 10000).rightValue
       val allInputs    = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
       val gasEstimator = TxScriptGasEstimator.Default(allInputs, blockFlow)
 
@@ -202,6 +228,36 @@ class SmartContractTest extends AlephiumActorSpec {
 
     gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
     unsignedTx.gasAmount is GasBox.unsafe(57062)
+
+    clique.stop()
+  }
+
+  it should "estimate gas for build script correctly" in new SwapContractsFixture {
+    val tokenContractBuildResult =
+      contract(
+        SwapContracts.tokenContract,
+        gas = Some(100000),
+        state = Some("[0u]"),
+        issueTokenAmount = Some(1024)
+      )
+    val tokenContractKey = tokenContractBuildResult.contractId
+
+    val tokenWithdrawScript = {
+      SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
+    }
+    val tokenWithdrawTxScriptResult = buildScript(tokenWithdrawScript, None, None, None)
+
+    val rawUnsignedTx = Hex.from(tokenWithdrawTxScriptResult.unsignedTx).value
+    val unsignedTx    = deserialize[UnsignedTransaction](rawUnsignedTx).rightValue
+
+    val scriptGas = estimateTxScriptGas(tokenWithdrawScript)
+    val gasWithoutScript = GasEstimation.estimateWithP2PKHInputs(
+      unsignedTx.inputs.length,
+      unsignedTx.fixedOutputs.length
+    )
+
+    gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
+    unsignedTx.gasAmount is GasBox.unsafe(32342)
 
     clique.stop()
   }
