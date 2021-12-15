@@ -43,7 +43,9 @@ object BIP32 {
 
   def isHardened(index: Int): Boolean = index < 0
 
-  def harden(index: Int): Int = index | 0x80000000
+  val hardeningValue: Int = 0x80000000
+
+  def harden(index: Int): Int = index | hardeningValue
 
   def hmacSha512(key: ByteString, data: ByteString): ByteString = {
     val mac = new HMac(new SHA512Digest())
@@ -99,6 +101,22 @@ object BIP32 {
         }
       }
       iter(this, 0)
+    }
+
+    lazy val derivationPath: String = {
+      if (path.isEmpty) {
+        "m"
+      } else {
+        "m/" + path
+          .map { i =>
+            if (isHardened(i)) {
+              s"${i - hardeningValue}'"
+            } else {
+              i.toString
+            }
+          }
+          .mkString("/")
+      }
     }
   }
 

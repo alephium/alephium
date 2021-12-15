@@ -158,6 +158,7 @@ class BIP32Spec extends AlephiumSpec {
 
       extendedPrivateKey.chainCode is chainCode0
       extendedPrivateKey.privateKey is privateKey
+      extendedPrivateKey.derivationPath is chain
       privateKey.publicKey is publicKey
 
       if (path.forall(!BIP32.isHardened(_))) {
