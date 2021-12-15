@@ -174,10 +174,10 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     )
   }
 
-  val deriveNextAddressLogic = serverLogic(deriveNextAddress) { wallet =>
+  val deriveNextAddressLogic = serverLogic(deriveNextAddress) { case (wallet, groupOpt) =>
     Future.successful(
       walletService
-        .deriveNextAddress(wallet)
+        .deriveNextAddress(wallet, groupOpt)
         .left
         .map(toApiError)
     )

@@ -97,7 +97,10 @@ trait WalletService extends Service {
       wallet: String,
       data: String
   ): Either[WalletError, Signature]
-  def deriveNextAddress(wallet: String): Either[WalletError, AddressInfo]
+  def deriveNextAddress(
+      wallet: String,
+      groupOpt: Option[GroupIndex]
+  ): Either[WalletError, AddressInfo]
   def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[AddressInfo]]
   def changeActiveAddress(wallet: String, address: Address.Asset): Either[WalletError, Unit]
   def listWallets(): Either[WalletError, AVector[(String, Boolean)]]
@@ -447,14 +450,26 @@ object WalletService {
     }
 
     override def deriveNextAddress(
-        wallet: String
+        wallet: String,
+        groupOpt: Option[GroupIndex]
     ): Either[WalletError, AddressInfo] = {
       withUserWallet(wallet) { secretStorage =>
-        secretStorage
-          .deriveNextKey()
-          .map(AddressInfo.fromPrivateKey)
-          .left
-          .map(WalletError.from)
+        deriveNextAddressFromSecretStorage(secretStorage, groupOpt)
+      }
+    }
+
+    @tailrec
+    private def deriveNextAddressFromSecretStorage(
+        secretStorage: SecretStorage,
+        groupOpt: Option[GroupIndex]
+    ): Either[WalletError, AddressInfo] = {
+      secretStorage
+        .deriveNextKey()
+        .map(AddressInfo.fromPrivateKey) match {
+        case Left(error) => Left(WalletError.from(error))
+        case Right(nextKey) if groupOpt.map(_ == nextKey.group).getOrElse(true) =>
+          Right(nextKey)
+        case _ => deriveNextAddressFromSecretStorage(secretStorage, groupOpt)
       }
     }
 

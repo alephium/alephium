@@ -1743,6 +1743,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {

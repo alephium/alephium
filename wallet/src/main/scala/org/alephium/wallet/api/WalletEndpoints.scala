@@ -22,7 +22,7 @@ import sttp.tapir.generic.auto._
 import org.alephium.api.{BaseEndpoint, TapirCodecs, TapirSchemasLike}
 import org.alephium.api.Endpoints.{jsonBody, jsonBodyWithAlph}
 import org.alephium.api.UtilJson._
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.json
@@ -134,9 +134,10 @@ trait WalletEndpoints
       .out(jsonBody[AddressInfo])
       .summary("Get address' info")
 
-  val deriveNextAddress: BaseEndpoint[String, AddressInfo] =
+  val deriveNextAddress: BaseEndpoint[(String, Option[GroupIndex]), AddressInfo] =
     wallet.post
       .in("derive-next-address")
+      .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[AddressInfo])
       .summary("Derive your next address")
       .description("Cannot be called from a miner wallet")

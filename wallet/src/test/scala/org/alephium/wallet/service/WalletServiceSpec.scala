@@ -25,7 +25,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, PrivateKey, PublicKey, SignatureSchema}
+import org.alephium.protocol.{Generators, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex}
@@ -54,7 +54,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     (0 to (groupNum - 1)).foreach { group => groups.contains(group) }
     minerAddresses.foreach { address => addresses.contains(address) }
 
-    walletService.deriveNextAddress(walletName) is Left(WalletService.MinerWalletRequired)
+    walletService.deriveNextAddress(walletName, None) is Left(WalletService.MinerWalletRequired)
 
     val newMinerAddresses = walletService.deriveNextMinerAddresses(walletName).rightValue
 
@@ -147,7 +147,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .transfer(wrongWalletName, AVector(Destination(address, Amount.Zero)), None, None, None)
       .futureValue
       .leftValue is notFound
-    walletService.deriveNextAddress(wrongWalletName).leftValue is notFound
+    walletService.deriveNextAddress(wrongWalletName, None).leftValue is notFound
     walletService.deriveNextMinerAddresses(wrongWalletName).leftValue is notFound
     walletService.changeActiveAddress(wrongWalletName, address).leftValue is notFound
 
@@ -243,6 +243,36 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       .createWallet(password, mnemonicSize, false, "", None)
       .leftValue
       .message is s"Cannot create encrypted file at $tempSecretDir"
+  }
+
+  it should "correclty derive next address of a given group" in new Fixture {
+    walletService.createWallet(password, mnemonicSize, false, walletName, None).rightValue
+
+    forAll(Generators.groupIndexGen) { group =>
+      walletService
+        .deriveNextAddress(walletName, Some(group))
+        .rightValue
+        .group is group
+    }
+  }
+
+  it should "derive the minium addresses when searching a given group" in new Fixture {
+    walletService.createWallet(password, mnemonicSize, false, walletName, None).rightValue
+
+    val groupIndex = Generators.groupIndexGen.sample.get
+    val i          = 4
+    (0 until i).foreach { _ =>
+      walletService
+        .deriveNextAddress(walletName, Some(groupIndex))
+    }
+    val addresses = walletService.getAddresses(walletName).rightValue._2
+
+    // scalastyle:off no.equal
+    addresses.tail
+      .filter(_.groupIndex == groupIndex)
+      .length is i
+
+    addresses.last.groupIndex is groupIndex
   }
 
   trait Fixture extends WalletConfigFixture {
