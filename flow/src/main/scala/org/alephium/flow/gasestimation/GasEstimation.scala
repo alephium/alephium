@@ -95,7 +95,7 @@ object GasEstimation extends StrictLogging {
             )
             defaultGasPerInput
           case Right(value) =>
-            value
+            GasSchedule.txInputBaseGas.addUnsafe(value)
         }
     }
   }

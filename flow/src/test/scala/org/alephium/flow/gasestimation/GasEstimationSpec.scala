@@ -18,18 +18,17 @@ package org.alephium.flow.gasestimation
 
 import org.scalacheck.Gen
 
+import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasBox
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
+import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript, Val}
+import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util._
 
-class GasEstimationSpec extends AlephiumSpec with TxInputGenerators {
-  implicit val groupConfig = new GroupConfig {
-    override def groups: Int = 2
-  }
+class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
-  "GasEstimation.estimateGasWithP2PKHOutputs" should "estimate the gas for P2PKH outputs" in {
+  "GasEstimation.estimateWithP2PKHInputs" should "estimate the gas for P2PKH inputs" in {
     GasEstimation.estimateWithP2PKHInputs(0, 0) is minimalGas
     GasEstimation.estimateWithP2PKHInputs(1, 0) is minimalGas
     GasEstimation.estimateWithP2PKHInputs(0, 1) is minimalGas
@@ -39,7 +38,7 @@ class GasEstimationSpec extends AlephiumSpec with TxInputGenerators {
     GasEstimation.estimateWithP2PKHInputs(5, 10) is GasBox.unsafe(66300)
   }
 
-  "GasEstimation.sweepAll" should "behave the same as GasEstimation.estimateGasWithP2PKHOutputs" in {
+  "GasEstimation.sweepAll" should "behave the same as GasEstimation.estimateWithP2PKHInputs" in {
     val inputNumGen  = Gen.choose(0, ALPH.MaxTxInputNum)
     val outputNumGen = Gen.choose(0, ALPH.MaxTxOutputNum)
 
@@ -49,7 +48,7 @@ class GasEstimationSpec extends AlephiumSpec with TxInputGenerators {
     }
   }
 
-  "GasEstimation.estimateGas" should "take output lockup script into consideration" in {
+  "GasEstimation.estimate" should "take input unlock script into consideration" in {
     val groupIndex = groupIndexGen.sample.value
     val p2pkhUnlockScripts =
       Gen.listOfN(3, p2pkhUnlockGen(groupIndex)).map(AVector.from).sample.value
@@ -77,5 +76,120 @@ class GasEstimationSpec extends AlephiumSpec with TxInputGenerators {
       2,
       AssetScriptGasEstimator.Mock
     ) is GasBox.unsafe(36480)
+  }
+
+  "GasEstimation.estimateWithInputScript" should "take input unlock script into consideration" in {
+    val groupIndex = groupIndexGen.sample.value
+
+    info("P2PKH")
+
+    {
+      val script        = p2pkhUnlockGen(groupIndex).sample.value
+      val mockEstimator = AssetScriptGasEstimator.Mock
+
+      GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator) is GasBox.unsafe(20000)
+      GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator) is GasBox.unsafe(26240)
+      GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator) is GasBox.unsafe(50600)
+    }
+
+    info("P2MPKH")
+
+    {
+      val script        = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
+      val mockEstimator = AssetScriptGasEstimator.Mock
+
+      GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator) is GasBox.unsafe(20000)
+      GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator) is GasBox.unsafe(34480)
+      GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator) is GasBox.unsafe(71200)
+    }
+
+    info("P2SH, no signatures required")
+
+    def p2shNoSignature(i: Int) = {
+      val raw =
+        s"""
+           |AssetScript Foo {
+           |  pub fn bar(a: U256, b: U256) -> () {
+           |    let mut c = 0u
+           |    let mut d = 0u
+           |    let mut e = 0u
+           |    let mut f = 0u
+           |
+           |    let mut i = 0u
+           |    while (i <= $i) {
+           |      c = a + b
+           |      d = a - b
+           |      e = c + d
+           |      f = c * d
+           |
+           |      i = i + 1
+           |    }
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      val script = Compiler.compileAssetScript(raw).rightValue
+      val lockup = LockupScript.p2sh(script)
+      val unlock = UnlockScript.p2sh(script, AVector(Val.U256(60), Val.U256(50)))
+
+      val estimator = AssetScriptGasEstimator.Default(blockFlow)
+      transferFromLockup(lockup, unlock, estimator)
+
+      GasEstimation.estimateInputGas(unlock, estimator)
+    }
+
+    p2shNoSignature(4) is GasBox.unsafe(2815)
+    p2shNoSignature(59) is GasBox.unsafe(7491)
+    p2shNoSignature(108) is GasBox.unsafe(11657)
+
+    info("P2SH, signatures required")
+
+    val (pubKey1, _) = keypairGen(groupIndex).sample.value
+
+    val raw =
+      s"""
+       |// comment
+       |AssetScript P2sh {
+       |  pub fn main(pubKey1: ByteVec) -> () {
+       |    verifyAbsoluteLocktime!(1630879601000)
+       |    verifyTxSignature!(pubKey1)
+       |  }
+       |}
+       |""".stripMargin
+
+    val script = Compiler.compileAssetScript(raw).rightValue
+    val lockup = LockupScript.p2sh(script)
+    val unlock = UnlockScript.p2sh(script, AVector(Val.ByteVec(pubKey1.bytes)))
+
+    val estimator = AssetScriptGasEstimator.Default(blockFlow)
+    transferFromLockup(lockup, unlock, estimator)
+
+    // Fallback to defaultGasPerInput
+    GasEstimation.estimateInputGas(unlock, estimator) is GasBox.unsafe(2500)
+  }
+
+  private def transferFromLockup(
+      lockup: LockupScript.Asset,
+      unlock: UnlockScript,
+      assetScriptGasEstimatorEstimator: AssetScriptGasEstimator
+  ): UnsignedTransaction = {
+    val group                 = lockup.groupIndex
+    val (genesisPriKey, _, _) = genesisKeys(group.value)
+    val block                 = transfer(blockFlow, genesisPriKey, lockup, ALPH.alph(2))
+    val output                = AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
+    addAndCheck(blockFlow, block)
+
+    blockFlow
+      .transfer(
+        lockup,
+        unlock,
+        output,
+        None,
+        defaultGasPrice,
+        defaultUtxoLimit,
+        assetScriptGasEstimatorEstimator
+      )
+      .rightValue
+      .rightValue
   }
 }
