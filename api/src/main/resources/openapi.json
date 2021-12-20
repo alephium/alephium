@@ -6074,11 +6074,15 @@
     "schemas": {
       "Address": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6157,7 +6161,8 @@
       "Asset": {
         "required": [
           "outputRef",
-          "unlockScript"
+          "unlockScript",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6165,6 +6170,9 @@
             "$ref": "#/components/schemas/OutputRef"
           },
           "unlockScript": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6175,7 +6183,8 @@
           "address",
           "tokens",
           "lockTime",
-          "additionalData"
+          "additionalData",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6197,6 +6206,9 @@
             "format": "int64"
           },
           "additionalData": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6272,7 +6284,8 @@
       },
       "Ban": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6281,18 +6294,25 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Banned": {
         "required": [
-          "until"
+          "until",
+          "type"
         ],
         "type": "object",
         "properties": {
           "until": {
             "type": "integer",
             "format": "int64"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6375,12 +6395,16 @@
       },
       "Bool": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "boolean"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6670,11 +6694,15 @@
       },
       "ByteVec": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6718,7 +6746,8 @@
           "txIndex",
           "chainConfirmations",
           "fromGroupConfirmations",
-          "toGroupConfirmations"
+          "toGroupConfirmations",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6736,17 +6765,24 @@
           },
           "toGroupConfirmations": {
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Contract": {
         "required": [
-          "outputRef"
+          "outputRef",
+          "type"
         ],
         "type": "object",
         "properties": {
           "outputRef": {
             "$ref": "#/components/schemas/OutputRef"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6754,7 +6790,8 @@
         "required": [
           "amount",
           "address",
-          "tokens"
+          "tokens",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6770,6 +6807,9 @@
             "items": {
               "$ref": "#/components/schemas/Token"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6843,7 +6883,10 @@
           {
             "$ref": "#/components/schemas/Unreachable"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "FetchResponse": {
         "required": [
@@ -6889,11 +6932,15 @@
       },
       "I256": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6921,7 +6968,10 @@
           {
             "$ref": "#/components/schemas/Contract"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "InterCliquePeerInfo": {
         "required": [
@@ -6966,7 +7016,15 @@
         }
       },
       "MemPooled": {
-        "type": "object"
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
       },
       "MinerAddressInfo": {
         "required": [
@@ -7019,7 +7077,10 @@
           {
             "$ref": "#/components/schemas/Unban"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "NodeInfo": {
         "required": [
@@ -7059,7 +7120,15 @@
         }
       },
       "NotFound1": {
-        "type": "object"
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
       },
       "Output": {
         "oneOf": [
@@ -7069,7 +7138,10 @@
           {
             "$ref": "#/components/schemas/Contract1"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "OutputRef": {
         "required": [
@@ -7132,22 +7204,30 @@
           {
             "$ref": "#/components/schemas/Penalty"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "Penalty": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Reachable": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7156,6 +7236,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7515,17 +7598,24 @@
           {
             "$ref": "#/components/schemas/NotFound1"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "U256": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "string",
             "format": "uint256"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7591,7 +7681,8 @@
       },
       "Unban": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7600,6 +7691,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7627,7 +7721,8 @@
       },
       "Unreachable": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7636,6 +7731,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7656,7 +7754,10 @@
           {
             "$ref": "#/components/schemas/U256"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "VerifySignature": {
         "required": [
