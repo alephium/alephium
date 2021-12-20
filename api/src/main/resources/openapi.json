@@ -6101,14 +6101,16 @@
             "format": "uint256"
           },
           "balanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },
           "lockedBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "warning": {
             "type": "string"
@@ -6225,14 +6227,16 @@
             "format": "uint256"
           },
           "balanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },
           "lockedBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "utxoNum": {
             "type": "integer"
@@ -6255,7 +6259,8 @@
             "format": "uint256"
           },
           "totalBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "balances": {
             "type": "array",
@@ -6426,7 +6431,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6502,7 +6508,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6544,7 +6551,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6595,7 +6603,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6628,7 +6637,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6852,18 +6862,6 @@
           }
         }
       },
-      "GasPrice": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
-          }
-        }
-      },
       "Group": {
         "required": [
           "group"
@@ -6886,18 +6884,6 @@
             "items": {
               "type": "string"
             }
-          }
-        }
-      },
-      "Hint": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
           }
         }
       },
@@ -7417,7 +7403,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -7456,7 +7443,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
