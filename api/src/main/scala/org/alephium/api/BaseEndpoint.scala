@@ -21,6 +21,7 @@ import scala.concurrent.Future
 import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
+import sttp.tapir.generic.Configuration
 import sttp.tapir.generic.auto._
 import sttp.tapir.server._
 
@@ -30,6 +31,9 @@ import org.alephium.api.model.ApiKey
 trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike with StrictLogging {
   import Endpoints._
   import ApiError._
+
+  implicit val customConfiguration: Configuration =
+    Configuration.default.withDiscriminator("type")
 
   def maybeApiKey: Option[ApiKey]
 

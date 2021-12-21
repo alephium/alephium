@@ -898,12 +898,12 @@
       }
     },
     "/wallets/{wallet_name}/reveal-mnemonic": {
-      "get": {
+      "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Reveal your mnemonic. !!! use it with caution !!!",
-        "operationId": "getWalletsWallet_nameReveal-mnemonic",
+        "operationId": "postWalletsWallet_nameReveal-mnemonic",
         "parameters": [
           {
             "name": "wallet_name",
@@ -6074,11 +6074,15 @@
     "schemas": {
       "Address": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6101,14 +6105,16 @@
             "format": "uint256"
           },
           "balanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },
           "lockedBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "warning": {
             "type": "string"
@@ -6155,7 +6161,8 @@
       "Asset": {
         "required": [
           "outputRef",
-          "unlockScript"
+          "unlockScript",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6163,6 +6170,9 @@
             "$ref": "#/components/schemas/OutputRef"
           },
           "unlockScript": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6173,7 +6183,8 @@
           "address",
           "tokens",
           "lockTime",
-          "additionalData"
+          "additionalData",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6195,6 +6206,9 @@
             "format": "int64"
           },
           "additionalData": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6225,14 +6239,16 @@
             "format": "uint256"
           },
           "balanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },
           "lockedBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "utxoNum": {
             "type": "integer"
@@ -6255,7 +6271,8 @@
             "format": "uint256"
           },
           "totalBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "balances": {
             "type": "array",
@@ -6267,7 +6284,8 @@
       },
       "Ban": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6276,18 +6294,25 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Banned": {
         "required": [
-          "until"
+          "until",
+          "type"
         ],
         "type": "object",
         "properties": {
           "until": {
             "type": "integer",
             "format": "int64"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6370,12 +6395,16 @@
       },
       "Bool": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "boolean"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6426,7 +6455,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6502,7 +6532,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6544,7 +6575,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6595,7 +6627,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6628,7 +6661,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6660,11 +6694,15 @@
       },
       "ByteVec": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6708,7 +6746,8 @@
           "txIndex",
           "chainConfirmations",
           "fromGroupConfirmations",
-          "toGroupConfirmations"
+          "toGroupConfirmations",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6726,17 +6765,24 @@
           },
           "toGroupConfirmations": {
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Contract": {
         "required": [
-          "outputRef"
+          "outputRef",
+          "type"
         ],
         "type": "object",
         "properties": {
           "outputRef": {
             "$ref": "#/components/schemas/OutputRef"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6744,7 +6790,8 @@
         "required": [
           "amount",
           "address",
-          "tokens"
+          "tokens",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6760,6 +6807,9 @@
             "items": {
               "$ref": "#/components/schemas/Token"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6833,7 +6883,10 @@
           {
             "$ref": "#/components/schemas/Unreachable"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "FetchResponse": {
         "required": [
@@ -6849,18 +6902,6 @@
                 "$ref": "#/components/schemas/BlockEntry"
               }
             }
-          }
-        }
-      },
-      "GasPrice": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
           }
         }
       },
@@ -6889,25 +6930,17 @@
           }
         }
       },
-      "Hint": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
-          }
-        }
-      },
       "I256": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6935,7 +6968,10 @@
           {
             "$ref": "#/components/schemas/Contract"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "InterCliquePeerInfo": {
         "required": [
@@ -6980,7 +7016,15 @@
         }
       },
       "MemPooled": {
-        "type": "object"
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
       },
       "MinerAddressInfo": {
         "required": [
@@ -7033,7 +7077,10 @@
           {
             "$ref": "#/components/schemas/Unban"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "NodeInfo": {
         "required": [
@@ -7073,7 +7120,15 @@
         }
       },
       "NotFound1": {
-        "type": "object"
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
       },
       "Output": {
         "oneOf": [
@@ -7083,7 +7138,10 @@
           {
             "$ref": "#/components/schemas/Contract1"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "OutputRef": {
         "required": [
@@ -7146,22 +7204,30 @@
           {
             "$ref": "#/components/schemas/Penalty"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "Penalty": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Reachable": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7170,6 +7236,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7417,7 +7486,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -7456,7 +7526,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -7527,17 +7598,24 @@
           {
             "$ref": "#/components/schemas/NotFound1"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "U256": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "string",
             "format": "uint256"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7603,7 +7681,8 @@
       },
       "Unban": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7612,6 +7691,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7639,7 +7721,8 @@
       },
       "Unreachable": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7648,6 +7731,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7668,7 +7754,10 @@
           {
             "$ref": "#/components/schemas/U256"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "VerifySignature": {
         "required": [
