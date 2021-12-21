@@ -817,7 +817,7 @@
                   "totalBalanceHint": "10 ALPH",
                   "balances": [
                     {
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                       "balance": "10000000000000000000",
                       "balanceHint": "10 ALPH",
                       "lockedBalance": "0",
@@ -1039,7 +1039,7 @@
                   "value": {
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -1050,7 +1050,7 @@
                   "value": {
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -1186,13 +1186,13 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "toAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "toAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -1425,10 +1425,10 @@
                   "$ref": "#/components/schemas/Addresses"
                 },
                 "example": {
-                  "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "activeAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                   "addresses": [
                     {
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                       "group": 0
                     }
                   ]
@@ -1538,9 +1538,9 @@
                   "$ref": "#/components/schemas/AddressInfo"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                  "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "group": 0
+                  "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
+                  "publicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
+                  "group": 3
                 }
               }
             }
@@ -1646,7 +1646,7 @@
                   {
                     "addresses": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "group": 2
                       }
                     ]
@@ -1750,7 +1750,7 @@
                   "$ref": "#/components/schemas/Result5"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
                 }
               }
             }
@@ -1854,7 +1854,7 @@
                 },
                 "example": [
                   {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                     "group": 2
                   }
                 ]
@@ -1954,7 +1954,7 @@
                 "$ref": "#/components/schemas/ChangeActiveAddress"
               },
               "example": {
-                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
               }
             }
           },
@@ -2146,7 +2146,7 @@
                   "$ref": "#/components/schemas/SelfClique"
                 },
                 "example": {
-                  "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                  "cliqueId": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                   "networkId": 0,
                   "numZerosAtLeastInHash": 18,
                   "nodes": [
@@ -2253,7 +2253,7 @@
                 },
                 "example": [
                   {
-                    "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "cliqueId": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "brokerId": 1,
                     "groupNumPerBroker": 1,
                     "address": {
@@ -2355,7 +2355,7 @@
                 },
                 "example": [
                   {
-                    "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "cliqueId": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "brokerId": 1,
                     "brokerNum": 1,
                     "address": {
@@ -2903,14 +2903,14 @@
                                   "hint": 23412,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                                 },
-                                "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                                "unlockScript": "0002febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                               }
                             ],
                             "outputs": [
                               {
                                 "type": "asset",
                                 "amount": "10000000000000000000",
-                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                                "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                                 "tokens": [
                                   {
                                     "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3049,14 +3049,14 @@
                             "hint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                           },
-                          "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                          "unlockScript": "0002febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                         }
                       ],
                       "outputs": [
                         {
                           "type": "asset",
                           "amount": "10000000000000000000",
-                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                          "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3995,14 +3995,14 @@
                               "hint": 23412,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                             },
-                            "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                            "unlockScript": "0002febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                           }
                         ],
                         "outputs": [
                           {
                             "type": "asset",
                             "amount": "10000000000000000000",
-                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                            "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                             "tokens": [
                               {
                                 "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4113,10 +4113,10 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -4125,10 +4125,10 @@
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -4261,15 +4261,15 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
+                    "toAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
+                    "toAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -4507,14 +4507,14 @@
                         "hint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                       },
-                      "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                      "unlockScript": "0002febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                     }
                   ],
                   "outputs": [
                     {
                       "type": "asset",
                       "amount": "10000000000000000000",
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                       "tokens": [
                         {
                           "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4754,7 +4754,7 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n, 1024) } }"
+                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9, 1024) } }"
               }
             }
           },
@@ -4859,14 +4859,14 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -5082,14 +5082,14 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                     "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
                     "issueTokenAmount": "2000000000000000000",
@@ -5333,8 +5333,8 @@
               },
               "example": {
                 "keys": [
-                  "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                  "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7",
+                  "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                 ],
                 "mrequired": 1
               }
@@ -5350,7 +5350,7 @@
                   "$ref": "#/components/schemas/Result6"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
                 }
               }
             }
@@ -5441,13 +5441,13 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                     "fromPublicKeys": [
-                      "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                      "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                     ],
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -5456,13 +5456,13 @@
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromAddress": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                     "fromPublicKeys": [
-                      "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                      "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
                     ],
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -5694,7 +5694,7 @@
               "example": {
                 "data": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                 "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b",
-                "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                "publicKey": "02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"
               }
             }
           },
@@ -5901,7 +5901,7 @@
                 },
                 "example": {
                   "addresses": [
-                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
                   ]
                 }
               }
@@ -5989,7 +5989,7 @@
               },
               "example": {
                 "addresses": [
-                  "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9"
                 ]
               }
             }

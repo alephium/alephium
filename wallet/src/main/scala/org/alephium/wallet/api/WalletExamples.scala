@@ -47,7 +47,7 @@ trait WalletExamples extends EndpointsExamples {
   private val fromGroup          = 2
   private val toGroup            = 1
   private val publicKey = PublicKey
-    .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
+    .from(Hex.unsafe("02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"))
     .get
   val mnemonicSizes: String = Mnemonic.Size.list.toSeq.map(_.value).mkString(", ")
 

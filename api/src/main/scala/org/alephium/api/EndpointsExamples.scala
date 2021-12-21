@@ -35,9 +35,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
   private val lockupScript =
-    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+    LockupScript.asset("1AUa4Haz7D6ZezUydKGyZNXUmCo1bhbvs4pizS5LMrnQ9").get
   private val publicKey = PublicKey
-    .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
+    .from(Hex.unsafe("02febe3a7b4035057c2cfbe2f89de2e86becc9821ae149e0044875a031e1d102b7"))
     .get
   private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
   protected val defaultUtxosLimit: Int   = 512
