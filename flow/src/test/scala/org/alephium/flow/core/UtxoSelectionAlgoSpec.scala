@@ -274,6 +274,18 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     checkOrderByToken(utxos, tokenId4, 4, 2, 3, 1, 0, 5)
   }
 
+  it should "fall back to the descending order when ascending order doesn't work" in new Fixture {
+    implicit val utxos = buildUtxos(40000, 20, 55000)
+
+    // Ascending order
+    //   68340 = 40000 + 20 + 55000 - 26680
+    //   where 26680 is the estimated gas for 3 outputs
+    UtxoSelection(68340).verifyWithGas(1, 0, 2)
+
+    // Descending order
+    UtxoSelection(68341).verifyWithGas(2, 0)
+  }
+
   trait Fixture extends AlephiumConfigFixture {
 
     def buildOutput(
@@ -326,7 +338,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
       lazy val valueWithGas = {
         UtxoSelectionAlgo
-          .BuildWithOrder(dustAmount, ProvidedGas(gasOpt, Some(GasPrice(1))), AssetAscendingOrder)
+          .Build(dustAmount, ProvidedGas(gasOpt, Some(GasPrice(1))))
           .select(
             AssetAmounts(alph, AVector.from(tokens)),
             defaultUnlockScript,

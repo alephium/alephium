@@ -125,7 +125,6 @@ object UtxoSelectionAlgo extends StrictLogging {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class BuildWithOrder(
       dustAmount: U256,
       providedGas: ProvidedGas,
