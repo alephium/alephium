@@ -18,6 +18,8 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import com.typesafe.scalalogging.StrictLogging
+
 import org.alephium.flow.gasestimation._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, UnlockScript}
@@ -30,7 +32,7 @@ import org.alephium.util._
  *   - the above logic applies to both ALPH and tokens.
  */
 // scalastyle:off parameter.number
-object UtxoSelectionAlgo {
+object UtxoSelectionAlgo extends StrictLogging {
   trait AssetOrder {
     def byAlph: Ordering[Asset]
     def byToken(id: TokenId): Ordering[Asset]
@@ -80,11 +82,54 @@ object UtxoSelectionAlgo {
   )
   final case class AssetAmounts(alph: U256, tokens: AVector[(TokenId, U256)])
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Build(
       dustAmount: U256,
+      providedGas: ProvidedGas
+  ) {
+    val ascendingOrderSelector: BuildWithOrder =
+      BuildWithOrder(dustAmount, providedGas, AssetAscendingOrder)
+    val descendingOrderSelector: BuildWithOrder =
+      BuildWithOrder(dustAmount, providedGas, AssetDescendingOrder)
+
+    def select(
+        amounts: AssetAmounts,
+        unlockScript: UnlockScript,
+        utxos: AVector[Asset],
+        txOutputsLength: Int,
+        estimatedTxScriptGas: Option[GasBox],
+        assetScriptGasEstimator: AssetScriptGasEstimator
+    ): Either[String, Selected] = {
+      val ascendingResult = ascendingOrderSelector.select(
+        amounts,
+        unlockScript,
+        utxos,
+        txOutputsLength,
+        estimatedTxScriptGas,
+        assetScriptGasEstimator
+      )
+
+      ascendingResult match {
+        case Right(_) =>
+          ascendingResult
+        case Left(err) =>
+          logger.info(s"Select with ascending order returns $err, try descending order instead")
+          descendingOrderSelector.select(
+            amounts,
+            unlockScript,
+            utxos,
+            txOutputsLength,
+            estimatedTxScriptGas,
+            assetScriptGasEstimator
+          )
+      }
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  final case class BuildWithOrder(
+      dustAmount: U256,
       providedGas: ProvidedGas,
-      assetOrder: AssetOrder = AssetAscendingOrder
+      assetOrder: AssetOrder
   ) {
     def select(
         amounts: AssetAmounts,

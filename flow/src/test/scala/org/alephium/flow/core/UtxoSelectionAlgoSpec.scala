@@ -326,7 +326,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
       lazy val valueWithGas = {
         UtxoSelectionAlgo
-          .Build(dustAmount, ProvidedGas(gasOpt, Some(GasPrice(1))))
+          .BuildWithOrder(dustAmount, ProvidedGas(gasOpt, Some(GasPrice(1))), AssetAscendingOrder)
           .select(
             AssetAmounts(alph, AVector.from(tokens)),
             defaultUnlockScript,
