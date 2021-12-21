@@ -106,7 +106,7 @@ class WalletAppSpec
   def getBalance()             = Get(s"/wallets/$wallet/balances")
   def getAddresses()           = Get(s"/wallets/$wallet/addresses")
   def getMinerAddresses()      = Get(s"/wallets/$minerWallet/miner-addresses")
-  def revealMnemonic()         = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
+  def revealMnemonic()         = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int)    = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def sweepAll()               = Post(s"/wallets/$wallet/sweep-all", sweepAllJson)
   def sign(data: String)       = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")

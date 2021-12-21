@@ -148,7 +148,7 @@ trait WalletEndpoints
       .summary("Choose the active address")
 
   val revealMnemonic: BaseEndpoint[(String, RevealMnemonic), RevealMnemonic.Result] =
-    wallet.get
+    wallet.post
       .in("reveal-mnemonic")
       .in(jsonBody[RevealMnemonic])
       .out(jsonBody[RevealMnemonic.Result])

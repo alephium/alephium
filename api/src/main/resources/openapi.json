@@ -898,12 +898,12 @@
       }
     },
     "/wallets/{wallet_name}/reveal-mnemonic": {
-      "get": {
+      "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Reveal your mnemonic. !!! use it with caution !!!",
-        "operationId": "getWalletsWallet_nameReveal-mnemonic",
+        "operationId": "postWalletsWallet_nameReveal-mnemonic",
         "parameters": [
           {
             "name": "wallet_name",
