@@ -227,13 +227,60 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     }
   }
 
+  it should "sort the utxos in specified order" in new Fixture {
+    val tokenId1 = Hash.hash("tokenId1")
+    val tokenId2 = Hash.hash("tokenId2")
+    val tokenId3 = Hash.hash("tokenId3")
+    val tokenId4 = Hash.hash("tokenId4")
+
+    def checkOrderByAlph(
+        input: AVector[Asset],
+        utxoIndexes: Int*
+    ) = {
+      val ascending = AVector.from(utxoIndexes).map(input(_))
+      input.sorted(AssetAscendingOrder.byAlph) is ascending
+      input.sorted(AssetDescendingOrder.byAlph) is ascending.reverse
+    }
+
+    def checkOrderByToken(
+        input: AVector[Asset],
+        tokenId: Hash,
+        utxoIndexes: Int*
+    ) = {
+      val ascending = AVector.from(utxoIndexes).map(input(_))
+      input.sorted(AssetAscendingOrder.byToken(tokenId)) is ascending
+      input.sorted(AssetDescendingOrder.byToken(tokenId)) is ascending.reverse
+    }
+
+    val utxos = buildUtxosWithTokens(
+      (20, AVector((tokenId1, 10), (tokenId2, 2))),
+      (10, AVector.empty),
+      (5, AVector.empty),
+      (6, AVector((tokenId1, 3), (tokenId2, 10))),
+      (4, AVector((tokenId1, 3), (tokenId2, 19))),
+      (30, AVector((tokenId1, 2), (tokenId3, 10)))
+    )
+
+    checkOrderByAlph(AVector.empty)
+    checkOrderByToken(AVector.empty, tokenId1)
+    checkOrderByToken(AVector.empty, tokenId2)
+    checkOrderByToken(AVector.empty, tokenId3)
+    checkOrderByToken(AVector.empty, tokenId4)
+
+    checkOrderByAlph(utxos, 4, 2, 3, 1, 0, 5)
+    checkOrderByToken(utxos, tokenId1, 5, 4, 3, 0, 2, 1)
+    checkOrderByToken(utxos, tokenId2, 0, 3, 4, 2, 1, 5)
+    checkOrderByToken(utxos, tokenId3, 5, 4, 2, 3, 1, 0)
+    checkOrderByToken(utxos, tokenId4, 4, 2, 3, 1, 0, 5)
+  }
+
   trait Fixture extends AlephiumConfigFixture {
 
     def buildOutput(
         lockupScript: LockupScript.Asset,
         tokens: AVector[(TokenId, U256)],
         amount: U256
-    ): AssetOutputInfo = {
+    ): Asset = {
       val output =
         AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
       val ref = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
@@ -244,7 +291,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     val defaultLockupScript = scriptPair.lockup
     val defaultUnlockScript = scriptPair.unlock
 
-    def buildUtxos(amounts: Int*): AVector[AssetOutputInfo] = {
+    def buildUtxos(amounts: Int*): AVector[Asset] = {
       AVector.from(amounts.map { amount =>
         buildOutput(defaultLockupScript, AVector.empty, U256.unsafe(amount))
       })
@@ -252,14 +299,14 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
     def buildUtxosWithTokens(
         amounts: (Int, AVector[(TokenId, U256)])*
-    ): AVector[AssetOutputInfo] = {
+    ): AVector[Asset] = {
       AVector.from(amounts.map { case (amount, tokens) =>
         buildOutput(defaultLockupScript, tokens, U256.unsafe(amount))
       })
     }
 
     case class UtxoSelection(alph: U256, tokens: (TokenId, U256)*)(implicit
-        utxos: AVector[AssetOutputInfo]
+        utxos: AVector[Asset]
     ) {
       val utxosSorted            = utxos.sorted(AssetAscendingOrder.byAlph)
       var dustAmount: U256       = U256.Zero

@@ -54,13 +54,21 @@ object UtxoSelectionAlgo {
           if (compare1 != 0) {
             compare1
           } else {
-            amountX.compareTo(amountY)
+            amountX.compareTo(amountY) match {
+              case 0 => byAlph.compare(x, y)
+              case v => v
+            }
           }
         case (Some(_), None) => -1
         case (None, Some(_)) => 1
         case (None, None)    => byAlph.compare(x, y)
       }
     }
+  }
+
+  object AssetDescendingOrder extends AssetOrder {
+    val byAlph: Ordering[Asset]               = AssetAscendingOrder.byAlph.reverse
+    def byToken(id: TokenId): Ordering[Asset] = AssetAscendingOrder.byToken(id).reverse
   }
 
   type Asset = FlowUtils.AssetOutputInfo

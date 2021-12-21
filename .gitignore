@@ -1,2 +1,6 @@
 target
 log
+.bloop
+.metals
+project/metals.sbt
+project/project
