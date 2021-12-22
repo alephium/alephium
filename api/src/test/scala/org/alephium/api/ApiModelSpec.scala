@@ -31,6 +31,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
+//scalastyle:off file.size.limit
 class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
   val defaultUtxosLimit: Int = 1024
 
@@ -43,7 +44,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
       i,
       i,
       AVector(BlockHash.zero),
-      AVector.empty
+      AVector.empty,
+      ByteString.empty,
+      1.toByte,
+      Hash.zero,
+      Hash.zero,
+      ByteString.empty
     )
   val dummyAddress     = new InetSocketAddress("127.0.0.1", 9000)
   val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
@@ -75,6 +81,23 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     read[T](jsonRaw) is data
   }
 
+  def blockEntryJson(blockEntry: BlockEntry): String = {
+    s"""
+      |{
+      |  "hash":"${blockEntry.hash.toHexString}",
+      |  "timestamp":${blockEntry.timestamp.millis},
+      |  "chainFrom":${blockEntry.chainFrom},
+      |  "chainTo":${blockEntry.chainTo},
+      |  "height":${blockEntry.height},
+      |  "deps":${write(blockEntry.deps.map(_.toHexString))},
+      |  "transactions":${write(blockEntry.transactions)},
+      |  "nonce":"${Hex.toHexString(blockEntry.nonce)}",
+      |  "version":${blockEntry.version},
+      |  "depStateHash":"${blockEntry.depStateHash.toHexString}",
+      |  "txsHash":"${blockEntry.txsHash.toHexString}",
+      |  "target":"${Hex.toHexString(blockEntry.target)}"
+      |}""".stripMargin
+  }
   def parseFail[A: Reader](jsonRaw: String): String = {
     scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getMessage
   }
@@ -129,9 +152,10 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode FetchResponse" in {
-    val response = FetchResponse(AVector(AVector.tabulate(2)(entryDummy)))
+    val entries  = AVector.tabulate(2)(entryDummy)
+    val response = FetchResponse(AVector(entries))
     val jsonRaw =
-      s"""{"blocks":[[{"hash":"$zeroHash","timestamp":0,"chainFrom":0,"chainTo":0,"height":0,"deps":["$zeroHash"],"transactions":[]},{"hash":"$zeroHash","timestamp":1,"chainFrom":1,"chainTo":1,"height":1,"deps":["$zeroHash"],"transactions":[]}]]}"""
+      s"""{"blocks":[[${blockEntryJson(entries.head)},${blockEntryJson(entries.last)}]]}"""
     checkData(response, jsonRaw)
   }
 
