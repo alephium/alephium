@@ -19,11 +19,13 @@ package org.alephium.app
 import java.net.InetAddress
 
 import com.typesafe.config.{Config, ConfigException}
+import com.typesafe.scalalogging.StrictLogging
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.api.model.ApiKey
 import org.alephium.conf._
+import org.alephium.protocol.Hash
 import org.alephium.util.{Duration, U256}
 
 final case class ApiConfig(
@@ -35,7 +37,7 @@ final case class ApiConfig(
     defaultUtxosLimit: Int
 )
 
-object ApiConfig {
+object ApiConfig extends StrictLogging {
 
   implicit private val apiValueReader: ValueReader[ApiKey] =
     ValueReader[String].map { input =>
@@ -47,15 +49,33 @@ object ApiConfig {
 
   implicit private val apiConfigValueReader: ValueReader[ApiConfig] =
     valueReader { implicit cfg =>
+      val maybeApiKey = if (as[Boolean]("apiKeyEnabled")) {
+        as[Option[ApiKey]]("apiKey").orElse(generateApiKey())
+      } else {
+        None
+      }
+
       ApiConfig(
         as[InetAddress]("networkInterface"),
         as[Duration]("blockflowFetchMaxAge"),
         as[Duration]("askTimeout"),
-        as[Option[ApiKey]]("apiKey"),
+        maybeApiKey,
         as[U256]("gasFeeCap"),
         as[Int]("defaultUtxosLimit")
       )
     }
+
+  private def generateApiKey(): Option[ApiKey] = {
+    val key = Hash.generate.toHexString
+    ApiKey.from(key) match {
+      case Right(apiKey) =>
+        logger.info(s"API key: $key")
+        Some(apiKey)
+      case Left(error) =>
+        logger.error(error)
+        None
+    }
+  }
 
   def load(config: Config, path: String): ApiConfig = config.as[ApiConfig](path)
   def load(config: Config): ApiConfig               = config.as[ApiConfig]("alephium.api")
