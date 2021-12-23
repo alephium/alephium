@@ -646,8 +646,6 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  // Here maybe we will ask user to double the gas when not enough gas
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
     val alphAmount = query.amount.map(_.value).getOrElse(U256.Zero)
     for {
@@ -782,10 +780,8 @@ object ServerUtils {
 
   private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
     str match {
-      case None => Right(AVector.empty[vm.Val])
-      case Some(state) =>
-        val res = Compiler.compileState(state)
-        res
+      case None        => Right(AVector.empty[vm.Val])
+      case Some(state) => Compiler.compileState(state)
     }
   }
 }

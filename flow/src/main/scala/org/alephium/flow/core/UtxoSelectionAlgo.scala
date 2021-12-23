@@ -232,7 +232,6 @@ object UtxoSelectionAlgo {
       }
     }
 
-    // TODO: optimize this method
     private def calculateRemainingTokensAmount(
         utxos: AVector[Asset],
         tokenId: TokenId,

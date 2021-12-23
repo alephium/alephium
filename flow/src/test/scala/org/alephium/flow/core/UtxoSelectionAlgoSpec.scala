@@ -97,7 +97,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     }
   }
 
-  // Gas is calculated using GasEstimation.estimateGasWithP2PKHOutputs
+  // Gas is calculated using GasEstimation.estimateWithP2PKHInputs
   // 1 input:  20000
   // 2 inputs: 22620
   // 3 inputs: 26680

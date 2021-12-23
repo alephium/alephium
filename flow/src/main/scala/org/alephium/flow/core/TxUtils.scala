@@ -259,7 +259,7 @@ trait TxUtils { Self: FlowUtils =>
       case Right(()) =>
         getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
           // Sweep as much as we can, taking maximalGasPerTx into consideration
-          // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx (1044860)
+          // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx
           val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum / 2)
           for {
             txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
