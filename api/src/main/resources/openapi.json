@@ -817,7 +817,7 @@
                   "totalBalanceHint": "10 ALPH",
                   "balances": [
                     {
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "balance": "10000000000000000000",
                       "balanceHint": "10 ALPH",
                       "lockedBalance": "0",
@@ -1039,7 +1039,7 @@
                   "value": {
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -1050,7 +1050,7 @@
                   "value": {
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -1186,13 +1186,13 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -1425,10 +1425,10 @@
                   "$ref": "#/components/schemas/Addresses"
                 },
                 "example": {
-                  "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                   "addresses": [
                     {
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "group": 0
                     }
                   ]
@@ -1538,7 +1538,7 @@
                   "$ref": "#/components/schemas/AddressInfo"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                   "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                   "group": 0
                 }
@@ -1646,7 +1646,7 @@
                   {
                     "addresses": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "group": 2
                       }
                     ]
@@ -1750,7 +1750,7 @@
                   "$ref": "#/components/schemas/Result5"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                 }
               }
             }
@@ -1854,7 +1854,7 @@
                 },
                 "example": [
                   {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "group": 2
                   }
                 ]
@@ -1954,7 +1954,7 @@
                 "$ref": "#/components/schemas/ChangeActiveAddress"
               },
               "example": {
-                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
               }
             }
           },
@@ -2910,7 +2910,7 @@
                               {
                                 "type": "asset",
                                 "amount": "10000000000000000000",
-                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                 "tokens": [
                                   {
                                     "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3061,7 +3061,7 @@
                         {
                           "type": "asset",
                           "amount": "10000000000000000000",
-                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4012,7 +4012,7 @@
                           {
                             "type": "asset",
                             "amount": "10000000000000000000",
-                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                             "tokens": [
                               {
                                 "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4126,7 +4126,7 @@
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -4138,7 +4138,7 @@
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -4272,14 +4272,14 @@
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -4524,7 +4524,7 @@
                     {
                       "type": "asset",
                       "amount": "10000000000000000000",
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
                         {
                           "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4764,7 +4764,7 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n, 1024) } }"
+                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) } }"
               }
             }
           },
@@ -5360,7 +5360,7 @@
                   "$ref": "#/components/schemas/Result6"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                 }
               }
             }
@@ -5451,13 +5451,13 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "fromPublicKeys": [
                       "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                     ],
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -5466,13 +5466,13 @@
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "fromPublicKeys": [
                       "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                     ],
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -5911,7 +5911,7 @@
                 },
                 "example": {
                   "addresses": [
-                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                   ]
                 }
               }
@@ -5999,7 +5999,7 @@
               },
               "example": {
                 "addresses": [
-                  "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                 ]
               }
             }
