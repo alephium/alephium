@@ -20,7 +20,7 @@ import java.io.File
 
 import scala.jdk.CollectionConverters._
 
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigException, ConfigFactory, ConfigValueFactory}
 
 import org.alephium.util.AlephiumSpec
 
@@ -40,11 +40,12 @@ class ApiConfigSpec extends AlephiumSpec {
     apiConfig.apiKey.get.value is apiKey
   }
 
-  it should "generate api key" in new ApiKeyConfigFixture {
+  it should "fail if api key is not provided" in new ApiKeyConfigFixture {
     override val apiKeyEnabled = true
     override val apiKey        = null
-
-    apiConfig.apiKey.isDefined is true
+    assertThrows[ConfigException] {
+      apiConfig
+    }
   }
 
   it should "ignore defined api key if api key is not enabled" in new ApiKeyConfigFixture {

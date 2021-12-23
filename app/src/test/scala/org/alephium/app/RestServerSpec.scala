@@ -731,28 +731,13 @@ abstract class RestServerSpec(
   }
 }
 
-abstract class RestServerAutoApiKeyGenSpec(
-    val nbOfNodes: Int = 1,
-    val apiKey: Option[ApiKey] = None,
-    val apiKeyEnabled: Boolean = true
-) extends RestServerFixture {
-
-  it should "autogenerate the api-key" in {
-    val generatedApikey = Some(servers.head.maybeApiKey.get.value)
-
-    Get(blockflowFromTo(0, 0), apiKey = generatedApikey) check { response =>
-      response.code is StatusCode.Ok
-    }
-  }
-}
-
 abstract class RestServerApiKeyDisableSpec(
     val apiKey: Option[ApiKey],
     val nbOfNodes: Int = 1,
     val apiKeyEnabled: Boolean = false
 ) extends RestServerFixture {
 
-  it should "not require api key" in {
+  it should "not require api key if disabled" in {
     Get(blockflowFromTo(0, 0), apiKey = None) check { response =>
       response.code is StatusCode.Ok
     }
@@ -971,7 +956,6 @@ class RestServerSpecApiKey
       Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377")),
       true
     )
-class RestServerSpecAutoApiKeyGenSpec1Node extends RestServerAutoApiKeyGenSpec()
 class RestServerSpecApiKeyDisableWithApiKey
     extends RestServerApiKeyDisableSpec(
       Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"))

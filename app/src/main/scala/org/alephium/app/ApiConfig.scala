@@ -50,7 +50,19 @@ object ApiConfig extends StrictLogging {
   implicit private val apiConfigValueReader: ValueReader[ApiConfig] =
     valueReader { implicit cfg =>
       val maybeApiKey = if (as[Boolean]("apiKeyEnabled")) {
-        as[Option[ApiKey]]("apiKey").orElse(generateApiKey())
+        as[Option[ApiKey]]("apiKey").orElse {
+          val generatedKey = generateApiKey()
+
+          val errorMessage = s"""|
+          |Api key is mandatory, please add:
+          |    alephium.api.api-key = XXXXX
+          |to your user.conf.
+          |Here is an auto generate api-key for you:
+          |    ${generatedKey.value}
+          |""".stripMargin
+
+          throw new ConfigException.BadValue("api-key", errorMessage)
+        }
       } else {
         None
       }
@@ -65,16 +77,10 @@ object ApiConfig extends StrictLogging {
       )
     }
 
-  private def generateApiKey(): Option[ApiKey] = {
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def generateApiKey(): ApiKey = {
     val key = Hash.generate.toHexString
-    ApiKey.from(key) match {
-      case Right(apiKey) =>
-        logger.info(s"API key: $key")
-        Some(apiKey)
-      case Left(error) =>
-        logger.error(error)
-        None
-    }
+    ApiKey.from(key).toOption.get
   }
 
   def load(config: Config, path: String): ApiConfig = config.as[ApiConfig](path)
