@@ -43,9 +43,9 @@ object BIP32 {
 
   def isHardened(index: Int): Boolean = index < 0
 
-  val hardeningValue: Int = 0x80000000
+  def harden(index: Int): Int = index | 0x80000000
 
-  def harden(index: Int): Int = index | hardeningValue
+  def unharden(index: Int): Int = index & 0x7fffffff
 
   def hmacSha512(key: ByteString, data: ByteString): ByteString = {
     val mac = new HMac(new SHA512Digest())
@@ -54,6 +54,22 @@ object BIP32 {
     val out = new Array[Byte](64)
     mac.doFinal(out, 0)
     ByteString.fromArrayUnsafe(out)
+  }
+
+  def showDerivationPath(path: AVector[Int]): String = {
+    if (path.isEmpty) {
+      "m"
+    } else {
+      "m/" + path
+        .map { i =>
+          if (isHardened(i)) {
+            s"${unharden(i)}'"
+          } else {
+            i.toString
+          }
+        }
+        .mkString("/")
+    }
   }
 
   final case class ExtendedPrivateKey protected[wallet] (
@@ -103,21 +119,7 @@ object BIP32 {
       iter(this, 0)
     }
 
-    lazy val derivationPath: String = {
-      if (path.isEmpty) {
-        "m"
-      } else {
-        "m/" + path
-          .map { i =>
-            if (isHardened(i)) {
-              s"${i - hardeningValue}'"
-            } else {
-              i.toString
-            }
-          }
-          .mkString("/")
-      }
-    }
+    lazy val derivationPath: String = showDerivationPath(path)
   }
 
   final case class ExtendedPublicKey protected[wallet] (

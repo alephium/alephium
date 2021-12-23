@@ -17,6 +17,7 @@
 package org.alephium.crypto.wallet
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
 import org.alephium.util.{AlephiumSpec, AVector, Base58}
@@ -181,5 +182,25 @@ class BIP32Spec extends AlephiumSpec {
       tests3
     )
     check(hex"3ddd5602285899a946114506157c7997e5444528f3003f6134712147db19b678", tests4)
+  }
+
+  it should "harden/unharden" in {
+    forAll(Gen.choose(0, Int.MaxValue)) { i =>
+      BIP32.unharden(BIP32.harden(i)) is i
+    }
+  }
+
+  it should "show derivation path" in {
+    def check(chain: String) = {
+      val path = decodeChain(chain)
+
+      BIP32.showDerivationPath(path) is chain
+    }
+
+    check("m")
+    check("m/12345'/123456789'/123456789")
+    check("m/0/1/2/3/4/5/6/7")
+    check("m/0'/1'/2'/3'/4'/5'/6'/7'")
+    check("m/0'/1/2'/3/4'/5'/6")
   }
 }
