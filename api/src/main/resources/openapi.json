@@ -2928,7 +2928,12 @@
                             "gasAmount": 20000,
                             "gasPrice": "100000000000"
                           }
-                        ]
+                        ],
+                        "nonce": "",
+                        "version": 1,
+                        "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "target": ""
                       }
                     ]
                   ]
@@ -3074,7 +3079,12 @@
                       "gasAmount": 20000,
                       "gasPrice": "100000000000"
                     }
-                  ]
+                  ],
+                  "nonce": "",
+                  "version": 1,
+                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "target": ""
                 }
               }
             }
@@ -6324,7 +6334,12 @@
           "chainTo",
           "height",
           "deps",
-          "transactions"
+          "transactions",
+          "nonce",
+          "version",
+          "depStateHash",
+          "txsHash",
+          "target"
         ],
         "type": "object",
         "properties": {
@@ -6355,6 +6370,21 @@
             "items": {
               "$ref": "#/components/schemas/Tx"
             }
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "depStateHash": {
+            "type": "string"
+          },
+          "txsHash": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
           }
         }
       },
