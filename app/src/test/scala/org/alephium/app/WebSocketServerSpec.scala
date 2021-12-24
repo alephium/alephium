@@ -28,6 +28,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
+import org.alephium.api.model.BlockEntry
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
@@ -63,15 +64,11 @@ class WebSocketServerSpec
 
     val block       = Block(header, AVector.empty)
     val blockNotify = BlockNotify(block, 1)
-    val headerHash  = header.hash.toHexString
-    val chainIndex  = header.chainIndex
+    val result      = WebSocketServer.blockNotifyEncode(blockNotify)
 
-    val result = WebSocketServer.blockNotifyEncode(blockNotify)
-
-    val depsString = AVector.fill(groupConfig.depsNum)(s""""${dep.toHexString}"""").mkString(",")
     show(
       result
-    ) is s"""{"hash":"$headerHash","timestamp":0,"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"height":1,"deps":[$depsString],"transactions":[]}"""
+    ) is write(BlockEntry.from(block, 1))
   }
 
   behavior of "ws"
