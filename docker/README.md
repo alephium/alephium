@@ -44,12 +44,14 @@ http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 
 ### API Key
 
-By default, API key is not setup as Swagger APIs are bound to `127.0.0.0` interface and are not accessible from public network.
-However, if you modified `docker-compose.yml` to expose `12973`, then you'd better to setup API key for the sake of security.
+API key is mandatory by default for the sake of security.
 
-You could setup API key as follows:
+You should setup API key as follows:
 1. remove the `# ` before `alephium.api.api-key` in `user.conf`
 2. replace the default key `0000...000` with your own key. The key must have at least 32 alphanumeric characters.
+
+If you don't want to use an API key, you can setup in your `user.conf`:
+- `alephium.api.api-key-enabled = false`
 
 For more information about using API key, please follow this wiki [API Key](https://wiki.alephium.org/Full-Node-More.html#api-key)
 
