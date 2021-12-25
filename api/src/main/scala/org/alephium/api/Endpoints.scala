@@ -174,6 +174,13 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
+  val isBlockInMainChain: BaseEndpoint[BlockHash, Boolean] =
+    blockflowEndpoint.get
+      .in("is-block-in-main-chain")
+      .in(query[BlockHash]("blockHash"))
+      .out(jsonBody[Boolean])
+      .summary("Check if the block is in main chain")
+
   val getBalance: BaseEndpoint[(Address.Asset, Option[Int]), Balance] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
@@ -349,8 +356,8 @@ trait Endpoints
       .in(jsonBody[ExportFile])
       .summary("Exports all the blocks")
 
-  val metrics: BaseEndpoint[Unit, String] =
-    baseEndpoint.get
+  val metrics: BaseEndpointWithoutApi[Unit, String] =
+    baseEndpointWithoutApiKey.get
       .in("metrics")
       .out(alphPlainTextBody)
       .summary("Exports all prometheus metrics")

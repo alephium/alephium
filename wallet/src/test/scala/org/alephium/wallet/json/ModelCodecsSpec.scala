@@ -22,15 +22,21 @@ import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
 class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
+  implicit val groupConfig =
+    new GroupConfig {
+      override def groups: Int = 4
+    }
+
   val blockflowFetchMaxAge = Duration.unsafe(1000)
   val address              = Address.p2pkh(PublicKey.generate)
-  val group                = 1
+  val group                = GroupIndex.unsafe(1)
   val balance              = Amount(ALPH.oneAlph)
   val lockedBalance        = Amount(ALPH.alph(2))
   val hash                 = Hash.generate
@@ -43,6 +49,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val publicKey = PublicKey
     .from(Hex.unsafe("0362a56b41565582ec52c78f6adf76d7afdcf4b7584682011b0caa6846c3f44819"))
     .get
+  val path = "m/44'/1234'/0'/0/0"
 
   def check[T: ReadWriter](input: T, rawJson: String): Assertion = {
     write(input) is rawJson
@@ -55,21 +62,16 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   it should "Addresses" in {
     val json =
-      s"""{"activeAddress":"$address","addresses":[{"address":"$address","group":$group}]}"""
+      s"""{"activeAddress":"$address","addresses":[{"address":"$address","group":${group.value}}]}"""
     val addresses = Addresses(address, AVector(Addresses.Info(address, group)))
     check(addresses, json)
   }
 
   it should "AddressInfo" in {
-    val json        = s"""{"address":"$address","publicKey":"${publicKey.toHexString}","group":$group}"""
-    val addressInfo = AddressInfo(address, publicKey, group)
+    val json =
+      s"""{"address":"$address","publicKey":"${publicKey.toHexString}","group":${group.value},"path":"$path"}"""
+    val addressInfo = AddressInfo(address, publicKey, group, path)
     check(addressInfo, json)
-  }
-
-  it should "MinerAddressesInfo" in {
-    val json               = s"""{"addresses":[{"address":"$address","group":$group}]}"""
-    val minerAddressesInfo = MinerAddressesInfo(AVector(MinerAddressInfo(address, group)))
-    check(minerAddressesInfo, json)
   }
 
   it should "Balances.AddressBalance" in {
@@ -93,12 +95,6 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     check(changeActiveAddress, json)
   }
 
-  it should "DeriveNextAddress.Result" in {
-    val json                    = s"""{"address":"$address"}"""
-    val deriveNextAddressResult = DeriveNextAddress.Result(address)
-    check(deriveNextAddressResult, json)
-  }
-
   it should "Transfer" in {
     val json     = s"""{"destinations":[{"address":"$address","amount":"$balance"}]}"""
     val transfer = Transfer(AVector(Destination(address, balance)))
@@ -106,7 +102,8 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Transfer.Result" in {
-    val json     = s"""{"txId":"${hash.toHexString}","fromGroup":$group,"toGroup":$group}"""
+    val json =
+      s"""{"txId":"${hash.toHexString}","fromGroup":${group.value},"toGroup":${group.value}}"""
     val transfer = Transfer.Result(hash, group, group)
     check(transfer, json)
   }

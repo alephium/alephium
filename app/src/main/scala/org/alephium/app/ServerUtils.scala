@@ -336,6 +336,19 @@ class ServerUtils(implicit
         .map(failedInIO)
     } yield BlockEntry.from(block, height)
 
+  def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
+    for {
+      height <- blockFlow
+        .getHeight(blockHash)
+        .left
+        .map(_ => failed(s"Fail fetching block height with hash ${blockHash.toHexString}"))
+      hashes <- blockFlow
+        .getHashes(ChainIndex.from(blockHash), height)
+        .left
+        .map(failedInIO)
+    } yield hashes.headOption.contains(blockHash)
+  }
+
   def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =
     for {
       blockHeader <- blockFlow

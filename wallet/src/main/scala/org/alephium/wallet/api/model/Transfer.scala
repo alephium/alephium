@@ -18,6 +18,7 @@ package org.alephium.wallet.api.model
 
 import org.alephium.api.model.Destination
 import org.alephium.protocol.Hash
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
@@ -30,5 +31,5 @@ final case class Transfer(
 )
 
 object Transfer {
-  final case class Result(txId: Hash, fromGroup: Int, toGroup: Int)
+  final case class Result(txId: Hash, fromGroup: GroupIndex, toGroup: GroupIndex)
 }

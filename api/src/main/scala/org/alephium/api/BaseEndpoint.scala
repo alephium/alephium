@@ -21,6 +21,7 @@ import scala.concurrent.Future
 import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
+import sttp.tapir.generic.Configuration
 import sttp.tapir.generic.auto._
 import sttp.tapir.server._
 
@@ -31,24 +32,31 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
   import Endpoints._
   import ApiError._
 
+  implicit val customConfiguration: Configuration =
+    Configuration.default.withDiscriminator("type")
+
   def maybeApiKey: Option[ApiKey]
+
+  type BaseEndpointWithoutApi[I, O] =
+    Endpoint[I, ApiError[_ <: StatusCode], O, Any]
 
   type BaseEndpoint[I, O] =
     PartialServerEndpoint[Option[ApiKey], Unit, I, ApiError[_ <: StatusCode], O, Any, Future]
 
-  val baseEndpoint: BaseEndpoint[Unit, Unit] =
-    endpoint
-      .errorOut(
-        oneOf[ApiError[_ <: StatusCode]](
-          error(BadRequest, { case BadRequest(_) => true }),
-          error(InternalServerError, { case InternalServerError(_) => true }),
-          error(NotFound, { case NotFound(_) => true }),
-          error(ServiceUnavailable, { case ServiceUnavailable(_) => true }),
-          error(Unauthorized, { case Unauthorized(_) => true })
-        )
+  val baseEndpointWithoutApiKey: BaseEndpointWithoutApi[Unit, Unit] = endpoint
+    .errorOut(
+      oneOf[ApiError[_ <: StatusCode]](
+        error(BadRequest, { case BadRequest(_) => true }),
+        error(InternalServerError, { case InternalServerError(_) => true }),
+        error(NotFound, { case NotFound(_) => true }),
+        error(ServiceUnavailable, { case ServiceUnavailable(_) => true }),
+        error(Unauthorized, { case Unauthorized(_) => true })
       )
-      .in(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
-      .serverLogicForCurrent { apiKey => Future.successful(checkApiKey(apiKey)) }
+    )
+
+  val baseEndpoint: BaseEndpoint[Unit, Unit] = baseEndpointWithoutApiKey
+    .in(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
+    .serverLogicForCurrent { apiKey => Future.successful(checkApiKey(apiKey)) }
 
   private def checkApiKey(
       maybeToCheck: Option[ApiKey]

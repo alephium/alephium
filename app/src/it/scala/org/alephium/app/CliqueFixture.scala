@@ -544,7 +544,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
   def getTransactionStatus(tx: Transfer.Result) = {
     httpGet(
-      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
+      s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup.value}&toGroup=${tx.toGroup.value}"
     )
   }
 

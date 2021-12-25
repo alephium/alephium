@@ -27,7 +27,7 @@ import org.alephium.api.model.Amount
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TapirSchemasLike {
@@ -47,6 +47,9 @@ trait TapirSchemasLike {
   implicit val timestampSchema: Schema[TimeStamp]                 = Schema(SInteger()).format("int64")
   implicit val u256Schema: Schema[U256]                           = Schema(SString()).format("uint256")
   implicit val amountSchema: Schema[Amount]                       = Schema(SString()).format("uint256")
+  implicit val amountHintSchema: Schema[Amount.Hint]              = Schema(SString()).format("x.x ALPH")
+  implicit val gasBoxSchema: Schema[GasBox]                       = Schema(SInteger())
+  implicit val gasPriceSchema: Schema[GasPrice]                   = Schema(SString()).format("uint256")
   implicit val bigIntegerSchema: Schema[BigInteger]               = Schema(SString()).format("bigint")
   implicit val inetAddressSchema: Schema[InetAddress]             = Schema(SString())
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] = Schema(SString())
