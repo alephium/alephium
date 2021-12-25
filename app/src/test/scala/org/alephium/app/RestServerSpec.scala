@@ -49,30 +49,11 @@ import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 
 //scalastyle:off file.size.limit
-abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = None)
-    extends AlephiumFutureSpec
-    with RestServerFixture
-    with TxGenerators
-    with EitherValues
-    with NumericHelpers
-    with BeforeAndAfterAll
-    with BeforeAndAfterEach {
-
-  override def beforeAll() = {
-    super.beforeAll()
-    servers.foreach(_.start().futureValue)
-  }
-
-  override def afterAll() = {
-    super.afterAll()
-    servers.foreach(_.stop().futureValue)
-  }
-
-  override def beforeEach() = {
-    super.beforeEach()
-    interCliqueSynced = true
-  }
-
+abstract class RestServerSpec(
+    val nbOfNodes: Int,
+    val apiKey: Option[ApiKey] = None,
+    val apiKeyEnabled: Boolean = false
+) extends RestServerFixture {
   it should "call GET /blockflow" in {
     Get(blockflowFromTo(0, 0)) check { response =>
       response.code is StatusCode.Ok
@@ -750,15 +731,59 @@ abstract class RestServerSpec(val nbOfNodes: Int, val apiKey: Option[ApiKey] = N
   }
 }
 
-trait RestServerFixture extends ServerFixture with HttpRouteFixture {
+abstract class RestServerApiKeyDisableSpec(
+    val apiKey: Option[ApiKey],
+    val nbOfNodes: Int = 1,
+    val apiKeyEnabled: Boolean = false
+) extends RestServerFixture {
+
+  it should "not require api key if disabled" in {
+    Get(blockflowFromTo(0, 0), apiKey = None) check { response =>
+      response.code is StatusCode.Ok
+    }
+  }
+}
+
+trait RestServerFixture
+    extends ServerFixture
+    with HttpRouteFixture
+    with AlephiumFutureSpec
+    with TxGenerators
+    with EitherValues
+    with NumericHelpers
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach {
+
+  override def beforeAll() = {
+    super.beforeAll()
+    servers.foreach(_.start().futureValue)
+  }
+
+  override def afterAll() = {
+    super.afterAll()
+    servers.foreach(_.stop().futureValue)
+  }
+
+  override def beforeEach() = {
+    super.beforeEach()
+    interCliqueSynced = true
+  }
+
   val nbOfNodes: Int
   val apiKey: Option[ApiKey]
+  val apiKeyEnabled: Boolean
+
   implicit val system: ActorSystem  = ActorSystem("rest-server-spec")
   implicit val ec: ExecutionContext = system.dispatcher
 
-  override val configValues = Map(("alephium.broker.broker-num", nbOfNodes)) ++ apiKey
-    .map(key => Map(("alephium.api.api-key", key.value)))
-    .getOrElse(Map.empty)
+  override val configValues = {
+    Map(
+      ("alephium.broker.broker-num", nbOfNodes),
+      ("alephium.api.api-key-enabled", apiKeyEnabled)
+    ) ++ apiKey
+      .map(key => Map(("alephium.api.api-key", key.value)))
+      .getOrElse(Map.empty)
+  }
 
   lazy val minerProbe                      = TestProbe()
   lazy val miner                           = ActorRefT[Miner.Command](minerProbe.ref)
@@ -928,5 +953,11 @@ class RestServerSpec3Nodes extends RestServerSpec(3)
 class RestServerSpecApiKey
     extends RestServerSpec(
       3,
+      Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377")),
+      true
+    )
+class RestServerSpecApiKeyDisableWithApiKey
+    extends RestServerApiKeyDisableSpec(
       Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"))
     )
+class RestServerSpecApiKeyDisableWithoutApiKey extends RestServerApiKeyDisableSpec(None)

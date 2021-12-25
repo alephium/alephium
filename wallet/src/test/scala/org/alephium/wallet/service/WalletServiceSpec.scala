@@ -106,7 +106,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     walletService.getAddresses(walletName).isRight is true
 
-    Thread.sleep(201)
+    Thread.sleep(1000)
 
     walletService.getAddresses(walletName).leftValue is WalletService.WalletLocked
 
@@ -122,7 +122,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     walletService.getAddresses(walletName).isRight is true
 
-    Thread.sleep(201)
+    Thread.sleep(1000)
 
     walletService.unlockWallet(walletName, password, None).isRight is true
 

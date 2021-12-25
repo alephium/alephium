@@ -25,7 +25,7 @@ import sttp.tapir.openapi._
 
 import org.alephium.json.Json._
 
-object OpenAPIWriters {
+object OpenAPIWriters extends EndpointsExamples {
 
   def openApiJson(openAPI: OpenAPI, dropAuth: Boolean): String = {
     val newOpenAPI = if (dropAuth) {
@@ -33,10 +33,16 @@ object OpenAPIWriters {
     } else {
       openAPI
     }
-    write(
-      dropNullValues(writeJs(newOpenAPI)),
-      indent = 2
+    cleanOpenAPIResult(
+      write(
+        dropNullValues(writeJs(newOpenAPI)),
+        indent = 2
+      )
     )
+  }
+
+  private def cleanOpenAPIResult(openAPI: String): String = {
+    openAPI.replaceAll(address.toBase58, address.toBase58.dropRight(2))
   }
 
   def dropSecurityFields(openAPI: OpenAPI): OpenAPI = {
