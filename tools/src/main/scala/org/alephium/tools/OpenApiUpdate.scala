@@ -30,6 +30,11 @@ object OpenApiUpdate extends App {
 
     override val maybeApiKey: Option[ApiKey]    = None
     override val blockflowFetchMaxAge: Duration = Duration.zero
+
+    implicit override val groupConfig: GroupConfig =
+      new GroupConfig {
+        override def groups: Int = 4
+      }
   }
 
   new Documentation {
@@ -40,7 +45,7 @@ object OpenApiUpdate extends App {
     override val walletEndpoints                = wallet.walletEndpoints
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
-        override def groups: Int = 3
+        override def groups: Int = 4
       }
 
     private val json = openApiJson(openAPI, dropAuth = maybeApiKey.isEmpty)

@@ -108,7 +108,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         .map { case (active, addresses) =>
           model.Addresses(
             active,
-            addresses.map(address => model.Addresses.Info(address, address.groupIndex.value))
+            addresses.map(address => model.Addresses.Info(address, address.groupIndex))
           )
         }
         .left
@@ -119,10 +119,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
   val getAddressInfoLogic = serverLogic(getAddressInfo) { case (wallet, address) =>
     Future.successful(
       walletService
-        .getPublicKey(wallet, address)
-        .map { publicKey =>
-          model.AddressInfo(address, publicKey, address.groupIndex.value)
-        }
+        .getAddressInfo(wallet, address)
         .left
         .map(toApiError)
     )
@@ -133,13 +130,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       walletService
         .getMinerAddresses(wallet)
         .map { addresses =>
-          addresses.map { p =>
-            model.MinerAddressesInfo(
-              p.map { case (group, ad) =>
-                model.MinerAddressInfo(ad, group.value)
-              }
-            )
-          }
+          addresses.map(model.MinerAddressesInfo(_))
         }
         .left
         .map(toApiError)
@@ -183,11 +174,10 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     )
   }
 
-  val deriveNextAddressLogic = serverLogic(deriveNextAddress) { wallet =>
+  val deriveNextAddressLogic = serverLogic(deriveNextAddress) { case (wallet, groupOpt) =>
     Future.successful(
       walletService
-        .deriveNextAddress(wallet)
-        .map(model.DeriveNextAddress.Result(_))
+        .deriveNextAddress(wallet, groupOpt)
         .left
         .map(toApiError)
     )
@@ -196,7 +186,6 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     Future.successful(
       walletService
         .deriveNextMinerAddresses(wallet)
-        .map(_.map(address => model.MinerAddressInfo(address, address.groupIndex.value)))
         .left
         .map(toApiError)
     )

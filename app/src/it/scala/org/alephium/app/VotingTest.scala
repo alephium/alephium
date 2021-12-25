@@ -270,7 +270,7 @@ trait WalletFixture extends CliqueFixture {
         // scalastyle:off no.equal
         val newActiveAddress =
           addresses.head.addresses.toIterable
-            .find(_.group == activeAddressesGroup)
+            .find(_.group.value == activeAddressesGroup)
             .get
             .address
             .toBase58
