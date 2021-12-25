@@ -153,7 +153,7 @@ lazy val app = mainProject("app")
       val artifact: File     = assembly.value
       val artifactTargetPath = "/alephium.jar"
 
-      val userConf: File = file("docker/user-mainnet.conf")
+      val userConf: File = file("docker/user.conf")
 
       val alephiumHome = "/alephium-home"
 

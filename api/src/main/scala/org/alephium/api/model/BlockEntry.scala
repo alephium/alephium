@@ -16,7 +16,9 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.BlockHash
+import akka.util.ByteString
+
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -28,7 +30,12 @@ final case class BlockEntry(
     chainTo: Int,
     height: Int,
     deps: AVector[BlockHash],
-    transactions: AVector[Tx]
+    transactions: AVector[Tx],
+    nonce: ByteString,
+    version: Byte,
+    depStateHash: Hash,
+    txsHash: Hash,
+    target: ByteString
 )
 object BlockEntry {
   def from(block: Block, height: Int): BlockEntry =
@@ -39,6 +46,11 @@ object BlockEntry {
       chainTo = block.header.chainIndex.to.value,
       height = height,
       deps = block.header.blockDeps.deps,
-      transactions = block.transactions.map(Tx.from(_))
+      transactions = block.transactions.map(Tx.from(_)),
+      nonce = block.header.nonce.value,
+      version = block.header.version,
+      depStateHash = block.header.depStateHash,
+      txsHash = block.header.txsHash,
+      target = block.header.target.bits
     )
 }

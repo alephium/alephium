@@ -16,7 +16,22 @@
 
 package org.alephium.wallet.api.model
 
+import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, GroupIndex}
 
-final case class AddressInfo(address: Address.Asset, publicKey: PublicKey, group: Int)
+final case class AddressInfo(
+    address: Address.Asset,
+    publicKey: PublicKey,
+    group: GroupIndex,
+    path: String
+)
+
+object AddressInfo {
+  def fromPrivateKey(privateKey: ExtendedPrivateKey)(implicit config: GroupConfig): AddressInfo = {
+    val publicKey = privateKey.extendedPublicKey.publicKey
+    val address   = Address.p2pkh(publicKey)
+    AddressInfo(address, publicKey, address.groupIndex, privateKey.derivationPath)
+  }
+}

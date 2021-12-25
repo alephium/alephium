@@ -22,7 +22,7 @@ import sttp.tapir.generic.auto._
 import org.alephium.api.{BaseEndpoint, TapirCodecs, TapirSchemasLike}
 import org.alephium.api.Endpoints.{jsonBody, jsonBodyWithAlph}
 import org.alephium.api.UtilJson._
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.util.AVector
 import org.alephium.wallet.api.model._
 import org.alephium.wallet.json
@@ -134,10 +134,11 @@ trait WalletEndpoints
       .out(jsonBody[AddressInfo])
       .summary("Get address' info")
 
-  val deriveNextAddress: BaseEndpoint[String, DeriveNextAddress.Result] =
+  val deriveNextAddress: BaseEndpoint[(String, Option[GroupIndex]), AddressInfo] =
     wallet.post
       .in("derive-next-address")
-      .out(jsonBody[DeriveNextAddress.Result])
+      .in(query[Option[GroupIndex]]("group"))
+      .out(jsonBody[AddressInfo])
       .summary("Derive your next address")
       .description("Cannot be called from a miner wallet")
 
@@ -148,7 +149,7 @@ trait WalletEndpoints
       .summary("Choose the active address")
 
   val revealMnemonic: BaseEndpoint[(String, RevealMnemonic), RevealMnemonic.Result] =
-    wallet.get
+    wallet.post
       .in("reveal-mnemonic")
       .in(jsonBody[RevealMnemonic])
       .out(jsonBody[RevealMnemonic.Result])
@@ -160,10 +161,10 @@ trait WalletEndpoints
       .out(jsonBody[AVector[MinerAddressesInfo]])
       .summary("List all miner addresses per group")
 
-  val deriveNextMinerAddresses: BaseEndpoint[String, AVector[MinerAddressInfo]] =
+  val deriveNextMinerAddresses: BaseEndpoint[String, AVector[AddressInfo]] =
     minerWallet.post
       .in("derive-next-miner-addresses")
-      .out(jsonBody[AVector[MinerAddressInfo]])
+      .out(jsonBody[AVector[AddressInfo]])
       .summary("Derive your next miner addresses for each group")
       .description(s"Your wallet need to have been created with the miner flag set to true")
 

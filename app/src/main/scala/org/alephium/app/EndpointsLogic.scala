@@ -139,6 +139,10 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.getBlock(blockFlow, GetBlock(hash)))
   }
 
+  val isBlockInMainChainLogic = serverLogic(isBlockInMainChain) { hash =>
+    Future.successful(serverUtils.isBlockInMainChain(blockFlow, hash))
+  }
+
   val getBlockHeaderEntryLogic = serverLogic(getBlockHeaderEntry) { hash =>
     Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
@@ -531,7 +535,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  val metricsLogic = serverLogic(metrics) { _ =>
+  val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
       val writer: Writer = new StringWriter()
       try {

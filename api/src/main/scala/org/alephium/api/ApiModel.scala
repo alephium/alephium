@@ -29,6 +29,7 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.RandomBytes
@@ -86,6 +87,12 @@ trait ApiModelCodec {
         Amount.from(input).getOrElse(throw new Abort(s"Invalid amount: $input"))
     }
   }
+
+  implicit def groupIndexRW(implicit groupConfig: GroupConfig): RW[GroupIndex] =
+    readwriter[Int].bimap(
+      _.value,
+      group => GroupIndex.from(group).getOrElse(throw Abort(s"Invalid group index : $group"))
+    )
 
   implicit val amountHintReader: Reader[Amount.Hint] = amountReader.map(_.hint)
   implicit val amountHintWriter: Writer[Amount.Hint] = StringWriter.comap[Amount.Hint] { amount =>

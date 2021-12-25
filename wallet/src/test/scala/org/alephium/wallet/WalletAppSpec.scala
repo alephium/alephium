@@ -101,16 +101,19 @@ class WalletAppSpec
     Put("/wallets", restoreJson(mnemonic, name))
   def unlock(mnemonicPassphrase: Option[String] = None) =
     Post(s"/wallets/$wallet/unlock", unlockJson(mnemonicPassphrase))
-  def lock()                   = Post(s"/wallets/$wallet/lock")
-  def delete()                 = Delete(s"/wallets/$wallet", passwordJson)
-  def getBalance()             = Get(s"/wallets/$wallet/balances")
-  def getAddresses()           = Get(s"/wallets/$wallet/addresses")
-  def getMinerAddresses()      = Get(s"/wallets/$minerWallet/miner-addresses")
-  def revealMnemonic()         = Get(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
-  def transfer(amount: Int)    = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def sweepAll()               = Post(s"/wallets/$wallet/sweep-all", sweepAllJson)
-  def sign(data: String)       = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
-  def deriveNextAddress()      = Post(s"/wallets/$wallet/derive-next-address")
+  def lock()                = Post(s"/wallets/$wallet/lock")
+  def delete()              = Delete(s"/wallets/$wallet", passwordJson)
+  def getBalance()          = Get(s"/wallets/$wallet/balances")
+  def getAddresses()        = Get(s"/wallets/$wallet/addresses")
+  def getMinerAddresses()   = Get(s"/wallets/$minerWallet/miner-addresses")
+  def revealMnemonic()      = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
+  def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
+  def sweepAll()            = Post(s"/wallets/$wallet/sweep-all", sweepAllJson)
+  def sign(data: String)    = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
+  def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
+  def deriveAddressWithGroup(group: Int) = Post(
+    s"/wallets/$wallet/derive-next-address?group=$group"
+  )
   def deriveNextMinerAddress() = Post(s"/wallets/$minerWallet/derive-next-miner-addresses")
   def getAddressInfo(address: Address) =
     Get(s"/wallets/$wallet/addresses/$address")
@@ -220,10 +223,10 @@ class WalletAppSpec
     }
 
     deriveNextAddress() check { response =>
-      address = response.as[model.DeriveNextAddress.Result].address
+      address = response.as[model.AddressInfo].address
       addresses = model.Addresses(
         address,
-        addresses.addresses :+ model.Addresses.Info(address, address.groupIndex.value)
+        addresses.addresses :+ model.Addresses.Info(address, address.groupIndex)
       )
       response.code is StatusCode.Ok
     }
@@ -340,7 +343,7 @@ class WalletAppSpec
       val addressInfo = response.as[model.AddressInfo]
       addressInfo.address is address
       addressInfo.publicKey is publicKey
-      addressInfo.group is 2
+      addressInfo.group.value is 2
       response.code is StatusCode.Ok
     }
 
@@ -375,7 +378,7 @@ class WalletAppSpec
     }
 
     deriveNextMinerAddress() check { response =>
-      val result = response.as[AVector[model.MinerAddressInfo]]
+      val result = response.as[AVector[model.AddressInfo]]
       result.length is groupConfig.groups
       response.code is StatusCode.Ok
     }
@@ -384,6 +387,22 @@ class WalletAppSpec
       val result = response.as[AVector[model.MinerAddressesInfo]]
       result.length is 2
       response.code is StatusCode.Ok
+    }
+
+    groupConfig.allGroups.foreach { group =>
+      deriveAddressWithGroup(group.value) check { response =>
+        response.as[model.AddressInfo].group is group
+      }
+    }
+
+    deriveAddressWithGroup(groupConfig.groups) check { response =>
+      val error = response.as[ApiError.BadRequest]
+      error.detail.contains(s"""Invalid group index: ${groupConfig.groups}""") is true
+    }
+
+    deriveAddressWithGroup(-1) check { response =>
+      val error = response.as[ApiError.BadRequest]
+      error.detail.contains(s"""Invalid group index: -1""") is true
     }
 
     tempSecretDir.toFile.listFiles.foreach(_.deleteOnExit())

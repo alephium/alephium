@@ -19,6 +19,7 @@ package org.alephium.wallet.service
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.{Timer, TimerTask}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -32,12 +33,13 @@ import org.alephium.api.ApiError
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp}
 import org.alephium.wallet.Constants
+import org.alephium.wallet.api.model.AddressInfo
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -72,17 +74,17 @@ trait WalletService extends Service {
       utxosLimit: Option[Int]
   ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]]
   def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
-  def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey]
+  def getAddressInfo(wallet: String, address: Address.Asset): Either[WalletError, AddressInfo]
   def getMinerAddresses(
       wallet: String
-  ): Either[WalletError, AVector[AVector[(GroupIndex, Address.Asset)]]]
+  ): Either[WalletError, AVector[AVector[AddressInfo]]]
   def transfer(
       wallet: String,
       destinations: AVector[Destination],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, (Hash, Int, Int)]]
+  ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]]
   def sweepAll(
       wallet: String,
       address: Address.Asset,
@@ -90,13 +92,16 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, (Hash, Int, Int)]]
+  ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]]
   def sign(
       wallet: String,
       data: String
   ): Either[WalletError, Signature]
-  def deriveNextAddress(wallet: String): Either[WalletError, Address.Asset]
-  def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[Address.Asset]]
+  def deriveNextAddress(
+      wallet: String,
+      groupOpt: Option[GroupIndex]
+  ): Either[WalletError, AddressInfo]
+  def deriveNextMinerAddresses(wallet: String): Either[WalletError, AVector[AddressInfo]]
   def changeActiveAddress(wallet: String, address: Address.Asset): Either[WalletError, Unit]
   def listWallets(): Either[WalletError, AVector[(String, Boolean)]]
   def getWallet(wallet: String): Either[WalletError, (String, Boolean)]
@@ -180,15 +185,24 @@ object WalletService {
     new Impl(blockFlowClient, secretDir, lockingTimeout)
   }
 
-  final private case class StorageState(secretStorage: SecretStorage, lastAccess: TimeStamp)
+  final private case class StorageState(secretStorage: SecretStorage, timerTask: TimerTask)
 
   final private case class Storages(
       storages: mutable.Map[String, StorageState],
       lockingTimeout: Duration
   ) {
+    private val isDaemon = true
+    private val timer    = new Timer(isDaemon)
+
+    private def lockTimerTask(storage: SecretStorage): TimerTask = new TimerTask {
+      override def run(): Unit = storage.lock()
+    }
+
     def addOne(filename: String, storage: SecretStorage): Unit = {
       discard(storages.synchronized {
-        storages.addOne(filename -> StorageState(storage, TimeStamp.now()))
+        val timerTask = lockTimerTask(storage)
+        timer.schedule(timerTask, lockingTimeout.millis)
+        storages.addOne(filename -> StorageState(storage, timerTask))
       })
     }
 
@@ -201,13 +215,11 @@ object WalletService {
     def get(wallet: String): Option[SecretStorage] = {
       storages.synchronized {
         storages.get(wallet).map { storageTs =>
-          val lockNeeded = TimeStamp.now().deltaUnsafe(storageTs.lastAccess) > lockingTimeout &&
-            !storageTs.secretStorage.isLocked()
-          if (lockNeeded) {
-            storageTs.secretStorage.lock()
-          } else {
-            storages.update(wallet, storageTs.copy(lastAccess = TimeStamp.now()))
-          }
+          storageTs.timerTask.cancel()
+          val timerTask = lockTimerTask(storageTs.secretStorage)
+          timer.purge()
+          timer.schedule(timerTask, lockingTimeout.millis)
+          storages.update(wallet, storageTs.copy(timerTask = timerTask))
           storageTs.secretStorage
         }
       }
@@ -221,7 +233,6 @@ object WalletService {
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
       extends WalletService {
-
     private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
 
     private val path: AVector[Int] = Constants.path
@@ -323,27 +334,31 @@ object WalletService {
     ): Either[WalletError, (Address.Asset, AVector[Address.Asset])] =
       withAddresses(wallet) { addresses => Right(addresses) }
 
-    override def getPublicKey(wallet: String, address: Address): Either[WalletError, PublicKey] = {
+    override def getAddressInfo(
+        wallet: String,
+        address: Address.Asset
+    ): Either[WalletError, AddressInfo] = {
       withWallet(wallet) { secretStorage =>
         withPrivateKeys(secretStorage) { case (_, privateKeys) =>
           (for {
             privateKey <- privateKeys.find(privateKey =>
               Address.p2pkh(privateKey.publicKey) == address
             )
-          } yield (privateKey.publicKey)).toRight(UnknownAddress(address): WalletError)
+          } yield AddressInfo.fromPrivateKey(privateKey))
+            .toRight(UnknownAddress(address): WalletError)
         }
       }
     }
 
     override def getMinerAddresses(
         wallet: String
-    ): Either[WalletError, AVector[AVector[(GroupIndex, Address.Asset)]]] = {
+    ): Either[WalletError, AVector[AVector[AddressInfo]]] = {
       withMinerWallet(wallet) { storage =>
         storage.getAllPrivateKeys() match {
           case Right((_, privateKeys)) =>
             Right(
-              buildMinerAddresses(privateKeys).map(_.map { case (group, address, _) =>
-                (group, address)
+              buildMinerAddresses(privateKeys).map(_.map { case (addressInfo, _) =>
+                addressInfo
               })
             )
           case Left(error) => Left(WalletError.from(error))
@@ -357,7 +372,7 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Hash, Int, Int)]] = {
+    ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
@@ -368,7 +383,11 @@ object WalletService {
               val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
               blockFlowClient
                 .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
-                .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
+                .map(
+                  _.map(res =>
+                    (res.txId, GroupIndex.unsafe(res.fromGroup), GroupIndex.unsafe(res.toGroup))
+                  )
+                )
                 .map(_.left.map(BlockFlowClientError))
           }
       }
@@ -381,7 +400,7 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Hash, Int, Int)]] = {
+    ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
@@ -392,7 +411,11 @@ object WalletService {
               val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
               blockFlowClient
                 .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
-                .map(_.map(res => (res.txId, res.fromGroup, res.toGroup)))
+                .map(
+                  _.map(res =>
+                    (res.txId, GroupIndex.unsafe(res.fromGroup), GroupIndex.unsafe(res.toGroup))
+                  )
+                )
                 .map(_.left.map(BlockFlowClientError))
           }
       }
@@ -413,7 +436,7 @@ object WalletService {
 
     override def deriveNextMinerAddresses(
         wallet: String
-    ): Either[WalletError, AVector[Address.Asset]] = {
+    ): Either[WalletError, AVector[AddressInfo]] = {
       withMinerWallet(wallet) { secretStorage =>
         secretStorage.getCurrentPrivateKey() match {
           case Right(activeKey) =>
@@ -426,13 +449,27 @@ object WalletService {
       }
     }
 
-    override def deriveNextAddress(wallet: String): Either[WalletError, Address.Asset] = {
+    override def deriveNextAddress(
+        wallet: String,
+        groupOpt: Option[GroupIndex]
+    ): Either[WalletError, AddressInfo] = {
       withUserWallet(wallet) { secretStorage =>
-        secretStorage
-          .deriveNextKey()
-          .map(privateKey => Address.p2pkh(privateKey.extendedPublicKey.publicKey))
-          .left
-          .map(WalletError.from)
+        deriveNextAddressFromSecretStorage(secretStorage, groupOpt)
+      }
+    }
+
+    @tailrec
+    private def deriveNextAddressFromSecretStorage(
+        secretStorage: SecretStorage,
+        groupOpt: Option[GroupIndex]
+    ): Either[WalletError, AddressInfo] = {
+      secretStorage
+        .deriveNextKey()
+        .map(AddressInfo.fromPrivateKey) match {
+        case Left(error) => Left(WalletError.from(error))
+        case Right(nextKey) if groupOpt.map(_ == nextKey.group).getOrElse(true) =>
+          Right(nextKey)
+        case _ => deriveNextAddressFromSecretStorage(secretStorage, groupOpt)
       }
     }
 
@@ -654,15 +691,18 @@ object WalletService {
 
     private def buildMinerAddresses(
         privateKeys: AVector[ExtendedPrivateKey]
-    ): AVector[AVector[(GroupIndex, Address.Asset, ExtendedPrivateKey)]] = {
-      val addresses =
-        privateKeys.map(privateKey => (Address.p2pkh(privateKey.publicKey), privateKey))
+    ): AVector[AVector[(AddressInfo, ExtendedPrivateKey)]] = {
+      val addresses: AVector[(AddressInfo, ExtendedPrivateKey)] =
+        privateKeys.map { privateKey =>
+          val addressInfo = AddressInfo.fromPrivateKey(privateKey)
+          (addressInfo, privateKey)
+        }
 
-      val addressByGroup = addresses.toSeq.groupBy(_._1.groupIndex)
+      val addressByGroup = addresses.toSeq.groupBy(_._1.group)
       val smallestIndex  = addressByGroup.values.map(_.length).minOption.getOrElse(1)
 
-      var res: Seq[Seq[(GroupIndex, (Address.Asset, ExtendedPrivateKey))]]    = Seq.empty
-      var addForGroup: Seq[(GroupIndex, (Address.Asset, ExtendedPrivateKey))] = Seq.empty
+      var res: Seq[Seq[(GroupIndex, (AddressInfo, ExtendedPrivateKey))]]    = Seq.empty
+      var addForGroup: Seq[(GroupIndex, (AddressInfo, ExtendedPrivateKey))] = Seq.empty
       (0 until smallestIndex).foreach { index =>
         (0 until groupConfig.groups).foreach { group =>
           val groupIndex = GroupIndex.unsafe(group)
@@ -675,8 +715,8 @@ object WalletService {
       }
       AVector.from(
         res.map(l =>
-          AVector.from(l.map { case (group, (address, privateKey)) =>
-            (group, address, privateKey)
+          AVector.from(l.map { case (_, (address, privateKey)) =>
+            (address, privateKey)
           })
         )
       )
@@ -685,18 +725,16 @@ object WalletService {
     private def buildMinerPrivateKeys(
         privateKeys: AVector[ExtendedPrivateKey]
     ): AVector[ExtendedPrivateKey] = {
-      buildMinerAddresses(privateKeys).flatMap(_.map { case (_, _, privateKey) => privateKey })
+      buildMinerAddresses(privateKeys).flatMap(_.map { case (_, privateKey) => privateKey })
     }
 
     private def computeNextMinerAddresses(
         storage: SecretStorage
-    ): Either[WalletError, AVector[Address.Asset]] = {
+    ): Either[WalletError, AVector[AddressInfo]] = {
       withAllMinerPrivateKeys(storage) { case (_, keys) =>
         val addressByGroup = keys.toSeq
-          .map { privateKey =>
-            Address.p2pkh(privateKey.extendedPublicKey.publicKey)
-          }
-          .groupBy(_.groupIndex)
+          .map(AddressInfo.fromPrivateKey)
+          .groupBy(_.group)
 
         if (addressByGroup.keys.size < groupConfig.groups) {
           computeNextMinerAddressesWithIndex(addressByGroup, storage, 0)
@@ -709,10 +747,10 @@ object WalletService {
 
     @tailrec
     private def computeNextMinerAddressesWithIndex(
-        addressByGroup: Map[GroupIndex, Seq[Address.Asset]],
+        addressByGroup: Map[GroupIndex, Seq[AddressInfo]],
         storage: SecretStorage,
         indexWanted: Int
-    ): Either[WalletError, AVector[Address.Asset]] = {
+    ): Either[WalletError, AVector[AddressInfo]] = {
       val addresses = addressByGroup.values.map(_.lift(indexWanted))
       if (addressByGroup.keys.size < groupConfig.groups || addresses.exists(_.isEmpty)) {
         storage
@@ -731,11 +769,11 @@ object WalletService {
     }
 
     private def updateAddressByGroup(
-        addressByGroup: Map[GroupIndex, Seq[Address.Asset]],
+        addressByGroup: Map[GroupIndex, Seq[AddressInfo]],
         privateKey: ExtendedPrivateKey
-    ): Map[GroupIndex, Seq[Address.Asset]] = {
-      val address = Address.p2pkh(privateKey.extendedPublicKey.publicKey)
-      val group   = address.groupIndex
+    ): Map[GroupIndex, Seq[AddressInfo]] = {
+      val address = AddressInfo.fromPrivateKey(privateKey)
+      val group   = address.group
       val newKeys = addressByGroup.get(group) match {
         case None       => Seq(address)
         case Some(keys) => keys :+ address

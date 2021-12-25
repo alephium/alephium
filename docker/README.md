@@ -1,9 +1,9 @@
-Docker setup
+Docker Stack Setup
 ====
 
 This folder container all the necessary material to build and run Alephium via docker container.
 
-# Prerequisites
+## Prerequisites
 
 We're using [docker-compose](https://docs.docker.com/compose/) to run Alephium here.
 Make sure you installed `docker` and `docker-compose` before proceeding further.
@@ -15,7 +15,7 @@ in the `docker` group by running the following command.
 sudo usermod -aG docker $USER
 ```
 
-# Run
+## Run
 
 The provided [docker-compose.yml](./docker-compose.yml) file will be used to run Alephium:
 
@@ -23,11 +23,7 @@ The provided [docker-compose.yml](./docker-compose.yml) file will be used to run
 docker-compose stop && docker-compose rm -f alephium && docker-compose pull && docker-compose up -d
 ```
 
-The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs):
-
-```
-curl http://127.0.0.1:12973/infos/self-clique
-```
+The default config connects your container to the mainnet, and makes the API available to [http://127.0.0.1:12973/docs](http://127.0.0.1:12973/docs).
 
 ## Monitoring
 
@@ -44,7 +40,22 @@ and `Alephium Overview`:
 http://127.0.0.1:3000/d/S3eJTo3Mk/alephium-overview?orgId=1&refresh=30s
 ```
 
-# Configuration
+## Advanced Configuration
+
+### API Key
+
+API key is mandatory by default for the sake of security.
+
+You should setup API key as follows:
+1. remove the `# ` before `alephium.api.api-key` in `user.conf`
+2. replace the default key `0000...000` with your own key. The key must have at least 32 alphanumeric characters.
+
+If you don't want to use an API key, you can setup in your `user.conf`:
+- `alephium.api.api-key-enabled = false`
+
+For more information about using API key, please follow this wiki [API Key](https://wiki.alephium.org/Full-Node-More.html#api-key)
+
+### Persistence
 
 In order to persist your data (blocks, wallets, ...), two volumes/mounts can be used.
 
@@ -65,9 +76,7 @@ Mount them as volumes inside the container:
       - ./alephium-wallets:/alephium-home/.alephium-wallets
 ```
 
-All good, your data will survive accross restarts!
-
-For more configuration, check the [Mainnet Guide](https://wiki.alephium.org/Mainnet-Guide.html) on the wiki.
+All good, your data will survive across restarts!
 
 ## GPU Miner (Optional)
 

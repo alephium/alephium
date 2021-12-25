@@ -817,7 +817,7 @@
                   "totalBalanceHint": "10 ALPH",
                   "balances": [
                     {
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "balance": "10000000000000000000",
                       "balanceHint": "10 ALPH",
                       "lockedBalance": "0",
@@ -898,12 +898,12 @@
       }
     },
     "/wallets/{wallet_name}/reveal-mnemonic": {
-      "get": {
+      "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Reveal your mnemonic. !!! use it with caution !!!",
-        "operationId": "getWalletsWallet_nameReveal-mnemonic",
+        "operationId": "postWalletsWallet_nameReveal-mnemonic",
         "parameters": [
           {
             "name": "wallet_name",
@@ -1039,7 +1039,7 @@
                   "value": {
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -1050,7 +1050,7 @@
                   "value": {
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -1186,13 +1186,13 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -1425,11 +1425,11 @@
                   "$ref": "#/components/schemas/Addresses"
                 },
                 "example": {
-                  "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "activeAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                   "addresses": [
                     {
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                      "group": 0
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                      "group": 2
                     }
                   ]
                 }
@@ -1538,9 +1538,10 @@
                   "$ref": "#/components/schemas/AddressInfo"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                   "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "group": 0
+                  "group": 0,
+                  "path": "m/44'/1234'/O'/O/O"
                 }
               }
             }
@@ -1646,8 +1647,10 @@
                   {
                     "addresses": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                        "group": 2
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "group": 0,
+                        "path": "m/44'/1234'/O'/O/O"
                       }
                     ]
                   }
@@ -1740,6 +1743,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -1747,10 +1758,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result5"
+                  "$ref": "#/components/schemas/AddressInfo"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                  "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                  "group": 0,
+                  "path": "m/44'/1234'/O'/O/O"
                 }
               }
             }
@@ -1849,13 +1863,15 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MinerAddressInfo"
+                    "$ref": "#/components/schemas/AddressInfo"
                   }
                 },
                 "example": [
                   {
-                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
-                    "group": 2
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                    "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "group": 0,
+                    "path": "m/44'/1234'/O'/O/O"
                   }
                 ]
               }
@@ -1954,7 +1970,7 @@
                 "$ref": "#/components/schemas/ChangeActiveAddress"
               },
               "example": {
-                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
               }
             }
           },
@@ -2910,7 +2926,7 @@
                               {
                                 "type": "asset",
                                 "amount": "10000000000000000000",
-                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                 "tokens": [
                                   {
                                     "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -2928,7 +2944,12 @@
                             "gasAmount": 20000,
                             "gasPrice": "100000000000"
                           }
-                        ]
+                        ],
+                        "nonce": "",
+                        "version": 1,
+                        "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "target": ""
                       }
                     ]
                   ]
@@ -3056,7 +3077,7 @@
                         {
                           "type": "asset",
                           "amount": "10000000000000000000",
-                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                           "tokens": [
                             {
                               "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3074,8 +3095,110 @@
                       "gasAmount": 20000,
                       "gasPrice": "100000000000"
                     }
-                  ]
+                  ],
+                  "nonce": "",
+                  "version": 1,
+                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "target": ""
                 }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blockflow/is-block-in-main-chain": {
+      "get": {
+        "tags": [
+          "Blockflow"
+        ],
+        "summary": "Check if the block is in main chain",
+        "operationId": "getBlockflowIs-block-in-main-chain",
+        "parameters": [
+          {
+            "name": "blockHash",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "example": true
               }
             }
           },
@@ -3905,7 +4028,7 @@
                           {
                             "type": "asset",
                             "amount": "10000000000000000000",
-                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                             "tokens": [
                               {
                                 "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4019,7 +4142,7 @@
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -4031,7 +4154,7 @@
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -4165,14 +4288,14 @@
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "lockTime": 1611041396892,
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -4417,7 +4540,7 @@
                     {
                       "type": "asset",
                       "amount": "10000000000000000000",
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
                         {
                           "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4657,7 +4780,7 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n, 1024) } }"
+                "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) } }"
               }
             }
           },
@@ -5251,10 +5374,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result6"
+                  "$ref": "#/components/schemas/Result5"
                 },
                 "example": {
-                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                 }
               }
             }
@@ -5345,13 +5468,13 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "fromPublicKeys": [
                       "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                     ],
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000"
                       }
                     ]
@@ -5360,13 +5483,13 @@
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "fromPublicKeys": [
                       "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                     ],
                     "destinations": [
                       {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "amount": "2000000000000000000",
                         "tokens": [
                           {
@@ -5805,7 +5928,7 @@
                 },
                 "example": {
                   "addresses": [
-                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                    "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                   ]
                 }
               }
@@ -5893,7 +6016,7 @@
               },
               "example": {
                 "addresses": [
-                  "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"
+                  "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                 ]
               }
             }
@@ -5978,11 +6101,15 @@
     "schemas": {
       "Address": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6005,14 +6132,16 @@
             "format": "uint256"
           },
           "balanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },
           "lockedBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "warning": {
             "type": "string"
@@ -6023,7 +6152,8 @@
         "required": [
           "address",
           "publicKey",
-          "group"
+          "group",
+          "path"
         ],
         "type": "object",
         "properties": {
@@ -6035,6 +6165,9 @@
           },
           "group": {
             "type": "integer"
+          },
+          "path": {
+            "type": "string"
           }
         }
       },
@@ -6059,7 +6192,8 @@
       "Asset": {
         "required": [
           "outputRef",
-          "unlockScript"
+          "unlockScript",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6067,6 +6201,9 @@
             "$ref": "#/components/schemas/OutputRef"
           },
           "unlockScript": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6077,7 +6214,8 @@
           "address",
           "tokens",
           "lockTime",
-          "additionalData"
+          "additionalData",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6099,6 +6237,9 @@
             "format": "int64"
           },
           "additionalData": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6129,14 +6270,16 @@
             "format": "uint256"
           },
           "balanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "lockedBalance": {
             "type": "string",
             "format": "uint256"
           },
           "lockedBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "utxoNum": {
             "type": "integer"
@@ -6159,7 +6302,8 @@
             "format": "uint256"
           },
           "totalBalanceHint": {
-            "$ref": "#/components/schemas/Hint"
+            "type": "string",
+            "format": "x.x ALPH"
           },
           "balances": {
             "type": "array",
@@ -6171,7 +6315,8 @@
       },
       "Ban": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6180,18 +6325,25 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Banned": {
         "required": [
-          "until"
+          "until",
+          "type"
         ],
         "type": "object",
         "properties": {
           "until": {
             "type": "integer",
             "format": "int64"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6203,7 +6355,12 @@
           "chainTo",
           "height",
           "deps",
-          "transactions"
+          "transactions",
+          "nonce",
+          "version",
+          "depStateHash",
+          "txsHash",
+          "target"
         ],
         "type": "object",
         "properties": {
@@ -6234,6 +6391,21 @@
             "items": {
               "$ref": "#/components/schemas/Tx"
             }
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "depStateHash": {
+            "type": "string"
+          },
+          "txsHash": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
           }
         }
       },
@@ -6274,12 +6446,16 @@
       },
       "Bool": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "boolean"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6330,7 +6506,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6406,7 +6583,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6452,7 +6630,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6503,7 +6682,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6536,7 +6716,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -6568,11 +6749,15 @@
       },
       "ByteVec": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6616,7 +6801,8 @@
           "txIndex",
           "chainConfirmations",
           "fromGroupConfirmations",
-          "toGroupConfirmations"
+          "toGroupConfirmations",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6634,17 +6820,24 @@
           },
           "toGroupConfirmations": {
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Contract": {
         "required": [
-          "outputRef"
+          "outputRef",
+          "type"
         ],
         "type": "object",
         "properties": {
           "outputRef": {
             "$ref": "#/components/schemas/OutputRef"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6652,7 +6845,8 @@
         "required": [
           "amount",
           "address",
-          "tokens"
+          "tokens",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -6668,6 +6862,9 @@
             "items": {
               "$ref": "#/components/schemas/Token"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -6741,7 +6938,10 @@
           {
             "$ref": "#/components/schemas/Unreachable"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "FetchResponse": {
         "required": [
@@ -6757,18 +6957,6 @@
                 "$ref": "#/components/schemas/BlockEntry"
               }
             }
-          }
-        }
-      },
-      "GasPrice": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
           }
         }
       },
@@ -6797,25 +6985,17 @@
           }
         }
       },
-      "Hint": {
-        "required": [
-          "value"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
-          }
-        }
-      },
       "I256": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -6843,7 +7023,10 @@
           {
             "$ref": "#/components/schemas/Contract"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "InterCliquePeerInfo": {
         "required": [
@@ -6888,20 +7071,13 @@
         }
       },
       "MemPooled": {
-        "type": "object"
-      },
-      "MinerAddressInfo": {
         "required": [
-          "address",
-          "group"
+          "type"
         ],
         "type": "object",
         "properties": {
-          "address": {
+          "type": {
             "type": "string"
-          },
-          "group": {
-            "type": "integer"
           }
         }
       },
@@ -6928,7 +7104,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MinerAddressInfo"
+              "$ref": "#/components/schemas/AddressInfo"
             }
           }
         }
@@ -6941,7 +7117,10 @@
           {
             "$ref": "#/components/schemas/Unban"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "NodeInfo": {
         "required": [
@@ -6981,7 +7160,15 @@
         }
       },
       "NotFound1": {
-        "type": "object"
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
       },
       "Output": {
         "oneOf": [
@@ -6991,7 +7178,10 @@
           {
             "$ref": "#/components/schemas/Contract1"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "OutputRef": {
         "required": [
@@ -7054,22 +7244,30 @@
           {
             "$ref": "#/components/schemas/Penalty"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "Penalty": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
       "Reachable": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7078,6 +7276,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7168,17 +7369,6 @@
         }
       },
       "Result5": {
-        "required": [
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "Result6": {
         "required": [
           "address"
         ],
@@ -7325,7 +7515,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -7364,7 +7555,8 @@
             "type": "integer"
           },
           "gasPrice": {
-            "$ref": "#/components/schemas/GasPrice"
+            "type": "string",
+            "format": "uint256"
           },
           "utxosLimit": {
             "type": "integer"
@@ -7435,17 +7627,24 @@
           {
             "$ref": "#/components/schemas/NotFound1"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "U256": {
         "required": [
-          "value"
+          "value",
+          "type"
         ],
         "type": "object",
         "properties": {
           "value": {
             "type": "string",
             "format": "uint256"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7511,7 +7710,8 @@
       },
       "Unban": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7520,6 +7720,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7547,7 +7750,8 @@
       },
       "Unreachable": {
         "required": [
-          "peers"
+          "peers",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7556,6 +7760,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7576,7 +7783,10 @@
           {
             "$ref": "#/components/schemas/U256"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "VerifySignature": {
         "required": [

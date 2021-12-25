@@ -336,6 +336,19 @@ class ServerUtils(implicit
         .map(failedInIO)
     } yield BlockEntry.from(block, height)
 
+  def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
+    for {
+      height <- blockFlow
+        .getHeight(blockHash)
+        .left
+        .map(_ => failed(s"Fail fetching block height with hash ${blockHash.toHexString}"))
+      hashes <- blockFlow
+        .getHashes(ChainIndex.from(blockHash), height)
+        .left
+        .map(failedInIO)
+    } yield hashes.headOption.contains(blockHash)
+  }
+
   def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =
     for {
       blockHeader <- blockFlow
@@ -646,8 +659,6 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  // Here maybe we will ask user to double the gas when not enough gas
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
     val alphAmount = query.amount.map(_.value).getOrElse(U256.Zero)
     for {
@@ -782,10 +793,8 @@ object ServerUtils {
 
   private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
     str match {
-      case None => Right(AVector.empty[vm.Val])
-      case Some(state) =>
-        val res = Compiler.compileState(state)
-        res
+      case None        => Right(AVector.empty[vm.Val])
+      case Some(state) => Compiler.compileState(state)
     }
   }
 }
