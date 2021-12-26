@@ -314,6 +314,12 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
     simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
 
+  implicit val buildSweepAllTransactionsResultExamples
+      : List[Example[BuildSweepAllTransactionsResult]] = {
+    val sweepAllTxs = AVector(SweepAllTransaction(hash, hexString))
+    simpleExample(BuildSweepAllTransactionsResult(sweepAllTxs, fromGroup = 2, toGroup = 1))
+  }
+
   implicit val submitTransactionExamples: List[Example[SubmitTransaction]] =
     simpleExample(SubmitTransaction(unsignedTx = hexString, signature))
 

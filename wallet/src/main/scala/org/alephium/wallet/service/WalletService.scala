@@ -30,14 +30,14 @@ import scala.util.Try
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
-import org.alephium.api.model.{Amount, Destination}
+import org.alephium.api.model.{Amount, Destination, SweepAllTransaction}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp}
+import org.alephium.util.{discard, AVector, Duration, FutureCollection, Hex, Service, TimeStamp}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.api.model.AddressInfo
 import org.alephium.wallet.storage.SecretStorage
@@ -92,7 +92,7 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]]
+  ): Future[Either[WalletError, (AVector[Hash], GroupIndex, GroupIndex)]]
   def sign(
       wallet: String,
       data: String
@@ -400,23 +400,28 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]] = {
+    ): Future[Either[WalletError, (AVector[Hash], GroupIndex, GroupIndex)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
           .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
-            case Right(buildTxResult) =>
-              val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
-              blockFlowClient
-                .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
-                .map(
-                  _.map(res =>
-                    (res.txId, GroupIndex.unsafe(res.fromGroup), GroupIndex.unsafe(res.toGroup))
-                  )
-                )
-                .map(_.left.map(BlockFlowClientError))
+            case Right(buildSweepAllTxResult) =>
+              FutureCollection
+                .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[Hash]) {
+                  case (txIds, SweepAllTransaction(txId, unsignedTx)) => {
+                    val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
+                    blockFlowClient
+                      .postTransaction(unsignedTx, signature, buildSweepAllTxResult.fromGroup)
+                      .map(_.map(_.txId +: txIds).left.map(BlockFlowClientError))
+                  }
+                }
+                .map { res =>
+                  val from = GroupIndex.unsafe(buildSweepAllTxResult.fromGroup)
+                  val to   = GroupIndex.unsafe(buildSweepAllTxResult.toGroup)
+                  res.map { (_, from, to) }
+                }
           }
       }
     }

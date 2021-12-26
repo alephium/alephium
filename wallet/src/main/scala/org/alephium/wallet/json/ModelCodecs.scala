@@ -52,6 +52,8 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val transferResultRW: RW[Transfer.Result] = macroRW
 
+  implicit val transferResultsRW: RW[Transfer.Results] = macroRW
+
   implicit val mnemonicRW: RW[Mnemonic] = readwriter[String].bimap[Mnemonic](
     _.toLongString,
     { input =>

@@ -217,12 +217,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       info("Sweep coins from the 3 UTXOs of this public key to another address")
       val senderBalanceBeforeSweep = genesisBalance - block0.transactions.head.gasFeeUnsafe
       val sweepAllToAddress        = generateAddress(chainIndex)
-      val buildSweepAllTransaction = serverUtils
+      val buildSweepAllTransactionRes = serverUtils
         .buildSweepAllTransaction(
           blockFlow,
           BuildSweepAllTransaction(fromPublicKey, sweepAllToAddress)
         )
         .rightValue
+      val buildSweepAllTransaction = buildSweepAllTransactionRes.unsignedTxs.head
 
       val sweepAllTxTemplate = signAndAddToMemPool(
         buildSweepAllTransaction.txId,
@@ -306,12 +307,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       info("Sweep coins from the 3 UTXOs for the same public key to another address")
       val senderBalanceBeforeSweep = receiverInitialBalance + ALPH.alph(10)
       val sweepAllToAddress        = generateAddress(chainIndex)
-      val buildSweepAllTransaction = serverUtils
+      val buildSweepAllTransactionRes = serverUtils
         .buildSweepAllTransaction(
           blockFlow,
           BuildSweepAllTransaction(toPublicKey, sweepAllToAddress)
         )
         .rightValue
+      val buildSweepAllTransaction = buildSweepAllTransactionRes.unsignedTxs.head
 
       val sweepAllChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
       val sweepAllTxTemplate = signAndAddToMemPool(

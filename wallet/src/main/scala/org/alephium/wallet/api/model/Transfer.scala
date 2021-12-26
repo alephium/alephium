@@ -32,4 +32,5 @@ final case class Transfer(
 
 object Transfer {
   final case class Result(txId: Hash, fromGroup: GroupIndex, toGroup: GroupIndex)
+  final case class Results(txId: AVector[Hash], fromGroup: GroupIndex, toGroup: GroupIndex)
 }
