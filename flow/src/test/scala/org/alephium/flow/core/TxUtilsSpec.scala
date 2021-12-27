@@ -599,7 +599,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val newBlock  = block.copy(transactions = AVector(newTx))
       addAndUpdateView(blockflow, newBlock)
 
-      val unsignedTx = blockflow
+      val unsignedTxs = blockflow
         .sweepAll(
           keyManager(output.lockupScript).publicKey,
           output.lockupScript,
@@ -610,6 +610,8 @@ class TxUtilsSpec extends AlephiumSpec {
         )
         .rightValue
         .rightValue
+      unsignedTxs.length is 1
+      val unsignedTx = unsignedTxs.head
       unsignedTx.fixedOutputs.length is 1
       unsignedTx.gasAmount is GasEstimation.sweepAll(inputNum, 1)
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
@@ -844,7 +846,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "sweep as much as we can" in new LargeUtxos {
     val txValidation = TxValidation.build
-    val unsignedTx = blockFlow
+    val unsignedTxs = blockFlow
       .sweepAll(
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
@@ -855,7 +857,9 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
+    unsignedTxs.length is 1
+    val unsignedTx = unsignedTxs.head
+    val sweepTx    = Transaction.from(unsignedTx, keyManager(output.lockupScript))
     txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
   }
 

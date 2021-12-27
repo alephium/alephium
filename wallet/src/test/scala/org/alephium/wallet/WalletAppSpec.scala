@@ -218,7 +218,7 @@ class WalletAppSpec
     }
 
     sweepAll() check { response =>
-      response.as[model.Transfer.Result]
+      response.as[model.Transfer.Results]
       response.code is StatusCode.Ok
     }
 
@@ -469,12 +469,7 @@ object WalletAppSpec extends {
         val unsignedTx = transactionGen().sample.get.unsigned
         complete(
           ctx,
-          BuildTransactionResult(
-            Hex.toHexString(serialize(unsignedTx)),
-            unsignedTx.hash,
-            unsignedTx.fromGroup.value,
-            unsignedTx.toGroup.value
-          )
+          BuildSweepAllTransactionsResult.from(unsignedTx)
         )
     }
 

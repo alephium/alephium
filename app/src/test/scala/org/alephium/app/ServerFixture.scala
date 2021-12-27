@@ -45,7 +45,6 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
-import org.alephium.serde.serialize
 import org.alephium.util._
 
 trait ServerFixture
@@ -97,12 +96,8 @@ trait ServerFixture
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
-  def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult(
-    Hex.toHexString(serialize(tx.unsigned)),
-    tx.unsigned.hash,
-    tx.unsigned.fromGroup.value,
-    tx.unsigned.toGroup.value
-  )
+  def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult.from(tx.unsigned)
+  def dummySweepAllBuildTransactionsResult(tx: Transaction) = BuildSweepAllTransactionsResult.from(tx.unsigned)
   lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 
@@ -291,8 +286,8 @@ object ServerFixture {
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
         utxosLimit: Int
-    ): IOResult[Either[String, UnsignedTransaction]] = {
-      Right(Right(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned))
+    ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
+      Right(Right(AVector(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
     }
 
     // scalastyle:off no.equal

@@ -38,14 +38,23 @@ object BuildSweepAllTransactionsResult {
   def from(
       unsignedTx: UnsignedTransaction
   )(implicit groupConfig: GroupConfig): BuildSweepAllTransactionsResult = {
-    val sweepAllTx = SweepAllTransaction(
-      unsignedTx.hash,
-      Hex.toHexString(serialize(unsignedTx))
-    )
+    from(AVector(unsignedTx))
+  }
+
+  def from(
+      unsignedTxs: AVector[UnsignedTransaction]
+  )(implicit groupConfig: GroupConfig): BuildSweepAllTransactionsResult = {
+    assume(unsignedTxs.length > 0)
+    val sweepAllTxs = unsignedTxs.map { unsignedTx =>
+      SweepAllTransaction(
+        unsignedTx.hash,
+        Hex.toHexString(serialize(unsignedTx))
+      )
+    }
     BuildSweepAllTransactionsResult(
-      AVector(sweepAllTx),
-      unsignedTx.fromGroup.value,
-      unsignedTx.toGroup.value
+      sweepAllTxs,
+      unsignedTxs.head.fromGroup.value,
+      unsignedTxs.head.toGroup.value
     )
   }
 }

@@ -221,7 +221,7 @@ class ServerUtils(implicit
   ): Try[BuildSweepAllTransactionsResult] = {
     for {
       _ <- checkGroup(query.fromPublicKey)
-      unsignedTx <- prepareUnsignedTransaction(
+      unsignedTxs <- prepareUnsignedTransaction(
         blockFlow,
         query.fromPublicKey,
         query.toAddress,
@@ -231,7 +231,7 @@ class ServerUtils(implicit
         query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
       )
     } yield {
-      BuildSweepAllTransactionsResult.from(unsignedTx)
+      BuildSweepAllTransactionsResult.from(unsignedTxs)
     }
   }
 
@@ -460,7 +460,7 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int
-  ): Try[UnsignedTransaction] = {
+  ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAll(
       fromPublicKey,
       toAddress.lockupScript,
@@ -469,9 +469,9 @@ class ServerUtils(implicit
       gasPrice,
       utxosLimit
     ) match {
-      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
-      case Right(Left(error))                => Left(failed(error))
-      case Left(error)                       => failed(error)
+      case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
+      case Right(Left(error))        => Left(failed(error))
+      case Left(error)               => failed(error)
     }
   }
 

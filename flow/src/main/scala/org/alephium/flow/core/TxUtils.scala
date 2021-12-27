@@ -249,7 +249,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int
-  ): IOResult[Either[String, UnsignedTransaction]] = {
+  ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
@@ -260,25 +260,27 @@ trait TxUtils { Self: FlowUtils =>
         getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
           // Sweep as much as we can, taking maximalGasPerTx into consideration
           // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx
-          val utxos = allUtxos.takeUpto(ALPH.MaxTxInputNum / 2)
-          for {
-            txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
-              toLockupScript,
-              lockTimeOpt,
-              utxos.map(_.output),
-              gasOpt,
-              gasPrice
-            )
-            unsignedTx <- UnsignedTransaction
-              .build(
-                fromLockupScript,
-                fromUnlockScript,
-                utxos.map(asset => (asset.ref, asset.output)),
-                txOutputsWithGas._1,
-                txOutputsWithGas._2,
+          val groupedUtxos = allUtxos.grouped(ALPH.MaxTxInputNum / 2)
+          groupedUtxos.mapE { utxos =>
+            for {
+              txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
+                toLockupScript,
+                lockTimeOpt,
+                utxos.map(_.output),
+                gasOpt,
                 gasPrice
               )
-          } yield unsignedTx
+              unsignedTx <- UnsignedTransaction
+                .build(
+                  fromLockupScript,
+                  fromUnlockScript,
+                  utxos.map(asset => (asset.ref, asset.output)),
+                  txOutputsWithGas._1,
+                  txOutputsWithGas._2,
+                  gasPrice
+                )
+            } yield unsignedTx
+          }
         }
 
       case Left(e) =>

@@ -300,7 +300,7 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+      response.as[BuildSweepAllTransactionsResult] is dummySweepAllBuildTransactionsResult(
         ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, None)
       )
     }
@@ -315,7 +315,7 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+      response.as[BuildSweepAllTransactionsResult] is dummySweepAllBuildTransactionsResult(
         ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
       )
     }
