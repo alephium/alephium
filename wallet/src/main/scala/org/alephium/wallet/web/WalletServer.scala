@@ -59,7 +59,7 @@ class WalletServer(
     getAddressInfoLogic,
     getMinerAddressesLogic,
     transferLogic,
-    sweepAllLogic,
+    sweepActiveAddressLogic,
     signLogic,
     deriveNextAddressLogic,
     deriveNextMinerAddressesLogic,

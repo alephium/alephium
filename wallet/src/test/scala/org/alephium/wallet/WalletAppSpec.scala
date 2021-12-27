@@ -87,7 +87,7 @@ class WalletAppSpec
     }
   def transferJson(amount: Int) =
     s"""{"destinations":[{"address":"$transferAddress","amount":"$amount","tokens":[]}]}"""
-  val sweepAllJson =
+  val sweepActiveAddressJson =
     s"""{"toAddress":"$transferAddress"}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic, name: String) =
@@ -108,7 +108,7 @@ class WalletAppSpec
   def getMinerAddresses()   = Get(s"/wallets/$minerWallet/miner-addresses")
   def revealMnemonic()      = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def sweepAll()            = Post(s"/wallets/$wallet/sweep-all", sweepAllJson)
+  def sweepActiveAddress()  = Post(s"/wallets/$wallet/sweep-active-address", sweepActiveAddressJson)
   def sign(data: String)    = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
   def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
   def deriveAddressWithGroup(group: Int) = Post(
@@ -217,7 +217,7 @@ class WalletAppSpec
       response.code is StatusCode.BadRequest
     }
 
-    sweepAll() check { response =>
+    sweepActiveAddress() check { response =>
       response.as[model.Transfer.Results]
       response.code is StatusCode.Ok
     }
@@ -463,15 +463,18 @@ object WalletAppSpec extends {
       }
     }
 
-    router.route().path("/transactions/sweep-all/build").handler(BodyHandler.create()).handler {
-      ctx =>
+    router
+      .route()
+      .path("/transactions/sweep-active-address/build")
+      .handler(BodyHandler.create())
+      .handler { ctx =>
         val _          = read[BuildSweepAllTransaction](ctx.getBodyAsString())
         val unsignedTx = transactionGen().sample.get.unsigned
         complete(
           ctx,
           BuildSweepAllTransactionsResult.from(unsignedTx)
         )
-    }
+      }
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
       val _ = read[SubmitTransaction](ctx.getBodyAsString())

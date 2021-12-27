@@ -147,7 +147,7 @@ object BlockFlowClient {
       val lockupScript = LockupScript.p2pkh(fromPublicKey)
       requestFromGroup(
         lockupScript.groupIndex,
-        buildSweepAllTransaction,
+        buildSweepActiveAddressTransaction,
         BuildSweepAllTransaction(
           fromPublicKey,
           address,

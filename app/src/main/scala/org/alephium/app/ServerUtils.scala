@@ -228,7 +228,7 @@ class ServerUtils(implicit
         query.lockTime,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
+        query.utxosLimit.getOrElse(Int.MaxValue)
       )
     } yield {
       BuildSweepAllTransactionsResult.from(unsignedTxs)

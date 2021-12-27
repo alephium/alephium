@@ -1159,13 +1159,13 @@
         }
       }
     },
-    "/wallets/{wallet_name}/sweep-all": {
+    "/wallets/{wallet_name}/sweep-active-address": {
       "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Transfer all unlocked ALPH from the active address to another address",
-        "operationId": "postWalletsWallet_nameSweep-all",
+        "operationId": "postWalletsWallet_nameSweep-active-address",
         "parameters": [
           {
             "name": "wallet_name",
@@ -4272,13 +4272,13 @@
         }
       }
     },
-    "/transactions/sweep-all/build": {
+    "/transactions/sweep-active-address/build": {
       "post": {
         "tags": [
           "Transactions"
         ],
         "summary": "Build an unsigned transaction to send all unlocked balanced to an address",
-        "operationId": "postTransactionsSweep-allBuild",
+        "operationId": "postTransactionsSweep-active-addressBuild",
         "requestBody": {
           "content": {
             "application/json": {

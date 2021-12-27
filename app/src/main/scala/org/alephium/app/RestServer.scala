@@ -84,7 +84,7 @@ class RestServer(
       getBlockHeaderEntryLogic,
       listUnconfirmedTransactionsLogic,
       buildTransactionLogic,
-      buildSweepAllTransactionLogic,
+      buildSweepActiveAddressTransactionLogic,
       submitTransactionLogic,
       buildMultisigAddressLogic,
       buildMultisigLogic,

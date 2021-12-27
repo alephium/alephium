@@ -47,7 +47,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getBlockHeaderEntry,
     listUnconfirmedTransactions,
     buildTransaction,
-    buildSweepAllTransaction,
+    buildSweepActiveAddressTransaction,
     submitTransaction,
     decodeUnsignedTransaction,
     getTransactionStatus,

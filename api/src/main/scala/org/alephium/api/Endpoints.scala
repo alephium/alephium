@@ -242,10 +242,10 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
-  val buildSweepAllTransaction
+  val buildSweepActiveAddressTransaction
       : BaseEndpoint[BuildSweepAllTransaction, BuildSweepAllTransactionsResult] =
     transactionsEndpoint.post
-      .in("sweep-all")
+      .in("sweep-active-address")
       .in("build")
       .in(jsonBody[BuildSweepAllTransaction])
       .out(jsonBody[BuildSweepAllTransactionsResult])

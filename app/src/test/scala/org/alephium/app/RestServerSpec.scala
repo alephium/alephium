@@ -289,9 +289,9 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call POST /transactions/sweep-all/build" in {
+  it should "call POST /transactions/sweep-active-address/build" in {
     Post(
-      s"/transactions/sweep-all/build",
+      s"/transactions/sweep-active-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
@@ -305,7 +305,7 @@ abstract class RestServerSpec(
       )
     }
     Post(
-      s"/transactions/sweep-all/build",
+      s"/transactions/sweep-active-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
@@ -323,7 +323,7 @@ abstract class RestServerSpec(
     interCliqueSynced = false
 
     Post(
-      s"/transactions/sweep-all/build",
+      s"/transactions/sweep-active-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
