@@ -613,6 +613,9 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     val vc0 = AVector(0, 1, 2, 3, 4, 5)
     vc0.grouped(1) is vc0.map(AVector(_))
     vc0.grouped(3) is AVector(AVector(0, 1, 2), AVector(3, 4, 5))
+    vc0.grouped(4) is AVector(AVector(0, 1, 2, 3), AVector(4, 5))
+    vc0.grouped(5) is AVector(AVector(0, 1, 2, 3, 4), AVector(5))
+    vc0.grouped(100) is AVector(AVector(0, 1, 2, 3, 4, 5))
   }
 
   it should "withFilter (2)" in new Fixture {
