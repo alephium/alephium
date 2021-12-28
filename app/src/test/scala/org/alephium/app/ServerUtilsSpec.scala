@@ -220,7 +220,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAllTransactionRes = serverUtils
         .buildSweepAllTransaction(
           blockFlow,
-          BuildSweepAllTransaction(fromPublicKey, sweepAllToAddress)
+          BuildSweepAddressTransactions(fromPublicKey, sweepAllToAddress)
         )
         .rightValue
       val buildSweepAllTransaction = buildSweepAllTransactionRes.unsignedTxs.head
@@ -310,7 +310,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAllTransactionRes = serverUtils
         .buildSweepAllTransaction(
           blockFlow,
-          BuildSweepAllTransaction(toPublicKey, sweepAllToAddress)
+          BuildSweepAddressTransactions(toPublicKey, sweepAllToAddress)
         )
         .rightValue
       val buildSweepAllTransaction = buildSweepAllTransactionRes.unsignedTxs.head

@@ -22,7 +22,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildSweepAllTransaction(
+final case class BuildSweepAddressTransactions(
     fromPublicKey: PublicKey,
     toAddress: Address.Asset,
     lockTime: Option[TimeStamp] = None,

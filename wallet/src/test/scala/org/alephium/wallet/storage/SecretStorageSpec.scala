@@ -44,28 +44,28 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
         SecretStorage.create(mnemonic, None, password, miner, file, path).rightValue
       val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
-      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getActivePrivateKey() isE privateKey
       secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey)))
 
       val newKey = secretStorage.deriveNextKey().rightValue
 
-      secretStorage.getCurrentPrivateKey() isE newKey
+      secretStorage.getActivePrivateKey() isE newKey
       secretStorage.getAllPrivateKeys() isE ((newKey, AVector(privateKey, newKey)))
 
       secretStorage.changeActiveKey(privateKey) isE (())
 
-      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getActivePrivateKey() isE privateKey
       secretStorage.getAllPrivateKeys() isE ((privateKey, AVector(privateKey, newKey)))
 
       secretStorage.changeActiveKey(privateKey.derive(0).get) is Left(SecretStorage.UnknownKey)
 
       secretStorage.lock()
-      secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
+      secretStorage.getActivePrivateKey() is Left(SecretStorage.Locked)
 
       secretStorage.unlock(wrongPassword, None).isLeft is true
 
       secretStorage.unlock(password, None) is Right(())
-      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getActivePrivateKey() isE privateKey
 
       secretStorage.revealMnemonic(password) is Right(mnemonic)
       secretStorage.revealMnemonic(wrongPassword).isLeft is true
@@ -89,12 +89,12 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
       val privateKey = BIP32.btcMasterKey(seed).derive(path).get
 
-      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getActivePrivateKey() isE privateKey
 
       secretStorage.lock()
       secretStorage.unlock(password, None).leftValue is SecretStorage.InvalidMnemonicPassphrase
       secretStorage.unlock(password, Some(passphrase))
-      secretStorage.getCurrentPrivateKey() isE privateKey
+      secretStorage.getActivePrivateKey() isE privateKey
     }
   }
 
@@ -128,7 +128,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
     secretStorage.unlock(password, None).leftValue is SecretStorage.InvalidMnemonicPassphrase
     secretStorage.unlock(password, Some(mnemonicph)) is Right(())
 
-    secretStorage.getCurrentPrivateKey() isE privateKey
+    secretStorage.getActivePrivateKey() isE privateKey
   }
 
   it should "fail to create twice the same file" in {
@@ -146,7 +146,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
     val secretStorage = SecretStorage.load(file, path).rightValue
 
-    secretStorage.getCurrentPrivateKey() is Left(SecretStorage.Locked)
+    secretStorage.getActivePrivateKey() is Left(SecretStorage.Locked)
   }
 
   it should "fail to load an non existing file" in {

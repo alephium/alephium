@@ -60,6 +60,7 @@ class WalletServer(
     getMinerAddressesLogic,
     transferLogic,
     sweepActiveAddressLogic,
+    sweepAllAddressesLogic,
     signLogic,
     deriveNextAddressLogic,
     deriveNextMinerAddressesLogic,

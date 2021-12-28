@@ -217,8 +217,8 @@ class ServerUtils(implicit
 
   def buildSweepAllTransaction(
       blockFlow: BlockFlow,
-      query: BuildSweepAllTransaction
-  ): Try[BuildSweepAllTransactionsResult] = {
+      query: BuildSweepAddressTransactions
+  ): Try[BuildSweepAddressTransactionsResult] = {
     for {
       _ <- checkGroup(query.fromPublicKey)
       unsignedTxs <- prepareUnsignedTransaction(
@@ -231,7 +231,7 @@ class ServerUtils(implicit
         query.utxosLimit.getOrElse(Int.MaxValue)
       )
     } yield {
-      BuildSweepAllTransactionsResult.from(unsignedTxs)
+      BuildSweepAddressTransactionsResult.from(unsignedTxs)
     }
   }
 

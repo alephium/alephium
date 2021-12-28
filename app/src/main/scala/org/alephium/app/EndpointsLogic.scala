@@ -322,7 +322,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   )
 
   val buildSweepActiveAddressTransactionLogic =
-    serverLogicRedirect(buildSweepActiveAddressTransaction)(
+    serverLogicRedirect(buildSweepAddressTransactions)(
       buildSweepAllTransaction =>
         withSyncedClique {
           Future.successful(

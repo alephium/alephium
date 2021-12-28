@@ -289,9 +289,9 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call POST /transactions/sweep-active-address/build" in {
+  it should "call POST /transactions/sweep-address/build" in {
     Post(
-      s"/transactions/sweep-active-address/build",
+      s"/transactions/sweep-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
@@ -300,12 +300,12 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildSweepAllTransactionsResult] is dummySweepAllBuildTransactionsResult(
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAllBuildTransactionsResult(
         ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, None)
       )
     }
     Post(
-      s"/transactions/sweep-active-address/build",
+      s"/transactions/sweep-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
@@ -315,7 +315,7 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildSweepAllTransactionsResult] is dummySweepAllBuildTransactionsResult(
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAllBuildTransactionsResult(
         ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
       )
     }
@@ -323,7 +323,7 @@ abstract class RestServerSpec(
     interCliqueSynced = false
 
     Post(
-      s"/transactions/sweep-active-address/build",
+      s"/transactions/sweep-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",

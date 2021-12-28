@@ -98,7 +98,7 @@ trait ServerFixture
   )
   def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult.from(tx.unsigned)
   def dummySweepAllBuildTransactionsResult(tx: Transaction) =
-    BuildSweepAllTransactionsResult.from(tx.unsigned)
+    BuildSweepAddressTransactionsResult.from(tx.unsigned)
   lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 

@@ -841,7 +841,7 @@ class TxUtilsSpec extends AlephiumSpec {
         AssetScriptGasEstimator.Default(blockFlow)
       )
       .rightValue
-      .leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-active-address` endpoint to consolidate the inputs first"
+      .leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
   }
 
   it should "sweep as much as we can" in new LargeUtxos {

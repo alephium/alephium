@@ -22,7 +22,7 @@ import org.alephium.protocol.model.UnsignedTransaction
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
-final case class BuildSweepAllTransactionsResult(
+final case class BuildSweepAddressTransactionsResult(
     unsignedTxs: AVector[SweepAllTransaction],
     fromGroup: Int,
     toGroup: Int
@@ -33,17 +33,17 @@ final case class SweepAllTransaction(
     unsignedTx: String
 )
 
-object BuildSweepAllTransactionsResult {
+object BuildSweepAddressTransactionsResult {
 
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildSweepAllTransactionsResult = {
+  )(implicit groupConfig: GroupConfig): BuildSweepAddressTransactionsResult = {
     from(AVector(unsignedTx))
   }
 
   def from(
       unsignedTxs: AVector[UnsignedTransaction]
-  )(implicit groupConfig: GroupConfig): BuildSweepAllTransactionsResult = {
+  )(implicit groupConfig: GroupConfig): BuildSweepAddressTransactionsResult = {
     assume(unsignedTxs.length > 0)
     val sweepAllTxs = unsignedTxs.map { unsignedTx =>
       SweepAllTransaction(
@@ -51,7 +51,7 @@ object BuildSweepAllTransactionsResult {
         Hex.toHexString(serialize(unsignedTx))
       )
     }
-    BuildSweepAllTransactionsResult(
+    BuildSweepAddressTransactionsResult(
       sweepAllTxs,
       unsignedTxs.head.fromGroup.value,
       unsignedTxs.head.toGroup.value

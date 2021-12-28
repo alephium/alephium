@@ -194,7 +194,7 @@ object UnsignedTransaction {
   ): Either[String, Unit] = {
     check(
       failCondition = assets.length > ALPH.MaxTxInputNum,
-      "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-active-address` endpoint to consolidate the inputs first"
+      "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
     )
   }
 
