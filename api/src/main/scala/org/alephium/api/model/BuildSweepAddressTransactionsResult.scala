@@ -16,21 +16,14 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.UnsignedTransaction
-import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.AVector
 
 final case class BuildSweepAddressTransactionsResult(
-    unsignedTxs: AVector[SweepAllTransaction],
+    unsignedTxs: AVector[SweepAddressTransaction],
     fromGroup: Int,
     toGroup: Int
-)
-
-final case class SweepAllTransaction(
-    txId: Hash,
-    unsignedTx: String
 )
 
 object BuildSweepAddressTransactionsResult {
@@ -45,14 +38,8 @@ object BuildSweepAddressTransactionsResult {
       unsignedTxs: AVector[UnsignedTransaction]
   )(implicit groupConfig: GroupConfig): BuildSweepAddressTransactionsResult = {
     assume(unsignedTxs.length > 0)
-    val sweepAllTxs = unsignedTxs.map { unsignedTx =>
-      SweepAllTransaction(
-        unsignedTx.hash,
-        Hex.toHexString(serialize(unsignedTx))
-      )
-    }
     BuildSweepAddressTransactionsResult(
-      sweepAllTxs,
+      unsignedTxs.map(SweepAddressTransaction.from),
       unsignedTxs.head.fromGroup.value,
       unsignedTxs.head.toGroup.value
     )

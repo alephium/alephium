@@ -600,7 +600,7 @@ class TxUtilsSpec extends AlephiumSpec {
       addAndUpdateView(blockflow, newBlock)
 
       val unsignedTxs = blockflow
-        .sweepAll(
+        .sweepAddress(
           keyManager(output.lockupScript).publicKey,
           output.lockupScript,
           None,
@@ -613,7 +613,7 @@ class TxUtilsSpec extends AlephiumSpec {
       unsignedTxs.length is 1
       val unsignedTx = unsignedTxs.head
       unsignedTx.fixedOutputs.length is 1
-      unsignedTx.gasAmount is GasEstimation.sweepAll(inputNum, 1)
+      unsignedTx.gasAmount is GasEstimation.sweepAddress(inputNum, 1)
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
       txValidation.validateTxOnlyForTest(sweepTx, blockflow) isE ()
     }
@@ -636,7 +636,7 @@ class TxUtilsSpec extends AlephiumSpec {
       )
 
       val result = TxUtils
-        .buildSweepAllTxOutputsWithGas(
+        .buildSweepAddressTxOutputsWithGas(
           toLockupScript,
           lockTimeOpt = None,
           AVector(output),
@@ -662,7 +662,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("no tokens")
       Test(AVector.empty).success { case (outputs, gas) =>
         outputs.length is 1
-        gas is GasEstimation.sweepAll(1, 1)
+        gas is GasEstimation.sweepAddress(1, 1)
       }
     }
 
@@ -675,7 +675,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       Test(tokens).success { case (outputs, gas) =>
         outputs.length is 1
-        gas is GasEstimation.sweepAll(1, 1)
+        gas is GasEstimation.sweepAddress(1, 1)
       }
     }
 
@@ -697,7 +697,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         verifyExtraOutput(outputs(1))
 
-        gas is GasEstimation.sweepAll(1, 2)
+        gas is GasEstimation.sweepAddress(1, 2)
       }
     }
 
@@ -720,7 +720,7 @@ class TxUtilsSpec extends AlephiumSpec {
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
 
-        gas is GasEstimation.sweepAll(1, 3)
+        gas is GasEstimation.sweepAddress(1, 3)
       }
     }
 
@@ -743,14 +743,14 @@ class TxUtilsSpec extends AlephiumSpec {
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
 
-        gas is GasEstimation.sweepAll(1, 3)
+        gas is GasEstimation.sweepAddress(1, 3)
       }
     }
 
     {
       info("The amount in the first output is below minimalAlphAmountPerTxOutput(tokens)")
       val alphAmount = minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
-        .addUnsafe(defaultGasPrice * GasEstimation.sweepAll(1, 3))
+        .addUnsafe(defaultGasPrice * GasEstimation.sweepAddress(1, 3))
         .addUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
 
       val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
@@ -767,7 +767,7 @@ class TxUtilsSpec extends AlephiumSpec {
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
 
-        gas is GasEstimation.sweepAll(1, 3)
+        gas is GasEstimation.sweepAddress(1, 3)
       }
 
       Test(tokens, alphAmount.subUnsafe(1))
@@ -775,7 +775,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  "TxUtils.getFirstOutputTokensNum" should "return the number of tokens for the first output of the sweepAll transaction" in {
+  "TxUtils.getFirstOutputTokensNum" should "return the number of tokens for the first output of the sweepAddress transaction" in {
     TxUtils.getFirstOutputTokensNum(0) is 0
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo) is maxTokenPerUtxo
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 1) is 1
@@ -847,7 +847,7 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "sweep as much as we can" in new LargeUtxos {
     val txValidation = TxValidation.build
     val unsignedTxs = blockFlow
-      .sweepAll(
+      .sweepAddress(
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,

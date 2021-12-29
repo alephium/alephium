@@ -300,8 +300,8 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildSweepAddressTransactionsResult] is dummySweepAllBuildTransactionsResult(
-        ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, None)
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None)
       )
     }
     Post(
@@ -315,8 +315,12 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildSweepAddressTransactionsResult] is dummySweepAllBuildTransactionsResult(
-        ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(
+          dummyTx,
+          dummyToLockupScript,
+          Some(TimeStamp.unsafe(1234))
+        )
       )
     }
 

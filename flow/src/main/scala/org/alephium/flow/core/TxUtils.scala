@@ -242,7 +242,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def sweepAll(
+  def sweepAddress(
       fromPublicKey: PublicKey,
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
@@ -263,7 +263,7 @@ trait TxUtils { Self: FlowUtils =>
           val groupedUtxos = allUtxos.grouped(ALPH.MaxTxInputNum / 2)
           groupedUtxos.mapE { utxos =>
             for {
-              txOutputsWithGas <- buildSweepAllTxOutputsWithGas(
+              txOutputsWithGas <- buildSweepAddressTxOutputsWithGas(
                 toLockupScript,
                 lockTimeOpt,
                 utxos.map(_.output),
@@ -456,10 +456,10 @@ object TxUtils {
     blockCaches.exists(_.inputs.contains(outputRef))
   }
 
-  // Normally there is one output for the `sweepAll` transaction. However, If there are more
+  // Normally there is one output for the `sweepAddress` transaction. However, If there are more
   // tokens than `maxTokenPerUtxo`, instead of failing the transaction validation, we will
   // try to build a valid transaction by creating more outputs.
-  def buildSweepAllTxOutputsWithGas(
+  def buildSweepAddressTxOutputsWithGas(
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       utxos: AVector[AssetOutput],
@@ -473,7 +473,7 @@ object TxUtils {
       )
       groupsOfTokens    = (totalAmountPerToken.length + maxTokenPerUtxo - 1) / maxTokenPerUtxo
       extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
-      gas               = gasOpt.getOrElse(GasEstimation.sweepAll(utxos.length, extraNumOfOutputs + 1))
+      gas               = gasOpt.getOrElse(GasEstimation.sweepAddress(utxos.length, extraNumOfOutputs + 1))
       totalAmountWithoutGas <- totalAmount
         .sub(gasPrice * gas)
         .toRight("Not enough balance for gas fee")

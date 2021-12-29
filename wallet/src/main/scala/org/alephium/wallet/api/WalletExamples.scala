@@ -159,11 +159,11 @@ trait WalletExamples extends EndpointsExamples {
   implicit val signTransactionResultExamples: List[Example[Sign.Result]] =
     simpleExample(Sign.Result(signature))
 
-  implicit val sweepAllExamples: List[Example[SweepAll]] =
+  implicit val sweepAllExamples: List[Example[Sweep]] =
     List(
-      defaultExample(SweepAll(address)),
+      defaultExample(Sweep(address)),
       moreSettingsExample(
-        SweepAll(
+        Sweep(
           address,
           Some(ts),
           Some(minimalGas),

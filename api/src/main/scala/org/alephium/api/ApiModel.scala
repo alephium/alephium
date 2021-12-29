@@ -210,15 +210,16 @@ trait ApiModelCodec {
 
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
 
-  implicit val buildSweepAllTransactionRW: RW[BuildSweepAddressTransactions] = macroRW
+  implicit val buildSweepAddressTransactionsRW: RW[BuildSweepAddressTransactions] = macroRW
 
   implicit val groupRW: RW[Group] = macroRW
 
   implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
 
-  implicit val sweepAllTransactionRW: RW[SweepAllTransaction] = macroRW
+  implicit val sweepAddressTransactionRW: RW[SweepAddressTransaction] = macroRW
 
-  implicit val buildSweepAllTransactionsResultRW: RW[BuildSweepAddressTransactionsResult] = macroRW
+  implicit val buildSweepAddressTransactionsResultRW: RW[BuildSweepAddressTransactionsResult] =
+    macroRW
 
   implicit val submitTransactionRW: RW[SubmitTransaction] = macroRW
 

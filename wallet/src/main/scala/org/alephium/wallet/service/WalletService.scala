@@ -30,7 +30,7 @@ import scala.util.Try
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
-import org.alephium.api.model.{Amount, Destination, SweepAllTransaction}
+import org.alephium.api.model.{Amount, Destination, SweepAddressTransaction}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
@@ -455,7 +455,7 @@ object WalletService {
           case Right(buildSweepAllTxResult) =>
             FutureCollection
               .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[Hash]) {
-                case (txIds, SweepAllTransaction(txId, unsignedTx)) => {
+                case (txIds, SweepAddressTransaction(txId, unsignedTx)) => {
                   val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
                   blockFlowClient
                     .postTransaction(unsignedTx, signature, buildSweepAllTxResult.fromGroup)

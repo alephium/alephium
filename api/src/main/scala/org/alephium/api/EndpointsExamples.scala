@@ -292,7 +292,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildSweepAllTransactionExamples: List[Example[BuildSweepAddressTransactions]] =
+  implicit val buildSweepAddressTransactionExamples: List[Example[BuildSweepAddressTransactions]] =
     List(
       defaultExample(
         BuildSweepAddressTransactions(
@@ -315,10 +315,10 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
     simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
 
-  implicit val buildSweepAllTransactionsResultExamples
+  implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
-    val sweepAllTxs = AVector(SweepAllTransaction(hash, hexString))
-    simpleExample(BuildSweepAddressTransactionsResult(sweepAllTxs, fromGroup = 2, toGroup = 1))
+    val sweepAddressTxs = AVector(SweepAddressTransaction(hash, hexString))
+    simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
 
   implicit val submitTransactionExamples: List[Example[SubmitTransaction]] =

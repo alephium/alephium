@@ -1180,7 +1180,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SweepAll"
+                "$ref": "#/components/schemas/Sweep"
               },
               "examples": {
                 "Example0": {
@@ -1313,7 +1313,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SweepAll"
+                "$ref": "#/components/schemas/Sweep"
               },
               "examples": {
                 "Example0": {
@@ -4418,7 +4418,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildSweepAllTransaction"
+                "$ref": "#/components/schemas/BuildSweepAddressTransactions"
               },
               "examples": {
                 "Example0": {
@@ -4449,7 +4449,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildSweepAllTransactionsResult"
+                  "$ref": "#/components/schemas/BuildSweepAddressTransactionsResult"
                 },
                 "example": {
                   "unsignedTxs": [
@@ -6802,7 +6802,7 @@
           }
         }
       },
-      "BuildSweepAllTransaction": {
+      "BuildSweepAddressTransactions": {
         "required": [
           "fromPublicKey",
           "toAddress"
@@ -6831,7 +6831,7 @@
           }
         }
       },
-      "BuildSweepAllTransactionsResult": {
+      "BuildSweepAddressTransactionsResult": {
         "required": [
           "unsignedTxs",
           "fromGroup",
@@ -6842,7 +6842,7 @@
           "unsignedTxs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/SweepAllTransaction"
+              "$ref": "#/components/schemas/SweepAddressTransaction"
             }
           },
           "fromGroup": {
@@ -7675,7 +7675,7 @@
           }
         }
       },
-      "SweepAll": {
+      "Sweep": {
         "required": [
           "toAddress"
         ],
@@ -7700,7 +7700,7 @@
           }
         }
       },
-      "SweepAllTransaction": {
+      "SweepAddressTransaction": {
         "required": [
           "txId",
           "unsignedTx"

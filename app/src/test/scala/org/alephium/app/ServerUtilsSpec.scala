@@ -216,34 +216,34 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sweep coins from the 3 UTXOs of this public key to another address")
       val senderBalanceBeforeSweep = genesisBalance - block0.transactions.head.gasFeeUnsafe
-      val sweepAllToAddress        = generateAddress(chainIndex)
-      val buildSweepAllTransactionRes = serverUtils
-        .buildSweepAllTransaction(
+      val sweepAddressDestination  = generateAddress(chainIndex)
+      val buildSweepAddressTransactionsRes = serverUtils
+        .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(fromPublicKey, sweepAllToAddress)
+          BuildSweepAddressTransactions(fromPublicKey, sweepAddressDestination)
         )
         .rightValue
-      val buildSweepAllTransaction = buildSweepAllTransactionRes.unsignedTxs.head
+      val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
-      val sweepAllTxTemplate = signAndAddToMemPool(
-        buildSweepAllTransaction.txId,
-        buildSweepAllTransaction.unsignedTx,
+      val sweepAddressTxTemplate = signAndAddToMemPool(
+        sweepAddressTransaction.txId,
+        sweepAddressTransaction.unsignedTx,
         chainIndex,
         fromPrivateKey
       )
 
       checkAddressBalance(
-        sweepAllToAddress,
-        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+        sweepAddressDestination,
+        senderBalanceBeforeSweep - sweepAddressTxTemplate.gasFeeUnsafe
       )
 
       val block1 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
-      serverUtils.getTransactionStatus(blockFlow, sweepAllTxTemplate.id, chainIndex) isE
+      serverUtils.getTransactionStatus(blockFlow, sweepAddressTxTemplate.id, chainIndex) isE
         Confirmed(block1.hash, 0, 1, 1, 1)
       checkAddressBalance(
-        sweepAllToAddress,
-        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+        sweepAddressDestination,
+        senderBalanceBeforeSweep - sweepAddressTxTemplate.gasFeeUnsafe
       )
       checkAddressBalance(fromAddress, U256.unsafe(0), 0)
     }
@@ -306,37 +306,37 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sweep coins from the 3 UTXOs for the same public key to another address")
       val senderBalanceBeforeSweep = receiverInitialBalance + ALPH.alph(10)
-      val sweepAllToAddress        = generateAddress(chainIndex)
-      val buildSweepAllTransactionRes = serverUtils
-        .buildSweepAllTransaction(
+      val sweepAddressDestination  = generateAddress(chainIndex)
+      val buildSweepAddressTransactionsRes = serverUtils
+        .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(toPublicKey, sweepAllToAddress)
+          BuildSweepAddressTransactions(toPublicKey, sweepAddressDestination)
         )
         .rightValue
-      val buildSweepAllTransaction = buildSweepAllTransactionRes.unsignedTxs.head
+      val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
-      val sweepAllChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
-      val sweepAllTxTemplate = signAndAddToMemPool(
-        buildSweepAllTransaction.txId,
-        buildSweepAllTransaction.unsignedTx,
-        sweepAllChainIndex,
+      val sweepAddressChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
+      val sweepAddressTxTemplate = signAndAddToMemPool(
+        sweepAddressTransaction.txId,
+        sweepAddressTransaction.unsignedTx,
+        sweepAddressChainIndex,
         toPrivateKey
       )
 
       // Spend 10 UTXOs and generate 1 output
-      sweepAllTxTemplate.unsigned.fixedOutputs.length is 1
-      sweepAllTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * GasEstimation.sweepAll(11, 1)
+      sweepAddressTxTemplate.unsigned.fixedOutputs.length is 1
+      sweepAddressTxTemplate.unsigned.gasAmount > minimalGas is true
+      sweepAddressTxTemplate.gasFeeUnsafe is defaultGasPrice * GasEstimation.sweepAddress(11, 1)
 
       checkAddressBalance(
-        sweepAllToAddress,
-        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+        sweepAddressDestination,
+        senderBalanceBeforeSweep - sweepAddressTxTemplate.gasFeeUnsafe
       )
 
-      val block2 = mineFromMemPool(blockFlow, sweepAllChainIndex)
+      val block2 = mineFromMemPool(blockFlow, sweepAddressChainIndex)
       addAndCheck(blockFlow, block2)
       checkAddressBalance(
-        sweepAllToAddress,
+        sweepAddressDestination,
         senderBalanceBeforeSweep - block2.transactions.head.gasFeeUnsafe
       )
       checkAddressBalance(toAddress, 0, 0)

@@ -215,7 +215,7 @@ class ServerUtils(implicit
     }
   }
 
-  def buildSweepAllTransaction(
+  def buildSweepAddressTransactions(
       blockFlow: BlockFlow,
       query: BuildSweepAddressTransactions
   ): Try[BuildSweepAddressTransactionsResult] = {
@@ -461,7 +461,7 @@ class ServerUtils(implicit
       gasPrice: GasPrice,
       utxosLimit: Int
   ): Try[AVector[UnsignedTransaction]] = {
-    blockFlow.sweepAll(
+    blockFlow.sweepAddress(
       fromPublicKey,
       toAddress.lockupScript,
       lockTimeOpt,

@@ -26,7 +26,7 @@ import org.alephium.util._
 //   - UnlockScript, including P2PKH, P2MPKH and P2SH
 //   - TxScript
 object GasEstimation extends StrictLogging {
-  def sweepAll: (Int, Int) => GasBox = estimateWithP2PKHInputs _
+  def sweepAddress: (Int, Int) => GasBox = estimateWithP2PKHInputs _
 
   def estimateWithP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
     val inputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)

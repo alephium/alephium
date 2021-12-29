@@ -38,13 +38,13 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     GasEstimation.estimateWithP2PKHInputs(5, 10) is GasBox.unsafe(66300)
   }
 
-  "GasEstimation.sweepAll" should "behave the same as GasEstimation.estimateWithP2PKHInputs" in {
+  "GasEstimation.sweepAddress" should "behave the same as GasEstimation.estimateWithP2PKHInputs" in {
     val inputNumGen  = Gen.choose(0, ALPH.MaxTxInputNum)
     val outputNumGen = Gen.choose(0, ALPH.MaxTxOutputNum)
 
     forAll(inputNumGen, outputNumGen) { case (inputNum, outputNum) =>
-      val sweepAllGas = GasEstimation.sweepAll(inputNum, outputNum)
-      sweepAllGas is GasEstimation.estimateWithP2PKHInputs(inputNum, outputNum)
+      val sweepAddressGas = GasEstimation.sweepAddress(inputNum, outputNum)
+      sweepAddressGas is GasEstimation.estimateWithP2PKHInputs(inputNum, outputNum)
     }
   }
 

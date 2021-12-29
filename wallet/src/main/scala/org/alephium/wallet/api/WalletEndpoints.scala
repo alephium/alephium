@@ -114,17 +114,17 @@ trait WalletEndpoints
       .out(jsonBody[Sign.Result])
       .summary("Sign the given data and return back the signature")
 
-  val sweepActiveAddress: BaseEndpoint[(String, SweepAll), Transfer.Results] =
+  val sweepActiveAddress: BaseEndpoint[(String, Sweep), Transfer.Results] =
     wallet.post
       .in("sweep-active-address")
-      .in(jsonBody[SweepAll])
+      .in(jsonBody[Sweep])
       .out(jsonBody[Transfer.Results])
       .summary("Transfer all unlocked ALPH from the active address to another address")
 
-  val sweepAllAddresses: BaseEndpoint[(String, SweepAll), Transfer.Results] =
+  val sweepAllAddresses: BaseEndpoint[(String, Sweep), Transfer.Results] =
     wallet.post
       .in("sweep-all-addresses")
-      .in(jsonBody[SweepAll])
+      .in(jsonBody[Sweep])
       .out(jsonBody[Transfer.Results])
       .summary(
         "Transfer unlocked ALPH from all addresses (including all mining addresses if applicable) to another address"

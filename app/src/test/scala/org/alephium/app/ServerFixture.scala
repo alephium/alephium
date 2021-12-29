@@ -97,7 +97,7 @@ trait ServerFixture
     dummyTx.toGroup.value
   )
   def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult.from(tx.unsigned)
-  def dummySweepAllBuildTransactionsResult(tx: Transaction) =
+  def dummySweepAddressBuildTransactionsResult(tx: Transaction) =
     BuildSweepAddressTransactionsResult.from(tx.unsigned)
   lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
@@ -118,7 +118,7 @@ object ServerFixture {
     tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
   }
 
-  def dummySweepAllTx(
+  def dummySweepAddressTx(
       tx: Transaction,
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp]
@@ -280,7 +280,7 @@ object ServerFixture {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
 
-    override def sweepAll(
+    override def sweepAddress(
         fromPublicKey: PublicKey,
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
@@ -288,7 +288,7 @@ object ServerFixture {
         gasPrice: GasPrice,
         utxosLimit: Int
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-      Right(Right(AVector(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
+      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
     }
 
     // scalastyle:off no.equal
