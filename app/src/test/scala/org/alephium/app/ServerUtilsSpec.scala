@@ -176,7 +176,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check sweep all tx status for intra group txs" in new Fixture {
+  it should "check sweep address tx status for intra group txs" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils

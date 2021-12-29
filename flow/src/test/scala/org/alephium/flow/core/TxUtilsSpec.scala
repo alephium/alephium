@@ -846,6 +846,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "sweep as much as we can" in new LargeUtxos {
     val txValidation = TxValidation.build
+
     val unsignedTxs = blockFlow
       .sweepAddress(
         keyManager(output.lockupScript).publicKey,
@@ -853,14 +854,17 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         None,
         defaultGasPrice,
-        defaultUtxoLimit
+        Int.MaxValue
       )
       .rightValue
       .rightValue
-    unsignedTxs.length is 4
-    val unsignedTx = unsignedTxs.head
-    val sweepTx    = Transaction.from(unsignedTx, keyManager(output.lockupScript))
-    txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
+
+    unsignedTxs.length is 6
+
+    unsignedTxs.foreach { unsignedTx =>
+      val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
+      txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
+    }
   }
 
   private def input(

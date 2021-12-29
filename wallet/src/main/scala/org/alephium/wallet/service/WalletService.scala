@@ -423,9 +423,9 @@ object WalletService {
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
     ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
-      withPrivateKeysFut(wallet) { case (privateKey, otherPrivateKeys) =>
+      withPrivateKeysFut(wallet) { case (_, privateKeys) =>
         val init = AVector.empty[(Hash, GroupIndex, GroupIndex)]
-        FutureCollection.foldSequentialE(privateKey +: otherPrivateKeys)(init) {
+        FutureCollection.foldSequentialE(privateKeys)(init) {
           case (txs, privKey) =>
             sweepAddress(privKey, address, lockTime, gas, gasPrice, utxosLimit)
               .map(_.map(_ ++ txs))

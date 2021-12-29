@@ -446,6 +446,24 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       Some(s"""{"password": "${password}"}""")
     )
 
+  def walletBalances(walletName: String) = {
+    httpGet(s"/wallets/${walletName}/balances")
+  }
+
+  def sweepActiveAddress(walletName: String, toAddress: String) = {
+    httpPost(
+      s"/wallets/${walletName}/sweep-active-address",
+      Some(s"""{"toAddress": "${toAddress}"}""")
+    )
+  }
+
+  def sweepAllAddresses(walletName: String, toAddress: String) = {
+    httpPost(
+      s"/wallets/${walletName}/sweep-all-addresses",
+      Some(s"""{"toAddress": "${toAddress}"}""")
+    )
+  }
+
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
