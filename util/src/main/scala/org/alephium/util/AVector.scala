@@ -170,6 +170,11 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
   }
 
   def grouped(k: Int): AVector[AVector[A]] = {
+    assume(length % k == 0)
+    AVector.tabulate(length / k) { l => slice(k * l, k * (l + 1)) }
+  }
+
+  def groupedWithRemainder(k: Int): AVector[AVector[A]] = {
     val remainder = length % k
     val tabulated = AVector.tabulate(length / k) { l => slice(k * l, k * (l + 1)) }
     if (remainder == 0) {

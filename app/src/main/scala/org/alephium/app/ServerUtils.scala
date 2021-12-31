@@ -221,7 +221,7 @@ class ServerUtils(implicit
   ): Try[BuildSweepAddressTransactionsResult] = {
     for {
       _ <- checkGroup(query.fromPublicKey)
-      unsignedTxs <- prepareUnsignedTransaction(
+      unsignedTxs <- prepareSweepAddressTransaction(
         blockFlow,
         query.fromPublicKey,
         query.toAddress,
@@ -452,7 +452,7 @@ class ServerUtils(implicit
     }
   }
 
-  def prepareUnsignedTransaction(
+  def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
       toAddress: Address.Asset,
