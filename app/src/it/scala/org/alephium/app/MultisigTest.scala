@@ -30,45 +30,15 @@ import org.alephium.wallet.api.model._
 
 class MultisigTest extends AlephiumActorSpec {
 
-  it should "handle multisig with private keys" in new CliqueFixture {
-
-    val clique = bootClique(nbOfNodes = 1)
-    clique.start()
-
-    val group    = clique.getGroup(address)
-    val restPort = clique.getRestPort(group.group)
-
-    request[Balance](getBalance(address), restPort) is initialBalance
+  it should "handle multisig with private keys" in new MultisigFixture {
 
     val (_, publicKey2, _)           = generateAccount
     val (_, publicKey3, privateKey3) = generateAccount
 
-    val multisigAddress =
-      request[BuildMultisigAddress.Result](
-        multisig(AVector(publicKey, publicKey2, publicKey3), 2),
-        restPort
-      ).address.toBase58
-
-    request[Balance](getBalance(multisigAddress), restPort) is
-      Balance.from(Amount.Zero, Amount.Zero, 0)
-
-    clique.startMining()
-
-    val tx = transfer(publicKey, multisigAddress, transferAmount, privateKey, restPort)
-    confirmTx(tx, restPort)
-
-    val tx2 = transfer(publicKey, multisigAddress, transferAmount, privateKey, restPort)
-    confirmTx(tx2, restPort)
-
-    val amount = transferAmount + (transferAmount / 2) // To force 2 inputs
-
-    val buildTx = buildMultisigTransaction(
-      multisigAddress,
-      AVector(publicKey, publicKey3), // Order needs to be respected
-      address,
-      amount
+    val buildTxResult = createMultisigTransaction(
+      AVector(publicKey, publicKey2, publicKey3),
+      AVector(publicKey, publicKey3)
     )
-    val buildTxResult = request[BuildTransactionResult](buildTx, restPort)
 
     val unsignedTx =
       deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
@@ -87,40 +57,21 @@ class MultisigTest extends AlephiumActorSpec {
     ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
       .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
-    val submitMultisigTx1sig = signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey))
-    request[ApiError.InternalServerError](
-      submitMultisigTx1sig,
-      restPort
-    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
+    submitFailedMultisigTransaction(
+      buildTxResult,
+      AVector(privateKey)
+    ) is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
       .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
-    val submitMultisigTxWrongSig =
-      signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey3))
-    request[ApiError.InternalServerError](
-      submitMultisigTxWrongSig,
-      restPort
-    ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
+    submitFailedMultisigTransaction(
+      buildTxResult,
+      AVector(privateKey3)
+    ) is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
       .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey3)))))}"
 
-    val submitMultisigTx =
-      signAndSubmitMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
-    val multisigTx = request[TxResult](submitMultisigTx, restPort)
+    submitSuccessfulMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
 
-    confirmTx(multisigTx, restPort)
-
-    val inputUnlockScripts = unsignedTx.inputs.map(_.unlockScript)
-
-    val estimatedGas = GasEstimation.estimate(
-      inputUnlockScripts,
-      unsignedTx.fixedOutputs.length,
-      AssetScriptGasEstimator.Mock
-    )
-    unsignedTx.gasAmount is GasBox.unsafe(22240)
-    unsignedTx.gasAmount is estimatedGas
-
-    val gasFee = defaultGasPrice * estimatedGas
-    request[Balance](getBalance(multisigAddress), restPort) is
-      Balance.from(Amount(transferAmount.mulUnsafe(2) - amount - gasFee), Amount.Zero, 1)
+    verifyEstimatedGas(unsignedTx, GasBox.unsafe(22240))
 
     clique.stopMining()
     clique.stop()
@@ -130,11 +81,12 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey2, _) = generateAccount
     val (_, publicKey3, _) = generateAccount
 
-    val unsignedTx = createMultisigTransaction(
+    val buildResult = createMultisigTransaction(
       AVector(publicKey, publicKey2, publicKey3),
-      AVector(publicKey),
-      AVector(privateKey)
+      AVector(publicKey)
     )
+
+    val unsignedTx = submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey))
 
     verifyEstimatedGas(unsignedTx, GasBox.unsafe(20000))
 
@@ -146,11 +98,13 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey2, _)           = generateAccount
     val (_, publicKey3, privateKey3) = generateAccount
 
-    val unsignedTx = createMultisigTransaction(
+    val buildResult = createMultisigTransaction(
       AVector(publicKey, publicKey2, publicKey3),
-      AVector(publicKey, publicKey3),
-      AVector(privateKey, privateKey3)
+      AVector(publicKey, publicKey3)
     )
+
+    val unsignedTx =
+      submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey, privateKey3))
 
     verifyEstimatedGas(unsignedTx, GasBox.unsafe(22240))
 
@@ -163,9 +117,13 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey3, privateKey3) = generateAccount
     val (_, publicKey4, privateKey4) = generateAccount
 
-    val unsignedTx = createMultisigTransaction(
+    val buildResult = createMultisigTransaction(
       AVector(publicKey, publicKey2, publicKey3, publicKey4),
-      AVector(publicKey, publicKey3, publicKey4),
+      AVector(publicKey, publicKey3, publicKey4)
+    )
+
+    val unsignedTx = submitSuccessfulMultisigTransaction(
+      buildResult,
       AVector(privateKey, privateKey3, privateKey4)
     )
 
@@ -271,9 +229,8 @@ class MultisigTest extends AlephiumActorSpec {
 
     def createMultisigTransaction(
         allPubKeys: AVector[String],
-        unlockPubKeys: AVector[String],
-        unlockPrivKeys: AVector[String]
-    ): UnsignedTransaction = {
+        unlockPubKeys: AVector[String]
+    ): BuildTransactionResult = {
       val multisigAddress =
         request[BuildMultisigAddress.Result](
           multisig(allPubKeys, unlockPubKeys.length),
@@ -299,7 +256,14 @@ class MultisigTest extends AlephiumActorSpec {
         address,
         amount
       )
-      val buildTxResult = request[BuildTransactionResult](buildTx, restPort)
+
+      request[BuildTransactionResult](buildTx, restPort)
+    }
+
+    def submitSuccessfulMultisigTransaction(
+        buildTxResult: BuildTransactionResult,
+        unlockPrivKeys: AVector[String]
+    ): UnsignedTransaction = {
       val unsignedTx =
         deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
       val decodedTx = request[Tx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
@@ -312,6 +276,19 @@ class MultisigTest extends AlephiumActorSpec {
       confirmTx(multisigTx, restPort)
 
       unsignedTx
+    }
+
+    def submitFailedMultisigTransaction(
+        buildTxResult: BuildTransactionResult,
+        unlockPrivKeys: AVector[String]
+    ): String = {
+      val failedTx =
+        signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
+
+      request[ApiError.InternalServerError](
+        failedTx,
+        restPort
+      ).detail
     }
 
     def verifyEstimatedGas(unsignedTx: UnsignedTransaction, gas: GasBox) = {
