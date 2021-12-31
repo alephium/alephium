@@ -88,8 +88,6 @@ object UtxoSelectionAlgo extends StrictLogging {
   ) {
     val ascendingOrderSelector: BuildWithOrder =
       BuildWithOrder(dustAmount, providedGas, AssetAscendingOrder)
-    val descendingOrderSelector: BuildWithOrder =
-      BuildWithOrder(dustAmount, providedGas, AssetDescendingOrder)
 
     def select(
         amounts: AssetAmounts,
@@ -113,6 +111,10 @@ object UtxoSelectionAlgo extends StrictLogging {
           ascendingResult
         case Left(err) =>
           logger.info(s"Select with ascending order returns $err, try descending order instead")
+
+          val descendingOrderSelector: BuildWithOrder =
+            BuildWithOrder(dustAmount, providedGas, AssetDescendingOrder)
+
           descendingOrderSelector.select(
             amounts,
             unlockScript,
