@@ -440,8 +440,7 @@ class ServerUtils(implicit
           outputInfos,
           gasOpt,
           gasPrice,
-          utxosLimit,
-          AssetScriptGasEstimator.Default(blockFlow)
+          utxosLimit
         )
     }
 
@@ -492,8 +491,7 @@ class ServerUtils(implicit
       outputInfos,
       gasOpt,
       gasPrice,
-      utxosLimit,
-      AssetScriptGasEstimator.Default(blockFlow)
+      utxosLimit
     ) match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
@@ -587,7 +585,7 @@ class ServerUtils(implicit
         TxScriptGasEstimator.Default(allInputs, blockFlow)
       )
       unsignedTx <- UtxoSelectionAlgo
-        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice))
+        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
         .select(
           AssetAmounts(amount, AVector.empty),
           unlockScript,

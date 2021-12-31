@@ -107,6 +107,12 @@ object AssetScriptGasEstimator {
     }
   }
 
+  object NotImplemented extends AssetScriptGasEstimator {
+    def estimate(script: UnlockScript.P2SH): Either[String, GasBox] = {
+      throw new NotImplementedError("AssetScriptGasEstimator not implemented")
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def getChainIndex(
       tx: UnsignedTransaction

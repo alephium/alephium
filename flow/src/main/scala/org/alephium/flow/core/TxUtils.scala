@@ -33,6 +33,8 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TxUtils { Self: FlowUtils =>
 
+  lazy val assetScriptGasEstimator = AssetScriptGasEstimator.Default(Self.blockFlow)
+
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
   // In this way, we can guarantee that no concurrent utxos operations are making trouble
   def getUsableUtxos(
@@ -102,16 +104,14 @@ trait TxUtils { Self: FlowUtils =>
       amount: U256,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxoLimit: Int,
-      assetScriptGasEstimator: AssetScriptGasEstimator
+      utxoLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     transfer(
       fromPublicKey,
       AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
       gasOpt,
       gasPrice,
-      utxoLimit,
-      assetScriptGasEstimator
+      utxoLimit
     )
   }
 
@@ -120,8 +120,7 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxoLimit: Int,
-      assetScriptGasEstimator: AssetScriptGasEstimator
+      utxoLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
@@ -131,8 +130,7 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos,
       gasOpt,
       gasPrice,
-      utxoLimit,
-      assetScriptGasEstimator
+      utxoLimit
     )
   }
 
@@ -143,8 +141,7 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxosLimit: Int,
-      assetScriptGasEstimator: AssetScriptGasEstimator
+      utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
@@ -160,7 +157,7 @@ trait TxUtils { Self: FlowUtils =>
         getUsableUtxos(fromLockupScript, utxosLimit)
           .map { utxos =>
             UtxoSelectionAlgo
-              .Build(dustUtxoAmount, ProvidedGas(gasOpt, Some(gasPrice)))
+              .Build(dustUtxoAmount, ProvidedGas(gasOpt, gasPrice))
               .select(
                 AssetAmounts(totalAmount, totalAmountPerToken),
                 fromUnlockScript,

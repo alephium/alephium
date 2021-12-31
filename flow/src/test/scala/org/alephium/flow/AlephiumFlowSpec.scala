@@ -24,7 +24,6 @@ import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.gasestimation._
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -154,8 +153,7 @@ trait FlowFixture
         amount,
         None,
         defaultGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -201,8 +199,7 @@ trait FlowFixture
           outputInfos,
           Some(gasAmount),
           defaultGasPrice,
-          defaultUtxoLimit,
-          AssetScriptGasEstimator.Default(blockFlow)
+          defaultUtxoLimit
         )
         .rightValue
         .rightValue
@@ -253,8 +250,7 @@ trait FlowFixture
         amount - defaultGasFee,
         Some(gasAmount),
         defaultGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue

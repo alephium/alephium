@@ -83,4 +83,10 @@ object TxScriptGasEstimator {
       Right(defaultGasPerInput)
     }
   }
+
+  object NotImplemented extends TxScriptGasEstimator {
+    def estimate(script: StatefulScript): Either[String, GasBox] = {
+      throw new NotImplementedError("TxScriptGasEstimator not implemented")
+    }
+  }
 }

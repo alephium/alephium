@@ -30,7 +30,6 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
-import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
@@ -262,8 +261,7 @@ object ServerFixture {
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
-        utxosLimit: Int,
-        assetScriptGasEstimator: AssetScriptGasEstimator
+        utxosLimit: Int
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
@@ -274,8 +272,7 @@ object ServerFixture {
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
-        utxosLimit: Int,
-        assetScriptGasEstimator: AssetScriptGasEstimator
+        utxosLimit: Int
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }

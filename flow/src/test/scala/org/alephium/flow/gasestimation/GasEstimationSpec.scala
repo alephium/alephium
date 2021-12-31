@@ -133,9 +133,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         val lockup = LockupScript.p2sh(script)
         val unlock = UnlockScript.p2sh(script, AVector(Val.U256(60), Val.U256(50)))
 
-        val estimator = AssetScriptGasEstimator.Default(blockFlow)
-        transferFromP2sh(lockup, unlock, estimator)
+        transferFromP2sh(lockup, unlock)
 
+        val estimator = assetScriptGasEstimator(lockup, unlock)
         GasEstimation.estimateInputGas(unlock, estimator)
       }
 
@@ -164,9 +164,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       val lockup = LockupScript.p2sh(script)
       val unlock = UnlockScript.p2sh(script, AVector(Val.ByteVec(pubKey1.bytes)))
 
-      val estimator = AssetScriptGasEstimator.Default(blockFlow)
-      transferFromP2sh(lockup, unlock, estimator)
+      transferFromP2sh(lockup, unlock)
 
+      val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation.estimateInputGas(unlock, estimator) is GasBox.unsafe(2500)
     }
 
@@ -188,9 +188,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       val lockup = LockupScript.p2sh(script)
       val unlock = UnlockScript.p2sh(script, AVector(Val.U256(50), Val.U256(60)))
 
-      val estimator = AssetScriptGasEstimator.Default(blockFlow)
-      transferFromP2sh(lockup, unlock, estimator)
+      transferFromP2sh(lockup, unlock)
 
+      val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation.estimateInputGas(unlock, estimator) is GasBox.unsafe(2500)
     }
   }
@@ -263,8 +263,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
   private def transferFromP2sh(
       lockup: LockupScript.P2SH,
-      unlock: UnlockScript,
-      assetScriptGasEstimatorEstimator: AssetScriptGasEstimator
+      unlock: UnlockScript
   ): UnsignedTransaction = {
     val group                 = lockup.groupIndex
     val (genesisPriKey, _, _) = genesisKeys(group.value)
@@ -279,8 +278,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         output,
         None,
         defaultGasPrice,
-        defaultUtxoLimit,
-        assetScriptGasEstimatorEstimator
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -297,5 +295,17 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     val estimator         = TxScriptGasEstimator.Default(inputs, blockFlow)
 
     GasEstimation.estimate(script, estimator)
+  }
+
+  private def assetScriptGasEstimator(
+      lockup: LockupScript.Asset,
+      unlock: UnlockScript
+  ): AssetScriptGasEstimator = {
+    val inputs = blockFlow
+      .getUsableUtxos(lockup, defaultUtxoLimit)
+      .rightValue
+      .map(_.ref)
+      .map(TxInput(_, unlock))
+    AssetScriptGasEstimator.Default(blockFlow).setInputs(inputs)
   }
 }

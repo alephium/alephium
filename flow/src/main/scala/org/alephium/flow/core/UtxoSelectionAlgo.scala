@@ -78,7 +78,7 @@ object UtxoSelectionAlgo extends StrictLogging {
   final case class SelectedSoFar(alph: U256, selected: AVector[Asset], rest: AVector[Asset])
   final case class ProvidedGas(
       gasOpt: Option[GasBox],
-      gasPriceOpt: Option[GasPrice]
+      gasPrice: GasPrice
   )
   final case class AssetAmounts(alph: U256, tokens: AVector[(TokenId, U256)])
 
@@ -141,7 +141,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         assetScriptGasEstimator: AssetScriptGasEstimator
     ): Either[String, Selected] = {
       val sortedUtxos = utxos.sorted(assetOrder.byAlph)
-      val gasPrice    = providedGas.gasPriceOpt.getOrElse(defaultGasPrice)
+      val gasPrice    = providedGas.gasPrice
 
       providedGas.gasOpt match {
         case Some(gas) =>

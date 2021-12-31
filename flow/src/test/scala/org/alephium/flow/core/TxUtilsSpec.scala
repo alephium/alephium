@@ -48,8 +48,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGasFee / 2,
         None,
         minimalGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .isRight is true
@@ -92,8 +91,7 @@ class TxUtilsSpec extends AlephiumSpec {
         ALPH.cent(50),
         None,
         defaultGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -119,8 +117,7 @@ class TxUtilsSpec extends AlephiumSpec {
         AVector(output0, output1),
         Some(defaultGas),
         defaultGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -819,8 +816,7 @@ class TxUtilsSpec extends AlephiumSpec {
         ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
         Some(GasBox.unsafe(600000)),
         defaultGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .rightValue
@@ -837,8 +833,7 @@ class TxUtilsSpec extends AlephiumSpec {
         ALPH.alph(ALPH.MaxTxInputNum.toLong),
         None,
         defaultGasPrice,
-        defaultUtxoLimit,
-        AssetScriptGasEstimator.Default(blockFlow)
+        defaultUtxoLimit
       )
       .rightValue
       .leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
