@@ -57,7 +57,7 @@ object ApiConfig extends StrictLogging {
           |Api key is mandatory, please add:
           |    alephium.api.api-key = XXXXX
           |to your user.conf.
-          |Here is an auto generate api-key for you:
+          |Here is an auto-generated api-key for you:
           |    ${generatedKey.value}
           |""".stripMargin
 
