@@ -335,13 +335,15 @@ object UtxoSelectionAlgo extends StrictLogging {
         val utxos  = selectedUTXOs ++ restOfUtxos.take(index)
         val inputs = utxos.map(_.ref).map(TxInput(_, unlockScript))
 
-        GasEstimation
+        val estimatedGas = GasEstimation
           .estimateWithInputScript(
             unlockScript,
             sizeOfSelectedUTXOs + index,
             txOutputsLength,
             assetScriptGasEstimator.setInputs(inputs)
-          ) match {
+          )
+
+        estimatedGas match {
           case Right(gas) =>
             val gasFee = gasPrice * gas
             if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustAmount)) {
@@ -355,7 +357,6 @@ object UtxoSelectionAlgo extends StrictLogging {
             }
           case Left(e) =>
             Left(e)
-
         }
       }
 
