@@ -45,6 +45,8 @@ trait FlowUtils
   implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
 
+  val blockFlow = Self
+
   val grandPool = GrandPool.empty
 
   def getMemPool(mainGroup: GroupIndex): MemPool = {

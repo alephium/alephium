@@ -184,4 +184,6 @@ object GasSchedule {
   val p2pkUnlockGas: GasBox = {
     GasBox.unsafe(GasHash.gas(PublicKey.length).value + GasSignature.gas.value)
   }
+
+  def p2mpkUnlockGas(m: Int): GasBox = p2pkUnlockGas.mulUnsafe(m)
 }

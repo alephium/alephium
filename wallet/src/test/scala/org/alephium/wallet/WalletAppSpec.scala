@@ -36,7 +36,7 @@ import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
-import org.alephium.wallet.api.model
+import org.alephium.wallet.api.model._
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.json.ModelCodecs
 
@@ -61,18 +61,18 @@ class WalletAppSpec
 
   walletApp.start().futureValue is ()
 
-  val password                   = Hash.generate.toHexString
-  val mnemonicPassphrase         = "mnemonic-passphrase"
-  var mnemonic: Mnemonic         = _
-  var addresses: model.Addresses = _
-  var address: Address.Asset     = _
-  var wallet: String             = "wallet-name"
-  var minerWallet: String        = "miner-wallet-name"
-  val (_, transferPublicKey)     = SignatureSchema.generatePriPub()
-  val transferAddress            = Address.p2pkh(transferPublicKey).toBase58
-  val transferAmount             = 10
-  val balanceAmount              = Amount(ALPH.alph(42))
-  val lockedAmount               = Amount(ALPH.alph(21))
+  val password               = Hash.generate.toHexString
+  val mnemonicPassphrase     = "mnemonic-passphrase"
+  var mnemonic: Mnemonic     = _
+  var addresses: Addresses   = _
+  var address: Address.Asset = _
+  var wallet: String         = "wallet-name"
+  var minerWallet: String    = "miner-wallet-name"
+  val (_, transferPublicKey) = SignatureSchema.generatePriPub()
+  val transferAddress        = Address.p2pkh(transferPublicKey).toBase58
+  val transferAmount         = 10
+  val balanceAmount          = Amount(ALPH.alph(42))
+  val lockedAmount           = Amount(ALPH.alph(21))
 
   def creationJson(size: Int, name: String) =
     s"""{"password":"$password","mnemonicSize":${size},"walletName":"$name"}"""
@@ -87,8 +87,7 @@ class WalletAppSpec
     }
   def transferJson(amount: Int) =
     s"""{"destinations":[{"address":"$transferAddress","amount":"$amount","tokens":[]}]}"""
-  val sweepAllJson =
-    s"""{"toAddress":"$transferAddress"}"""
+  val sweepJson                                 = s"""{"toAddress":"$transferAddress"}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic, name: String) =
     s"""{"password":"$password","mnemonic":${writeJs(mnemonic)},"walletName":"$name"}"""
@@ -108,7 +107,8 @@ class WalletAppSpec
   def getMinerAddresses()   = Get(s"/wallets/$minerWallet/miner-addresses")
   def revealMnemonic()      = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
-  def sweepAll()            = Post(s"/wallets/$wallet/sweep-all", sweepAllJson)
+  def sweepActiveAddress()  = Post(s"/wallets/$wallet/sweep-active-address", sweepJson)
+  def sweepAllAddresses()   = Post(s"/wallets/$wallet/sweep-all-addresses", sweepJson)
   def sign(data: String)    = Post(s"/wallets/$wallet/sign", s"""{"data":"$data"}""")
   def deriveNextAddress()   = Post(s"/wallets/$wallet/derive-next-address")
   def deriveAddressWithGroup(group: Int) = Post(
@@ -136,21 +136,21 @@ class WalletAppSpec
     }
 
     create(24) check { response =>
-      val result = response.as[model.WalletCreation.Result]
+      val result = response.as[WalletCreation.Result]
       mnemonic = result.mnemonic
       wallet = result.walletName
       response.code is StatusCode.Ok
     }
 
     listWallets() check { response =>
-      val walletStatus = response.as[AVector[model.WalletStatus]].head
+      val walletStatus = response.as[AVector[WalletStatus]].head
       walletStatus.walletName is wallet
       walletStatus.locked is false
       response.code is StatusCode.Ok
     }
 
     getWallet() check { response =>
-      val walletStatus = response.as[model.WalletStatus]
+      val walletStatus = response.as[WalletStatus]
       walletStatus.walletName is wallet
       walletStatus.locked is false
       response.code is StatusCode.Ok
@@ -176,7 +176,7 @@ class WalletAppSpec
     }
 
     getWallet() check { response =>
-      val walletStatus = response.as[model.WalletStatus]
+      val walletStatus = response.as[WalletStatus]
       walletStatus.walletName is wallet
       walletStatus.locked is true
       response.code is StatusCode.Ok
@@ -185,21 +185,21 @@ class WalletAppSpec
     unlock()
 
     getAddresses() check { response =>
-      addresses = response.as[model.Addresses]
+      addresses = response.as[Addresses]
       address = addresses.activeAddress
       response.code is StatusCode.Ok
     }
 
     getBalance() check { response =>
-      response.as[model.Balances] is model.Balances.from(
+      response.as[Balances] is Balances.from(
         balanceAmount,
-        AVector(model.Balances.AddressBalance.from(address, balanceAmount, lockedAmount, None))
+        AVector(Balances.AddressBalance.from(address, balanceAmount, lockedAmount, None))
       )
       response.code is StatusCode.Ok
     }
 
     transfer(transferAmount) check { response =>
-      response.as[model.Transfer.Result]
+      response.as[Transfer.Result]
       response.code is StatusCode.Ok
     }
 
@@ -217,22 +217,27 @@ class WalletAppSpec
       response.code is StatusCode.BadRequest
     }
 
-    sweepAll() check { response =>
-      response.as[model.Transfer.Result]
+    sweepActiveAddress() check { response =>
+      response.as[Transfer.Results]
+      response.code is StatusCode.Ok
+    }
+
+    sweepAllAddresses() check { response =>
+      response.as[Transfer.Results]
       response.code is StatusCode.Ok
     }
 
     deriveNextAddress() check { response =>
-      address = response.as[model.AddressInfo].address
-      addresses = model.Addresses(
+      address = response.as[AddressInfo].address
+      addresses = Addresses(
         address,
-        addresses.addresses :+ model.Addresses.Info(address, address.groupIndex)
+        addresses.addresses :+ Addresses.Info(address, address.groupIndex)
       )
       response.code is StatusCode.Ok
     }
 
     getAddresses() check { response =>
-      response.as[model.Addresses] is addresses
+      response.as[Addresses] is addresses
       response.code is StatusCode.Ok
     }
 
@@ -244,23 +249,23 @@ class WalletAppSpec
     }
 
     getAddresses() check { response =>
-      response.as[model.Addresses] is addresses
+      response.as[Addresses] is addresses
       response.code is StatusCode.Ok
     }
 
     revealMnemonic() check { response =>
-      response.as[model.RevealMnemonic.Result].mnemonic is mnemonic
+      response.as[RevealMnemonic.Result].mnemonic is mnemonic
       response.code is StatusCode.Ok
     }
 
     val newMnemonic = Mnemonic.generate(24).get
     restore(newMnemonic, "wallet-new-name") check { response =>
-      wallet = response.as[model.WalletRestore.Result].walletName
+      wallet = response.as[WalletRestore.Result].walletName
       response.code is StatusCode.Ok
     }
 
     listWallets() check { response =>
-      val walletStatuses = response.as[AVector[model.WalletStatus]]
+      val walletStatuses = response.as[AVector[WalletStatus]]
       walletStatuses.length is 2
       walletStatuses.map(_.walletName).contains(wallet)
       response.code is StatusCode.Ok
@@ -295,14 +300,14 @@ class WalletAppSpec
 
     //handle passphrase
     Post("/wallets", passwordWithPassphraseJson(mnemonicPassphrase)) check { response =>
-      val result = response.as[model.WalletCreation.Result]
+      val result = response.as[WalletCreation.Result]
       mnemonic = result.mnemonic
       wallet = result.walletName
       response.code is StatusCode.Ok
     }
 
     getAddresses() check { response =>
-      addresses = response.as[model.Addresses]
+      addresses = response.as[Addresses]
       address = addresses.activeAddress
       response.code is StatusCode.Ok
     }
@@ -315,7 +320,7 @@ class WalletAppSpec
     unlock(Some(mnemonicPassphrase))
 
     getAddresses() check { response =>
-      response.as[model.Addresses].activeAddress is address
+      response.as[Addresses].activeAddress is address
     }
 
     mnemonic = Mnemonic
@@ -326,7 +331,7 @@ class WalletAppSpec
     address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").get
 
     restore(mnemonic, "new-wallet") check { response =>
-      wallet = response.as[model.WalletRestore.Result].walletName
+      wallet = response.as[WalletRestore.Result].walletName
       wallet is "new-wallet"
       response.code is StatusCode.Ok
     }
@@ -340,7 +345,7 @@ class WalletAppSpec
       .get
 
     getAddressInfo(address) check { response =>
-      val addressInfo = response.as[model.AddressInfo]
+      val addressInfo = response.as[AddressInfo]
       addressInfo.address is address
       addressInfo.publicKey is publicKey
       addressInfo.group.value is 2
@@ -350,7 +355,7 @@ class WalletAppSpec
     val unsignedTx = transactionGen().sample.get.unsigned
 
     sign(unsignedTx.hash.toHexString) check { response =>
-      response.as[model.Sign.Result].signature is SignatureSchema.sign(
+      response.as[Sign.Result].signature is SignatureSchema.sign(
         unsignedTx.hash.bytes,
         privateKey
       )
@@ -364,34 +369,34 @@ class WalletAppSpec
     }
 
     minerCreate() check { response =>
-      val result = response.as[model.WalletCreation.Result]
+      val result = response.as[WalletCreation.Result]
       mnemonic = result.mnemonic
       minerWallet = result.walletName
       response.code is StatusCode.Ok
     }
 
     getMinerAddresses() check { response =>
-      val result = response.as[AVector[model.MinerAddressesInfo]]
+      val result = response.as[AVector[MinerAddressesInfo]]
       result.length is 1
       result.head.addresses.length is groupConfig.groups
       response.code is StatusCode.Ok
     }
 
     deriveNextMinerAddress() check { response =>
-      val result = response.as[AVector[model.AddressInfo]]
+      val result = response.as[AVector[AddressInfo]]
       result.length is groupConfig.groups
       response.code is StatusCode.Ok
     }
 
     getMinerAddresses() check { response =>
-      val result = response.as[AVector[model.MinerAddressesInfo]]
+      val result = response.as[AVector[MinerAddressesInfo]]
       result.length is 2
       response.code is StatusCode.Ok
     }
 
     groupConfig.allGroups.foreach { group =>
       deriveAddressWithGroup(group.value) check { response =>
-        response.as[model.AddressInfo].group is group
+        response.as[AddressInfo].group is group
       }
     }
 
@@ -463,20 +468,18 @@ object WalletAppSpec extends {
       }
     }
 
-    router.route().path("/transactions/sweep-all/build").handler(BodyHandler.create()).handler {
-      ctx =>
-        val _          = read[BuildSweepAllTransaction](ctx.getBodyAsString())
+    router
+      .route()
+      .path("/transactions/sweep-address/build")
+      .handler(BodyHandler.create())
+      .handler { ctx =>
+        val _          = read[BuildSweepAddressTransactions](ctx.getBodyAsString())
         val unsignedTx = transactionGen().sample.get.unsigned
         complete(
           ctx,
-          BuildTransactionResult(
-            Hex.toHexString(serialize(unsignedTx)),
-            unsignedTx.hash,
-            unsignedTx.fromGroup.value,
-            unsignedTx.toGroup.value
-          )
+          BuildSweepAddressTransactionsResult.from(unsignedTx)
         )
-    }
+      }
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
       val _ = read[SubmitTransaction](ctx.getBodyAsString())

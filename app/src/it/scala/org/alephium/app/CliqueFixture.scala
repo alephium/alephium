@@ -83,6 +83,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
+  // This address is allocated 1 ALPH in the genensis block
   val address    = "14PqtYSSbwpUi2RJKUvv9yUwGafd6yHbEcke7ionuiE7w"
   val publicKey  = "03e75902fa24caff042b2b4c350e8f2ffeb3cb95f4263f0e109a2c2d7aa3dcae5c"
   val privateKey = "d24967efb7f1b558ad40a4d71593ceb5b3cecf46d17f0e68ef53def6b391c33d"
@@ -134,7 +135,17 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKey: String,
       restPort: Int
   ): TxResult = eventually {
-    val buildTx    = buildTransaction(fromPubKey, toAddress, amount)
+    val destinations = AVector(Destination(Address.asset(toAddress).get, Amount(amount)))
+    transfer(fromPubKey, destinations, privateKey, restPort)
+  }
+
+  def transfer(
+      fromPubKey: String,
+      destinations: AVector[Destination],
+      privateKey: String,
+      restPort: Int
+  ): TxResult = eventually {
+    val buildTx    = buildTransaction(fromPubKey, destinations)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[TxResult](submitTx, restPort)
@@ -377,22 +388,20 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def getBlock(blockHash: String) =
     httpGet(s"/blockflow/blocks/$blockHash")
 
-  def buildTransaction(fromPubKey: String, toAddress: String, amount: U256) =
+  def buildTransaction(
+      fromPubKey: String,
+      destinations: AVector[Destination]
+  ): Int => HttpRequest = {
     httpPost(
       "/transactions/build",
       Some(s"""
         |{
         |  "fromPublicKey": "$fromPubKey",
-        |  "destinations": [
-        |    {
-        |      "address": "$toAddress",
-        |      "amount": "$amount",
-        |      "tokens": []
-        |    }
-        |  ]
+        |  "destinations": ${write(destinations)}
         |}
         """.stripMargin)
     )
+  }
 
   def buildMultisigTransaction(
       fromAddress: String,
@@ -436,6 +445,24 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       s"/wallets/${walletName}/unlock",
       Some(s"""{"password": "${password}"}""")
     )
+
+  def walletBalances(walletName: String) = {
+    httpGet(s"/wallets/${walletName}/balances")
+  }
+
+  def sweepActiveAddress(walletName: String, toAddress: String) = {
+    httpPost(
+      s"/wallets/${walletName}/sweep-active-address",
+      Some(s"""{"toAddress": "${toAddress}"}""")
+    )
+  }
+
+  def sweepAllAddresses(walletName: String, toAddress: String) = {
+    httpPost(
+      s"/wallets/${walletName}/sweep-all-addresses",
+      Some(s"""{"toAddress": "${toAddress}"}""")
+    )
+  }
 
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
@@ -601,6 +628,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildScript(
       fromPublicKey: String,
       code: String,
+      alphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ) = {
@@ -611,6 +639,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
            "code": "$code"
            ${gas.map(g => s""","gas": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+           ${alphAmount.map(a => s""","amount": "${a.value.v}"""").getOrElse("")}
          }
          """
     httpPost("/contracts/build-script", Some(query))

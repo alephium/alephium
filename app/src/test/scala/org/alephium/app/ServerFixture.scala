@@ -44,7 +44,6 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
-import org.alephium.serde.serialize
 import org.alephium.util._
 
 trait ServerFixture
@@ -96,12 +95,9 @@ trait ServerFixture
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
-  def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult(
-    Hex.toHexString(serialize(tx.unsigned)),
-    tx.unsigned.hash,
-    tx.unsigned.fromGroup.value,
-    tx.unsigned.toGroup.value
-  )
+  def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult.from(tx.unsigned)
+  def dummySweepAddressBuildTransactionsResult(tx: Transaction) =
+    BuildSweepAddressTransactionsResult.from(tx.unsigned)
   lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 
@@ -121,7 +117,7 @@ object ServerFixture {
     tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))
   }
 
-  def dummySweepAllTx(
+  def dummySweepAddressTx(
       tx: Transaction,
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp]
@@ -281,15 +277,15 @@ object ServerFixture {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
 
-    override def sweepAll(
+    override def sweepAddress(
         fromPublicKey: PublicKey,
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
         utxosLimit: Int
-    ): IOResult[Either[String, UnsignedTransaction]] = {
-      Right(Right(dummySweepAllTx(dummyTx, toLockupScript, lockTimeOpt).unsigned))
+    ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
+      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
     }
 
     // scalastyle:off no.equal

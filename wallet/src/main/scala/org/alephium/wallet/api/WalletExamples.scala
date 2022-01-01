@@ -159,11 +159,11 @@ trait WalletExamples extends EndpointsExamples {
   implicit val signTransactionResultExamples: List[Example[Sign.Result]] =
     simpleExample(Sign.Result(signature))
 
-  implicit val sweepAllExamples: List[Example[SweepAll]] =
+  implicit val sweepAllExamples: List[Example[Sweep]] =
     List(
-      defaultExample(SweepAll(address)),
+      defaultExample(Sweep(address)),
       moreSettingsExample(
-        SweepAll(
+        Sweep(
           address,
           Some(ts),
           Some(minimalGas),
@@ -175,6 +175,9 @@ trait WalletExamples extends EndpointsExamples {
 
   implicit val transferResultExamples: List[Example[Transfer.Result]] =
     simpleExample(Transfer.Result(txId, fromGroup, toGroup))
+
+  implicit val transferResultsExamples: List[Example[Transfer.Results]] =
+    simpleExample(Transfer.Results(AVector(Transfer.Result(txId, fromGroup, toGroup))))
 
   implicit val addressesExamples: List[Example[Addresses]] =
     simpleExample(Addresses(address, AVector(Addresses.Info(address, fromGroup))))

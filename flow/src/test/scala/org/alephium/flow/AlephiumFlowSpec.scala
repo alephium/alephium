@@ -146,7 +146,15 @@ trait FlowFixture
       amount: U256
   ): Block = {
     val unsigned = blockFlow
-      .transfer(from.publicKey, to, None, amount, None, defaultGasPrice, defaultUtxoLimit)
+      .transfer(
+        from.publicKey,
+        to,
+        None,
+        amount,
+        None,
+        defaultGasPrice,
+        defaultUtxoLimit
+      )
       .rightValue
       .rightValue
     val tx         = Transaction.from(unsigned, from)
@@ -186,7 +194,13 @@ trait FlowFixture
     }
     val unsignedTx =
       blockFlow
-        .transfer(publicKey, outputInfos, Some(gasAmount), defaultGasPrice, defaultUtxoLimit)
+        .transfer(
+          publicKey,
+          outputInfos,
+          Some(gasAmount),
+          defaultGasPrice,
+          defaultUtxoLimit
+        )
         .rightValue
         .rightValue
     val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)

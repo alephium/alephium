@@ -17,13 +17,15 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildScript(
+final case class BuildSweepAddressTransactions(
     fromPublicKey: PublicKey,
-    code: String,
-    amount: Option[Amount] = None,
+    toAddress: Address.Asset,
+    lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None

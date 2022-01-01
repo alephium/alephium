@@ -14,16 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.wallet.api.model
 
-import org.alephium.protocol.PublicKey
+import org.alephium.api.model.UtxoBasedModel
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildSweepAllTransaction(
-    fromPublicKey: PublicKey,
+final case class Sweep(
     toAddress: Address.Asset,
     lockTime: Option[TimeStamp] = None,
     gas: Option[GasBox] = None,

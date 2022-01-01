@@ -84,7 +84,14 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       addAndCheck(blockFlow, block)
 
       blockFlow
-        .transfer(lockup, unlock, output, None, defaultGasPrice, defaultUtxoLimit)
+        .transfer(
+          lockup,
+          unlock,
+          output,
+          None,
+          defaultGasPrice,
+          defaultUtxoLimit
+        )
         .rightValue
         .rightValue
     }
@@ -751,7 +758,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     val script   = Compiler.compileAssetScript(rawScript).rightValue
     val lockup   = LockupScript.p2sh(script)
-    val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
+    val unlock   = UnlockScript.p2sh(script, AVector.empty)
     val unsigned = prepareOutput(lockup, unlock)
     val tx       = Transaction.from(unsigned, AVector.empty[Signature])
 

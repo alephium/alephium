@@ -32,4 +32,11 @@ final case class Transfer(
 
 object Transfer {
   final case class Result(txId: Hash, fromGroup: GroupIndex, toGroup: GroupIndex)
+  final case class Results(results: AVector[Result])
+
+  object Results {
+    def from(input: AVector[(Hash, GroupIndex, GroupIndex)]): Results = {
+      Results(input.map((Result.apply _).tupled))
+    }
+  }
 }

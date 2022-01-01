@@ -49,7 +49,7 @@ trait Endpoints
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
       .and(query[TimeStamp]("toTs"))
-      .map({ case (from, to) => TimeInterval(from, to) })(timeInterval =>
+      .map { case (from, to) => TimeInterval(from, to) }(timeInterval =>
         (timeInterval.from, timeInterval.to)
       )
       .validate(Validator.custom { timeInterval =>
@@ -63,7 +63,7 @@ trait Endpoints
   private lazy val chainIndexQuery: EndpointInput[ChainIndex] =
     query[GroupIndex]("fromGroup")
       .and(query[GroupIndex]("toGroup"))
-      .map({ case (from, to) => ChainIndex(from, to) })(chainIndex =>
+      .map { case (from, to) => ChainIndex(from, to) }(chainIndex =>
         (chainIndex.from, chainIndex.to)
       )
 
@@ -242,13 +242,16 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
-  val buildSweepAllTransaction: BaseEndpoint[BuildSweepAllTransaction, BuildTransactionResult] =
+  val buildSweepAddressTransactions
+      : BaseEndpoint[BuildSweepAddressTransactions, BuildSweepAddressTransactionsResult] =
     transactionsEndpoint.post
-      .in("sweep-all")
+      .in("sweep-address")
       .in("build")
-      .in(jsonBody[BuildSweepAllTransaction])
-      .out(jsonBody[BuildTransactionResult])
-      .summary("Build an unsigned transaction to send all unlocked balanced to an address")
+      .in(jsonBody[BuildSweepAddressTransactions])
+      .out(jsonBody[BuildSweepAddressTransactionsResult])
+      .summary(
+        "Build unsigned transactions to send all unlocked balanced of one address to another address"
+      )
 
   val submitTransaction: BaseEndpoint[SubmitTransaction, TxResult] =
     transactionsEndpoint.post

@@ -1159,13 +1159,13 @@
         }
       }
     },
-    "/wallets/{wallet_name}/sweep-all": {
+    "/wallets/{wallet_name}/sweep-active-address": {
       "post": {
         "tags": [
           "Wallets"
         ],
         "summary": "Transfer all unlocked ALPH from the active address to another address",
-        "operationId": "postWalletsWallet_nameSweep-all",
+        "operationId": "postWalletsWallet_nameSweep-active-address",
         "parameters": [
           {
             "name": "wallet_name",
@@ -1180,7 +1180,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SweepAll"
+                "$ref": "#/components/schemas/Sweep"
               },
               "examples": {
                 "Example0": {
@@ -1209,12 +1209,149 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result3"
+                  "$ref": "#/components/schemas/Results"
                 },
                 "example": {
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "fromGroup": 2,
-                  "toGroup": 1
+                  "results": [
+                    {
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{wallet_name}/sweep-all-addresses": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Transfer unlocked ALPH from all addresses (including all mining addresses if applicable) to another address",
+        "operationId": "postWalletsWallet_nameSweep-all-addresses",
+        "parameters": [
+          {
+            "name": "wallet_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sweep"
+              },
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                    "lockTime": 1611041396892,
+                    "gas": 20000,
+                    "gasPrice": "100000000000",
+                    "utxosLimit": 512
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Results"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ]
                 }
               }
             }
@@ -4270,18 +4407,18 @@
         }
       }
     },
-    "/transactions/sweep-all/build": {
+    "/transactions/sweep-address/build": {
       "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Build an unsigned transaction to send all unlocked balanced to an address",
-        "operationId": "postTransactionsSweep-allBuild",
+        "summary": "Build unsigned transactions to send all unlocked balanced of one address to another address",
+        "operationId": "postTransactionsSweep-addressBuild",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildSweepAllTransaction"
+                "$ref": "#/components/schemas/BuildSweepAddressTransactions"
               },
               "examples": {
                 "Example0": {
@@ -4312,11 +4449,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildTransactionResult"
+                  "$ref": "#/components/schemas/BuildSweepAddressTransactionsResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "unsignedTxs": [
+                    {
+                      "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    }
+                  ],
                   "fromGroup": 2,
                   "toGroup": 1
                 }
@@ -4894,6 +5035,7 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "amount": "1000000000000",
                     "gas": 20000,
                     "gasPrice": "100000000000",
                     "utxosLimit": 512
@@ -6621,6 +6763,10 @@
           "code": {
             "type": "string"
           },
+          "amount": {
+            "type": "string",
+            "format": "uint256"
+          },
           "gas": {
             "type": "integer"
           },
@@ -6656,7 +6802,7 @@
           }
         }
       },
-      "BuildSweepAllTransaction": {
+      "BuildSweepAddressTransactions": {
         "required": [
           "fromPublicKey",
           "toAddress"
@@ -6681,6 +6827,28 @@
             "format": "uint256"
           },
           "utxosLimit": {
+            "type": "integer"
+          }
+        }
+      },
+      "BuildSweepAddressTransactionsResult": {
+        "required": [
+          "unsignedTxs",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "unsignedTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SweepAddressTransaction"
+            }
+          },
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
             "type": "integer"
           }
         }
@@ -7374,6 +7542,20 @@
           }
         }
       },
+      "Results": {
+        "required": [
+          "results"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Result3"
+            }
+          }
+        }
+      },
       "RevealMnemonic": {
         "required": [
           "password"
@@ -7493,7 +7675,7 @@
           }
         }
       },
-      "SweepAll": {
+      "Sweep": {
         "required": [
           "toAddress"
         ],
@@ -7515,6 +7697,21 @@
           },
           "utxosLimit": {
             "type": "integer"
+          }
+        }
+      },
+      "SweepAddressTransaction": {
+        "required": [
+          "txId",
+          "unsignedTx"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string"
+          },
+          "unsignedTx": {
+            "type": "string"
           }
         }
       },

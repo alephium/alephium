@@ -42,7 +42,7 @@ trait SecretStorage {
   def delete(password: String): Either[SecretStorage.Error, Unit]
   def isLocked(): Boolean
   def isMiner(): Either[SecretStorage.Error, Boolean]
-  def getCurrentPrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
+  def getActivePrivateKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
   def getAllPrivateKeys()
       : Either[SecretStorage.Error, (ExtendedPrivateKey, AVector[ExtendedPrivateKey])]
   def deriveNextKey(): Either[SecretStorage.Error, ExtendedPrivateKey]
@@ -231,7 +231,7 @@ object SecretStorage {
       }
     }
 
-    override def getCurrentPrivateKey(): Either[Error, ExtendedPrivateKey] = {
+    override def getActivePrivateKey(): Either[Error, ExtendedPrivateKey] = {
       for {
         state <- getState
       } yield {

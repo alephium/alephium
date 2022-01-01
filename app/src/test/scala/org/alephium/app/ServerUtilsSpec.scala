@@ -22,11 +22,11 @@ import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.core.UtxoUtils
+import org.alephium.flow.gasestimation._
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -176,7 +176,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check sweep all tx status for intra group txs" in new Fixture {
+  it should "check sweep address tx status for intra group txs" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
@@ -216,33 +216,34 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sweep coins from the 3 UTXOs of this public key to another address")
       val senderBalanceBeforeSweep = genesisBalance - block0.transactions.head.gasFeeUnsafe
-      val sweepAllToAddress        = generateAddress(chainIndex)
-      val buildSweepAllTransaction = serverUtils
-        .buildSweepAllTransaction(
+      val sweepAddressDestination  = generateAddress(chainIndex)
+      val buildSweepAddressTransactionsRes = serverUtils
+        .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAllTransaction(fromPublicKey, sweepAllToAddress)
+          BuildSweepAddressTransactions(fromPublicKey, sweepAddressDestination)
         )
         .rightValue
+      val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
-      val sweepAllTxTemplate = signAndAddToMemPool(
-        buildSweepAllTransaction.txId,
-        buildSweepAllTransaction.unsignedTx,
+      val sweepAddressTxTemplate = signAndAddToMemPool(
+        sweepAddressTransaction.txId,
+        sweepAddressTransaction.unsignedTx,
         chainIndex,
         fromPrivateKey
       )
 
       checkAddressBalance(
-        sweepAllToAddress,
-        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+        sweepAddressDestination,
+        senderBalanceBeforeSweep - sweepAddressTxTemplate.gasFeeUnsafe
       )
 
       val block1 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
-      serverUtils.getTransactionStatus(blockFlow, sweepAllTxTemplate.id, chainIndex) isE
+      serverUtils.getTransactionStatus(blockFlow, sweepAddressTxTemplate.id, chainIndex) isE
         Confirmed(block1.hash, 0, 1, 1, 1)
       checkAddressBalance(
-        sweepAllToAddress,
-        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+        sweepAddressDestination,
+        senderBalanceBeforeSweep - sweepAddressTxTemplate.gasFeeUnsafe
       )
       checkAddressBalance(fromAddress, U256.unsafe(0), 0)
     }
@@ -305,36 +306,37 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sweep coins from the 3 UTXOs for the same public key to another address")
       val senderBalanceBeforeSweep = receiverInitialBalance + ALPH.alph(10)
-      val sweepAllToAddress        = generateAddress(chainIndex)
-      val buildSweepAllTransaction = serverUtils
-        .buildSweepAllTransaction(
+      val sweepAddressDestination  = generateAddress(chainIndex)
+      val buildSweepAddressTransactionsRes = serverUtils
+        .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAllTransaction(toPublicKey, sweepAllToAddress)
+          BuildSweepAddressTransactions(toPublicKey, sweepAddressDestination)
         )
         .rightValue
+      val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
-      val sweepAllChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
-      val sweepAllTxTemplate = signAndAddToMemPool(
-        buildSweepAllTransaction.txId,
-        buildSweepAllTransaction.unsignedTx,
-        sweepAllChainIndex,
+      val sweepAddressChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
+      val sweepAddressTxTemplate = signAndAddToMemPool(
+        sweepAddressTransaction.txId,
+        sweepAddressTransaction.unsignedTx,
+        sweepAddressChainIndex,
         toPrivateKey
       )
 
       // Spend 10 UTXOs and generate 1 output
-      sweepAllTxTemplate.unsigned.fixedOutputs.length is 1
-      sweepAllTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAllTxTemplate.gasFeeUnsafe is defaultGasPrice * UtxoUtils.estimateSweepAllTxGas(11, 1)
+      sweepAddressTxTemplate.unsigned.fixedOutputs.length is 1
+      sweepAddressTxTemplate.unsigned.gasAmount > minimalGas is true
+      sweepAddressTxTemplate.gasFeeUnsafe is defaultGasPrice * GasEstimation.sweepAddress(11, 1)
 
       checkAddressBalance(
-        sweepAllToAddress,
-        senderBalanceBeforeSweep - sweepAllTxTemplate.gasFeeUnsafe
+        sweepAddressDestination,
+        senderBalanceBeforeSweep - sweepAddressTxTemplate.gasFeeUnsafe
       )
 
-      val block2 = mineFromMemPool(blockFlow, sweepAllChainIndex)
+      val block2 = mineFromMemPool(blockFlow, sweepAddressChainIndex)
       addAndCheck(blockFlow, block2)
       checkAddressBalance(
-        sweepAllToAddress,
+        sweepAddressDestination,
         senderBalanceBeforeSweep - block2.transactions.head.gasFeeUnsafe
       )
       checkAddressBalance(toAddress, 0, 0)
@@ -448,7 +450,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val fromAddressBalanceAfterTransfer = {
-      val defaultGas    = UtxoUtils.estimateGas(outputRefs.length, destinations.length + 1)
+      val fromLockupScript    = LockupScript.p2pkh(fromPublicKey)
+      val outputLockupScripts = fromLockupScript +: destinations.map(_.address.lockupScript)
+      val defaultGas =
+        GasEstimation.estimateWithP2PKHInputs(outputRefs.length, outputLockupScripts.length)
       val defaultGasFee = defaultGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
     }

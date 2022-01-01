@@ -40,7 +40,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, ReleaseVersion, TxGenerators}
+import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
@@ -289,9 +289,9 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call POST /transactions/sweep-all/build" in {
+  it should "call POST /transactions/sweep-address/build" in {
     Post(
-      s"/transactions/sweep-all/build",
+      s"/transactions/sweep-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
@@ -300,12 +300,12 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-        ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, None)
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None)
       )
     }
     Post(
-      s"/transactions/sweep-all/build",
+      s"/transactions/sweep-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",
@@ -315,15 +315,19 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
-        ServerFixture.dummySweepAllTx(dummyTx, dummyToLockupScript, Some(TimeStamp.unsafe(1234)))
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(
+          dummyTx,
+          dummyToLockupScript,
+          Some(TimeStamp.unsafe(1234))
+        )
       )
     }
 
     interCliqueSynced = false
 
     Post(
-      s"/transactions/sweep-all/build",
+      s"/transactions/sweep-address/build",
       body = s"""
         |{
         |  "fromPublicKey": "$dummyKeyHex",

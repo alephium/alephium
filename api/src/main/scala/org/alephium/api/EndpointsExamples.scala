@@ -292,27 +292,34 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildSweepAllTransactionExamples: List[Example[BuildSweepAllTransaction]] = List(
-    defaultExample(
-      BuildSweepAllTransaction(
-        publicKey,
-        address
-      )
-    ),
-    moreSettingsExample(
-      BuildSweepAllTransaction(
-        publicKey,
-        address,
-        Some(ts),
-        Some(minimalGas),
-        Some(defaultGasPrice),
-        Some(defaultUtxosLimit)
+  implicit val buildSweepAddressTransactionExamples: List[Example[BuildSweepAddressTransactions]] =
+    List(
+      defaultExample(
+        BuildSweepAddressTransactions(
+          publicKey,
+          address
+        )
+      ),
+      moreSettingsExample(
+        BuildSweepAddressTransactions(
+          publicKey,
+          address,
+          Some(ts),
+          Some(minimalGas),
+          Some(defaultGasPrice),
+          Some(defaultUtxosLimit)
+        )
       )
     )
-  )
 
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
     simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
+
+  implicit val buildSweepAddressTransactionsResultExamples
+      : List[Example[BuildSweepAddressTransactionsResult]] = {
+    val sweepAddressTxs = AVector(SweepAddressTransaction(hash, hexString))
+    simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
+  }
 
   implicit val submitTransactionExamples: List[Example[SubmitTransaction]] =
     simpleExample(SubmitTransaction(unsignedTx = hexString, signature))
@@ -409,6 +416,7 @@ trait EndpointsExamples extends ErrorExamples {
       BuildScript(
         publicKey,
         hexString,
+        Some(Amount(dustUtxoAmount)),
         Some(minimalGas),
         Some(defaultGasPrice),
         Some(defaultUtxosLimit)

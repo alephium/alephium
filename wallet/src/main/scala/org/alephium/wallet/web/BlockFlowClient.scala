@@ -42,14 +42,14 @@ trait BlockFlowClient {
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
   ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
-  def prepareSweepAllTransaction(
+  def prepareSweepActiveAddressTransaction(
       fromPublicKey: PublicKey,
       address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]]
+  ): Future[Either[ApiError[_ <: StatusCode], BuildSweepAddressTransactionsResult]]
   def postTransaction(
       tx: String,
       signature: Signature,
@@ -136,19 +136,19 @@ object BlockFlowClient {
       )
     }
 
-    def prepareSweepAllTransaction(
+    def prepareSweepActiveAddressTransaction(
         fromPublicKey: PublicKey,
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult]] = {
+    ): Future[Either[ApiError[_ <: StatusCode], BuildSweepAddressTransactionsResult]] = {
       val lockupScript = LockupScript.p2pkh(fromPublicKey)
       requestFromGroup(
         lockupScript.groupIndex,
-        buildSweepAllTransaction,
-        BuildSweepAllTransaction(
+        buildSweepAddressTransactions,
+        BuildSweepAddressTransactions(
           fromPublicKey,
           address,
           lockTime,

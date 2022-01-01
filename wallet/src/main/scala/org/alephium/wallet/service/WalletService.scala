@@ -30,19 +30,20 @@ import scala.util.Try
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiError
-import org.alephium.api.model.{Amount, Destination}
+import org.alephium.api.model.{Amount, Destination, SweepAddressTransaction}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{discard, AVector, Duration, Hex, Service, TimeStamp}
+import org.alephium.util.{discard, AVector, Duration, FutureCollection, Hex, Service, TimeStamp}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.api.model.AddressInfo
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
+// scalastyle:off file.size.limit
 trait WalletService extends Service {
   import WalletService._
 
@@ -85,14 +86,22 @@ trait WalletService extends Service {
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
   ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]]
-  def sweepAll(
+  def sweepActiveAddress(
       wallet: String,
       address: Address.Asset,
       lockTime: Option[TimeStamp],
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]]
+  ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]]
+  def sweepAllAddresses(
+      wallet: String,
+      address: Address.Asset,
+      lockTime: Option[TimeStamp],
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice],
+      utxosLimit: Option[Int]
+  ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]]
   def sign(
       wallet: String,
       data: String
@@ -393,32 +402,71 @@ object WalletService {
       }
     }
 
-    override def sweepAll(
+    override def sweepActiveAddress(
         wallet: String,
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]] = {
+    ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
       withPrivateKeyFut(wallet) { privateKey =>
-        val pubKey = privateKey.publicKey
-        blockFlowClient
-          .prepareSweepAllTransaction(pubKey, address, lockTime, gas, gasPrice, utxosLimit)
-          .flatMap {
-            case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
-            case Right(buildTxResult) =>
-              val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
-              blockFlowClient
-                .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
-                .map(
-                  _.map(res =>
-                    (res.txId, GroupIndex.unsafe(res.fromGroup), GroupIndex.unsafe(res.toGroup))
-                  )
-                )
-                .map(_.left.map(BlockFlowClientError))
-          }
+        sweepAddress(privateKey, address, lockTime, gas, gasPrice, utxosLimit)
       }
+    }
+
+    override def sweepAllAddresses(
+        wallet: String,
+        address: Address.Asset,
+        lockTime: Option[TimeStamp],
+        gas: Option[GasBox],
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
+    ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
+      withPrivateKeysFut(wallet) { case (_, privateKeys) =>
+        val init = AVector.empty[(Hash, GroupIndex, GroupIndex)]
+        FutureCollection.foldSequentialE(privateKeys)(init) { case (txs, privKey) =>
+          sweepAddress(privKey, address, lockTime, gas, gasPrice, utxosLimit)
+            .map(_.map(_ ++ txs))
+        }
+      }
+    }
+
+    private def sweepAddress(
+        privateKey: ExtendedPrivateKey,
+        address: Address.Asset,
+        lockTime: Option[TimeStamp],
+        gas: Option[GasBox],
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
+    ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
+      blockFlowClient
+        .prepareSweepActiveAddressTransaction(
+          privateKey.publicKey,
+          address,
+          lockTime,
+          gas,
+          gasPrice,
+          utxosLimit
+        )
+        .flatMap {
+          case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
+          case Right(buildSweepAllTxResult) =>
+            FutureCollection
+              .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[Hash]) {
+                case (txIds, SweepAddressTransaction(txId, unsignedTx)) => {
+                  val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
+                  blockFlowClient
+                    .postTransaction(unsignedTx, signature, buildSweepAllTxResult.fromGroup)
+                    .map(_.map(_.txId +: txIds).left.map(BlockFlowClientError))
+                }
+              }
+              .map { res =>
+                val from = GroupIndex.unsafe(buildSweepAllTxResult.fromGroup)
+                val to   = GroupIndex.unsafe(buildSweepAllTxResult.toGroup)
+                res.map(_.map((_, from, to)))
+              }
+        }
     }
 
     def sign(
@@ -438,7 +486,7 @@ object WalletService {
         wallet: String
     ): Either[WalletError, AVector[AddressInfo]] = {
       withMinerWallet(wallet) { secretStorage =>
-        secretStorage.getCurrentPrivateKey() match {
+        secretStorage.getActivePrivateKey() match {
           case Right(activeKey) =>
             for {
               res <- computeNextMinerAddresses(secretStorage)
@@ -599,7 +647,7 @@ object WalletService {
     private def withPrivateKey[A](
         wallet: String
     )(f: ExtendedPrivateKey => Either[WalletError, A]): Either[WalletError, A] =
-      withWallet(wallet)(_.getCurrentPrivateKey() match {
+      withWallet(wallet)(_.getActivePrivateKey() match {
         case Left(error)       => Left(WalletError.from(error))
         case Right(privateKey) => f(privateKey)
       })
@@ -607,10 +655,17 @@ object WalletService {
     private def withPrivateKeyFut[A](
         wallet: String
     )(f: ExtendedPrivateKey => Future[Either[WalletError, A]]): Future[Either[WalletError, A]] =
-      withWalletFut(wallet)(_.getCurrentPrivateKey() match {
+      withWalletFut(wallet)(_.getActivePrivateKey() match {
         case Left(error)       => Future.successful(Left(WalletError.from(error)))
         case Right(privateKey) => f(privateKey)
       })
+
+    def withPrivateKeysFut[A](wallet: String)(
+        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Future[Either[WalletError, A]]
+    ): Future[Either[WalletError, A]] =
+      withWalletFut(wallet) { storage =>
+        withPrivateKeysM(storage)(f)(error => Future.successful(Left(error)))
+      }
 
     private def withPrivateKeysM[A, M[_]](storage: SecretStorage)(
         f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => M[A]

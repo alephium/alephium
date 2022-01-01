@@ -321,14 +321,14 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     bt => bt.fromAddress.lockupScript.groupIndex(brokerConfig)
   )
 
-  val buildSweepAllTransactionLogic = serverLogicRedirect(buildSweepAllTransaction)(
-    buildSweepAllTransaction =>
+  val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
+    buildSweepAddressTransactions =>
       withSyncedClique {
         Future.successful(
           serverUtils
-            .buildSweepAllTransaction(
+            .buildSweepAddressTransactions(
               blockFlow,
-              buildSweepAllTransaction
+              buildSweepAddressTransactions
             )
         )
       },

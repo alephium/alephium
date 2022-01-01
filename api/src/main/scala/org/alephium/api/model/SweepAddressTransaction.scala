@@ -14,18 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api.model
+package org.alephium.api.model
 
-import org.alephium.api.model.UtxoBasedModel
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.TimeStamp
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.UnsignedTransaction
+import org.alephium.serde.serialize
+import org.alephium.util.Hex
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class SweepAll(
-    toAddress: Address.Asset,
-    lockTime: Option[TimeStamp] = None,
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
-) extends UtxoBasedModel
+final case class SweepAddressTransaction(
+    txId: Hash,
+    unsignedTx: String
+)
+
+object SweepAddressTransaction {
+  def from(unsignedTx: UnsignedTransaction): SweepAddressTransaction = {
+    SweepAddressTransaction(
+      unsignedTx.hash,
+      Hex.toHexString(serialize(unsignedTx))
+    )
+  }
+}

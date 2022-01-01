@@ -25,7 +25,9 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model._
-import org.alephium.flow.core.{BlockFlow, BlockFlowState}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.UtxoSelectionAlgo._
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
@@ -213,23 +215,23 @@ class ServerUtils(implicit
     }
   }
 
-  def buildSweepAllTransaction(
+  def buildSweepAddressTransactions(
       blockFlow: BlockFlow,
-      query: BuildSweepAllTransaction
-  ): Try[BuildTransactionResult] = {
+      query: BuildSweepAddressTransactions
+  ): Try[BuildSweepAddressTransactionsResult] = {
     for {
       _ <- checkGroup(query.fromPublicKey)
-      unsignedTx <- prepareUnsignedTransaction(
+      unsignedTxs <- prepareSweepAddressTransaction(
         blockFlow,
         query.fromPublicKey,
         query.toAddress,
         query.lockTime,
         query.gas,
         query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
+        query.utxosLimit.getOrElse(Int.MaxValue)
       )
     } yield {
-      BuildTransactionResult.from(unsignedTx)
+      BuildSweepAddressTransactionsResult.from(unsignedTxs)
     }
   }
 
@@ -433,7 +435,13 @@ class ServerUtils(implicit
           Right(Left("Selected UTXOs must be of asset type"))
         }
       case None =>
-        blockFlow.transfer(fromPublicKey, outputInfos, gasOpt, gasPrice, utxosLimit)
+        blockFlow.transfer(
+          fromPublicKey,
+          outputInfos,
+          gasOpt,
+          gasPrice,
+          utxosLimit
+        )
     }
 
     transferResult match {
@@ -443,7 +451,7 @@ class ServerUtils(implicit
     }
   }
 
-  def prepareUnsignedTransaction(
+  def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
       toAddress: Address.Asset,
@@ -451,8 +459,8 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int
-  ): Try[UnsignedTransaction] = {
-    blockFlow.sweepAll(
+  ): Try[AVector[UnsignedTransaction]] = {
+    blockFlow.sweepAddress(
       fromPublicKey,
       toAddress.lockupScript,
       lockTimeOpt,
@@ -460,9 +468,9 @@ class ServerUtils(implicit
       gasPrice,
       utxosLimit
     ) match {
-      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
-      case Right(Left(error))                => Left(failed(error))
-      case Left(error)                       => failed(error)
+      case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
+      case Right(Left(error))        => Left(failed(error))
+      case Left(error)               => failed(error)
     }
   }
 
@@ -542,15 +550,6 @@ class ServerUtils(implicit
       Right(true)
     }
 
-  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
-    str match {
-      case None => Right(AVector.empty[vm.Val])
-      case Some(state) =>
-        val res = Compiler.compileState(state)
-        res
-    }
-  }
-
   def buildMultisigAddress(
       keys: AVector[PublicKey],
       mrequired: Int
@@ -566,34 +565,10 @@ class ServerUtils(implicit
     }
   }
 
-  private def buildContract(
-      codeRaw: String,
-      address: Address,
-      initialState: AVector[vm.Val],
-      alphAmount: U256,
-      newTokenAmount: Option[U256]
-  ): Either[Compiler.Error, StatefulScript] = {
-
-    val stateRaw = Hex.toHexString(serialize(initialState))
-    val creation = newTokenAmount match {
-      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
-    }
-
-    val scriptRaw = s"""
-      |TxScript Main {
-      |  pub payable fn main() -> () {
-      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
-      |    $creation
-      |  }
-      |}
-      |""".stripMargin
-    Compiler.compileTxScript(scriptRaw)
-  }
-
   private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
+      amount: U256,
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
@@ -602,15 +577,31 @@ class ServerUtils(implicit
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
     val utxosLimit   = utxosLimitOpt.getOrElse(apiConfig.defaultUtxosLimit)
-    (for {
-      balances <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(e => failedInIO(e))
-    } yield {
-      val inputs = balances.map(_.ref).map(TxInput(_, unlockScript))
-      UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
-        gasAmount = gas.getOrElse(minimalGas),
-        gasPrice = gasPrice.getOrElse(defaultGasPrice)
-      )
-    }).flatMap(validateUnsignedTransaction)
+    for {
+      allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
+      allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
+      unsignedTx <- UtxoSelectionAlgo
+        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
+        .select(
+          AssetAmounts(amount, AVector.empty),
+          unlockScript,
+          allUtxos,
+          txOutputsLength = 0,
+          Some(script),
+          AssetScriptGasEstimator.Default(blockFlow),
+          TxScriptGasEstimator.Default(allInputs, blockFlow)
+        )
+        .map { selectedUtxos =>
+          val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
+          UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
+            gasAmount = gas.getOrElse(selectedUtxos.gas),
+            gasPrice = gasPrice.getOrElse(defaultGasPrice)
+          )
+        }
+        .left
+        .map(badRequest)
+      validatedUnsignedTx <- validateUnsignedTransaction(unsignedTx)
+    } yield validatedUnsignedTx
   }
 
   private def validateStateLength(
@@ -640,7 +631,7 @@ class ServerUtils(implicit
       state <- parseState(query.state).left.map(error => badRequest(error.message))
       _     <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
-      script <- buildContract(
+      script <- buildContractWithParsedState(
         query.code,
         address,
         state,
@@ -650,6 +641,7 @@ class ServerUtils(implicit
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
+        dustUtxoAmount,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,
@@ -662,8 +654,8 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
+    val alphAmount = query.amount.map(_.value).getOrElse(U256.Zero)
     for {
       codeByteString <- decodeCodeHexString(query.code)
       script <- deserialize[StatefulScript](codeByteString).left.map(serdeError =>
@@ -672,6 +664,7 @@ class ServerUtils(implicit
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
+        alphAmount,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,
@@ -756,4 +749,47 @@ object ServerUtils {
     } yield unsignedTx
   }
 
+  def buildContract(
+      codeRaw: String,
+      address: Address,
+      initialState: Option[String],
+      alphAmount: U256,
+      newTokenAmount: Option[U256]
+  ): Either[Compiler.Error, StatefulScript] = {
+    parseState(initialState).flatMap { state =>
+      buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
+    }
+  }
+
+  def buildContractWithParsedState(
+      codeRaw: String,
+      address: Address,
+      initialState: AVector[vm.Val],
+      alphAmount: U256,
+      newTokenAmount: Option[U256]
+  ): Either[Compiler.Error, StatefulScript] = {
+    val stateRaw = Hex.toHexString(serialize(initialState))
+    val creation = newTokenAmount match {
+      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
+      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
+    }
+
+    val scriptRaw = s"""
+      |TxScript Main {
+      |  pub payable fn main() -> () {
+      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
+      |    $creation
+      |  }
+      |}
+      |""".stripMargin
+
+    Compiler.compileTxScript(scriptRaw)
+  }
+
+  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
+    str match {
+      case None        => Right(AVector.empty[vm.Val])
+      case Some(state) => Compiler.compileState(state)
+    }
+  }
 }
