@@ -156,7 +156,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       p2shNoSignature(108) is GasBox.unsafe(11657)
     }
 
-    info("P2SH, signatures required. Fallback to defaultGasPerInput")
+    info("P2SH, signatures required")
 
     {
       val (pubKey1, _) = keypairGen(groupIndex).sample.value

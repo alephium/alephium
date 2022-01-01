@@ -330,7 +330,7 @@ object UtxoSelectionAlgo extends StrictLogging {
       val sizeOfSelectedUTXOs = selectedUTXOs.length
       val restOfUtxos         = selectedSoFar.rest
 
-      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      @tailrec
       def iter(sum: U256, index: Int): Either[String, (U256, Int)] = {
         val utxos  = selectedUTXOs ++ restOfUtxos.take(index)
         val inputs = utxos.map(_.ref).map(TxInput(_, unlockScript))
@@ -341,8 +341,8 @@ object UtxoSelectionAlgo extends StrictLogging {
             sizeOfSelectedUTXOs + index,
             txOutputsLength,
             assetScriptGasEstimator.setInputs(inputs)
-          )
-          .flatMap { gas =>
+          ) match {
+          case Right(gas) =>
             val gasFee = gasPrice * gas
             if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustAmount)) {
               Right((sum, index))
@@ -353,7 +353,10 @@ object UtxoSelectionAlgo extends StrictLogging {
                 iter(sum.addUnsafe(restOfUtxos(index).output.amount), index + 1)
               }
             }
-          }
+          case Left(e) =>
+            Left(e)
+
+        }
       }
 
       iter(selectedSoFar.alph, 0).flatMap {

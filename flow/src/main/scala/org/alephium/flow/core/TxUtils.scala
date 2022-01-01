@@ -163,7 +163,7 @@ trait TxUtils { Self: FlowUtils =>
                 outputInfos.length + 1,
                 txScriptOpt = None,
                 AssetScriptGasEstimator.Default(Self.blockFlow),
-                TxScriptGasEstimator.Mock
+                TxScriptGasEstimator.NotImplemented
               )
           }
           .map {
@@ -224,7 +224,7 @@ trait TxUtils { Self: FlowUtils =>
                       fromUnlockScript,
                       utxoRefs.length,
                       outputScripts.length,
-                      AssetScriptGasEstimator.Mock // Not P2SH
+                      AssetScriptGasEstimator.NotImplemented // Not P2SH
                     )
                   case Some(gas) =>
                     Right(gas)
