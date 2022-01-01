@@ -293,11 +293,13 @@ class MultisigTest extends AlephiumActorSpec {
 
     def verifyEstimatedGas(unsignedTx: UnsignedTransaction, gas: GasBox) = {
       val inputUnlockScripts = unsignedTx.inputs.map(_.unlockScript)
-      val estimatedGas = GasEstimation.estimate(
-        inputUnlockScripts,
-        unsignedTx.fixedOutputs.length,
-        AssetScriptGasEstimator.Mock
-      )
+      val estimatedGas = GasEstimation
+        .estimate(
+          inputUnlockScripts,
+          unsignedTx.fixedOutputs.length,
+          AssetScriptGasEstimator.Mock
+        )
+        .rightValue
       unsignedTx.gasAmount is gas
       unsignedTx.gasAmount is estimatedGas
     }

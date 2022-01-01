@@ -344,8 +344,9 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
             defaultUnlockScript,
             utxos,
             outputs.length,
-            estimatedTxScriptGas = None,
-            AssetScriptGasEstimator.Mock
+            txScriptOpt = None,
+            AssetScriptGasEstimator.Mock,
+            TxScriptGasEstimator.Mock
           )
       }
 

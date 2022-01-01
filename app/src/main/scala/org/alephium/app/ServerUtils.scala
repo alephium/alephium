@@ -580,10 +580,6 @@ class ServerUtils(implicit
     for {
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
-      scriptGas = GasEstimation.estimate(
-        script,
-        TxScriptGasEstimator.Default(allInputs, blockFlow)
-      )
       unsignedTx <- UtxoSelectionAlgo
         .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
         .select(
@@ -591,8 +587,9 @@ class ServerUtils(implicit
           unlockScript,
           allUtxos,
           txOutputsLength = 0,
-          Some(scriptGas),
-          AssetScriptGasEstimator.Default(blockFlow)
+          Some(script),
+          AssetScriptGasEstimator.Default(blockFlow),
+          TxScriptGasEstimator.Default(allInputs, blockFlow)
         )
         .map { selectedUtxos =>
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))

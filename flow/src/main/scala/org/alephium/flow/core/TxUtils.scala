@@ -33,8 +33,6 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TxUtils { Self: FlowUtils =>
 
-  lazy val assetScriptGasEstimator = AssetScriptGasEstimator.Default(Self.blockFlow)
-
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
   // In this way, we can guarantee that no concurrent utxos operations are making trouble
   def getUsableUtxos(
@@ -163,8 +161,9 @@ trait TxUtils { Self: FlowUtils =>
                 fromUnlockScript,
                 utxos,
                 outputInfos.length + 1,
-                estimatedTxScriptGas = None,
-                assetScriptGasEstimator
+                txScriptOpt = None,
+                AssetScriptGasEstimator.Default(Self.blockFlow),
+                TxScriptGasEstimator.Mock
               )
           }
           .map {
@@ -185,7 +184,6 @@ trait TxUtils { Self: FlowUtils =>
         Right(Left(e))
     }
   }
-  // scalastyle:on method.length
 
   def transfer(
       fromPublicKey: PublicKey,
@@ -219,15 +217,18 @@ trait TxUtils { Self: FlowUtils =>
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>
               val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
-              val gas = gasOpt.getOrElse(
-                GasEstimation.estimateWithInputScript(
-                  fromUnlockScript,
-                  utxoRefs.length,
-                  outputScripts.length,
-                  AssetScriptGasEstimator.Mock // Not P2SH
-                )
-              )
               for {
+                gas <- gasOpt match {
+                  case None =>
+                    GasEstimation.estimateWithInputScript(
+                      fromUnlockScript,
+                      utxoRefs.length,
+                      outputScripts.length,
+                      AssetScriptGasEstimator.Mock // Not P2SH
+                    )
+                  case Some(gas) =>
+                    Right(gas)
+                }
                 utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
                 unsignedTx <- UnsignedTransaction
                   .build(fromLockupScript, fromUnlockScript, utxos, outputInfos, gas, gasPrice)
@@ -238,6 +239,7 @@ trait TxUtils { Self: FlowUtils =>
       }
     }
   }
+  // scalastyle:on method.length
 
   def sweepAddress(
       fromPublicKey: PublicKey,

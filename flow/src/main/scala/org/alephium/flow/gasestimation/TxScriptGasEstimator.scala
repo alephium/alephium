@@ -28,6 +28,7 @@ trait TxScriptGasEstimator {
 }
 
 object TxScriptGasEstimator {
+
   final case class Default(
       inputs: AVector[TxInput],
       flow: BlockFlow
@@ -59,10 +60,13 @@ object TxScriptGasEstimator {
           )
         }
 
-        result match {
-          case Right(value)       => Right(value)
-          case Left(Right(error)) => Left(error.name)
-          case Left(Left(error))  => Left(error.name)
+        result.left.map {
+          case Right(InvalidPublicKey) =>
+            "Please use binary search to set the gas manually as signature is required in tx script or contract"
+          case Right(error) =>
+            s"Execution error when estimating gas for tx script or contract: $error"
+          case Left(error) =>
+            s"IO error when estimating gas for tx script or contract: $error"
         }
       }
 

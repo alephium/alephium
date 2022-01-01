@@ -22,7 +22,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.gasestimation._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript, UnlockScript}
 import org.alephium.util._
 
 /*
@@ -94,16 +94,18 @@ object UtxoSelectionAlgo extends StrictLogging {
         unlockScript: UnlockScript,
         utxos: AVector[Asset],
         txOutputsLength: Int,
-        estimatedTxScriptGas: Option[GasBox],
-        assetScriptGasEstimator: AssetScriptGasEstimator
+        txScriptOpt: Option[StatefulScript],
+        assetScriptGasEstimator: AssetScriptGasEstimator,
+        txScriptGasEstimator: TxScriptGasEstimator
     ): Either[String, Selected] = {
       val ascendingResult = ascendingOrderSelector.select(
         amounts,
         unlockScript,
         utxos,
         txOutputsLength,
-        estimatedTxScriptGas,
-        assetScriptGasEstimator
+        txScriptOpt,
+        assetScriptGasEstimator,
+        txScriptGasEstimator
       )
 
       ascendingResult match {
@@ -120,8 +122,9 @@ object UtxoSelectionAlgo extends StrictLogging {
             unlockScript,
             utxos,
             txOutputsLength,
-            estimatedTxScriptGas,
-            assetScriptGasEstimator
+            txScriptOpt,
+            assetScriptGasEstimator,
+            txScriptGasEstimator
           )
       }
     }
@@ -132,13 +135,15 @@ object UtxoSelectionAlgo extends StrictLogging {
       providedGas: ProvidedGas,
       assetOrder: AssetOrder
   ) {
+    // scalastyle:off method.length
     def select(
         amounts: AssetAmounts,
         unlockScript: UnlockScript,
         utxos: AVector[Asset],
         txOutputsLength: Int,
-        estimatedTxScriptGas: Option[GasBox],
-        assetScriptGasEstimator: AssetScriptGasEstimator
+        txScriptOpt: Option[StatefulScript],
+        assetScriptGasEstimator: AssetScriptGasEstimator,
+        txScriptGasEstimator: TxScriptGasEstimator
     ): Either[String, Selected] = {
       val sortedUtxos = utxos.sorted(assetOrder.byAlph)
       val gasPrice    = providedGas.gasPrice
@@ -153,9 +158,14 @@ object UtxoSelectionAlgo extends StrictLogging {
             }
 
         case None =>
-          val scriptGas    = estimatedTxScriptGas.getOrElse(GasBox.zero)
-          val scriptGasFee = gasPrice * scriptGas
           for {
+            scriptGas <- txScriptOpt match {
+              case None =>
+                Right(GasBox.zero)
+              case Some(txScript) =>
+                GasEstimation.estimate(txScript, txScriptGasEstimator)
+            }
+            scriptGasFee = gasPrice * scriptGas
             totalAlphAmount <- scriptGasFee
               .add(amounts.alph)
               .toRight("ALPH balance overflow with estimated script gas")
@@ -169,18 +179,19 @@ object UtxoSelectionAlgo extends StrictLogging {
               dustAmount,
               assetScriptGasEstimator
             )
-          } yield {
-            val inputs = utxos.map(_.ref).map(TxInput(_, unlockScript))
-            val gas = GasEstimation.estimateWithInputScript(
+            inputs = utxos.map(_.ref).map(TxInput(_, unlockScript))
+            gas <- GasEstimation.estimateWithInputScript(
               unlockScript,
               utxos.length,
               txOutputsLength,
               assetScriptGasEstimator.setInputs(inputs)
             )
+          } yield {
             Selected(utxos, gas.addUnsafe(scriptGas))
           }
       }
     }
+    // scalastyle:on method.length
 
     private def selectUtxos(
         assetAmounts: AssetAmounts,
@@ -319,30 +330,34 @@ object UtxoSelectionAlgo extends StrictLogging {
       val sizeOfSelectedUTXOs = selectedUTXOs.length
       val restOfUtxos         = selectedSoFar.rest
 
-      @tailrec
-      def iter(sum: U256, index: Int): (U256, Int) = {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def iter(sum: U256, index: Int): Either[String, (U256, Int)] = {
         val utxos  = selectedUTXOs ++ restOfUtxos.take(index)
         val inputs = utxos.map(_.ref).map(TxInput(_, unlockScript))
-        val gas = GasEstimation.estimateWithInputScript(
-          unlockScript,
-          sizeOfSelectedUTXOs + index,
-          txOutputsLength,
-          assetScriptGasEstimator.setInputs(inputs)
-        )
-        val gasFee = gasPrice * gas
-        if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustAmount)) {
-          (sum, index)
-        } else {
-          if (index == restOfUtxos.length) {
-            (sum, -1)
-          } else {
-            iter(sum.addUnsafe(restOfUtxos(index).output.amount), index + 1)
+
+        GasEstimation
+          .estimateWithInputScript(
+            unlockScript,
+            sizeOfSelectedUTXOs + index,
+            txOutputsLength,
+            assetScriptGasEstimator.setInputs(inputs)
+          )
+          .flatMap { gas =>
+            val gasFee = gasPrice * gas
+            if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustAmount)) {
+              Right((sum, index))
+            } else {
+              if (index == restOfUtxos.length) {
+                Right((sum, -1))
+              } else {
+                iter(sum.addUnsafe(restOfUtxos(index).output.amount), index + 1)
+              }
+            }
           }
-        }
       }
 
-      iter(selectedSoFar.alph, 0) match {
-        case (_, -1) => Left(s"Not enough balance for fee, maybe transfer a smaller amount")
+      iter(selectedSoFar.alph, 0).flatMap {
+        case (_, -1) => Left("Not enough balance for fee, maybe transfer a smaller amount")
         case (sum, index) =>
           Right(SelectedSoFar(sum, restOfUtxos.take(index), restOfUtxos.drop(index)))
       }

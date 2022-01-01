@@ -38,7 +38,7 @@ object GasEstimation extends StrictLogging {
       numInputs: Int,
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
-  ): GasBox = {
+  ): Either[String, GasBox] = {
     val inputs = AVector.fill(numInputs)(unlockScript)
     estimate(inputs, numOutputs, assetScriptGasEstimator)
   }
@@ -47,10 +47,12 @@ object GasEstimation extends StrictLogging {
       unlockScripts: AVector[UnlockScript],
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
-  ): GasBox = {
-    val inputGas =
-      unlockScripts.fold(GasBox.zero)(_ addUnsafe estimateInputGas(_, assetScriptGasEstimator))
-    estimate(inputGas, numOutputs)
+  ): Either[String, GasBox] = {
+    val inputGas: Either[String, GasBox] = unlockScripts.foldE(GasBox.zero) { (gas, unlock) =>
+      estimateInputGas(unlock, assetScriptGasEstimator).map(gas.addUnsafe)
+    }
+
+    inputGas.map(estimate(_, numOutputs))
   }
 
   def estimate(inputGas: GasBox, numOutputs: Int): GasBox = {
@@ -64,39 +66,27 @@ object GasEstimation extends StrictLogging {
   def estimate(
       script: StatefulScript,
       txScriptGasEstimator: TxScriptGasEstimator
-  ): GasBox = {
-    txScriptGasEstimator.estimate(script) match {
-      case Left(error) =>
-        logger.info(
-          s"Estimating gas for TxScript with error $error, fall back to $defaultGasPerInput"
-        )
-        defaultGasPerInput
-      case Right(value) =>
-        value
-    }
+  ): Either[String, GasBox] = {
+    txScriptGasEstimator.estimate(script)
   }
 
   private[gasestimation] def estimateInputGas(
       unlockScript: UnlockScript,
       assetScriptGasEstimator: AssetScriptGasEstimator
-  ): GasBox = {
+  ): Either[String, GasBox] = {
     unlockScript match {
       case _: UnlockScript.P2PKH =>
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
+        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
       case p2mpkh: UnlockScript.P2MPKH =>
-        GasSchedule.txInputBaseGas.addUnsafe(
-          GasSchedule.p2mpkUnlockGas(p2mpkh.indexedPublicKeys.length)
+        Right(
+          GasSchedule.txInputBaseGas.addUnsafe(
+            GasSchedule.p2mpkUnlockGas(p2mpkh.indexedPublicKeys.length)
+          )
         )
       case p2sh: UnlockScript.P2SH =>
-        assetScriptGasEstimator.estimate(p2sh) match {
-          case Left(error) =>
-            logger.info(
-              s"Estimating gas for AssetScript with error $error, fall back to $defaultGasPerInput"
-            )
-            defaultGasPerInput
-          case Right(value) =>
-            GasSchedule.txInputBaseGas.addUnsafe(value)
-        }
+        assetScriptGasEstimator
+          .estimate(p2sh)
+          .map(GasSchedule.txInputBaseGas.addUnsafe(_))
     }
   }
 }

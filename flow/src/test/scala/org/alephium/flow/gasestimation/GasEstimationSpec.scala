@@ -53,29 +53,35 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     val p2pkhUnlockScripts =
       Gen.listOfN(3, p2pkhUnlockGen(groupIndex)).map(AVector.from).sample.value
 
-    GasEstimation.estimate(p2pkhUnlockScripts, 2, AssetScriptGasEstimator.Mock) is GasBox.unsafe(
-      22180
-    )
+    GasEstimation
+      .estimate(p2pkhUnlockScripts, 2, AssetScriptGasEstimator.Mock)
+      .rightValue is GasBox.unsafe(22180)
 
     val p2mphkUnlockScript1 = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
-    GasEstimation.estimate(
-      p2mphkUnlockScript1 +: p2pkhUnlockScripts,
-      2,
-      AssetScriptGasEstimator.Mock
-    ) is GasBox.unsafe(28300)
+    GasEstimation
+      .estimate(
+        p2mphkUnlockScript1 +: p2pkhUnlockScripts,
+        2,
+        AssetScriptGasEstimator.Mock
+      )
+      .rightValue is GasBox.unsafe(28300)
 
     val p2mphkUnlockScript2 = p2mpkhUnlockGen(5, 3, groupIndex).sample.value
-    GasEstimation.estimate(
-      p2mphkUnlockScript2 +: p2pkhUnlockScripts,
-      2,
-      AssetScriptGasEstimator.Mock
-    ) is GasBox.unsafe(30360)
+    GasEstimation
+      .estimate(
+        p2mphkUnlockScript2 +: p2pkhUnlockScripts,
+        2,
+        AssetScriptGasEstimator.Mock
+      )
+      .rightValue is GasBox.unsafe(30360)
 
-    GasEstimation.estimate(
-      p2mphkUnlockScript1 +: p2mphkUnlockScript2 +: p2pkhUnlockScripts,
-      2,
-      AssetScriptGasEstimator.Mock
-    ) is GasBox.unsafe(36480)
+    GasEstimation
+      .estimate(
+        p2mphkUnlockScript1 +: p2mphkUnlockScript2 +: p2pkhUnlockScripts,
+        2,
+        AssetScriptGasEstimator.Mock
+      )
+      .rightValue is GasBox.unsafe(36480)
   }
 
   "GasEstimation.estimateWithInputScript" should "take input unlock script into consideration" in {
@@ -87,9 +93,12 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       val script        = p2pkhUnlockGen(groupIndex).sample.value
       val mockEstimator = AssetScriptGasEstimator.Mock
 
-      GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator) is GasBox.unsafe(20000)
-      GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator) is GasBox.unsafe(26240)
-      GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator) is GasBox.unsafe(50600)
+      GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator).rightValue is GasBox
+        .unsafe(20000)
+      GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator).rightValue is GasBox
+        .unsafe(26240)
+      GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator).rightValue is GasBox
+        .unsafe(50600)
     }
 
     info("P2MPKH")
@@ -98,9 +107,12 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       val script        = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
       val mockEstimator = AssetScriptGasEstimator.Mock
 
-      GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator) is GasBox.unsafe(20000)
-      GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator) is GasBox.unsafe(34480)
-      GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator) is GasBox.unsafe(71200)
+      GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator).rightValue is GasBox
+        .unsafe(20000)
+      GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator).rightValue is GasBox
+        .unsafe(34480)
+      GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator).rightValue is GasBox
+        .unsafe(71200)
     }
 
     info("P2SH, no signature required")
@@ -136,7 +148,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         transferFromP2sh(lockup, unlock)
 
         val estimator = assetScriptGasEstimator(lockup, unlock)
-        GasEstimation.estimateInputGas(unlock, estimator)
+        GasEstimation.estimateInputGas(unlock, estimator).rightValue
       }
 
       p2shNoSignature(4) is GasBox.unsafe(2815)
@@ -167,10 +179,12 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       transferFromP2sh(lockup, unlock)
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
-      GasEstimation.estimateInputGas(unlock, estimator) is GasBox.unsafe(2500)
+      GasEstimation
+        .estimateInputGas(unlock, estimator)
+        .leftValue is "Please use binary search to set the gas manually as signature is required in P2SH script"
     }
 
-    info("P2SH, other execution error, e.g. ArithmeticError. Fallback to defaultGasPerInput")
+    info("P2SH, other execution error, e.g. ArithmeticError")
 
     {
       val raw =
@@ -191,7 +205,10 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       transferFromP2sh(lockup, unlock)
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
-      GasEstimation.estimateInputGas(unlock, estimator) is GasBox.unsafe(2500)
+      GasEstimation
+        .estimateInputGas(unlock, estimator)
+        .leftValue
+        .startsWith("Execution error when estimating gas for P2SH script: ArithmeticError") is true
     }
   }
 
@@ -224,12 +241,12 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
           |""".stripMargin
       }
 
-      estimateTxScript(simpleScript(1)) is GasBox.unsafe(468)
-      estimateTxScript(simpleScript(10)) is GasBox.unsafe(1198)
-      estimateTxScript(simpleScript(100)) is GasBox.unsafe(8489)
+      estimateTxScript(simpleScript(1)).rightValue is GasBox.unsafe(468)
+      estimateTxScript(simpleScript(10)).rightValue is GasBox.unsafe(1198)
+      estimateTxScript(simpleScript(100)).rightValue is GasBox.unsafe(8489)
     }
 
-    info("Signature required. Fallback to defaultGasPerInput")
+    info("Signature required")
 
     {
       val (pubKey, _) = keypairGen.sample.value
@@ -241,10 +258,10 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |  }
            |}
            |""".stripMargin
-      ) is GasBox.unsafe(2500)
+      ).leftValue is "Please use binary search to set the gas manually as signature is required in tx script or contract"
     }
 
-    info("Other execution error, e.g. AssertionFailed. Fallback to defaultGasPerInput")
+    info("Other execution error, e.g. AssertionFailed")
 
     {
       // scalastyle:off no.equal
@@ -256,7 +273,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |  }
            |}
            |""".stripMargin
-      ) is GasBox.unsafe(2500)
+      ).leftValue is "Execution error when estimating gas for tx script or contract: AssertionFailed"
       // scalastyle:on no.equal
     }
   }
@@ -264,7 +281,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
   private def transferFromP2sh(
       lockup: LockupScript.P2SH,
       unlock: UnlockScript
-  ): UnsignedTransaction = {
+  ): Either[String, UnsignedTransaction] = {
     val group                 = lockup.groupIndex
     val (genesisPriKey, _, _) = genesisKeys(group.value)
     val block                 = transfer(blockFlow, genesisPriKey, lockup, ALPH.alph(2))
@@ -281,10 +298,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         defaultUtxoLimit
       )
       .rightValue
-      .rightValue
   }
 
-  private def estimateTxScript(raw: String): GasBox = {
+  private def estimateTxScript(raw: String): Either[String, GasBox] = {
     val script            = Compiler.compileTxScript(raw).rightValue
     val chainIndex        = ChainIndex.unsafe(0, 0)
     val (_, publicKey, _) = genesisKeys(chainIndex.from.value)
