@@ -58,6 +58,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
     val connection = TestProbe()
     connection.send(interCliqueManager, Tcp.Connected(peer, socketAddressGen.sample.get))
+    discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
     eventually {
@@ -77,6 +78,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     EventFilter.info(start = "Try to connect to").intercept {
       interCliqueManager ! DiscoveryServer.NewPeer(peerInfo)
       interCliqueManagerActor.connecting.contains(peerInfo.address) is true
+      discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
     }
 
     // It's already connecting, so there is no retry
