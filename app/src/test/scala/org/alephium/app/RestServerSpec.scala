@@ -960,8 +960,4 @@ class RestServerSpecApiKey
       Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377")),
       true
     )
-class RestServerSpecApiKeyDisableWithApiKey
-    extends RestServerApiKeyDisableSpec(
-      Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"))
-    )
 class RestServerSpecApiKeyDisableWithoutApiKey extends RestServerApiKeyDisableSpec(None)
