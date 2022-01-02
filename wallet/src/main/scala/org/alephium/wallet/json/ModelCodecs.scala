@@ -28,8 +28,6 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit def groupConfig: GroupConfig
 
-  implicit val addressesInfoRW: RW[Addresses.Info] = macroRW
-
   implicit val addressesRW: RW[Addresses] = macroRW
 
   implicit val addressInfoRW: RW[AddressInfo] = macroRW

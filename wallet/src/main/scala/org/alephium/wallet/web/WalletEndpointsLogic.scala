@@ -85,6 +85,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       walletService.deleteWallet(wallet, walletDeletion.password).left.map(toApiError)
     )
   }
+
   val getBalancesLogic = serverLogic(getBalances) { case (wallet, utxosLimit) =>
     walletService
       .getBalances(wallet, utxosLimit)
@@ -101,16 +102,11 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         model.Balances(totalBalance, totalBalance.hint, balancesPerAddress)
       }.left.map(toApiError))
   }
+
   val getAddressesLogic = serverLogic(getAddresses) { wallet =>
     Future.successful(
       walletService
         .getAddresses(wallet)
-        .map { case (active, addresses) =>
-          model.Addresses(
-            active,
-            addresses.map(address => model.Addresses.Info(address, address.groupIndex))
-          )
-        }
         .left
         .map(toApiError)
     )

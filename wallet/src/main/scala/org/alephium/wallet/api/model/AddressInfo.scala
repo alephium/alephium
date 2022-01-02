@@ -29,7 +29,7 @@ final case class AddressInfo(
 )
 
 object AddressInfo {
-  def fromPrivateKey(privateKey: ExtendedPrivateKey)(implicit config: GroupConfig): AddressInfo = {
+  def from(privateKey: ExtendedPrivateKey)(implicit config: GroupConfig): AddressInfo = {
     val publicKey = privateKey.extendedPublicKey.publicKey
     val address   = Address.p2pkh(publicKey)
     AddressInfo(address, publicKey, address.groupIndex, privateKey.derivationPath)

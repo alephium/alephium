@@ -16,11 +16,18 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
-final case class Addresses(activeAddress: Address.Asset, addresses: AVector[Addresses.Info])
+final case class Addresses(activeAddress: Address.Asset, addresses: AVector[AddressInfo])
 
 object Addresses {
-  final case class Info(address: Address.Asset, group: GroupIndex)
+  def from(
+      activeKey: ExtendedPrivateKey,
+      allPrivateKeys: AVector[ExtendedPrivateKey]
+  )(implicit config: GroupConfig): Addresses = {
+    Addresses(Address.p2pkh(activeKey.publicKey), allPrivateKeys.map(AddressInfo.from))
+  }
 }

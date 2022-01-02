@@ -29,7 +29,7 @@ import org.alephium.protocol.{Generators, Hash, PrivateKey, PublicKey, Signature
 import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex}
-import org.alephium.wallet.api.model.AddressInfo
+import org.alephium.wallet.api.model.{Addresses, AddressInfo}
 import org.alephium.wallet.config.WalletConfigFixture
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -39,7 +39,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     walletService.createWallet(password, mnemonicSize, true, walletName, None).rightValue
 
-    val (_, addresses) = walletService.getAddresses(walletName).rightValue
+    val Addresses(_, addresses) = walletService.getAddresses(walletName).rightValue
 
     addresses.length is groupNum
 
@@ -51,8 +51,8 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     groups.length is groupNum
     minerAddresses.length is addresses.length
 
-    (0 to (groupNum - 1)).foreach { group => groups.contains(group) }
-    minerAddresses.foreach { address => addresses.contains(address) }
+    (0 until groupNum).foreach { group => groups.contains(group) }
+    minerAddresses.foreach { address => addresses.map(_.address).contains(address) }
 
     walletService.deriveNextAddress(walletName, None) is Left(WalletService.MinerWalletRequired)
 
@@ -265,14 +265,14 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       walletService
         .deriveNextAddress(walletName, Some(groupIndex))
     }
-    val addresses = walletService.getAddresses(walletName).rightValue._2
+    val addresses = walletService.getAddresses(walletName).rightValue.addresses
 
     // scalastyle:off no.equal
     addresses.tail
-      .filter(_.groupIndex == groupIndex)
+      .filter(_.group == groupIndex)
       .length is i
 
-    addresses.last.groupIndex is groupIndex
+    addresses.last.group is groupIndex
   }
 
   trait Fixture extends WalletConfigFixture {

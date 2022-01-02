@@ -39,7 +39,7 @@ import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, FutureCollection, Hex, Service, TimeStamp}
 import org.alephium.wallet.Constants
-import org.alephium.wallet.api.model.AddressInfo
+import org.alephium.wallet.api.model.{Addresses, AddressInfo}
 import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web.BlockFlowClient
 
@@ -74,7 +74,7 @@ trait WalletService extends Service {
       wallet: String,
       utxosLimit: Option[Int]
   ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]]
-  def getAddresses(wallet: String): Either[WalletError, (Address.Asset, AVector[Address.Asset])]
+  def getAddresses(wallet: String): Either[WalletError, Addresses]
   def getAddressInfo(wallet: String, address: Address.Asset): Either[WalletError, AddressInfo]
   def getMinerAddresses(
       wallet: String
@@ -340,8 +340,13 @@ object WalletService {
 
     override def getAddresses(
         wallet: String
-    ): Either[WalletError, (Address.Asset, AVector[Address.Asset])] =
-      withAddresses(wallet) { addresses => Right(addresses) }
+    ): Either[WalletError, Addresses] = {
+      withWallet(wallet) { secretStorage =>
+        withPrivateKeys(secretStorage) { case (activeKey, privateKeys) =>
+          Right(Addresses.from(activeKey, privateKeys))
+        }
+      }
+    }
 
     override def getAddressInfo(
         wallet: String,
@@ -353,7 +358,7 @@ object WalletService {
             privateKey <- privateKeys.find(privateKey =>
               Address.p2pkh(privateKey.publicKey) == address
             )
-          } yield AddressInfo.fromPrivateKey(privateKey))
+          } yield AddressInfo.from(privateKey))
             .toRight(UnknownAddress(address): WalletError)
         }
       }
@@ -513,7 +518,7 @@ object WalletService {
     ): Either[WalletError, AddressInfo] = {
       secretStorage
         .deriveNextKey()
-        .map(AddressInfo.fromPrivateKey) match {
+        .map(AddressInfo.from) match {
         case Left(error) => Left(WalletError.from(error))
         case Right(nextKey) if groupOpt.map(_ == nextKey.group).getOrElse(true) =>
           Right(nextKey)
@@ -723,13 +728,6 @@ object WalletService {
         }(errorWrapper)
       }(errorWrapper)
 
-    private def withAddresses[A](
-        wallet: String
-    )(
-        f: ((Address.Asset, AVector[Address.Asset])) => Either[WalletError, A]
-    ): Either[WalletError, A] =
-      withAddressesM(wallet)(f)(Left.apply)
-
     private def withAddressesFut[A](wallet: String)(
         f: ((Address.Asset, AVector[Address.Asset])) => Future[Either[WalletError, A]]
     ): Future[Either[WalletError, A]] =
@@ -749,7 +747,7 @@ object WalletService {
     ): AVector[AVector[(AddressInfo, ExtendedPrivateKey)]] = {
       val addresses: AVector[(AddressInfo, ExtendedPrivateKey)] =
         privateKeys.map { privateKey =>
-          val addressInfo = AddressInfo.fromPrivateKey(privateKey)
+          val addressInfo = AddressInfo.from(privateKey)
           (addressInfo, privateKey)
         }
 
@@ -788,7 +786,7 @@ object WalletService {
     ): Either[WalletError, AVector[AddressInfo]] = {
       withAllMinerPrivateKeys(storage) { case (_, keys) =>
         val addressByGroup = keys.toSeq
-          .map(AddressInfo.fromPrivateKey)
+          .map(AddressInfo.from)
           .groupBy(_.group)
 
         if (addressByGroup.keys.size < groupConfig.groups) {
@@ -827,7 +825,7 @@ object WalletService {
         addressByGroup: Map[GroupIndex, Seq[AddressInfo]],
         privateKey: ExtendedPrivateKey
     ): Map[GroupIndex, Seq[AddressInfo]] = {
-      val address = AddressInfo.fromPrivateKey(privateKey)
+      val address = AddressInfo.from(privateKey)
       val group   = address.group
       val newKeys = addressByGroup.get(group) match {
         case None       => Seq(address)
