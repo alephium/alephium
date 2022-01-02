@@ -1566,7 +1566,9 @@
                   "addresses": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                      "group": 2
+                      "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                      "group": 0,
+                      "path": "m/44'/1234'/O'/O/O"
                     }
                   ]
                 }
@@ -6325,7 +6327,7 @@
           "addresses": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Info"
+              "$ref": "#/components/schemas/AddressInfo"
             }
           }
         }
@@ -7160,21 +7162,6 @@
           },
           "type": {
             "type": "string"
-          }
-        }
-      },
-      "Info": {
-        "required": [
-          "address",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          },
-          "group": {
-            "type": "integer"
           }
         }
       },
