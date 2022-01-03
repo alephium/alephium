@@ -16,6 +16,8 @@
 
 package org.alephium.io
 
+import scala.collection.mutable
+
 import akka.util.ByteString
 
 import org.alephium.crypto.{Blake2b => Hash}
@@ -211,9 +213,27 @@ object SparseMerkleTrie {
       storage: KeyValueStorage[Hash, Node]
   ): SparseMerkleTrie[K, V] =
     new SparseMerkleTrie[K, V](rootHash, storage)
+
+  def inMemory[K: Serde, V: Serde](
+      storage: KeyValueStorage[Hash, Node],
+      genesisKey: K,
+      genesisValue: V
+  ): InMemorySparseMerkleTrie[K, V] = {
+    val genesisPath = bytes2Nibbles(serialize(genesisKey))
+    val genesisData = serialize(genesisValue)
+    val genesisNode = LeafNode(genesisPath, genesisData)
+    storage.put(genesisNode.hash, genesisNode)
+    new InMemorySparseMerkleTrie(genesisNode.hash, storage, mutable.Map.empty)
+  }
+
+  def inMemory[K: Serde, V: Serde](
+      rootHash: Hash,
+      storage: KeyValueStorage[Hash, Node]
+  ): InMemorySparseMerkleTrie[K, V] =
+    new InMemorySparseMerkleTrie[K, V](rootHash, storage, mutable.Map.empty)
 }
 
-abstract class SparseMerkleTrieBase[K: Serde, V: Serde] {
+abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableTrie[K, V, T] {
   import SparseMerkleTrie._
 
   def rootHash: Hash
@@ -531,8 +551,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde] {
 final class SparseMerkleTrie[K: Serde, V: Serde](
     val rootHash: Hash,
     storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
-) extends SparseMerkleTrieBase[K, V]
-    with MutableTrie[K, V, SparseMerkleTrie[K, V]] {
+) extends SparseMerkleTrieBase[K, V, SparseMerkleTrie[K, V]] {
   import SparseMerkleTrie._
 
   def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
@@ -570,5 +589,44 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       result <- put(rootHash, nibbles, value)
       trie   <- applyActions(result)
     } yield trie
+  }
+}
+
+final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
+    var rootHash: Hash,
+    storage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+    cache: mutable.Map[Hash, SparseMerkleTrie.Node]
+) extends SparseMerkleTrieBase[K, V, Unit] {
+  import SparseMerkleTrie._
+
+  def getNode(hash: Hash): IOResult[Node] = {
+    cache.get(hash) match {
+      case Some(node) => Right(node)
+      case None       => storage.get(hash)
+    }
+  }
+
+  def applyActions(result: TrieUpdateActions): Unit = {
+    result.toAdd.foreach(node => cache.put(node.hash, node))
+    result.toDelete.foreach(hash => cache -= hash)
+    result.nodeOpt.foreach(node => rootHash = node.hash)
+  }
+
+  def remove(key: K): IOResult[Unit] = {
+    removeRaw(serialize[K](key))
+  }
+
+  def removeRaw(key: ByteString): IOResult[Unit] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
+    remove(rootHash, nibbles).map(applyActions)
+  }
+
+  def put(key: K, value: V): IOResult[Unit] = {
+    putRaw(serialize[K](key), serialize[V](value))
+  }
+
+  def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
+    put(rootHash, nibbles, value).map(applyActions)
   }
 }
