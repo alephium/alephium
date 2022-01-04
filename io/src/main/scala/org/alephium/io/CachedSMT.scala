@@ -32,12 +32,16 @@ final class CachedSMT[K, V](
   }
 
   def persist(): IOResult[SparseMerkleTrie[K, V]] = {
-    EitherF.foldTry(caches, underlying) {
-      case (trie, (_, Cached(_)))         => Right(trie)
-      case (trie, (key, Updated(value)))  => trie.put(key, value)
-      case (trie, (key, Inserted(value))) => trie.put(key, value)
-      case (trie, (key, Removed()))       => trie.remove(key)
-    }
+    val inMemoryTrie = underlying.inMemory()
+    for {
+      _ <- EitherF.foreachTry(caches) {
+        case (_, Cached(_))         => Right(())
+        case (key, Updated(value))  => inMemoryTrie.put(key, value)
+        case (key, Inserted(value)) => inMemoryTrie.put(key, value)
+        case (key, Removed())       => inMemoryTrie.remove(key)
+      }
+      persisted <- inMemoryTrie.persistInBatch()
+    } yield persisted
   }
 
   def staging(): StagingSMT[K, V] = new StagingSMT[K, V](this, mutable.Map.empty)
