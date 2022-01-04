@@ -13,8 +13,10 @@ No need to run `sweep` endpoints multiple times.
 
 ### New Feature
 * Gas estimation for multi-sig and smart contract transactions.
-* Support UTXO selection for smart contract transactions.
+* UTXO selection for smart contract transactions.
 * User-friendly `sweep-active-address` and `sweep-all-addresses` API endpoints.
+* Batch write for Merkle tree
 
 ### Improvements
 * Api key is optional if the api interface is `127.0.0.1`.
+* Better UTXO selection algorithm
