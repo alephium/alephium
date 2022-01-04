@@ -115,9 +115,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   }
 
   trait TrieFixture extends StorageFixture {
-    val db        = newDB[Hash, SparseMerkleTrie.Node]
-    var trie      = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
-    var inMemTrie = trie.inMemory()
+    val db0  = newDB[Hash, SparseMerkleTrie.Node]
+    var trie = SparseMerkleTrie.build[Hash, Hash](db0, genesisKey, genesisValue)
+
+    val db1       = newDB[Hash, SparseMerkleTrie.Node]
+    var inMemTrie = SparseMerkleTrie.inMemory[Hash, Hash](db1, genesisKey, genesisValue)
   }
 
   def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
@@ -274,15 +276,15 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     trie.rootHash is inMemTrie.rootHash
 
     info("Insert 2000 random key-value pairs")
-    val keys = AVector.tabulate(2000) { _ =>
+    val pairs = AVector.tabulate(2000) { _ =>
       val (key, value) = generateKV()
       trie = trie.put(key, value).rightValue
       inMemTrie.put(key, value)
-      key
+      key -> value
     }
 
     info("Remove 500 key-value pairs")
-    keys.take(500).foreach { key =>
+    pairs.take(500).foreach { case (key, _) =>
       trie = trie.remove(key).rightValue
       inMemTrie.remove(key)
     }
@@ -292,12 +294,19 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     persisted.rootHash is trie.rootHash
 
     info("Verify the final persisted merkle tree")
-    keys.take(500).foreach { key =>
+    pairs.take(500).foreach { case (key, _) =>
       persisted.exist(key) isE false
     }
-    keys.drop(500).foreach { key =>
+    pairs.drop(500).foreach { case (key, value) =>
       persisted.exist(key) isE true
+      persisted.get(key) isE value
     }
+    trie.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 1501
+    persisted.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 1501
+  }
+
+  it should "persist empty trie" in withTrieFixture { fixture =>
+    fixture.inMemTrie.persistInBatch().rightValue.rootHash is fixture.trie.rootHash
   }
 }
 
