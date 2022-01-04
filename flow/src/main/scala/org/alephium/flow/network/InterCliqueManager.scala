@@ -284,6 +284,7 @@ class InterCliqueManager(
   }
 
   var lastNodeSyncedStatus: Option[Boolean] = None
+  var checkConnectionsCount: Long           = 0
   def updateNodeSyncedStatus(): Unit = {
     val nodeSyncStatus = isSynced()
     lastNodeSyncedStatus match {
@@ -296,7 +297,10 @@ class InterCliqueManager(
     }
     lastNodeSyncedStatus = Some(nodeSyncStatus)
 
-    getMoreOutConnectionsIfNeeded() // check out-going connections regularly
+    if ((checkConnectionsCount & 0x0fL) == 0) {
+      getMoreOutConnectionsIfNeeded() // check out-going connections regularly
+      checkConnectionsCount += 1
+    }
   }
 
   def publishNodeStatus(result: SyncedResult): Unit = {

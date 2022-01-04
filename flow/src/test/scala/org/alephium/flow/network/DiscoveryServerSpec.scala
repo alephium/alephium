@@ -256,6 +256,15 @@ class DiscoveryServerSpec
     }
   }
 
+  it should "reply to GetMorePeers only when initial discovery is done" in new Fixture {
+    server0 ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+    server0 ! DiscoveryServer.GetMorePeers(brokerConfig)
+    expectNoMsg()
+    server0.underlyingActor.postInitialDiscovery()
+    server0 ! DiscoveryServer.GetMorePeers(brokerConfig)
+    expectMsgType[DiscoveryServer.NeighborPeers]
+  }
+
   it should "simulate large network" in new SimulationFixture with NetworkConfigFixture.Default {
     self =>
     val groups = 4
