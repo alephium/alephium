@@ -633,26 +633,25 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
   }
 
   def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def iter(hash: Hash, accumulatePut: (Hash, Node) => Unit): Unit = {
-      cache.get(hash) match {
-        case Some(node: BranchNode) =>
-          accumulatePut(hash, node)
-          node.children.foreach { childOpt =>
-            childOpt.foreach(iter(_, accumulatePut))
-          }
-        case Some(node: LeafNode) =>
-          accumulatePut(hash, node)
-        case None => ()
+    @inline def preOrderTraversal(accumulatePut: (Hash, Node) => Unit): Unit = {
+      val queue = mutable.Queue(rootHash)
+      while (queue.nonEmpty) {
+        val current = queue.dequeue()
+        cache.get(current) match {
+          case Some(node: BranchNode) =>
+            accumulatePut(current, node)
+            node.children.foreach { childOpt =>
+              childOpt.foreach(queue.enqueue)
+            }
+          case Some(node: LeafNode) =>
+            accumulatePut(current, node)
+          case None => ()
+        }
       }
     }
 
     storage
-      .putBatch { accumulatePut =>
-        iter(rootHash, accumulatePut)
-      }
-      .map { _ =>
-        SparseMerkleTrie(rootHash, storage)
-      }
+      .putBatch(preOrderTraversal)
+      .map(_ => SparseMerkleTrie(rootHash, storage))
   }
 }
