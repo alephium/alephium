@@ -16,6 +16,8 @@
 
 package org.alephium.io
 
+import scala.collection.mutable
+
 import akka.util.ByteString
 
 import org.alephium.crypto.{Blake2b => Hash}
@@ -194,7 +196,7 @@ object SparseMerkleTrie {
     ByteString.fromArrayUnsafe(bytes)
   }
 
-  def build[K: Serde, V: Serde](
+  def unsafe[K: Serde, V: Serde](
       storage: KeyValueStorage[Hash, Node],
       genesisKey: K,
       genesisValue: V
@@ -202,7 +204,7 @@ object SparseMerkleTrie {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
     val genesisNode = LeafNode(genesisPath, genesisData)
-    storage.put(genesisNode.hash, genesisNode)
+    storage.putUnsafe(genesisNode.hash, genesisNode)
     new SparseMerkleTrie(genesisNode.hash, storage)
   }
 
@@ -211,25 +213,31 @@ object SparseMerkleTrie {
       storage: KeyValueStorage[Hash, Node]
   ): SparseMerkleTrie[K, V] =
     new SparseMerkleTrie[K, V](rootHash, storage)
+
+  def inMemoryUnsafe[K: Serde, V: Serde](
+      storage: KeyValueStorage[Hash, Node],
+      genesisKey: K,
+      genesisValue: V
+  ): InMemorySparseMerkleTrie[K, V] = {
+    val genesisPath = bytes2Nibbles(serialize(genesisKey))
+    val genesisData = serialize(genesisValue)
+    val genesisNode = LeafNode(genesisPath, genesisData)
+    storage.putUnsafe(genesisNode.hash, genesisNode)
+    new InMemorySparseMerkleTrie(genesisNode.hash, storage, mutable.Map.empty)
+  }
+
+  def inMemory[K: Serde, V: Serde](
+      rootHash: Hash,
+      storage: KeyValueStorage[Hash, Node]
+  ): InMemorySparseMerkleTrie[K, V] =
+    new InMemorySparseMerkleTrie[K, V](rootHash, storage, mutable.Map.empty)
 }
 
-// TODO: batch mode
-final class SparseMerkleTrie[K: Serde, V: Serde](
-    val rootHash: Hash,
-    storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
-) extends MutableTrie[K, V, SparseMerkleTrie[K, V]] {
+abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableTrie[K, V, T] {
   import SparseMerkleTrie._
 
-  def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
-    result.toAdd
-      .foreachE { node => storage.put(node.hash, node) }
-      .map { _ =>
-        result.nodeOpt match {
-          case None       => this
-          case Some(node) => new SparseMerkleTrie(node.hash, storage)
-        }
-      }
-  }
+  def rootHash: Hash
+  def getNode(hash: Hash): IOResult[Node]
 
   def get(key: K): IOResult[V] = {
     getOpt(key).flatMap {
@@ -277,8 +285,6 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
-
   def exist(key: K): IOResult[Boolean] = {
     existRaw(serialize[K](key))
   }
@@ -287,24 +293,12 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     getOptRaw(key).map(_.nonEmpty)
   }
 
-  def remove(key: K): IOResult[SparseMerkleTrie[K, V]] = {
-    removeRaw(serialize[K](key))
-  }
-
-  def removeRaw(key: ByteString): IOResult[SparseMerkleTrie[K, V]] = {
-    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
-    for {
-      result <- remove(rootHash, nibbles)
-      trie   <- applyActions(result)
-    } yield trie
-  }
-
-  private def remove(hash: Hash, nibbles: ByteString): IOResult[TrieUpdateActions] = {
+  protected def remove(hash: Hash, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     getNode(hash).flatMap(remove(hash, _, nibbles))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def remove(hash: Hash, node: Node, nibbles: ByteString): IOResult[TrieUpdateActions] = {
+  protected def remove(hash: Hash, node: Node, nibbles: ByteString): IOResult[TrieUpdateActions] = {
     node match {
       case node @ BranchNode(path, children) =>
         assume(nibbles.length > path.length)
@@ -363,19 +357,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  def put(key: K, value: V): IOResult[SparseMerkleTrie[K, V]] = {
-    putRaw(serialize[K](key), serialize[V](value))
-  }
-
-  def putRaw(key: ByteString, value: ByteString): IOResult[SparseMerkleTrie[K, V]] = {
-    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
-    for {
-      result <- put(rootHash, nibbles, value)
-      trie   <- applyActions(result)
-    } yield trie
-  }
-
-  private def put(
+  protected def put(
       hash: Hash,
       nibbles: ByteString,
       value: ByteString
@@ -384,7 +366,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     getNode(hash).flatMap(put(hash, _, nibbles, value))
   }
 
-  private def put(
+  protected def put(
       hash: Hash,
       node: Node,
       nibbles: ByteString,
@@ -422,7 +404,7 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
     }
   }
 
-  private def branch(
+  protected def branch(
       hash: Hash,
       node: Node,
       branchIndex: Int,
@@ -563,5 +545,113 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
       }
     }
     deser.left.map(IOError.Serde)
+  }
+}
+
+final class SparseMerkleTrie[K: Serde, V: Serde](
+    val rootHash: Hash,
+    storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
+) extends SparseMerkleTrieBase[K, V, SparseMerkleTrie[K, V]] {
+  import SparseMerkleTrie._
+
+  def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
+
+  def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
+    result.toAdd
+      .foreachE { node => storage.put(node.hash, node) }
+      .map { _ =>
+        result.nodeOpt match {
+          case None       => this
+          case Some(node) => new SparseMerkleTrie(node.hash, storage)
+        }
+      }
+  }
+
+  def remove(key: K): IOResult[SparseMerkleTrie[K, V]] = {
+    removeRaw(serialize[K](key))
+  }
+
+  def removeRaw(key: ByteString): IOResult[SparseMerkleTrie[K, V]] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
+    for {
+      result <- remove(rootHash, nibbles)
+      trie   <- applyActions(result)
+    } yield trie
+  }
+
+  def put(key: K, value: V): IOResult[SparseMerkleTrie[K, V]] = {
+    putRaw(serialize[K](key), serialize[V](value))
+  }
+
+  def putRaw(key: ByteString, value: ByteString): IOResult[SparseMerkleTrie[K, V]] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
+    for {
+      result <- put(rootHash, nibbles, value)
+      trie   <- applyActions(result)
+    } yield trie
+  }
+
+  def inMemory(): InMemorySparseMerkleTrie[K, V] = SparseMerkleTrie.inMemory(rootHash, storage)
+}
+
+final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
+    var rootHash: Hash,
+    storage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+    cache: mutable.Map[Hash, SparseMerkleTrie.Node]
+) extends SparseMerkleTrieBase[K, V, Unit] {
+  import SparseMerkleTrie._
+
+  def getNode(hash: Hash): IOResult[Node] = {
+    cache.get(hash) match {
+      case Some(node) => Right(node)
+      case None       => storage.get(hash)
+    }
+  }
+
+  def applyActions(result: TrieUpdateActions): Unit = {
+    result.toAdd.foreach(node => cache.put(node.hash, node))
+//    result.toDelete.foreach(hash => cache -= hash) // this trades space for performance
+    result.nodeOpt.foreach(node => rootHash = node.hash)
+  }
+
+  def remove(key: K): IOResult[Unit] = {
+    removeRaw(serialize[K](key))
+  }
+
+  def removeRaw(key: ByteString): IOResult[Unit] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
+    remove(rootHash, nibbles).map(applyActions)
+  }
+
+  def put(key: K, value: V): IOResult[Unit] = {
+    putRaw(serialize[K](key), serialize[V](value))
+  }
+
+  def putRaw(key: ByteString, value: ByteString): IOResult[Unit] = {
+    val nibbles = SparseMerkleTrie.bytes2Nibbles(key)
+    put(rootHash, nibbles, value).map(applyActions)
+  }
+
+  def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
+    @inline def preOrderTraversal(accumulatePut: (Hash, Node) => Unit): Unit = {
+      val queue = mutable.Queue(rootHash)
+      while (queue.nonEmpty) {
+        val current = queue.dequeue()
+        cache.get(current) match {
+          case Some(node: BranchNode) =>
+            accumulatePut(current, node)
+            node.children.foreach { childOpt =>
+              childOpt.foreach(queue.enqueue)
+            }
+          case Some(node: LeafNode) =>
+            accumulatePut(current, node)
+          case None => ()
+        }
+      }
+    }
+
+    storage
+      .putBatch(preOrderTraversal)
+      .map(_ => SparseMerkleTrie(rootHash, storage))
   }
 }

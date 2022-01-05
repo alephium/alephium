@@ -18,6 +18,9 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
+import scala.util.Random
+
+import akka.util.ByteString
 import org.openjdk.jmh.annotations._
 
 import org.alephium.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource, SparseMerkleTrie}
@@ -31,31 +34,45 @@ import org.alephium.util.Files
 class TrieBench {
   import RocksDBSource.ColumnFamily
 
-  private val tmpdir = Files.tmpDir
-  private val dbname = "trie"
-  private val dbPath = tmpdir.resolve(dbname)
+  def prepareTrie(): SparseMerkleTrie[Hash, Hash] = {
+    val tmpdir = Files.tmpDir
+    val dbname = s"trie-${Random.nextLong()}"
+    val dbPath = tmpdir.resolve(dbname)
 
-  val dbStorage: RocksDBSource = {
-    val files = dbPath.toFile.listFiles
-    if (files != null) {
-      files.foreach(_.delete)
+    val dbStorage: RocksDBSource = {
+      val files = dbPath.toFile.listFiles
+      if (files != null) {
+        files.foreach(_.delete)
+      }
+
+      RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
     }
-
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
+    val db: KeyValueStorage[Hash, Node] = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
+    SparseMerkleTrie.unsafe(db, Hash.zero, Hash.zero)
   }
-  val db: KeyValueStorage[Hash, Node]    = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
-  val trie: SparseMerkleTrie[Hash, Hash] = SparseMerkleTrie.build(db, Hash.zero, Hash.zero)
-  val genesisHash: Hash                  = trie.rootHash
+
+  val data: Array[(ByteString, ByteString)] = Array.tabulate(1 << 20) { _ =>
+    (Hash.random.bytes, Hash.random.bytes)
+  }
 
   @Benchmark
   def randomInsert(): Unit = {
-    val keys = Array.tabulate(1 << 10) { _ =>
-      val key  = Hash.random.bytes
-      val data = Hash.random.bytes
-      trie.putRaw(key, data)
-      key
+    var trie = prepareTrie()
+    data.foreach { case (key, value) =>
+      trie = trie.putRaw(key, value).getOrElse(???)
     }
-    keys.foreach(trie.removeRaw)
-    assume(trie.rootHash == genesisHash)
+    print(trie.rootHash.toHexString + "\n")
+  }
+
+  @Benchmark
+  def randomInsertBatch(): Unit = {
+    val trie = prepareTrie().inMemory()
+    data.foreach { case (key, value) =>
+      trie.putRaw(key, value)
+    }
+    trie.persistInBatch().map { trie =>
+      print(trie.rootHash.toHexString + "\n")
+    }
+    ()
   }
 }

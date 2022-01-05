@@ -429,12 +429,12 @@ object WorldState {
     val genesisRef  = ContractOutputRef.forSMT
     val emptyOutput = TxOutput.forSMT
     val emptyOutputTrie =
-      SparseMerkleTrie.build[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
+      SparseMerkleTrie.unsafe[TxOutputRef, TxOutput](storage, genesisRef, emptyOutput)
     val emptyState =
       ContractState.unsafe(StatefulContract.forSMT, AVector.empty, genesisRef)
     val emptyCode         = CodeRecord(StatefulContract.forSMT, 0)
-    val emptyContractTrie = SparseMerkleTrie.build(storage, Hash.zero, emptyState)
-    val emptyCodeTrie     = SparseMerkleTrie.build(storage, Hash.zero, emptyCode)
+    val emptyContractTrie = SparseMerkleTrie.unsafe(storage, Hash.zero, emptyState)
+    val emptyCodeTrie     = SparseMerkleTrie.unsafe(storage, Hash.zero, emptyCode)
     Persisted(emptyOutputTrie, emptyContractTrie, emptyCodeTrie)
   }
 

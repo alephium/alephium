@@ -26,10 +26,11 @@ trait MockFactory {
       implicit override def keySerde: Serde[K]   = ???
       implicit override def valueSerde: Serde[V] = ???
 
-      override def getRawUnsafe(key: ByteString): ByteString              = ???
-      override def getOptRawUnsafe(key: ByteString): Option[ByteString]   = ???
-      override def putRawUnsafe(key: ByteString, value: ByteString): Unit = ???
-      override def existsRawUnsafe(key: ByteString): Boolean              = ???
-      override def deleteRawUnsafe(key: ByteString): Unit                 = ???
+      override def getRawUnsafe(key: ByteString): ByteString                     = ???
+      override def getOptRawUnsafe(key: ByteString): Option[ByteString]          = ???
+      override def putRawUnsafe(key: ByteString, value: ByteString): Unit        = ???
+      def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit = ???
+      override def existsRawUnsafe(key: ByteString): Boolean                     = ???
+      override def deleteRawUnsafe(key: ByteString): Unit                        = ???
     }
 }

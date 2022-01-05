@@ -228,11 +228,9 @@ class WalletAppSpec
     }
 
     deriveNextAddress() check { response =>
-      address = response.as[AddressInfo].address
-      addresses = Addresses(
-        address,
-        addresses.addresses :+ Addresses.Info(address, address.groupIndex)
-      )
+      val addressInfo = response.as[AddressInfo]
+      address = addressInfo.address
+      addresses = Addresses(address, addresses.addresses :+ addressInfo)
       response.code is StatusCode.Ok
     }
 

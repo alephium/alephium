@@ -14,20 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.wallet.api.model
+package org.alephium.io
 
-import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.Address
-import org.alephium.util.AVector
+import org.alephium.crypto.{Blake2b => Hash}
+import org.alephium.util.AlephiumSpec
 
-final case class Addresses(activeAddress: Address.Asset, addresses: AVector[AddressInfo])
+class KeyValueStorageSpec extends AlephiumSpec {
 
-object Addresses {
-  def from(
-      activeKey: ExtendedPrivateKey,
-      allPrivateKeys: AVector[ExtendedPrivateKey]
-  )(implicit config: GroupConfig): Addresses = {
-    Addresses(Address.p2pkh(activeKey.publicKey), allPrivateKeys.map(AddressInfo.from))
+  it should "write in batch" in new StorageFixture {
+    val db    = newDB[Hash, Hash]
+    val pairs = Seq.tabulate(1000)(_ => Hash.random -> Hash.random)
+    db.putBatch { putAccumulate =>
+      pairs.foreach { case (key, value) =>
+        putAccumulate(key, value)
+      }
+    }
+    pairs.foreach { case (key, value) =>
+      db.get(key) isE value
+    }
   }
 }

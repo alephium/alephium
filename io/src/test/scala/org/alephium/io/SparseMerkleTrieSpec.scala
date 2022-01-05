@@ -108,15 +108,18 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     LeafNode(genesisPath, genesisValue.bytes)
   }
 
-  trait TrieFixture extends StorageFixture {
-    val db   = newDB[Hash, SparseMerkleTrie.Node]
-    var trie = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+  def generateKV(keyPrefix: ByteString = ByteString.empty): (Hash, Hash) = {
+    val key  = Hash.random
+    val data = Hash.random
+    (Hash.unsafe(keyPrefix ++ key.bytes.drop(keyPrefix.length)), data)
+  }
 
-    def generateKV(keyPrefix: ByteString = ByteString.empty): (Hash, Hash) = {
-      val key  = Hash.random
-      val data = Hash.random
-      (Hash.unsafe(keyPrefix ++ key.bytes.drop(keyPrefix.length)), data)
-    }
+  trait TrieFixture extends StorageFixture {
+    val db0  = newDB[Hash, SparseMerkleTrie.Node]
+    var trie = SparseMerkleTrie.unsafe[Hash, Hash](db0, genesisKey, genesisValue)
+
+    val db1       = newDB[Hash, SparseMerkleTrie.Node]
+    var inMemTrie = SparseMerkleTrie.inMemoryUnsafe[Hash, Hash](db1, genesisKey, genesisValue)
   }
 
   def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
@@ -138,7 +141,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
         None
       } else {
         val prefix       = ByteString(i.toByte)
-        val (key, value) = fixture.generateKV(prefix)
+        val (key, value) = generateKV(prefix)
         trie = trie.put(key, value).rightValue
         Some(key)
       }
@@ -168,15 +171,24 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     trie.rootHash is genesisNode.hash
   }
 
-  it should "work for random insertions" in withTrieFixture { fixture =>
-    import fixture.trie
+  // scalastyle:off method.length
+  def testRandomInsertions[T](initialTrie: SparseMerkleTrieBase[Hash, Hash, T]) = {
+    var trie = initialTrie
+
+    def update(f: => IOResult[T]) = f.rightValue match {
+      case _: Unit => ()
+      case newTrie: SparseMerkleTrieBase[_, _, _] =>
+        trie = newTrie.asInstanceOf[SparseMerkleTrieBase[Hash, Hash, T]]
+      case _ => ???
+    }
 
     val keys = AVector.tabulate(1000) { _ =>
-      val (key, value) = fixture.generateKV()
-      val trie1        = trie.put(key, value).rightValue
-      val trie2        = trie.put(key, value).rightValue //idempotent tests
-      trie2.rootHash is trie1.rootHash
-      trie = trie2
+      val (key, value) = generateKV()
+      update(trie.put(key, value))
+      val trieHash1 = trie.rootHash
+      update(trie.put(key, value)) //idempotent tests
+      val trieHash2 = trie.rootHash
+      trieHash2 is trieHash1
       key
     }
 
@@ -204,12 +216,12 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
 
     keys.foreach { key =>
-      val (_, value) = fixture.generateKV()
-      trie = trie.put(key, value).rightValue
+      val (_, value) = generateKV()
+      update(trie.put(key, value))
     }
 
     (1 to 1001).foreach { k =>
-      val (key, _) = fixture.generateKV()
+      val (key, _) = generateKV()
       trie.getOpt(key).map(_.isEmpty) isE true
       trie.get(key).leftValue is a[IOError.KeyNotFound]
       trie.getAll(ByteString.empty, k).rightValue.length is k
@@ -220,7 +232,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
 
     keys.map { key =>
-      trie = trie.remove(key).toOption.get
+      update(trie.remove(key))
       trie.getOpt(key).map(_.isEmpty) isE true
       trie.exist(key) isE false
     }
@@ -228,9 +240,17 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     trie.rootHash is genesisNode.hash
   }
 
+  it should "work for random insertions" in withTrieFixture { fixture =>
+    testRandomInsertions(fixture.trie)
+  }
+
+  it should "work for random insertions with in memory trie" in withTrieFixture { fixture =>
+    testRandomInsertions(fixture.inMemTrie)
+  }
+
   it should "work for explicit examples" in new StorageFixture {
     val db    = newDB[Hash, SparseMerkleTrie.Node]
-    val trie0 = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+    val trie0 = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
 
     val key0   = Hash.generate
     val key1   = Hash.generate
@@ -248,6 +268,45 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     trie5.rootHash is trie1.rootHash
     val trie6 = trie5.remove(key0).rightValue
     trie6.rootHash is trie0.rootHash
+  }
+
+  it should "write in batch" in withTrieFixture { fixture =>
+    import fixture.{inMemTrie, trie}
+
+    trie.rootHash is inMemTrie.rootHash
+
+    info("Insert 2000 random key-value pairs")
+    val pairs = AVector.tabulate(2000) { _ =>
+      val (key, value) = generateKV()
+      trie = trie.put(key, value).rightValue
+      inMemTrie.put(key, value)
+      key -> value
+    }
+
+    info("Remove 500 key-value pairs")
+    pairs.take(500).foreach { case (key, _) =>
+      trie = trie.remove(key).rightValue
+      inMemTrie.remove(key)
+    }
+
+    info("Persist the merkle tree in batch")
+    val persisted = inMemTrie.persistInBatch().rightValue
+    persisted.rootHash is trie.rootHash
+
+    info("Verify the final persisted merkle tree")
+    pairs.take(500).foreach { case (key, _) =>
+      persisted.exist(key) isE false
+    }
+    pairs.drop(500).foreach { case (key, value) =>
+      persisted.exist(key) isE true
+      persisted.get(key) isE value
+    }
+    trie.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 1501
+    persisted.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 1501
+  }
+
+  it should "persist empty trie" in withTrieFixture { fixture =>
+    fixture.inMemTrie.persistInBatch().rightValue.rootHash is fixture.trie.rootHash
   }
 }
 

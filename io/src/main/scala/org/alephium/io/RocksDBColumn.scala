@@ -17,7 +17,7 @@
 package org.alephium.io
 
 import akka.util.ByteString
-import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
+import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch, WriteOptions}
 
 object RocksDBColumn {
   import RocksDBSource.Settings
@@ -72,6 +72,13 @@ trait RocksDBColumn extends RawKeyValueStorage {
 
   override def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
     db.put(handle, writeOptions, key.toArray, value.toArray)
+  }
+
+  override def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit = {
+    val writeBatch = new WriteBatch()
+    f((x, y) => writeBatch.put(handle, x.toArray, y.toArray))
+    db.write(writeOptions, writeBatch)
+    writeBatch.close()
   }
 
   override def existsRawUnsafe(key: ByteString): Boolean = {

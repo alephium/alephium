@@ -16,7 +16,7 @@
 
 package org.alephium.io
 
-import org.scalatest.Assertion
+import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Keccak256
 import org.alephium.io.RocksDBSource.ColumnFamily
@@ -24,16 +24,19 @@ import org.alephium.serde.Serde
 import org.alephium.util.{AlephiumFixture, Files}
 
 trait StorageFixture extends AlephiumFixture {
-  private lazy val tmpdir = Files.tmpDir
-  private lazy val dbname = s"test-db-${Keccak256.generate.toHexString}"
-  private lazy val dbPath = tmpdir.resolve(dbname)
 
-  private lazy val storage = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+  private val storages = ArrayBuffer.empty[RocksDBSource]
 
-  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] =
+  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] = {
+    val tmpdir  = Files.tmpDir
+    val dbname  = s"test-db-${Keccak256.generate.toHexString}"
+    val dbPath  = tmpdir.resolve(dbname)
+    val storage = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    storages.append(storage)
     RocksDBKeyValueStorage[K, V](storage, ColumnFamily.All)
+  }
 
-  protected def postTest(): Assertion = {
-    storage.dESTROY().isRight is true
+  protected def postTest(): Unit = {
+    storages.foreach(_.dESTROY().isRight is true)
   }
 }

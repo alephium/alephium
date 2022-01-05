@@ -49,29 +49,25 @@ object ApiConfig extends StrictLogging {
 
   implicit private val apiConfigValueReader: ValueReader[ApiConfig] =
     valueReader { implicit cfg =>
-      val maybeApiKey = if (as[Boolean]("apiKeyEnabled")) {
-        as[Option[ApiKey]]("apiKey").orElse {
-          val generatedKey = generateApiKey()
+      val interface     = as[String]("networkInterface")
+      val apiKeyEnabled = as[Boolean]("apiKeyEnabled")
+      val apiKeyOpt     = as[Option[ApiKey]]("apiKey")
 
-          val errorMessage = s"""|
-          |Api key is mandatory, please add:
-          |    alephium.api.api-key = XXXXX
+      if ((interface != "127.0.0.1") && apiKeyEnabled && apiKeyOpt.isEmpty) {
+        val errorMessage = s"""|
+          |Api key is necessary, please add:
+          |    alephium.api.api-key = ${generateApiKey().value}
           |to your user.conf.
-          |Here is an auto-generated api-key for you:
-          |    ${generatedKey.value}
           |""".stripMargin
 
-          throw new ConfigException.BadValue("api-key", errorMessage)
-        }
-      } else {
-        None
+        throw new ConfigException.BadValue("api-key", errorMessage)
       }
 
       ApiConfig(
         as[InetAddress]("networkInterface"),
         as[Duration]("blockflowFetchMaxAge"),
         as[Duration]("askTimeout"),
-        maybeApiKey,
+        apiKeyOpt,
         as[U256]("gasFeeCap"),
         as[Int]("defaultUtxosLimit")
       )

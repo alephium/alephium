@@ -62,8 +62,8 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   it should "Addresses" in {
     val json =
-      s"""{"activeAddress":"$address","addresses":[{"address":"$address","group":${group.value}}]}"""
-    val addresses = Addresses(address, AVector(Addresses.Info(address, group)))
+      s"""{"activeAddress":"$address","addresses":[{"address":"$address","publicKey":"${publicKey.toHexString}","group":${group.value},"path":"$path"}]}"""
+    val addresses = Addresses(address, AVector(AddressInfo(address, publicKey, group, path)))
     check(addresses, json)
   }
 

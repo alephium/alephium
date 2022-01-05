@@ -244,7 +244,8 @@ lazy val benchmark = project("benchmark")
   .dependsOn(flow)
   .settings(
     publish / skip := true,
-    scalacOptions += "-Xdisable-assertions"
+    scalacOptions += "-Xdisable-assertions",
+    wartremoverErrors in (Compile, compile) := Seq.empty
   )
 
 lazy val flow = project("flow")

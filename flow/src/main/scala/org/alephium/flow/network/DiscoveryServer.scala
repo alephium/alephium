@@ -205,7 +205,9 @@ class DiscoveryServer(
     case GetNeighborPeers =>
       sender() ! NeighborPeers(getActivePeers())
     case GetMorePeers(targetGroupInfo) =>
-      sender() ! NeighborPeers(getMorePeers(targetGroupInfo))
+      if (initialDiscoveryDone) {
+        sender() ! NeighborPeers(getMorePeers(targetGroupInfo))
+      }
 
     case Remove(peer) => remove(peer)
     case PeerDenied(peerInfo) =>

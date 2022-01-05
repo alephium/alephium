@@ -177,7 +177,7 @@ object CachedTrieSpec {
     val genesisKey   = Hash.zero
     val genesisValue = Hash.zero
     val db           = newDB[Hash, SparseMerkleTrie.Node]
-    val unCached     = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+    val unCached     = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
 
     var cached: MutableTrie[Hash, Hash, Unit] = CachedSMT.from(unCached)
 

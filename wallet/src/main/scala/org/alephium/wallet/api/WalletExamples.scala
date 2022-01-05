@@ -180,7 +180,7 @@ trait WalletExamples extends EndpointsExamples {
     simpleExample(Transfer.Results(AVector(Transfer.Result(txId, fromGroup, toGroup))))
 
   implicit val addressesExamples: List[Example[Addresses]] =
-    simpleExample(Addresses(address, AVector(Addresses.Info(address, fromGroup))))
+    simpleExample(Addresses(address, AVector(addressInfo)))
 
   implicit val addressInfoExamples: List[Example[AddressInfo]] =
     simpleExample(addressInfo)

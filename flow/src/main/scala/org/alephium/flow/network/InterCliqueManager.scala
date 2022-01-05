@@ -234,14 +234,14 @@ class InterCliqueManager(
       connecting.remove(peer)
       publishEvent(DiscoveryServer.Unreachable(peer))
       removeBroker(peer)
-      moreOutConnections()
+      getMoreOutConnectionsIfNeeded()
 
     case DiscoveryServer.NeighborPeers(randomPeers) =>
       extractPeersToConnect(randomPeers, networkSetting.maxOutboundConnectionsPerGroup)
         .foreach(connectUnsafe)
   }
 
-  def moreOutConnections(): Unit = {
+  def getMoreOutConnectionsIfNeeded(): Unit = {
     if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
       discoveryServer ! DiscoveryServer.GetMorePeers(brokerConfig)
     }
@@ -284,6 +284,7 @@ class InterCliqueManager(
   }
 
   var lastNodeSyncedStatus: Option[Boolean] = None
+  var checkConnectionsCount: Long           = 0
   def updateNodeSyncedStatus(): Unit = {
     val nodeSyncStatus = isSynced()
     lastNodeSyncedStatus match {
@@ -293,12 +294,13 @@ class InterCliqueManager(
         if (nodeSyncStatus != lastStatus) {
           publishNodeStatus(SyncedResult(nodeSyncStatus))
         } // else we don't do anything
-
-        if (lastStatus && !nodeSyncStatus) { // Get more connections as the node is not synced
-          moreOutConnections()
-        }
     }
     lastNodeSyncedStatus = Some(nodeSyncStatus)
+
+    if ((checkConnectionsCount & 0x0fL) == 0) {
+      getMoreOutConnectionsIfNeeded() // check out-going connections regularly
+      checkConnectionsCount += 1
+    }
   }
 
   def publishNodeStatus(result: SyncedResult): Unit = {
@@ -339,7 +341,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def selfCliqueId: CliqueId
   def networkSetting: NetworkSetting
-  def moreOutConnections(): Unit
+  def getMoreOutConnectionsIfNeeded(): Unit
 
   def log: LoggingAdapter
   implicit def brokerConfig: BrokerConfig
@@ -581,7 +583,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       // unwatch to avoid publish unreachable
       context.unwatch(removedBroker)
       context.stop(removedBroker)
-      moreOutConnections()
+      getMoreOutConnectionsIfNeeded()
     } else {
       log.debug(s"Invalid double connection from ${brokerInfo.peerId}")
       brokers.remove(existedBroker.info.peerId)
