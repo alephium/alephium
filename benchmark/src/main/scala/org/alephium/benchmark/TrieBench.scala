@@ -48,7 +48,7 @@ class TrieBench {
       RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
     }
     val db: KeyValueStorage[Hash, Node] = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
-    SparseMerkleTrie.build(db, Hash.zero, Hash.zero)
+    SparseMerkleTrie.unsafe(db, Hash.zero, Hash.zero)
   }
 
   val data: Array[(ByteString, ByteString)] = Array.tabulate(1 << 20) { _ =>

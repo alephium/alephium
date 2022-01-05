@@ -196,7 +196,7 @@ object SparseMerkleTrie {
     ByteString.fromArrayUnsafe(bytes)
   }
 
-  def build[K: Serde, V: Serde](
+  def unsafe[K: Serde, V: Serde](
       storage: KeyValueStorage[Hash, Node],
       genesisKey: K,
       genesisValue: V
@@ -204,7 +204,7 @@ object SparseMerkleTrie {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
     val genesisNode = LeafNode(genesisPath, genesisData)
-    storage.put(genesisNode.hash, genesisNode)
+    storage.putUnsafe(genesisNode.hash, genesisNode)
     new SparseMerkleTrie(genesisNode.hash, storage)
   }
 
@@ -214,7 +214,7 @@ object SparseMerkleTrie {
   ): SparseMerkleTrie[K, V] =
     new SparseMerkleTrie[K, V](rootHash, storage)
 
-  def inMemory[K: Serde, V: Serde](
+  def inMemoryUnsafe[K: Serde, V: Serde](
       storage: KeyValueStorage[Hash, Node],
       genesisKey: K,
       genesisValue: V
@@ -222,7 +222,7 @@ object SparseMerkleTrie {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
     val genesisNode = LeafNode(genesisPath, genesisData)
-    storage.put(genesisNode.hash, genesisNode)
+    storage.putUnsafe(genesisNode.hash, genesisNode)
     new InMemorySparseMerkleTrie(genesisNode.hash, storage, mutable.Map.empty)
   }
 

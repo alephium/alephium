@@ -116,10 +116,10 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
   trait TrieFixture extends StorageFixture {
     val db0  = newDB[Hash, SparseMerkleTrie.Node]
-    var trie = SparseMerkleTrie.build[Hash, Hash](db0, genesisKey, genesisValue)
+    var trie = SparseMerkleTrie.unsafe[Hash, Hash](db0, genesisKey, genesisValue)
 
     val db1       = newDB[Hash, SparseMerkleTrie.Node]
-    var inMemTrie = SparseMerkleTrie.inMemory[Hash, Hash](db1, genesisKey, genesisValue)
+    var inMemTrie = SparseMerkleTrie.inMemoryUnsafe[Hash, Hash](db1, genesisKey, genesisValue)
   }
 
   def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
@@ -250,7 +250,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
   it should "work for explicit examples" in new StorageFixture {
     val db    = newDB[Hash, SparseMerkleTrie.Node]
-    val trie0 = SparseMerkleTrie.build[Hash, Hash](db, genesisKey, genesisValue)
+    val trie0 = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
 
     val key0   = Hash.generate
     val key1   = Hash.generate
