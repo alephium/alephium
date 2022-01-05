@@ -475,7 +475,8 @@ object WalletAppSpec extends {
         val unsignedTx = transactionGen().sample.get.unsigned
         complete(
           ctx,
-          BuildSweepAddressTransactionsResult.from(unsignedTx)
+          BuildSweepAddressTransactionsResult
+            .from(unsignedTx, unsignedTx.fromGroup, unsignedTx.toGroup)
         )
       }
 

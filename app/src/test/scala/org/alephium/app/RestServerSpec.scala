@@ -301,7 +301,9 @@ abstract class RestServerSpec(
     ) check { response =>
       response.code is StatusCode.Ok
       response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
-        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None)
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None),
+        Address.asset(dummyKeyAddress).value.groupIndex,
+        Address.asset(dummyToAddress).value.groupIndex
       )
     }
     Post(
@@ -320,7 +322,9 @@ abstract class RestServerSpec(
           dummyTx,
           dummyToLockupScript,
           Some(TimeStamp.unsafe(1234))
-        )
+        ),
+        Address.asset(dummyKeyAddress).value.groupIndex,
+        Address.asset(dummyToAddress).value.groupIndex
       )
     }
 
