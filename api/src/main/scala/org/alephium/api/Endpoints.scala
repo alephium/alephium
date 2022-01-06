@@ -173,7 +173,7 @@ trait Endpoints
       .in("current-hashrate")
       .in(query[Option[TimeSpan]]("timespan"))
       .out(jsonBody[HashRateResponse])
-      .summary("Get average hashrate from `now - timespan(seconds)` to `now`")
+      .summary("Get average hashrate from `now - timespan(millis)` to `now`")
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get

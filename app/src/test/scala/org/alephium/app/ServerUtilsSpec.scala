@@ -249,22 +249,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check hashrate time interval" in new Fixture {
-    val serverUtils = new ServerUtils
-
-    val timestamp = TimeStamp.now()
-    serverUtils.checkHashRateTimeInterval(timestamp, timestamp) is Left(
-      ApiError.BadRequest("`fromTs` must be before `toTs`")
-    )
-    serverUtils.checkHashRateTimeInterval(timestamp + Duration.unsafe(1), timestamp) is Left(
-      ApiError.BadRequest("`fromTs` must be before `toTs`")
-    )
-    serverUtils.checkHashRateTimeInterval(timestamp, timestamp.plusMinutesUnsafe(61)) is Left(
-      ApiError.BadRequest("exceed maximal time interval(1 hour)")
-    )
-    serverUtils.checkHashRateTimeInterval(timestamp, timestamp.plusMinutesUnsafe(10)) isE ()
-  }
-
   it should "check sweep all tx status for inter group txs" in new FlowFixtureWithApi {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 

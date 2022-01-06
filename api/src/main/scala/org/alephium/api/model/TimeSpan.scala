@@ -16,4 +16,8 @@
 
 package org.alephium.api.model
 
-final case class TimeSpan(seconds: Int) extends AnyVal
+import org.alephium.util.Duration
+
+final case class TimeSpan(millis: Long) extends AnyVal {
+  def toDuration(): Duration = Duration.ofMillisUnsafe(millis)
+}

@@ -16,6 +16,19 @@
 
 package org.alephium.api.model
 
-import org.alephium.util.TimeStamp
+import sttp.model.StatusCode
 
-final case class TimeInterval(from: TimeStamp, to: TimeStamp)
+import org.alephium.api.ApiError
+import org.alephium.util.{Duration, TimeStamp}
+
+final case class TimeInterval(from: TimeStamp, to: TimeStamp) {
+  def validateTimeSpan(max: Duration): Either[ApiError[_ <: StatusCode], Unit] = {
+    if (durationUnsafe() > max) {
+      Left(ApiError.BadRequest(s"Time span cannot be greater than ${max}"))
+    } else {
+      Right(())
+    }
+  }
+
+  def durationUnsafe(): Duration = to.deltaUnsafe(from)
+}

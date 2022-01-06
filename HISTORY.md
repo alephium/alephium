@@ -16,8 +16,8 @@ No need to run `sweep` endpoints multiple times.
 * UTXO selection for smart contract transactions.
 * User-friendly `sweep-active-address` and `sweep-all-addresses` API endpoints.
 * Batch write for Merkle tree
-* `/infos/history-hashrate` endpoint used for get history hashrate
-* `/infos/current-hashrate` endpoint used for get current hashrate
+* `/infos/history-hashrate` endpoint for getting history hashrate
+* `/infos/current-hashrate` endpoint for getting current hashrate
 
 ### Improvements
 * Api key is optional if the api interface is `127.0.0.1`.

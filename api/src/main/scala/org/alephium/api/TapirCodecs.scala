@@ -73,7 +73,7 @@ trait TapirCodecs extends ApiModelCodec {
     fromJson[MinerAction]
 
   implicit val timespanTapirCodec: Codec[String, TimeSpan, TextPlain] =
-    Codec.int.validate(Validator.min(1)).map(TimeSpan.apply)(_.seconds)
+    Codec.long.validate(Validator.min(1)).map(TimeSpan.apply)(_.millis)
 
   implicit def groupIndexCodec(implicit
       groupConfig: GroupConfig

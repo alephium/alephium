@@ -3115,7 +3115,7 @@
         "tags": [
           "Infos"
         ],
-        "summary": "Get average hashrate from `now - timespan(seconds)` to `now`",
+        "summary": "Get average hashrate from `now - timespan(millis)` to `now`",
         "operationId": "getInfosCurrent-hashrate",
         "parameters": [
           {
@@ -3124,6 +3124,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "format": "int64",
               "minimum": "1"
             }
           }

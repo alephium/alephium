@@ -797,4 +797,13 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         """.stripMargin
     checkData(ContractStateResult(AVector(u256, i256, bool, byteVec, address1, address2)), jsonRaw)
   }
+
+  it should "validate the time span of TimeInterval" in {
+    val timestamp = TimeStamp.now()
+    val timespan  = Duration.ofHoursUnsafe(1)
+    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(61)).validateTimeSpan(timespan) is Left(
+      ApiError.BadRequest(s"Time span cannot be greater than ${timespan}")
+    )
+    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(10)).validateTimeSpan(timespan) isE ()
+  }
 }

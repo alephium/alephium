@@ -29,7 +29,7 @@ import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
-import org.alephium.io.IOError
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -52,47 +52,38 @@ class ServerUtils(implicit
 
   private val defaultUtxosLimit: Int = 5000
 
+  def getHeightedBlocks(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval
+  ): Try[AVector[AVector[(Block, Int)]]] = {
+    for {
+      _      <- timeInterval.validateTimeSpan(apiConfig.blockflowFetchMaxAge)
+      blocks <- wrapResult(blockFlow.getHeightedBlocks(timeInterval.from, timeInterval.to))
+    } yield blocks
+  }
+
   def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
-    val entriesEither = for {
-      blocks <- blockFlow.getHeightedBlocks(timeInterval.from, timeInterval.to)
-    } yield blocks.map(_.map { case (block, height) =>
-      BlockEntry.from(block, height)
-    })
-
-    entriesEither match {
-      case Right(entries) => Right(FetchResponse(entries))
-      case Left(error)    => failed[FetchResponse](error)
+    getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
+      FetchResponse(heightedBlocks.map(_.map { case (block, height) =>
+        BlockEntry.from(block, height)
+      }))
     }
   }
 
-  def checkHashRateTimeInterval(fromTs: TimeStamp, toTs: TimeStamp): Try[Unit] = {
-    if (fromTs >= toTs) {
-      Left(ApiError.BadRequest("`fromTs` must be before `toTs`"))
-    } else if (toTs.deltaUnsafe(fromTs) > Duration.ofHoursUnsafe(1)) {
-      Left(ApiError.BadRequest("exceed maximal time interval(1 hour)"))
-    } else {
-      Right(())
-    }
-  }
-
-  def averageHashRate(blockFlow: BlockFlow, fromTs: TimeStamp, toTs: TimeStamp)(implicit
+  def averageHashRate(blockFlow: BlockFlow, timeInterval: TimeInterval)(implicit
       groupConfig: GroupConfig
   ): Try[HashRateResponse] = {
-    checkHashRateTimeInterval(fromTs, toTs).flatMap { _ =>
-      blockFlow.getHeightedBlocks(fromTs, toTs) match {
-        case Right(blocks) =>
-          val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
-            entries.fold(acc) { case (hashCount, entry) =>
-              val target   = entry._1.target
-              val hashDone = Target.maxBigInt.divide(target.value)
-              hashCount + hashDone
-            }
-          }
-          val timeSpan = toTs.deltaUnsafe(fromTs)
-          val hashrate = (hashCount * 1000 * groupConfig.chainNum) / timeSpan.millis
-          Right(HashRateResponse(s"${hashrate / 1000000} MH/s"))
-        case Left(error) => failed(error)
+    getHeightedBlocks(blockFlow, timeInterval).map { blocks =>
+      val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
+        entries.fold(acc) { case (hashCount, entry) =>
+          val target   = entry._1.target
+          val hashDone = Target.maxBigInt.divide(target.value)
+          hashCount + hashDone
+        }
       }
+      val hashrate =
+        (hashCount * 1000 * groupConfig.chainNum) / timeInterval.durationUnsafe().millis
+      HashRateResponse(s"${hashrate / 1000000} MH/s")
     }
   }
 
@@ -750,6 +741,9 @@ class ServerUtils(implicit
     ApiError.InternalServerError(s"Failed in IO: $error")
   private def failed[T](error: IOError): Try[T] = Left(failedInIO(error))
 
+  def wrapResult[T](result: IOResult[T]): Try[T] = {
+    result.left.map(failedInIO)
+  }
 }
 
 object ServerUtils {
