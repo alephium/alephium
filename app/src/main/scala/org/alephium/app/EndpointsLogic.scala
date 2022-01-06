@@ -156,7 +156,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val getBlockflowLogic = serverLogic(getBlockflow) { timeInterval =>
     Future.successful(
-      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
+      serverUtils.getBlockflow(blockFlow, timeInterval)
     )
   }
 

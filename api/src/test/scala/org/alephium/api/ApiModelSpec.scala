@@ -127,23 +127,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     parseFail[Amount.Hint](""""1 alph"""")
   }
 
-  it should "encode/decode FetchRequest" in {
-    val request =
-      FetchRequest(TimeStamp.unsafe(1L), TimeStamp.unsafe(42L))
-    val jsonRaw = """{"fromTs":1,"toTs":42}"""
-    checkData(request, jsonRaw)
-  }
-
-  it should "validate FetchRequest" in {
-    parseFail[FetchRequest](
-      """{"fromTs":42,"toTs":1}"""
-    ) is "`toTs` cannot be before `fromTs` at index 21"
-    parseFail[FetchRequest](
-      """{"fromTs":1,"toTs":100000}"""
-    ) is s"interval cannot be greater than $blockflowFetchMaxAge at index 25"
-    parseFail[FetchRequest]("""{}""") is s"missing keys in dictionary: fromTs, toTs at index 1"
-  }
-
   it should "encode/decode empty FetchResponse" in {
     val response = FetchResponse(AVector.empty)
     val jsonRaw =

@@ -52,9 +52,9 @@ class ServerUtils(implicit
 
   private val defaultUtxosLimit: Int = 5000
 
-  def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
+  def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
     val entriesEither = for {
-      blocks <- blockFlow.getHeightedBlocks(fetchRequest.fromTs, fetchRequest.toTs)
+      blocks <- blockFlow.getHeightedBlocks(timeInterval.from, timeInterval.to)
     } yield blocks.map(_.map { case (block, height) =>
       BlockEntry.from(block, height)
     })
