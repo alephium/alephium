@@ -96,8 +96,11 @@ trait ServerFixture
     dummyTx.toGroup.value
   )
   def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult.from(tx.unsigned)
-  def dummySweepAddressBuildTransactionsResult(tx: Transaction) =
-    BuildSweepAddressTransactionsResult.from(tx.unsigned)
+  def dummySweepAddressBuildTransactionsResult(
+      tx: Transaction,
+      fromGroup: GroupIndex,
+      toGroup: GroupIndex
+  )                                = BuildSweepAddressTransactionsResult.from(tx.unsigned, fromGroup, toGroup)
   lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 

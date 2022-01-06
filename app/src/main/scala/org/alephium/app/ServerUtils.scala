@@ -251,8 +251,9 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildSweepAddressTransactions
   ): Try[BuildSweepAddressTransactionsResult] = {
+    val lockupScript = LockupScript.p2pkh(query.fromPublicKey)
     for {
-      _ <- checkGroup(query.fromPublicKey)
+      _ <- checkGroup(lockupScript)
       unsignedTxs <- prepareSweepAddressTransaction(
         blockFlow,
         query.fromPublicKey,
@@ -263,7 +264,11 @@ class ServerUtils(implicit
         query.utxosLimit.getOrElse(Int.MaxValue)
       )
     } yield {
-      BuildSweepAddressTransactionsResult.from(unsignedTxs)
+      BuildSweepAddressTransactionsResult.from(
+        unsignedTxs,
+        lockupScript.groupIndex,
+        query.toAddress.groupIndex
+      )
     }
   }
 

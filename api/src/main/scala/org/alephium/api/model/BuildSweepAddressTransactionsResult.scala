@@ -16,8 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.UnsignedTransaction
+import org.alephium.protocol.model.{GroupIndex, UnsignedTransaction}
 import org.alephium.util.AVector
 
 final case class BuildSweepAddressTransactionsResult(
@@ -29,19 +28,22 @@ final case class BuildSweepAddressTransactionsResult(
 object BuildSweepAddressTransactionsResult {
 
   def from(
-      unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildSweepAddressTransactionsResult = {
-    from(AVector(unsignedTx))
+      unsignedTx: UnsignedTransaction,
+      fromGroup: GroupIndex,
+      toGroup: GroupIndex
+  ): BuildSweepAddressTransactionsResult = {
+    from(AVector(unsignedTx), fromGroup, toGroup)
   }
 
   def from(
-      unsignedTxs: AVector[UnsignedTransaction]
-  )(implicit groupConfig: GroupConfig): BuildSweepAddressTransactionsResult = {
-    assume(unsignedTxs.length > 0)
+      unsignedTxs: AVector[UnsignedTransaction],
+      fromGroup: GroupIndex,
+      toGroup: GroupIndex
+  ): BuildSweepAddressTransactionsResult = {
     BuildSweepAddressTransactionsResult(
       unsignedTxs.map(SweepAddressTransaction.from),
-      unsignedTxs.head.fromGroup.value,
-      unsignedTxs.head.toGroup.value
+      fromGroup.value,
+      toGroup.value
     )
   }
 }

@@ -42,6 +42,10 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
         balances.balances.find(_.address.equals(addr)).value.balance.value is ALPH.alph(1)
       }
     }
+
+    val transfer1 =
+      request[Transfer.Results](sweepActiveAddress(walletName, transferAddress), restPort)
+    transfer1.results.length is 0
   }
 
   it should "sweep amounts from all addresses" in new SweepFixture {
@@ -58,6 +62,10 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
         balances.balances.find(_.address.equals(addr)).value.balance.value is ALPH.alph(0)
       }
     }
+
+    val transfer1 =
+      request[Transfer.Results](sweepAllAddresses(walletName, transferAddress), restPort)
+    transfer1.results.length is 0
   }
 
   trait SweepFixture extends CliqueFixture {
