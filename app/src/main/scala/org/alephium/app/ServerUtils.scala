@@ -65,22 +65,34 @@ class ServerUtils(implicit
     }
   }
 
+  def checkHashRateTimeInterval(fromTs: TimeStamp, toTs: TimeStamp): Try[Unit] = {
+    if (fromTs >= toTs) {
+      Left(ApiError.BadRequest("`fromTs` must be before `toTs`"))
+    } else if (toTs.deltaUnsafe(fromTs) > Duration.ofHoursUnsafe(1)) {
+      Left(ApiError.BadRequest("exceed maximal time interval(1 hour)"))
+    } else {
+      Right(())
+    }
+  }
+
   def averageHashRate(blockFlow: BlockFlow, fromTs: TimeStamp, toTs: TimeStamp)(implicit
       groupConfig: GroupConfig
   ): Try[HashRateResponse] = {
-    blockFlow.getHeightedBlocks(fromTs, toTs) match {
-      case Right(blocks) =>
-        val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
-          entries.fold(acc) { case (hashCount, entry) =>
-            val target   = entry._1.target
-            val hashDone = Target.maxBigInt.divide(target.value)
-            hashCount + hashDone
+    checkHashRateTimeInterval(fromTs, toTs).flatMap { _ =>
+      blockFlow.getHeightedBlocks(fromTs, toTs) match {
+        case Right(blocks) =>
+          val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
+            entries.fold(acc) { case (hashCount, entry) =>
+              val target   = entry._1.target
+              val hashDone = Target.maxBigInt.divide(target.value)
+              hashCount + hashDone
+            }
           }
-        }
-        val timeSpan = toTs.deltaUnsafe(fromTs)
-        val hashrate = (hashCount * 1000 * groupConfig.chainNum) / timeSpan.millis
-        Right(HashRateResponse(s"${hashrate / 1000000} MH/s"))
-      case Left(error) => failed(error)
+          val timeSpan = toTs.deltaUnsafe(fromTs)
+          val hashrate = (hashCount * 1000 * groupConfig.chainNum) / timeSpan.millis
+          Right(HashRateResponse(s"${hashrate / 1000000} MH/s"))
+        case Left(error) => failed(error)
+      }
     }
   }
 

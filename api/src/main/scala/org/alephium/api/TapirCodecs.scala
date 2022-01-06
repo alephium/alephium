@@ -72,6 +72,9 @@ trait TapirCodecs extends ApiModelCodec {
   implicit val minerActionTapirCodec: Codec[String, MinerAction, TextPlain] =
     fromJson[MinerAction]
 
+  implicit val timespanTapirCodec: Codec[String, TimeSpan, TextPlain] =
+    Codec.int.validate(Validator.min(1)).map(TimeSpan.apply)(_.seconds)
+
   implicit def groupIndexCodec(implicit
       groupConfig: GroupConfig
   ): Codec[String, GroupIndex, TextPlain] =

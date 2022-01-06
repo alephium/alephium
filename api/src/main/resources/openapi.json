@@ -2999,18 +2999,18 @@
         }
       }
     },
-    "/infos/hashrate": {
+    "/infos/history-hashrate": {
       "get": {
         "tags": [
           "Infos"
         ],
-        "summary": "Get average hashrate on the given time interval(10m by default)",
-        "operationId": "getInfosHashrate",
+        "summary": "Get history average hashrate on the given time interval",
+        "operationId": "getInfosHistory-hashrate",
         "parameters": [
           {
             "name": "fromTs",
             "in": "query",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "integer",
               "format": "int64",
@@ -3020,11 +3020,111 @@
           {
             "name": "toTs",
             "in": "query",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "integer",
               "format": "int64",
               "minimum": "0"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": {
+                  "hashrate": "100 MH/s"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/infos/current-hashrate": {
+      "get": {
+        "tags": [
+          "Infos"
+        ],
+        "summary": "Get average hashrate from `now - timespan(seconds)` to `now`",
+        "operationId": "getInfosCurrent-hashrate",
+        "parameters": [
+          {
+            "name": "timespan",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": "1"
             }
           }
         ],

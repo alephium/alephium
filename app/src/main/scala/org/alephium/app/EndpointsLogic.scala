@@ -129,28 +129,20 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       .map(response => Right(response.peers))
   }
 
-  val getHashRateLogic = serverLogic(getHashRate) { case (fromTsOpt, toTsOpt) =>
-    val defaultTimeSpan = Duration.ofMinutesUnsafe(10)
-    val maxTimeSpan     = Duration.ofHoursUnsafe(1)
-    val result = (fromTsOpt, toTsOpt) match {
-      case (None, None) =>
-        val now = TimeStamp.now()
-        serverUtils.averageHashRate(blockFlow, now.minusUnsafe(defaultTimeSpan), now)
-      case (Some(fromTs), None) =>
-        serverUtils.averageHashRate(blockFlow, fromTs, fromTs.plusUnsafe(defaultTimeSpan))
-      case (None, Some(toTs)) =>
-        (toTs - defaultTimeSpan)
-          .toRight(ApiError.BadRequest("invalid `toTs`"))
-          .flatMap(fromTs => serverUtils.averageHashRate(blockFlow, fromTs, toTs))
-      case (Some(fromTs), Some(toTs)) =>
-        if (toTs <= fromTs) {
-          Left(ApiError.BadRequest("`fromTs` must be before `toTs`"))
-        } else if (toTs.deltaUnsafe(fromTs) > maxTimeSpan) {
-          Left(ApiError.BadRequest("exceed maximal timespan(1 hour)"))
-        } else {
-          serverUtils.averageHashRate(blockFlow, fromTs, toTs)
-        }
-    }
+  val getHistoryHashRateLogic = serverLogic(getHistoryHashRate) { timeInterval =>
+    Future.successful(serverUtils.averageHashRate(blockFlow, timeInterval.from, timeInterval.to))
+  }
+
+  val getCurrentHashRateLogic = serverLogic(getCurrentHashRate) { timeSpanOpt =>
+    val timeSpan = timeSpanOpt
+      .map(ts => Duration.ofSecondsUnsafe(ts.seconds.toLong))
+      .getOrElse(Duration.ofMinutesUnsafe(10))
+    val toTs = TimeStamp.now()
+    val result = (toTs - timeSpan)
+      .toRight(ApiError.BadRequest("timespan too large"))
+      .flatMap { fromTs =>
+        serverUtils.averageHashRate(blockFlow, fromTs, toTs)
+      }
     Future.successful(result)
   }
 
