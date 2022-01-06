@@ -228,6 +228,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
 
+  implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
+    simpleExample(HashRateResponse("100 MH/s"))
+
   implicit val fetchResponseExamples: List[Example[FetchResponse]] =
     simpleExample(FetchResponse(AVector(AVector(blockEntry))))
 

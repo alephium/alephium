@@ -129,6 +129,31 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       .map(response => Right(response.peers))
   }
 
+  val getHashRateLogic = serverLogic(getHashRate) { case (fromTsOpt, toTsOpt) =>
+    val defaultTimeSpan = Duration.ofMinutesUnsafe(10)
+    val maxTimeSpan     = Duration.ofHoursUnsafe(1)
+    val result = (fromTsOpt, toTsOpt) match {
+      case (None, None) =>
+        val now = TimeStamp.now()
+        serverUtils.averageHashRate(blockFlow, now.minusUnsafe(defaultTimeSpan), now)
+      case (Some(fromTs), None) =>
+        serverUtils.averageHashRate(blockFlow, fromTs, fromTs.plusUnsafe(defaultTimeSpan))
+      case (None, Some(toTs)) =>
+        (toTs - defaultTimeSpan)
+          .toRight(ApiError.BadRequest("invalid `toTs`"))
+          .flatMap(fromTs => serverUtils.averageHashRate(blockFlow, fromTs, toTs))
+      case (Some(fromTs), Some(toTs)) =>
+        if (toTs <= fromTs) {
+          Left(ApiError.BadRequest("`fromTs` must be before `toTs`"))
+        } else if (toTs.deltaUnsafe(fromTs) > maxTimeSpan) {
+          Left(ApiError.BadRequest("exceed maximal timespan(1 hour)"))
+        } else {
+          serverUtils.averageHashRate(blockFlow, fromTs, toTs)
+        }
+    }
+    Future.successful(result)
+  }
+
   val getBlockflowLogic = serverLogic(getBlockflow) { timeInterval =>
     Future.successful(
       serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))

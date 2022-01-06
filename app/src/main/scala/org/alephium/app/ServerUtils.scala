@@ -31,7 +31,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
@@ -41,6 +41,7 @@ import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
+// scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
     networkConfig: NetworkConfig,
@@ -61,6 +62,25 @@ class ServerUtils(implicit
     entriesEither match {
       case Right(entries) => Right(FetchResponse(entries))
       case Left(error)    => failed[FetchResponse](error)
+    }
+  }
+
+  def averageHashRate(blockFlow: BlockFlow, fromTs: TimeStamp, toTs: TimeStamp)(implicit
+      groupConfig: GroupConfig
+  ): Try[HashRateResponse] = {
+    blockFlow.getHeightedBlocks(fromTs, toTs) match {
+      case Right(blocks) =>
+        val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
+          entries.fold(acc) { case (hashCount, entry) =>
+            val target   = entry._1.target
+            val hashDone = Target.maxBigInt.divide(target.value)
+            hashCount + hashDone
+          }
+        }
+        val timeSpan = toTs.deltaUnsafe(fromTs)
+        val hashrate = (hashCount * 1000 * groupConfig.chainNum) / timeSpan.millis
+        Right(HashRateResponse(s"${hashrate / 1000000} MH/s"))
+      case Left(error) => failed(error)
     }
   }
 

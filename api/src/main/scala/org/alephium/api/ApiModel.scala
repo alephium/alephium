@@ -160,6 +160,8 @@ trait ApiModelCodec {
   implicit val networkIdWriter: Writer[NetworkId] = ByteWriter.comap[NetworkId](_.id)
   implicit val networkIdReader: Reader[NetworkId] = ByteReader.map(NetworkId(_))
 
+  implicit val hashrateResponseRW: RW[HashRateResponse] = macroRW
+
   implicit val fetchResponseRW: RW[FetchResponse] = macroRW
 
   implicit val unconfirmedTransactionsRW: RW[UnconfirmedTransactions] = macroRW

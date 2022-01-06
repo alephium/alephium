@@ -161,6 +161,14 @@ trait Endpoints
       .in(jsonBody[DiscoveryAction])
       .summary("Set brokers to be unreachable/reachable")
 
+  val getHashRate: BaseEndpoint[(Option[TimeStamp], Option[TimeStamp]), HashRateResponse] =
+    infosEndpoint.get
+      .in("hashrate")
+      .in(query[Option[TimeStamp]]("fromTs"))
+      .in(query[Option[TimeStamp]]("toTs"))
+      .out(jsonBody[HashRateResponse])
+      .summary("Get average hashrate on the given time interval(10m by default)")
+
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get
       .in(timeIntervalQuery)

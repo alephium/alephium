@@ -72,6 +72,7 @@ class RestServer(
       misbehaviorActionLogic,
       getUnreachableBrokersLogic,
       discoveryActionLogic,
+      getHashRateLogic,
       getBlockflowLogic,
       getBlockLogic,
       isBlockInMainChainLogic,

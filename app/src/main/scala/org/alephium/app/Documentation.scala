@@ -36,6 +36,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     misbehaviorAction,
     getUnreachableBrokers,
     discoveryAction,
+    getHashRate,
     getBlockflow,
     getBlock,
     isBlockInMainChain,
