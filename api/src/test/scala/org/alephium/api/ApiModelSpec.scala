@@ -127,23 +127,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     parseFail[Amount.Hint](""""1 alph"""")
   }
 
-  it should "encode/decode FetchRequest" in {
-    val request =
-      FetchRequest(TimeStamp.unsafe(1L), TimeStamp.unsafe(42L))
-    val jsonRaw = """{"fromTs":1,"toTs":42}"""
-    checkData(request, jsonRaw)
-  }
-
-  it should "validate FetchRequest" in {
-    parseFail[FetchRequest](
-      """{"fromTs":42,"toTs":1}"""
-    ) is "`toTs` cannot be before `fromTs` at index 21"
-    parseFail[FetchRequest](
-      """{"fromTs":1,"toTs":100000}"""
-    ) is s"interval cannot be greater than $blockflowFetchMaxAge at index 25"
-    parseFail[FetchRequest]("""{}""") is s"missing keys in dictionary: fromTs, toTs at index 1"
-  }
-
   it should "encode/decode empty FetchResponse" in {
     val response = FetchResponse(AVector.empty)
     val jsonRaw =
@@ -813,5 +796,25 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |}
         """.stripMargin
     checkData(ContractStateResult(AVector(u256, i256, bool, byteVec, address1, address2)), jsonRaw)
+  }
+
+  behavior of "TimeInterval"
+
+  it should "validate fromTs and toTs" in {
+    val ts0 = TimeStamp.unsafe(0)
+    val ts1 = TimeStamp.unsafe(1)
+    TimeInterval.validator(TimeInterval(ts0, ts0)).isEmpty is false
+    TimeInterval.validator(TimeInterval(ts0, ts1)).isEmpty is true
+    TimeInterval.validator(TimeInterval(ts1, ts0)).isEmpty is false
+    TimeInterval.validator(TimeInterval(ts1, ts1)).isEmpty is false
+  }
+
+  it should "validate the time span" in {
+    val timestamp = TimeStamp.now()
+    val timespan  = Duration.ofHoursUnsafe(1)
+    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(61)).validateTimeSpan(timespan) is Left(
+      ApiError.BadRequest(s"Time span cannot be greater than ${timespan}")
+    )
+    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
   }
 }

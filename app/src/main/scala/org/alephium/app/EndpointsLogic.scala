@@ -129,10 +129,21 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       .map(response => Right(response.peers))
   }
 
+  val getHistoryHashRateLogic = serverLogic(getHistoryHashRate) { timeInterval =>
+    Future.successful(serverUtils.averageHashRate(blockFlow, timeInterval))
+  }
+
+  private val defaultHashRateDuration: Duration = Duration.ofMinutesUnsafe(10)
+  val getCurrentHashRateLogic = serverLogic(getCurrentHashRate) { timeSpanOpt =>
+    val timeSpan = timeSpanOpt.map(_.toDuration()).getOrElse(defaultHashRateDuration)
+    val toTs     = TimeStamp.now()
+    val fromTs   = toTs.minusUnsafe(timeSpan)
+    val result   = serverUtils.averageHashRate(blockFlow, TimeInterval(fromTs, toTs))
+    Future.successful(result)
+  }
+
   val getBlockflowLogic = serverLogic(getBlockflow) { timeInterval =>
-    Future.successful(
-      serverUtils.getBlockflow(blockFlow, FetchRequest(timeInterval.from, timeInterval.to))
-    )
+    Future.successful(serverUtils.getBlockflow(blockFlow, timeInterval))
   }
 
   val getBlockLogic = serverLogic(getBlock) { hash =>

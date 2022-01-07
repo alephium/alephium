@@ -160,6 +160,8 @@ trait ApiModelCodec {
   implicit val networkIdWriter: Writer[NetworkId] = ByteWriter.comap[NetworkId](_.id)
   implicit val networkIdReader: Reader[NetworkId] = ByteReader.map(NetworkId(_))
 
+  implicit val hashrateResponseRW: RW[HashRateResponse] = macroRW
+
   implicit val fetchResponseRW: RW[FetchResponse] = macroRW
 
   implicit val unconfirmedTransactionsRW: RW[UnconfirmedTransactions] = macroRW
@@ -306,19 +308,6 @@ trait ApiModelCodec {
   }
 
   implicit val interCliqueSyncedStatusRW: RW[InterCliquePeerInfo] = macroRW
-
-  implicit val fetchRequestRW: RW[FetchRequest] = macroRW[FetchRequest].bimap[FetchRequest](
-    identity,
-    { fetchRequest =>
-      if (fetchRequest.toTs < fetchRequest.fromTs) {
-        throw Abort("`toTs` cannot be before `fromTs`")
-      } else if ((fetchRequest.toTs -- fetchRequest.fromTs).exists(_ > blockflowFetchMaxAge)) {
-        throw Abort(s"interval cannot be greater than ${blockflowFetchMaxAge}")
-      } else {
-        fetchRequest
-      }
-    }
-  )
 
   implicit val mnemonicSizeRW: RW[Mnemonic.Size] = readwriter[Int].bimap(
     _.value,

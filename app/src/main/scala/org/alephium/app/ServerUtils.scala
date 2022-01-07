@@ -29,9 +29,9 @@ import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
-import org.alephium.io.IOError
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
@@ -41,6 +41,7 @@ import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
+// scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
     networkConfig: NetworkConfig,
@@ -51,16 +52,38 @@ class ServerUtils(implicit
 
   private val defaultUtxosLimit: Int = 5000
 
-  def getBlockflow(blockFlow: BlockFlow, fetchRequest: FetchRequest): Try[FetchResponse] = {
-    val entriesEither = for {
-      blocks <- blockFlow.getHeightedBlocks(fetchRequest.fromTs, fetchRequest.toTs)
-    } yield blocks.map(_.map { case (block, height) =>
-      BlockEntry.from(block, height)
-    })
+  def getHeightedBlocks(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval
+  ): Try[AVector[AVector[(Block, Int)]]] = {
+    for {
+      _      <- timeInterval.validateTimeSpan(apiConfig.blockflowFetchMaxAge)
+      blocks <- wrapResult(blockFlow.getHeightedBlocks(timeInterval.from, timeInterval.to))
+    } yield blocks
+  }
 
-    entriesEither match {
-      case Right(entries) => Right(FetchResponse(entries))
-      case Left(error)    => failed[FetchResponse](error)
+  def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
+    getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
+      FetchResponse(heightedBlocks.map(_.map { case (block, height) =>
+        BlockEntry.from(block, height)
+      }))
+    }
+  }
+
+  def averageHashRate(blockFlow: BlockFlow, timeInterval: TimeInterval)(implicit
+      groupConfig: GroupConfig
+  ): Try[HashRateResponse] = {
+    getHeightedBlocks(blockFlow, timeInterval).map { blocks =>
+      val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
+        entries.fold(acc) { case (hashCount, entry) =>
+          val target   = entry._1.target
+          val hashDone = Target.maxBigInt.divide(target.value)
+          hashCount + hashDone
+        }
+      }
+      val hashrate =
+        (hashCount * 1000 * groupConfig.chainNum) / timeInterval.durationUnsafe().millis
+      HashRateResponse(s"${hashrate / 1000000} MH/s")
     }
   }
 
@@ -718,6 +741,9 @@ class ServerUtils(implicit
     ApiError.InternalServerError(s"Failed in IO: $error")
   private def failed[T](error: IOError): Try[T] = Left(failedInIO(error))
 
+  def wrapResult[T](result: IOResult[T]): Try[T] = {
+    result.left.map(failedInIO)
+  }
 }
 
 object ServerUtils {

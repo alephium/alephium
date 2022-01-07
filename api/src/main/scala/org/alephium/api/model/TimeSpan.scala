@@ -16,6 +16,8 @@
 
 package org.alephium.api.model
 
-import org.alephium.util.TimeStamp
+import org.alephium.util.Duration
 
-final case class FetchRequest(fromTs: TimeStamp, toTs: TimeStamp)
+final case class TimeSpan(millis: Long) extends AnyVal {
+  def toDuration(): Duration = Duration.ofMillisUnsafe(millis)
+}

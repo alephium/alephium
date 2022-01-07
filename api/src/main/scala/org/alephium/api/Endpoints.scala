@@ -52,13 +52,7 @@ trait Endpoints
       .map { case (from, to) => TimeInterval(from, to) }(timeInterval =>
         (timeInterval.from, timeInterval.to)
       )
-      .validate(Validator.custom { timeInterval =>
-        if (timeInterval.from > timeInterval.to) {
-          List(ValidationError.Custom(timeInterval, s"`fromTs` must be before `toTs`"))
-        } else {
-          List.empty
-        }
-      })
+      .validate(TimeInterval.validator)
 
   private lazy val chainIndexQuery: EndpointInput[ChainIndex] =
     query[GroupIndex]("fromGroup")
@@ -160,6 +154,20 @@ trait Endpoints
       .in("discovery")
       .in(jsonBody[DiscoveryAction])
       .summary("Set brokers to be unreachable/reachable")
+
+  val getHistoryHashRate: BaseEndpoint[TimeInterval, HashRateResponse] =
+    infosEndpoint.get
+      .in("history-hashrate")
+      .in(timeIntervalQuery)
+      .out(jsonBody[HashRateResponse])
+      .summary("Get history average hashrate on the given time interval")
+
+  val getCurrentHashRate: BaseEndpoint[Option[TimeSpan], HashRateResponse] =
+    infosEndpoint.get
+      .in("current-hashrate")
+      .in(query[Option[TimeSpan]]("timespan"))
+      .out(jsonBody[HashRateResponse])
+      .summary("Get average hashrate from `now - timespan(millis)` to `now`")
 
   val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
     blockflowEndpoint.get
