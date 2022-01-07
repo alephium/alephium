@@ -746,7 +746,7 @@ abstract class RestServerApiKeyDisableSpec(
 ) extends RestServerFixture {
 
   it should "not require api key if disabled" in {
-    Get(blockflowFromTo(0, 0), apiKey = None) check { response =>
+    Get(blockflowFromTo(0, 1), apiKey = None) check { response =>
       response.code is StatusCode.Ok
     }
   }
