@@ -1,6 +1,6 @@
 # Alephium Change Log
 
-## Unreleased
+## 1.2.0
 
 ### Database change
 * Upgrade rocksdb from `5.18.4` to `6.27.3`. Rocksdb will not be able to fallback to version 5 after this.
