@@ -55,7 +55,7 @@ abstract class RestServerSpec(
     val apiKeyEnabled: Boolean = false
 ) extends RestServerFixture {
   it should "call GET /blockflow" in {
-    Get(blockflowFromTo(0, 0)) check { response =>
+    Get(blockflowFromTo(0, 1)) check { response =>
       response.code is StatusCode.Ok
       response.as[FetchResponse] is dummyFetchResponse
     }
@@ -713,7 +713,7 @@ abstract class RestServerSpec(
       case None    => Some(Hash.random.toHexString)
     }
 
-    Get(blockflowFromTo(0, 0), apiKey = newApiKey) check { response =>
+    Get(blockflowFromTo(0, 1), apiKey = newApiKey) check { response =>
       response.code is StatusCode.Unauthorized
       if (newApiKey.isDefined) {
         response.as[ApiError.Unauthorized] is ApiError.Unauthorized(
@@ -728,7 +728,7 @@ abstract class RestServerSpec(
   it should "validate the api-key" in {
     val newApiKey = apiKey.map(_ => Hash.random.toHexString)
 
-    Get(blockflowFromTo(0, 0), apiKey = newApiKey) check { response =>
+    Get(blockflowFromTo(0, 1), apiKey = newApiKey) check { response =>
       if (apiKey.isDefined) {
         response.code is StatusCode.Unauthorized
         response.as[ApiError.Unauthorized] is ApiError.Unauthorized("Wrong api key")
@@ -848,7 +848,7 @@ trait RestServerFixture
 
   lazy val walletApp = new WalletApp(walletConfig)
 
-  implicit lazy val blockflowFetchMaxAge = Duration.zero
+  implicit lazy val blockflowFetchMaxAge = Duration.ofHoursUnsafe(1)
 
   private def buildPeer(id: Int): (PeerInfo, ApiConfig) = {
     val peerPort = generatePort()
