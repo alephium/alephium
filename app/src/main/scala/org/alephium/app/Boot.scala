@@ -107,7 +107,11 @@ class BootUp extends StrictLogging {
   def logConfig(): Unit = {
     val renderOptions =
       ConfigRenderOptions.defaults().setOriginComments(false).setComments(true).setJson(false)
-    logger.debug(typesafeConfig.root().render(renderOptions))
+    val alephiumConf = typesafeConfig.withOnlyPath("alephium").withoutPath("alephium.genesis")
+    val akkaConf     = typesafeConfig.withOnlyPath("akka")
+    logger.debug(
+      alephiumConf.withFallback(akkaConf).root().render(renderOptions)
+    )
 
     val digests = config.genesisBlocks.map(showBlocks).mkString("-")
     logger.info(s"Genesis digests: $digests")
