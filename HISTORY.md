@@ -1,5 +1,9 @@
 # Alephium Change Log
 
+## Unreleased
+
+* Check estimated gas for `/transactions/build` endpoint.
+
 ## 1.2.0
 
 ### Database change
