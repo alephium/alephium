@@ -105,3 +105,13 @@ or run the following docker command:
 ```shell
 docker run --network="docker_default" --gpus all --privileged --name gpu-miner -d alephium/gpu-miner:latest alephium
 ```
+
+## Block Explorer (Optional)
+
+To start the block explorer docker containers, run the following `docker-compose` command (requires version [v1.28.0+](https://docs.docker.com/compose/gpu-support/#enabling-gpu-access-to-service-containers))
+
+```shell
+docker-compose -f docker-compose.yml -f docker-compose.explorer.yml up -d
+```
+
+Block Explorer should be available at `localhost:3001`.

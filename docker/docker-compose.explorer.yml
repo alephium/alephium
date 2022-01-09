@@ -1,0 +1,36 @@
+version: "3.3"
+
+volumes:
+  postgres-data: {}
+
+services:
+  postgres:
+    image: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=explorer
+    restart: unless-stopped
+
+  explorer-backend:
+    image: alephium/explorer-backend:1.2.0
+    ports:
+      - 9090:9090
+    environment:
+      - DB_HOST=postgres
+      - BLOCKFLOW_HOST=alephium
+      - EXPLORER_HOST=0.0.0.0
+    depends_on:
+      - postgres
+      - alephium
+    restart: unless-stopped
+
+  explorer:
+    image: alephium/explorer:latest
+    ports:
+      - 3001:3000
+    depends_on:
+      - explorer-backend
+    restart: unless-stopped
