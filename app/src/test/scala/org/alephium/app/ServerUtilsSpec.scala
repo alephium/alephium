@@ -576,7 +576,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         defaultUtxosLimit
       )
       .leftValue
-      .detail is "Gas GasBox(100) too small, minimal GasBox(20000)"
+      .detail is "Provided gas GasBox(100) too small, minimal GasBox(20000)"
 
     info("Gas amount too large")
     serverUtils
@@ -590,7 +590,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         defaultUtxosLimit
       )
       .leftValue
-      .detail is "Gas GasBox(625001) too large, maximal GasBox(625000)"
+      .detail is "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
   }
 
   it should "not create transaction with invalid gas price" in new MultipleUtxos {

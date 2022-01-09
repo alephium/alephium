@@ -143,7 +143,7 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
-      _               <- checkGas(gasOpt, gasPrice)
+      _               <- checkProvidedGas(gasOpt, gasPrice)
       totalAlphAmount <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
@@ -166,9 +166,11 @@ trait TxUtils { Self: FlowUtils =>
                 TxScriptGasEstimator.NotImplemented
               )
           }
-          .map {
-            _.flatMap { selected =>
-              UnsignedTransaction
+          .map { utxoSelectionResult =>
+            for {
+              selected <- utxoSelectionResult
+              _        <- checkEstimatedGasAmount(selected.gas)
+              unsignedTx <- UnsignedTransaction
                 .build(
                   fromLockupScript,
                   fromUnlockScript,
@@ -177,7 +179,7 @@ trait TxUtils { Self: FlowUtils =>
                   selected.gas,
                   gasPrice
                 )
-            }
+            } yield unsignedTx
           }
 
       case Left(e) =>
@@ -204,7 +206,7 @@ trait TxUtils { Self: FlowUtils =>
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
-        _ <- checkGas(gasOpt, gasPrice)
+        _ <- checkProvidedGas(gasOpt, gasPrice)
         _ <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
         _ <- UnsignedTransaction.calculateTotalAmountPerToken(
           outputInfos.flatMap(_.tokens)
@@ -220,12 +222,15 @@ trait TxUtils { Self: FlowUtils =>
               for {
                 gas <- gasOpt match {
                   case None =>
-                    GasEstimation.estimateWithInputScript(
-                      fromUnlockScript,
-                      utxoRefs.length,
-                      outputScripts.length,
-                      AssetScriptGasEstimator.NotImplemented // Not P2SH
-                    )
+                    for {
+                      estimatedGas <- GasEstimation.estimateWithInputScript(
+                        fromUnlockScript,
+                        utxoRefs.length,
+                        outputScripts.length,
+                        AssetScriptGasEstimator.NotImplemented // Not P2SH
+                      )
+                      _ <- checkEstimatedGasAmount(estimatedGas)
+                    } yield estimatedGas
                   case Some(gas) =>
                     Right(gas)
                 }
@@ -252,7 +257,7 @@ trait TxUtils { Self: FlowUtils =>
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
-    val checkResult = checkGas(gasOpt, gasPrice)
+    val checkResult = checkProvidedGas(gasOpt, gasPrice)
 
     checkResult match {
       case Right(()) =>
@@ -386,24 +391,35 @@ trait TxUtils { Self: FlowUtils =>
     } yield failedTxs
   }
 
-  private def checkGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {
+  private def checkProvidedGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {
     for {
-      _ <- checkGasAmount(gasOpt)
+      _ <- checkProvidedGasAmount(gasOpt)
       _ <- checkGasPrice(gasPrice)
     } yield ()
   }
 
-  private def checkGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
+  private def checkProvidedGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
     gasOpt match {
       case None => Right(())
       case Some(gas) =>
         if (gas < minimalGas) {
-          Left(s"Gas $gas too small, minimal $minimalGas")
+          Left(s"Provided gas $gas too small, minimal $minimalGas")
         } else if (gas > maximalGasPerTx) {
-          Left(s"Gas $gas too large, maximal $maximalGasPerTx")
+          Left(s"Provided gas $gas too large, maximal $maximalGasPerTx")
         } else {
           Right(())
         }
+    }
+  }
+
+  private def checkEstimatedGasAmount(gas: GasBox): Either[String, Unit] = {
+    if (gas > maximalGasPerTx) {
+      Left(
+        s"Estimated gas $gas too large, maximal $maximalGasPerTx. " ++
+          "Consider consolidating UTXOs using the sweep endpoints"
+      )
+    } else {
+      Right(())
     }
   }
 

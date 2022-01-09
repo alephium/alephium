@@ -142,6 +142,7 @@ lazy val app = mainProject("app")
       case other => (assemblyMergeStrategy in assembly).value(other)
     },
     libraryDependencies ++= Seq(
+      janino,
       vertx,
       `tapir-core`,
       `tapir-vertx`,

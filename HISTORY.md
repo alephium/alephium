@@ -1,5 +1,12 @@
 # Alephium Change Log
 
+## Unreleased
+
+## 1.2.1
+
+* Check estimated gas for `/transactions/build` endpoint.
+* Make debug logging disabled by default
+
 ## 1.2.0
 
 ### Database change
