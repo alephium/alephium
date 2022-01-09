@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.1
+
 * Check estimated gas for `/transactions/build` endpoint.
 * Make debug logging disabled by default
 
