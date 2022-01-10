@@ -243,14 +243,18 @@ class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues w
     val tokenId2  = Hash.hash("token2")
     val tokens =
       AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
+    val hint = 1234
+    val key  = hashGen.sample.get
 
     {
       val address         = generateContractAddress()
       val addressStr      = address.toBase58
-      val request: Output = Output.Contract(amount, address, tokens)
+      val request: Output = Output.Contract(hint, key, amount, address, tokens)
       val jsonRaw         = s"""
         |{
         |  "type": "contract",
+        |  "hint": $hint,
+        |  "key": "${key.toHexString}",
         |  "amount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [
@@ -272,10 +276,20 @@ class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues w
       val address    = generateAddress()
       val addressStr = address.toBase58
       val request: Output =
-        Output.Asset(amount, address, AVector.empty, TimeStamp.unsafe(1234), ByteString.empty)
+        Output.Asset(
+          hint,
+          key,
+          amount,
+          address,
+          AVector.empty,
+          TimeStamp.unsafe(1234),
+          ByteString.empty
+        )
       val jsonRaw = s"""
         |{
         |  "type": "asset",
+        |  "hint": $hint,
+        |  "key": "${key.toHexString}",
         |  "amount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [],

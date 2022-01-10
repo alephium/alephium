@@ -6515,6 +6515,8 @@
       },
       "Asset1": {
         "required": [
+          "hint",
+          "key",
           "amount",
           "address",
           "tokens",
@@ -6523,6 +6525,12 @@
         ],
         "type": "object",
         "properties": {
+          "hint": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
           "amount": {
             "type": "string",
             "format": "uint256"
@@ -7151,6 +7159,8 @@
       },
       "Contract": {
         "required": [
+          "hint",
+          "key",
           "amount",
           "address",
           "tokens",
@@ -7158,6 +7168,12 @@
         ],
         "type": "object",
         "properties": {
+          "hint": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
           "amount": {
             "type": "string",
             "format": "uint256"

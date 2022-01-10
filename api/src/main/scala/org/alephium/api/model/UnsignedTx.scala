@@ -66,7 +66,9 @@ object UnsignedTx {
       unsignedTx.gasAmount.value,
       unsignedTx.gasPrice.value,
       unsignedTx.inputs.map(Input.from),
-      unsignedTx.fixedOutputs.map(Output.Asset.fromProtocol)
+      unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
+        Output.Asset.fromProtocol(out, unsignedTx.hash, index)
+      }
     )
   }
 }

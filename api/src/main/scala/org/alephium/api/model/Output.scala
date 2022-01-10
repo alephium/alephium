@@ -18,11 +18,14 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Address, TxOutput}
 import org.alephium.util.{AVector, TimeStamp}
 
 sealed trait Output {
+  def hint: Int
+  def key: Hash
   def amount: Amount
   def address: Address
   def tokens: AVector[Token]
@@ -39,6 +42,8 @@ object Output {
 
   @upickle.implicits.key("asset")
   final case class Asset(
+      hint: Int,
+      key: Hash,
       amount: Amount,
       address: Address.Asset,
       tokens: AVector[Token],
@@ -58,6 +63,8 @@ object Output {
 
   @upickle.implicits.key("contract")
   final case class Contract(
+      hint: Int,
+      key: Hash,
       amount: Amount,
       address: Address.Contract,
       tokens: AVector[Token]
@@ -71,10 +78,12 @@ object Output {
     }
   }
 
-  def from(output: TxOutput): Output = {
+  def from(output: TxOutput, txId: Hash, index: Int): Output = {
     output match {
       case o: model.AssetOutput =>
         Asset(
+          o.hint.value,
+          model.TxOutputRef.key(txId, index),
           Amount(o.amount),
           Address.Asset(o.lockupScript),
           o.tokens.map(Token.tupled),
@@ -83,6 +92,8 @@ object Output {
         )
       case o: model.ContractOutput =>
         Contract(
+          o.hint.value,
+          model.TxOutputRef.key(txId, index),
           Amount(o.amount),
           Address.Contract(o.lockupScript),
           o.tokens.map(Token.tupled)
@@ -90,8 +101,10 @@ object Output {
     }
   }
   object Asset {
-    def fromProtocol(assetOutput: model.AssetOutput): Asset = {
+    def fromProtocol(assetOutput: model.AssetOutput, txId: Hash, index: Int): Asset = {
       Asset(
+        assetOutput.hint.value,
+        model.TxOutputRef.key(txId, index),
         Amount(assetOutput.amount),
         Address.Asset(assetOutput.lockupScript),
         assetOutput.tokens.map(Token.tupled),

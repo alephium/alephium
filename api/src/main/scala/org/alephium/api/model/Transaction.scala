@@ -56,7 +56,9 @@ object Transaction {
       UnsignedTx.fromProtocol(transaction.unsigned),
       transaction.scriptExecutionOk,
       transaction.contractInputs.map(OutputRef.from),
-      transaction.generatedOutputs.map(Output.from),
+      transaction.generatedOutputs.zipWithIndex.map { case (out, index) =>
+        Output.from(out, transaction.unsigned.hash, index)
+      },
       transaction.inputSignatures.map(sig => serialize(sig)),
       transaction.scriptSignatures.map(sig => serialize(sig))
     )

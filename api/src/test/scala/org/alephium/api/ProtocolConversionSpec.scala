@@ -62,7 +62,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   it should "convert AssetOutput" in new Fixture {
     checkData[Output.Asset, protocol.AssetOutput](
       assetOutput,
-      Output.Asset.fromProtocol,
+      out => Output.Asset.fromProtocol(out, hashGen.sample.get, 0),
       _.toProtocol()
     )
   }
