@@ -170,8 +170,10 @@ trait ApiModelCodec {
 
   implicit val tokenRW: RW[Token] = macroRW
 
-  implicit val methodRW: RW[Method] = macroRW[Method]
-  implicit val scriptRW: RW[Script] = macroRW[Script]
+  implicit val scriptRW: RW[Script] = readwriter[String].bimap(
+    _.value,
+    Script(_)
+  )
 
   implicit val outputAssetRW: RW[Output.Asset]       = macroRW[Output.Asset]
   implicit val outputContractRW: RW[Output.Contract] = macroRW[Output.Contract]

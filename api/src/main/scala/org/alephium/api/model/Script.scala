@@ -17,13 +17,14 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.vm
-import org.alephium.util.AVector
+import org.alephium.serde.{deserialize, serialize}
+import org.alephium.util.Hex
 
-final case class Script(methods: AVector[Method]) {
+final case class Script(value: String) extends AnyVal {
   def toProtocol(): Either[String, vm.StatefulScript] = {
     for {
-      protocolMethods <- methods.mapE(_.toProtocol())
-      script          <- vm.StatefulScript.from(protocolMethods).toRight("Invalid methods")
+      bytes  <- Hex.from(value).toRight("Invalid script hex string")
+      script <- deserialize[vm.StatefulScript](bytes).left.map(_.getMessage)
     } yield script
   }
 }
@@ -31,7 +32,7 @@ final case class Script(methods: AVector[Method]) {
 object Script {
   def fromProtocol(script: vm.StatefulScript): Script = {
     Script(
-      script.methods.map(Method.fromProtocol)
+      Hex.toHexString(serialize(script))
     )
   }
 }

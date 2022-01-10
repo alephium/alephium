@@ -29,7 +29,6 @@ import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -825,20 +824,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues w
     TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
   }
 
-  it should "encode/decode Method" in {
-    val jsonRaw = s"""
-       |{
-       |  "isPublic": ${method.isPublic},
-       |  "isPayable": ${method.isPayable},
-       |  "argsLength": ${method.argsLength},
-       |  "localsLength": ${method.localsLength},
-       |  "returnLength": ${method.returnLength},
-       |  "instrs": ${write(instrs.map { instr => Hex.toHexString(serialize(instr)) })}
-       |}""".stripMargin
-
-    checkData(Method.fromProtocol(method), jsonRaw)
-  }
-
   it should "encode/decode UnsignedTx" in {
     val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
     val jsonRaw    = s"""
@@ -846,9 +831,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues w
        |  "hash": "${unsignedTransaction.hash.toHexString}",
        |  "version": ${unsignedTransaction.version},
        |  "networkId": ${unsignedTransaction.networkId.id},
-       |  "scriptOpt": {
-       |    "methods": ${write(methods.map(Method.fromProtocol))}
-       |  },
+       |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
        |  "gasAmount": ${defaultGas.value},
        |  "gasPrice": "${defaultGasPrice.value}",
        |  "inputs": ${write(unsignedTx.inputs)},

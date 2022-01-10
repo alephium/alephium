@@ -31,14 +31,6 @@ import org.alephium.serde.deserialize
 import org.alephium.util._
 
 class ProtocolConversionSpec extends AlephiumSpec with EitherValues with NumericHelpers {
-  it should "convert Method" in new Fixture {
-    checkData[Method, vm.Method[vm.StatefulContext]](
-      method,
-      Method.fromProtocol,
-      _.toProtocol().rightValue
-    )
-  }
-
   it should "convert Script" in new Fixture {
     checkData[Script, vm.StatefulScript](script, Script.fromProtocol, _.toProtocol().rightValue)
   }

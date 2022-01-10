@@ -5086,7 +5086,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Script1"
+                "$ref": "#/components/schemas/Script"
               },
               "example": {
                 "code": "TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) } }"
@@ -7377,40 +7377,6 @@
           }
         }
       },
-      "Method": {
-        "required": [
-          "isPublic",
-          "isPayable",
-          "argsLength",
-          "localsLength",
-          "returnLength",
-          "instrs"
-        ],
-        "type": "object",
-        "properties": {
-          "isPublic": {
-            "type": "boolean"
-          },
-          "isPayable": {
-            "type": "boolean"
-          },
-          "argsLength": {
-            "type": "integer"
-          },
-          "localsLength": {
-            "type": "integer"
-          },
-          "returnLength": {
-            "type": "integer"
-          },
-          "instrs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
       "MinerAddresses": {
         "required": [
           "addresses"
@@ -7735,20 +7701,6 @@
         }
       },
       "Script": {
-        "required": [
-          "methods"
-        ],
-        "type": "object",
-        "properties": {
-          "methods": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Method"
-            }
-          }
-        }
-      },
-      "Script1": {
         "required": [
           "code"
         ],
@@ -8194,7 +8146,7 @@
             "type": "integer"
           },
           "scriptOpt": {
-            "$ref": "#/components/schemas/Script"
+            "type": "string"
           },
           "gasAmount": {
             "type": "integer"
