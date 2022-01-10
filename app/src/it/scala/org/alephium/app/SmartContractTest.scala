@@ -160,8 +160,8 @@ class SmartContractTest extends AlephiumActorSpec {
       GasEstimation.estimate(script, gasEstimator).rightValue
     }
 
-    def decodeTx(str: String): Tx = {
-      request[Tx](decodeUnsignedTransaction(str), restPort)
+    def decodeTx(str: String): UnsignedTx = {
+      request[UnsignedTx](decodeUnsignedTransaction(str), restPort)
     }
 
     def verifySpentUTXOs(unsignedTx: String, hashes: Set[String]) = {

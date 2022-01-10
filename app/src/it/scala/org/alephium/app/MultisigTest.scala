@@ -266,9 +266,10 @@ class MultisigTest extends AlephiumActorSpec {
     ): UnsignedTransaction = {
       val unsignedTx =
         deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
-      val decodedTx = request[Tx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
+      val decodedTx =
+        request[UnsignedTx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
 
-      decodedTx is Tx.from(unsignedTx)
+      decodedTx is UnsignedTx.fromProtocol(unsignedTx)
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
       val multisigTx       = request[TxResult](submitMultisigTx, restPort)
