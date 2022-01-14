@@ -20,6 +20,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
+import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
@@ -123,7 +124,7 @@ object AllHandlers {
         s"DependencyHandler$namePostfix"
       )
 
-    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler)
+    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler).withDispatcher(MiningDispatcher)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
     AllHandlers(
