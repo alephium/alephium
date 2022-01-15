@@ -23,7 +23,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.flow.mining.{ExternalMinerMock, Miner}
+import org.alephium.flow.mining.{ExternalMinerMock, Miner, MiningDispatcher}
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.util.{AVector, Env}
 
@@ -42,12 +42,12 @@ class CpuSoloMiner(config: AlephiumConfig, system: ActorSystem, rawApiAddresses:
   val miner: ActorRef = {
     val props = rawApiAddresses match {
       case None =>
-        ExternalMinerMock.singleNode(config).withDispatcher("akka.actor.mining-dispatcher")
+        ExternalMinerMock.singleNode(config).withDispatcher(MiningDispatcher)
       case Some(rawAddresses) =>
         val addresses = rawAddresses.split(",").map(parseHostAndPort)
         ExternalMinerMock
           .props(config, AVector.unsafe(addresses))
-          .withDispatcher("akka.actor.mining-dispatcher")
+          .withDispatcher(MiningDispatcher)
     }
     system.actorOf(props)
   }

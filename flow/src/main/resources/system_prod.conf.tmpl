@@ -132,6 +132,7 @@ akka {
       executor = "fork-join-executor"
       fork-join-executor {
         parallelism-min = 1
+        parallelism-max = 4
         parallelism-factor = 0.5
       }
       throughput = 1

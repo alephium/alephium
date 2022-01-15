@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Add docker volume for wallet
+* Improve dispatcher for mining related actors
+
 ## 1.2.1
 
 * Check estimated gas for `/transactions/build` endpoint.
