@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.2
+
 * Add docker volume for wallet
 * Improve dispatcher for mining related actors
 * Fix locale issue for configuration keys
