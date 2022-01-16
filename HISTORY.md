@@ -4,6 +4,7 @@
 
 * Add docker volume for wallet
 * Improve dispatcher for mining related actors
+* Fix locale issue for configuration keys
 
 ## 1.2.1
 
