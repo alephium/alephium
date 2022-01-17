@@ -4,7 +4,7 @@ volumes:
   prometheus_data: {}
   grafana_data: {}
   alephium-data: {}
-  alephium-wallet: {}
+  alephium-wallets: {}
 
 services:
   alephium:
