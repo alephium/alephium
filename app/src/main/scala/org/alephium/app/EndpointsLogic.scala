@@ -518,6 +518,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.verifySignature(query))
   }
 
+  val checkHashIndexingLogic = serverLogic(checkHashIndexing) { _ =>
+    Future.apply(blockFlow.checkHashIndexingUnsafe()) // Let's run it in the background
+    Future.successful(Right(()))
+  }
+
   val contractStateLogic = serverLogic(contractState) { case (contractAddress, groupIndex) =>
     requestFromGroupIndex(
       groupIndex,

@@ -583,4 +583,23 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val ten = ts(9).plusMillisUnsafe(1)
     subset(ten, ten) is AVector.empty[Int]
   }
+
+  it should "fix hash indexing" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val chain      = buildBlockChain()
+    addBlocks(chain, shortChain)
+    addBlocks(chain, longChain)
+
+    val shortHash = shortChain(1).hash
+    val longHash  = longChain(1).hash
+    chain.getHashes(2) isE AVector(longHash, shortHash)
+    chain.heightIndexStorage.put(2, AVector(shortHash, longHash))
+    chain.getHashes(2) isE AVector(shortHash, longHash)
+
+    chain.checkHashIndexingUnsafe(3)
+    chain.getHashes(2) isE AVector(longHash, shortHash)
+  }
 }

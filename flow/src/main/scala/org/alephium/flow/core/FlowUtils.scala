@@ -342,6 +342,19 @@ trait FlowUtils
       }
     } yield tx
   }
+
+  @volatile private var checkingHashIndexing: Boolean = false
+  def checkHashIndexingUnsafe(): Unit = {
+    if (!checkingHashIndexing) {
+      checkingHashIndexing = true
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        getHeaderChain(chainIndex).checkHashIndexingUnsafe()
+      }
+      checkingHashIndexing = false
+    } else {
+      logger.warn("Hash indexing checking is on-going")
+    }
+  }
 }
 
 object FlowUtils {

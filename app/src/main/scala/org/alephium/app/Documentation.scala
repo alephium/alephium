@@ -62,6 +62,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     buildMultisig,
     submitMultisigTransaction,
     verifySignature,
+    checkHashIndexing,
     minerAction,
     minerListAddresses,
     minerUpdateAddresses

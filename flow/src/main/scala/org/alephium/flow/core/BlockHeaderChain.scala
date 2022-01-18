@@ -18,17 +18,19 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import com.typesafe.scalalogging.LazyLogging
+
 import org.alephium.flow.Utils
-import org.alephium.flow.io._
+import org.alephium.flow.io.*
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{BlockHeader, Target, Weight}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, Target, Weight}
 import org.alephium.protocol.vm.BlockEnv
 import org.alephium.util._
 
-trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
+trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogging {
   implicit def networkConfig: NetworkConfig
 
   def headerStorage: BlockHeaderStorage
@@ -198,6 +200,41 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def getBlockTime(header: BlockHeader): IOResult[Duration] = {
     getBlockHeader(header.parentHash)
       .map(header.timestamp deltaUnsafe _.timestamp)
+  }
+
+  def checkHashIndexingUnsafe(): Unit = {
+    val maxHeight   = maxHeightUnsafe
+    var startHeight = maxHeight - maxForkDepth
+
+    if (startHeight > ALPH.GenesisHeight) {
+      while (getHashesUnsafe(startHeight).length > 1) {
+        startHeight = startHeight - 1
+      }
+      checkHashIndexingUnsafe(startHeight)
+      logger.info(s"Start checking hash indexing for $chainIndex from height $startHeight")
+    } else {
+      logger.info(s"No need to check hash indexing for $chainIndex due to too few blocks")
+    }
+  }
+
+  def checkHashIndexingUnsafe(startHeight: Int): Unit = {
+    val startHash  = getHashesUnsafe(startHeight).head
+    val chainIndex = ChainIndex.from(startHash)
+
+    var currentHeight = startHeight
+    var currentHeader = getBlockHeaderUnsafe(startHash)
+    while (!currentHeader.isGenesis) {
+      val nextHeight = currentHeight - 1
+      val nextHash   = currentHeader.parentHash
+      val nextHashes = getHashesUnsafe(nextHeight)
+      if (nextHashes.head != nextHash) {
+        logger.warn(s"Wrong hashes order at: chainIndex $chainIndex. height $nextHeight")
+        heightIndexStorage.put(nextHeight, nextHash +: nextHashes.filter(_ != nextHash))
+      }
+
+      currentHeight = nextHeight
+      currentHeader = getBlockHeaderUnsafe(nextHash)
+    }
   }
 }
 

@@ -386,6 +386,11 @@ trait Endpoints
       .in(jsonBody[VerifySignature])
       .out(jsonBody[Boolean])
       .summary("Verify the SecP256K1 signature of some data")
+
+  val checkHashIndexing: BaseEndpoint[Unit, Unit] =
+    utilsEndpoint.put
+      .in("check-hash-indexing")
+      .summary("Check and repair the indexing of block hashes")
 }
 
 object Endpoints {
