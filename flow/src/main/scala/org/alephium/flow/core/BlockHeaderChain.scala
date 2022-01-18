@@ -229,7 +229,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       val nextHash   = currentHeader.parentHash
       val nextHashes = getHashesUnsafe(nextHeight)
       if (nextHashes.head != nextHash) {
-        logger.warn(s"Wrong hashes order at: chainIndex $chainIndex. height $nextHeight")
+        logger.warn(s"Update hashes order at: chainIndex $chainIndex; height $nextHeight")
         heightIndexStorage.put(nextHeight, nextHash +: nextHashes.filter(_ != nextHash))
       }
 

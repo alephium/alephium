@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.2.4
+
+* Improve logging message for 1.2.3 fix
+
 ## 1.2.3
 
 * Fix docker volume for wallets
