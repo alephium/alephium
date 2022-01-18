@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.2.3
+
+* Fix docker volume for wallets
+* Fix height indexing for hashes
+
 ## 1.2.2
 
 * Add docker volume for wallet
