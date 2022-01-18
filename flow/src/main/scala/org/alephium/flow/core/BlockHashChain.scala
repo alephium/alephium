@@ -25,7 +25,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.Weight
+import org.alephium.protocol.model.{ChainIndex, Weight}
 import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -33,6 +33,8 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   implicit def brokerConfig: BrokerConfig
 
   def genesisHash: BlockHash
+
+  def chainIndex: ChainIndex = ChainIndex.from(genesisHash)
 
   def isGenesis(hash: BlockHash): Boolean = hash == genesisHash
 

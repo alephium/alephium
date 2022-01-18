@@ -84,7 +84,8 @@ trait Server extends Service {
     ArraySeq(restServer, webSocketServer, node) ++ ArraySeq.from[Service](walletService.toList)
   }
 
-  override protected def startSelfOnce(): Future[Unit] = Future.successful {
+  override protected def startSelfOnce(): Future[Unit] = Future {
+    node.blockFlow.checkHashIndexingUnsafe()
     val props =
       MinerApiController
         .props(node.allHandlers)(

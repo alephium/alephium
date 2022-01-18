@@ -103,6 +103,7 @@ class RestServer(
       contractStateLogic,
       exportBlocksLogic,
       verifySignatureLogic,
+      checkHashIndexingLogic,
       metricsLogic
     ).map(route(_)) :+ swaggerUiRoute
 
