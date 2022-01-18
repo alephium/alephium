@@ -458,6 +458,8 @@ object WalletAppSpec extends {
           ctx,
           BuildTransactionResult(
             Hex.toHexString(serialize(unsignedTx)),
+            unsignedTx.gasAmount,
+            unsignedTx.gasPrice,
             unsignedTx.hash,
             unsignedTx.fromGroup.value,
             unsignedTx.toGroup.value

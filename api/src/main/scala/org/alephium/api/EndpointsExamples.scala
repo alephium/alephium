@@ -316,7 +316,16 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
-    simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
+    simpleExample(
+      BuildTransactionResult(
+        unsignedTx = hexString,
+        minimalGas,
+        defaultGasPrice,
+        hash,
+        fromGroup = 2,
+        toGroup = 1
+      )
+    )
 
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
