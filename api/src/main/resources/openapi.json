@@ -4545,6 +4545,8 @@
                 },
                 "example": {
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "gasAmount": 20000,
+                  "gasPrice": "100000000000",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fromGroup": 2,
                   "toGroup": 1
@@ -5877,6 +5879,8 @@
                 },
                 "example": {
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "gasAmount": 20000,
+                  "gasPrice": "100000000000",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fromGroup": 2,
                   "toGroup": 1
@@ -7184,6 +7188,8 @@
       "BuildTransactionResult": {
         "required": [
           "unsignedTx",
+          "gasAmount",
+          "gasPrice",
           "txId",
           "fromGroup",
           "toGroup"
@@ -7192,6 +7198,13 @@
         "properties": {
           "unsignedTx": {
             "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
           },
           "txId": {
             "type": "string"

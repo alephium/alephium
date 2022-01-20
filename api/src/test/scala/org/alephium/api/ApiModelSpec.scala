@@ -502,9 +502,12 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val txId    = Hash.generate
-    val result  = BuildTransactionResult("tx", txId, 1, 2)
-    val jsonRaw = s"""{"unsignedTx":"tx","txId":"${txId.toHexString}","fromGroup":1,"toGroup":2}"""
+    val txId     = Hash.generate
+    val gas      = GasBox.unsafe(1)
+    val gasPrice = GasPrice(1)
+    val result   = BuildTransactionResult("tx", gas, gasPrice, txId, 1, 2)
+    val jsonRaw =
+      s"""{"unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1", "txId":"${txId.toHexString}", "fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
   }
 
