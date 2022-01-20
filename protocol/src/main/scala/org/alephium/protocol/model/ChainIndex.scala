@@ -44,6 +44,8 @@ class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
   }
 
   override def toString: String = s"ChainIndex(${from.value}, ${to.value})"
+
+  def prettyString: String = s"chain: ${from.value}->${to.value}"
 }
 
 object ChainIndex {
