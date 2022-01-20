@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Add gas info to tx building information for tx endpoints
+* Increasing polling interval to 2 seconds for mining api
+
 ## 1.2.4
 
 * Improve logging message for 1.2.3 fix
