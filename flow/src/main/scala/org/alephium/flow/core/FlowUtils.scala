@@ -350,6 +350,7 @@ trait FlowUtils
       brokerConfig.chainIndexes.foreach { chainIndex =>
         getHeaderChain(chainIndex).checkHashIndexingUnsafe()
       }
+      logger.info("Hash indexing checking is done!")
       checkingHashIndexing = false
     } else {
       logger.warn("Hash indexing checking is on-going")
