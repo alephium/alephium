@@ -20,6 +20,7 @@ import akka.actor.ActorRef
 import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.util.ActorRefT
 
@@ -27,6 +28,8 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   val brokerInfo = brokerInfoGen.sample.get
 
   trait Fixture extends BrokerStatusTracker {
+    def networkSetting: NetworkSetting = config.network
+
     def addNewBroker(): ActorRef = {
       val broker = TestProbe().ref
       brokerInfos += ActorRefT(broker) -> brokerInfo
@@ -35,6 +38,8 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   }
 
   it should "sample the right size" in new Fixture {
+    networkSetting.syncPeerSampleSize is 3
+
     (1 until 4).foreach(_ => addNewBroker())
     samplePeersSize() is 1
     samplePeers().toSeq.toMap.size is 1

@@ -22,6 +22,7 @@ import scala.collection.mutable
 import scala.util.Random
 
 import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -40,6 +41,8 @@ object BrokerStatusTracker {
 }
 
 trait BrokerStatusTracker {
+  def networkSetting: NetworkSetting
+
   val brokerInfos: mutable.ArrayBuffer[(ActorRefT[BrokerHandler.Command], BrokerInfo)] =
     mutable.ArrayBuffer.empty
 
