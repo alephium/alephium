@@ -323,9 +323,7 @@ class BlockFlowSpec extends AlephiumSpec {
         AVector.tabulate(groupConfig.groups) { toGroup =>
           val hashes: AVector[BlockHash] = if (toGroup equals testToGroup) {
             AVector(
-              hashes0(0),
               hashes0(1),
-              hashes0(2),
               hashes0(3),
               hashes0(4),
               hashes0(5)

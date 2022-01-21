@@ -14,12 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.network.broker
+package org.alephium.flow.network.sync
 
 import java.net.InetSocketAddress
 
 import scala.collection.mutable
+import scala.util.Random
 
+import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -38,9 +41,21 @@ object BrokerStatusTracker {
 }
 
 trait BrokerStatusTracker {
-  val brokerInfos: mutable.HashMap[ActorRefT[BrokerHandler.Command], BrokerInfo] =
-    mutable.HashMap.empty
+  def networkSetting: NetworkSetting
 
-  def samplePeers: AVector[(ActorRefT[BrokerHandler.Command], BrokerInfo)] =
-    AVector.from(brokerInfos)
+  val brokerInfos: mutable.ArrayBuffer[(ActorRefT[BrokerHandler.Command], BrokerInfo)] =
+    mutable.ArrayBuffer.empty
+
+  def samplePeersSize(): Int = {
+    val peerSize = Math.sqrt(brokerInfos.size.toDouble).toInt
+    Math.min(peerSize, networkSetting.syncPeerSampleSize)
+  }
+
+  def samplePeers(): AVector[(ActorRefT[BrokerHandler.Command], BrokerInfo)] = {
+    val peerSize   = samplePeersSize()
+    val startIndex = Random.nextInt(brokerInfos.size)
+    AVector.tabulate(peerSize) { k =>
+      brokerInfos((startIndex + k) % brokerInfos.size)
+    }
+  }
 }

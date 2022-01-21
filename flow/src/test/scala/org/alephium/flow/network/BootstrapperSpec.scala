@@ -84,7 +84,8 @@ class BootstrapperSpec extends AlephiumActorSpec {
     getPersistedKey() isE Some(intraCliqueInfo1.priKey)
   }
 
-  it should "bootstrap with persisted discovery key" in new Fixture {
+  // this is disabled for now
+  ignore should "bootstrap with persisted discovery key" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       "alephium.broker.broker-num" -> 1
     )

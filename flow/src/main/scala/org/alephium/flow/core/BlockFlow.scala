@@ -70,8 +70,9 @@ trait BlockFlow
       if (maxHeight == ALPH.GenesisHeight) {
         AVector.empty
       } else {
+        val startHeight = Math.max(ALPH.GenesisHeight + 1, maxHeight - 2 * maxForkDepth)
         HistoryLocators
-          .sampleHeights(ALPH.GenesisHeight + 1, maxHeight)
+          .sampleHeights(startHeight, maxHeight)
           .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
       }
     } else {

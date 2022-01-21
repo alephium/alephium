@@ -347,8 +347,13 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain0(1).hash)
 
     addBlocks(chain, chain1)
-    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(chain0(0).hash, chain1(0).hash)
-    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain0(1).hash, chain1(1).hash)
+    if (chain.blockHashOrdering.compare(chain1(1).hash, chain0(1).hash) > 0) {
+      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(chain1(0).hash, chain0(0).hash)
+      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain1(1).hash, chain0(1).hash)
+    } else {
+      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(chain0(0).hash, chain1(0).hash)
+      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain0(1).hash, chain1(1).hash)
+    }
   }
 
   it should "update mainchain hash based on heights instead of weight" in new Fixture {

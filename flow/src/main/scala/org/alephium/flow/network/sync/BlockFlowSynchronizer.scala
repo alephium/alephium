@@ -23,7 +23,7 @@ import akka.actor.{Props, Terminated}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, IOBaseActor}
 import org.alephium.flow.network._
-import org.alephium.flow.network.broker.{BrokerHandler, BrokerStatusTracker}
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
@@ -78,7 +78,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
       scheduleSync()
     case flowLocators: FlowHandler.SyncLocators =>
-      samplePeers.foreach { case (actor, brokerInfo) =>
+      samplePeers().foreach { case (actor, brokerInfo) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filerFor(brokerInfo))
       }
     case SyncInventories(hashes) => download(hashes)
@@ -88,11 +88,12 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case Terminated(actor) =>
       val broker = ActorRefT[BrokerHandler.Command](actor)
       log.debug(s"Connection to ${remoteAddress(broker)} is closing")
-      brokerInfos -= broker
+      brokerInfos.filterInPlace(_._1 != broker)
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {
-    brokerInfos(broker).address
+    val brokerIndex = brokerInfos.indexWhere(_._1 == broker)
+    brokerInfos(brokerIndex)._2.address
   }
 
   def scheduleSync(): Unit = {

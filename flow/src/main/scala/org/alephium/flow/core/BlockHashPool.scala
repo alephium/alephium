@@ -56,7 +56,7 @@ trait BlockHashPool {
   final val blockHashOrdering: Ordering[BlockHash] = { (hash0: BlockHash, hash1: BlockHash) =>
     val weight0 = getWeightUnsafe(hash0)
     val weight1 = getWeightUnsafe(hash1)
-    BlockHashPool.compare(hash0, weight0, hash1, weight1)
+    BlockHashPool.compareWeight(hash0, weight0, hash1, weight1)
   }
 
   def getBestTipUnsafe(): BlockHash
@@ -71,10 +71,19 @@ trait BlockHashPool {
 }
 
 object BlockHashPool {
-  def compare(hash0: BlockHash, weight0: Weight, hash1: BlockHash, weight1: Weight): Int = {
-    val compare1 = weight0.compareTo(weight1)
-    if (compare1 != 0) {
-      compare1
+  def compareWeight(hash0: BlockHash, weight0: Weight, hash1: BlockHash, weight1: Weight): Int = {
+    val compare = weight0.compare(weight1)
+    if (compare != 0) {
+      compare
+    } else {
+      Bytes.byteStringOrdering.compare(hash0.bytes, hash1.bytes)
+    }
+  }
+
+  def compareHeight(hash0: BlockHash, height0: Int, hash1: BlockHash, height1: Int): Int = {
+    val compare = height0.compare(height1)
+    if (compare != 0) {
+      compare
     } else {
       Bytes.byteStringOrdering.compare(hash0.bytes, hash1.bytes)
     }

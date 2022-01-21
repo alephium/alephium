@@ -29,7 +29,7 @@ trait DownloadTracker extends BaseActor {
   val syncing: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
 
   def needToDownload(hash: BlockHash): Boolean =
-    !(blockflow.containsUnsafe(hash) || syncing.contains(hash))
+    !(syncing.contains(hash) || blockflow.containsUnsafe(hash))
 
   def download(hashes: AVector[AVector[BlockHash]]): Unit = {
     val currentTs  = TimeStamp.now()

@@ -139,16 +139,9 @@ trait BootstrapperHandler extends IOBaseActor with Stash {
     tcpController ! TcpController.Start(self)
   }
 
+  // TODO: revert to load persisted key
   protected def loadOrGenDiscoveryKey(): (SecP256K1PrivateKey, SecP256K1PublicKey) = {
-    escapeIOError(
-      nodeStateStorage.getBootstrapInfo().map {
-        case Some(info) =>
-          log.info("Bootstrap with persisted discovery key")
-          (info.key, info.key.publicKey)
-        case None => SignatureSchema.secureGeneratePriPub()
-      },
-      SignatureSchema.secureGeneratePriPub()
-    )
+    SignatureSchema.secureGeneratePriPub()
   }
 
   private def persistBootstrapInfo(key: SecP256K1PrivateKey): Unit = {
