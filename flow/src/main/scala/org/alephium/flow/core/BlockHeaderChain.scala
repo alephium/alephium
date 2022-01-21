@@ -79,7 +79,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       parentState <- getState(parentHash)
       height = parentState.height + 1
       _           <- addHeader(header)
-      isCanonical <- checkCanonicality(height)
+      isCanonical <- checkCanonicality(header.hash, height)
       _           <- addHash(header.hash, parentHash, height, weight, header.timestamp, isCanonical)
       _           <- if (isCanonical) reorgFrom(header.parentHash, height - 1) else Right(())
     } yield ()
@@ -94,9 +94,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
   }
 
   // We use height for canonicality checking. This will converge to weight based checking eventually
-  private def checkCanonicality(height: Int): IOResult[Boolean] = {
+  private def checkCanonicality(hash: BlockHash, height: Int): IOResult[Boolean] = {
     EitherF.forallTry(tips.keys()) { tip =>
-      getHeight(tip).map(height > _)
+      getHeight(tip).map(BlockHashPool.compareHeight(hash, height, tip, _) > 0)
     }
   }
 
