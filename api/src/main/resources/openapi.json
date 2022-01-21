@@ -3269,18 +3269,81 @@
                               "gasAmount": 20000,
                               "gasPrice": "100000000000",
                               "inputs": [
-                                
+                                {
+                                  "type": "asset",
+                                  "outputRef": {
+                                    "hint": 23412,
+                                    "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                                  },
+                                  "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                                }
                               ],
                               "outputs": [
-                                
+                                {
+                                  "type": "asset",
+                                  "hint": 1,
+                                  "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                                  "amount": "2000000000000000000",
+                                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                                  "tokens": [
+                                    {
+                                      "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                      "amount": "42000000000000000000"
+                                    },
+                                    {
+                                      "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                      "amount": "1000000000000000000000"
+                                    }
+                                  ],
+                                  "lockTime": 1611041396892,
+                                  "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                                }
                               ]
                             },
                             "scriptExecutionOk": true,
                             "contractInputs": [
-                              
+                              {
+                                "hint": 23412,
+                                "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                              }
                             ],
                             "generatedOutputs": [
-                              
+                              {
+                                "type": "asset",
+                                "hint": 1,
+                                "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                                "amount": "2000000000000000000",
+                                "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                                "tokens": [
+                                  {
+                                    "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                    "amount": "42000000000000000000"
+                                  },
+                                  {
+                                    "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                    "amount": "1000000000000000000000"
+                                  }
+                                ],
+                                "lockTime": 1611041396892,
+                                "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                              },
+                              {
+                                "type": "contract",
+                                "hint": 1,
+                                "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                                "amount": "2000000000000000000",
+                                "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                                "tokens": [
+                                  {
+                                    "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                    "amount": "42000000000000000000"
+                                  },
+                                  {
+                                    "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                    "amount": "1000000000000000000000"
+                                  }
+                                ]
+                              }
                             ],
                             "inputSignatures": [
                               "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
@@ -3414,18 +3477,81 @@
                         "gasAmount": 20000,
                         "gasPrice": "100000000000",
                         "inputs": [
-                          
+                          {
+                            "type": "asset",
+                            "outputRef": {
+                              "hint": 23412,
+                              "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                            },
+                            "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                          }
                         ],
                         "outputs": [
-                          
+                          {
+                            "type": "asset",
+                            "hint": 1,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "amount": "2000000000000000000",
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "42000000000000000000"
+                              },
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "1000000000000000000000"
+                              }
+                            ],
+                            "lockTime": 1611041396892,
+                            "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          }
                         ]
                       },
                       "scriptExecutionOk": true,
                       "contractInputs": [
-                        
+                        {
+                          "hint": 23412,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        }
                       ],
                       "generatedOutputs": [
-                        
+                        {
+                          "type": "asset",
+                          "hint": 1,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "amount": "2000000000000000000",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ],
+                          "lockTime": 1611041396892,
+                          "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        },
+                        {
+                          "type": "contract",
+                          "hint": 1,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "amount": "2000000000000000000",
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ]
+                        }
                       ],
                       "inputSignatures": [
                         "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
@@ -3792,7 +3918,7 @@
                             }
                           ],
                           "lockTime": 1611041396892,
-                          "additionalData": ""
+                          "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                         }
                       ]
                     }
@@ -3818,7 +3944,7 @@
                             }
                           ],
                           "lockTime": 1611041396892,
-                          "additionalData": ""
+                          "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                         }
                       ],
                       "warning": "Result might not contains all utxos"
@@ -4359,10 +4485,35 @@
                           "gasAmount": 20000,
                           "gasPrice": "100000000000",
                           "inputs": [
-                            
+                            {
+                              "type": "asset",
+                              "outputRef": {
+                                "hint": 23412,
+                                "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                              },
+                              "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                            }
                           ],
                           "outputs": [
-                            
+                            {
+                              "type": "asset",
+                              "hint": 1,
+                              "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "amount": "2000000000000000000",
+                              "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                              "tokens": [
+                                {
+                                  "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                  "amount": "42000000000000000000"
+                                },
+                                {
+                                  "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                  "amount": "1000000000000000000000"
+                                }
+                              ],
+                              "lockTime": 1611041396892,
+                              "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                            }
                           ]
                         },
                         "inputSignatures": [
@@ -4861,10 +5012,35 @@
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "inputs": [
-                    
+                    {
+                      "type": "asset",
+                      "outputRef": {
+                        "hint": 23412,
+                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                      },
+                      "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                    }
                   ],
                   "outputs": [
-                    
+                    {
+                      "type": "asset",
+                      "hint": 1,
+                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "amount": "2000000000000000000",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                      "tokens": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42000000000000000000"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000000000000000000000"
+                        }
+                      ],
+                      "lockTime": 1611041396892,
+                      "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                    }
                   ]
                 }
               }

@@ -19,13 +19,13 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.util.ByteString
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -38,6 +38,9 @@ trait EndpointsExamples extends ErrorExamples {
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
+  private val unlockupScript: UnlockScript =
+    UnlockScript.p2pkh(publicKey)
+  private val unlockupScriptBytes      = serialize(unlockupScript)
   protected val defaultUtxosLimit: Int = 512
   val address                          = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
@@ -87,6 +90,29 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
+  private val inputAsset = Input.Asset(
+    outputRef,
+    unlockupScriptBytes
+  )
+
+  private val outputAsset: Output.Asset = Output.Asset(
+    1,
+    hash,
+    twoAlph,
+    address,
+    tokens,
+    ts,
+    hash.bytes
+  )
+
+  private val outputContract: Output = Output.Contract(
+    1,
+    hash,
+    twoAlph,
+    contractAddress,
+    tokens
+  )
+
   private val unsignedTx = UnsignedTx(
     Some(hash),
     1,
@@ -94,15 +120,15 @@ trait EndpointsExamples extends ErrorExamples {
     None,
     defaultGas.value,
     defaultGasPrice.value,
-    AVector.empty,
-    AVector.empty
+    AVector(inputAsset),
+    AVector(outputAsset)
   )
 
   private val transaction = Transaction(
     unsignedTx,
     true,
-    AVector.empty,
-    AVector.empty,
+    AVector(outputRef),
+    AVector(outputAsset, outputContract),
     AVector(signature.bytes),
     AVector(signature.bytes)
   )
@@ -118,7 +144,7 @@ trait EndpointsExamples extends ErrorExamples {
     balance,
     tokens,
     ts,
-    ByteString.empty
+    hash.bytes
   )
 
   private val blockEntry = BlockEntry(
