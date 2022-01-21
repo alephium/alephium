@@ -80,7 +80,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     toOpenAPI(
       walletEndpoints ++ blockflowEndpoints.map(_.endpoint),
       "Alephium API",
-      "1.0"
+      "1.1.0"
     )
       .servers(servers)
 }
