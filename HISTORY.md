@@ -4,6 +4,7 @@
 
 * Add gas info to tx building information for tx endpoints
 * Increasing polling interval to 2 seconds for mining api
+* Improve full node syncing
 
 ## 1.2.4
 
