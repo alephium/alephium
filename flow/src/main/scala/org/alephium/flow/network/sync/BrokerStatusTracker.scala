@@ -48,7 +48,7 @@ trait BrokerStatusTracker {
 
   def samplePeersSize(): Int = {
     val peerSize = Math.sqrt(brokerInfos.size.toDouble).toInt
-    Math.min(peerSize, 3)
+    Math.min(peerSize, networkSetting.syncPeerSampleSize)
   }
 
   def samplePeers(): AVector[(ActorRefT[BrokerHandler.Command], BrokerInfo)] = {

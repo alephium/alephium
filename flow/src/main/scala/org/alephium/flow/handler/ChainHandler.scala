@@ -161,7 +161,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
       broker: ActorRefT[ChainHandler.Event],
       origin: DataOrigin
   ): Unit = {
-    log.debug(s"${data.shortHex} is validated")
+    log.info(s"${data.shortHex} is validated")
     blockFlow.contains(data.hash) match {
       case Right(true) =>
         log.debug(s"Block/Header ${data.shortHex} exists already")
