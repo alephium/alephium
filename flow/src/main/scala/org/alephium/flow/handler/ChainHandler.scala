@@ -191,11 +191,12 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   def measure(data: T): Unit
 
   def showHeader(header: BlockHeader): String = {
+    val total     = blockFlow.numHashes
     val index     = header.chainIndex
     val chain     = blockFlow.getHeaderChain(header)
     val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
 
-    s"hash: ${header.hash.toHexString}; ${index.prettyString}; ${chain.showHeight(header.hash)}; blockTime: $blockTime"
+    s"hash: ${header.hash.toHexString}; ${index.prettyString}; ${chain.showHeight(header.hash)}; total: $total; blockTime: $blockTime"
   }
 
   protected def measureCommon(header: BlockHeader): BlockHeaderChain = {
