@@ -160,10 +160,9 @@ object StatefulContext {
       blockEnv: BlockEnv,
       txEnv: TxEnv,
       worldState: WorldState.Staging,
-      preOutputs: AVector[AssetOutput],
       gasRemaining: GasBox
   ): StatefulContext = {
-    new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
+    new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
   def apply(
@@ -174,7 +173,7 @@ object StatefulContext {
       preOutputs: AVector[AssetOutput]
   ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
-    apply(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
+    apply(blockEnv, txEnv, worldState, gasRemaining)
   }
 
   def build(
@@ -199,9 +198,10 @@ object StatefulContext {
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
       val worldState: WorldState.Staging,
-      val preOutputs: AVector[AssetOutput],
       var gasRemaining: GasBox
   ) extends StatefulContext {
+    def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
+
     def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     /*
