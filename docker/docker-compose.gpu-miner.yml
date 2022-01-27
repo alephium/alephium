@@ -6,7 +6,6 @@ services:
     depends_on:
       - alephium
     restart: unless-stopped
-    runtime: nvidia
     privileged: true
     command:
       - -a
