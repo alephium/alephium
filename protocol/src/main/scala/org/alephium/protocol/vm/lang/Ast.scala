@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm.lang
 
+import scala.collection.immutable
+
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
@@ -27,6 +29,8 @@ object Ast {
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean)
+
+  final case class EventField(ident: Ident, tpe: Type)
 
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
@@ -158,6 +162,7 @@ object Ast {
       )
     }
   }
+  // What does ContractConv stand for?
   final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
       extends Expr[Ctx] {
     override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
@@ -336,21 +341,34 @@ object Ast {
       )
     }
   }
-  sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
-    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
+
+  final case class EventDef(
+      ident: TypeId,
+      fields: Seq[EventField]
+  )
+
+  final case class EmitEvent[Ctx <: StatelessContext](id: TypeId, args: Seq[Expr[Ctx]])
+      extends Statement[Ctx] {
+    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
+      val newArgs = args.map(_.fillPlaceholder(expr))
+      if (newArgs == args) this else EmitEvent(id, newArgs)
+    }
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val eventInfo = state.getEvent(id)
+      eventInfo.checkFieldTypes(args.flatMap(_.getType(state)))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      Seq.empty
+    }
   }
-  final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
-      extends AssignmentTarget[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
-      if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
-    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = this
-  }
-  final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
-      ident: Ident,
-      indexes: Seq[Ast.Expr[Ctx]]
-  ) extends AssignmentTarget[Ctx] {
+
+  final case class ArrayElementAssign[Ctx <: StatelessContext](
+      target: Ident,
+      indexes: Seq[Ast.Expr[Ctx]],
+      rhs: Expr[Ctx]
+  ) extends Statement[Ctx] {
     @scala.annotation.tailrec
     private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
       if (indexes.isEmpty) {
@@ -608,7 +626,15 @@ object Ast {
     }
   }
 
-  sealed trait ContractWithState extends Contract[StatefulContext]
+  sealed trait ContractWithState extends Contract[StatefulContext] {
+    val events: Seq[EventDef] = Seq.empty
+
+    def eventTable(): immutable.Map[Ast.TypeId, Compiler.EventInfo] = {
+      events.map { event =>
+        event.ident -> Compiler.EventInfo(event.ident, event.fields.map(_.tpe))
+      }.toMap
+    }
+  }
 
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
       extends ContractWithState {
@@ -630,7 +656,8 @@ object Ast {
   final case class TxContract(
       ident: TypeId,
       fields: Seq[Argument],
-      funcs: Seq[FuncDef[StatefulContext]]
+      funcs: Seq[FuncDef[StatefulContext]],
+      override val events: Seq[EventDef]
   ) extends ContractWithState {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)

@@ -50,6 +50,10 @@ abstract class Parser[Ctx <: StatelessContext] {
   def contractConv[_: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
+  def emitEvent[_: P]: P[Ast.EmitEvent[Ctx]] =
+    P("emit" ~ Lexer.typeId ~ "(" ~ expr.rep(0, ",") ~ ")")
+      .map { case (typeId, exprs) => Ast.EmitEvent(typeId, exprs) }
+
   def chain[_: P](p: => P[Ast.Expr[Ctx]], op: => P[Operator]): P[Ast.Expr[Ctx]] =
     P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
       rhs.foldLeft(lhs) { case (acc, (op, right)) =>
@@ -167,15 +171,19 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(
       Lexer.funcModifier.rep(0) ~ Lexer
         .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}"
-    ).map { case (modifiers, funcId, params, returnType, statement) =>
+    ).map { case (modifiers, funcId, params, returnType, statements) =>
       if (modifiers.toSet.size != modifiers.length) {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic  = modifiers.contains(Lexer.Pub)
         val isPayable = modifiers.contains(Lexer.Payable)
-        Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statement)
+        Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statements)
       }
     }
+  def eventFields[_: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
+  def event[_: P]: P[Ast.EventDef] = P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
+    .map { case (typeId, fields) => Ast.EventDef(typeId, fields) }
+
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
 
@@ -206,6 +214,13 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.mut ~ Lexer.ident ~ ":").flatMap { case (isMutable, ident) =>
       parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
         Ast.Argument(ident, tpe, isMutable)
+      }
+    }
+
+  def eventField[_: P]: P[Ast.EventField] =
+    P(Lexer.ident ~ ":").flatMap { case (ident) =>
+      parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
+        Ast.EventField(ident, tpe)
       }
     }
 }
@@ -252,7 +267,7 @@ object StatefulParser extends Parser[StatefulContext] {
       .map { case (obj, (callId, exprs)) => Ast.ContractCall(obj, callId, exprs) }
 
   def statement[_: P]: P[Ast.Statement[StatefulContext]] =
-    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | loopStmt)
+    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | emitEvent | loopStmt)
 
   def rawTxScript[_: P]: P[Ast.TxScript] =
     P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
@@ -261,8 +276,12 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
   def rawTxContract[_: P]: P[Ast.TxContract] =
-    P(Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, params, funcs) => Ast.TxContract(typeId, params, funcs) }
+    P(
+      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ event.rep(0) ~ func.rep(
+        1
+      ) ~ "}"
+    )
+      .map { case (typeId, params, events, funcs) => Ast.TxContract(typeId, params, funcs, events) }
   def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
   def multiContract[_: P]: P[Ast.MultiTxContract] =

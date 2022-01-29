@@ -1141,4 +1141,65 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         )
       )
   }
+
+  it should "parse events definition and emission" in {
+
+    {
+      info("event definition and emission")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add(a, b)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("event doesn't exist")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add2(a, b)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).leftValue.message is "Event Add2 does not exist"
+    }
+
+    {
+      info("emit event with wrong args")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    let z = false
+           |    emit Add(a, z)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "Invalid args type List(U256, Bool) for event Add(U256, U256)"
+    }
+  }
 }
