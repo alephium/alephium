@@ -601,7 +601,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def requestFromGroupIndex[P, A](
       groupIndex: GroupIndex,
       f: => Future[Either[ApiError[_ <: StatusCode], A]],

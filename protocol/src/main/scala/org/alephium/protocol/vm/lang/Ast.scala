@@ -23,7 +23,7 @@ import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.{discard, AVector, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods number.of.types
 object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
@@ -312,6 +312,9 @@ object Ast {
       value.genCode(state) ++ variables.map(state.genStoreCode).reverse
     }
   }
+
+  sealed trait ContractDef
+
   final case class FuncDef[Ctx <: StatelessContext](
       id: FuncId,
       isPublic: Boolean,
@@ -319,7 +322,7 @@ object Ast {
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
-  ) {
+  ) extends ContractDef {
     def check(state: Compiler.State[Ctx]): Unit = {
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
@@ -692,3 +695,4 @@ object Ast {
     }
   }
 }
+// scalastyle:on number.of.methods number.of.types

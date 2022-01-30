@@ -275,13 +275,22 @@ object StatefulParser extends Parser[StatefulContext] {
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ event.rep(0) ~ func.rep(
-        1
-      ) ~ "}"
-    )
-      .map { case (typeId, params, events, funcs) => Ast.TxContract(typeId, params, funcs, events) }
+      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ P(event | func).rep ~ "}"
+    ).map { case (typeId, params, statements) =>
+      val funcs = statements.collect { case func: Ast.FuncDef[_] =>
+        func.asInstanceOf[Ast.FuncDef[StatefulContext]]
+      }
+      if (funcs.length < 1) {
+        throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
+      } else {
+        val events = statements.collect { case event: Ast.EventDef => event }
+        Ast.TxContract(typeId, params, funcs, events)
+      }
+    }
   def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
   def multiContract[_: P]: P[Ast.MultiTxContract] =

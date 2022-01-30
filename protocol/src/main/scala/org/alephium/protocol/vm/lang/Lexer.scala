@@ -138,10 +138,25 @@ object Lexer {
   def payable[_: P]: P[FuncModifier]      = keyword("payable").map(_ => Payable)
   def funcModifier[_: P]: P[FuncModifier] = P(pub | payable)
 
-  // format: off
-  def keywordSet: Set[String] =
-    Set("TxContract", "AssetScript", "TxScript", "let", "mut", "fn", "return", "true", "false", "if", "else", "while", "pub", "payable", "event", "emit", "loop")
-  // format: on
+  def keywordSet: Set[String] = Set(
+    "TxContract",
+    "AssetScript",
+    "TxScript",
+    "let",
+    "mut",
+    "fn",
+    "return",
+    "true",
+    "false",
+    "if",
+    "else",
+    "while",
+    "pub",
+    "payable",
+    "event",
+    "emit",
+    "loop"
+  )
 
   val primTpes: Map[String, Type] =
     Type.primitives.map(tpe => (getSimpleName(tpe), tpe)).toArray.toMap
