@@ -313,6 +313,20 @@ object Ast {
     }
   }
 
+  sealed trait UniqueDef {
+    def name: String
+  }
+
+  object UniqueDef {
+    def duplicates(defs: Seq[UniqueDef]): String = {
+      defs
+        .groupBy(_.name)
+        .filter(_._2.size > 1)
+        .keys
+        .mkString(", ")
+    }
+  }
+
   final case class FuncDef[Ctx <: StatelessContext](
       id: FuncId,
       isPublic: Boolean,
@@ -320,7 +334,9 @@ object Ast {
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
-  ) {
+  ) extends UniqueDef {
+    override def name: String = id.name
+
     def check(state: Compiler.State[Ctx]): Unit = {
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
@@ -344,9 +360,11 @@ object Ast {
   }
 
   final case class EventDef(
-      ident: TypeId,
+      id: TypeId,
       fields: Seq[EventField]
-  )
+  ) extends UniqueDef {
+    override def name: String = id.name
+  }
 
   final case class EmitEvent[Ctx <: StatelessContext](id: TypeId, args: Seq[Expr[Ctx]])
       extends Statement[Ctx] {
@@ -603,8 +621,8 @@ object Ast {
     lazy val funcTable: Map[FuncId, Compiler.SimpleFunc[Ctx]] = {
       val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
       if (table.size != funcs.size) {
-        val duplicates = funcs.groupBy(_.id).filter(_._2.size > 1).keys
-        throw Compiler.Error(s"These functions ${duplicates} are defined multiple times")
+        val duplicates = UniqueDef.duplicates(funcs)
+        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
       }
       table
     }
@@ -631,9 +649,15 @@ object Ast {
     val events: Seq[EventDef] = Seq.empty
 
     def eventTable(): immutable.Map[Ast.TypeId, Compiler.EventInfo] = {
-      events.map { event =>
-        event.ident -> Compiler.EventInfo(event.ident, event.fields.map(_.tpe))
+      val table = events.map { event =>
+        event.id -> Compiler.EventInfo(event.id, event.fields.map(_.tpe))
       }.toMap
+
+      if (table.size != events.size) {
+        val duplicates = UniqueDef.duplicates(events)
+        throw Compiler.Error(s"These events are defined multiple times: $duplicates")
+      }
+      table
     }
   }
 

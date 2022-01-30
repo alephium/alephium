@@ -118,6 +118,37 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .leftValue
         .message is "No function definition in TxContract Foo"
     }
+
+    {
+      info("duplicated function definitions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  pub fn add1(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add2(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add3(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |
+           |  pub fn add1(b: U256, a: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add2(b: U256, a: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "These functions are defined multiple times: add1, add2"
+    }
+
   }
 
   it should "infer types" in {
@@ -1241,6 +1272,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(contract).leftValue.message is "Event Add2 does not exist"
+    }
+
+    {
+      info("duplicated event definitions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add1(a: U256, b: U256)
+           |  event Add2(a: U256, b: U256)
+           |  event Add3(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add(a, b)
+           |    return (a + b)
+           |  }
+           |
+           |  event Add1(b: U256, a: U256)
+           |  event Add2(b: U256, a: U256)
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "These events are defined multiple times: Add1, Add2"
     }
 
     {
