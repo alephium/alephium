@@ -322,7 +322,7 @@ class TxHandler(
   ): Unit = {
     val currentTs = TimeStamp.now()
     val result    = mempool.addNewTx(chainIndex, tx, currentTs)
-    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
+    log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
       case MemPool.AddedToSharedPool =>
         if (needToDelay(chainIndex, tx)) {
