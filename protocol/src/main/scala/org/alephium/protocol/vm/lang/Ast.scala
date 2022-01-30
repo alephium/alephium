@@ -313,8 +313,6 @@ object Ast {
     }
   }
 
-  sealed trait ContractDef
-
   final case class FuncDef[Ctx <: StatelessContext](
       id: FuncId,
       isPublic: Boolean,
@@ -322,7 +320,7 @@ object Ast {
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
-  ) extends ContractDef {
+  ) {
     def check(state: Compiler.State[Ctx]): Unit = {
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
