@@ -1,6 +1,8 @@
 # Alephium Change Log
 
 ## Unreleased
+* Improve block cache
+* Cosmetic updates
 
 ## 1.2.5
 
