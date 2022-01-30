@@ -30,27 +30,20 @@ class FlowCacheSpec extends AlephiumSpec with LockFixture {
 
     val chainIndex = ChainIndex.unsafe(0, 1)
     val cache      = blockFlow.getGroupCache(GroupIndex.unsafe(0))
+    cache.size is 5
 
-    val blockFlow1 = isolatedBlockFlow()
-    val blocks = (0 until 3).map { _ =>
-      val block = emptyBlock(blockFlow1, chainIndex)
-      addAndCheck(blockFlow1, block)
+    val blocks = (0 until 5).map { _ =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
       block
     }
-    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 0))
+    cache.size is 5
+    blocks.foreach(block => cache.get(block.hash).nonEmpty is true)
 
-    blockFlow.cacheBlock(blocks(1))
-    cache.get(blocks(1).hash).nonEmpty is true
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 0))
     blockFlow.cacheBlock(block1)
-    cache.get(blocks(1).hash).nonEmpty is true
-    cache.get(block1.hash).nonEmpty is true
-    blockFlow.cacheBlock(blocks(0))
     cache.get(blocks(0).hash).nonEmpty is false
-    cache.get(blocks(1).hash).nonEmpty is true
-    cache.get(block1.hash).nonEmpty is true
-    blockFlow.cacheBlock(blocks(2))
-    cache.get(blocks(1).hash).nonEmpty is false
-    cache.get(blocks(2).hash).nonEmpty is true
+    blocks.tail.foreach(block => cache.get(block.hash).nonEmpty is true)
     cache.get(block1.hash).nonEmpty is true
   }
 

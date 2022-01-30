@@ -19,8 +19,8 @@ package org.alephium.flow.core
 import org.alephium.flow.core.BlockFlowState.BlockCache
 import org.alephium.flow.model.BlockState
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BlockHeader, ChainIndex}
+import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.{RWLock, ValueSortedMap}
 
 object FlowCache {
@@ -30,37 +30,26 @@ object FlowCache {
   implicit val blockOrdering: Ordering[BlockCache] = Ordering.by(_.blockTime)
   def blocks(
       capacityPerChain: Int
-  )(implicit groupConfig: GroupConfig): FlowCache[BlockHash, BlockCache] = {
-    val m = ValueSortedMap.empty[BlockHash, BlockCache]
-    new FlowCache[BlockHash, BlockCache](m, capacityPerChain) {
-      override protected def clean(newKey: BlockHash): Unit = {
-        val index           = ChainIndex.from(newKey)
-        val sameChainBlocks = underlying.keys().filter(ChainIndex.from(_) == index)
-        if (sameChainBlocks.hasNext) {
-          val oldest     = sameChainBlocks.next()
-          val restLength = sameChainBlocks.length
-          if (restLength == capacity) {
-            underlying.remove(oldest)
-          }
-        }
-      }
-    }
+  )(implicit brokerConfig: BrokerConfig): FlowCache[BlockHash, BlockCache] = {
+    val m        = ValueSortedMap.empty[BlockHash, BlockCache]
+    val capacity = (2 * brokerConfig.groups - 1) * capacityPerChain
+    new FlowCache[BlockHash, BlockCache](m, capacity)
   }
 
   implicit val headerOrdering: Ordering[BlockHeader] = Ordering.by(_.timestamp)
   def headers(capacity: Int): FlowCache[BlockHash, BlockHeader] = {
     val m = ValueSortedMap.empty[BlockHash, BlockHeader]
-    new DefaultFlowCache[BlockHash, BlockHeader](m, capacity)
+    new FlowCache[BlockHash, BlockHeader](m, capacity)
   }
 
   implicit val stateOrdering: Ordering[BlockState] = Ordering.by(_.height)
   def states(capacity: Int): FlowCache[BlockHash, BlockState] = {
     val m = ValueSortedMap.empty[BlockHash, BlockState]
-    new DefaultFlowCache[BlockHash, BlockState](m, capacity)
+    new FlowCache[BlockHash, BlockState](m, capacity)
   }
 }
 
-abstract class FlowCache[K, V](val underlying: ValueSortedMap[BlockHash, V], val capacity: Int)
+class FlowCache[K, V](val underlying: ValueSortedMap[BlockHash, V], val capacity: Int)
     extends RWLock {
   def size: Int = readOnly(underlying.size)
 
@@ -96,15 +85,10 @@ abstract class FlowCache[K, V](val underlying: ValueSortedMap[BlockHash, V], val
 
   def put(key: BlockHash, value: V): Unit = writeOnly {
     underlying.put(key, value)
-    clean(key)
+    evict()
   }
 
-  protected def clean(newKey: BlockHash): Unit
-}
-
-class DefaultFlowCache[K, V](underlying: ValueSortedMap[BlockHash, V], capacity: Int)
-    extends FlowCache[K, V](underlying, capacity) {
-  protected def clean(newKey: BlockHash): Unit = {
+  def evict(): Unit = {
     if (underlying.size > capacity) {
       underlying.remove(underlying.min)
     }

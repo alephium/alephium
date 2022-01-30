@@ -23,7 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{BlockFlow, FlowUtils}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -374,7 +374,8 @@ trait FlowFixture
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val txs              = prepareTxs(blockFlow, chainIndex)
-    val blockTs          = TimeStamp.now()
+    val parentTs         = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
+    val blockTs          = FlowUtils.nextTimeStamp(parentTs)
 
     val target     = blockFlow.getNextHashTarget(chainIndex, deps).rightValue
     val coinbaseTx = Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs)

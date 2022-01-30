@@ -40,11 +40,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
   import ConfigUtils._
   it should "load alephium config" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.groups", "13"),
+      ("alephium.broker.groups", "12"),
       ("alephium.consensus.block-target-time", "11 seconds")
     )
 
-    config.broker.groups is 13
+    config.broker.groups is 12
+    config.broker.brokerNum is 3
+    config.broker.groupNumPerBroker is 4
     config.network.networkId is NetworkId(2)
     config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.network.connectionBufferCapacityInByte is 100000000L
