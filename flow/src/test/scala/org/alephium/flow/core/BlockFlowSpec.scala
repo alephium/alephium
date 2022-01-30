@@ -549,7 +549,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val blockFlow2 = storageBlockFlow()
     blockFlow2.getGroupCache(GroupIndex.unsafe(0)).size is
-      consensusConfig.blockCacheCapacityPerChain + 4
+      consensusConfig.blockCacheCapacityPerChain + 5
     blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).headerCache.size is
       consensusConfig.blockCacheCapacityPerChain + 1
     blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).stateCache.size is
