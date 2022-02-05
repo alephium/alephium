@@ -74,7 +74,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-      Log1, Log2, Log3, Log4, Log5
+      Log
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
@@ -1301,42 +1301,46 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait LogFixture extends StatelessInstrFixture {
-    def test(instr: LogInstr, n: Int) = {
+    def test(n: Int) = {
       (0 until n).foreach { _ =>
         stack.push(Val.True)
       }
 
+      stack.push(Val.U256(U256.unsafe(n)))
+
       val initialGas = context.gasRemaining
-      instr.runWith(frame) isE ()
+      Log.runWith(frame) isE ()
       stack.size is 0
-      initialGas.subUnsafe(context.gasRemaining) is instr.gas(n)
+      initialGas.subUnsafe(context.gasRemaining) is Log.gas(n)
 
       (0 until (n - 1)).foreach { _ =>
         stack.push(Val.True)
       }
 
-      instr.runWith(frame).leftValue isE StackUnderflow
+      stack.push(Val.U256(U256.unsafe(n)))
+
+      Log.runWith(frame).leftValue isE StackUnderflow
     }
   }
 
   it should "Log1" in new LogFixture {
-    test(Log1, 1)
+    test(1)
   }
 
   it should "Log2" in new LogFixture {
-    test(Log2, 2)
+    test(2)
   }
 
   it should "Log3" in new LogFixture {
-    test(Log3, 3)
+    test(3)
   }
 
   it should "Log4" in new LogFixture {
-    test(Log4, 4)
+    test(4)
   }
 
   it should "Log5" in new LogFixture {
-    test(Log5, 5)
+    test(5)
   }
 
   trait StatefulFixture extends ContextGenerators {
@@ -1891,7 +1895,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200
+      Log -> 120
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -1908,7 +1912,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       instr match {
         case i: ToByteVecInstr[_]  => testToByteVec(i, gas)
         case _: ByteVecConcat.type => testByteVecConcatGas(gas)
-        case i: LogInstr           => testLog(i, gas)
+        case Log                   => testLog(gas)
         case i: GasSimple          => i.gas().value is gas
         case i: GasFormula         => i.gas(32).value is gas
       }
@@ -1928,12 +1932,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecConcat.runWith(frame) isE ()
       (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
     }
-    def testLog(instr: LogInstr, gas: Int) = instr match {
-      case i: Log1.type => i.gas(1).value is gas
-      case i: Log2.type => i.gas(2).value is gas
-      case i: Log3.type => i.gas(3).value is gas
-      case i: Log4.type => i.gas(4).value is gas
-      case i: Log5.type => i.gas(5).value is gas
+    def testLog(gas: Int) = {
+      Log.gas(1) is gas // HOW TO FIX THIS? what is the number?
     }
     statelessCases.foreach(test.tupled)
     statefulCases.foreach(test.tupled)
@@ -1967,7 +1967,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
-      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
+      Log -> 93,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,

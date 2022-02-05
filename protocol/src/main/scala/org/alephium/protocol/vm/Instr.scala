@@ -111,7 +111,7 @@ object Instr {
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-    Log1, Log2, Log3, Log4, Log5
+    Log
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1410,18 +1410,13 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
   }
 }
 
-sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
-  def n: Int
-
+object Log extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _ <- frame.ctx.chargeGasWithSize(this, n)
-      _ <- frame.opStack.pop(n) // TODO: send the log to an event bus
+      n <- frame.popOpStackU256()
+      argsLength = n.v.v.intValue()
+      _ <- frame.opStack.pop(argsLength)
+      _ <- frame.ctx.chargeGasWithSize(this, argsLength)
     } yield ()
   }
 }
-object Log1 extends LogInstr { val n: Int = 1 }
-object Log2 extends LogInstr { val n: Int = 2 }
-object Log3 extends LogInstr { val n: Int = 3 }
-object Log4 extends LogInstr { val n: Int = 4 }
-object Log5 extends LogInstr { val n: Int = 5 }
