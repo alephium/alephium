@@ -85,7 +85,6 @@ trait Server extends Service {
   }
 
   override protected def startSelfOnce(): Future[Unit] = Future {
-    node.blockFlow.checkHashIndexingUnsafe()
     val props =
       MinerApiController
         .props(node.allHandlers)(
