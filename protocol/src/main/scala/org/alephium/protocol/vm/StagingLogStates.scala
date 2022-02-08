@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
-final class StagingSMT[K, V](
-    val underlying: CachedSMT[K, V],
-    val caches: mutable.Map[K, Modified[V]]
-) extends StagingKV[K, V]
+import org.alephium.io._
+
+final class StagingLogStates(
+    val underlying: CachedLogStates,
+    val caches: mutable.Map[LogStatesId, Modified[LogStates]]
+) extends StagingKV[LogStatesId, LogStates]
