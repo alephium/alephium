@@ -16,13 +16,13 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def genBlockEnv(): BlockEnv = {
-    BlockEnv(NetworkId.AlephiumDevNet, TimeStamp.now(), Target.Max)
+    BlockEnv(NetworkId.AlephiumDevNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate))
   }
 
   def genTxEnv(scriptOpt: Option[StatefulScript] = None, signatures: AVector[Signature]): TxEnv = {
@@ -106,7 +106,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val worldState: WorldState.Staging            = cachedWorldState.staging()
       val outputBalances: Balances                  = Balances.empty
       def nextOutputIndex: Int                      = 0
-      def blockEnv: BlockEnv                        = ???
+      def blockEnv: BlockEnv                        = genBlockEnv()
       def txEnv: TxEnv                              = txEnvOpt.getOrElse(???)
       def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
       var gasRemaining: GasBox                      = gasLimit

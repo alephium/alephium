@@ -1413,10 +1413,29 @@ object Log extends StatefulInstrCompanion0 with GasLog {
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       u256 <- frame.popOpStackU256()
-      // fieldsLength = (event name + value of each argument).length
       fieldsLength = u256.v.v.intValue()
-      _ <- frame.opStack.pop(fieldsLength)
-      _ <- frame.ctx.chargeGasWithSize(this, fieldsLength)
+      name   <- frame.popOpStackByteVec()
+      fields <- frame.opStack.pop(fieldsLength - 1)
+      _      <- writeLog(frame, name, fields)
+      _      <- frame.ctx.chargeGasWithSize(this, fieldsLength)
     } yield ()
+  }
+
+  private def writeLog[C <: StatefulContext](
+      frame: Frame[C],
+      name: Val.ByteVec,
+      fields: AVector[Val]
+  ) = {
+    frame.ctx.worldState
+      .addLog(
+        frame.ctx.blockEnv.id,
+        frame.obj.contractIdOpt,
+        name,
+        fields
+      )
+      .left
+      .map { error =>
+        Left(IOErrorWriteLog(error))
+      }
   }
 }

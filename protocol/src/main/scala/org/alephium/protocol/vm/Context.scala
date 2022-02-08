@@ -18,15 +18,20 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector, TimeStamp, U256}
 
-final case class BlockEnv(networkId: NetworkId, timeStamp: TimeStamp, target: Target)
+final case class BlockEnv(
+    networkId: NetworkId,
+    timeStamp: TimeStamp,
+    target: Target,
+    id: Option[BlockHash]
+)
 object BlockEnv {
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
-    BlockEnv(networkConfig.networkId, header.timestamp, header.target)
+    BlockEnv(networkConfig.networkId, header.timestamp, header.target, Some(header.hash))
 }
 
 sealed trait TxEnv {

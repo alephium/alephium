@@ -33,7 +33,7 @@ object LogStatesId {
 // txId?
 // index in blocks?
 // removed field due to re-org?
-final case class LogState private (
+final case class LogState(
     name: Val.ByteVec,
     fields: AVector[Val]
 )
@@ -43,7 +43,7 @@ object LogState {
     Serde.forProduct2(LogState.apply, s => (s.name, s.fields))
 }
 
-final case class LogStates private (
+final case class LogStates(
     blockHash: BlockHash,
     contractId: ContractId,
     states: AVector[LogState]

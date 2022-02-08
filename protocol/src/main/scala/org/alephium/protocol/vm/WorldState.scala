@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.io._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
@@ -389,6 +389,31 @@ object WorldState {
         maxOutputs: Int,
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
+
+    def addLog(
+        blockHashOpt: Option[BlockHash],
+        contractIdOpt: Option[ContractId],
+        name: Val.ByteVec,
+        fields: AVector[Val]
+    ): IOResult[Unit] = {
+      (blockHashOpt, contractIdOpt) match {
+        case (Some(blockHash), Some(contractId)) =>
+          val id    = LogStatesId(blockHash, contractId)
+          val state = LogState(name, fields)
+          for {
+            logStatesOpt <- logState.getOpt(id)
+            _ <- logStatesOpt match {
+              case Some(logStates) =>
+                logState.put(id, logStates.copy(states = logStates.states :+ state))
+              case None =>
+                logState.put(id, LogStates(blockHash, contractId, AVector(state)))
+            }
+          } yield ()
+        case _ =>
+          Right(())
+      }
+
+    }
   }
 
   final case class Cached(
