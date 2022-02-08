@@ -14,15 +14,14 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.io
+package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
 import org.alephium.io._
-import org.alephium.protocol.vm.{LogStates, LogStatesId}
 
 final class CachedLogStates(
-    val underlying: LogStorage,
+    val underlying: KeyValueStorage[LogStatesId, LogStates],
     val caches: mutable.Map[LogStatesId, Cache[LogStates]]
 ) extends CachedKV[LogStatesId, LogStates, Cache[LogStates]] {
   protected def getOptFromUnderlying(key: LogStatesId): IOResult[Option[LogStates]] = {
@@ -32,7 +31,7 @@ final class CachedLogStates(
     }
   }
 
-  def persist(): IOResult[LogStorage] = {
+  def persist(): IOResult[KeyValueStorage[LogStatesId, LogStates]] = {
     underlying
       .putBatch { putAccumulate =>
         caches.foreach {
@@ -43,5 +42,11 @@ final class CachedLogStates(
         }
       }
       .map(_ => underlying)
+  }
+}
+
+object CachedLogStates {
+  def from(storage: KeyValueStorage[LogStatesId, LogStates]): CachedLogStates = {
+    new CachedLogStates(storage, mutable.Map.empty)
   }
 }

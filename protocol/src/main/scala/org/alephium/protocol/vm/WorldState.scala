@@ -316,7 +316,8 @@ object WorldState {
       val outputStateCache    = CachedSMT.from(outputState)
       val contractOutputCache = CachedSMT.from(contractState)
       val codeStateCache      = CachedSMT.from(codeState)
-      Cached(outputStateCache, contractOutputCache, codeStateCache, logState)
+      val logStatesCache      = CachedLogStates.from(logState)
+      Cached(outputStateCache, contractOutputCache, codeStateCache, logStatesCache)
     }
 
     def toHashes: WorldState.Hashes =
@@ -393,14 +394,15 @@ object WorldState {
       outputState: CachedSMT[TxOutputRef, TxOutput],
       contractState: CachedSMT[Hash, ContractState],
       codeState: CachedSMT[Hash, CodeRecord],
-      logState: KeyValueStorage[LogStatesId, LogStates] // Implement a cached kv?
+      logState: CachedLogStates
   ) extends AbstractCached {
     def persist(): IOResult[Persisted] = {
       for {
         outputStateNew   <- outputState.persist()
         contractStateNew <- contractState.persist()
         codeStateNew     <- codeState.persist()
-      } yield Persisted(outputStateNew, contractStateNew, codeStateNew, logState)
+        logStateNew      <- logState.persist()
+      } yield Persisted(outputStateNew, contractStateNew, codeStateNew, logStateNew)
     }
 
     def staging(): Staging =
