@@ -42,6 +42,7 @@ object RocksDBSource {
     case object PendingTx extends ColumnFamily("pendingtx")
     case object ReadyTx   extends ColumnFamily("readytx")
     case object Trie      extends ColumnFamily("trie")
+    case object Log       extends ColumnFamily("log")
 
     val values: AVector[ColumnFamily] =
       AVector(All, Block, Broker, Header, PendingTx, ReadyTx, Trie)

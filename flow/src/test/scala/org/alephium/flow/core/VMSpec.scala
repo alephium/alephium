@@ -1059,5 +1059,63 @@ class VMSpec extends AlephiumSpec {
     addAndCheck0(blockFlow, block)
     checkContract(ALPH.cent(95), 5)
   }
+
+  trait EventFixture extends FlowFixture {
+    lazy val input0 =
+      s"""
+         |TxContract Foo(mut result: U256) {
+         |
+         |  event Add(a: U256, b: U256)
+         |
+         |  pub fn add(a: U256) -> (U256) {
+         |    emit Add(a, result)
+         |    result = result + a
+         |    return result
+         |  }
+         |}
+         |""".stripMargin
+    lazy val script0      = Compiler.compileContract(input0).rightValue
+    lazy val initialState = AVector[Val](Val.U256.from(10))
+
+    lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val fromLockup = getGenesisLockupScript(chainIndex)
+    lazy val txScript0  = contractCreation(script0, initialState, fromLockup, ALPH.alph(1))
+    lazy val block0     = payableCall(blockFlow, chainIndex, txScript0)
+    lazy val contractOutputRef0 =
+      TxOutputRef.unsafe(block0.transactions.head, 0).asInstanceOf[ContractOutputRef]
+    lazy val contractKey0 = contractOutputRef0.key
+
+    lazy val input1 =
+      s"""
+         |TxContract Foo(mut result: U256) {
+         |
+         |  event Add(a: U256, b: U256)
+         |
+         |  pub fn add(a: U256) -> (U256) {
+         |    emit Add(a, result)
+         |    result = result + a
+         |    return result
+         |  }
+         |}
+         |
+         |TxScript Bar {
+         |  pub fn call() -> () {
+         |    let foo = Foo(#${contractKey0.toHexString})
+         |    foo.add(4)
+         |
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+  }
+
+  it should "emit events" in new EventFixture {
+    addAndCheck(blockFlow, block0, 1)
+    checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
+
+    val script1 = Compiler.compileTxScript(input1, 1).rightValue
+    simpleScript(blockFlow, chainIndex, script1)
+    simpleScript(blockFlow, chainIndex, script1)
+  }
 }
 // scalastyle:on file.size.limit no.equal regex

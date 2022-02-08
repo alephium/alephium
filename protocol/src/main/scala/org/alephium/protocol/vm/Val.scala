@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.nio.charset.StandardCharsets
+
 import akka.util.ByteString
 
 import org.alephium.serde.{_deserialize => decode, serialize => encode, _}
@@ -161,6 +163,10 @@ object Val {
     override def isNumeric: Boolean  = true
 
     override def toString: String = "U256"
+
+    def from(v: Int): U256 = {
+      U256(util.U256.unsafe(v))
+    }
   }
 
   object ByteVec extends Type {
@@ -172,6 +178,7 @@ object Val {
     override def toString: String = "ByteVec"
 
     def from(bytes: RandomBytes): ByteVec = ByteVec(bytes.bytes)
+    def from(str: String): ByteVec        = ByteVec(ByteString(str.getBytes(StandardCharsets.UTF_8)))
   }
   object Address extends Type {
     implicit val serde: Serde[Address] = serdeImpl[LockupScript].xmap(Address(_), _.lockupScript)

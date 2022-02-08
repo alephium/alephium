@@ -1413,10 +1413,11 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
 object Log extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      n <- frame.popOpStackU256()
-      argsLength = n.v.v.intValue()
-      _ <- frame.opStack.pop(argsLength)
-      _ <- frame.ctx.chargeGasWithSize(this, argsLength)
+      u256 <- frame.popOpStackU256()
+      // fieldsLength = (event name + value of each argument).length
+      fieldsLength = u256.v.v.intValue()
+      _ <- frame.opStack.pop(fieldsLength)
+      _ <- frame.ctx.chargeGasWithSize(this, fieldsLength)
     } yield ()
   }
 }

@@ -16,11 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
-import java.nio.charset.StandardCharsets
-
 import scala.collection.immutable
-
-import akka.util.ByteString
 
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
@@ -383,9 +379,8 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val eventName =
-        Const[Ctx](Val.ByteVec(ByteString(id.name.getBytes(StandardCharsets.UTF_8)))).genCode(state)
-      val argsLength = Const[Ctx](Val.U256(U256.unsafe(args.length + 1))).genCode(state)
+      val eventName  = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
+      val argsLength = Const[Ctx](Val.U256.from(args.length + 1)).genCode(state)
       eventName ++ args.flatMap(_.genCode(state)) ++ argsLength :+ Log
     }
   }
