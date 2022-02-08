@@ -285,7 +285,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
     }
   }
 
-  def exist(key: K): IOResult[Boolean] = {
+  def exists(key: K): IOResult[Boolean] = {
     existRaw(serialize[K](key))
   }
 

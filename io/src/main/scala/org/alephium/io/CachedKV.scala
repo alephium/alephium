@@ -43,9 +43,9 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]]
 
   // we don't cache this function as it is usually used for removal
-  def exist(key: K): IOResult[Boolean] = {
+  def exists(key: K): IOResult[Boolean] = {
     (caches.get(key): @unchecked) match {
-      case None                    => underlying.exist(key)
+      case None                    => underlying.exists(key)
       case Some(_: ValueExists[V]) => Right(true)
       case Some(Removed())         => Right(false)
     }
@@ -61,7 +61,7 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
   }
 
   protected def removeForUnderlying(key: K): IOResult[Unit] = {
-    underlying.exist(key).flatMap {
+    underlying.exists(key).flatMap {
       case true  => Right(discard(caches.addOne(key -> Removed())))
       case false => Left(IOError.keyNotFound(key, "CachedTrie.removeForUnderlying"))
     }
@@ -76,7 +76,7 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
   }
 
   protected def putForUnderlying(key: K, value: V): IOResult[Unit] = {
-    underlying.exist(key).map {
+    underlying.exists(key).map {
       case true  => discard(caches.addOne(key -> Updated(value)))
       case false => discard(caches.addOne(key -> Inserted(value)))
     }

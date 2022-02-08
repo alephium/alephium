@@ -56,7 +56,7 @@ trait WorldState[T, R1, R2, R3] {
   }
 
   def existOutput(outputRef: TxOutputRef): IOResult[Boolean] = {
-    outputState.exist(outputRef)
+    outputState.exists(outputRef)
   }
 
   def getContractState(key: Hash): IOResult[ContractState] = {
@@ -393,7 +393,7 @@ object WorldState {
       outputState: CachedSMT[TxOutputRef, TxOutput],
       contractState: CachedSMT[Hash, ContractState],
       codeState: CachedSMT[Hash, CodeRecord],
-      logState: KeyValueStorage[LogStatesId, LogStates]  // Implement a cached kv?
+      logState: KeyValueStorage[LogStatesId, LogStates] // Implement a cached kv?
   ) extends AbstractCached {
     def persist(): IOResult[Persisted] = {
       for {
@@ -428,8 +428,8 @@ object WorldState {
   }
 
   def emptyPersisted(
-    trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-    logStorage: KeyValueStorage[LogStatesId, LogStates]
+      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      logStorage: KeyValueStorage[LogStatesId, LogStates]
   ): Persisted = {
     val genesisRef  = ContractOutputRef.forSMT
     val emptyOutput = TxOutput.forSMT
@@ -444,16 +444,16 @@ object WorldState {
   }
 
   def emptyCached(
-    trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-    logStorage: KeyValueStorage[LogStatesId, LogStates]
+      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      logStorage: KeyValueStorage[LogStatesId, LogStates]
   ): Cached = {
     emptyPersisted(trieStorage, logStorage).cached()
   }
 
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash, codeStateHash: Hash) {
     def toPersistedWorldState(
-      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      logStorage: KeyValueStorage[LogStatesId, LogStates]
+        trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+        logStorage: KeyValueStorage[LogStatesId, LogStates]
     ): Persisted = {
       val outputState   = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage)
       val contractState = SparseMerkleTrie[Hash, ContractState](contractStateHash, trieStorage)
@@ -462,8 +462,8 @@ object WorldState {
     }
 
     def toCachedWorldState(
-      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      logStorage: KeyValueStorage[LogStatesId, LogStates]
+        trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+        logStorage: KeyValueStorage[LogStatesId, LogStates]
     ): Cached = {
       toPersistedWorldState(trieStorage, logStorage).cached()
     }

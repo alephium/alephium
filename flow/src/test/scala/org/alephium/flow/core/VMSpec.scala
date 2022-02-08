@@ -260,8 +260,8 @@ class VMSpec extends AlephiumSpec {
     ): Assertion = {
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(contractId).get).get
-      worldState.contractState.exist(contractKey) isE existed
-      worldState.outputState.exist(contractAssetRef) isE existed
+      worldState.contractState.exists(contractKey) isE existed
+      worldState.outputState.exists(contractAssetRef) isE existed
     }
   }
 

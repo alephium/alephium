@@ -21,5 +21,5 @@ trait ReadableKV[K, V] {
 
   def getOpt(key: K): IOResult[Option[V]]
 
-  def exist(key: K): IOResult[Boolean]
+  def exists(key: K): IOResult[Boolean]
 }

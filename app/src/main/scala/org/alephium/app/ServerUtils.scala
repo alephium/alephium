@@ -128,7 +128,7 @@ class ServerUtils(implicit
   ): Try[Group] = {
     val searchResult = for {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      existed    <- worldState.contractState.exist(contractId)
+      existed    <- worldState.contractState.exists(contractId)
     } yield existed
 
     searchResult match {

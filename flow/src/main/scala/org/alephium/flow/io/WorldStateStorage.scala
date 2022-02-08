@@ -22,9 +22,7 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.vm.WorldState
-import org.alephium.protocol.vm.LogStatesId
-import org.alephium.protocol.vm.LogStates
+import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
@@ -58,7 +56,14 @@ object WorldStateRockDBStorage {
       cf: ColumnFamily,
       writeOptions: WriteOptions
   ): WorldStateRockDBStorage = {
-    new WorldStateRockDBStorage(trieStorage, logStorage, storage, cf, writeOptions, Settings.readOptions)
+    new WorldStateRockDBStorage(
+      trieStorage,
+      logStorage,
+      storage,
+      cf,
+      writeOptions,
+      Settings.readOptions
+    )
   }
 
   def apply(
