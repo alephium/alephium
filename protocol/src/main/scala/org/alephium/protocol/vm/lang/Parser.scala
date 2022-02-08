@@ -50,10 +50,6 @@ abstract class Parser[Ctx <: StatelessContext] {
   def contractConv[_: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
-  def emitEvent[_: P]: P[Ast.EmitEvent[Ctx]] =
-    P("emit" ~ Lexer.typeId ~ "(" ~ expr.rep(0, ",") ~ ")")
-      .map { case (typeId, exprs) => Ast.EmitEvent(typeId, exprs) }
-
   def chain[_: P](p: => P[Ast.Expr[Ctx]], op: => P[Operator]): P[Ast.Expr[Ctx]] =
     P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
       rhs.foldLeft(lhs) { case (acc, (op, right)) =>
@@ -307,4 +303,8 @@ object StatefulParser extends Parser[StatefulContext] {
         (0 until size).flatMap(_ => consts)
       }
   )
+
+  def emitEvent[_: P]: P[Ast.EmitEvent[StatefulContext]] =
+    P("emit" ~ Lexer.typeId ~ "(" ~ expr.rep(0, ",") ~ ")")
+      .map { case (typeId, exprs) => Ast.EmitEvent(typeId, exprs) }
 }

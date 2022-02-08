@@ -328,6 +328,7 @@ object WorldState {
     def outputState: MutableKV[TxOutputRef, TxOutput, Unit]
     def contractState: MutableKV[Hash, ContractState, Unit]
     def codeState: MutableKV[Hash, CodeRecord, Unit]
+    def logState: MutableKV[LogStatesId, LogStates, Unit]
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
@@ -406,24 +407,32 @@ object WorldState {
     }
 
     def staging(): Staging =
-      Staging(outputState.staging(), contractState.staging(), codeState.staging())
+      Staging(
+        outputState.staging(),
+        contractState.staging(),
+        codeState.staging(),
+        logState.staging()
+      )
   }
 
   final case class Staging(
       outputState: StagingSMT[TxOutputRef, TxOutput],
       contractState: StagingSMT[Hash, ContractState],
-      codeState: StagingSMT[Hash, CodeRecord]
+      codeState: StagingSMT[Hash, CodeRecord],
+      logState: StagingLogStates
   ) extends AbstractCached {
     def commit(): Unit = {
       outputState.commit()
       contractState.commit()
       codeState.commit()
+      logState.commit()
     }
 
     def rollback(): Unit = {
       outputState.rollback()
       contractState.rollback()
       codeState.rollback()
+      logState.rollback()
     }
 
     def persist(): IOResult[Persisted] = ??? // should not be called

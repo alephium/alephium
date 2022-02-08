@@ -22,7 +22,6 @@ import org.alephium.protocol.vm.Val
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-// FIXME: better name
 final case class LogStatesId(blockHash: BlockHash, contractId: ContractId)
 
 object LogStatesId {
@@ -30,6 +29,10 @@ object LogStatesId {
     Serde.forProduct2(LogStatesId.apply, id => (id.blockHash, id.contractId))
 }
 
+// TODO:
+// txId?
+// index in blocks?
+// removed field due to re-org?
 final case class LogState private (
     name: Val.ByteVec,
     fields: AVector[Val]

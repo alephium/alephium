@@ -43,6 +43,8 @@ final class CachedLogStates(
       }
       .map(_ => underlying)
   }
+
+  def staging(): StagingLogStates = new StagingLogStates(this, mutable.Map.empty)
 }
 
 object CachedLogStates {

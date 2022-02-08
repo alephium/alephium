@@ -110,15 +110,14 @@ object Instr {
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
-    VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-    Log
+    VerifyAbsoluteLocktime, VerifyRelativeLocktime
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
     ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
     TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
+    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash, Log
   )
   // format: on
 
@@ -1410,8 +1409,8 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
   }
 }
 
-object Log extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+object Log extends StatefulInstrCompanion0 with GasLog {
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       u256 <- frame.popOpStackU256()
       // fieldsLength = (event name + value of each argument).length

@@ -73,15 +73,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
-      VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-      Log
+      VerifyAbsoluteLocktime, VerifyRelativeLocktime
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
       ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
       TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash, Log
     )
     // format: on
 
@@ -1300,7 +1299,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     initialGas.subUnsafe(context.gasRemaining) is TxCallerSize.gas()
   }
 
-  trait LogFixture extends StatelessInstrFixture {
+  trait LogFixture extends StatefulInstrFixture {
     def test(n: Int) = {
       (0 until n).foreach { _ =>
         stack.push(Val.True)
@@ -1894,15 +1893,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Assert -> 3,
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
-      VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log -> 120
+      VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
       ApproveAlph -> 30, ApproveToken -> 30, AlphRemaining -> 30, TokenRemaining -> 30, IsPaying -> 30,
       TransferAlph -> 30, TransferAlphFromSelf -> 30, TransferAlphToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
-      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5
+      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5,
+      ContractCodeHash -> 5, Log -> 120
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -1967,13 +1966,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
-      Log -> 93,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
-      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185
+      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184,
+      ContractCodeHash -> 185, Log -> 186
     )
     // format: on
 
