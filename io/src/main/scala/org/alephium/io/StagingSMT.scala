@@ -21,7 +21,7 @@ import scala.collection.mutable
 final class StagingSMT[K, V](
     val underlying: CachedSMT[K, V],
     val caches: mutable.Map[K, Modified[V]]
-) extends CachedTrie[K, V, Modified[V]] {
+) extends CachedKV[K, V, Modified[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = underlying.getOpt(key)
 
   def rollback(): Unit = {

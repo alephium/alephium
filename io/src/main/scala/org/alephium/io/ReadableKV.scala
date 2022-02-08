@@ -16,7 +16,7 @@
 
 package org.alephium.io
 
-trait ReadableTrie[K, V] {
+trait ReadableKV[K, V] {
   def get(key: K): IOResult[V]
 
   def getOpt(key: K): IOResult[Option[V]]

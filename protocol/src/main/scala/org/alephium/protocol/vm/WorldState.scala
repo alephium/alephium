@@ -25,9 +25,9 @@ import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
 trait WorldState[T, R1, R2, R3] {
-  def outputState: MutableTrie[TxOutputRef, TxOutput, R1]
-  def contractState: MutableTrie[Hash, ContractState, R2]
-  def codeState: MutableTrie[Hash, WorldState.CodeRecord, R3]
+  def outputState: MutableKV[TxOutputRef, TxOutput, R1]
+  def contractState: MutableKV[Hash, ContractState, R2]
+  def codeState: MutableKV[Hash, WorldState.CodeRecord, R3]
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def getAsset(outputRef: AssetOutputRef): IOResult[AssetOutput] = {
@@ -324,9 +324,9 @@ object WorldState {
   }
 
   sealed abstract class AbstractCached extends MutableWorldState {
-    def outputState: MutableTrie[TxOutputRef, TxOutput, Unit]
-    def contractState: MutableTrie[Hash, ContractState, Unit]
-    def codeState: MutableTrie[Hash, CodeRecord, Unit]
+    def outputState: MutableKV[TxOutputRef, TxOutput, Unit]
+    def contractState: MutableKV[Hash, ContractState, Unit]
+    def codeState: MutableKV[Hash, CodeRecord, Unit]
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
