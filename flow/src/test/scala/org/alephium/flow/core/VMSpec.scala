@@ -25,7 +25,7 @@ import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signa
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToSharedPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -1114,8 +1114,45 @@ class VMSpec extends AlephiumSpec {
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
     val script1 = Compiler.compileTxScript(input1, 1).rightValue
-    simpleScript(blockFlow, chainIndex, script1)
-    simpleScript(blockFlow, chainIndex, script1)
+    val block   = simpleScript(blockFlow, chainIndex, script1)
+    addAndCheck(blockFlow, block, 2)
+
+    {
+      info("Events emitted from the contract exist in the block")
+
+      val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block.hash, contractKey0)
+      val logStates    = logStatesOpt.value
+
+      logStates.blockHash is block.hash
+      logStates.contractId is contractKey0
+      logStates.states.length is 1
+
+      val logState = logStates.states.head
+      logState.name.bytes.utf8String is "Add"
+      logState.fields.length is 2
+      logState.fields(0) is Val.U256(U256.unsafe(10))
+      logState.fields(1) is Val.U256(U256.unsafe(4))
+    }
+
+    {
+      info("Events emitted from the contract does not exist in the block")
+
+      val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block0.hash, contractKey0)
+      logStatesOpt is None
+    }
+  }
+
+  private def getLogStates(
+      blockFlow: BlockFlow,
+      groupIndex: GroupIndex,
+      blockHash: BlockHash,
+      contractId: ContractId
+  ): Option[LogStates] = {
+    val logStatesId = LogStatesId(blockHash, contractId)
+    (for {
+      worldState   <- blockFlow.getBestPersistedWorldState(groupIndex)
+      logStatesOpt <- worldState.logState.getOpt(logStatesId)
+    } yield logStatesOpt).rightValue
   }
 }
 // scalastyle:on file.size.limit no.equal regex

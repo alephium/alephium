@@ -123,7 +123,7 @@ class ServerUtils(implicit
 
   def getContractGroup(
       blockFlow: BlockFlow,
-      contractId: Hash,
+      contractId: ContractId,
       groupIndex: GroupIndex
   ): Try[Group] = {
     val searchResult = for {
@@ -354,7 +354,7 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEvents(blockFlow: BlockFlow, blockHash: BlockHash, contractId: Hash): Try[Events] = {
+  def getEvents(blockFlow: BlockFlow, blockHash: BlockHash, contractId: ContractId): Try[Events] = {
     val chainIndex  = ChainIndex.from(blockHash)
     val logStatesId = LogStatesId(blockHash, contractId)
     if (chainIndex.isIntraGroup) {

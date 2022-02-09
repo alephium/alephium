@@ -407,7 +407,7 @@ trait Endpoints
   val getEvents: BaseEndpoint[(BlockHash, Hash), Events] =
     eventsEndpoint.get
       .in(query[BlockHash]("blockHash"))
-      .in(query[Hash]("contractId"))
+      .in(query[ContractId]("contractId"))
       .out(jsonBody[Events])
       .summary("Get events for a contract within a block")
 }

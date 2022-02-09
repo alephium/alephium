@@ -21,7 +21,7 @@ import java.nio.file.Path
 import org.rocksdb.WriteOptions
 
 import org.alephium.io.{IOResult, KeyValueSource, RocksDBKeyValueStorage, RocksDBSource}
-import org.alephium.io.RocksDBSource.ColumnFamily
+import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -36,25 +36,23 @@ object Storages {
   val chainStatePostfix: Byte    = 4
   val dbVersionPostfix: Byte     = 5
   val bootstrapInfoPostFix: Byte = 6
-  // log?
 
   def createUnsafe(rootPath: Path, storageDbFolder: String, writeOptions: WriteOptions)(implicit
       config: GroupConfig
   ): Storages = {
     val db                = createRocksDBUnsafe(rootPath, storageDbFolder)
-    val blockStorage      = BlockRockDBStorage(db, ColumnFamily.Block, writeOptions)
-    val headerStorage     = BlockHeaderRockDBStorage(db, ColumnFamily.Header, writeOptions)
-    val blockStateStorage = BlockStateRockDBStorage(db, ColumnFamily.All, writeOptions)
-    val txStorage         = TxRocksDBStorage(db, ColumnFamily.All, writeOptions)
-    val nodeStateStorage  = NodeStateRockDBStorage(db, ColumnFamily.All, writeOptions)
-    val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, ColumnFamily.Trie, writeOptions)
-    val logStorage        = LogRocksDBStorage(db, ColumnFamily.Log, writeOptions)
-    val trieHashStorage =
-      WorldStateRockDBStorage(trieStorage, logStorage, db, ColumnFamily.All, writeOptions)
-    val emptyWorldState  = WorldState.emptyPersisted(trieStorage, logStorage)
-    val pendingTxStorage = PendingTxRocksDBStorage(db, ColumnFamily.PendingTx, writeOptions)
-    val readyTxStorage   = ReadyTxRocksDBStorage(db, ColumnFamily.ReadyTx, writeOptions)
-    val brokerStorage    = BrokerRocksDBStorage(db, ColumnFamily.Broker, writeOptions)
+    val blockStorage      = BlockRockDBStorage(db, Block, writeOptions)
+    val headerStorage     = BlockHeaderRockDBStorage(db, Header, writeOptions)
+    val blockStateStorage = BlockStateRockDBStorage(db, All, writeOptions)
+    val txStorage         = TxRocksDBStorage(db, All, writeOptions)
+    val nodeStateStorage  = NodeStateRockDBStorage(db, All, writeOptions)
+    val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, Trie, writeOptions)
+    val logStorage        = LogRocksDBStorage(db, Log, writeOptions)
+    val trieHashStorage   = WorldStateRockDBStorage(trieStorage, logStorage, db, All, writeOptions)
+    val emptyWorldState   = WorldState.emptyPersisted(trieStorage, logStorage)
+    val pendingTxStorage  = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
+    val readyTxStorage    = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
+    val brokerStorage     = BrokerRocksDBStorage(db, Broker, writeOptions)
 
     Storages(
       AVector(db),

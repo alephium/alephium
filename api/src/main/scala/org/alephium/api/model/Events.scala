@@ -16,7 +16,8 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
@@ -26,7 +27,7 @@ final case class Events(
 
 final case class Event(
     blockHash: BlockHash,
-    contractId: Hash,
+    contractId: ContractId,
     name: Val.ByteVec,
     fields: AVector[Val]
 )

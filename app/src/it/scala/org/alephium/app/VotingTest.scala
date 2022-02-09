@@ -20,7 +20,7 @@ import org.alephium.api.model._
 import org.alephium.api.model.Output.Contract
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
@@ -310,7 +310,7 @@ trait WalletFixture extends CliqueFixture {
   val utxoFee = "50000000000000"
 }
 
-final case class ContractRef(contractId: Hash, contractAddress: Address, code: String)
+final case class ContractRef(contractId: ContractId, contractAddress: Address, code: String)
 final case class Wallet(
     creation: WalletCreation,
     result: WalletCreation.Result,
