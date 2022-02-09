@@ -381,7 +381,7 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val eventName  = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
       val argsLength = Const[Ctx](Val.U256.from(args.length + 1)).genCode(state)
-      args.flatMap(_.genCode(state)).reverse ++ eventName ++ argsLength :+ Log
+      args.flatMap(_.genCode(state)) ++ eventName ++ argsLength :+ Log
     }
   }
 
