@@ -511,6 +511,16 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(result, jsonRaw)
   }
 
+  it should "encode/decode SweepAddressTransaction" in {
+    val txId     = Hash.generate
+    val gas      = GasBox.unsafe(1)
+    val gasPrice = GasPrice(1)
+    val result   = SweepAddressTransaction(txId, "tx", gas, gasPrice)
+    val jsonRaw =
+      s"""{"txId":"${txId.toHexString}","unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1"}"""
+    checkData(result, jsonRaw)
+  }
+
   it should "encode/decode SubmitTransaction" in {
     val signature = Signature.generate
     val transfer  = SubmitTransaction("tx", signature)
