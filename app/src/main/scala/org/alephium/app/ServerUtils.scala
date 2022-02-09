@@ -354,6 +354,21 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
+  def getEvents(blockFlow: BlockFlow, blockHash: BlockHash, contractId: Hash): Try[Events] = {
+    val chainIndex  = ChainIndex.from(blockHash)
+    val logStatesId = LogStatesId(blockHash, contractId)
+    if (chainIndex.isIntraGroup) {
+      val events = for {
+        worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)
+        logStatesOpt <- worldState.logState.getOpt(logStatesId)
+      } yield logStatesOpt.map(Events.from).getOrElse(Events.empty())
+
+      wrapResult(events)
+    } else {
+      Right(Events.empty())
+    }
+  }
+
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
     for {
       _ <- checkHashChainIndex(query.hash)
@@ -801,7 +816,7 @@ class ServerUtils(implicit
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv =
-      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget)
+      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
       txId = Hash.random,

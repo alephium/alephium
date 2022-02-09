@@ -18,6 +18,7 @@ package org.alephium.api
 
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
+import java.nio.charset.StandardCharsets
 
 import akka.util.ByteString
 import sttp.tapir.EndpointIO.Example
@@ -524,5 +525,19 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
+
+  implicit val eventsExamples: List[Example[Events]] =
+    simpleExample(
+      Events(events =
+        AVector(
+          Event(
+            blockHash,
+            contractAddress.lockupScript.contractId,
+            Val.ByteVec(ByteString("TransferTo".getBytes(StandardCharsets.UTF_8))),
+            AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
+          )
+        )
+      )
+    )
 }
 // scalastyle:on magic.number

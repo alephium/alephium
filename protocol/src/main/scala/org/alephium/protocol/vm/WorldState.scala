@@ -390,7 +390,7 @@ object WorldState {
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
 
-    def addLog(
+    def writeLog(
         blockHashOpt: Option[BlockHash],
         contractIdOpt: Option[ContractId],
         name: Val.ByteVec,

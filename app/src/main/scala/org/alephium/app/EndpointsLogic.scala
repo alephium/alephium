@@ -556,6 +556,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
+  val getEventsLogic = serverLogic(getEvents) { case (blockHash, contractId) =>
+    Future.successful {
+      serverUtils.getEvents(blockFlow, blockHash, contractId)
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {

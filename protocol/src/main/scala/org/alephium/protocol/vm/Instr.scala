@@ -1427,7 +1427,7 @@ object Log extends StatefulInstrCompanion0 with GasLog {
       fields: AVector[Val]
   ) = {
     frame.ctx.worldState
-      .addLog(
+      .writeLog(
         frame.ctx.blockEnv.id,
         frame.obj.contractIdOpt,
         name,
