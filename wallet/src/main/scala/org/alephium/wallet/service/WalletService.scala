@@ -459,7 +459,7 @@ object WalletService {
           case Right(buildSweepAllTxResult) =>
             FutureCollection
               .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[Hash]) {
-                case (txIds, SweepAddressTransaction(txId, unsignedTx)) => {
+                case (txIds, SweepAddressTransaction(txId, unsignedTx, _, _)) => {
                   val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
                   blockFlowClient
                     .postTransaction(unsignedTx, signature, buildSweepAllTxResult.fromGroup)

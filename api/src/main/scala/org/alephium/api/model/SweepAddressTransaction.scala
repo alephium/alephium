@@ -18,19 +18,24 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.UnsignedTransaction
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
 final case class SweepAddressTransaction(
     txId: Hash,
-    unsignedTx: String
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice
 )
 
 object SweepAddressTransaction {
   def from(unsignedTx: UnsignedTransaction): SweepAddressTransaction = {
     SweepAddressTransaction(
       unsignedTx.hash,
-      Hex.toHexString(serialize(unsignedTx))
+      Hex.toHexString(serialize(unsignedTx)),
+      unsignedTx.gasAmount,
+      unsignedTx.gasPrice
     )
   }
 }

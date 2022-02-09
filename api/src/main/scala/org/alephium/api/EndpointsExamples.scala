@@ -329,7 +329,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
-    val sweepAddressTxs = AVector(SweepAddressTransaction(hash, hexString))
+    val sweepAddressTxs = AVector(
+      SweepAddressTransaction(hash, hexString, minimalGas, defaultGasPrice)
+    )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
 
