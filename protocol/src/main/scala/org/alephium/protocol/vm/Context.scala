@@ -21,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{discard, AVector, TimeStamp}
+import org.alephium.util.{discard, AVector, TimeStamp, U256}
 
 final case class BlockEnv(networkId: NetworkId, timeStamp: TimeStamp, target: Target)
 object BlockEnv {
@@ -29,19 +29,60 @@ object BlockEnv {
     BlockEnv(networkConfig.networkId, header.timestamp, header.target)
 }
 
-final case class TxEnv(
-    tx: TransactionAbstract,
-    prevOutputs: AVector[AssetOutput],
-    signatures: Stack[Signature]
-)
+sealed trait TxEnv {
+  def txId: Hash
+  def signatures: Stack[Signature]
+  def prevOutputs: AVector[AssetOutput]
+  def fixedOutputs: AVector[AssetOutput]
+  def gasFeeUnsafe: U256
+
+  def isEntryMethodPayable: Boolean
+}
+
+object TxEnv {
+  def apply(
+      tx: TransactionAbstract,
+      prevOutputs: AVector[AssetOutput],
+      signatures: Stack[Signature]
+  ): TxEnv = Default(tx, prevOutputs, signatures)
+
+  def mockup(
+      txId: Hash,
+      signatures: Stack[Signature],
+      prevOutputs: AVector[AssetOutput],
+      fixedOutputs: AVector[AssetOutput],
+      gasFeeUnsafe: U256,
+      isEntryMethodPayable: Boolean
+  ): TxEnv =
+    Mockup(txId, signatures, prevOutputs, fixedOutputs, gasFeeUnsafe, isEntryMethodPayable)
+
+  final case class Default(
+      tx: TransactionAbstract,
+      prevOutputs: AVector[AssetOutput],
+      signatures: Stack[Signature]
+  ) extends TxEnv {
+    def txId: Hash                         = tx.id
+    def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
+    def gasFeeUnsafe: U256                 = tx.gasFeeUnsafe
+    def isEntryMethodPayable: Boolean      = tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)
+  }
+
+  final case class Mockup(
+      txId: Hash,
+      signatures: Stack[Signature],
+      prevOutputs: AVector[AssetOutput],
+      fixedOutputs: AVector[AssetOutput],
+      gasFeeUnsafe: U256,
+      isEntryMethodPayable: Boolean
+  ) extends TxEnv
+}
 
 trait StatelessContext extends CostStrategy {
   def blockEnv: BlockEnv
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
 
-  def tx: TransactionAbstract      = txEnv.tx
-  def txId: Hash                   = txEnv.tx.id
+  def txId: Hash                   = txEnv.txId
   def signatures: Stack[Signature] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
@@ -202,7 +243,7 @@ object StatefulContext {
   ) extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 
-    def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
+    def nextOutputIndex: Int = txEnv.fixedOutputs.length + generatedOutputs.length
 
     /*
      * this should be used only when the tx has passed these checks in validation
@@ -217,13 +258,13 @@ object StatefulContext {
       )
     )
     def getInitialBalances(): ExeResult[Balances] =
-      if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
+      if (txEnv.isEntryMethodPayable) {
         for {
           balances <- Balances
-            .from(preOutputs, tx.unsigned.fixedOutputs)
+            .from(preOutputs, txEnv.fixedOutputs)
             .toRight(Right(InvalidBalances))
           _ <- balances
-            .subAlph(preOutputs.head.lockupScript, tx.gasFeeUnsafe)
+            .subAlph(preOutputs.head.lockupScript, txEnv.gasFeeUnsafe)
             .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {

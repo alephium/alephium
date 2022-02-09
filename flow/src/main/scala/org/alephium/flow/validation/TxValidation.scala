@@ -703,7 +703,7 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(txEnv.tx.id.bytes, signature, publicKey)) {
+          if (!SignatureSchema.verify(txEnv.txId.bytes, signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
             fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)

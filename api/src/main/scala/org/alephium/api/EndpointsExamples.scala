@@ -472,6 +472,10 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val testContractExamples: List[Example[TestContract]] = List.empty
+
+  implicit val testContractResultExamples: List[Example[TestContractResult]] = List.empty
+
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))
 

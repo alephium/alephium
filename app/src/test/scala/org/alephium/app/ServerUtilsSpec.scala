@@ -21,13 +21,13 @@ import java.net.InetSocketAddress
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
-import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
-import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil, TimeStamp, U256}
+import org.alephium.util._
 
 // scalastyle:off file.size.limit
 class ServerUtilsSpec extends AlephiumSpec {
@@ -770,6 +770,101 @@ class ServerUtilsSpec extends AlephiumSpec {
         AVector(Tx.fromTemplate(txTemplate))
       )
     )
+  }
+
+  trait TestContractFixture extends Fixture {
+    val testContractId = Hash.random
+    val tokenId        = Hash.random
+    val (_, pubKey)    = SignatureSchema.generatePriPub()
+    val lp             = Address.Asset(LockupScript.p2pkh(pubKey))
+    val buyer          = lp
+
+    def testContract: TestContract
+
+    val serverUtils = new ServerUtils()
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    lazy val result = serverUtils.runTestContract(testFlow, testContract).rightValue
+  }
+
+  it should "test AMM contract: add liquidity" in new TestContractFixture {
+    val testContract = TestContract(
+      testContractId = testContractId,
+      testCode = AMMContract.swapCode,
+      initialState =
+        AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100)),
+      initialAsset = TestContract.Asset(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
+      testMethodIndex = 0,
+      testArgs = AVector[Val](Val.Address(lp), Val.U256(ALPH.alph(100)), Val.U256(100)),
+      inputAssets = AVector(
+        TestContract.InputAsset(
+          lp,
+          TestContract.Asset(ALPH.alph(101), AVector(Token(tokenId, 100)))
+        )
+      )
+    )
+
+    result.returns.isEmpty is true
+    result.gasUsed is 17301
+    result.contracts.length is 1
+    val contractState = result.contracts.head
+    contractState.contractId is testContractId
+    contractState.state is
+      AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(110)), Val.U256(200))
+    contractState.asset is TestContract.Asset(ALPH.alph(110), AVector(Token(tokenId, 200)))
+  }
+
+  it should "test AMM contract: swap token" in new TestContractFixture {
+    val testContract = TestContract(
+      testContractId = testContractId,
+      testCode = AMMContract.swapCode,
+      initialState =
+        AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100)),
+      initialAsset = TestContract.Asset(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
+      testMethodIndex = 1,
+      testArgs = AVector[Val](Val.Address(buyer), Val.U256(ALPH.alph(10))),
+      inputAssets = AVector(
+        TestContract.InputAsset(
+          lp,
+          TestContract.Asset(ALPH.alph(101), AVector(Token(tokenId, 100)))
+        )
+      )
+    )
+
+    result.returns.isEmpty is true
+    result.gasUsed is 17333
+    result.contracts.length is 1
+    val contractState = result.contracts.head
+    contractState.contractId is testContractId
+    contractState.state is
+      AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(20)), Val.U256(50))
+    contractState.asset is TestContract.Asset(ALPH.alph(20), AVector(Token(tokenId, 50)))
+  }
+
+  it should "test AMM contract: swap Alph" in new TestContractFixture {
+    val testContract = TestContract(
+      testContractId = testContractId,
+      testCode = AMMContract.swapCode,
+      initialState =
+        AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100)),
+      initialAsset = TestContract.Asset(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
+      testMethodIndex = 2,
+      testArgs = AVector[Val](Val.Address(buyer), Val.U256(100)),
+      inputAssets = AVector(
+        TestContract.InputAsset(
+          lp,
+          TestContract.Asset(ALPH.alph(101), AVector(Token(tokenId, 100)))
+        )
+      )
+    )
+
+    result.returns.isEmpty is true
+    result.gasUsed is 17333
+    result.contracts.length is 1
+    val contractState = result.contracts.head
+    contractState.contractId is testContractId
+    contractState.state is
+      AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(5)), Val.U256(200))
+    contractState.asset is TestContract.Asset(ALPH.alph(5), AVector(Token(tokenId, 200)))
   }
 
   private def generateDestination(

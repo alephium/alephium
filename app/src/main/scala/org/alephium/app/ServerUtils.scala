@@ -20,22 +20,23 @@ import scala.concurrent._
 
 import akka.util.{ByteString, Timeout}
 import com.typesafe.scalalogging.StrictLogging
-import sttp.model.StatusCode
 
+import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model._
+import org.alephium.api.model.TestContract.ExistingContract
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.{failed => _, Val => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
@@ -44,6 +45,7 @@ import org.alephium.util._
 // scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
+    consensusConfig: ConsensusConfig,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     executionContext: ExecutionContext
@@ -656,7 +658,7 @@ class ServerUtils(implicit
       contract <- deserialize[StatefulContract](codeByteString).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      state <- parseState(query.state).left.map(error => badRequest(error.message))
+      state <- parseState(query.state)
       _     <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildContractWithParsedState(
@@ -665,7 +667,7 @@ class ServerUtils(implicit
         state,
         dustUtxoAmount,
         query.issueTokenAmount.map(_.value)
-      ).left.map(error => badRequest(error.message))
+      )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
@@ -733,22 +735,165 @@ class ServerUtils(implicit
     }
     result.left.map(failedInIO(_))
   }
-  private def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
-  private def failed(error: String): ApiError[_ <: StatusCode] =
-    ApiError.InternalServerError(error)
-  private val failedInIO: ApiError[_ <: StatusCode] = ApiError.InternalServerError("Failed in IO")
-  private def failedInIO(error: IOError): ApiError[_ <: StatusCode] =
-    ApiError.InternalServerError(s"Failed in IO: $error")
-  private def failed[T](error: IOError): Try[T] = Left(failedInIO(error))
 
-  def wrapResult[T](result: IOResult[T]): Try[T] = {
-    result.left.map(failedInIO)
+  def runTestContract(blockFlow: BlockFlow, testContract: TestContract): Try[TestContractResult] = {
+    val contractId = testContract.testContractId
+    for {
+      groupIndex <- testContract.groupIndex
+      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
+      _          <- testContract.existingContracts.foreachE(createContract(worldState, _))
+      _          <- createContract(worldState, contractId, testContract)
+      returnLength <- wrapExeResult(
+        testContract.testCode
+          .getMethod(testContract.testMethodIndex)
+          .map(_.returnLength)
+      )
+      executionResultPair <- executeTestContract(worldState, contractId, testContract, returnLength)
+      postState           <- fetchContractsState(worldState, testContract)
+    } yield {
+      val executionOutputs = executionResultPair._1
+      val executionResult  = executionResultPair._2
+      val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
+      TestContractResult(
+        returns = executionOutputs.map(Val.from),
+        gasUsed = gasUsed.value,
+        postState
+      )
+    }
+  }
+
+  private def fetchContractsState(
+      worldState: WorldState.Staging,
+      testContract: TestContract
+  ): Try[AVector[TestContract.ExistingContract]] = {
+    for {
+      existingContractsState <- testContract.existingContracts.mapE(contract =>
+        fetchContractState(worldState, contract.contractId)
+      )
+      testContractState <- fetchContractState(worldState, testContract.testContractId)
+    } yield existingContractsState ++ AVector(testContractState)
+  }
+
+  private def fetchContractState(
+      worldState: WorldState.Staging,
+      contractId: ContractId
+  ): Try[TestContract.ExistingContract] = {
+    val result = for {
+      state          <- worldState.getContractState(contractId)
+      codeRecord     <- worldState.getContractCode(state.codeHash)
+      contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
+      contractOutput <- worldState.getContractAsset(state.contractOutputRef)
+    } yield TestContract.ExistingContract(
+      contractId,
+      contract,
+      state.fields.map(Val.from),
+      TestContract.Asset.from(contractOutput)
+    )
+    wrapResult(result)
+  }
+
+  private def executeTestContract(
+      worldState: WorldState.Staging,
+      contractId: ContractId,
+      testContract: TestContract,
+      returnLength: Int
+  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val blockEnv =
+      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget)
+    val testGasFee = defaultGasPrice * maximalGasPerTx
+    val txEnv: TxEnv = TxEnv.mockup(
+      txId = Hash.random,
+      signatures = Stack.popOnly(AVector.empty[Signature]),
+      prevOutputs = testContract.inputAssets.map(_.toAssetOutput),
+      fixedOutputs = AVector.empty[AssetOutput],
+      gasFeeUnsafe = testGasFee,
+      isEntryMethodPayable = true
+    )
+    val context = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+    val script = StatefulScript.unsafe(
+      AVector(
+        Method[StatefulContext](
+          isPublic = true,
+          isPayable = testContract.inputAssets.nonEmpty,
+          argsLength = 0,
+          localsLength = 0,
+          returnLength = returnLength,
+          instrs = approveAsset(testContract, testGasFee) ++ callExternal(testContract, contractId)
+        )
+      )
+    )
+    wrapExeResult(StatefulVM.runTxScriptWithOutputs(context, script))
+  }
+
+  private def approveAsset(
+      testContract: TestContract,
+      gasFee: U256
+  ): AVector[Instr[StatefulContext]] = {
+    testContract.inputAssets.flatMapWithIndex { (asset, index) =>
+      val gasFeeOpt = if (index == 0) Some(gasFee) else None
+      asset.approveAll(gasFeeOpt)
+    }
+  }
+
+  private def callExternal(
+      testContract: TestContract,
+      contractId: ContractId
+  ): AVector[Instr[StatefulContext]] = {
+    testContract.testArgs.map(_.toVmVal.toConstInstr: Instr[StatefulContext]) ++
+      AVector[Instr[StatefulContext]](
+        BytesConst(vm.Val.ByteVec(contractId.bytes)),
+        CallExternal(testContract.testMethodIndex.toByte)
+      )
+  }
+
+  def createContract(
+      worldState: WorldState.Staging,
+      existingContract: ExistingContract
+  ): Try[Unit] = {
+    createContract(
+      worldState,
+      existingContract.contractId,
+      existingContract.code,
+      existingContract.state,
+      existingContract.asset
+    )
+  }
+
+  def createContract(
+      worldState: WorldState.Staging,
+      contractId: ContractId,
+      testContract: TestContract
+  ): Try[Unit] = {
+    createContract(
+      worldState,
+      contractId,
+      testContract.testCode,
+      testContract.initialState,
+      testContract.initialAsset
+    )
+  }
+
+  def createContract(
+      worldState: WorldState.Staging,
+      contractId: ContractId,
+      code: StatefulContract,
+      initialState: AVector[Val],
+      asset: TestContract.Asset
+  ): Try[Unit] = {
+    val outputRef = ContractOutputRef.unsafe(Hint.unsafe(0), contractId)
+    val output    = asset.toContractOutput(contractId)
+    wrapResult(
+      worldState.createContractUnsafe(
+        code.toHalfDecoded(),
+        initialState.map(_.toVmVal),
+        outputRef,
+        output
+      )
+    )
   }
 }
 
 object ServerUtils {
-  type Try[T]       = Either[ApiError[_ <: StatusCode], T]
-  type FutureTry[T] = Future[Try[T]]
 
   private def validateUtxInputs(
       unsignedTx: UnsignedTransaction
@@ -786,7 +931,7 @@ object ServerUtils {
       initialState: Option[String],
       alphAmount: U256,
       newTokenAmount: Option[U256]
-  ): Either[Compiler.Error, StatefulScript] = {
+  ): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
       buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
     }
@@ -798,7 +943,7 @@ object ServerUtils {
       initialState: AVector[vm.Val],
       alphAmount: U256,
       newTokenAmount: Option[U256]
-  ): Either[Compiler.Error, StatefulScript] = {
+  ): Try[StatefulScript] = {
     val stateRaw = Hex.toHexString(serialize(initialState))
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
@@ -814,13 +959,13 @@ object ServerUtils {
       |}
       |""".stripMargin
 
-    Compiler.compileTxScript(scriptRaw)
+    wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
   }
 
-  private def parseState(str: Option[String]): Either[Compiler.Error, AVector[vm.Val]] = {
+  def parseState(str: Option[String]): Try[AVector[vm.Val]] = {
     str match {
       case None        => Right(AVector.empty[vm.Val])
-      case Some(state) => Compiler.compileState(state)
+      case Some(state) => wrapCompilerResult(Compiler.compileState(state))
     }
   }
 }
