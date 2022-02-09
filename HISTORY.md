@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 1.2.7
+* Add gasAmount and gasPrice to sweep endpoint
+
 ## 1.2.6
 * Improve block cache
 * Cosmetic updates
