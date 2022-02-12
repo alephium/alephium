@@ -380,12 +380,35 @@ class ServerUtils(implicit
       contractId: ContractId
   ): Try[AVector[Events]] = {
     for {
+      timeInterval <- timeIntervalFromBlockRange(blockFlow, fromBlock, toBlock)
+      events       <- getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
+    } yield events
+  }
+
+  private def timeIntervalFromBlockRange(
+      blockFlow: BlockFlow,
+      fromBlock: BlockHash,
+      toBlock: BlockHash
+  ): Try[TimeInterval] = {
+    for {
       fromBlockHeader <- wrapResult(blockFlow.getBlockHeader(fromBlock))
       toBlockHeader   <- wrapResult(blockFlow.getBlockHeader(toBlock))
-      heightedBlocks <- getHeightedBlocks(
-        blockFlow,
-        TimeInterval(fromBlockHeader.timestamp, toBlockHeader.timestamp)
-      )
+      timeInterval <-
+        if (fromBlockHeader.timestamp >= toBlockHeader.timestamp) {
+          Left(badRequest("`fromBlock` must be before `toBlock`"))
+        } else {
+          Right(TimeInterval(fromBlockHeader.timestamp, toBlockHeader.timestamp))
+        }
+    } yield timeInterval
+  }
+
+  def getContractEventsWithinTimeInterval(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval,
+      contractId: ContractId
+  ): Try[AVector[Events]] = {
+    for {
+      heightedBlocks <- getHeightedBlocks(blockFlow, timeInterval)
       events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
         heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
           getContractEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>

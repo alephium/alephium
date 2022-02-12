@@ -406,18 +406,28 @@ trait Endpoints
 
   val getContractEventsForBlock: BaseEndpoint[(BlockHash, Hash), Events] =
     eventsEndpoint.get
-      .in(query[BlockHash]("blockHash"))
+      .in("in-block")
+      .in(query[BlockHash]("block"))
       .in(query[ContractId]("contractId"))
       .out(jsonBody[Events])
       .summary("Get events for a contract within a block")
 
   val getContractEventsWithinBlocks: BaseEndpoint[(BlockHash, BlockHash, Hash), AVector[Events]] =
     eventsEndpoint.get
+      .in("within-blocks")
       .in(query[BlockHash]("fromBlock"))
       .in(query[BlockHash]("toBlock"))
       .in(query[ContractId]("contractId"))
       .out(jsonBody[AVector[Events]])
       .summary("Get events for a contract within a range of blocks")
+
+  val getContractEventsWithinTimeInterval: BaseEndpoint[(TimeInterval, Hash), AVector[Events]] =
+    eventsEndpoint.get
+      .in("within-time-interval")
+      .in(timeIntervalQuery)
+      .in(query[ContractId]("contractId"))
+      .out(jsonBody[AVector[Events]])
+      .summary("Get events for a contract within a time interval")
 }
 
 object Endpoints {

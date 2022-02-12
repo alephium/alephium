@@ -570,6 +570,13 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
   }
 
+  val getContractEventsWithinTimeIntervalLogic = serverLogic(getContractEventsWithinTimeInterval) {
+    case (timeInterval, contractId) =>
+      Future.successful {
+        serverUtils.getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
+      }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
