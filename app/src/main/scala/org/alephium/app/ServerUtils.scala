@@ -354,7 +354,11 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEvents(blockFlow: BlockFlow, blockHash: BlockHash, contractId: ContractId): Try[Events] = {
+  def getContractEventsForBlock(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash,
+      contractId: ContractId
+  ): Try[Events] = {
     val chainIndex  = ChainIndex.from(blockHash)
     val logStatesId = LogStatesId(blockHash, contractId)
     if (chainIndex.isIntraGroup) {
@@ -367,6 +371,29 @@ class ServerUtils(implicit
     } else {
       Right(Events.empty())
     }
+  }
+
+  def getContractEventsWithinBlocks(
+      blockFlow: BlockFlow,
+      fromBlock: BlockHash,
+      toBlock: BlockHash,
+      contractId: ContractId
+  ): Try[AVector[Events]] = {
+    for {
+      fromBlockHeader <- wrapResult(blockFlow.getBlockHeader(fromBlock))
+      toBlockHeader   <- wrapResult(blockFlow.getBlockHeader(toBlock))
+      heightedBlocks <- getHeightedBlocks(
+        blockFlow,
+        TimeInterval(fromBlockHeader.timestamp, toBlockHeader.timestamp)
+      )
+      allEvents <- heightedBlocks.mapE {
+        _.foldE(Events.empty()) { case (events, (block, _)) =>
+          getContractEventsForBlock(blockFlow, block.hash, contractId).map { e =>
+            events.copy(events = events.events ++ e.events)
+          }
+        }
+      }
+    } yield allEvents
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =

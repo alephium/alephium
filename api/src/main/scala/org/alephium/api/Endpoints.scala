@@ -404,12 +404,20 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
-  val getEvents: BaseEndpoint[(BlockHash, Hash), Events] =
+  val getContractEventsForBlock: BaseEndpoint[(BlockHash, Hash), Events] =
     eventsEndpoint.get
       .in(query[BlockHash]("blockHash"))
       .in(query[ContractId]("contractId"))
       .out(jsonBody[Events])
       .summary("Get events for a contract within a block")
+
+  val getContractEventsWithinBlocks: BaseEndpoint[(BlockHash, BlockHash, Hash), AVector[Events]] =
+    eventsEndpoint.get
+      .in(query[BlockHash]("fromBlock"))
+      .in(query[BlockHash]("toBlock"))
+      .in(query[ContractId]("contractId"))
+      .out(jsonBody[AVector[Events]])
+      .summary("Get events for a contract within a range of blocks")
 }
 
 object Endpoints {

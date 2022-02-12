@@ -67,7 +67,8 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     minerAction,
     minerListAddresses,
     minerUpdateAddresses,
-    getEvents
+    getContractEventsForBlock,
+    getContractEventsWithinBlocks
   )
 
   private lazy val servers = List(
