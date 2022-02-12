@@ -17,11 +17,13 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ChainIndex, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
 final case class Events(
+    chainFrom: Int,
+    chainTo: Int,
     events: AVector[Event]
 )
 
@@ -33,7 +35,7 @@ final case class Event(
 )
 
 object Events {
-  def from(logStates: LogStates): Events = {
+  def from(chainIndex: ChainIndex, logStates: LogStates): Events = {
     val events: AVector[Event] = logStates.states.map { logState =>
       Event(
         logStates.blockHash,
@@ -43,10 +45,10 @@ object Events {
       )
     }
 
-    Events(events)
+    Events(chainIndex.from.value, chainIndex.to.value, events)
   }
 
-  def empty(): Events = {
-    Events(events = AVector.empty)
+  def empty(chainIndex: ChainIndex): Events = {
+    Events(chainIndex.from.value, chainIndex.to.value, events = AVector.empty)
   }
 }

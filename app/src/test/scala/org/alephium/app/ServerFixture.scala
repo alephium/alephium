@@ -234,9 +234,9 @@ object ServerFixture {
     override def getHeightedBlocks(
         fromTs: TimeStamp,
         toTs: TimeStamp
-    ): IOResult[AVector[AVector[(Block, Int)]]] = {
+    ): IOResult[AVector[(ChainIndex, AVector[(Block, Int)])]] = {
       blockFlowProbe ! (block.header.timestamp >= fromTs && block.header.timestamp <= toTs)
-      Right(AVector(AVector((block, 1))))
+      Right(AVector((block.chainIndex, AVector((block, 1)))))
     }
 
     override def getBalance(

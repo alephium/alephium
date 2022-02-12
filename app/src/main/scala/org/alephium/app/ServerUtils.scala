@@ -58,7 +58,7 @@ class ServerUtils(implicit
   def getHeightedBlocks(
       blockFlow: BlockFlow,
       timeInterval: TimeInterval
-  ): Try[AVector[AVector[(Block, Int)]]] = {
+  ): Try[AVector[(ChainIndex, AVector[(Block, Int)])]] = {
     for {
       _      <- timeInterval.validateTimeSpan(apiConfig.blockflowFetchMaxAge)
       blocks <- wrapResult(blockFlow.getHeightedBlocks(timeInterval.from, timeInterval.to))
@@ -67,7 +67,7 @@ class ServerUtils(implicit
 
   def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
     getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      FetchResponse(heightedBlocks.map(_.map { case (block, height) =>
+      FetchResponse(heightedBlocks.map(_._2.map { case (block, height) =>
         BlockEntry.from(block, height)
       }))
     }
@@ -77,7 +77,7 @@ class ServerUtils(implicit
       groupConfig: GroupConfig
   ): Try[HashRateResponse] = {
     getHeightedBlocks(blockFlow, timeInterval).map { blocks =>
-      val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
+      val hashCount = blocks.fold(BigInt(0)) { case (acc, (_, entries)) =>
         entries.fold(acc) { case (hashCount, entry) =>
           val target   = entry._1.target
           val hashDone = Target.maxBigInt.divide(target.value)
@@ -365,11 +365,11 @@ class ServerUtils(implicit
       val events = for {
         worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)
         logStatesOpt <- worldState.logState.getOpt(logStatesId)
-      } yield logStatesOpt.map(Events.from).getOrElse(Events.empty())
+      } yield logStatesOpt.map(Events.from(chainIndex, _)).getOrElse(Events.empty(chainIndex))
 
       wrapResult(events)
     } else {
-      Right(Events.empty())
+      Right(Events.empty(chainIndex))
     }
   }
 
@@ -386,14 +386,14 @@ class ServerUtils(implicit
         blockFlow,
         TimeInterval(fromBlockHeader.timestamp, toBlockHeader.timestamp)
       )
-      allEvents <- heightedBlocks.mapE {
-        _.foldE(Events.empty()) { case (events, (block, _)) =>
-          getContractEventsForBlock(blockFlow, block.hash, contractId).map { e =>
-            events.copy(events = events.events ++ e.events)
+      events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
+        heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
+          getContractEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
+            eventsSoFar.copy(events = eventsSoFar.events ++ eventsForBlock.events)
           }
         }
       }
-    } yield allEvents
+    } yield events
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =

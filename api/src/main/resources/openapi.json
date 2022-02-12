@@ -6772,6 +6772,8 @@
                   "$ref": "#/components/schemas/Events"
                 },
                 "example": {
+                  "chainFrom": 0,
+                  "chainTo": 1,
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
@@ -7790,10 +7792,18 @@
       },
       "Events": {
         "required": [
+          "chainFrom",
+          "chainTo",
           "events"
         ],
         "type": "object",
         "properties": {
+          "chainFrom": {
+            "type": "integer"
+          },
+          "chainTo": {
+            "type": "integer"
+          },
           "events": {
             "type": "array",
             "items": {
