@@ -39,6 +39,7 @@ trait FlowUtils
     with BlockFlowState
     with SyncUtils
     with TxUtils
+    with LogUtils
     with ConflictedBlocks
     with LazyLogging { Self: BlockFlow =>
   implicit def mempoolSetting: MemPoolSetting

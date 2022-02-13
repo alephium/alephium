@@ -319,6 +319,33 @@ object ServerFixture {
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
     override def calWeight(block: Block): IOResult[Weight]              = ???
 
+    override def getEvents(
+        blockHash: BlockHash,
+        contractId: ContractId
+    ): IOResult[Option[LogStates]] = {
+      lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
+      lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
+
+      Right(
+        Some(
+          LogStates(
+            blockHash,
+            contractId,
+            states = AVector(
+              LogState(
+                name = vm.Val.ByteVec.from("Transfer"),
+                fields = AVector(
+                  vm.Val.U256(U256.unsafe(4)),
+                  vm.Val.Address(address1.lockupScript),
+                  vm.Val.Address(address2.lockupScript)
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
     // scalastyle:off no.equal
     override def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
       val contractGroup = brokerConfig.groups - 1

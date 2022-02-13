@@ -360,13 +360,11 @@ class ServerUtils(implicit
       blockHash: BlockHash,
       contractId: ContractId
   ): Try[Events] = {
-    val chainIndex  = ChainIndex.from(blockHash)
-    val logStatesId = LogStatesId(blockHash, contractId)
+    val chainIndex = ChainIndex.from(blockHash)
     if (chainIndex.isIntraGroup) {
-      val events = for {
-        worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-        logStatesOpt <- worldState.logState.getOpt(logStatesId)
-      } yield logStatesOpt.map(Events.from(chainIndex, _)).getOrElse(Events.empty(chainIndex))
+      val events = blockFlow.getEvents(blockHash, contractId).map {
+        _.map(Events.from(chainIndex, _)).getOrElse(Events.empty(chainIndex))
+      }
 
       wrapResult(events)
     } else {

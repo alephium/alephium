@@ -6756,7 +6756,7 @@
             }
           },
           {
-            "name": "contractId",
+            "name": "contractAddress",
             "in": "query",
             "required": true,
             "schema": {
@@ -6892,7 +6892,7 @@
             }
           },
           {
-            "name": "contractId",
+            "name": "contractAddress",
             "in": "query",
             "required": true,
             "schema": {
@@ -7037,7 +7037,7 @@
             }
           },
           {
-            "name": "contractId",
+            "name": "contractAddress",
             "in": "query",
             "required": true,
             "schema": {

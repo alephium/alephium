@@ -559,22 +559,25 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getContractEventsForBlockLogic = serverLogic(getContractEventsForBlock) {
-    case (blockHash, contractId) =>
+    case (blockHash, contractAddress) =>
       Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
         serverUtils.getContractEventsForBlock(blockFlow, blockHash, contractId)
       }
   }
 
   val getContractEventsWithinBlocksLogic = serverLogic(getContractEventsWithinBlocks) {
-    case (fromBlock, toBlock, contractId) =>
+    case (fromBlock, toBlock, contractAddress) =>
       Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
         serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlock, contractId)
       }
   }
 
   val getContractEventsWithinTimeIntervalLogic = serverLogic(getContractEventsWithinTimeInterval) {
-    case (timeInterval, contractId) =>
+    case (timeInterval, contractAddress) =>
       Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
         serverUtils.getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
       }
   }

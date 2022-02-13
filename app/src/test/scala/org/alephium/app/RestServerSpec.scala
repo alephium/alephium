@@ -737,6 +737,52 @@ abstract class RestServerSpec(
       }
     }
   }
+
+  it should "get event for a contract from a given block" in {
+    val block = blockGen
+      .map(_.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get))
+      .retryUntil(_.chainIndex.isIntraGroup)
+      .sample
+      .get
+    val blockHash  = block.hash.toHexString
+    val chainIndex = block.chainIndex
+
+    Get(s"/events/in-block?block=$blockHash&contractAddress=$dummyContractAddress") check {
+      response =>
+        response.code is StatusCode.Ok
+        val events = response.body.rightValue
+        events is s"""
+        |{
+        |  "chainFrom": ${chainIndex.from.value},
+        |  "chainTo": ${chainIndex.to.value},
+        |  "events": [
+        |    {
+        |      "blockHash": "$blockHash",
+        |      "contractId": "${counterContract.hash.toHexString}",
+        |      "name":{
+        |        "type": "bytevec",
+        |        "value": "5472616e73666572"
+        |      },
+        |      "fields": [
+        |        {
+        |          "type": "u256",
+        |          "value": "4"
+        |        },
+        |        {
+        |          "type": "address",
+        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+        |        },
+        |        {
+        |          "type": "address",
+        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+        |        }
+        |      ]
+        |    }
+        |  ]
+        |}
+        |""".stripMargin.filterNot(_.isWhitespace)
+    }
+  }
 }
 
 abstract class RestServerApiKeyDisableSpec(
