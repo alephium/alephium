@@ -1431,7 +1431,8 @@ object Log extends StatefulInstrCompanion0 with GasLog {
         frame.ctx.blockEnv.id,
         frame.obj.contractIdOpt,
         name,
-        fields
+        fields,
+        frame.ctx.logConfig
       )
       .left
       .map { error =>

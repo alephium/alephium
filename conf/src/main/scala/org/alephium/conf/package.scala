@@ -32,8 +32,9 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import net.ceedubs.ficus.readers.CollectionReaders.traversableReader
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.{AVector, Duration, U256}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.util.{AVector, Duration, Hex, U256}
 
 package object conf {
 
@@ -120,6 +121,17 @@ package object conf {
         }
       }
     }
+
+  implicit val contractIdValueReader: ValueReader[ContractId] = {
+    ValueReader[String].map { str =>
+      (for {
+        bs   <- Hex.from(str)
+        hash <- Hash.from(bs)
+      } yield hash).getOrElse(
+        throw new ConfigException.BadValue("ContractId", "oops")
+      )
+    }
+  }
 
   private val inetSocketAddressesStringReader: ValueReader[ArraySeq[InetSocketAddress]] =
     ValueReader[String].map(_.split(",")).map {

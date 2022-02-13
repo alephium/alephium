@@ -82,6 +82,17 @@ object TxEnv {
   ) extends TxEnv
 }
 
+final case class LogConfig(
+    enabled: Boolean,
+    contractIds: Option[AVector[ContractId]]
+)
+
+object LogConfig {
+  def disabled(): LogConfig = {
+    LogConfig(enabled = false, contractIds = None)
+  }
+}
+
 trait StatelessContext extends CostStrategy {
   def blockEnv: BlockEnv
   def txEnv: TxEnv
@@ -120,6 +131,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
   def outputBalances: Balances
+
+  def logConfig: LogConfig
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
@@ -207,7 +220,7 @@ object StatefulContext {
       txEnv: TxEnv,
       worldState: WorldState.Staging,
       gasRemaining: GasBox
-  ): StatefulContext = {
+  )(implicit logConfig: LogConfig): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
@@ -217,7 +230,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
-  ): StatefulContext = {
+  )(implicit logConfig: LogConfig): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
@@ -228,7 +241,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputsOpt: Option[AVector[AssetOutput]]
-  ): ExeResult[StatefulContext] = {
+  )(implicit logConfig: LogConfig): ExeResult[StatefulContext] = {
     preOutputsOpt match {
       case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
@@ -245,7 +258,8 @@ object StatefulContext {
       val txEnv: TxEnv,
       val worldState: WorldState.Staging,
       var gasRemaining: GasBox
-  ) extends StatefulContext {
+  )(implicit val logConfig: LogConfig)
+      extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 
     def nextOutputIndex: Int = txEnv.fixedOutputs.length + generatedOutputs.length

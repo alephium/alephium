@@ -394,21 +394,28 @@ object WorldState {
         blockHashOpt: Option[BlockHash],
         contractIdOpt: Option[ContractId],
         name: Val.ByteVec,
-        fields: AVector[Val]
+        fields: AVector[Val],
+        logConfig: LogConfig
     ): IOResult[Unit] = {
       (blockHashOpt, contractIdOpt) match {
         case (Some(blockHash), Some(contractId)) =>
-          val id    = LogStatesId(blockHash, contractId)
-          val state = LogState(name, fields)
-          for {
-            logStatesOpt <- logState.getOpt(id)
-            _ <- logStatesOpt match {
-              case Some(logStates) =>
-                logState.put(id, logStates.copy(states = logStates.states :+ state))
-              case None =>
-                logState.put(id, LogStates(blockHash, contractId, AVector(state)))
-            }
-          } yield ()
+          val allowAllContracts = logConfig.contractIds.isEmpty
+          val allowThisContract = logConfig.contractIds.exists(_.contains(contractId))
+          if (logConfig.enabled && (allowAllContracts || allowThisContract)) {
+            val id    = LogStatesId(blockHash, contractId)
+            val state = LogState(name, fields)
+            for {
+              logStatesOpt <- logState.getOpt(id)
+              _ <- logStatesOpt match {
+                case Some(logStates) =>
+                  logState.put(id, logStates.copy(states = logStates.states :+ state))
+                case None =>
+                  logState.put(id, LogStates(blockHash, contractId, AVector(state)))
+              }
+            } yield ()
+          } else {
+            Right(())
+          }
         case _ =>
           Right(())
       }

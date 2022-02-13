@@ -255,6 +255,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         override def txId: Hash            = Hash.zero
         var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
+        def logConfig: LogConfig           = LogConfig(enabled = true, contractIds = None)
 
         def getInitialBalances(): ExeResult[Balances] = {
           Right(
