@@ -98,6 +98,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     case ViewHandler.SubscribeResult(succeeded) =>
       if (succeeded) {
         pendings.foreach { case (remote, connection) =>
+          log.info(s"Remote $remote subscribed")
           val connectionHandler = ActorRefT[ConnectionHandler.Command](
             context.actorOf(MinerApiController.connection(remote, connection))
           )
@@ -137,6 +138,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   }
 
   def publishTemplates(templatess: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
+    log.info(
+      s"Sending block templates to subscribers: #${connections.length} connections, #${pendings.length} pending connections"
+    )
     val jobs = templatess.foldLeft(AVector.ofSize[Job](templatess.length * brokerConfig.groups)) {
       case (acc, templates) =>
         acc ++ AVector.from(templates.view.map(Job.from))
