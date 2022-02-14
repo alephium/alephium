@@ -76,8 +76,15 @@ object Ast {
       elements.flatMap(_.genCode(state))
     }
   }
-  // TODO: support runtime variable index
-  final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Int)
+  def getConstantArrayIndex[Ctx <: StatelessContext](index: Expr[Ctx]): Int = {
+    index match {
+      case Ast.Const(Val.U256(v)) =>
+        v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index $v"))
+      case _: Ast.Placeholder[Ctx] => throw Compiler.Error("Placeholder only allowed in loop")
+      case _                       => throw Compiler.Error(s"Invalid array index $index")
+    }
+  }
+  final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Ast.Expr[Ctx])
       extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       array.getType(state) match {
@@ -88,11 +95,12 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val idx               = getConstantArrayIndex(index)
       val (arrayRef, codes) = state.getOrCreateArrayRef(array, isMutable = false)
       if (arrayRef.isMultiDim()) {
-        codes ++ arrayRef.subArray(index).vars.flatMap(state.genLoadCode)
+        codes ++ arrayRef.subArray(idx).vars.flatMap(state.genLoadCode)
       } else {
-        val ident = arrayRef.getVariable(index)
+        val ident = arrayRef.getVariable(idx)
         codes ++ state.genLoadCode(ident)
       }
     }
@@ -194,6 +202,12 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       expr.genCode(state)
   }
+  final case class Placeholder[Ctx <: StatelessContext]() extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.U256)
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
+      throw Compiler.Error("Placeholder only allowed in loop")
+  }
 
   sealed trait Statement[Ctx <: StatelessContext] {
     def check(state: Compiler.State[Ctx]): Unit
@@ -262,11 +276,11 @@ object Ast {
   }
   final case class ArrayElementAssign[Ctx <: StatelessContext](
       target: Ident,
-      indexes: Seq[Int],
+      indexes: Seq[Ast.Expr[Ctx]],
       rhs: Expr[Ctx]
   ) extends Statement[Ctx] {
     @scala.annotation.tailrec
-    private def elementType(indexes: Seq[Int], tpe: Type): Type = {
+    private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
       if (indexes.isEmpty) {
         tpe
       } else {
@@ -290,13 +304,14 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val idxes = indexes.map(getConstantArrayIndex)
       rhs.getType(state) match {
         case Seq(_: Type.FixedSizeArray) =>
-          val targetArrayRef = state.getArrayRef(target).subArray(indexes)
+          val targetArrayRef = state.getArrayRef(target).subArray(idxes)
           rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
         case _ =>
           val targetArrayRef = state.getArrayRef(target)
-          val ident          = targetArrayRef.getVariable(indexes)
+          val ident          = targetArrayRef.getVariable(idxes)
           rhs.genCode(state) :+ state.genStoreCode(ident)
       }
     }

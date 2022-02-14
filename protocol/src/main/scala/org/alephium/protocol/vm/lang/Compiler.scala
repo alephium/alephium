@@ -185,8 +185,9 @@ object Compiler {
     ): (ArrayTransformer.ArrayRef, Seq[Instr[Ctx]]) = {
       expr match {
         case Ast.ArrayElement(array, index) =>
+          val idx               = Ast.getConstantArrayIndex(index)
           val (arrayRef, codes) = getOrCreateArrayRef(array, isMutable)
-          val subArrayRef       = arrayRef.subArray(index)
+          val subArrayRef       = arrayRef.subArray(idx)
           (subArrayRef, codes)
         case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
         case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)

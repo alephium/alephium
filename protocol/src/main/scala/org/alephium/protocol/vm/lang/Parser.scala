@@ -18,7 +18,8 @@ package org.alephium.protocol.vm.lang
 
 import fastparse._
 
-import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
+import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
+import org.alephium.util.U256
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
@@ -31,6 +32,7 @@ import org.alephium.protocol.vm.{StatefulContext, StatelessContext}
 abstract class Parser[Ctx <: StatelessContext] {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
+  def placeholder[_: P]: P[Ast.Placeholder[Ctx]] = P("?").map(_ => Ast.Placeholder[Ctx]())
   def const[_: P]: P[Ast.Const[Ctx]] =
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(Ast.Const.apply[Ctx])
   def createArray1[_: P]: P[Ast.CreateArrayExpr[Ctx]] =
@@ -62,7 +64,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
     idx
   }
-  def arrayIndex[_: P]: P[Int] = P("[" ~ positiveNum("array index") ~ "]")
+
+  def arrayIndex[_: P]: P[Ast.Expr[Ctx]] = {
+    P(
+      "[" ~ (positiveNum("arrayIndex").map(v =>
+        Ast.Const[Ctx](Val.U256(U256.unsafe(v)))
+      ) | placeholder) ~ "]"
+    )
+  }
 
   // Optimize chained comparisons
   def expr[_: P]: P[Ast.Expr[Ctx]]         = P(chain(andExpr, Lexer.opOr))
@@ -189,7 +198,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[_: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr)
+    P(placeholder | const | callExpr | contractConv | variable | parenExpr | arrayExpr)
 
   def statement[_: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | funcCall | ifelse | whileStmt | ret)
@@ -208,7 +217,9 @@ object StatelessParser extends Parser[StatelessContext] {
 )
 object StatefulParser extends Parser[StatefulContext] {
   def atom[_: P]: P[Ast.Expr[StatefulContext]] =
-    P(const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr)
+    P(
+      placeholder | const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr
+    )
 
   def contractCallExpr[_: P]: P[Ast.ContractCallExpr] =
     P((contractConv | variable) ~ "." ~ callAbs).map { case (obj, (callId, exprs)) =>
