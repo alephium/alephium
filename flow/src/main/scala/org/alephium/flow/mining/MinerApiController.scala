@@ -87,6 +87,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
+  var latestJobs: Option[AVector[Job]]                                   = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
 
@@ -104,6 +105,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           )
           context.watch(connectionHandler.ref)
           connections.addOne(connectionHandler)
+          latestJobs.foreach(jobs =>
+            connectionHandler ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs)))
+          )
         }
       } else {
         log.error(s"Failed in subscribing mining tasks. Closing all the connections")
@@ -145,6 +149,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       case (acc, templates) =>
         acc ++ AVector.from(templates.view.map(Job.from))
     }
+    latestJobs = Some(jobs)
     connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
   }
 
