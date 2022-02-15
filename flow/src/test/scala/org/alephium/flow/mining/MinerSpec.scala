@@ -27,8 +27,8 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.validation.InvalidBlockVersion
-import org.alephium.protocol.model.*
-import org.alephium.serde.*
+import org.alephium.protocol.model._
+import org.alephium.serde._
 import org.alephium.util.{AVector, Duration}
 
 class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
