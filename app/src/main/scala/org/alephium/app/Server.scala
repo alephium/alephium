@@ -25,7 +25,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
-import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController, MiningDispatcher}
+import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.util.{ActorRefT, Service}
@@ -73,10 +73,7 @@ trait Server extends Service {
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
-    val props =
-      CpuMiner
-        .props(node)
-        .withDispatcher(MiningDispatcher)
+    val props = CpuMiner.props(node)
     ActorRefT.build(flowSystem, props, s"Miner")
   }
 
@@ -92,7 +89,6 @@ trait Server extends Service {
           config.network,
           config.mining
         )
-        .withDispatcher(MiningDispatcher)
     ActorRefT.build(flowSystem, props, s"MinerApi")
     ()
   }
