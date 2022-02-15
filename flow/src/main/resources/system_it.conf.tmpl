@@ -67,6 +67,10 @@ alephium {
     max-clique-from-same-ip = 2
   }
 
+  compiler {
+    loop-unrolling-limit = 1000
+  }
+
   api {
     network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes

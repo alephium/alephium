@@ -254,6 +254,7 @@ trait TxGenerators
     with TxInputGenerators
     with TokenGenerators {
   implicit def networkConfig: NetworkConfig
+  implicit def compilerConfig: CompilerConfig
 
   lazy val createdHeightGen: Gen[Int] = Gen.choose(ALPH.GenesisHeight, Int.MaxValue)
 
@@ -540,6 +541,7 @@ trait NoIndexModelGenerators
     with GroupConfigFixture.Default
     with ConsensusConfigFixture.Default
     with NetworkConfigFixture.Default
+    with CompilerConfigFixture.Default
 
 object ModelGenerators {
   final case class ScriptPair(

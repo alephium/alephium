@@ -21,7 +21,7 @@ import scala.collection.mutable
 import akka.util.ByteString
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{NetworkId, TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
@@ -201,5 +201,9 @@ class BalancesPerLockupSpec extends AlephiumSpec {
       override def networkId: NetworkId       = NetworkId.AlephiumTestNet
       override def noPreMineProof: ByteString = ByteString.empty
     }
+    implicit override val compilerConfig: CompilerConfig =
+      new CompilerConfig {
+        override def loopUnrollingLimit: Int = 1000
+      }
   }
 }

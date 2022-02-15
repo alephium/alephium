@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
+import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.{AVector, U256}
@@ -540,19 +541,30 @@ object Ast {
     override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] =
       throw Compiler.Error("Nested loops are not supported")
 
-    private val statements = {
-      if (step == 0) throw Compiler.Error("loop step cannot be 0")
-      start.until(end, step).flatMap { index =>
-        val expr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-        body.map(_.fillPlaceholder(expr))
+    private var _statements: Option[Seq[Statement[Ctx]]] = None
+    private def getStatements(state: Compiler.State[Ctx]): Seq[Statement[Ctx]] = {
+      _statements match {
+        case Some(stats) => stats
+        case None =>
+          if (step == 0) throw Compiler.Error("loop step cannot be 0")
+          val range = start.until(end, step)
+          if (range.size > state.config.loopUnrollingLimit) {
+            throw Compiler.Error("loop range too large")
+          }
+          val stats = range.flatMap { index =>
+            val expr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            body.map(_.fillPlaceholder(expr))
+          }
+          _statements = Some(stats)
+          stats
       }
     }
 
     override def check(state: Compiler.State[Ctx]): Unit =
-      statements.foreach(_.check(state))
+      getStatements(state).foreach(_.check(state))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
-      statements.flatMap(_.genCode(state))
+      getStatements(state).flatMap(_.genCode(state))
   }
 
   trait Contract[Ctx <: StatelessContext] {
@@ -627,16 +639,16 @@ object Ast {
       }
     }
 
-    def genStatefulScript(contractIndex: Int): StatefulScript = {
-      val state = Compiler.State.buildFor(this, contractIndex)
+    def genStatefulScript(config: CompilerConfig, contractIndex: Int): StatefulScript = {
+      val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
         case script: TxScript => script.genCode(state)
         case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
       }
     }
 
-    def genStatefulContract(contractIndex: Int): StatefulContract = {
-      val state = Compiler.State.buildFor(this, contractIndex)
+    def genStatefulContract(config: CompilerConfig, contractIndex: Int): StatefulContract = {
+      val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
         case contract: TxContract => contract.genCode(state)
         case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")

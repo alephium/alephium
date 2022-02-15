@@ -19,6 +19,7 @@ package org.alephium.protocol.vm.lang
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
+import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -815,6 +816,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(6, AVector.empty, AVector(Val.U256(19)))
     test(7, AVector.empty, AVector(Val.U256(20)))
     test(8, AVector.empty, AVector(Val.U256(23)))
+  }
+
+  it should "compile failed if loop range too large" in {
+    val code =
+      s"""
+         |TxContract LoopTest() {
+         |  fn foo() -> () {
+         |    let mut x = 0
+         |    loop(0, 10, 1, x = x + ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val config = new CompilerConfig {
+      override def loopUnrollingLimit: Int = 5
+    }
+    Compiler.compileContract(code)(config) is Left(Compiler.Error("loop range too large"))
   }
 
   it should "test loop" in new TestContractMethodFixture {
