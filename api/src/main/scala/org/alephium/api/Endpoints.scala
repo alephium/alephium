@@ -412,7 +412,8 @@ trait Endpoints
       .out(jsonBody[Events])
       .summary("Get events for a contract within a block")
 
-  val getContractEventsWithinBlocks: BaseEndpoint[(BlockHash, BlockHash, Address.Contract), AVector[Events]] =
+  val getContractEventsWithinBlocks
+      : BaseEndpoint[(BlockHash, BlockHash, Address.Contract), AVector[Events]] =
     eventsEndpoint.get
       .in("within-blocks")
       .in(query[BlockHash]("fromBlock"))
@@ -421,7 +422,8 @@ trait Endpoints
       .out(jsonBody[AVector[Events]])
       .summary("Get events for a contract within a range of blocks")
 
-  val getContractEventsWithinTimeInterval: BaseEndpoint[(TimeInterval, Address.Contract), AVector[Events]] =
+  val getContractEventsWithinTimeInterval
+      : BaseEndpoint[(TimeInterval, Address.Contract), AVector[Events]] =
     eventsEndpoint.get
       .in("within-time-interval")
       .in(timeIntervalQuery)

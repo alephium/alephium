@@ -24,7 +24,6 @@ import org.alephium.protocol.vm.LogStatesId
 
 trait LogUtils { Self: FlowUtils =>
   def getEvents(blockHash: BlockHash, contractId: ContractId): IOResult[Option[LogStates]] = {
-    println(s"niux, niux, niux")
     val chainIndex  = ChainIndex.from(blockHash)
     val logStatesId = LogStatesId(blockHash, contractId)
 

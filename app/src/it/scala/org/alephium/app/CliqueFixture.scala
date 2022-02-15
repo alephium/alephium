@@ -113,7 +113,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       val response = request(port).send(backend).futureValue
       val body = response.body match {
         case Right(r) => r
-        case Left(l)  => l
+        case Left(l)  => throw new RuntimeException(l)
       }
       read[T](body)
     }
@@ -578,6 +578,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def getContractState(address: String, group: Int) = {
     httpGet(s"/contracts/${address}/state?group=${group}")
+  }
+
+  def getEventsWithinTimeInterval(startTs: TimeStamp, toTs: TimeStamp, address: Address) = {
+    httpGet(s"/events/within-time-interval?fromTs=${startTs.millis}&toTs=${toTs.millis}&contractAddress=${address.toBase58}")
   }
 
   def multisig(keys: AVector[String], mrequired: Int) = {

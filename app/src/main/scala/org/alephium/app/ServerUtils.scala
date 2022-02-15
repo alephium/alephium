@@ -407,7 +407,9 @@ class ServerUtils(implicit
       contractId: ContractId
   ): Try[AVector[Events]] = {
     for {
-      heightedBlocks <- getHeightedBlocks(blockFlow, timeInterval)
+      heightedBlocks <- wrapResult(
+        blockFlow.getHeightedIntraBlocks(timeInterval.from, timeInterval.to)
+      )
       events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
         heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
           getContractEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
