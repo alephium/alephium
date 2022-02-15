@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 
 import akka.testkit.TestActorRef
 import akka.util.Timeout
+import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
@@ -94,7 +95,7 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     miner.underlyingActor.isRunning(0, 0) is true
     miner ! BlockChainHandler.InvalidBlock(block.hash, InvalidBlockVersion)
-    miner.underlyingActor.isRunning(0, 0) is false
+    eventually(miner.underlyingActor.isRunning(0, 0) is false)
     awaitForBlocks(3)
   }
 
