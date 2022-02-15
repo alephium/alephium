@@ -179,6 +179,17 @@ abstract class Parser[Ctx <: StatelessContext] {
   def whileStmt[_: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
+  def loopStmt[_: P]: P[Ast.Loop[Ctx]] =
+    P(
+      Lexer.keyword("loop") ~/ "(" ~
+        positiveNum("loop start") ~ "," ~
+        positiveNum("loop end") ~ "," ~
+        Lexer.num.map(_.intValue()) ~ "," ~
+        statement.rep(1) ~ ")"
+    ).map { case (start, end, step, statements) =>
+      Ast.Loop[Ctx](start, end, step, statements)
+    }
+
   def statement[_: P]: P[Ast.Statement[Ctx]]
 
   def contractArgument[_: P]: P[Ast.Argument] =
@@ -201,7 +212,7 @@ object StatelessParser extends Parser[StatelessContext] {
     P(placeholder | const | callExpr | contractConv | variable | parenExpr | arrayExpr)
 
   def statement[_: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | funcCall | ifelse | whileStmt | ret)
+    P(varDef | assign | funcCall | ifelse | whileStmt | ret | loopStmt)
 
   def assetScript[_: P]: P[Ast.AssetScript] =
     P(Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
@@ -231,7 +242,7 @@ object StatefulParser extends Parser[StatefulContext] {
       .map { case (obj, (callId, exprs)) => Ast.ContractCall(obj, callId, exprs) }
 
   def statement[_: P]: P[Ast.Statement[StatefulContext]] =
-    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret)
+    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | loopStmt)
 
   def rawTxScript[_: P]: P[Ast.TxScript] =
     P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
