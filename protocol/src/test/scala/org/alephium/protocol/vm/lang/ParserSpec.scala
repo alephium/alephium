@@ -259,4 +259,21 @@ class ParserSpec extends AlephiumSpec {
       check(str, expr)
     }
   }
+
+  it should "parse loop" in {
+    val code = "loop(0, 4, 1, x[?] = ?)"
+    fastparse.parse(code, StatelessParser.statement(_)).get.value is
+      Ast.Loop[StatelessContext](
+        0,
+        4,
+        1,
+        Seq(
+          Ast.ArrayElementAssign(
+            Ast.Ident("x"),
+            Seq(Ast.Placeholder[StatelessContext]()),
+            Ast.Placeholder[StatelessContext]()
+          )
+        )
+      )
+  }
 }
