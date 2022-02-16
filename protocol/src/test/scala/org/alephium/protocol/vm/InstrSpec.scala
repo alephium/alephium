@@ -74,7 +74,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-      Log1, Log2, Log3, Log4, Log5
+      Log1, Log2, Log3, Log4, Log5, ByteVecSlice
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
@@ -891,6 +891,26 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.ByteVec(dataGen.sample.get))
     ByteVecNeq.runWith(frame).leftValue isE StackUnderflow
+  }
+
+  it should "ByteVecSlice" in new StatelessInstrFixture {
+    val intGen: Gen[Int] = Gen.chooseNum[Int](0, Int.MaxValue)
+
+    forAll(dataGen, intGen, intGen) { case (bytes, begin, end) =>
+      val slice = bytes.slice(begin, end)
+
+      stack.push(Val.ByteVec(bytes))
+      stack.push(Val.U256(begin))
+      stack.push(Val.U256(end))
+
+      val initialGas = context.gasRemaining
+      ByteVecSlice.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.ByteVec(slice)
+      initialGas.subUnsafe(context.gasRemaining) is ByteVecSlice.gas(slice.length)
+      stack.pop()
+    }
   }
 
   trait AddressCompFixture extends StatelessInstrFixture {
@@ -1891,7 +1911,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200
+      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200, ByteVecSlice -> 1
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -1908,6 +1928,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       instr match {
         case i: ToByteVecInstr[_]  => testToByteVec(i, gas)
         case _: ByteVecConcat.type => testByteVecConcatGas(gas)
+        case _: ByteVecSlice.type  => testByteVecSliceGas(gas)
         case i: LogInstr           => testLog(i, gas)
         case i: GasSimple          => i.gas().value is gas
         case i: GasFormula         => i.gas(32).value is gas
@@ -1927,6 +1948,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val initialGas = frame.ctx.gasRemaining
       ByteVecConcat.runWith(frame) isE ()
       (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
+    }
+    def testByteVecSliceGas(gas: Int) = {
+      val frame = genStatefulFrame()
+      frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](20)))) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(1))) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(10))) isE ()
+      var remaining = frame.ctx.gasRemaining
+      ByteVecSlice.runWith(frame) isE ()
+      (remaining.value - frame.ctx.gasRemaining.value) is (9 * gas)
+
+      remaining = frame.ctx.gasRemaining
+      frame.pushOpStack(Val.U256(U256.unsafe(5))) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(5))) isE ()
+      ByteVecSlice.runWith(frame) isE ()
+      (remaining.value - frame.ctx.gasRemaining.value) is (1 * gas)
     }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas
@@ -1967,7 +2003,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
-      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
+      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97, ByteVecSlice -> 98,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,

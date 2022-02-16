@@ -111,7 +111,7 @@ object Instr {
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-    Log1, Log2, Log3, Log4, Log5
+    Log1, Log2, Log3, Log4, Log5, ByteVecSlice
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -700,6 +700,18 @@ case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 w
       v2 <- frame.popOpStackByteVec()
       v1 <- frame.popOpStackByteVec()
       result = Val.ByteVec(v1.bytes ++ v2.bytes)
+      _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
+      _ <- frame.pushOpStack(result)
+    } yield ()
+  }
+}
+case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 with GasBytesSlice {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      end   <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
+      begin <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
+      bytes <- frame.popOpStackByteVec().map(_.bytes)
+      result = Val.ByteVec(bytes.slice(begin, end))
       _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
       _ <- frame.pushOpStack(result)
     } yield ()
