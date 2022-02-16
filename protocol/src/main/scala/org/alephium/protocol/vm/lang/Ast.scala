@@ -536,7 +536,7 @@ object Ast {
       start: Int,
       end: Int,
       step: Int,
-      body: Seq[Statement[Ctx]]
+      body: Statement[Ctx]
   ) extends Statement[Ctx] {
     override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] =
       throw Compiler.Error("Nested loops are not supported")
@@ -551,9 +551,9 @@ object Ast {
           if (range.size > state.config.loopUnrollingLimit) {
             throw Compiler.Error("loop range too large")
           }
-          val stats = range.flatMap { index =>
+          val stats = range.map { index =>
             val expr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-            body.map(_.fillPlaceholder(expr))
+            body.fillPlaceholder(expr)
           }
           _statements = Some(stats)
           stats

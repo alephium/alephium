@@ -267,12 +267,10 @@ class ParserSpec extends AlephiumSpec {
         0,
         4,
         1,
-        Seq(
-          Ast.ArrayElementAssign(
-            Ast.Ident("x"),
-            Seq(Ast.Placeholder[StatelessContext]()),
-            Ast.Placeholder[StatelessContext]()
-          )
+        Ast.ArrayElementAssign(
+          Ast.Ident("x"),
+          Seq(Ast.Placeholder[StatelessContext]()),
+          Ast.Placeholder[StatelessContext]()
         )
       )
   }

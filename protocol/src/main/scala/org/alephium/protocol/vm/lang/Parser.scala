@@ -185,9 +185,9 @@ abstract class Parser[Ctx <: StatelessContext] {
         nonNegativeNum("loop start") ~ "," ~
         nonNegativeNum("loop end") ~ "," ~
         Lexer.num.map(_.intValue()) ~ "," ~
-        statement.rep(1) ~ ")"
-    ).map { case (start, end, step, statements) =>
-      Ast.Loop[Ctx](start, end, step, statements)
+        statement ~ ")"
+    ).map { case (start, end, step, statement) =>
+      Ast.Loop[Ctx](start, end, step, statement)
     }
 
   def statement[_: P]: P[Ast.Statement[Ctx]]

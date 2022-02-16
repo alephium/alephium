@@ -622,6 +622,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
+         |""".stripMargin,
+      s"""
+         |// only allow one statement in loop body
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 1
+         |    loop(0, 4, 1,
+         |      a = a + ?
+         |      b = b + ?
+         |    )
+         |    return
+         |  }
+         |}
          |""".stripMargin
     )
     codes.foreach(code => Compiler.compileContract(code).isLeft is true)
@@ -868,10 +882,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn test3() -> (Bool) {
          |    let mut x = [0; 3]
          |    let mut y = [1; 3]
-         |    loop(0, 3, 1,
-         |      x[?] = ?
-         |      y[?] = ?
-         |    )
+         |    loop(0, 3, 1, x[?] = ?)
+         |    loop(0, 3, 1, y[?] = ?)
          |    return x[0] == y[0] &&
          |           x[1] == y[1] &&
          |           x[2] == y[2]
@@ -914,13 +926,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let mut x = 0
          |    let mut i = 0
          |    loop(0, 3, 1,
-         |      i = 0
          |      while (i < ?) {
          |        x = ? + x
          |        i = i + 1
          |      }
          |    )
-         |    return x == 5
+         |    return x == 3
          |  }
          |
          |  pub fn bar() -> ([U256; 3]) {
