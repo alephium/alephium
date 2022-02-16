@@ -38,7 +38,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def createArray1[_: P]: P[Ast.CreateArrayExpr[Ctx]] =
     P("[" ~ expr.rep(1, ",") ~ "]").map(Ast.CreateArrayExpr.apply)
   def createArray2[_: P]: P[Ast.CreateArrayExpr[Ctx]] =
-    P("[" ~ expr ~ ";" ~ positiveNum("array size") ~ "]").map { case (expr, size) =>
+    P("[" ~ expr ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (expr, size) =>
       Ast.CreateArrayExpr(Seq.fill(size)(expr))
     }
   def arrayExpr[_: P]: P[Ast.Expr[Ctx]]    = P(createArray1 | createArray2)
@@ -57,7 +57,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
-  def positiveNum[_: P](errorMsg: String): P[Int] = Lexer.num.map { value =>
+  def nonNegativeNum[_: P](errorMsg: String): P[Int] = Lexer.num.map { value =>
     val idx = value.intValue()
     if (idx < 0) {
       throw Compiler.Error(s"Invalid $errorMsg: $idx")
@@ -67,7 +67,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def arrayIndex[_: P]: P[Ast.Expr[Ctx]] = {
     P(
-      "[" ~ (positiveNum("arrayIndex").map(v =>
+      "[" ~ (nonNegativeNum("arrayIndex").map(v =>
         Ast.Const[Ctx](Val.U256(U256.unsafe(v)))
       ) | placeholder) ~ "]"
     )
@@ -139,7 +139,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[_: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ positiveNum("array size") ~ "]").map { case (tpe, size) =>
+    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
       Type.FixedSizeArray(tpe, size)
     }
   }
@@ -182,8 +182,8 @@ abstract class Parser[Ctx <: StatelessContext] {
   def loopStmt[_: P]: P[Ast.Loop[Ctx]] =
     P(
       Lexer.keyword("loop") ~/ "(" ~
-        positiveNum("loop start") ~ "," ~
-        positiveNum("loop end") ~ "," ~
+        nonNegativeNum("loop start") ~ "," ~
+        nonNegativeNum("loop end") ~ "," ~
         Lexer.num.map(_.intValue()) ~ "," ~
         statement.rep(1) ~ ")"
     ).map { case (start, end, step, statements) =>
@@ -265,7 +265,7 @@ object StatefulParser extends Parser[StatefulContext] {
   def constOrArray[_: P]: P[Seq[Ast.Const[StatefulContext]]] = P(
     const.map(Seq(_)) |
       P("[" ~ constOrArray.rep(0, ",").map(_.flatten) ~ "]") |
-      P("[" ~ constOrArray ~ ";" ~ positiveNum("array size") ~ "]").map { case (consts, size) =>
+      P("[" ~ constOrArray ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (consts, size) =>
         (0 until size).flatMap(_ => consts)
       }
   )
