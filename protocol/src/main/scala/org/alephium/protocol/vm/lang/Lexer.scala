@@ -140,7 +140,7 @@ object Lexer {
 
   // format: off
   def keywordSet: Set[String] =
-    Set("TxContract", "AssetScript", "TxScript", "let", "mut", "fn", "return", "true", "false", "if", "else", "while")
+    Set("TxContract", "AssetScript", "TxScript", "let", "mut", "fn", "return", "true", "false", "if", "else", "while", "loop")
   // format: on
 
   val primTpes: Map[String, Type] =

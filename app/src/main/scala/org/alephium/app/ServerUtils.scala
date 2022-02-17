@@ -32,7 +32,13 @@ import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{
+  BrokerConfig,
+  CompilerConfig,
+  ConsensusConfig,
+  GroupConfig,
+  NetworkConfig
+}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
@@ -48,6 +54,7 @@ class ServerUtils(implicit
     consensusConfig: ConsensusConfig,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
+    compilerConfig: CompilerConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
   import ServerUtils._
@@ -932,7 +939,7 @@ object ServerUtils {
       initialState: Option[String],
       alphAmount: U256,
       newTokenAmount: Option[U256]
-  ): Try[StatefulScript] = {
+  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
       buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
     }
@@ -944,7 +951,7 @@ object ServerUtils {
       initialState: AVector[vm.Val],
       alphAmount: U256,
       newTokenAmount: Option[U256]
-  ): Try[StatefulScript] = {
+  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     val stateRaw = Hex.toHexString(serialize(initialState))
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"

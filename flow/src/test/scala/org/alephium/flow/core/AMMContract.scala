@@ -16,6 +16,7 @@
 
 package org.alephium.flow.core
 
+import org.alephium.flow.setting.CompilerSetting
 import org.alephium.protocol.vm.lang.Compiler
 
 object AMMContract {
@@ -50,5 +51,6 @@ object AMMContract {
        |}
        |""".stripMargin
 
-  lazy val swapCode = Compiler.compileContract(swapContract).toOption.get
+  implicit private val compilerConfig = CompilerSetting(1000)
+  lazy val swapCode                   = Compiler.compileContract(swapContract).toOption.get
 }
