@@ -960,6 +960,144 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(10, AVector.empty, AVector(Val.Bool(true)))
   }
 
+  it should "compile return multiple values failed" in {
+    val codes = Seq(
+      s"""
+         |// Assign to immutable variable
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let b = 1
+         |    a, b = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// Assign ByteVec to U256
+         |TxContract Foo() {
+         |  fn bar() -> (U256, ByteVec) {
+         |    return 1, #00
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 1
+         |    a, b = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// Assign (U256, U256) to (U256, U256, U256)
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 0
+         |    let mut c = 0
+         |    a, b, c = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// Assign (U256, U256, U256) to (U256, U256)
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256, U256) {
+         |    return 1, 2, 3
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 0
+         |    a, b = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    )
+
+    codes.foreach(Compiler.compileContract(_).isLeft is true)
+  }
+
+  it should "test return multiple values" in new TestContractMethodFixture {
+    val code: String =
+      s"""
+         |TxContract Foo(mut array: [U256; 3]) {
+         |  fn foo0() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn test1() -> (Bool) {
+         |    let mut a = 0
+         |    let mut b = 0
+         |    a, b = foo0()
+         |    return a == 1 && b == 2
+         |  }
+         |
+         |  pub fn test2() -> (Bool) {
+         |    array[0], array[1] = foo0()
+         |    return array[0] == 1 && array[1] == 2
+         |  }
+         |
+         |  pub fn foo1() -> ([U256; 3], [U256; 3], U256) {
+         |    return [1, 2, 3], [4, 5, 6], 7
+         |  }
+         |
+         |  pub fn test4() -> (Bool) {
+         |    let mut i = 0
+         |    let mut x = [[0; 3]; 2]
+         |    x[0], array, i = foo1()
+         |    return x[0][0] == 1 &&
+         |           x[0][1] == 2 &&
+         |           x[0][2] == 3 &&
+         |           array[0] == 4 &&
+         |           array[1] == 5 &&
+         |           array[2] == 6 &&
+         |           i == 7
+         |  }
+         |
+         |  pub fn foo2(value: U256) -> ([U256; 3], U256) {
+         |    loop(0, 3, 1, array[?] = array[?] + value)
+         |    return array, value
+         |  }
+         |
+         |  pub fn test6() -> (Bool) {
+         |    array = [1, 2, 3]
+         |    let mut x = [[0; 3]; 3]
+         |    let mut y = [0; 3]
+         |    loop(0, 3, 1, x[?], y[?] = foo2(?))
+         |    return x[0][0] == 1 &&
+         |           x[0][1] == 2 &&
+         |           x[0][2] == 3 &&
+         |           x[1][0] == 2 &&
+         |           x[1][1] == 3 &&
+         |           x[1][2] == 4 &&
+         |           x[2][0] == 4 &&
+         |           x[2][1] == 5 &&
+         |           x[2][2] == 6 &&
+         |           y[0] == 0 &&
+         |           y[1] == 1 &&
+         |           y[2] == 2
+         |  }
+         |}
+         |""".stripMargin
+
+    override val fields = AVector.fill(3)(Val.U256(0))
+    test(1, AVector.empty, AVector(Val.True))
+    test(2, AVector.empty, AVector(Val.True))
+    test(4, AVector.empty, AVector(Val.True))
+    test(6, AVector.empty, AVector(Val.True))
+  }
+
   it should "generate efficient code for arrays" in {
     val code =
       s"""
