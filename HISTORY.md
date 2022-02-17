@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.2.8
+* Improve logging and thread pool for mining controller
+* Send latest mining jobs to new mining connections always
+
 ## 1.2.7
 * Add gasAmount and gasPrice to sweep endpoint
 

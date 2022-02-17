@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.Utils
-import org.alephium.flow.io.*
+import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, BlockHash}
