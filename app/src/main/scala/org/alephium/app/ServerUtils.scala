@@ -757,7 +757,8 @@ class ServerUtils(implicit
       TestContractResult(
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
-        postState
+        contracts = postState,
+        outputs = executionResult.generatedOutputs.map(Output.from)
       )
     }
   }

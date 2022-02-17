@@ -18,6 +18,8 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
+import akka.util.ByteString
+
 import org.alephium.api.ApiError
 import org.alephium.api.model._
 import org.alephium.flow.FlowFixture
@@ -773,10 +775,11 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait TestContractFixture extends Fixture {
-    val tokenId     = Hash.random
-    val (_, pubKey) = SignatureSchema.generatePriPub()
-    val lp          = Address.Asset(LockupScript.p2pkh(pubKey))
-    val buyer       = lp
+    val tokenId         = Hash.random
+    val (_, pubKey)     = SignatureSchema.generatePriPub()
+    val lp              = Address.Asset(LockupScript.p2pkh(pubKey))
+    val buyer           = lp
+    val contractAddress = Address.contract(ContractId.zero)
 
     def testContract: TestContract
 
@@ -809,6 +812,19 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.fields is
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(110)), Val.U256(200))
     contractState.asset is TestContract.Asset(ALPH.alph(110), AVector(Token(tokenId, 200)))
+    result.outputs.length is 2
+    result.outputs(0) is Output.Contract(
+      Amount(ALPH.alph(110)),
+      contractAddress,
+      AVector(Token(tokenId, 200))
+    )
+    result.outputs(1) is Output.Asset(
+      Amount(937500000000000000L),
+      lp,
+      AVector.empty,
+      TimeStamp.zero,
+      ByteString.empty
+    )
   }
 
   it should "test AMM contract: swap token" in new TestContractFixture {
@@ -835,6 +851,19 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.fields is
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(20)), Val.U256(50))
     contractState.asset is TestContract.Asset(ALPH.alph(20), AVector(Token(tokenId, 50)))
+    result.outputs.length is 2
+    result.outputs(0) is Output.Contract(
+      Amount(ALPH.alph(20)),
+      contractAddress,
+      AVector(Token(tokenId, 50))
+    )
+    result.outputs(1) is Output.Asset(
+      Amount(ALPH.nanoAlph(90937500000L)),
+      buyer,
+      AVector(Token(tokenId, 150)),
+      TimeStamp.zero,
+      ByteString.empty
+    )
   }
 
   it should "test AMM contract: swap Alph" in new TestContractFixture {
@@ -861,6 +890,19 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.fields is
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(5)), Val.U256(200))
     contractState.asset is TestContract.Asset(ALPH.alph(5), AVector(Token(tokenId, 200)))
+    result.outputs.length is 2
+    result.outputs(0) is Output.Contract(
+      Amount(ALPH.alph(5)),
+      contractAddress,
+      AVector(Token(tokenId, 200))
+    )
+    result.outputs(1) is Output.Asset(
+      Amount(ALPH.nanoAlph(105937500000L)),
+      buyer,
+      AVector.empty,
+      TimeStamp.zero,
+      ByteString.empty
+    )
   }
 
   private def generateDestination(
