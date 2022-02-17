@@ -119,15 +119,13 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map {
       case (isMutable, ident, expr) => Ast.VarDef(isMutable, ident, expr)
     }
-  def varAssign[_: P]: P[Ast.Assign[Ctx]] =
-    P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
-      Ast.Assign(ident, expr)
+  def assignedOperand[_: P]: P[Ast.AssignedOperand[Ctx]] = P(
+    Lexer.ident ~ arrayIndex.rep(0)
+  ).map { case (ident, indexes) => Ast.AssignedOperand(ident, indexes) }
+  def assign[_: P]: P[Ast.Statement[Ctx]] =
+    P(assignedOperand.rep(1, ",") ~ "=" ~ expr).map { case (operands, expr) =>
+      Ast.Assign(operands, expr)
     }
-  def arrayElementAssign[_: P]: P[Ast.ArrayElementAssign[Ctx]] =
-    P(Lexer.ident ~ arrayIndex.rep(1) ~ "=" ~ expr).map { case (ident, indexes, expr) =>
-      Ast.ArrayElementAssign(ident, indexes, expr)
-    }
-  def assign[_: P]: P[Ast.Statement[Ctx]] = P(varAssign | arrayElementAssign)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def parseType[_: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {

@@ -235,23 +235,34 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
-  it should "parse array assign" in {
+  it should "parse assign statement" in {
     def check(str: String, stat: Ast.Statement[StatelessContext]) = {
       fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
     }
 
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
-      "a[0] = b" -> Ast
-        .ArrayElementAssign(Ident("a"), Seq(constantIndex(0)), Ast.Variable(Ast.Ident("b"))),
-      "a[0][1] = b[0]" -> Ast.ArrayElementAssign(
-        Ident("a"),
-        Seq(constantIndex(0), constantIndex(1)),
+      "a[0] = b" -> Assign(
+        Seq(AssignedOperand(Ident("a"), Seq(constantIndex(0)))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[0][1] = b[0]" -> Assign(
+        Seq(AssignedOperand(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
         Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
       ),
-      "a[?][0] = ?" -> Ast.ArrayElementAssign(
-        Ident("a"),
-        Seq(Ast.Placeholder(), constantIndex(0)),
+      "a[?][0] = ?" -> Assign(
+        Seq(AssignedOperand(Ident("a"), Seq(Ast.Placeholder(), constantIndex(0)))),
         Ast.Placeholder()
+      ),
+      "a, b = foo()" -> Assign(
+        Seq(AssignedOperand(Ident("a"), Seq.empty), AssignedOperand(Ident("b"), Seq.empty)),
+        CallExpr(FuncId("foo", false), Seq.empty)
+      ),
+      "a, b[?] = foo()" -> Assign(
+        Seq(
+          AssignedOperand(Ident("a"), Seq.empty),
+          AssignedOperand(Ident("b"), Seq(Placeholder()))
+        ),
+        CallExpr(FuncId("foo", false), Seq.empty)
       )
     )
 
@@ -267,9 +278,13 @@ class ParserSpec extends AlephiumSpec {
         0,
         4,
         1,
-        Ast.ArrayElementAssign(
-          Ast.Ident("x"),
-          Seq(Ast.Placeholder[StatelessContext]()),
+        Ast.Assign(
+          Seq(
+            Ast.AssignedOperand(
+              Ast.Ident("x"),
+              Seq(Ast.Placeholder[StatelessContext]())
+            )
+          ),
           Ast.Placeholder[StatelessContext]()
         )
       )

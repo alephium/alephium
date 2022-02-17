@@ -983,12 +983,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           U256Const2,
           U256Const3,
           U256Const4,
-          StoreLocal(4),
           StoreLocal(3),
           StoreLocal(2),
           StoreLocal(1),
-          LoadLocal(1),
-          StoreLocal(0)
+          StoreLocal(0),
+          LoadLocal(0),
+          StoreLocal(4)
         )
       )
   }
