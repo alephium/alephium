@@ -94,6 +94,7 @@ case object NoCaller                                           extends ExeFailur
 final case class NegativeTimeStamp(millis: Long)               extends ExeFailure
 final case class InvalidTarget(value: BigInteger)              extends ExeFailure
 case object InvalidBytesSliceArg                               extends ExeFailure
+case object InvalidBytesSize                                   extends ExeFailure
 
 sealed trait IOFailure extends Product {
   def error: IOError

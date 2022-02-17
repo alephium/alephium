@@ -19,6 +19,8 @@ package org.alephium.util
 import java.math.BigInteger
 
 import akka.util.ByteString
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 
 class U256Spec extends AlephiumSpec {
   val numGen = (0 to 3).flatMap { i =>
@@ -253,5 +255,19 @@ class U256Spec extends AlephiumSpec {
     U256.unsafe(0).toLong.get is 0
     U256.unsafe(Long.MaxValue).toLong.get is Long.MaxValue
     U256.unsafe(Long.MaxValue).addUnsafe(U256.One).toLong is None
+  }
+
+  it should "convert to fixed size bytes" in {
+    Seq(1, 2, 4, 8, 16, 32).foreach { size =>
+      forAll(Gen.listOfN(size, arbitrary[Byte])) { bytes =>
+        val byteString = ByteString(bytes)
+        val value      = U256.from(byteString).get
+        val encoded    = value.toFixedSizeBytes(size).get
+        encoded is byteString
+      }
+    }
+
+    U256.MaxValue.toFixedSizeBytes(16) is None
+    U256.MaxValue.toFixedSizeBytes(32) is Some(ByteString(Array.fill[Byte](32)(-1)))
   }
 }
