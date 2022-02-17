@@ -55,8 +55,11 @@ package object model {
   }
   //scalastyle:on magic.number
 
-  type TokenId    = Hash
+  type TokenId = Hash
+  val TokenId: Hash.type = Hash
+
   type ContractId = Hash
+  val ContractId: Hash.type = Hash
 
   implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
 }

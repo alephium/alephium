@@ -28,7 +28,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
     group: Int = 0,
-    testContractId: ContractId,
+    testContractId: ContractId = ContractId.zero,
     testCode: StatefulContract,
     initialState: AVector[Val] = AVector.empty,
     initialAsset: TestContract.Asset,
