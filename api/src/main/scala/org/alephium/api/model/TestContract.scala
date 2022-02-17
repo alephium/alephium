@@ -28,8 +28,8 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
     group: Int = 0,
-    testContractId: ContractId = ContractId.zero,
-    testCode: StatefulContract,
+    contractId: ContractId = ContractId.zero,
+    code: StatefulContract,
     initialFields: AVector[Val] = AVector.empty,
     initialAsset: TestContract.Asset,
     testMethodIndex: Int = 0,
@@ -62,7 +62,7 @@ object TestContract {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class ExistingContract(
-      contractId: ContractId,
+      id: ContractId,
       code: StatefulContract,
       fields: AVector[Val] = AVector.empty,
       asset: Asset

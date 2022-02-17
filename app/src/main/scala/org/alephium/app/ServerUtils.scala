@@ -737,14 +737,14 @@ class ServerUtils(implicit
   }
 
   def runTestContract(blockFlow: BlockFlow, testContract: TestContract): Try[TestContractResult] = {
-    val contractId = testContract.testContractId
+    val contractId = testContract.contractId
     for {
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
       _          <- testContract.existingContracts.foreachE(createContract(worldState, _))
       _          <- createContract(worldState, contractId, testContract)
       returnLength <- wrapExeResult(
-        testContract.testCode
+        testContract.code
           .getMethod(testContract.testMethodIndex)
           .map(_.returnLength)
       )
@@ -769,9 +769,9 @@ class ServerUtils(implicit
   ): Try[AVector[TestContract.ExistingContract]] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
-        fetchContractState(worldState, contract.contractId)
+        fetchContractState(worldState, contract.id)
       )
-      testContractState <- fetchContractState(worldState, testContract.testContractId)
+      testContractState <- fetchContractState(worldState, testContract.contractId)
     } yield existingContractsState ++ AVector(testContractState)
   }
 
@@ -853,7 +853,7 @@ class ServerUtils(implicit
   ): Try[Unit] = {
     createContract(
       worldState,
-      existingContract.contractId,
+      existingContract.id,
       existingContract.code,
       existingContract.fields,
       existingContract.asset
@@ -868,7 +868,7 @@ class ServerUtils(implicit
     createContract(
       worldState,
       contractId,
-      testContract.testCode,
+      testContract.code,
       testContract.initialFields,
       testContract.initialAsset
     )

@@ -790,7 +790,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: add liquidity" in new TestContractFixture {
     val testContract = TestContract(
-      testCode = AMMContract.swapCode,
+      code = AMMContract.swapCode,
       initialFields =
         AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100)),
       initialAsset = TestContract.Asset(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -808,7 +808,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.gasUsed is 17301
     result.contracts.length is 1
     val contractState = result.contracts.head
-    contractState.contractId is ContractId.zero
+    contractState.id is ContractId.zero
     contractState.fields is
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(110)), Val.U256(200))
     contractState.asset is TestContract.Asset(ALPH.alph(110), AVector(Token(tokenId, 200)))
@@ -829,7 +829,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap token" in new TestContractFixture {
     val testContract = TestContract(
-      testCode = AMMContract.swapCode,
+      code = AMMContract.swapCode,
       initialFields =
         AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100)),
       initialAsset = TestContract.Asset(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -847,7 +847,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.gasUsed is 17333
     result.contracts.length is 1
     val contractState = result.contracts.head
-    contractState.contractId is ContractId.zero
+    contractState.id is ContractId.zero
     contractState.fields is
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(20)), Val.U256(50))
     contractState.asset is TestContract.Asset(ALPH.alph(20), AVector(Token(tokenId, 50)))
@@ -868,7 +868,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap Alph" in new TestContractFixture {
     val testContract = TestContract(
-      testCode = AMMContract.swapCode,
+      code = AMMContract.swapCode,
       initialFields =
         AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100)),
       initialAsset = TestContract.Asset(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -886,7 +886,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.gasUsed is 17333
     result.contracts.length is 1
     val contractState = result.contracts.head
-    contractState.contractId is ContractId.zero
+    contractState.id is ContractId.zero
     contractState.fields is
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(5)), Val.U256(200))
     contractState.asset is TestContract.Asset(ALPH.alph(5), AVector(Token(tokenId, 200)))
