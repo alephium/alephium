@@ -5703,6 +5703,208 @@
         }
       }
     },
+    "/contracts/test-contract": {
+      "post": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Test contract",
+        "operationId": "postContractsTest-contract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestContract"
+              },
+              "example": {
+                "code": "00010700000000000118",
+                "initialFields": [
+                  {
+                    "type": "u256",
+                    "value": "1000000000000000000"
+                  }
+                ],
+                "initialAsset": {
+                  "alphAmount": "1000000000000000000",
+                  "tokens": [
+                    {
+                      "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                      "amount": "1000000000"
+                    }
+                  ]
+                },
+                "testArgs": [
+                  {
+                    "type": "u256",
+                    "value": "1000000000000000000"
+                  }
+                ],
+                "existingContracts": [
+                  {
+                    "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
+                    "code": "00010700000000000118",
+                    "fields": [
+                      {
+                        "type": "u256",
+                        "value": "2000000000000000000"
+                      }
+                    ],
+                    "asset": {
+                      "alphAmount": "2000000000000000000",
+                      "tokens": [
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "2000000000"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "inputAssets": [
+                  {
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                    "asset": {
+                      "alphAmount": "3000000000000000000",
+                      "tokens": [
+                        {
+                          "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
+                          "amount": "3000000000"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestContractResult"
+                },
+                "example": {
+                  "returns": [
+                    {
+                      "type": "u256",
+                      "value": "1000000000000000000"
+                    }
+                  ],
+                  "gasUsed": 20000,
+                  "contracts": [
+                    {
+                      "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
+                      "code": "00010700000000000118",
+                      "fields": [
+                        {
+                          "type": "u256",
+                          "value": "2000000000000000000"
+                        }
+                      ],
+                      "asset": {
+                        "alphAmount": "2000000000000000000",
+                        "tokens": [
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "2000000000"
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "type": "contract",
+                      "amount": "1000000000000000000",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                      "tokens": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42000000000000000000"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000000000000000000000"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/multisig/address": {
       "post": {
         "tags": [
@@ -6685,6 +6887,25 @@
           }
         }
       },
+      "Asset2": {
+        "required": [
+          "alphAmount",
+          "tokens"
+        ],
+        "type": "object",
+        "properties": {
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          }
+        }
+      },
       "BadRequest": {
         "required": [
           "detail"
@@ -7415,6 +7636,32 @@
           "propertyName": "type"
         }
       },
+      "ExistingContract": {
+        "required": [
+          "id",
+          "code",
+          "fields",
+          "asset"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "asset": {
+            "$ref": "#/components/schemas/Asset2"
+          }
+        }
+      },
       "FetchResponse": {
         "required": [
           "blocks"
@@ -7483,6 +7730,21 @@
         ],
         "discriminator": {
           "propertyName": "type"
+        }
+      },
+      "InputAsset": {
+        "required": [
+          "address",
+          "asset"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "asset": {
+            "$ref": "#/components/schemas/Asset2"
+          }
         }
       },
       "InterCliquePeerInfo": {
@@ -8015,6 +8277,93 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          }
+        }
+      },
+      "TestContract": {
+        "required": [
+          "group",
+          "contractId",
+          "code",
+          "initialFields",
+          "initialAsset",
+          "testMethodIndex",
+          "testArgs",
+          "existingContracts",
+          "inputAssets"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "integer"
+          },
+          "contractId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "initialFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "initialAsset": {
+            "$ref": "#/components/schemas/Asset2"
+          },
+          "testMethodIndex": {
+            "type": "integer"
+          },
+          "testArgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "existingContracts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExistingContract"
+            }
+          },
+          "inputAssets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputAsset"
+            }
+          }
+        }
+      },
+      "TestContractResult": {
+        "required": [
+          "returns",
+          "gasUsed",
+          "contracts",
+          "outputs"
+        ],
+        "type": "object",
+        "properties": {
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "gasUsed": {
+            "type": "integer"
+          },
+          "contracts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExistingContract"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Output"
+            }
           }
         }
       },
