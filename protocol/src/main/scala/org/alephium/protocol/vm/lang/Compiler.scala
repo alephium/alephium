@@ -20,16 +20,19 @@ import scala.collection.{immutable, mutable}
 
 import fastparse.Parsed
 
+import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.MultiTxContract
 import org.alephium.util.AVector
 
 object Compiler {
-  def compileAssetScript(input: String): Either[Error, StatelessScript] =
+  def compileAssetScript(
+      input: String
+  )(implicit config: CompilerConfig): Either[Error, StatelessScript] =
     try {
       fastparse.parse(input, StatelessParser.assetScript(_)) match {
         case Parsed.Success(script, _) =>
-          val state = State.buildFor(script)
+          val state = State.buildFor(config, script)
           Right(script.genCode(state))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
@@ -38,17 +41,25 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  def compileTxScript(input: String): Either[Error, StatefulScript] =
+  def compileTxScript(input: String)(implicit
+      config: CompilerConfig
+  ): Either[Error, StatefulScript] =
     compileTxScript(input, 0)
 
-  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
-    compileStateful(input, _.genStatefulScript(index))
+  def compileTxScript(input: String, index: Int)(implicit
+      config: CompilerConfig
+  ): Either[Error, StatefulScript] =
+    compileStateful(input, _.genStatefulScript(config, index))
 
-  def compileContract(input: String): Either[Error, StatefulContract] =
+  def compileContract(input: String)(implicit
+      config: CompilerConfig
+  ): Either[Error, StatefulContract] =
     compileContract(input, 0)
 
-  def compileContract(input: String, index: Int): Either[Error, StatefulContract] =
-    compileStateful(input, _.genStatefulContract(index))
+  def compileContract(input: String, index: Int)(implicit
+      config: CompilerConfig
+  ): Either[Error, StatefulContract] =
+    compileStateful(input, _.genStatefulContract(config, index))
 
   private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
     try {
@@ -140,8 +151,9 @@ object Compiler {
   object State {
     private val maxVarIndex: Int = 0xff
 
-    def buildFor(script: Ast.AssetScript): State[StatelessContext] =
+    def buildFor(config: CompilerConfig, script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
+        config,
         mutable.HashMap.empty,
         Ast.FuncId.empty,
         0,
@@ -149,9 +161,14 @@ object Compiler {
         immutable.Map(script.ident -> script.funcTable)
       )
 
-    def buildFor(multiContract: MultiTxContract, contractIndex: Int): State[StatefulContext] = {
+    def buildFor(
+        config: CompilerConfig,
+        multiContract: MultiTxContract,
+        contractIndex: Int
+    ): State[StatefulContext] = {
       val contractTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
       StateForContract(
+        config,
         mutable.HashMap.empty,
         Ast.FuncId.empty,
         0,
@@ -162,6 +179,7 @@ object Compiler {
   }
 
   trait State[Ctx <: StatelessContext] {
+    def config: CompilerConfig
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
     var varIndex: Int
@@ -185,8 +203,9 @@ object Compiler {
     ): (ArrayTransformer.ArrayRef, Seq[Instr[Ctx]]) = {
       expr match {
         case Ast.ArrayElement(array, index) =>
+          val idx               = Ast.getConstantArrayIndex(index)
           val (arrayRef, codes) = getOrCreateArrayRef(array, isMutable)
-          val subArrayRef       = arrayRef.subArray(index)
+          val subArrayRef       = arrayRef.subArray(idx)
           (subArrayRef, codes)
         case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
         case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)
@@ -328,6 +347,7 @@ object Compiler {
 
   type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]
   final case class StateForScript(
+      config: CompilerConfig,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
@@ -364,6 +384,7 @@ object Compiler {
   }
 
   final case class StateForContract(
+      config: CompilerConfig,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,

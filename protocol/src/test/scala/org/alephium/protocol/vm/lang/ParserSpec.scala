@@ -81,6 +81,8 @@ class ParserSpec extends AlephiumSpec {
         FuncId("bar", false),
         List(Variable(Ident("x")))
       )
+    fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
+      CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
   }
 
   it should "parse return" in {
@@ -194,16 +196,29 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  def constantIndex[Ctx <: StatelessContext](value: Int): Ast.Const[Ctx] =
+    Ast.Const[Ctx](Val.U256(U256.unsafe(value)))
+
   it should "parse array expression" in {
     def check(str: String, expr: Ast.Expr[StatelessContext]) = {
       fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
     }
 
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
-      "a[0][1]" -> Ast.ArrayElement(Ast.ArrayElement(Variable(Ast.Ident("a")), 0), 1),
+      "a[0][?]" -> Ast.ArrayElement(
+        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+        Ast.Placeholder()
+      ),
+      "a[0][1]" -> Ast.ArrayElement(
+        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+        constantIndex(1)
+      ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(Ast.ArrayElement(Variable(Ast.Ident("a")), 0), 1)
+        Ast.ArrayElement(
+          Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+          constantIndex(1)
+        )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -226,16 +241,37 @@ class ParserSpec extends AlephiumSpec {
     }
 
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
-      "a[0] = b" -> Ast.ArrayElementAssign(Ident("a"), Seq(0), Ast.Variable(Ast.Ident("b"))),
+      "a[0] = b" -> Ast
+        .ArrayElementAssign(Ident("a"), Seq(constantIndex(0)), Ast.Variable(Ast.Ident("b"))),
       "a[0][1] = b[0]" -> Ast.ArrayElementAssign(
         Ident("a"),
-        Seq(0, 1),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), 0)
+        Seq(constantIndex(0), constantIndex(1)),
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
+      ),
+      "a[?][0] = ?" -> Ast.ArrayElementAssign(
+        Ident("a"),
+        Seq(Ast.Placeholder(), constantIndex(0)),
+        Ast.Placeholder()
       )
     )
 
     stats.foreach { case (str, expr) =>
       check(str, expr)
     }
+  }
+
+  it should "parse loop" in {
+    val code = "loop(0, 4, 1, x[?] = ?)"
+    fastparse.parse(code, StatelessParser.statement(_)).get.value is
+      Ast.Loop[StatelessContext](
+        0,
+        4,
+        1,
+        Ast.ArrayElementAssign(
+          Ast.Ident("x"),
+          Seq(Ast.Placeholder[StatelessContext]()),
+          Ast.Placeholder[StatelessContext]()
+        )
+      )
   }
 }

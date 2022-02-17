@@ -45,7 +45,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -64,9 +64,10 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
-  implicit lazy val groupConfig: GroupConfig      = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting = node.config.network
-  implicit lazy val askTimeout: Timeout           = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig       = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting  = node.config.network
+  implicit lazy val compilerConfig: CompilerConfig = node.config.compiler
+  implicit lazy val askTimeout: Timeout            = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
