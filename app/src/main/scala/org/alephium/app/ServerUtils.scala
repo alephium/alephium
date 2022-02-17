@@ -32,13 +32,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config.{
-  BrokerConfig,
-  CompilerConfig,
-  ConsensusConfig,
-  GroupConfig,
-  NetworkConfig
-}
+import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
