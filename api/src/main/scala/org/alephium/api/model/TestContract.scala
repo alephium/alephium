@@ -30,7 +30,7 @@ final case class TestContract(
     group: Int = 0,
     testContractId: ContractId = ContractId.zero,
     testCode: StatefulContract,
-    initialState: AVector[Val] = AVector.empty,
+    initialFields: AVector[Val] = AVector.empty,
     initialAsset: TestContract.Asset,
     testMethodIndex: Int = 0,
     testArgs: AVector[Val] = AVector.empty,
@@ -64,7 +64,7 @@ object TestContract {
   final case class ExistingContract(
       contractId: ContractId,
       code: StatefulContract,
-      state: AVector[Val] = AVector.empty,
+      fields: AVector[Val] = AVector.empty,
       asset: Asset
   )
 

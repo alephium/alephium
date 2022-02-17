@@ -854,7 +854,7 @@ class ServerUtils(implicit
       worldState,
       existingContract.contractId,
       existingContract.code,
-      existingContract.state,
+      existingContract.fields,
       existingContract.asset
     )
   }
@@ -868,7 +868,7 @@ class ServerUtils(implicit
       worldState,
       contractId,
       testContract.testCode,
-      testContract.initialState,
+      testContract.initialFields,
       testContract.initialAsset
     )
   }
