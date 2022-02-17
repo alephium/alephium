@@ -753,83 +753,68 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    test(0, AVector.empty, AVector(Val.Bool(true)))
+    test(0, AVector.empty, AVector(Val.True))
     test(1, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(2, AVector.fill(4)(Val.Bool(true)), AVector(Val.Bool(false)))
-    test(3, AVector.fill(4)(Val.U256(10)), AVector(Val.Bool(true)))
+    test(2, AVector.fill(4)(Val.True), AVector(Val.False))
+    test(3, AVector.fill(4)(Val.U256(10)), AVector(Val.True))
     test(4, AVector(Val.U256(4)), AVector.fill(2)(Val.U256(4)))
     test(5, AVector(Val.U256(1)), AVector(Val.U256(2), Val.U256(2), Val.U256(3), Val.U256(3)))
     test(7, AVector(Val.U256(3)), AVector(Val.U256(3)))
     test(9, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(10, AVector.empty, AVector(Val.Bool(true)))
-    test(11, AVector.empty, AVector(Val.Bool(true)))
-    test(12, AVector.empty, AVector(Val.Bool(true)))
-    test(13, AVector.empty, AVector(Val.Bool(true)))
+    test(10, AVector.empty, AVector(Val.True))
+    test(11, AVector.empty, AVector(Val.True))
+    test(12, AVector.empty, AVector(Val.True))
+    test(13, AVector.empty, AVector(Val.True))
   }
 
   it should "test contract array fields" in new TestContractMethodFixture {
     val code =
       s"""
          |TxContract Foo(
-         |  arr0: [U256; 2],
-         |  mut arr1: [[U256; 2]; 4],
+         |  mut array: [[U256; 2]; 4],
          |  mut x: U256
          |) {
-         |  pub fn getArr0() -> ([U256; 2]) {
-         |    return arr0
-         |  }
-         |
-         |  pub fn getArr1() -> ([[U256; 2]; 4]) {
-         |    return arr1
-         |  }
-         |
-         |  pub fn setArr1(arr: [[U256; 2]; 4]) -> () {
-         |    arr1 = arr
+         |  fn foo0(a: [U256; 2], b: [U256; 2]) -> () {
+         |    loop(0, 2, 1, assert!(a[?] == b[?]))
          |    return
          |  }
          |
-         |  pub fn add() -> ([U256; 4]) {
+         |  pub fn test1(a: [[U256; 2]; 4]) -> () {
+         |    array = a
+         |    loop(0, 4, 1, foo0(array[?], a[?]))
+         |    return
+         |  }
+         |
+         |  fn foo1() -> (U256) {
          |    x = x + 1
-         |    return [x + 1, x + 2, x + 3, x + 4]
-         |  }
-         |
-         |  pub fn addTest1() -> (U256) {
-         |    let res = [add(), add(), add(), add()]
          |    return x
          |  }
          |
-         |  pub fn addTest2() -> (U256) {
-         |    let res = [add(), add(), add(), add()][2]
-         |    return x
+         |  pub fn test3() -> (Bool) {
+         |    x = 0
+         |    let res = [foo1(), foo1(), foo1(), foo1()]
+         |    return x == 4
          |  }
          |
-         |  pub fn addTest3() -> (U256) {
-         |    let res = [add(); 4]
-         |    return x
+         |  pub fn test4() -> (Bool) {
+         |    x = 0
+         |    let res = [foo1(), foo1(), foo1(), foo1()][2]
+         |    return x == 4
          |  }
          |
-         |  pub fn addTest4() -> (U256) {
-         |    let res = add()
-         |    return x
-         |  }
-         |
-         |  pub fn test8() -> (U256) {
-         |    let a = add()[1]
-         |    return a
+         |  pub fn test5() -> (Bool) {
+         |    x = 0
+         |    let res = [foo1(); 4]
+         |    return x == 4
          |  }
          |}
          |""".stripMargin
 
-    override val fields: AVector[Val] = AVector.fill(11)(Val.U256(7))
-    test(0, AVector.empty, AVector.fill(2)(Val.U256(7)))
-    test(1, AVector.empty, AVector.fill(8)(Val.U256(7)))
-    test(2, AVector.fill(8)(Val.U256(3)), AVector.empty)
-    test(1, AVector.empty, AVector.fill(8)(Val.U256(3)))
-    test(4, AVector.empty, AVector(Val.U256(11)))
-    test(5, AVector.empty, AVector(Val.U256(15)))
-    test(6, AVector.empty, AVector(Val.U256(19)))
-    test(7, AVector.empty, AVector(Val.U256(20)))
-    test(8, AVector.empty, AVector(Val.U256(23)))
+    override val fields: AVector[Val] = AVector.fill(9)(Val.U256(0))
+    test(1, AVector.fill(8)(Val.U256(3)), AVector.empty)
+    test(3, AVector.empty, AVector(Val.True))
+    test(4, AVector.empty, AVector(Val.True))
+    test(5, AVector.empty, AVector(Val.True))
   }
 
   it should "compile failed if loop range too large" in {
@@ -949,15 +934,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
 
     override val fields: AVector[Val] = AVector.fill(3)(Val.U256(0))
-    test(0, AVector.empty, AVector(Val.Bool(true)))
-    test(1, AVector.empty, AVector(Val.Bool(true)))
-    test(2, AVector.empty, AVector(Val.Bool(true)))
-    test(3, AVector.empty, AVector(Val.Bool(true)))
-    test(4, AVector.empty, AVector(Val.Bool(true)))
-    test(6, AVector.empty, AVector(Val.Bool(true)))
-    test(7, AVector.empty, AVector(Val.Bool(true)))
-    test(8, AVector.empty, AVector(Val.Bool(true)))
-    test(10, AVector.empty, AVector(Val.Bool(true)))
+    test(0, AVector.empty, AVector(Val.True))
+    test(1, AVector.empty, AVector(Val.True))
+    test(2, AVector.empty, AVector(Val.True))
+    test(3, AVector.empty, AVector(Val.True))
+    test(4, AVector.empty, AVector(Val.True))
+    test(6, AVector.empty, AVector(Val.True))
+    test(7, AVector.empty, AVector(Val.True))
+    test(8, AVector.empty, AVector(Val.True))
+    test(10, AVector.empty, AVector(Val.True))
   }
 
   it should "compile return multiple values failed" in {
