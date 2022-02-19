@@ -319,6 +319,13 @@ object ServerFixture {
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
     override def calWeight(block: Block): IOResult[Weight]              = ???
 
+    override def getHeightedIntraBlocks(
+        fromTs: TimeStamp,
+        toTs: TimeStamp
+    ): IOResult[AVector[(ChainIndex, AVector[(Block, Int)])]] = {
+      Right(AVector((block.chainIndex, AVector((block, 10)))))
+    }
+
     override def getEvents(
         blockHash: BlockHash,
         contractId: ContractId

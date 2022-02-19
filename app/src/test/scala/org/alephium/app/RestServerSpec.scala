@@ -25,6 +25,8 @@ import scala.util.{Random, Using}
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{TestActor, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, EitherValues}
+import org.scalatest.compatible.Assertion
+import sttp.client3.Response
 import sttp.model.StatusCode
 
 import org.alephium.api.{ApiError, ApiModel}
@@ -781,6 +783,75 @@ abstract class RestServerSpec(
         |  ]
         |}
         |""".stripMargin.filterNot(_.isWhitespace)
+    }
+  }
+
+  it should "get events for a contract within a time interval" in {
+    val blockHash  = dummyBlock.hash.toHexString
+    val chainIndex = dummyBlock.chainIndex
+
+    val now    = TimeStamp.now()
+    val fromTs = (now - Duration.ofMinutes(10).get).get
+    val toTs   = (now - Duration.ofMinutes(3).get).get
+
+    val urlBase = s"/events/within-time-interval?contractAddress=$dummyContractAddress"
+
+    info("with valid fromTs and toTs")
+    Get(s"$urlBase&fromTs=${fromTs.millis}&toTs=${toTs.millis}").check(validResponse)
+
+    info("with fromTs only")
+    Get(s"$urlBase&fromTs=${fromTs.millis}").check(validResponse)
+
+    info("with invalid fromTs and toTs")
+    Get(s"$urlBase&fromTs=${toTs.millis}&toTs=${fromTs.millis}").check { response =>
+      response.code is StatusCode.BadRequest
+      response.body.leftValue is s"""{"detail":"Invalid value (`fromTs` must be before `toTs`)"}"""
+    }
+
+    def validResponse(response: Response[Either[String, String]]): Assertion = {
+      response.code is StatusCode.Ok
+      val events = response.body.rightValue
+      if (dummyBlock.chainIndex.isIntraGroup) {
+        events is s"""
+        |[{
+        |  "chainFrom": ${chainIndex.from.value},
+        |  "chainTo": ${chainIndex.to.value},
+        |  "events": [
+        |    {
+        |      "blockHash": "$blockHash",
+        |      "contractId": "${counterContract.hash.toHexString}",
+        |      "name":{
+        |        "type": "bytevec",
+        |        "value": "5472616e73666572"
+        |      },
+        |      "fields": [
+        |        {
+        |          "type": "u256",
+        |          "value": "4"
+        |        },
+        |        {
+        |          "type": "address",
+        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+        |        },
+        |        {
+        |          "type": "address",
+        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+        |        }
+        |      ]
+        |    }
+        |  ]
+        |}]
+        |""".stripMargin.filterNot(_.isWhitespace)
+      } else {
+        events is s"""
+        |[{
+        |  "chainFrom": ${chainIndex.from.value},
+        |  "chainTo": ${chainIndex.to.value},
+        |  "events": [
+        |  ]
+        |}]
+        |""".stripMargin.filterNot(_.isWhitespace)
+      }
     }
   }
 }
