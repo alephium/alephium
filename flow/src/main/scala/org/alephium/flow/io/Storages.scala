@@ -20,12 +20,12 @@ import java.nio.file.Path
 
 import org.rocksdb.WriteOptions
 
-import org.alephium.io.{IOResult, KeyValueSource, RocksDBKeyValueStorage, RocksDBSource}
+import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.WorldState
+import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
 import org.alephium.util.AVector
 
 object Storages {
@@ -47,7 +47,7 @@ object Storages {
     val txStorage         = TxRocksDBStorage(db, All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, Trie, writeOptions)
-    val logStorage        = LogRocksDBStorage(db, Log, writeOptions)
+    val logStorage        = RocksDBKeyValueStorage[LogStatesId, LogStates](db, Log, writeOptions)
     val trieHashStorage   = WorldStateRockDBStorage(trieStorage, logStorage, db, All, writeOptions)
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage, logStorage)
     val pendingTxStorage  = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
@@ -88,7 +88,7 @@ final case class Storages(
     pendingTxStorage: PendingTxStorage,
     readyTxStorage: ReadyTxStorage,
     brokerStorage: BrokerStorage,
-    logStorage: LogStorage
+    logStorage: KeyValueStorage[LogStatesId, LogStates]
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 
