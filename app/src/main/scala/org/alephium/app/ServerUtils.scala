@@ -882,8 +882,9 @@ class ServerUtils(implicit
       initialState: AVector[Val],
       asset: TestContract.Asset
   ): Try[Unit] = {
-    val outputRef = ContractOutputRef.unsafe(Hint.unsafe(0), contractId)
-    val output    = asset.toContractOutput(contractId)
+    val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
+    val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)
+    val output     = asset.toContractOutput(contractId)
     wrapResult(
       worldState.createContractUnsafe(
         code.toHalfDecoded(),
