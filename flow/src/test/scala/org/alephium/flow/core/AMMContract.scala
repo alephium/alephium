@@ -62,12 +62,12 @@ object AMMContract {
        |    approveToken!(lp, tokenId, tokenAmount)
        |    Swap(swapContractId).addLiquidity(lp, alphAmount, tokenAmount)
        |  }
-       |  
+       |
        |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
        |    approveAlph!(buyer, alphAmount)
        |    Swap(swapContractId).swapToken(buyer, alphAmount)
        |  }
-       |  
+       |
        |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    approveToken!(buyer, tokenId, tokenAmount)
        |    Swap(swapContractId).swapAlph(buyer, tokenAmount)
