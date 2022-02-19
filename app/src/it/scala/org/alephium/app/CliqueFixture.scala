@@ -113,7 +113,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       val response = request(port).send(backend).futureValue
       val body = response.body match {
         case Right(r) => r
-        case Left(l)  => throw new RuntimeException(l)
+        case Left(l)  => l
       }
       read[T](body)
     }
