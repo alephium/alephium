@@ -20,7 +20,9 @@ import org.alephium.flow.setting.CompilerSetting
 import org.alephium.protocol.vm.lang.Compiler
 
 object AMMContract {
-  val swapContract =
+  implicit private val compilerConfig = CompilerSetting(1000)
+
+  lazy val swapContract =
     s"""
        |// Simple swap contract purely for testing
        |
@@ -50,7 +52,29 @@ object AMMContract {
        |  }
        |}
        |""".stripMargin
+  lazy val swapCode = Compiler.compileContract(swapContract).toOption.get
 
-  implicit private val compilerConfig = CompilerSetting(1000)
-  lazy val swapCode                   = Compiler.compileContract(swapContract).toOption.get
+  lazy val swapProxyContract: String =
+    s"""
+       |TxContract SwapProxy(swapContractId: ByteVec, tokenId: ByteVec) {
+       |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
+       |    approveAlph!(lp, alphAmount)
+       |    approveToken!(lp, tokenId, tokenAmount)
+       |    Swap(swapContractId).addLiquidity(lp, alphAmount, tokenAmount)
+       |  }
+       |  
+       |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
+       |    approveAlph!(buyer, alphAmount)
+       |    Swap(swapContractId).swapToken(buyer, alphAmount)
+       |  }
+       |  
+       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
+       |    approveToken!(buyer, tokenId, tokenAmount)
+       |    Swap(swapContractId).swapAlph(buyer, tokenAmount)
+       |  }
+       |}
+       |
+       |$swapContract
+       |""".stripMargin
+  lazy val swapProxyCode = Compiler.compileContract(swapProxyContract).toOption.get
 }
