@@ -581,7 +581,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def getEventsWithinTimeInterval(startTs: TimeStamp, toTs: TimeStamp, address: Address) = {
-    httpGet(s"/events/within-time-interval?fromTs=${startTs.millis}&toTs=${toTs.millis}&contractAddress=${address.toBase58}")
+    httpGet(
+      s"/events/within-time-interval?fromTs=${startTs.millis}&toTs=${toTs.millis}&contractAddress=${address.toBase58}"
+    )
   }
 
   def multisig(keys: AVector[String], mrequired: Int) = {

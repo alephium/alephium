@@ -3020,7 +3020,7 @@
           {
             "name": "toTs",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer",
               "format": "int64",
@@ -3232,7 +3232,7 @@
           {
             "name": "toTs",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer",
               "format": "int64",
@@ -6886,7 +6886,7 @@
           {
             "name": "toBlock",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -7029,7 +7029,7 @@
           {
             "name": "toTs",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer",
               "format": "int64",

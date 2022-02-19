@@ -375,11 +375,11 @@ class ServerUtils(implicit
   def getContractEventsWithinBlocks(
       blockFlow: BlockFlow,
       fromBlock: BlockHash,
-      toBlock: BlockHash,
+      toBlockOpt: Option[BlockHash],
       contractId: ContractId
   ): Try[AVector[Events]] = {
     for {
-      timeInterval <- timeIntervalFromBlockRange(blockFlow, fromBlock, toBlock)
+      timeInterval <- timeIntervalFromBlockRange(blockFlow, fromBlock, toBlockOpt)
       events       <- getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
     } yield events
   }
@@ -387,18 +387,37 @@ class ServerUtils(implicit
   private def timeIntervalFromBlockRange(
       blockFlow: BlockFlow,
       fromBlock: BlockHash,
-      toBlock: BlockHash
+      toBlockOpt: Option[BlockHash]
   ): Try[TimeInterval] = {
     for {
-      fromBlockHeader <- wrapResult(blockFlow.getBlockHeader(fromBlock))
-      toBlockHeader   <- wrapResult(blockFlow.getBlockHeader(toBlock))
-      timeInterval <-
-        if (fromBlockHeader.timestamp >= toBlockHeader.timestamp) {
-          Left(badRequest("`fromBlock` must be before `toBlock`"))
-        } else {
-          Right(TimeInterval(fromBlockHeader.timestamp, toBlockHeader.timestamp))
-        }
+      fromTimestamp <- wrapResult(blockFlow.getBlockHeader(fromBlock)).map(_.timestamp)
+      timeInterval <- toBlockOpt match {
+        case Some(toBlock) =>
+          for {
+            toTimestamp <- wrapResult(blockFlow.getBlockHeader(toBlock)).map(_.timestamp)
+            timeInterval <- validateTimeInterval(
+              TimeInterval(fromTimestamp, Some(toTimestamp)),
+              "`fromBlock` must be before `toBlock`"
+            )
+          } yield timeInterval
+        case None =>
+          validateTimeInterval(
+            TimeInterval(fromTimestamp, None),
+            "Timestamp for `fromBlock` is in the future"
+          )
+      }
     } yield timeInterval
+  }
+
+  private def validateTimeInterval(
+      timeInterval: TimeInterval,
+      errorMsg: String
+  ): Try[TimeInterval] = {
+    if (timeInterval.from >= timeInterval.to) {
+      Left(badRequest(errorMsg))
+    } else {
+      Right(timeInterval)
+    }
   }
 
   def getContractEventsWithinTimeInterval(

@@ -738,7 +738,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get event for a contract from a given block" in {
+  it should "get events for a contract from a given block" in {
     val block = blockGen
       .map(_.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get))
       .retryUntil(_.chainIndex.isIntraGroup)

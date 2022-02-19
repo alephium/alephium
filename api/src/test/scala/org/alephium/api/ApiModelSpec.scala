@@ -816,18 +816,19 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "validate fromTs and toTs" in {
     val ts0 = TimeStamp.unsafe(0)
     val ts1 = TimeStamp.unsafe(1)
-    TimeInterval.validator(TimeInterval(ts0, ts0)).isEmpty is false
-    TimeInterval.validator(TimeInterval(ts0, ts1)).isEmpty is true
-    TimeInterval.validator(TimeInterval(ts1, ts0)).isEmpty is false
-    TimeInterval.validator(TimeInterval(ts1, ts1)).isEmpty is false
+    TimeInterval.validator(TimeInterval(ts0, Some(ts0))).isEmpty is false
+    TimeInterval.validator(TimeInterval(ts0, Some(ts1))).isEmpty is true
+    TimeInterval.validator(TimeInterval(ts1, Some(ts0))).isEmpty is false
+    TimeInterval.validator(TimeInterval(ts1, Some(ts1))).isEmpty is false
   }
 
   it should "validate the time span" in {
     val timestamp = TimeStamp.now()
     val timespan  = Duration.ofHoursUnsafe(1)
-    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(61)).validateTimeSpan(timespan) is Left(
+    TimeInterval(timestamp, Some(timestamp.plusMinutesUnsafe(61)))
+      .validateTimeSpan(timespan) is Left(
       ApiError.BadRequest(s"Time span cannot be greater than ${timespan}")
     )
-    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
+    TimeInterval(timestamp, Some(timestamp.plusMinutesUnsafe(60))).validateTimeSpan(timespan) isE ()
   }
 }

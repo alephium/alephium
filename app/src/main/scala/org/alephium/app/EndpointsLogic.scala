@@ -141,7 +141,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     val timeSpan = timeSpanOpt.map(_.toDuration()).getOrElse(defaultHashRateDuration)
     val toTs     = TimeStamp.now()
     val fromTs   = toTs.minusUnsafe(timeSpan)
-    val result   = serverUtils.averageHashRate(blockFlow, TimeInterval(fromTs, toTs))
+    val result   = serverUtils.averageHashRate(blockFlow, TimeInterval(fromTs, Some(toTs)))
     Future.successful(result)
   }
 
@@ -567,10 +567,10 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getContractEventsWithinBlocksLogic = serverLogic(getContractEventsWithinBlocks) {
-    case (fromBlock, toBlock, contractAddress) =>
+    case (fromBlock, toBlockOpt, contractAddress) =>
       Future.successful {
         val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlock, contractId)
+        serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlockOpt, contractId)
       }
   }
 
