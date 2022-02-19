@@ -66,7 +66,6 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       genBlockEnv(),
       txEnv,
       cachedWorldState.staging(),
-      txEnv.prevOutputs,
       gasLimit
     )
   }

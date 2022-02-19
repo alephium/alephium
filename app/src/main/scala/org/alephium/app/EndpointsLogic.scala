@@ -30,9 +30,8 @@ import sttp.model.{StatusCode, Uri}
 import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
-import org.alephium.api.{ApiError, Endpoints}
+import org.alephium.api.{ApiError, Endpoints, Try}
 import org.alephium.api.model._
-import org.alephium.app.ServerUtils.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
@@ -47,7 +46,7 @@ import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{Val => _, _}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -64,10 +63,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
-  implicit lazy val groupConfig: GroupConfig       = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting  = node.config.network
-  implicit lazy val compilerConfig: CompilerConfig = node.config.compiler
-  implicit lazy val askTimeout: Timeout            = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig         = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting    = node.config.network
+  implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
+  implicit lazy val compilerConfig: CompilerConfig   = node.config.compiler
+  implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -275,7 +275,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   private def serverLogicRedirectWith[R, P, A](
       endpoint: BaseEndpoint[R, A]
   )(
-      paramsConvert: R => ServerUtils.Try[P],
+      paramsConvert: R => Try[P],
       localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]],
       getIndex: P => GroupIndex
   ) = {
@@ -378,7 +378,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       txId: Hash,
       chainFrom: Option[GroupIndex],
       chainTo: Option[GroupIndex]
-  ): Future[ServerUtils.Try[TxStatus]] = {
+  ): FutureTry[TxStatus] = {
     (chainFrom, chainTo) match {
       case (Some(from), Some(to)) =>
         Future.successful(
@@ -405,12 +405,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   private def searchLocalTransactionStatus(
       txId: Hash,
       chainIndexes: AVector[ChainIndex]
-  ): ServerUtils.Try[TxStatus] = {
+  ): Try[TxStatus] = {
     @tailrec
     def rec(
         indexes: AVector[ChainIndex],
-        currentRes: ServerUtils.Try[TxStatus]
-    ): ServerUtils.Try[TxStatus] = {
+        currentRes: Try[TxStatus]
+    ): Try[TxStatus] = {
       if (indexes.isEmpty) {
         currentRes
       } else {
@@ -427,7 +427,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def searchTransactionStatusInOtherNodes(txId: Hash): Future[ServerUtils.Try[TxStatus]] = {
+  private def searchTransactionStatusInOtherNodes(txId: Hash): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
       Future.successful(Right(NotFound))
@@ -436,7 +436,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       def rec(
           from: GroupIndex,
           remaining: AVector[GroupIndex]
-      ): Future[ServerUtils.Try[TxStatus]] = {
+      ): FutureTry[TxStatus] = {
         requestFromGroupIndex(
           from,
           Future.successful(Right(NotFound)),
@@ -531,6 +531,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       contractState,
       (contractAddress, groupIndex)
     )
+  }
+
+  val testContractLogic = serverLogic(testContract) { testContract: TestContract =>
+    val blockFlow = BlockFlow.emptyUnsafe(node.config)
+    Future(serverUtils.runTestContract(blockFlow, testContract))
   }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
