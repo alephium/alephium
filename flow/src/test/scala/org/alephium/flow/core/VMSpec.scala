@@ -1208,6 +1208,23 @@ class VMSpec extends AlephiumSpec {
     testEventLogState2.fields(4) is Val.Bool(true)
   }
 
+  it should "not compile when emitting events with array field types" in new FlowFixture {
+    def contractRaw: String =
+      s"""
+         |TxContract Foo(mut result: U256) {
+         |
+         |  event TestEvent(f: [U256; 2])
+         |
+         |  pub fn testArrayEventType() -> (U256) {
+         |    emit TestEvent([1, 2])
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(contractRaw).leftValue is Compiler.Error(
+      "Array type for events not supported"
+    )
+  }
+
   private def getLogStates(
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
