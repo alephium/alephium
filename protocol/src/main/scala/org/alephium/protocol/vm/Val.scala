@@ -164,7 +164,7 @@ object Val {
 
     override def toString: String = "U256"
 
-    def from(v: Int): U256 = {
+    def unsafe(v: Int): U256 = {
       U256(util.U256.unsafe(v))
     }
   }

@@ -29,10 +29,6 @@ object LogStatesId {
     Serde.forProduct2(LogStatesId.apply, id => (id.blockHash, id.contractId))
 }
 
-// TODO:
-// txId?
-// index in blocks?
-// removed field due to re-org?
 final case class LogState(
     name: Val.ByteVec,
     txId: Hash,
@@ -48,11 +44,7 @@ final case class LogStates(
     blockHash: BlockHash,
     contractId: ContractId,
     states: AVector[LogState]
-) {
-  def id(): LogStatesId = {
-    LogStatesId(blockHash, contractId)
-  }
-}
+)
 
 object LogStates {
   implicit val serde: Serde[LogStates] =

@@ -162,7 +162,6 @@ object Ast {
       )
     }
   }
-  // What does ContractConv stand for?
   final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
       extends Expr[Ctx] {
     override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
@@ -359,41 +358,21 @@ object Ast {
     }
   }
 
-  final case class EventDef(
-      id: TypeId,
-      fields: Seq[EventField]
-  ) extends UniqueDef {
-    override def name: String = id.name
+  sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
+    def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
+    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
   }
-
-  final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
-      extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newArgs = args.map(_.fillPlaceholder(expr))
-      if (newArgs == args) this else EmitEvent(id, newArgs)
-    }
-
-    override def check(state: Compiler.State[Ctx]): Unit = {
-      val eventInfo = state.getEvent(id)
-      eventInfo.checkFieldTypes(args.flatMap(_.getType(state)))
-    }
-
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val eventName = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
-      val argsType  = args.flatMap(_.getType(state))
-      if (argsType.exists(_.isArrayType)) {
-        throw Compiler.Error("Array type for events not supported")
-      }
-      val argsLength = Const[Ctx](Val.U256.from(args.length + 1)).genCode(state)
-      args.flatMap(_.genCode(state)) ++ eventName ++ argsLength :+ Log
-    }
+  final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
+      extends AssignmentTarget[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
+    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
+      if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
+    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = this
   }
-
-  final case class ArrayElementAssign[Ctx <: StatelessContext](
-      target: Ident,
-      indexes: Seq[Ast.Expr[Ctx]],
-      rhs: Expr[Ctx]
-  ) extends Statement[Ctx] {
+  final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
+      ident: Ident,
+      indexes: Seq[Ast.Expr[Ctx]]
+  ) extends AssignmentTarget[Ctx] {
     @scala.annotation.tailrec
     private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
       if (indexes.isEmpty) {
@@ -426,6 +405,37 @@ object Ast {
       if (newIndexes == indexes) this else AssignmentArrayElementTarget(ident, newIndexes)
     }
   }
+
+  final case class EventDef(
+      id: TypeId,
+      fields: Seq[EventField]
+  ) extends UniqueDef {
+    override def name: String = id.name
+  }
+
+  final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
+      extends Statement[Ctx] {
+    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
+      val newArgs = args.map(_.fillPlaceholder(expr))
+      if (newArgs == args) this else EmitEvent(id, newArgs)
+    }
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val eventInfo = state.getEvent(id)
+      eventInfo.checkFieldTypes(args.flatMap(_.getType(state)))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val eventName = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
+      val argsType  = args.flatMap(_.getType(state))
+      if (argsType.exists(_.isArrayType)) {
+        throw Compiler.Error("Array type for events not supported")
+      }
+      val argsLength = Const[Ctx](Val.U256.unsafe(args.length + 1)).genCode(state)
+      args.flatMap(_.genCode(state)) ++ eventName ++ argsLength :+ Log
+    }
+  }
+
   final case class Assign[Ctx <: StatelessContext](
       targets: Seq[AssignmentTarget[Ctx]],
       rhs: Expr[Ctx]
@@ -652,7 +662,7 @@ object Ast {
   }
 
   sealed trait ContractWithState extends Contract[StatefulContext] {
-    val events: Seq[EventDef] = Seq.empty
+    def events: Seq[EventDef]
 
     def eventTable(): immutable.Map[Ast.TypeId, Compiler.EventInfo] = {
       val table = events.map { event =>
@@ -669,7 +679,8 @@ object Ast {
 
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
       extends ContractWithState {
-    val fields: Seq[Argument] = Seq.empty
+    override def events: Seq[EventDef] = Seq.empty
+    val fields: Seq[Argument]          = Seq.empty
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)

@@ -48,7 +48,7 @@ object Storages {
     val nodeStateStorage  = NodeStateRockDBStorage(db, All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, Trie, writeOptions)
     val logStorage        = RocksDBKeyValueStorage[LogStatesId, LogStates](db, Log, writeOptions)
-    val trieHashStorage   = WorldStateRockDBStorage(trieStorage, logStorage, db, All, writeOptions)
+    val worldStateStorage = WorldStateRockDBStorage(trieStorage, logStorage, db, All, writeOptions)
     val emptyWorldState   = WorldState.emptyPersisted(trieStorage, logStorage)
     val pendingTxStorage  = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage    = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
@@ -60,7 +60,7 @@ object Storages {
       blockStorage,
       txStorage,
       emptyWorldState,
-      trieHashStorage,
+      worldStateStorage,
       blockStateStorage,
       nodeStateStorage,
       pendingTxStorage,

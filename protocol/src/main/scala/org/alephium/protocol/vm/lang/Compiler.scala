@@ -150,9 +150,7 @@ object Compiler {
 
   final case class EventInfo(typeId: Ast.TypeId, fieldTypes: Seq[Type]) {
     def checkFieldTypes(argTypes: Seq[Type]): Unit = {
-      if (fieldTypes == argTypes) {
-        ()
-      } else {
+      if (fieldTypes != argTypes) {
         val eventAbi = s"""${typeId.name}${fieldTypes.mkString("(", ", ", ")")}"""
         throw Error(s"Invalid args type $argTypes for event $eventAbi")
       }

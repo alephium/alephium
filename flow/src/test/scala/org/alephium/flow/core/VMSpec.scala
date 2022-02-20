@@ -1065,7 +1065,7 @@ class VMSpec extends AlephiumSpec {
     def callingScriptRaw: String
 
     lazy val contract     = Compiler.compileContract(contractRaw).rightValue
-    lazy val initialState = AVector[Val](Val.U256.from(10))
+    lazy val initialState = AVector[Val](Val.U256.unsafe(10))
     lazy val chainIndex   = ChainIndex.unsafe(0, 0)
     lazy val fromLockup   = getGenesisLockupScript(chainIndex)
     lazy val contractCreationScript =
@@ -1084,7 +1084,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, callingBlock, 2)
   }
 
-  it should "emit events and write to the log storage" in new EventFixture {
+  trait EventFixtureWithContract extends EventFixture {
     override def contractRaw: String =
       s"""
          |TxContract Foo(mut result: U256) {
@@ -1114,7 +1114,9 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
+  }
 
+  it should "emit events and write to the log storage" in new EventFixtureWithContract {
     {
       info("Events emitted from the contract exist in the block")
 
@@ -1150,6 +1152,21 @@ class VMSpec extends AlephiumSpec {
         getLogStates(blockFlow, chainIndex.from, callingBlock.hash, wrongContractId)
       logStatesOpt2 is None
     }
+  }
+
+  it should "not write to the log storage when logging is disabled" in new EventFixtureWithContract {
+    implicit override lazy val logConfig: LogConfig = LogConfig(enabled = false, contractIds = None)
+
+    getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId) is None
+  }
+
+  it should "not write to the log storage when logging is enabled but contract is not whitelisted" in new EventFixtureWithContract {
+    implicit override lazy val logConfig: LogConfig = LogConfig(
+      enabled = true,
+      contractIds = Some(AVector(Hash.generate, Hash.generate))
+    )
+
+    getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId) is None
   }
 
   it should "emit events with all supported field types" in new EventFixture {
