@@ -107,7 +107,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val outputBalances: Balances                  = Balances.empty
       def nextOutputIndex: Int                      = 0
       def blockEnv: BlockEnv                        = genBlockEnv()
-      def txEnv: TxEnv                              = txEnvOpt.getOrElse(???)
+      def txEnv: TxEnv                              = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
       def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
       def logConfig: LogConfig                      = LogConfig(enabled = true, contractIds = None)
       var gasRemaining: GasBox                      = gasLimit

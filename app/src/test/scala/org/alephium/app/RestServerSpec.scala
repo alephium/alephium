@@ -761,6 +761,7 @@ abstract class RestServerSpec(
         |    {
         |      "blockHash": "$blockHash",
         |      "contractId": "${counterContract.hash.toHexString}",
+        |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
         |      "name":{
         |        "type": "bytevec",
         |        "value": "5472616e73666572"
@@ -820,6 +821,7 @@ abstract class RestServerSpec(
         |    {
         |      "blockHash": "$blockHash",
         |      "contractId": "${counterContract.hash.toHexString}",
+        |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
         |      "name":{
         |        "type": "bytevec",
         |        "value": "5472616e73666572"

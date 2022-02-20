@@ -1127,12 +1127,14 @@ class VMSpec extends AlephiumSpec {
 
       val addingLogState = logStates.states(0)
       addingLogState.name.bytes.utf8String is "Adding"
+      addingLogState.txId is callingBlock.nonCoinbase.head.id
       addingLogState.fields.length is 2
       addingLogState.fields(0) is Val.U256(U256.unsafe(4))
       addingLogState.fields(1) is Val.U256(U256.unsafe(10))
 
       val addedLogState = logStates.states(1)
       addedLogState.name.bytes.utf8String is "Added"
+      addedLogState.txId is callingBlock.nonCoinbase.head.id
       addedLogState.fields.length is 0
     }
 
@@ -1191,6 +1193,7 @@ class VMSpec extends AlephiumSpec {
 
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.name.bytes.utf8String is "TestEvent"
+    testEventLogState1.txId is callingBlock.nonCoinbase.head.id
     testEventLogState1.fields.length is 5
     testEventLogState1.fields(0) is Val.U256(U256.unsafe(4))
     testEventLogState1.fields(1) is Val.I256(I256.unsafe(-5))
@@ -1200,6 +1203,7 @@ class VMSpec extends AlephiumSpec {
 
     val testEventLogState2 = logStates.states(1)
     testEventLogState2.name.bytes.utf8String is "TestEvent"
+    testEventLogState1.txId is callingBlock.nonCoinbase.head.id
     testEventLogState2.fields.length is 5
     testEventLogState2.fields(0) is Val.U256(U256.unsafe(5))
     testEventLogState2.fields(1) is Val.I256(I256.unsafe(-4))

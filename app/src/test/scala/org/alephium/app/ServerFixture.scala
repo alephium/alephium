@@ -332,6 +332,9 @@ object ServerFixture {
     ): IOResult[Option[LogStates]] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
+      lazy val txId = Hash
+        .from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"))
+        .get
 
       Right(
         Some(
@@ -341,6 +344,7 @@ object ServerFixture {
             states = AVector(
               LogState(
                 name = vm.Val.ByteVec.from("Transfer"),
+                txId = txId,
                 fields = AVector(
                   vm.Val.U256(U256.unsafe(4)),
                   vm.Val.Address(address1.lockupScript),

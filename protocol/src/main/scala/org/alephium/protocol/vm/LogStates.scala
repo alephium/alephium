@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.Val
 import org.alephium.serde.Serde
@@ -35,12 +35,13 @@ object LogStatesId {
 // removed field due to re-org?
 final case class LogState(
     name: Val.ByteVec,
+    txId: Hash,
     fields: AVector[Val]
 )
 
 object LogState {
   implicit val serde: Serde[LogState] =
-    Serde.forProduct2(LogState.apply, s => (s.name, s.fields))
+    Serde.forProduct3(LogState.apply, s => (s.name, s.txId, s.fields))
 }
 
 final case class LogStates(

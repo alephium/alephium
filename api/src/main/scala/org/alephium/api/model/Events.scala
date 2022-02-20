@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.{ChainIndex, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
@@ -30,6 +30,7 @@ final case class Events(
 final case class Event(
     blockHash: BlockHash,
     contractId: ContractId,
+    txId: Hash,
     name: Val.ByteVec,
     fields: AVector[Val]
 )
@@ -40,6 +41,7 @@ object Events {
       Event(
         logStates.blockHash,
         logStates.contractId,
+        logState.txId,
         Val.ByteVec(logState.name.bytes),
         logState.fields.map(Val.from)
       )

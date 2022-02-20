@@ -379,8 +379,8 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val eventName  = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
-      val argsType   = args.flatMap(_.getType(state))
+      val eventName = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
+      val argsType  = args.flatMap(_.getType(state))
       if (argsType.exists(_.isArrayType)) {
         throw Compiler.Error("Array type for events not supported")
       }
