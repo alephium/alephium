@@ -623,9 +623,8 @@ sealed abstract class U256FromBytesInstr(val size: Int)
       byteVec <- frame.popOpStackByteVec()
       _       <- if (byteVec.bytes.length == size) okay else failed(InvalidBytesSize)
       number  <- util.U256.from(byteVec.bytes).toRight(Right(InvalidConversion(byteVec, Val.U256)))
-      value = Val.U256(number)
-      _ <- frame.pushOpStack(value)
-      _ <- frame.ctx.chargeGasWithSize(this, size)
+      _       <- frame.pushOpStack(Val.U256(number))
+      _       <- frame.ctx.chargeGasWithSize(this, size)
     } yield ()
   }
 }
@@ -758,7 +757,12 @@ case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 wi
       end   <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
       begin <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
       bytes <- frame.popOpStackByteVec().map(_.bytes)
-      result = Val.ByteVec(bytes.slice(begin, end))
+      result <-
+        if (begin < 0 || end > bytes.length || begin >= end) {
+          failed(InvalidBytesSliceArg)
+        } else {
+          Right(Val.ByteVec(bytes.slice(begin, end)))
+        }
       _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
       _ <- frame.pushOpStack(result)
     } yield ()

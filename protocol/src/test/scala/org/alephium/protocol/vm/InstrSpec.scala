@@ -898,15 +898,25 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "ByteVecSlice" in new StatelessInstrFixture {
-    val intGen: Gen[Int] = Gen.chooseNum[Int](0, Int.MaxValue)
-
-    forAll(dataGen, intGen, intGen) { case (bytes, begin, end) =>
-      val slice = bytes.slice(begin, end)
-
+    def prepare(bytes: ByteString, begin: Int, end: Int) = {
       stack.push(Val.ByteVec(bytes))
       stack.push(Val.U256(begin))
       stack.push(Val.U256(end))
+    }
 
+    val bytes = ByteString(Array[Byte](1, 2, 3, 4))
+    // The type is U256 and cannot be less than 0
+    val invalidArgs = Seq((0, 5), (3, 2), (3, 3))
+    invalidArgs.foreach { case (begin, end) =>
+      prepare(bytes, begin, end)
+      ByteVecSlice.runWith(frame).leftValue isE InvalidBytesSliceArg
+      stack.pop(3)
+    }
+    val validArgs = Seq((0, 4), (1, 3))
+    validArgs.foreach { case (begin, end) =>
+      prepare(bytes, begin, end)
+
+      val slice      = bytes.slice(begin, end)
       val initialGas = context.gasRemaining
       ByteVecSlice.runWith(frame) isE ()
 
@@ -2068,15 +2078,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](20)))) isE ()
       frame.pushOpStack(Val.U256(U256.unsafe(1))) isE ()
       frame.pushOpStack(Val.U256(U256.unsafe(10))) isE ()
-      var remaining = frame.ctx.gasRemaining
+      val initialGas = frame.ctx.gasRemaining
       ByteVecSlice.runWith(frame) isE ()
-      (remaining.value - frame.ctx.gasRemaining.value) is (9 * gas)
-
-      remaining = frame.ctx.gasRemaining
-      frame.pushOpStack(Val.U256(U256.unsafe(5))) isE ()
-      frame.pushOpStack(Val.U256(U256.unsafe(5))) isE ()
-      ByteVecSlice.runWith(frame) isE ()
-      (remaining.value - frame.ctx.gasRemaining.value) is (1 * gas)
+      (initialGas.value - frame.ctx.gasRemaining.value) is (GasVeryLow.gas.value + 9 * gas)
     }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas

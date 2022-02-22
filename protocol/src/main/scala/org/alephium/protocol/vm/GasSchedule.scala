@@ -113,7 +113,7 @@ trait GasBytesSlice extends GasFormula {
 object GasBytesSlice {
   val gasPerByte: Int = 1
   def gas(byteLength: Int): GasBox =
-    if (byteLength == 0) GasBox.unsafe(gasPerByte) else GasBox.unsafe(byteLength * gasPerByte)
+    GasVeryLow.gas.addUnsafe(GasBox.unsafe(byteLength * gasPerByte))
 }
 
 @Gas
