@@ -212,6 +212,10 @@ class U256Spec extends AlephiumSpec {
       val byteString = ByteString.fromArrayUnsafe(x.toByteArray())
       U256.from(byteString).get.v is x
     }
+
+    val maxPlusOne = ByteString.fromArrayUnsafe(U256.upperBound.toByteArray)
+    maxPlusOne.length is 33
+    U256.from(maxPlusOne).isEmpty is true
   }
 
   it should "convert from Int" in {
@@ -263,11 +267,15 @@ class U256Spec extends AlephiumSpec {
         val byteString = ByteString(bytes)
         val value      = U256.from(byteString).get
         val encoded    = value.toFixedSizeBytes(size).get
+        encoded.length is size
         encoded is byteString
       }
-    }
 
-    U256.MaxValue.toFixedSizeBytes(16) is None
-    U256.MaxValue.toFixedSizeBytes(32) is Some(ByteString(Array.fill[Byte](32)(-1)))
+      U256.Zero.toFixedSizeBytes(size) is Some(ByteString(Array.fill[Byte](size)(0)))
+      U256.from(BigInteger.ONE.shiftLeft(size * 8)).flatMap(_.toFixedSizeBytes(size)) is None
+      U256
+        .unsafe(BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE))
+        .toFixedSizeBytes(size) is Some(ByteString(Array.fill[Byte](size)(-1)))
+    }
   }
 }

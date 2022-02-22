@@ -319,6 +319,7 @@ object BuiltIn {
     size,
     isAssetAddress,
     isContractAddress,
+    /* Below are instructions for Leman hard fork */
     byteVecSlice,
     u256To1Byte,
     u256To2Byte,

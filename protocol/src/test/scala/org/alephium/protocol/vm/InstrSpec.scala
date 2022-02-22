@@ -76,7 +76,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-      Log1, Log2, Log3, Log4, Log5, ByteVecSlice,
+      Log1, Log2, Log3, Log4, Log5,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
     )
@@ -1374,6 +1376,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait U256ToBytesFixture extends StatelessInstrFixture {
+    def check(instr: U256ToBytesInstr, value: U256, bytes: ByteString) = {
+      stack.push(Val.U256(value))
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas(instr.size)
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      stack.pop()
+    }
+
     def test(instr: U256ToBytesInstr, size: Int) = {
       val gen = Gen
         .choose[BigInteger](
@@ -1383,47 +1395,42 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .map(U256.unsafe)
 
       forAll(gen) { value =>
-        val bytes = value.toFixedSizeBytes(size).get
-        stack.push(Val.U256(value))
-        val initialGas = context.gasRemaining
-        instr.runWith(frame) isE ()
-        initialGas.subUnsafe(context.gasRemaining) is instr.gas(size)
-        stack.size is 1
-        stack.top.get is Val.ByteVec(bytes)
-        stack.pop()
+        val expected = value.toFixedSizeBytes(size).get
+        check(instr, value, expected)
       }
-    }
 
-    def testInvalidConversion(instr: U256ToBytesInstr) = {
-      val value = Val.U256(U256.MaxValue)
-      stack.push(value)
-      instr.runWith(frame).leftValue isE InvalidConversion(value, Val.ByteVec)
+      check(instr, U256.Zero, ByteString(Array.fill[Byte](size)(0)))
+      check(
+        instr,
+        U256.unsafe(BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE)),
+        ByteString(Array.fill[Byte](size)(-1))
+      )
+      if (size != 32) {
+        val value = Val.U256(U256.unsafe(BigInteger.ONE.shiftLeft(size * 8)))
+        stack.push(value)
+        instr.runWith(frame).leftValue isE InvalidConversion(value, Val.ByteVec)
+      }
     }
   }
 
   it should "U256To1Byte" in new U256ToBytesFixture {
     test(U256To1Byte, 1)
-    testInvalidConversion(U256To1Byte)
   }
 
   it should "U256To2Byte" in new U256ToBytesFixture {
     test(U256To2Byte, 2)
-    testInvalidConversion(U256To2Byte)
   }
 
   it should "U256To4Byte" in new U256ToBytesFixture {
     test(U256To4Byte, 4)
-    testInvalidConversion(U256To4Byte)
   }
 
   it should "U256To8Byte" in new U256ToBytesFixture {
     test(U256To8Byte, 8)
-    testInvalidConversion(U256To8Byte)
   }
 
   it should "U256To16Byte" in new U256ToBytesFixture {
     test(U256To16Byte, 16)
-    testInvalidConversion(U256To16Byte)
   }
 
   it should "U256To32Byte" in new U256ToBytesFixture {
@@ -1443,9 +1450,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         stack.pop()
       }
 
-      val bytes = ByteString(Gen.listOfN(size + 1, arbitrary[Byte]).sample.get)
-      stack.push(Val.ByteVec(bytes))
-      instr.runWith(frame).leftValue isE InvalidBytesSize
+      Seq(size - 1, size + 1).foreach { n =>
+        val bytes = ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get)
+        stack.push(Val.ByteVec(bytes))
+        instr.runWith(frame).leftValue isE InvalidBytesSize
+      }
     }
   }
 
