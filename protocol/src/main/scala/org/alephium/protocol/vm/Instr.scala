@@ -760,10 +760,10 @@ case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 wi
       begin <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
       bytes <- frame.popOpStackByteVec().map(_.bytes)
       result <-
-        if (begin < 0 || end > bytes.length || begin >= end) {
-          failed(InvalidBytesSliceArg)
-        } else {
+        if (0 <= begin && begin < end && end <= bytes.length) {
           Right(Val.ByteVec(bytes.slice(begin, end)))
+        } else {
+          failed(InvalidBytesSliceArg)
         }
       _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
       _ <- frame.pushOpStack(result)
