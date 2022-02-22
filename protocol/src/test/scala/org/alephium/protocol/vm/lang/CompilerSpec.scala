@@ -1007,6 +1007,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let (a, mut b, c) = bar()
+         |    return
+         |  }
+         |}
          |""".stripMargin
     )
 
@@ -1073,6 +1085,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |           y[1] == 1 &&
          |           y[2] == 2
          |  }
+         |
+         |  fn foo3() -> ([U256; 2], U256, U256) {
+         |    return [1; 2], 1, 1
+         |  }
+         |
+         |  pub fn test8() -> () {
+         |    let (mut a, mut b, c) = foo3()
+         |    assert!(b == 1 && c == 1 && a[0] == 1 && a[1] == 1)
+         |    b = 2
+         |    loop(0, 2, 1, a[?] = ?)
+         |    assert!(b == 2 && a[0] == 0 && a[1] == 1)
+         |    return
+         |  }
          |}
          |""".stripMargin
 
@@ -1081,6 +1106,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(2, AVector.empty, AVector(Val.True))
     test(4, AVector.empty, AVector(Val.True))
     test(6, AVector.empty, AVector(Val.True))
+    test(8, AVector.empty, AVector.empty)
   }
 
   it should "generate efficient code for arrays" in {

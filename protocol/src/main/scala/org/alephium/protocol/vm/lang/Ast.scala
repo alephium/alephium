@@ -273,16 +273,22 @@ object Ast {
     }
   }
   final case class VarDef[Ctx <: StatelessContext](
-      isMutable: Boolean,
-      ident: Ident,
+      idents: Seq[(Boolean, Ident)],
       value: Expr[Ctx]
   ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
-      state.addVariable(ident, value.getType(state), isMutable)
-      value.getType(state) match {
-        case Seq(tpe: Type.FixedSizeArray) =>
+      val types = value.getType(state)
+      if (types.length != idents.length) {
+        throw Compiler.Error(
+          s"Invalid variable def, expect ${types.length} vars, have ${idents.length} vars"
+        )
+      }
+      idents.zip(types).foreach {
+        case ((isMutable, ident), tpe: Type.FixedSizeArray) =>
+          state.addVariable(ident, tpe, isMutable)
           discard(ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable))
-        case _ =>
+        case ((isMutable, ident), tpe) =>
+          state.addVariable(ident, tpe, isMutable)
       }
     }
 
@@ -290,13 +296,12 @@ object Ast {
       throw Compiler.Error("Cannot define new variable in loop")
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          val targetArrayRef = state.getArrayRef(ident)
-          value.genCode(state) ++ state.copyArrayRef(targetArrayRef)
-        case _ =>
-          value.genCode(state) :+ state.genStoreCode(ident)
+      val variables = idents.zip(value.getType(state)).flatMap {
+        case ((_, ident), _: Type.FixedSizeArray) =>
+          state.getArrayRef(ident).vars
+        case ((_, ident), _) => Seq(ident)
       }
+      value.genCode(state) ++ variables.map(state.genStoreCode).reverse
     }
   }
   final case class FuncDef[Ctx <: StatelessContext](

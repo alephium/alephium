@@ -115,9 +115,13 @@ abstract class Parser[Ctx <: StatelessContext] {
   def ret[_: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
+  def ident[_: P]: P[(Boolean, Ast.Ident)] = P(Lexer.mut ~ Lexer.ident)
+  def idents[_: P]: P[Seq[(Boolean, Ast.Ident)]] = P(
+    ident.map(Seq(_)) | "(" ~ ident.rep(1, ",") ~ ")"
+  )
   def varDef[_: P]: P[Ast.VarDef[Ctx]] =
-    P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map {
-      case (isMutable, ident, expr) => Ast.VarDef(isMutable, ident, expr)
+    P(Lexer.keyword("let") ~/ idents ~ "=" ~ expr).map { case (idents, expr) =>
+      Ast.VarDef(idents, expr)
     }
   def assignedOperand[_: P]: P[Ast.AssignedOperand[Ctx]] = P(
     Lexer.ident ~ arrayIndex.rep(0)
