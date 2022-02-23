@@ -16,25 +16,17 @@
 
 package org.alephium.protocol.config
 
-import akka.util.ByteString
+import org.alephium.protocol.model.HardFork
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
-import org.alephium.protocol.model.NetworkId
-import org.alephium.util.TimeStamp
+class NetworkConfigSpec extends AlephiumSpec with NetworkConfigFixture.Default {
+  override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
 
-trait NetworkConfigFixture { self =>
-  def networkId: NetworkId
-  def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
-
-  implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    val networkId: NetworkId       = self.networkId
-    val noPreMineProof: ByteString = ByteString.empty
-    val lemanHardForkTimestamp: TimeStamp =
-      self.lemanHardForkTimestamp // enabled by default for all tests
-  }
-}
-
-object NetworkConfigFixture {
-  trait Default extends NetworkConfigFixture {
-    val networkId: NetworkId = NetworkId.AlephiumDevNet
-  }
+  networkConfig.getHardFork(lemanHardForkTimestamp) is HardFork.Leman
+  networkConfig.getHardFork(
+    lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+  ) is HardFork.Mainnet
+  networkConfig.getHardFork(
+    lemanHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+  ) is HardFork.Leman
 }

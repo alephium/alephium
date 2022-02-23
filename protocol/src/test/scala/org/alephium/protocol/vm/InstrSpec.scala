@@ -91,6 +91,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
     val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
     lemanInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+
+    val networkConfig2 = new NetworkConfig {
+      override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
+      override def noPreMineProof: ByteString = ByteString.empty
+      override def lemanHardForkTimestamp: TimeStamp =
+        TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(10))
+    }
+    val frame2 = prepareFrame(AVector.empty)(networkConfig2) // hardfork is not activated yet
+    lemanInstrs.foreach(instr => instr.runWith(frame2).leftValue isnotE InactiveInstr(instr))
   }
 
   trait StatelessFixture extends ContextGenerators {
