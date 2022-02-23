@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 
 import akka.util.ByteString
 
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
 
@@ -322,7 +323,7 @@ object StatelessVM {
       initialGas: GasBox,
       script: StatelessScript,
       args: AVector[Val]
-  ): ExeResult[AssetScriptExecution] = {
+  )(implicit networkConfig: NetworkConfig): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(blockEnv, txEnv, initialGas)
     val obj     = script.toObject
     execute(context, obj, args)
@@ -370,7 +371,7 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit networkConfig: NetworkConfig): ExeResult[TxScriptExecution] = {
     runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
@@ -381,7 +382,7 @@ object StatefulVM {
       preOutputsOpt: Option[AVector[AssetOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit networkConfig: NetworkConfig): ExeResult[TxScriptExecution] = {
     for {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       _       <- execute(context, script.toObject, AVector.empty)
