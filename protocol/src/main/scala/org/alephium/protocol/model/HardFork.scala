@@ -14,25 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.protocol.model
 
-import akka.util.ByteString
-
-import org.alephium.protocol.model.NetworkId
-import org.alephium.util.TimeStamp
-
-trait NetworkConfigFixture { self =>
-  def networkId: NetworkId
-
-  implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    val networkId: NetworkId              = self.networkId
-    val noPreMineProof: ByteString        = ByteString.empty
-    val lemanHardForkTimestamp: TimeStamp = TimeStamp.zero // enabled by default for all tests
-  }
+sealed class HardFork(val version: Int) extends Ordered[HardFork] {
+  def compare(that: HardFork): Int = this.version.compareTo(that.version)
 }
-
-object NetworkConfigFixture {
-  trait Default extends NetworkConfigFixture {
-    val networkId: NetworkId = NetworkId.AlephiumDevNet
-  }
+object HardFork {
+  object Mainnet extends HardFork(0)
+  object Leman   extends HardFork(1)
 }
