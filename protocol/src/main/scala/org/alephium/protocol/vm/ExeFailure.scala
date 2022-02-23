@@ -96,6 +96,8 @@ final case class InvalidTarget(value: BigInteger)              extends ExeFailur
 case object InvalidBytesSliceArg                               extends ExeFailure
 case object InvalidBytesSize                                   extends ExeFailure
 
+final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
+
 sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix

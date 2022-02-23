@@ -36,7 +36,10 @@ final case class TxEnv(
 )
 
 trait StatelessContext extends CostStrategy {
+  def networkConfig: NetworkConfig
   def blockEnv: BlockEnv
+  def getHardFork(): HardFork = networkConfig.getHardFork(blockEnv.timeStamp)
+
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
 
@@ -58,14 +61,15 @@ object StatelessContext {
       blockEnv: BlockEnv,
       txEnv: TxEnv,
       txGas: GasBox
-  ): StatelessContext =
+  )(implicit networkConfig: NetworkConfig): StatelessContext =
     new Impl(blockEnv, txEnv, txGas)
 
   final class Impl(
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
       var gasRemaining: GasBox
-  ) extends StatelessContext {
+  )(implicit val networkConfig: NetworkConfig)
+      extends StatelessContext {
     def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
   }
 }
@@ -162,7 +166,7 @@ object StatefulContext {
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput],
       gasRemaining: GasBox
-  ): StatefulContext = {
+  )(implicit networkConfig: NetworkConfig): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
 
@@ -172,7 +176,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
-  ): StatefulContext = {
+  )(implicit networkConfig: NetworkConfig): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, preOutputs, gasRemaining)
   }
@@ -183,7 +187,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputsOpt: Option[AVector[AssetOutput]]
-  ): ExeResult[StatefulContext] = {
+  )(implicit networkConfig: NetworkConfig): ExeResult[StatefulContext] = {
     preOutputsOpt match {
       case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
@@ -201,7 +205,8 @@ object StatefulContext {
       val worldState: WorldState.Staging,
       val preOutputs: AVector[AssetOutput],
       var gasRemaining: GasBox
-  ) extends StatefulContext {
+  )(implicit val networkConfig: NetworkConfig)
+      extends StatefulContext {
     def nextOutputIndex: Int = tx.unsigned.fixedOutputs.length + generatedOutputs.length
 
     /*

@@ -25,7 +25,8 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 import org.alephium.crypto
-import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{model, ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
@@ -49,48 +50,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "serde properly" in {
-    val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
-    val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
-    def byte: Byte = bytes.sample()
-    def int: Int   = ints.sample()
-    // format: off
-    val statelessInstrs: AVector[Instr[StatelessContext]] = AVector(
-      ConstTrue, ConstFalse,
-      I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
-      U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
-      I256Const(Val.I256(UnsecureRandom.nextI256())), U256Const(Val.U256(UnsecureRandom.nextU256())),
-      BytesConst(Val.ByteVec.default), AddressConst(Val.Address.default),
-      LoadLocal(byte), StoreLocal(byte),
-      Pop,
-      BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
-      I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
-      U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
-      U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
-      I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
-      ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
-      IsAssetAddress, IsContractAddress,
-      Jump(int), IfTrue(int), IfFalse(int),
-      CallLocal(byte), Return,
-      Assert,
-      Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
-      VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-      Log1, Log2, Log3, Log4, Log5,
-      /* Below are instructions for Leman hard fork */
-      ByteVecSlice,
-      U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
-      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
-    )
-    val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
-      LoadField(byte), StoreField(byte), CallExternal(byte),
-      ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
-      TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
-      CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
-    )
-    // format: on
-
+  it should "serde properly" in new AllInstrsFixture {
     statelessInstrs.toSet.size is Instr.statelessInstrs0.length
     statefulInstrs.toSet.size is Instr.statefulInstrs0.length
     statelessInstrs.foreach { instr =>
@@ -102,13 +62,44 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  trait LemanForkFixture extends AllInstrsFixture {
+    // format: off
+    val lemanInstrs = AVector(
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice,
+      U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
+      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
+    )
+    // format: on
+  }
+
+  it should "derive from LemanInstr" in new LemanForkFixture {
+    lemanInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    (statelessInstrs.toSet -- lemanInstrs.toSet).map(_.isInstanceOf[LemanInstr[_]] is false)
+    (statefulInstrs.toSet -- lemanInstrs.toSet).map(_.isInstanceOf[LemanInstr[_]] is false)
+  }
+
+  it should "fail if the fork is not activated yet" in new LemanForkFixture with StatelessFixture {
+    val frame0 = prepareFrame(AVector.empty)(networkConfig) // hardfork is activated
+    lemanInstrs.foreach(instr => instr.runWith(frame0).leftValue isnotE InactiveInstr(instr))
+
+    val networkConfig1 = new NetworkConfig {
+      override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
+      override def noPreMineProof: ByteString = ByteString.empty
+      override def lemanHardForkTimestamp: TimeStamp =
+        TimeStamp.now().plusUnsafe(Duration.ofSecondsUnsafe(10))
+    }
+    val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
+    lemanInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+  }
+
   trait StatelessFixture extends ContextGenerators {
     lazy val localsLength = 0
     def prepareFrame(
         instrs: AVector[Instr[StatelessContext]],
         blockEnv: Option[BlockEnv] = None,
         txEnv: Option[TxEnv] = None
-    ): Frame[StatelessContext] = {
+    )(implicit networkConfig: NetworkConfig): Frame[StatelessContext] = {
       val baseMethod = Method[StatelessContext](
         isPublic = true,
         isPayable = false,
@@ -2145,5 +2136,48 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     def test(instr: Instr[_], code: Int) = instr.code is code.toByte
     allInstrs.length is toCode.size
     allInstrs.foreach(test.tupled)
+  }
+
+  trait AllInstrsFixture {
+    val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
+    val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
+    def byte: Byte = bytes.sample()
+    def int: Int   = ints.sample()
+    // format: off
+    val statelessInstrs: AVector[Instr[StatelessContext]] = AVector(
+      ConstTrue, ConstFalse,
+      I256Const0, I256Const1, I256Const2, I256Const3, I256Const4, I256Const5, I256ConstN1,
+      U256Const0, U256Const1, U256Const2, U256Const3, U256Const4, U256Const5,
+      I256Const(Val.I256(UnsecureRandom.nextI256())), U256Const(Val.U256(UnsecureRandom.nextU256())),
+      BytesConst(Val.ByteVec.default), AddressConst(Val.Address.default),
+      LoadLocal(byte), StoreLocal(byte),
+      Pop,
+      BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
+      I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
+      U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
+      U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
+      I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
+      ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
+      IsAssetAddress, IsContractAddress,
+      Jump(int), IfTrue(int), IfFalse(int),
+      CallLocal(byte), Return,
+      Assert,
+      Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
+      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+      VerifyAbsoluteLocktime, VerifyRelativeLocktime,
+      Log1, Log2, Log3, Log4, Log5,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice,
+      U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
+      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
+    )
+    val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
+      LoadField(byte), StoreField(byte), CallExternal(byte),
+      ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
+      TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
+      CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
+    )
+    // format: on
   }
 }
