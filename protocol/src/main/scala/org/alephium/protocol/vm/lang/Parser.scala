@@ -123,12 +123,20 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.keyword("let") ~/ idents ~ "=" ~ expr).map { case (idents, expr) =>
       Ast.VarDef(idents, expr)
     }
-  def assignedOperand[_: P]: P[Ast.AssignedOperand[Ctx]] = P(
-    Lexer.ident ~ arrayIndex.rep(0)
-  ).map { case (ident, indexes) => Ast.AssignedOperand(ident, indexes) }
+  def assignmentSimpleTarget[_: P]: P[Ast.AssignmentTarget[Ctx]] = P(
+    Lexer.ident.map(Ast.AssignmentSimpleTarget.apply[Ctx])
+  )
+  def assignmentArrayElementTarget[_: P]: P[Ast.AssignmentArrayElementTarget[Ctx]] = P(
+    Lexer.ident ~ arrayIndex.rep(1)
+  ).map { case (ident, indexes) =>
+    Ast.AssignmentArrayElementTarget[Ctx](ident, indexes)
+  }
+  def assignmentTarget[_: P]: P[Ast.AssignmentTarget[Ctx]] = P(
+    assignmentArrayElementTarget | assignmentSimpleTarget
+  )
   def assign[_: P]: P[Ast.Statement[Ctx]] =
-    P(assignedOperand.rep(1, ",") ~ "=" ~ expr).map { case (operands, expr) =>
-      Ast.Assign(operands, expr)
+    P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
+      Ast.Assign(targets, expr)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
