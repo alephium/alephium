@@ -32,10 +32,10 @@ object Ast {
     def empty: FuncId = FuncId("", isBuiltIn = false)
   }
 
-  sealed trait Expr[Ctx <: StatelessContext] {
-    var tpe: Option[Seq[Type]] = None
-    protected def _getType(state: Compiler.State[Ctx]): Seq[Type]
-    def getType(state: Compiler.State[Ctx]): Seq[Type] =
+  trait Typed[Ctx <: StatelessContext, T] {
+    var tpe: Option[T] = None
+    protected def _getType(state: Compiler.State[Ctx]): T
+    def getType(state: Compiler.State[Ctx]): T =
       tpe match {
         case Some(ts) => ts
         case None =>
@@ -43,6 +43,9 @@ object Ast {
           tpe = Some(t)
           t
       }
+  }
+
+  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
     def fillPlaceholder(expr: Ast.Const[Ctx]): Expr[Ctx]
   }
@@ -333,14 +336,13 @@ object Ast {
       )
     }
   }
-  sealed trait AssignmentTarget[Ctx <: StatelessContext] {
-    def getType(state: Compiler.State[Ctx]): Type
+  sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
     def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
-    def getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
+    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
     def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
       if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
     def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = this
@@ -363,7 +365,7 @@ object Ast {
       }
     }
 
-    def getType(state: Compiler.State[Ctx]): Type = {
+    def _getType(state: Compiler.State[Ctx]): Type = {
       elementType(indexes, state.getVariable(ident).tpe)
     }
 
