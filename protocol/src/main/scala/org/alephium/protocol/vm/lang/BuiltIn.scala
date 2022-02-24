@@ -296,6 +296,14 @@ object BuiltIn {
       U256From32Byte
     )
 
+  val byteVecToAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "byteVecToAddress",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.Address),
+      ByteVecToAddress
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -332,7 +340,8 @@ object BuiltIn {
     u256From4Byte,
     u256From8Byte,
     u256From16Byte,
-    u256From32Byte
+    u256From32Byte,
+    byteVecToAddress
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =

@@ -115,7 +115,8 @@ object Instr {
     /* Below are instructions for Leman hard fork */
     ByteVecSlice,
     U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
-    U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
+    U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
+    ByteVecToAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -767,6 +768,22 @@ case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 wi
         }
       _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
       _ <- frame.pushOpStack(result)
+    } yield ()
+  }
+}
+case object ByteVecToAddress extends StatelessInstr with StatelessInstrCompanion0 with GasToByte {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      bytes <- frame.popOpStackByteVec().map { byteVec =>
+        if (byteVec.bytes.length == Hash.length) {
+          ByteString(0) ++ byteVec.bytes
+        } else {
+          byteVec.bytes
+        }
+      }
+      address <- decode[Val.Address](bytes).left.map(e => Right(SerdeErrorByteVecToAddress(e)))
+      _       <- frame.ctx.chargeGasWithSize(this, bytes.length)
+      _       <- frame.pushOpStack(address)
     } yield ()
   }
 }
