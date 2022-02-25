@@ -938,28 +938,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "ByteVecToAddress" in new StatelessInstrFixture {
-    def test(bytes: ByteString, address: Val.Address, length: Int) = {
+    forAll(lockupScriptGen) { lockupScript =>
+      val address    = Val.Address(lockupScript)
+      val bytes      = serialize(address)
       val initialGas = context.gasRemaining
+
       stack.push(Val.ByteVec(bytes))
       ByteVecToAddress.runWith(frame) isE ()
       stack.size is 1
       stack.top.get is address
-      initialGas.subUnsafe(context.gasRemaining) is ByteVecToAddress.gas(length)
+      initialGas.subUnsafe(context.gasRemaining) is ByteVecToAddress.gas(bytes.length)
       stack.pop()
     }
 
-    forAll(lockupScriptGen) { lockupScript =>
-      val address = Val.Address(lockupScript)
-      val bytes   = serialize(address)
-      test(bytes, address, bytes.length)
-    }
-
-    forAll(hashGen) { hash =>
-      val address = Val.Address(LockupScript.p2pkh(hash))
-      test(hash.bytes, address, hash.bytes.length + 1)
-    }
-
-    Seq(31, 34).foreach { n =>
+    Seq(32, 34).foreach { n =>
       val byteVec = Val.ByteVec(ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get))
       stack.push(byteVec)
       ByteVecToAddress.runWith(frame).leftValue isE a[SerdeErrorByteVecToAddress]

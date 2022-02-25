@@ -774,13 +774,7 @@ case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 wi
 case object ByteVecToAddress extends StatelessInstr with StatelessInstrCompanion0 with GasToByte {
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      bytes <- frame.popOpStackByteVec().map { byteVec =>
-        if (byteVec.bytes.length == Hash.length) {
-          ByteString(0) ++ byteVec.bytes
-        } else {
-          byteVec.bytes
-        }
-      }
+      bytes   <- frame.popOpStackByteVec().map(_.bytes)
       address <- decode[Val.Address](bytes).left.map(e => Right(SerdeErrorByteVecToAddress(e)))
       _       <- frame.ctx.chargeGasWithSize(this, bytes.length)
       _       <- frame.pushOpStack(address)
