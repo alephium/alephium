@@ -19,7 +19,7 @@ package org.alephium.protocol.vm.lang
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{discard, AVector, U256}
 
 // scalastyle:off number.of.methods
 object Ast {
@@ -32,10 +32,10 @@ object Ast {
     def empty: FuncId = FuncId("", isBuiltIn = false)
   }
 
-  sealed trait Expr[Ctx <: StatelessContext] {
-    var tpe: Option[Seq[Type]] = None
-    protected def _getType(state: Compiler.State[Ctx]): Seq[Type]
-    def getType(state: Compiler.State[Ctx]): Seq[Type] =
+  trait Typed[Ctx <: StatelessContext, T] {
+    var tpe: Option[T] = None
+    protected def _getType(state: Compiler.State[Ctx]): T
+    def getType(state: Compiler.State[Ctx]): T =
       tpe match {
         case Some(ts) => ts
         case None =>
@@ -43,6 +43,9 @@ object Ast {
           tpe = Some(t)
           t
       }
+  }
+
+  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
     def fillPlaceholder(expr: Ast.Const[Ctx]): Expr[Ctx]
   }
@@ -273,24 +276,35 @@ object Ast {
     }
   }
   final case class VarDef[Ctx <: StatelessContext](
-      isMutable: Boolean,
-      ident: Ident,
+      idents: Seq[(Boolean, Ident)],
       value: Expr[Ctx]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit =
-      state.addVariable(ident, value.getType(state), isMutable)
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val types = value.getType(state)
+      if (types.length != idents.length) {
+        throw Compiler.Error(
+          s"Invalid variable def, expect ${types.length} vars, have ${idents.length} vars"
+        )
+      }
+      idents.zip(types).foreach {
+        case ((isMutable, ident), tpe: Type.FixedSizeArray) =>
+          state.addVariable(ident, tpe, isMutable)
+          discard(ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable))
+        case ((isMutable, ident), tpe) =>
+          state.addVariable(ident, tpe, isMutable)
+      }
+    }
 
     override def fillPlaceholder(expr: Ast.Const[Ctx]): Statement[Ctx] =
       throw Compiler.Error("Cannot define new variable in loop")
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.getType(state) match {
-        case Seq(tpe: Type.FixedSizeArray) =>
-          val targetArrayRef = ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable)
-          value.genCode(state) ++ state.copyArrayRef(targetArrayRef)
-        case _ =>
-          value.genCode(state) :+ state.genStoreCode(ident)
+      val variables = idents.zip(value.getType(state)).flatMap {
+        case ((_, ident), _: Type.FixedSizeArray) =>
+          state.getArrayRef(ident).vars
+        case ((_, ident), _) => Seq(ident)
       }
+      value.genCode(state) ++ variables.map(state.genStoreCode).reverse
     }
   }
   final case class FuncDef[Ctx <: StatelessContext](
@@ -322,11 +336,21 @@ object Ast {
       )
     }
   }
-  final case class ArrayElementAssign[Ctx <: StatelessContext](
-      target: Ident,
-      indexes: Seq[Ast.Expr[Ctx]],
-      rhs: Expr[Ctx]
-  ) extends Statement[Ctx] {
+  sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
+    def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
+    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
+  }
+  final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
+      extends AssignmentTarget[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
+    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
+      if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
+    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = this
+  }
+  final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
+      ident: Ident,
+      indexes: Seq[Ast.Expr[Ctx]]
+  ) extends AssignmentTarget[Ctx] {
     @scala.annotation.tailrec
     private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
       if (indexes.isEmpty) {
@@ -336,65 +360,57 @@ object Ast {
           case arrayType: Type.FixedSizeArray =>
             elementType(indexes.drop(1), arrayType.baseType)
           case _ =>
-            throw Compiler.Error("Invalid array element assign statement")
+            throw Compiler.Error("Invalid array element assignment target")
         }
       }
     }
 
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
+    def _getType(state: Compiler.State[Ctx]): Type = {
+      elementType(indexes, state.getVariable(ident).tpe)
+    }
+
+    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] = {
+      val arrayRef = state.getArrayRef(ident)
+      val idxes    = indexes.map(getConstantArrayIndex)
+      getType(state) match {
+        case _: Type.FixedSizeArray => arrayRef.subArray(idxes).vars
+        case _                      => Seq(arrayRef.getVariable(idxes))
+      }
+    }
+
+    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = {
       val newIndexes = indexes.map(_.fillPlaceholder(expr))
-      val newRhs     = rhs.fillPlaceholder(expr)
-      if (newIndexes == indexes && newRhs == rhs) {
-        this
-      } else {
-        ArrayElementAssign(target, newIndexes, newRhs)
-      }
-    }
-
-    override def check(state: Compiler.State[Ctx]): Unit = {
-      val varInfo = state.getVariable(target)
-      if (!varInfo.isMutable) throw Compiler.Error("Assign to immutable array")
-      val elementTpe = elementType(indexes, varInfo.tpe)
-      rhs.getType(state) match {
-        case Seq(tpe) if tpe == elementTpe =>
-        case tpe                           => throw Compiler.Error(s"Assign $tpe to $elementTpe")
-      }
-    }
-
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val idxes = indexes.map(getConstantArrayIndex)
-      rhs.getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          val targetArrayRef = state.getArrayRef(target).subArray(idxes)
-          rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
-        case _ =>
-          val targetArrayRef = state.getArrayRef(target)
-          val ident          = targetArrayRef.getVariable(idxes)
-          rhs.genCode(state) :+ state.genStoreCode(ident)
-      }
+      if (newIndexes == indexes) this else AssignmentArrayElementTarget(ident, newIndexes)
     }
   }
-  // TODO: handle multiple returns
-  final case class Assign[Ctx <: StatelessContext](target: Ident, rhs: Expr[Ctx])
-      extends Statement[Ctx] {
+  final case class Assign[Ctx <: StatelessContext](
+      targets: Seq[AssignmentTarget[Ctx]],
+      rhs: Expr[Ctx]
+  ) extends Statement[Ctx] {
     override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newRhs = rhs.fillPlaceholder(expr)
-      if (newRhs == rhs) this else Assign(target, newRhs)
+      val newTargets = targets.map(_.fillPlaceholder(expr))
+      val newRhs     = rhs.fillPlaceholder(expr)
+      if (newTargets == targets && newRhs == rhs) this else Assign(newTargets, newRhs)
     }
 
     override def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkAssign(target, rhs.getType(state))
+      val leftTypes  = targets.map(_.getType(state))
+      val rightTypes = rhs.getType(state)
+      if (leftTypes != rightTypes) {
+        throw Compiler.Error(s"Assign $rightTypes to $leftTypes")
+      }
+      val variables = targets.flatMap(_.getVariables(state))
+      variables.foreach { ident =>
+        if (!state.getVariable(ident).isMutable) {
+          throw Compiler.Error(s"Assign to immutable variable $ident")
+        }
+      }
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      rhs.getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          val targetArrayRef = state.getArrayRef(target)
-          rhs.genCode(state) ++ state.copyArrayRef(targetArrayRef)
-        case _ =>
-          rhs.genCode(state) :+ state.genStoreCode(target)
-      }
+      val variables  = targets.flatMap(_.getVariables(state))
+      val storeCodes = variables.map(state.genStoreCode).reverse
+      rhs.genCode(state) ++ storeCodes
     }
   }
   final case class FuncCall[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])

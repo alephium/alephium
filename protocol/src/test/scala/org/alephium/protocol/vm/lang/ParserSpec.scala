@@ -199,11 +199,35 @@ class ParserSpec extends AlephiumSpec {
   def constantIndex[Ctx <: StatelessContext](value: Int): Ast.Const[Ctx] =
     Ast.Const[Ctx](Val.U256(U256.unsafe(value)))
 
-  it should "parse array expression" in {
-    def check(str: String, expr: Ast.Expr[StatelessContext]) = {
-      fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
-    }
+  def checkParseExpr(str: String, expr: Ast.Expr[StatelessContext]) = {
+    fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
+  }
 
+  def checkParseStat(str: String, stat: Ast.Statement[StatelessContext]) = {
+    fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
+  }
+
+  it should "parse variable definitions" in {
+    val states: List[(String, Ast.Statement[StatelessContext])] = List(
+      "let (a, b) = foo()" -> Ast.VarDef(
+        Seq((false, Ast.Ident("a")), (false, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+      ),
+      "let (a, mut b) = foo()" -> Ast.VarDef(
+        Seq((false, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+      ),
+      "let (mut a, mut b) = foo()" -> Ast.VarDef(
+        Seq((true, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+      )
+    )
+    states.foreach { case (code, ast) =>
+      checkParseStat(code, ast)
+    }
+  }
+
+  it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0][?]" -> Ast.ArrayElement(
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
@@ -231,47 +255,59 @@ class ParserSpec extends AlephiumSpec {
     )
 
     exprs.foreach { case (str, expr) =>
-      check(str, expr)
+      checkParseExpr(str, expr)
     }
   }
 
-  it should "parse array assign" in {
-    def check(str: String, stat: Ast.Statement[StatelessContext]) = {
-      fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
-    }
-
+  it should "parse assign statement" in {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
-      "a[0] = b" -> Ast
-        .ArrayElementAssign(Ident("a"), Seq(constantIndex(0)), Ast.Variable(Ast.Ident("b"))),
-      "a[0][1] = b[0]" -> Ast.ArrayElementAssign(
-        Ident("a"),
-        Seq(constantIndex(0), constantIndex(1)),
+      "a[0] = b" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0)))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[0][1] = b[0]" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
         Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
       ),
-      "a[?][0] = ?" -> Ast.ArrayElementAssign(
-        Ident("a"),
-        Seq(Ast.Placeholder(), constantIndex(0)),
+      "a[?][0] = ?" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Ast.Placeholder(), constantIndex(0)))),
         Ast.Placeholder()
+      ),
+      "a, b = foo()" -> Assign(
+        Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
+        CallExpr(FuncId("foo", false), Seq.empty)
+      ),
+      "a, b[?] = foo()" -> Assign(
+        Seq(
+          AssignmentSimpleTarget(Ident("a")),
+          AssignmentArrayElementTarget(Ident("b"), Seq(Placeholder()))
+        ),
+        CallExpr(FuncId("foo", false), Seq.empty)
       )
     )
 
-    stats.foreach { case (str, expr) =>
-      check(str, expr)
+    stats.foreach { case (str, ast) =>
+      checkParseStat(str, ast)
     }
   }
 
   it should "parse loop" in {
-    val code = "loop(0, 4, 1, x[?] = ?)"
-    fastparse.parse(code, StatelessParser.statement(_)).get.value is
+    checkParseStat(
+      "loop(0, 4, 1, x[?] = ?)",
       Ast.Loop[StatelessContext](
         0,
         4,
         1,
-        Ast.ArrayElementAssign(
-          Ast.Ident("x"),
-          Seq(Ast.Placeholder[StatelessContext]()),
+        Ast.Assign(
+          Seq(
+            Ast.AssignmentArrayElementTarget(
+              Ast.Ident("x"),
+              Seq(Ast.Placeholder[StatelessContext]())
+            )
+          ),
           Ast.Placeholder[StatelessContext]()
         )
       )
+    )
   }
 }
