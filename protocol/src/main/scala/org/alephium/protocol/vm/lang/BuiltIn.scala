@@ -192,6 +192,110 @@ object BuiltIn {
       IsContractAddress
     )
 
+  val byteVecSlice: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "byteVecSlice",
+      Seq[Type](Type.ByteVec, Type.U256, Type.U256),
+      Seq[Type](Type.ByteVec),
+      ByteVecSlice
+    )
+
+  val u256To1Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256To1Byte",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      U256To1Byte
+    )
+
+  val u256To2Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256To2Byte",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      U256To2Byte
+    )
+
+  val u256To4Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256To4Byte",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      U256To4Byte
+    )
+
+  val u256To8Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256To8Byte",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      U256To8Byte
+    )
+
+  val u256To16Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256To16Byte",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      U256To16Byte
+    )
+
+  val u256To32Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256To32Byte",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      U256To32Byte
+    )
+
+  val u256From1Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256From1Byte",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.U256),
+      U256From1Byte
+    )
+
+  val u256From2Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256From2Byte",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.U256),
+      U256From2Byte
+    )
+
+  val u256From4Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256From4Byte",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.U256),
+      U256From4Byte
+    )
+
+  val u256From8Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256From8Byte",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.U256),
+      U256From8Byte
+    )
+
+  val u256From16Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256From16Byte",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.U256),
+      U256From16Byte
+    )
+
+  val u256From32Byte: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "u256From32Byte",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.U256),
+      U256From32Byte
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -214,7 +318,21 @@ object BuiltIn {
     toByteVec,
     size,
     isAssetAddress,
-    isContractAddress
+    isContractAddress,
+    /* Below are instructions for Leman hard fork */
+    byteVecSlice,
+    u256To1Byte,
+    u256To2Byte,
+    u256To4Byte,
+    u256To8Byte,
+    u256To16Byte,
+    u256To32Byte,
+    u256From1Byte,
+    u256From2Byte,
+    u256From4Byte,
+    u256From8Byte,
+    u256From16Byte,
+    u256From32Byte
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =

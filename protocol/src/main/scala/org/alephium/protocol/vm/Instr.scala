@@ -111,7 +111,11 @@ object Instr {
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-    Log1, Log2, Log3, Log4, Log5
+    Log1, Log2, Log3, Log4, Log5,
+    /* Below are instructions for Leman hard fork */
+    ByteVecSlice,
+    U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
+    U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -590,6 +594,50 @@ case object BoolNeq extends BinaryBool {
   def op(bool1: Val.Bool, bool2: Val.Bool): Val.Bool = Val.Bool(bool1 != bool2)
 }
 
+sealed abstract class U256ToBytesInstr(val size: Int)
+    extends StatelessInstr
+    with GasToByte
+    with StatelessInstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.popOpStackU256()
+      bytes <- value.v.toFixedSizeBytes(size).toRight(Right(InvalidConversion(value, Val.ByteVec)))
+      byteVec = Val.ByteVec(bytes)
+      _ <- frame.pushOpStack(byteVec)
+      _ <- frame.ctx.chargeGasWithSize(this, size)
+    } yield ()
+  }
+}
+
+case object U256To1Byte  extends U256ToBytesInstr(1)
+case object U256To2Byte  extends U256ToBytesInstr(2)
+case object U256To4Byte  extends U256ToBytesInstr(4)
+case object U256To8Byte  extends U256ToBytesInstr(8)
+case object U256To16Byte extends U256ToBytesInstr(16)
+case object U256To32Byte extends U256ToBytesInstr(32)
+
+sealed abstract class U256FromBytesInstr(val size: Int)
+    extends StatelessInstr
+    with GasToByte
+    with StatelessInstrCompanion0 {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      byteVec <- frame.popOpStackByteVec()
+      _       <- if (byteVec.bytes.length == size) okay else failed(InvalidBytesSize)
+      number  <- util.U256.from(byteVec.bytes).toRight(Right(InvalidConversion(byteVec, Val.U256)))
+      _       <- frame.pushOpStack(Val.U256(number))
+      _       <- frame.ctx.chargeGasWithSize(this, size)
+    } yield ()
+  }
+}
+
+case object U256From1Byte  extends U256FromBytesInstr(1)
+case object U256From2Byte  extends U256FromBytesInstr(2)
+case object U256From4Byte  extends U256FromBytesInstr(4)
+case object U256From8Byte  extends U256FromBytesInstr(8)
+case object U256From16Byte extends U256FromBytesInstr(16)
+case object U256From32Byte extends U256FromBytesInstr(32)
+
 sealed trait ToByteVecInstr[R <: Val]
     extends StatelessInstr
     with StackOps[R]
@@ -700,6 +748,23 @@ case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 w
       v2 <- frame.popOpStackByteVec()
       v1 <- frame.popOpStackByteVec()
       result = Val.ByteVec(v1.bytes ++ v2.bytes)
+      _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
+      _ <- frame.pushOpStack(result)
+    } yield ()
+  }
+}
+case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 with GasBytesSlice {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      end   <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
+      begin <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
+      bytes <- frame.popOpStackByteVec().map(_.bytes)
+      result <-
+        if (0 <= begin && begin < end && end <= bytes.length) {
+          Right(Val.ByteVec(bytes.slice(begin, end)))
+        } else {
+          failed(InvalidBytesSliceArg)
+        }
       _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
       _ <- frame.pushOpStack(result)
     } yield ()

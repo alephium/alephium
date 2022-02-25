@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
+
 import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
@@ -74,7 +76,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
-      Log1, Log2, Log3, Log4, Log5
+      Log1, Log2, Log3, Log4, Log5,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice,
+      U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
+      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
@@ -893,6 +899,36 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     ByteVecNeq.runWith(frame).leftValue isE StackUnderflow
   }
 
+  it should "ByteVecSlice" in new StatelessInstrFixture {
+    def prepare(bytes: ByteString, begin: Int, end: Int) = {
+      stack.push(Val.ByteVec(bytes))
+      stack.push(Val.U256(begin))
+      stack.push(Val.U256(end))
+    }
+
+    val bytes = ByteString(Array[Byte](1, 2, 3, 4))
+    // The type is U256 and cannot be less than 0
+    val invalidArgs = Seq((0, 5), (3, 2), (3, 3))
+    invalidArgs.foreach { case (begin, end) =>
+      prepare(bytes, begin, end)
+      ByteVecSlice.runWith(frame).leftValue isE InvalidBytesSliceArg
+      stack.pop(3)
+    }
+    val validArgs = Seq((0, 4), (1, 3))
+    validArgs.foreach { case (begin, end) =>
+      prepare(bytes, begin, end)
+
+      val slice      = bytes.slice(begin, end)
+      val initialGas = context.gasRemaining
+      ByteVecSlice.runWith(frame) isE ()
+
+      stack.size is 1
+      stack.top.get is Val.ByteVec(slice)
+      initialGas.subUnsafe(context.gasRemaining) is ByteVecSlice.gas(slice.length)
+      stack.pop()
+    }
+  }
+
   trait AddressCompFixture extends StatelessInstrFixture {
     def test(
         instr: ComparisonInstr[Val.Address],
@@ -1337,6 +1373,113 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "Log5" in new LogFixture {
     test(Log5, 5)
+  }
+
+  trait U256ToBytesFixture extends StatelessInstrFixture {
+    def check(instr: U256ToBytesInstr, value: U256, bytes: ByteString) = {
+      stack.push(Val.U256(value))
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas(instr.size)
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      stack.pop()
+    }
+
+    def test(instr: U256ToBytesInstr, size: Int) = {
+      val gen = Gen
+        .choose[BigInteger](
+          BigInteger.ZERO,
+          BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE)
+        )
+        .map(U256.unsafe)
+
+      forAll(gen) { value =>
+        val expected = value.toFixedSizeBytes(size).get
+        check(instr, value, expected)
+      }
+
+      check(instr, U256.Zero, ByteString(Array.fill[Byte](size)(0)))
+      check(
+        instr,
+        U256.unsafe(BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE)),
+        ByteString(Array.fill[Byte](size)(-1))
+      )
+      if (size != 32) {
+        val value = Val.U256(U256.unsafe(BigInteger.ONE.shiftLeft(size * 8)))
+        stack.push(value)
+        instr.runWith(frame).leftValue isE InvalidConversion(value, Val.ByteVec)
+      }
+    }
+  }
+
+  it should "U256To1Byte" in new U256ToBytesFixture {
+    test(U256To1Byte, 1)
+  }
+
+  it should "U256To2Byte" in new U256ToBytesFixture {
+    test(U256To2Byte, 2)
+  }
+
+  it should "U256To4Byte" in new U256ToBytesFixture {
+    test(U256To4Byte, 4)
+  }
+
+  it should "U256To8Byte" in new U256ToBytesFixture {
+    test(U256To8Byte, 8)
+  }
+
+  it should "U256To16Byte" in new U256ToBytesFixture {
+    test(U256To16Byte, 16)
+  }
+
+  it should "U256To32Byte" in new U256ToBytesFixture {
+    test(U256To32Byte, 32)
+  }
+
+  trait U256FromBytesFixture extends StatelessInstrFixture {
+    def test(instr: U256FromBytesInstr, size: Int) = {
+      forAll(Gen.listOfN(size, arbitrary[Byte])) { bytes =>
+        val byteString = ByteString(bytes)
+        val value      = U256.from(byteString).get
+        stack.push(Val.ByteVec(byteString))
+        val initialGas = context.gasRemaining
+        instr.runWith(frame) isE ()
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas(size)
+        stack.top.get is Val.U256(value)
+        stack.pop()
+      }
+
+      Seq(size - 1, size + 1).foreach { n =>
+        val bytes = ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get)
+        stack.push(Val.ByteVec(bytes))
+        instr.runWith(frame).leftValue isE InvalidBytesSize
+      }
+    }
+  }
+
+  it should "U256From1Byte" in new U256FromBytesFixture {
+    test(U256From1Byte, 1)
+  }
+
+  it should "U256From2Byte" in new U256FromBytesFixture {
+    test(U256From2Byte, 2)
+  }
+
+  it should "U256From4Byte" in new U256FromBytesFixture {
+    test(U256From4Byte, 4)
+  }
+
+  it should "U256From8Byte" in new U256FromBytesFixture {
+    test(U256From8Byte, 8)
+  }
+
+  it should "U256From16Byte" in new U256FromBytesFixture {
+    test(U256From16Byte, 16)
+  }
+
+  it should "U256From32Byte" in new U256FromBytesFixture {
+    test(U256From32Byte, 32)
   }
 
   trait StatefulFixture extends ContextGenerators {
@@ -1891,7 +2034,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200
+      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200, ByteVecSlice -> 1,
+      U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
+      U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -1908,6 +2053,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       instr match {
         case i: ToByteVecInstr[_]  => testToByteVec(i, gas)
         case _: ByteVecConcat.type => testByteVecConcatGas(gas)
+        case _: ByteVecSlice.type  => testByteVecSliceGas(gas)
+        case i: U256ToBytesInstr   => testU256ToBytes(i, gas)
+        case i: U256FromBytesInstr => testU256FromBytes(i, gas)
         case i: LogInstr           => testLog(i, gas)
         case i: GasSimple          => i.gas().value is gas
         case i: GasFormula         => i.gas(32).value is gas
@@ -1920,6 +2068,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       case i: AddressToByteVec.type => i.gas(33).value is gas
       case _                        => true is false
     }
+    def testU256ToBytes(instr: U256ToBytesInstr, gas: Int) = {
+      instr.gas(instr.size).value is gas
+    }
+    def testU256FromBytes(instr: U256FromBytesInstr, gas: Int) = {
+      instr.gas(instr.size).value is gas
+    }
     def testByteVecConcatGas(gas: Int) = {
       val frame = genStatefulFrame()
       frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](123)))) isE ()
@@ -1927,6 +2081,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val initialGas = frame.ctx.gasRemaining
       ByteVecConcat.runWith(frame) isE ()
       (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
+    }
+    def testByteVecSliceGas(gas: Int) = {
+      val frame = genStatefulFrame()
+      frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](20)))) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(1))) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(10))) isE ()
+      val initialGas = frame.ctx.gasRemaining
+      ByteVecSlice.runWith(frame) isE ()
+      (initialGas.value - frame.ctx.gasRemaining.value) is (GasVeryLow.gas.value + 9 * gas)
     }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas
@@ -1967,7 +2130,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
-      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
+      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97, ByteVecSlice -> 98,
+      U256To1Byte -> 99, U256To2Byte -> 100, U256To4Byte -> 101, U256To8Byte -> 102, U256To16Byte -> 103, U256To32Byte -> 104,
+      U256From1Byte -> 105, U256From2Byte -> 106, U256From4Byte -> 107, U256From8Byte -> 108, U256From16Byte -> 109, U256From32Byte -> 110,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
