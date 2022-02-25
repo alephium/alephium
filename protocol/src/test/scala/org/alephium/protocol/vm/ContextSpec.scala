@@ -43,7 +43,7 @@ class ContextSpec
         AVector.empty,
         None
       ) isE ()
-      val contractId = TxOutputRef.key(context.txId, context.txEnv.tx.unsigned.fixedOutputs.length)
+      val contractId = TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length)
       context.worldState.getContractState(contractId).isRight is true
       BalancesPerLockup.from(context.worldState.getContractAsset(contractId).rightValue) is balances
       context.generatedOutputs.size is 1

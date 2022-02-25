@@ -897,39 +897,8 @@ class VMSpec extends AlephiumSpec {
                     |
                     |$tokenContract
                     |""".stripMargin)
-
-    val swapContract =
-      s"""
-         |// Simple swap contract purely for testing
-         |
-         |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
-         |
-         |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
-         |    transferAlphToSelf!(lp, alphAmount)
-         |    transferTokenToSelf!(lp, tokenId, tokenAmount)
-         |    alphReserve = alphAmount
-         |    tokenReserve = tokenAmount
-         |  }
-         |
-         |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
-         |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
-         |    transferAlphToSelf!(buyer, alphAmount)
-         |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
-         |    alphReserve = alphReserve + alphAmount
-         |    tokenReserve = tokenReserve - tokenAmount
-         |  }
-         |
-         |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
-         |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
-         |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-         |    transferAlphFromSelf!(buyer, alphAmount)
-         |    alphReserve = alphReserve - alphAmount
-         |    tokenReserve = tokenReserve + tokenAmount
-         |  }
-         |}
-         |""".stripMargin
     val swapContractKey = createContract(
-      swapContract,
+      AMMContract.swapContract,
       AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero)),
       tokenAmount = Some(1024)
     ).key
@@ -953,7 +922,7 @@ class VMSpec extends AlephiumSpec {
                     |  }
                     |}
                     |
-                    |$swapContract
+                    |${AMMContract.swapContract}
                     |""".stripMargin)
     checkSwapBalance(dustUtxoAmount + 10, 100)
 
@@ -966,7 +935,7 @@ class VMSpec extends AlephiumSpec {
                     |  }
                     |}
                     |
-                    |$swapContract
+                    |${AMMContract.swapContract}
                     |""".stripMargin)
     checkSwapBalance(dustUtxoAmount + 20, 50)
 
@@ -979,7 +948,7 @@ class VMSpec extends AlephiumSpec {
                     |  }
                     |}
                     |
-                    |$swapContract
+                    |${AMMContract.swapContract}
                     |""".stripMargin)
     checkSwapBalance(dustUtxoAmount + 10, 100)
   }

@@ -22,7 +22,9 @@ import org.alephium.protocol.model
 import org.alephium.protocol.vm
 import org.alephium.util
 
-sealed trait Val
+sealed trait Val {
+  def toVmVal: vm.Val
+}
 
 object Val {
 
@@ -36,19 +38,29 @@ object Val {
   }
 
   @upickle.implicits.key("bool")
-  final case class Bool(value: Boolean) extends Val
+  final case class Bool(value: Boolean) extends Val {
+    override def toVmVal: vm.Val = vm.Val.Bool(value)
+  }
 
   @upickle.implicits.key("i256")
-  final case class I256(value: util.I256) extends Val
+  final case class I256(value: util.I256) extends Val {
+    override def toVmVal: vm.Val = vm.Val.I256(value)
+  }
 
   @upickle.implicits.key("u256")
-  final case class U256(value: util.U256) extends Val
+  final case class U256(value: util.U256) extends Val {
+    override def toVmVal: vm.Val = vm.Val.U256(value)
+  }
 
   @upickle.implicits.key("bytevec")
-  final case class ByteVec(value: ByteString) extends Val
+  final case class ByteVec(value: ByteString) extends Val {
+    override def toVmVal: vm.Val = vm.Val.ByteVec(value)
+  }
 
   @upickle.implicits.key("address")
-  final case class Address(value: model.Address) extends Val
+  final case class Address(value: model.Address) extends Val {
+    override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
+  }
 
   val True: Bool  = Bool(true)
   val False: Bool = Bool(false)

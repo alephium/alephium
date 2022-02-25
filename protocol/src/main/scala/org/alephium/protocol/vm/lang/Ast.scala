@@ -51,15 +51,8 @@ object Ast {
 
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
-    // TODO: support constants for all values
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      v match {
-        case Val.Bool(b)    => Seq(if (b) ConstTrue else ConstFalse)
-        case v: Val.I256    => Seq(ConstInstr.i256(v))
-        case v: Val.U256    => Seq(ConstInstr.u256(v))
-        case v: Val.ByteVec => Seq(BytesConst(v))
-        case v: Val.Address => Seq(AddressConst(v))
-      }
+      Seq(v.toConstInstr)
     }
   }
   final case class CreateArrayExpr[Ctx <: StatelessContext](elements: Seq[Expr[Ctx]])

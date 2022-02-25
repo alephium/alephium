@@ -67,6 +67,9 @@ sealed trait Contract[Ctx <: StatelessContext] {
   def methodsLength: Int
   def getMethod(index: Int): ExeResult[Method[Ctx]]
   def hash: Hash
+
+  def initialStateHash(fields: AVector[Val]): Hash =
+    Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
@@ -380,5 +383,16 @@ object StatefulContractObject {
       initialFields.toArray,
       contractId
     )
+  }
+
+  def from(
+      contract: StatefulContract,
+      initialFields: AVector[Val],
+      contractId: ContractId
+  ): StatefulContractObject = {
+    val code             = contract.toHalfDecoded()
+    val codeHash         = code.hash
+    val initialStateHash = code.initialStateHash(initialFields)
+    unsafe(codeHash, code, initialStateHash, initialFields, contractId)
   }
 }
