@@ -53,7 +53,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "load mainnet config" in {
-    lazy val rootPath = Platform.getRootPath(Env.Test)
+    lazy val rootPath = Platform.getRootPath(Env.Prod)
     val config        = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
     config.broker.groups is 4
@@ -66,6 +66,14 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.discovery.bootstrap.head is new InetSocketAddress("bootstrap0.alephium.org", 9973)
     config.genesis.allocations.length is 858
     config.genesis.allocations.sumBy(_.amount.value.v) is ALPH.alph(140000000).v
+  }
+
+  it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.network.leman-hard-fork-timestamp", 0)
+    )
+    assertThrows[IllegalArgumentException](config.network.networkId is NetworkId.AlephiumMainNet)
   }
 
   it should "load bootstrap config" in {

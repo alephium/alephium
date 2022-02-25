@@ -23,10 +23,10 @@ import akka.util.ByteString
 import org.alephium.crypto
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.AssetOutput
+import org.alephium.protocol.model.{AssetOutput, HardFork}
 import org.alephium.serde.{deserialize => decode, _}
-import org.alephium.util
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
+import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
 
@@ -37,6 +37,19 @@ sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
 
   // this function needs to charge gas manually
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    val hardFork = frame.ctx.getHardFork()
+    if (hardFork >= HardFork.Leman) {
+      runWithLeman(frame)
+    } else {
+      failed(InactiveInstr(this))
+    }
+  }
+
+  def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
@@ -596,9 +609,10 @@ case object BoolNeq extends BinaryBool {
 
 sealed abstract class U256ToBytesInstr(val size: Int)
     extends StatelessInstr
+    with LemanInstr[StatelessContext]
     with GasToByte
     with StatelessInstrCompanion0 {
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       value <- frame.popOpStackU256()
       bytes <- value.v.toFixedSizeBytes(size).toRight(Right(InvalidConversion(value, Val.ByteVec)))
@@ -618,9 +632,10 @@ case object U256To32Byte extends U256ToBytesInstr(32)
 
 sealed abstract class U256FromBytesInstr(val size: Int)
     extends StatelessInstr
+    with LemanInstr[StatelessContext]
     with GasToByte
     with StatelessInstrCompanion0 {
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       byteVec <- frame.popOpStackByteVec()
       _       <- if (byteVec.bytes.length == size) okay else failed(InvalidBytesSize)
@@ -753,8 +768,12 @@ case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 w
     } yield ()
   }
 }
-case object ByteVecSlice extends StatelessInstr with StatelessInstrCompanion0 with GasBytesSlice {
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object ByteVecSlice
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasBytesSlice {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       end   <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
       begin <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
