@@ -390,17 +390,6 @@ object StatefulVM {
   }
 
   def runTxScript(
-      worldState: WorldState.Staging,
-      blockEnv: BlockEnv,
-      txEnv: TxEnv,
-      script: StatefulScript,
-      gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(blockEnv, txEnv, worldState, gasRemaining)
-    runTxScript(context, script)
-  }
-
-  def runTxScript(
       context: StatefulContext,
       script: StatefulScript
   ): ExeResult[TxScriptExecution] = {
