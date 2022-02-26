@@ -790,8 +790,12 @@ case object ByteVecSlice
     } yield ()
   }
 }
-case object ByteVecToAddress extends StatelessInstr with StatelessInstrCompanion0 with GasToByte {
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+case object ByteVecToAddress
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasToByte {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       bytes   <- frame.popOpStackByteVec().map(_.bytes)
       address <- decode[Val.Address](bytes).left.map(e => Right(SerdeErrorByteVecToAddress(e)))
