@@ -97,6 +97,8 @@ case object InvalidBytesSliceArg                               extends ExeFailur
 case object InvalidBytesSize                                   extends ExeFailure
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 
+final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
+
 sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix

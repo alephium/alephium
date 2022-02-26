@@ -32,6 +32,7 @@ trait TxValidation {
   import ValidationStatus._
 
   implicit def groupConfig: GroupConfig
+  implicit def networkConfig: NetworkConfig
 
   private def validateTxTemplate(
       tx: TransactionTemplate,
@@ -321,7 +322,7 @@ object TxValidation {
     new Impl()
 
   // scalastyle:off number.of.methods
-  class Impl(implicit val groupConfig: GroupConfig, networkConfig: NetworkConfig)
+  class Impl(implicit val groupConfig: GroupConfig, val networkConfig: NetworkConfig)
       extends TxValidation {
     protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit] = {
       if (tx.unsigned.version == DefaultTxVersion) {
@@ -703,7 +704,7 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(txEnv.tx.id.bytes, signature, publicKey)) {
+          if (!SignatureSchema.verify(txEnv.txId.bytes, signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
             fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)

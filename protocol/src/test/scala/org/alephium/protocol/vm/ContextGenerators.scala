@@ -17,6 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -38,7 +39,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       signatures: AVector[Signature] = AVector.empty,
       blockEnv: Option[BlockEnv] = None,
       txEnv: Option[TxEnv] = None
-  ): StatelessContext = {
+  )(implicit networkConfig: NetworkConfig): StatelessContext = {
     StatelessContext.apply(
       blockEnv.getOrElse(genBlockEnv()),
       txEnv.getOrElse(genTxEnv(signatures = signatures)),
@@ -66,7 +67,6 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       genBlockEnv(),
       txEnv,
       cachedWorldState.staging(),
-      txEnv.prevOutputs,
       gasLimit
     )
   }
@@ -103,7 +103,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     ) isE ()
 
     val obj = halfDecoded.toObjectUnsafe(contractOutputRef.key, fields)
-    val context = new StatefulContext {
+    val context = new StatefulContext with NetworkConfigFixture.Default {
       val worldState: WorldState.Staging            = cachedWorldState.staging()
       val outputBalances: Balances                  = Balances.empty
       def nextOutputIndex: Int                      = 0

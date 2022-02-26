@@ -115,19 +115,29 @@ abstract class Parser[Ctx <: StatelessContext] {
   def ret[_: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
+  def ident[_: P]: P[(Boolean, Ast.Ident)] = P(Lexer.mut ~ Lexer.ident)
+  def idents[_: P]: P[Seq[(Boolean, Ast.Ident)]] = P(
+    ident.map(Seq(_)) | "(" ~ ident.rep(1, ",") ~ ")"
+  )
   def varDef[_: P]: P[Ast.VarDef[Ctx]] =
-    P(Lexer.keyword("let") ~/ Lexer.mut ~ Lexer.ident ~ "=" ~ expr).map {
-      case (isMutable, ident, expr) => Ast.VarDef(isMutable, ident, expr)
+    P(Lexer.keyword("let") ~/ idents ~ "=" ~ expr).map { case (idents, expr) =>
+      Ast.VarDef(idents, expr)
     }
-  def varAssign[_: P]: P[Ast.Assign[Ctx]] =
-    P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
-      Ast.Assign(ident, expr)
+  def assignmentSimpleTarget[_: P]: P[Ast.AssignmentTarget[Ctx]] = P(
+    Lexer.ident.map(Ast.AssignmentSimpleTarget.apply[Ctx])
+  )
+  def assignmentArrayElementTarget[_: P]: P[Ast.AssignmentArrayElementTarget[Ctx]] = P(
+    Lexer.ident ~ arrayIndex.rep(1)
+  ).map { case (ident, indexes) =>
+    Ast.AssignmentArrayElementTarget[Ctx](ident, indexes)
+  }
+  def assignmentTarget[_: P]: P[Ast.AssignmentTarget[Ctx]] = P(
+    assignmentArrayElementTarget | assignmentSimpleTarget
+  )
+  def assign[_: P]: P[Ast.Statement[Ctx]] =
+    P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
+      Ast.Assign(targets, expr)
     }
-  def arrayElementAssign[_: P]: P[Ast.ArrayElementAssign[Ctx]] =
-    P(Lexer.ident ~ arrayIndex.rep(1) ~ "=" ~ expr).map { case (ident, indexes, expr) =>
-      Ast.ArrayElementAssign(ident, indexes, expr)
-    }
-  def assign[_: P]: P[Ast.Statement[Ctx]] = P(varAssign | arrayElementAssign)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def parseType[_: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {

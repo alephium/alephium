@@ -14,27 +14,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium
 
-import akka.util.ByteString
+import scala.concurrent.Future
 
-import org.alephium.protocol.model.NetworkId
-import org.alephium.util.TimeStamp
+import org.alephium.api.{badRequest, Try}
+import org.alephium.protocol.vm.lang.Compiler
 
-trait NetworkConfigFixture { self =>
-  def networkId: NetworkId
-  def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
+package object app {
+  type FutureTry[T] = Future[Try[T]]
 
-  implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    val networkId: NetworkId       = self.networkId
-    val noPreMineProof: ByteString = ByteString.empty
-    val lemanHardForkTimestamp: TimeStamp =
-      self.lemanHardForkTimestamp // enabled by default for all tests
-  }
-}
-
-object NetworkConfigFixture {
-  trait Default extends NetworkConfigFixture {
-    val networkId: NetworkId = NetworkId.AlephiumDevNet
+  def wrapCompilerResult[T](result: Either[Compiler.Error, T]): Try[T] = {
+    result.left.map(error => badRequest(error.message))
   }
 }

@@ -43,6 +43,10 @@ object Address {
     }
   }
 
+  def contract(contractId: ContractId): Address = {
+    Contract(LockupScript.p2c(contractId))
+  }
+
   def fromBase58(input: String): Option[Address] = {
     for {
       lockupScript <- LockupScript.fromBase58(input)

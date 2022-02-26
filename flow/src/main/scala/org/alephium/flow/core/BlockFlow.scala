@@ -24,11 +24,12 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{AVector, Env, TimeStamp}
+import org.alephium.util.{AVector, Env, Files, TimeStamp}
 
 trait BlockFlow
     extends MultiChain
@@ -118,6 +119,19 @@ trait BlockFlow
 
 object BlockFlow extends StrictLogging {
   type WorldStateUpdater = (WorldState.Cached, Block) => IOResult[Unit]
+
+  def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
+    val storages =
+      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, Settings.writeOptions)(
+        config.broker
+      )
+    fromGenesisUnsafe(storages, config.genesisBlocks)(
+      config.broker,
+      config.network,
+      config.consensus,
+      config.mempool
+    )
+  }
 
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
     fromGenesisUnsafe(storages, config.genesisBlocks)(

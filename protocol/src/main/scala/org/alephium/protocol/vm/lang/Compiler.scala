@@ -212,7 +212,7 @@ object Compiler {
         case _ =>
           val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
           val arrayRef  = ArrayTransformer.ArrayRef.init(this, arrayType, freshName(), isMutable)
-          val codes     = expr.genCode(this) ++ copyArrayRef(arrayRef)
+          val codes     = expr.genCode(this) ++ arrayRef.vars.map(genStoreCode).reverse
           (arrayRef, codes)
       }
     }
@@ -229,12 +229,6 @@ object Compiler {
         ident.name,
         arrayRefs.getOrElse(sname, throw Error(s"Array $ident does not exist"))
       )
-    }
-
-    def copyArrayRef(
-        target: ArrayTransformer.ArrayRef
-    ): Seq[Instr[Ctx]] = {
-      target.vars.map(genStoreCode).reverse
     }
 
     def setFuncScope(funcId: Ast.FuncId): Unit = {

@@ -14,27 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.api.model
 
-import akka.util.ByteString
+import org.alephium.util.AVector
 
-import org.alephium.protocol.model.NetworkId
-import org.alephium.util.TimeStamp
-
-trait NetworkConfigFixture { self =>
-  def networkId: NetworkId
-  def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
-
-  implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    val networkId: NetworkId       = self.networkId
-    val noPreMineProof: ByteString = ByteString.empty
-    val lemanHardForkTimestamp: TimeStamp =
-      self.lemanHardForkTimestamp // enabled by default for all tests
-  }
-}
-
-object NetworkConfigFixture {
-  trait Default extends NetworkConfigFixture {
-    val networkId: NetworkId = NetworkId.AlephiumDevNet
-  }
-}
+final case class TestContractResult(
+    returns: AVector[Val],
+    gasUsed: Int,
+    contracts: AVector[TestContract.ExistingContract],
+    outputs: AVector[Output]
+)
