@@ -1162,7 +1162,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           StoreLocal(1),
           StoreLocal(0),
           LoadLocal(0),
-          StoreLocal(4)
+          StoreLocal(4),
+          Return
         )
       )
   }
