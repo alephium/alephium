@@ -273,7 +273,12 @@ lazy val protocol = project("protocol")
     buildInfoPackage := "org.alephium.protocol",
     buildInfoUsePackageAsPath := true
   )
-  .dependsOn(crypto, io % "compile->compile;test->test", serde, util % "test->test")
+  .dependsOn(
+    crypto % "compile->compile;test->test",
+    io     % "compile->compile;test->test",
+    serde,
+    util % "test->test"
+  )
   .settings(
     libraryDependencies ++= Seq(
       `prometheus-simple-client`,

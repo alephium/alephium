@@ -21,6 +21,7 @@ import scala.annotation.switch
 import akka.util.ByteString
 
 import org.alephium.crypto
+import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{AssetOutput, HardFork}
@@ -129,7 +130,7 @@ object Instr {
     ByteVecSlice,
     U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
     U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-    ByteVecToAddress
+    ByteVecToAddress, EthEcRecover
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1031,6 +1032,24 @@ case object VerifyED25519
       pubKey: crypto.ED25519PublicKey
   ): Boolean =
     crypto.ED25519.verify(data, signature, pubKey)
+}
+
+case object EthEcRecover
+    extends CryptoInstr
+    with LemanInstr[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasEcRecover {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _           <- frame.ctx.chargeGas(gas())
+      sigBytes    <- frame.popOpStackByteVec()
+      messageHash <- frame.popOpStackByteVec()
+      address <- SecP256K1
+        .ethEcRecover(messageHash.bytes, sigBytes.bytes)
+        .toRight(Right(FailedInRecoverEthAddress))
+      _ <- frame.pushOpStack(Val.ByteVec(address))
+    } yield ()
+  }
 }
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance

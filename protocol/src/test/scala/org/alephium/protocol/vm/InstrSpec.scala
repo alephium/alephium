@@ -69,7 +69,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecSlice,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      ByteVecToAddress
+      ByteVecToAddress, EthEcRecover
     )
     // format: on
   }
@@ -1254,6 +1254,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(VerifyED25519, crypto.ED25519.generatePriPub(), crypto.ED25519.sign)
   }
 
+  it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture
+    with crypto.EthEcRecoverFixture {
+    val initialGas = context.gasRemaining
+    stack.push(Val.ByteVec(messageHash.bytes))
+    stack.push(Val.ByteVec(signature))
+    EthEcRecover.runWith(frame) isE ()
+    stack.size is 1
+    stack.top.get is Val.ByteVec(address)
+    initialGas.subUnsafe(context.gasRemaining) is EthEcRecover.gas()
+  }
+
+  it should "test EthEcRecover: fail in execution" in new StatelessInstrFixture
+    with crypto.EthEcRecoverFixture {
+    stack.push(Val.ByteVec(signature))
+    stack.push(Val.ByteVec(messageHash.bytes))
+    EthEcRecover.runWith(frame).leftValue isE FailedInRecoverEthAddress
+  }
+
   it should "NetworkId" in new StatelessInstrFixture {
     override lazy val frame = prepareFrame(
       AVector.empty,
@@ -2061,7 +2079,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200, ByteVecSlice -> 1,
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
-      ByteVecToAddress -> 5
+      ByteVecToAddress -> 5, EthEcRecover -> 2500
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2159,7 +2177,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97, ByteVecSlice -> 98,
       U256To1Byte -> 99, U256To2Byte -> 100, U256To4Byte -> 101, U256To8Byte -> 102, U256To16Byte -> 103, U256To32Byte -> 104,
       U256From1Byte -> 105, U256From2Byte -> 106, U256From4Byte -> 107, U256From8Byte -> 108, U256From16Byte -> 109, U256From32Byte -> 110,
-      ByteVecToAddress -> 111,
+      ByteVecToAddress -> 111, EthEcRecover -> 112,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2206,7 +2224,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecSlice,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      ByteVecToAddress
+      ByteVecToAddress, EthEcRecover
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),

@@ -89,6 +89,13 @@ object BuiltIn {
       Seq.empty,
       VerifyED25519
     )
+  val ethEcRecover: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "ethEcRecover",
+      Seq(Type.ByteVec, Type.ByteVec),
+      Seq(Type.ByteVec),
+      EthEcRecover
+    )
   val networkId: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("networkId", Seq.empty, Seq(Type.ByteVec), NetworkId)
   val blockTimeStamp: SimpleStatelessBuiltIn =
@@ -313,6 +320,7 @@ object BuiltIn {
     verifyTxSignature,
     verifySecP256K1,
     verifyED25519,
+    ethEcRecover,
     networkId,
     blockTimeStamp,
     blockTarget,

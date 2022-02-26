@@ -136,15 +136,7 @@ class SecP256K1Spec extends AlephiumSpec {
     }
   }
 
-  it should "recover Ethereum address" in {
-    // test vector from web3j
-    val signature =
-      hex"2c6401216c9031b9a6fb8cbfccab4fcec6c951cdf40e2320108d1856eb532250576865fbcd452bcdc4c57321b619ed7a9cfd38bd973c3e1e0243ac2777fe9d5b1b"
-    val address       = hex"31b26e43651e9371c88af3d36c14cfd938baf4fd"
-    val message       = ByteString("v0G9u7huK4mJb2K1")
-    val messagePrefix = ByteString(s"\u0019Ethereum Signed Message:\n${message.length}")
-    val messageToSign = messagePrefix ++ message
-    val messageHash   = Keccak256.hash(messageToSign)
+  it should "recover Ethereum address" in new EthEcRecoverFixture {
 
     signature.length is 65
     SecP256K1.ethEcRecoverUnsafe(
@@ -200,4 +192,15 @@ class SecP256K1Spec extends AlephiumSpec {
       error = "requirement failed: Invalid s"
     )
   }
+}
+
+trait EthEcRecoverFixture {
+  // test vector from web3j
+  val signature =
+    hex"2c6401216c9031b9a6fb8cbfccab4fcec6c951cdf40e2320108d1856eb532250576865fbcd452bcdc4c57321b619ed7a9cfd38bd973c3e1e0243ac2777fe9d5b1b"
+  val address       = hex"31b26e43651e9371c88af3d36c14cfd938baf4fd"
+  val message       = ByteString("v0G9u7huK4mJb2K1")
+  val messagePrefix = ByteString(s"\u0019Ethereum Signed Message:\n${message.length}")
+  val messageToSign = messagePrefix ++ message
+  val messageHash   = Keccak256.hash(messageToSign)
 }

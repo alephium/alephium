@@ -96,6 +96,7 @@ final case class InvalidTarget(value: BigInteger)              extends ExeFailur
 case object InvalidBytesSliceArg                               extends ExeFailure
 case object InvalidBytesSize                                   extends ExeFailure
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
+case object FailedInRecoverEthAddress                          extends ExeFailure
 
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 
