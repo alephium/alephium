@@ -539,7 +539,7 @@ object Ast {
       state.checkReturn(exprs.flatMap(_.getType(state)))
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
-      exprs.flatMap(_.genCode(state)) ++ (if (exprs.isEmpty) Seq() else Seq(Return))
+      exprs.flatMap(_.genCode(state)) :+ Return
   }
   final case class Loop[Ctx <: StatelessContext](
       start: Int,
