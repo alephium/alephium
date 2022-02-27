@@ -1109,6 +1109,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(8, AVector.empty, AVector.empty)
   }
 
+  it should "return from if block" in new TestContractMethodFixture {
+    val code: String =
+      s"""
+         |TxContract Foo(mut value: U256) {
+         |  pub fn foo() -> () {
+         |    if (true) {
+         |      value = 1
+         |      return
+         |    }
+         |
+         |    value = 2
+         |    return
+         |  }
+         |
+         |  pub fn getValue() -> (U256) {
+         |    return value
+         |  }
+         |}
+         |""".stripMargin
+
+    override val fields = AVector(Val.U256(0))
+    test(0, AVector.empty, AVector.empty)
+    test(1, AVector.empty, AVector(Val.U256(1)))
+  }
+
   it should "generate efficient code for arrays" in {
     val code =
       s"""
@@ -1137,7 +1162,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           StoreLocal(1),
           StoreLocal(0),
           LoadLocal(0),
-          StoreLocal(4)
+          StoreLocal(4),
+          Return
         )
       )
   }
