@@ -315,9 +315,21 @@ object Ast {
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
   ) {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
+      stmt match {
+        case Some(_: ReturnStmt[Ctx]) => // we checked the `rtypes` in `ReturnStmt`
+        case Some(IfElse(_, ifBranch, elseBranch)) =>
+          checkRetTypes(ifBranch.lastOption)
+          checkRetTypes(elseBranch.lastOption)
+        case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
+      if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
     def toMethod(state: Compiler.State[Ctx]): Method[Ctx] = {

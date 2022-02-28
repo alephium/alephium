@@ -143,6 +143,103 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileTxScript(input, 1).isRight is true
   }
 
+  it should "check function return types" in {
+    val failed = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 1
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |    let mut x = 0
+         |    return 0
+         |    x = 1
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 0
+         |    } else {
+         |      if (value > 20) {
+         |        return 1
+         |      }
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    )
+    failed.foreach { code =>
+      Compiler.compileContract(code).leftValue is Compiler.Error(
+        "Expect return statement for function foo"
+      )
+    }
+
+    val succeed = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 0
+         |    } else {
+         |      return 1
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 0
+         |    } else {
+         |      if (value > 20) {
+         |        return 1
+         |      }
+         |      return 2
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      if (value < 8) {
+         |        return 0
+         |      } else {
+         |        return 1
+         |      }
+         |    } else {
+         |      if (value > 20) {
+         |        return 2
+         |      } else {
+         |        return 3
+         |      }
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    )
+    succeed.foreach { code =>
+      Compiler.compileContract(code).isRight is true
+    }
+  }
+
   trait Fixture {
     def test(
         input: String,
