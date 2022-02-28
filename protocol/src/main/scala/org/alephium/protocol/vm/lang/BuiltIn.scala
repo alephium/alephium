@@ -320,7 +320,6 @@ object BuiltIn {
     verifyTxSignature,
     verifySecP256K1,
     verifyED25519,
-    ethEcRecover,
     networkId,
     blockTimeStamp,
     blockTarget,
@@ -349,7 +348,8 @@ object BuiltIn {
     u256From8Byte,
     u256From16Byte,
     u256From32Byte,
-    byteVecToAddress
+    byteVecToAddress,
+    ethEcRecover
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =
