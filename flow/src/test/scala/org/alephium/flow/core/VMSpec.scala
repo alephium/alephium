@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.language.implicitConversions
 
 import akka.util.ByteString
@@ -25,7 +27,7 @@ import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signa
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToSharedPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -832,6 +834,97 @@ class VMSpec extends AlephiumSpec {
       main(block.timestamp, Duration.ofMinutesUnsafe(1), 0),
       RelativeLockTimeVerificationFailed
     )
+  }
+
+  it should "test u256 to bytes" in new ContractFixture {
+    def genNumber(size: Int): BigInteger =
+      BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE)
+    def main(func: String, size: Int): String = {
+      val number = U256.from(genNumber(size)).getOrElse(U256.MaxValue)
+      val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!($func($number) == #$hex)
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    Array(1, 2, 4, 8, 16).foreach { size =>
+      val name = s"u256To${size}Byte!"
+      testSimpleScript(main(name, size))
+      val number = Val.U256(U256.unsafe(genNumber(size + 1)))
+      failSimpleScript(main(name, size + 1), InvalidConversion(number, Val.ByteVec))
+    }
+    testSimpleScript(main("u256To32Byte!", 32))
+    failSimpleScript(main("u256To32Byte!", 33), AssertionFailed)
+  }
+
+  it should "test u256 from bytes" in new ContractFixture {
+    def main(func: String, size: Int): String = {
+      val number = BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE)
+      val u256   = U256.from(number).getOrElse(U256.MaxValue)
+      val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!($func(#$hex) == $u256)
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    Array(1, 2, 4, 8, 16, 32).foreach { size =>
+      val name = s"u256From${size}Byte!"
+      testSimpleScript(main(name, size))
+      failSimpleScript(main(name, size + 1), InvalidBytesSize)
+    }
+  }
+
+  it should "test bytevec slice" in new ContractFixture {
+    val hex = "1b6dffea4ac54dbc4bbc65169dd054de826add0c62a85789662d477116304488"
+    def main(start: Int, end: Int, slice: String): String = {
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    testSimpleScript(main(4, 13, hex.slice(4 * 2, 13 * 2)))
+    failSimpleScript(main(4, 4, "00"), InvalidBytesSliceArg)
+    failSimpleScript(main(13, 4, "00"), InvalidBytesSliceArg)
+    failSimpleScript(main(4, 33, "00"), InvalidBytesSliceArg)
+  }
+
+  it should "test bytevec to address" in new ContractFixture {
+    val p2pkhAddress = Address.p2pkh(PublicKey.generate)
+    val p2shAddress  = Address.Asset(LockupScript.p2sh(Hash.generate))
+    val p2mpkhAddress = Address.Asset(
+      LockupScript.p2mpkhUnsafe(
+        AVector.fill(3)(PublicKey.generate),
+        2
+      )
+    )
+    val p2cAddress = Address.contract(Hash.generate)
+    def main(address: Address): String = {
+      val hex = Hex.toHexString(serialize(address.lockupScript))
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    testSimpleScript(main(p2pkhAddress))
+    testSimpleScript(main(p2shAddress))
+    testSimpleScript(main(p2mpkhAddress))
+    testSimpleScript(main(p2cAddress))
   }
 
   it should "create and use NFT contract" in new ContractFixture {
