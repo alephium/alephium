@@ -19,7 +19,7 @@ package org.alephium.api.model
 import scala.util.control.NonFatal
 
 import org.alephium.api.{failed, Try}
-import org.alephium.protocol.{vm, BlockHash, Hash}
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.{ChainIndex, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
@@ -42,13 +42,12 @@ object Events {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def from(chainIndex: ChainIndex, logStates: LogStates): Try[Events] = try {
     val events: AVector[Event] = logStates.states.map { logState =>
-      val index = logState.fields(0).asInstanceOf[vm.Val.I256].v.v.intValue()
       Event(
         logStates.blockHash,
         logStates.contractId,
         logState.txId,
-        index,
-        logState.fields.tail.map(Val.from)
+        logState.index.toInt,
+        logState.fields.map(Val.from)
       )
     }
 

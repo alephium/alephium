@@ -397,29 +397,40 @@ object WorldState {
         fields: AVector[Val],
         logConfig: LogConfig
     ): IOResult[Unit] = {
-      (blockHashOpt, contractIdOpt) match {
-        case (Some(blockHash), Some(contractId)) =>
-          val allowAllContracts = logConfig.contractIds.isEmpty
-          val allowThisContract = logConfig.contractIds.exists(_.contains(contractId))
-          if (logConfig.enabled && (allowAllContracts || allowThisContract)) {
-            val id    = LogStatesId(blockHash, contractId)
-            val state = LogState(txId, fields)
-            for {
-              logStatesOpt <- logState.getOpt(id)
-              _ <- logStatesOpt match {
-                case Some(logStates) =>
-                  logState.put(id, logStates.copy(states = logStates.states :+ state))
-                case None =>
-                  logState.put(id, LogStates(blockHash, contractId, AVector(state)))
-              }
-            } yield ()
-          } else {
-            Right(())
-          }
-        case _ =>
-          Right(())
+      val indexOpt = fields.headOption.flatMap {
+        case Val.I256(i) => i.toByte
+        case _           => None
       }
+      (blockHashOpt, contractIdOpt, indexOpt) match {
+        case (Some(blockHash), Some(contractId), Some(index)) =>
+          writeLog(blockHash, txId, contractId, index, fields.tail, logConfig)
+        case _ => Right(())
+      }
+    }
 
+    def writeLog(
+        blockHash: BlockHash,
+        txId: Hash,
+        contractId: ContractId,
+        index: Byte,
+        fields: AVector[Val],
+        logConfig: LogConfig
+    ): IOResult[Unit] = {
+      if (logConfig.logContractEnabled(contractId)) {
+        val id    = LogStatesId(blockHash, contractId)
+        val state = LogState(txId, index, fields)
+        for {
+          logStatesOpt <- logState.getOpt(id)
+          _ <- logStatesOpt match {
+            case Some(logStates) =>
+              logState.put(id, logStates.copy(states = logStates.states :+ state))
+            case None =>
+              logState.put(id, LogStates(blockHash, contractId, AVector(state)))
+          }
+        } yield ()
+      } else {
+        Right(())
+      }
     }
   }
 

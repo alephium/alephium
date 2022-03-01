@@ -1129,15 +1129,15 @@ class VMSpec extends AlephiumSpec {
 
       val addingLogState = logStates.states(0)
       addingLogState.txId is callingBlock.nonCoinbase.head.id
-      addingLogState.fields.length is 3
-      addingLogState.fields(0) is Val.I256(I256.unsafe(0))
-      addingLogState.fields(1) is Val.U256(U256.unsafe(4))
-      addingLogState.fields(2) is Val.U256(U256.unsafe(10))
+      addingLogState.index is 0.toByte
+      addingLogState.fields.length is 2
+      addingLogState.fields(0) is Val.U256(U256.unsafe(4))
+      addingLogState.fields(1) is Val.U256(U256.unsafe(10))
 
       val addedLogState = logStates.states(1)
       addedLogState.txId is callingBlock.nonCoinbase.head.id
-      addedLogState.fields.length is 1
-      addedLogState.fields(0) is Val.I256(I256.unsafe(1))
+      addedLogState.index is 1.toByte
+      addedLogState.fields.length is 0
     }
 
     {
@@ -1211,21 +1211,21 @@ class VMSpec extends AlephiumSpec {
 
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
-    testEventLogState1.fields.length is 5
-    testEventLogState1.fields(0) is Val.I256(I256.unsafe(0))
-    testEventLogState1.fields(1) is Val.U256(U256.unsafe(4))
-    testEventLogState1.fields(2) is Val.I256(I256.unsafe(-5))
-    testEventLogState1.fields(3) is Val.Address(address.lockupScript)
-    testEventLogState1.fields(4) is Val.Address(address.lockupScript).toByteVec()
+    testEventLogState1.index is 0.toByte
+    testEventLogState1.fields.length is 4
+    testEventLogState1.fields(0) is Val.U256(U256.unsafe(4))
+    testEventLogState1.fields(1) is Val.I256(I256.unsafe(-5))
+    testEventLogState1.fields(2) is Val.Address(address.lockupScript)
+    testEventLogState1.fields(3) is Val.Address(address.lockupScript).toByteVec()
 
     val testEventLogState2 = logStates.states(1)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
-    testEventLogState2.fields.length is 5
-    testEventLogState2.fields(0) is Val.I256(I256.unsafe(1))
-    testEventLogState2.fields(1) is Val.U256(U256.unsafe(5))
-    testEventLogState2.fields(2) is Val.I256(I256.unsafe(-4))
-    testEventLogState2.fields(3) is Val.Address(address.lockupScript)
-    testEventLogState2.fields(4) is Val.Bool(true)
+    testEventLogState2.index is 1.toByte
+    testEventLogState2.fields.length is 4
+    testEventLogState2.fields(0) is Val.U256(U256.unsafe(5))
+    testEventLogState2.fields(1) is Val.I256(I256.unsafe(-4))
+    testEventLogState2.fields(2) is Val.Address(address.lockupScript)
+    testEventLogState2.fields(3) is Val.Bool(true)
   }
 
   it should "not compile when emitting events with array field types" in new FlowFixture {

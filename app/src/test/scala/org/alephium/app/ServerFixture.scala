@@ -344,8 +344,8 @@ object ServerFixture {
             states = AVector(
               LogState(
                 txId = txId,
+                index = 0,
                 fields = AVector(
-                  vm.Val.I256(I256.from(0)),
                   vm.Val.U256(U256.unsafe(4)),
                   vm.Val.Address(address1.lockupScript),
                   vm.Val.Address(address2.lockupScript)
