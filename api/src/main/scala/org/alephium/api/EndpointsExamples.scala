@@ -18,7 +18,6 @@ package org.alephium.api
 
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
-import java.nio.charset.StandardCharsets
 
 import akka.util.ByteString
 import sttp.tapir.EndpointIO.Example
@@ -147,8 +146,8 @@ trait EndpointsExamples extends ErrorExamples {
     blockHash,
     txId,
     contractAddress.lockupScript.contractId,
-    Val.ByteVec(ByteString("TransferTo".getBytes(StandardCharsets.UTF_8))),
-    AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
+    index = 1,
+    fields = AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
   )
 
   implicit val minerActionExamples: List[Example[MinerAction]] = List(

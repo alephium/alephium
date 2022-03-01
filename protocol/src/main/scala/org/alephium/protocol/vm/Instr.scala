@@ -110,14 +110,15 @@ object Instr {
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
     NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
-    VerifyAbsoluteLocktime, VerifyRelativeLocktime
+    VerifyAbsoluteLocktime, VerifyRelativeLocktime,
+    Log1, Log2, Log3, Log4, Log5
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
     ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
     TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash, Log
+    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
   )
   // format: on
 
@@ -1409,35 +1410,19 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
   }
 }
 
-object Log extends StatefulInstrCompanion0 with GasLog {
-  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
+  def n: Int
+
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      u256 <- frame.popOpStackU256()
-      fieldsLength = u256.v.v.intValue()
-      name   <- frame.popOpStackByteVec()
-      fields <- frame.opStack.pop(fieldsLength - 1)
-      _      <- writeLog(frame, name, fields)
-      _      <- frame.ctx.chargeGasWithSize(this, fieldsLength)
+      _      <- frame.ctx.chargeGasWithSize(this, n)
+      fields <- frame.opStack.pop(n)
+      _      <- frame.ctx.writeLog(frame.obj.contractIdOpt, fields)
     } yield ()
   }
-
-  private def writeLog[C <: StatefulContext](
-      frame: Frame[C],
-      name: Val.ByteVec,
-      fields: AVector[Val]
-  ) = {
-    frame.ctx.worldState
-      .writeLog(
-        frame.ctx.blockEnv.id,
-        frame.ctx.txId,
-        frame.obj.contractIdOpt,
-        name,
-        fields,
-        frame.ctx.logConfig
-      )
-      .left
-      .map { error =>
-        Left(IOErrorWriteLog(error))
-      }
-  }
 }
+object Log1 extends LogInstr { val n: Int = 1 }
+object Log2 extends LogInstr { val n: Int = 2 }
+object Log3 extends LogInstr { val n: Int = 3 }
+object Log4 extends LogInstr { val n: Int = 4 }
+object Log5 extends LogInstr { val n: Int = 5 }

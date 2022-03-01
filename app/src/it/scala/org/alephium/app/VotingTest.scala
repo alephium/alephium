@@ -42,7 +42,7 @@ class VotingTest extends AlephiumActorSpec {
 
       allEvents.length is 1
       val votingStartedEvent = allEvents.head
-      votingStartedEvent.name.value.utf8String is "VotingStarted"
+      votingStartedEvent.index is 0
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
@@ -57,15 +57,15 @@ class VotingTest extends AlephiumActorSpec {
       val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
 
       val expectedResult = voters.take(nbYes).map { wallet =>
-        ("VoteCasted", wallet.activeAddress, true)
+        (1, wallet.activeAddress, true)
       } ++ voters.drop(nbYes).map { wallet =>
-        ("VoteCasted", wallet.activeAddress, false)
+        (1, wallet.activeAddress, false)
       }
 
       val returnedResult = allEvents.map { event =>
         val voterAddress = event.fields(0).asInstanceOf[Val.Address]
         val decision     = event.fields(1).asInstanceOf[Val.Bool]
-        (event.name.value.utf8String, voterAddress.value.toBase58, decision.value)
+        (event.index, voterAddress.value.toBase58, decision.value)
       }
 
       returnedResult.toSeq is expectedResult.toSeq
@@ -80,7 +80,7 @@ class VotingTest extends AlephiumActorSpec {
 
       allEvents.length is 1
       val votingStartedEvent = allEvents.head
-      votingStartedEvent.name.value.utf8String is "VotingClosed"
+      votingStartedEvent.index is 2
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 

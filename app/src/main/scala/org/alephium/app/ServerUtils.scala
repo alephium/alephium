@@ -362,11 +362,10 @@ class ServerUtils(implicit
   ): Try[Events] = {
     val chainIndex = ChainIndex.from(blockHash)
     if (chainIndex.isIntraGroup) {
-      val events = blockFlow.getEvents(blockHash, contractId).map {
-        _.map(Events.from(chainIndex, _)).getOrElse(Events.empty(chainIndex))
+      wrapResult(blockFlow.getEvents(blockHash, contractId)).flatMap {
+        case Some(logs) => Events.from(chainIndex, logs)
+        case None       => Right(Events.empty(chainIndex))
       }
-
-      wrapResult(events)
     } else {
       Right(Events.empty(chainIndex))
     }

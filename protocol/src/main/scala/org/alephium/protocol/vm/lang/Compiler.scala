@@ -183,7 +183,7 @@ object Compiler {
         Ast.FuncId.empty,
         0,
         contract.funcTable,
-        contract.eventTable(),
+        contract.eventsInfo(),
         contractsTable
       )
     }
@@ -198,7 +198,7 @@ object Compiler {
     def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]]
     private var freshNameIndex: Int                               = 0
     val arrayRefs: mutable.Map[String, ArrayTransformer.ArrayRef] = mutable.Map.empty
-    def eventTable: immutable.Map[Ast.TypeId, EventInfo]
+    def eventsInfo: Seq[EventInfo]
 
     @inline final def freshName(): String = {
       val name = s"_generated#$freshNameIndex"
@@ -328,7 +328,11 @@ object Compiler {
     }
 
     def getEvent(typeId: Ast.TypeId): EventInfo = {
-      eventTable.getOrElse(typeId, throw Error(s"Event ${typeId.name} does not exist"))
+      eventsInfo
+        .find(_.typeId == typeId)
+        .getOrElse(
+          throw Error(s"Event ${typeId.name} does not exist")
+        )
     }
 
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[Ctx]
@@ -364,7 +368,7 @@ object Compiler {
       funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, Contract[StatelessContext]]
   ) extends State[StatelessContext] {
-    override def eventTable: immutable.Map[Ast.TypeId, EventInfo] = immutable.Map.empty
+    override def eventsInfo: Seq[EventInfo] = Seq.empty
 
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
       BuiltIn.statelessFuncs
@@ -401,7 +405,7 @@ object Compiler {
       var scope: Ast.FuncId,
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]],
-      eventTable: immutable.Map[Ast.TypeId, EventInfo],
+      eventsInfo: Seq[EventInfo],
       contractTable: immutable.Map[Ast.TypeId, Contract[StatefulContext]]
   ) extends State[StatefulContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {

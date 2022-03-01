@@ -73,14 +73,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
       NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
-      VerifyAbsoluteLocktime, VerifyRelativeLocktime
+      VerifyAbsoluteLocktime, VerifyRelativeLocktime,
+      Log1, Log2, Log3, Log4, Log5
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
       ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
       TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash, Log
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
     )
     // format: on
 
@@ -1304,52 +1305,42 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait LogFixture extends StatefulInstrFixture {
-    def test(n: Int) = {
-      val logName = Val.ByteVec.from("event")
-
-      (0 until n - 1).foreach { _ =>
+    def test(instr: LogInstr, n: Int) = {
+      (0 until n).foreach { _ =>
         stack.push(Val.True)
       }
-      stack.push(logName)
-
-      stack.push(Val.U256(U256.unsafe(n)))
 
       val initialGas = context.gasRemaining
-      Log.runWith(frame) isE ()
+      instr.runWith(frame) isE ()
       stack.size is 0
-      initialGas.subUnsafe(context.gasRemaining) is Log.gas(n)
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas(n)
 
-      if (n - 2 > 0) {
-        (0 until (n - 2)).foreach { _ =>
-          stack.push(Val.True)
-        }
-        stack.push(logName)
+      (0 until (n - 1)).foreach { _ =>
+        stack.push(Val.True)
       }
 
-      stack.push(Val.U256(U256.unsafe(n)))
-
-      Log.runWith(frame).leftValue isE StackUnderflow
+      instr.runWith(frame).leftValue isE StackUnderflow
     }
   }
 
   it should "Log1" in new LogFixture {
-    test(1)
+    test(Log1, 1)
   }
 
   it should "Log2" in new LogFixture {
-    test(2)
+    test(Log2, 2)
   }
 
   it should "Log3" in new LogFixture {
-    test(3)
+    test(Log3, 3)
   }
 
   it should "Log4" in new LogFixture {
-    test(4)
+    test(Log4, 4)
   }
 
   it should "Log5" in new LogFixture {
-    test(5)
+    test(Log5, 5)
   }
 
   trait StatefulFixture extends ContextGenerators {
@@ -1903,15 +1894,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Assert -> 3,
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
-      VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8
+      VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
+      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
       ApproveAlph -> 30, ApproveToken -> 30, AlphRemaining -> 30, TokenRemaining -> 30, IsPaying -> 30,
       TransferAlph -> 30, TransferAlphFromSelf -> 30, TransferAlphToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
-      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5,
-      ContractCodeHash -> 5, Log -> 120
+      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -1921,7 +1912,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       instr match {
         case i: ToByteVecInstr[_]  => testToByteVec(i, gas)
         case _: ByteVecConcat.type => testByteVecConcatGas(gas)
-        case Log                   => testLog(gas)
+        case i: LogInstr           => testLog(i, gas)
         case i: GasSimple          => i.gas().value is gas
         case i: GasFormula         => i.gas(32).value is gas
       }
@@ -1941,8 +1932,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecConcat.runWith(frame) isE ()
       (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
     }
-    def testLog(gas: Int) = {
-      Log.gas(1) is gas // HOW TO FIX THIS? what is the number?
+    def testLog(instr: LogInstr, gas: Int) = instr match {
+      case i: Log1.type => i.gas(1).value is gas
+      case i: Log2.type => i.gas(2).value is gas
+      case i: Log3.type => i.gas(3).value is gas
+      case i: Log4.type => i.gas(4).value is gas
+      case i: Log5.type => i.gas(5).value is gas
     }
     statelessCases.foreach(test.tupled)
     statefulCases.foreach(test.tupled)
@@ -1976,13 +1971,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
+      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
-      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184,
-      ContractCodeHash -> 185, Log -> 186
+      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185
     )
     // format: on
 

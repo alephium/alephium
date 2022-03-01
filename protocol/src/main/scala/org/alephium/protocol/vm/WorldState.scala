@@ -394,7 +394,6 @@ object WorldState {
         blockHashOpt: Option[BlockHash],
         txId: Hash,
         contractIdOpt: Option[ContractId],
-        name: Val.ByteVec,
         fields: AVector[Val],
         logConfig: LogConfig
     ): IOResult[Unit] = {
@@ -404,7 +403,7 @@ object WorldState {
           val allowThisContract = logConfig.contractIds.exists(_.contains(contractId))
           if (logConfig.enabled && (allowAllContracts || allowThisContract)) {
             val id    = LogStatesId(blockHash, contractId)
-            val state = LogState(name, txId, fields)
+            val state = LogState(txId, fields)
             for {
               logStatesOpt <- logState.getOpt(id)
               _ <- logStatesOpt match {

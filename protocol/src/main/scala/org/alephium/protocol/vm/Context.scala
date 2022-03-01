@@ -98,6 +98,8 @@ trait StatelessContext extends CostStrategy {
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
 
+  def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit]
+
   def txId: Hash                   = txEnv.txId
   def signatures: Stack[Signature] = txEnv.signatures
 
@@ -123,7 +125,8 @@ object StatelessContext {
       val txEnv: TxEnv,
       var gasRemaining: GasBox
   ) extends StatelessContext {
-    def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
+    def getInitialBalances(): ExeResult[Balances]                                          = failed(ExpectNonPayableMethod)
+    def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = okay
   }
 }
 
@@ -211,6 +214,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
         .map(e => Left(IOErrorUpdateState(e)))
       _ <- markAssetFlushed(contractId)
     } yield ()
+  }
+
+  def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
+    worldState
+      .writeLog(blockEnv.id, txId, contractIdOpt, fields, logConfig)
+      .left
+      .map(e => Left(IOErrorWriteLog(e)))
   }
 }
 

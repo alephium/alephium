@@ -30,14 +30,13 @@ object LogStatesId {
 }
 
 final case class LogState(
-    name: Val.ByteVec,
     txId: Hash,
     fields: AVector[Val]
 )
 
 object LogState {
   implicit val serde: Serde[LogState] =
-    Serde.forProduct3(LogState.apply, s => (s.name, s.txId, s.fields))
+    Serde.forProduct2(LogState.apply, s => (s.txId, s.fields))
 }
 
 final case class LogStates(

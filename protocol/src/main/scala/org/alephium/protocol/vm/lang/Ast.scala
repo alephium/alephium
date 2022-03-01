@@ -16,12 +16,12 @@
 
 package org.alephium.protocol.vm.lang
 
-import scala.collection.immutable
+import scala.annotation.switch
 
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
-import org.alephium.util.{discard, AVector, U256}
+import org.alephium.util.{discard, AVector, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types
 object Ast {
@@ -426,13 +426,32 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val eventName = Const[Ctx](Val.ByteVec.from(id.name)).genCode(state)
-      val argsType  = args.flatMap(_.getType(state))
-      if (argsType.exists(_.isArrayType)) {
-        throw Compiler.Error("Array type for events not supported")
+      val eventIndex = {
+        val index = state.eventsInfo.map(_.typeId).indexOf(id)
+        // `check` method ensures that this event is defined
+        assume(index >= 0)
+
+        Const[Ctx](Val.I256(I256.from(index))).genCode(state)
       }
-      val argsLength = Const[Ctx](Val.U256.unsafe(args.length + 1)).genCode(state)
-      args.flatMap(_.genCode(state)) ++ eventName ++ argsLength :+ Log
+      val argsType = args.flatMap(_.getType(state))
+      if (argsType.exists(_.isArrayType)) {
+        throw Compiler.Error(s"Array type not supported for event ${id.name}")
+      }
+      val logOpCode = (args.length: @switch) match {
+        case 0 =>
+          Log1
+        case 1 =>
+          Log2
+        case 2 =>
+          Log3
+        case 3 =>
+          Log4
+        case 4 =>
+          Log5
+        case _ =>
+          throw Compiler.Error(s"Max 4 fields allowed for event ${id.name}")
+      }
+      eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
   }
 
@@ -664,16 +683,14 @@ object Ast {
   sealed trait ContractWithState extends Contract[StatefulContext] {
     def events: Seq[EventDef]
 
-    def eventTable(): immutable.Map[Ast.TypeId, Compiler.EventInfo] = {
-      val table = events.map { event =>
-        event.id -> Compiler.EventInfo(event.id, event.fields.map(_.tpe))
-      }.toMap
-
-      if (table.size != events.size) {
+    def eventsInfo(): Seq[Compiler.EventInfo] = {
+      if (events.distinctBy(_.id).size != events.size) {
         val duplicates = UniqueDef.duplicates(events)
         throw Compiler.Error(s"These events are defined multiple times: $duplicates")
       }
-      table
+      events.map { event =>
+        Compiler.EventInfo(event.id, event.fields.map(_.tpe))
+      }
     }
   }
 
