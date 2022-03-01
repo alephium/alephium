@@ -1130,7 +1130,6 @@ class VMSpec extends AlephiumSpec {
       val addingLogState = logStates.states(0)
       addingLogState.txId is callingBlock.nonCoinbase.head.id
       addingLogState.fields.length is 3
-      println(addingLogState.fields)
       addingLogState.fields(0) is Val.I256(I256.unsafe(0))
       addingLogState.fields(1) is Val.U256(U256.unsafe(4))
       addingLogState.fields(2) is Val.U256(U256.unsafe(10))
