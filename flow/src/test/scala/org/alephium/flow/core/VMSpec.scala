@@ -875,11 +875,14 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     }
 
-    Array(1, 2, 4, 8, 16, 32).foreach { size =>
+    Array(2, 4, 8, 16, 32).foreach { size =>
       val name = s"u256From${size}Byte!"
       testSimpleScript(main(name, size))
       failSimpleScript(main(name, size + 1), InvalidBytesSize)
+      failSimpleScript(main(name, size - 1), InvalidBytesSize)
     }
+    testSimpleScript(main("u256From1Byte!", 1))
+    failSimpleScript(main("u256From1Byte!", 2), InvalidBytesSize)
   }
 
   it should "test bytevec slice" in new ContractFixture {
