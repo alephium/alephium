@@ -23,7 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signature}
+import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToSharedPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
@@ -808,6 +808,25 @@ class VMSpec extends AlephiumSpec {
     testSimpleScript(main(p256Sig, ed25519Sig))
     failSimpleScript(main(SecP256K1Signature.zero.toHexString, ed25519Sig), InvalidSignature)
     failSimpleScript(main(p256Sig, ED25519Signature.zero.toHexString), InvalidSignature)
+  }
+
+  it should "test eth ecrecover" in new ContractFixture with EthEcRecoverFixture {
+    def main(messageHash: ByteString, signature: ByteString, address: ByteString) =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
+         |      #${Hex.toHexString(signature)})
+         |    assert!(address == #${Hex.toHexString(address)})
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(main(messageHash.bytes, signature, address))
+    failSimpleScript(main(signature, messageHash.bytes, address), FailedInRecoverEthAddress)
+    failSimpleScript(
+      main(messageHash.bytes, signature, Hash.random.bytes.take(20)),
+      AssertionFailed
+    )
   }
 
   it should "test locktime built-ins" in new ContractFixture {

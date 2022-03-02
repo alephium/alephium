@@ -89,6 +89,13 @@ object BuiltIn {
       Seq.empty,
       VerifyED25519
     )
+  val ethEcRecover: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "ethEcRecover",
+      Seq(Type.ByteVec, Type.ByteVec),
+      Seq(Type.ByteVec),
+      EthEcRecover
+    )
   val networkId: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("networkId", Seq.empty, Seq(Type.ByteVec), NetworkId)
   val blockTimeStamp: SimpleStatelessBuiltIn =
@@ -341,7 +348,8 @@ object BuiltIn {
     u256From8Byte,
     u256From16Byte,
     u256From32Byte,
-    byteVecToAddress
+    byteVecToAddress,
+    ethEcRecover
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =

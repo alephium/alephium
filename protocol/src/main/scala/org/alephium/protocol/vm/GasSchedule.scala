@@ -123,6 +123,12 @@ object GasSignature {
 }
 
 @Gas
+trait GasEcRecover extends GasSimple
+object GasEcRecover {
+  val gas: GasBox = GasBox.unsafe(2500)
+}
+
+@Gas
 trait GasCreate extends GasSimple
 object GasCreate {
   val gas: GasBox = GasBox.unsafe(32000)
