@@ -141,7 +141,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     val timeSpan = timeSpanOpt.map(_.toDuration()).getOrElse(defaultHashRateDuration)
     val toTs     = TimeStamp.now()
     val fromTs   = toTs.minusUnsafe(timeSpan)
-    val result   = serverUtils.averageHashRate(blockFlow, TimeInterval(fromTs, Some(toTs)))
+    val result   = serverUtils.averageHashRate(blockFlow, TimeInterval(fromTs, toTs))
     Future.successful(result)
   }
 

@@ -174,16 +174,10 @@ trait BlockFlowState extends FlowTipsUtil {
     outBlockChains.flatMapE { chains => chains.mapE(f) }
   }
 
-  protected def concatOutIntraBlockChainsE[T: ClassTag](
+  protected def concatIntraBlockChainsE[T: ClassTag](
       f: BlockChain => IOResult[T]
   ): IOResult[AVector[T]] = {
-    outBlockChains
-      .map { chains =>
-        chains.filter(_.chainIndex.isIntraGroup)
-      }
-      .flatMapE { chains =>
-        chains.mapE(f)
-      }
+    intraGroupBlockChains.mapE(f)
   }
 
   def getBlockChain(hash: BlockHash): BlockChain

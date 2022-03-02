@@ -39,7 +39,6 @@ final case class Event(
 )
 
 object Events {
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def from(chainIndex: ChainIndex, logStates: LogStates): Try[Events] = try {
     val events: AVector[Event] = logStates.states.map { logState =>
       Event(

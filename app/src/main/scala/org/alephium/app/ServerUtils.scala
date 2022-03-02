@@ -395,7 +395,7 @@ class ServerUtils(implicit
           for {
             toTimestamp <- wrapResult(blockFlow.getBlockHeader(toBlock)).map(_.timestamp)
             timeInterval <- validateTimeInterval(
-              TimeInterval(fromTimestamp, Some(toTimestamp)),
+              TimeInterval(fromTimestamp, toTimestamp),
               "`fromBlock` must be before `toBlock`"
             )
           } yield timeInterval

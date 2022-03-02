@@ -44,4 +44,8 @@ object TimeInterval {
       List.empty
     }
   }
+
+  def apply(from: TimeStamp, to: TimeStamp): TimeInterval = {
+    TimeInterval(from, Some(to))
+  }
 }

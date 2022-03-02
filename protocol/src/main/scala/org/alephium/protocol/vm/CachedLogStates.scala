@@ -38,7 +38,8 @@ final class CachedLogStates(
           case (_, Cached(_))         => Right(())
           case (key, Updated(value))  => putAccumulate(key, value)
           case (key, Inserted(value)) => putAccumulate(key, value)
-          case (_, Removed())         => Right(()) // Should never be `Remove` in cache
+          case (_, Removed()) =>
+            throw new RuntimeException("Unexpected `Remove` action in CachedLogStates")
         }
       }
       .map(_ => underlying)

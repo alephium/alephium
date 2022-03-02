@@ -27,7 +27,7 @@ final case class BlockEnv(
     networkId: NetworkId,
     timeStamp: TimeStamp,
     target: Target,
-    id: Option[BlockHash]
+    blockId: Option[BlockHash]
 )
 object BlockEnv {
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
@@ -224,7 +224,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
     worldState
-      .writeLog(blockEnv.id, txId, contractIdOpt, fields, logConfig)
+      .writeLog(blockEnv.blockId, txId, contractIdOpt, fields, logConfig)
       .left
       .map(e => Left(IOErrorWriteLog(e)))
   }
