@@ -43,7 +43,7 @@ object Address {
     }
   }
 
-  def contract(contractId: ContractId): Address = {
+  def contract(contractId: ContractId): Address.Contract = {
     Contract(LockupScript.p2c(contractId))
   }
 

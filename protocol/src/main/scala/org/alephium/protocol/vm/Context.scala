@@ -84,18 +84,18 @@ object TxEnv {
 
 final case class LogConfig(
     enabled: Boolean,
-    contractIds: Option[AVector[ContractId]]
+    contractAddresses: Option[AVector[Address.Contract]]
 ) {
-  def logContractEnabled(contractId: ContractId): Boolean = {
-    val allowAllContracts = contractIds.isEmpty
-    val allowThisContract = contractIds.exists(_.contains(contractId))
+  def logContractEnabled(contractAddress: Address.Contract): Boolean = {
+    val allowAllContracts = contractAddresses.isEmpty
+    val allowThisContract = contractAddresses.exists(_.contains(contractAddress))
     enabled && (allowAllContracts || allowThisContract)
   }
 }
 
 object LogConfig {
   def disabled(): LogConfig = {
-    LogConfig(enabled = false, contractIds = None)
+    LogConfig(enabled = false, contractAddresses = None)
   }
 }
 

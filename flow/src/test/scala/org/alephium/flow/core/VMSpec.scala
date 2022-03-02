@@ -1155,7 +1155,8 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "not write to the log storage when logging is disabled" in new EventFixtureWithContract {
-    implicit override lazy val logConfig: LogConfig = LogConfig(enabled = false, contractIds = None)
+    implicit override lazy val logConfig: LogConfig =
+      LogConfig(enabled = false, contractAddresses = None)
 
     getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId) is None
   }
@@ -1163,7 +1164,7 @@ class VMSpec extends AlephiumSpec {
   it should "not write to the log storage when logging is enabled but contract is not whitelisted" in new EventFixtureWithContract {
     implicit override lazy val logConfig: LogConfig = LogConfig(
       enabled = true,
-      contractIds = Some(AVector(Hash.generate, Hash.generate))
+      contractAddresses = Some(AVector(Hash.generate, Hash.generate).map(Address.contract))
     )
 
     getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId) is None

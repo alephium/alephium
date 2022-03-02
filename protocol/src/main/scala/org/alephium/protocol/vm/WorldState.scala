@@ -416,7 +416,7 @@ object WorldState {
         fields: AVector[Val],
         logConfig: LogConfig
     ): IOResult[Unit] = {
-      if (logConfig.logContractEnabled(contractId)) {
+      if (logConfig.logContractEnabled(Address.contract(contractId))) {
         val id    = LogStatesId(blockHash, contractId)
         val state = LogState(txId, index, fields)
         for {
