@@ -68,7 +68,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       ByteVecSlice,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
-      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
+      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
+      ByteVecToAddress
     )
     // format: on
   }
@@ -102,7 +103,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lemanInstrs.foreach(instr => instr.runWith(frame2).leftValue isnotE InactiveInstr(instr))
   }
 
-  trait StatelessFixture extends ContextGenerators {
+  trait GenFixture extends ContextGenerators {
+    val lockupScriptGen: Gen[LockupScript] = for {
+      group        <- groupIndexGen
+      lockupScript <- lockupGen(group)
+    } yield lockupScript
+  }
+
+  trait StatelessFixture extends GenFixture {
     lazy val localsLength = 0
     def prepareFrame(
         instrs: AVector[Instr[StatelessContext]],
@@ -929,6 +937,27 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  it should "ByteVecToAddress" in new StatelessInstrFixture {
+    forAll(lockupScriptGen) { lockupScript =>
+      val address    = Val.Address(lockupScript)
+      val bytes      = serialize(address)
+      val initialGas = context.gasRemaining
+
+      stack.push(Val.ByteVec(bytes))
+      ByteVecToAddress.runWith(frame) isE ()
+      stack.size is 1
+      stack.top.get is address
+      initialGas.subUnsafe(context.gasRemaining) is ByteVecToAddress.gas(bytes.length)
+      stack.pop()
+    }
+
+    Seq(32, 34).foreach { n =>
+      val byteVec = Val.ByteVec(ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get))
+      stack.push(byteVec)
+      ByteVecToAddress.runWith(frame).leftValue isE a[SerdeErrorByteVecToAddress]
+    }
+  }
+
   trait AddressCompFixture extends StatelessInstrFixture {
     def test(
         instr: ComparisonInstr[Val.Address],
@@ -1482,7 +1511,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(U256From32Byte, 32)
   }
 
-  trait StatefulFixture extends ContextGenerators {
+  trait StatefulFixture extends GenFixture {
     val baseMethod =
       Method[StatefulContext](
         isPublic = true,
@@ -1530,11 +1559,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         )
         .rightValue
     }
-
-    val lockupScriptGen: Gen[LockupScript] = for {
-      group        <- groupIndexGen
-      lockupScript <- lockupGen(group)
-    } yield lockupScript
 
     val p2cGen: Gen[LockupScript.P2C] = for {
       group <- groupIndexGen
@@ -2036,7 +2060,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
       Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200, ByteVecSlice -> 1,
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
-      U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4
+      U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
+      ByteVecToAddress -> 5
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2051,14 +2076,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {
-        case i: ToByteVecInstr[_]  => testToByteVec(i, gas)
-        case _: ByteVecConcat.type => testByteVecConcatGas(gas)
-        case _: ByteVecSlice.type  => testByteVecSliceGas(gas)
-        case i: U256ToBytesInstr   => testU256ToBytes(i, gas)
-        case i: U256FromBytesInstr => testU256FromBytes(i, gas)
-        case i: LogInstr           => testLog(i, gas)
-        case i: GasSimple          => i.gas().value is gas
-        case i: GasFormula         => i.gas(32).value is gas
+        case i: ToByteVecInstr[_]     => testToByteVec(i, gas)
+        case _: ByteVecConcat.type    => testByteVecConcatGas(gas)
+        case _: ByteVecSlice.type     => testByteVecSliceGas(gas)
+        case i: U256ToBytesInstr      => testU256ToBytes(i, gas)
+        case i: U256FromBytesInstr    => testU256FromBytes(i, gas)
+        case i: ByteVecToAddress.type => i.gas(33).value is gas
+        case i: LogInstr              => testLog(i, gas)
+        case i: GasSimple             => i.gas().value is gas
+        case i: GasFormula            => i.gas(32).value is gas
       }
     }
     def testToByteVec(instr: ToByteVecInstr[_], gas: Int) = instr match {
@@ -2133,6 +2159,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97, ByteVecSlice -> 98,
       U256To1Byte -> 99, U256To2Byte -> 100, U256To4Byte -> 101, U256To8Byte -> 102, U256To16Byte -> 103, U256To32Byte -> 104,
       U256From1Byte -> 105, U256From2Byte -> 106, U256From4Byte -> 107, U256From8Byte -> 108, U256From16Byte -> 109, U256From32Byte -> 110,
+      ByteVecToAddress -> 111,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2178,7 +2205,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       ByteVecSlice,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
-      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte
+      U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
+      ByteVecToAddress
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),

@@ -95,6 +95,7 @@ final case class NegativeTimeStamp(millis: Long)               extends ExeFailur
 final case class InvalidTarget(value: BigInteger)              extends ExeFailure
 case object InvalidBytesSliceArg                               extends ExeFailure
 case object InvalidBytesSize                                   extends ExeFailure
+final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 
