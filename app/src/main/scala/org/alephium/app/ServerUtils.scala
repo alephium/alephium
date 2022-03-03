@@ -49,6 +49,7 @@ class ServerUtils(implicit
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     compilerConfig: CompilerConfig,
+    logConfig: LogConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
   import ServerUtils._
@@ -58,7 +59,7 @@ class ServerUtils(implicit
   def getHeightedBlocks(
       blockFlow: BlockFlow,
       timeInterval: TimeInterval
-  ): Try[AVector[AVector[(Block, Int)]]] = {
+  ): Try[AVector[(ChainIndex, AVector[(Block, Int)])]] = {
     for {
       _      <- timeInterval.validateTimeSpan(apiConfig.blockflowFetchMaxAge)
       blocks <- wrapResult(blockFlow.getHeightedBlocks(timeInterval.from, timeInterval.to))
@@ -67,7 +68,7 @@ class ServerUtils(implicit
 
   def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
     getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      FetchResponse(heightedBlocks.map(_.map { case (block, height) =>
+      FetchResponse(heightedBlocks.map(_._2.map { case (block, height) =>
         BlockEntry.from(block, height)
       }))
     }
@@ -77,7 +78,7 @@ class ServerUtils(implicit
       groupConfig: GroupConfig
   ): Try[HashRateResponse] = {
     getHeightedBlocks(blockFlow, timeInterval).map { blocks =>
-      val hashCount = blocks.fold(BigInt(0)) { case (acc, entries) =>
+      val hashCount = blocks.fold(BigInt(0)) { case (acc, (_, entries)) =>
         entries.fold(acc) { case (hashCount, entry) =>
           val target   = entry._1.target
           val hashDone = Target.maxBigInt.divide(target.value)
@@ -123,12 +124,12 @@ class ServerUtils(implicit
 
   def getContractGroup(
       blockFlow: BlockFlow,
-      contractId: Hash,
+      contractId: ContractId,
       groupIndex: GroupIndex
   ): Try[Group] = {
     val searchResult = for {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      existed    <- worldState.contractState.exist(contractId)
+      existed    <- worldState.contractState.exists(contractId)
     } yield existed
 
     searchResult match {
@@ -352,6 +353,89 @@ class ServerUtils(implicit
 
   def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
+  }
+
+  def getContractEventsForBlock(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash,
+      contractId: ContractId
+  ): Try[Events] = {
+    val chainIndex = ChainIndex.from(blockHash)
+    if (chainIndex.isIntraGroup) {
+      wrapResult(blockFlow.getEvents(blockHash, contractId)).flatMap {
+        case Some(logs) => Events.from(chainIndex, logs)
+        case None       => Right(Events.empty(chainIndex))
+      }
+    } else {
+      Right(Events.empty(chainIndex))
+    }
+  }
+
+  def getContractEventsWithinBlocks(
+      blockFlow: BlockFlow,
+      fromBlock: BlockHash,
+      toBlockOpt: Option[BlockHash],
+      contractId: ContractId
+  ): Try[AVector[Events]] = {
+    for {
+      timeInterval <- timeIntervalFromBlockRange(blockFlow, fromBlock, toBlockOpt)
+      events       <- getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
+    } yield events
+  }
+
+  private def timeIntervalFromBlockRange(
+      blockFlow: BlockFlow,
+      fromBlock: BlockHash,
+      toBlockOpt: Option[BlockHash]
+  ): Try[TimeInterval] = {
+    for {
+      fromTimestamp <- wrapResult(blockFlow.getBlockHeader(fromBlock)).map(_.timestamp)
+      timeInterval <- toBlockOpt match {
+        case Some(toBlock) =>
+          for {
+            toTimestamp <- wrapResult(blockFlow.getBlockHeader(toBlock)).map(_.timestamp)
+            timeInterval <- validateTimeInterval(
+              TimeInterval(fromTimestamp, toTimestamp),
+              "`fromBlock` must be before `toBlock`"
+            )
+          } yield timeInterval
+        case None =>
+          validateTimeInterval(
+            TimeInterval(fromTimestamp, None),
+            "Timestamp for `fromBlock` is in the future"
+          )
+      }
+    } yield timeInterval
+  }
+
+  private def validateTimeInterval(
+      timeInterval: TimeInterval,
+      errorMsg: String
+  ): Try[TimeInterval] = {
+    if (timeInterval.from >= timeInterval.to) {
+      Left(badRequest(errorMsg))
+    } else {
+      Right(timeInterval)
+    }
+  }
+
+  def getContractEventsWithinTimeInterval(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval,
+      contractId: ContractId
+  ): Try[AVector[Events]] = {
+    for {
+      heightedBlocks <- wrapResult(
+        blockFlow.getHeightedIntraBlocks(timeInterval.from, timeInterval.to)
+      )
+      events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
+        heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
+          getContractEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
+            eventsSoFar.copy(events = eventsSoFar.events ++ eventsForBlock.events)
+          }
+        }
+      }
+    } yield events
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
@@ -801,7 +885,7 @@ class ServerUtils(implicit
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv =
-      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget)
+      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
       txId = Hash.random,

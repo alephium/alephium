@@ -16,9 +16,10 @@
 
 package org.alephium.io
 
-import scala.collection.mutable
+trait ReadableKV[K, V] {
+  def get(key: K): IOResult[V]
 
-final class StagingSMT[K, V](
-    val underlying: CachedSMT[K, V],
-    val caches: mutable.Map[K, Modified[V]]
-) extends StagingKV[K, V]
+  def getOpt(key: K): IOResult[Option[V]]
+
+  def exists(key: K): IOResult[Boolean]
+}

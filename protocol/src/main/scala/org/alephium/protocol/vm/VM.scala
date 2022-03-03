@@ -371,7 +371,7 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig): ExeResult[TxScriptExecution] = {
+  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
@@ -382,7 +382,7 @@ object StatefulVM {
       preOutputsOpt: Option[AVector[AssetOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig): ExeResult[TxScriptExecution] = {
+  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     for {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       result  <- runTxScript(context, script)

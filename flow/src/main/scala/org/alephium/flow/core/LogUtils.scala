@@ -14,11 +14,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.flow.core
 
-import scala.collection.mutable
+import org.alephium.io.IOResult
+import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.{ChainIndex, ContractId}
+import org.alephium.protocol.vm.LogStates
+import org.alephium.protocol.vm.LogStatesId
 
-final class StagingSMT[K, V](
-    val underlying: CachedSMT[K, V],
-    val caches: mutable.Map[K, Modified[V]]
-) extends StagingKV[K, V]
+trait LogUtils { Self: FlowUtils =>
+  def getEvents(blockHash: BlockHash, contractId: ContractId): IOResult[Option[LogStates]] = {
+    val chainIndex  = ChainIndex.from(blockHash)
+    val logStatesId = LogStatesId(blockHash, contractId)
+
+    for {
+      worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)
+      logStatesOpt <- worldState.logState.getOpt(logStatesId)
+    } yield logStatesOpt
+  }
+}

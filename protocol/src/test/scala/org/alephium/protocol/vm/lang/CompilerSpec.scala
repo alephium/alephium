@@ -40,42 +40,115 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "parse tx script" in {
-    val script =
-      s"""
-         |// comment
-         |TxScript Foo {
-         |  pub fn bar(a: U256, b: U256) -> (U256) {
-         |    return (a + b)
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileTxScript(script).isRight is true
+    {
+      info("success")
+
+      val script =
+        s"""
+           |// comment
+           |TxScript Foo {
+           |  pub fn bar(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(script).isRight is true
+    }
+
+    {
+      info("fail with event definition")
+
+      val script =
+        s"""
+           |TxScript Foo {
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn bar(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(script)
+        .leftValue
+        .message is """Parser failed: Parsed.Failure(Position 3:3, found "event Add(")"""
+    }
   }
 
   it should "parse contracts" in {
-    val contract =
-      s"""
-         |// comment
-         |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
-         |  // comment
-         |  pub fn add0(a: U256, b: U256) -> (U256) {
-         |    return (a + b)
-         |  }
-         |
-         |  fn add1() -> (U256) {
-         |    return (x + y)
-         |  }
-         |
-         |  fn add2(d: U256) -> () {
-         |    let mut z = 0u
-         |    z = d
-         |    x = x + z // comment
-         |    y = y + z // comment
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileContract(contract).isRight is true
+    {
+      info("success")
+
+      val contract =
+        s"""
+           |// comment
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  // comment
+           |  pub fn add0(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |
+           |  fn add1() -> (U256) {
+           |    return (x + y)
+           |  }
+           |
+           |  fn add2(d: U256) -> () {
+           |    let mut z = 0u
+           |    z = d
+           |    x = x + z // comment
+           |    y = y + z // comment
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("no function definition")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  event Add(a: U256, b: U256)
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "No function definition in TxContract Foo"
+    }
+
+    {
+      info("duplicated function definitions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  pub fn add1(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add2(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add3(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |
+           |  pub fn add1(b: U256, a: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add2(b: U256, a: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "These functions are defined multiple times: add1, add2"
+    }
+
   }
 
   it should "infer types" in {
@@ -1109,6 +1182,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(8, AVector.empty, AVector.empty)
   }
 
+  it should "return from if block" in new TestContractMethodFixture {
+    val code: String =
+      s"""
+         |TxContract Foo(mut value: U256) {
+         |  pub fn foo() -> () {
+         |    if (true) {
+         |      value = 1
+         |      return
+         |    }
+         |
+         |    value = 2
+         |    return
+         |  }
+         |
+         |  pub fn getValue() -> (U256) {
+         |    return value
+         |  }
+         |}
+         |""".stripMargin
+
+    override val fields = AVector(Val.U256(0))
+    test(0, AVector.empty, AVector.empty)
+    test(1, AVector.empty, AVector(Val.U256(1)))
+  }
+
   it should "generate efficient code for arrays" in {
     val code =
       s"""
@@ -1137,8 +1235,117 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           StoreLocal(1),
           StoreLocal(0),
           LoadLocal(0),
-          StoreLocal(4)
+          StoreLocal(4),
+          Return
         )
       )
+  }
+
+  it should "parse events definition and emission" in {
+
+    {
+      info("event definition and emission")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add(a, b)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("multiple event definitions and emissions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add1(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add1(a, b)
+           |    emit Add2(a, b)
+           |    return (a + b)
+           |  }
+           |
+           |  event Add2(a: U256, b: U256)
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("event doesn't exist")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add2(a, b)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).leftValue.message is "Event Add2 does not exist"
+    }
+
+    {
+      info("duplicated event definitions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add1(a: U256, b: U256)
+           |  event Add2(a: U256, b: U256)
+           |  event Add3(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add(a, b)
+           |    return (a + b)
+           |  }
+           |
+           |  event Add1(b: U256, a: U256)
+           |  event Add2(b: U256, a: U256)
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "These events are defined multiple times: Add1, Add2"
+    }
+
+    {
+      info("emit event with wrong args")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    let z = false
+           |    emit Add(a, z)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "Invalid args type List(U256, Bool) for event Add(U256, U256)"
+    }
   }
 }

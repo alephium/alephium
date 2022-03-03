@@ -25,7 +25,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 import org.alephium.crypto
-import org.alephium.protocol.{model, ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
@@ -155,7 +155,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           BlockEnv(
             AlephiumMainNet,
             blockTs,
-            Target.Max
+            Target.Max,
+            Some(BlockHash.generate)
           )
         )
       )
@@ -199,7 +200,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           BlockEnv(
             AlephiumMainNet,
             blockTs,
-            Target.Max
+            Target.Max,
+            Some(BlockHash.generate)
           )
         ),
         txEnv = Some(
@@ -1275,7 +1277,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "NetworkId" in new StatelessInstrFixture {
     override lazy val frame = prepareFrame(
       AVector.empty,
-      blockEnv = Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max))
+      blockEnv =
+        Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate)))
     )
 
     val initialGas = context.gasRemaining
@@ -1290,7 +1293,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       private val timestamp = TimeStamp.now()
       override lazy val frame = prepareFrame(
         AVector.empty,
-        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max))
+        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max, Some(BlockHash.generate)))
       )
 
       private val initialGas = context.gasRemaining
@@ -1304,7 +1307,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val timestamp = new TimeStamp(-1)
       override lazy val frame = prepareFrame(
         AVector.empty,
-        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max))
+        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max, Some(BlockHash.generate)))
       )
 
       BlockTimeStamp.runWith(frame).leftValue isE NegativeTimeStamp(-1)
@@ -1314,7 +1317,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "BlockTarget" in new StatelessInstrFixture {
     override lazy val frame = prepareFrame(
       AVector.empty,
-      blockEnv = Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max))
+      blockEnv =
+        Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate)))
     )
 
     private val initialGas = context.gasRemaining
@@ -1383,7 +1387,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     initialGas.subUnsafe(context.gasRemaining) is TxCallerSize.gas()
   }
 
-  trait LogFixture extends StatelessInstrFixture {
+  trait LogFixture extends StatefulInstrFixture {
     def test(instr: LogInstr, n: Int) = {
       (0 until n).foreach { _ =>
         stack.push(Val.True)

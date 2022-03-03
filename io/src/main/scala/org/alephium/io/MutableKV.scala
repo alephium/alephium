@@ -16,7 +16,7 @@
 
 package org.alephium.io
 
-trait MutableTrie[K, V, T] extends ReadableTrie[K, V] {
+trait MutableKV[K, V, T] extends ReadableKV[K, V] {
   def remove(key: K): IOResult[T]
 
   def put(key: K, value: V): IOResult[T]
