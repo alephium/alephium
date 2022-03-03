@@ -240,6 +240,73 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "check contract type" in {
+    val failed = Seq(
+      s"""
+         |TxContract Foo(bar: Bar) {
+         |  fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(bar: Bar) -> () {
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let bar = Bar(#00)
+         |  }
+         |}
+         |""".stripMargin
+    )
+    failed.foreach { code =>
+      Compiler.compileContract(code).leftValue is Compiler.Error(
+        "Contract Bar does not exist"
+      )
+    }
+
+    val barContract =
+      s"""
+         |TxContract Bar() {
+         |  fn bar() -> () {
+         |  }
+         |}
+         |""".stripMargin
+    val succeed = Seq(
+      s"""
+         |TxContract Foo(bar: Bar) {
+         |  fn foo() -> () {
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(bar: Bar) -> () {
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let bar = Bar(#00)
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin
+    )
+    succeed.foreach { code =>
+      Compiler.compileContract(code).isRight is true
+    }
+  }
+
   trait Fixture {
     def test(
         input: String,

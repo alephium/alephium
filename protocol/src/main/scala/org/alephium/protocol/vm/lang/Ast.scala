@@ -166,6 +166,7 @@ object Ast {
     }
 
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      state.checkContractType(contractType)
       if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       } else {
@@ -327,6 +328,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkArguments(args)
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
@@ -603,6 +605,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkArguments(fields)
       ArrayTransformer.initArgVars(state, fields)
     }
 
