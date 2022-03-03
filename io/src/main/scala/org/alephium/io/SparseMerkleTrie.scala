@@ -233,7 +233,7 @@ object SparseMerkleTrie {
     new InMemorySparseMerkleTrie[K, V](rootHash, storage, mutable.Map.empty)
 }
 
-abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableTrie[K, V, T] {
+abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, V, T] {
   import SparseMerkleTrie._
 
   def rootHash: Hash
@@ -285,7 +285,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableTrie[K
     }
   }
 
-  def exist(key: K): IOResult[Boolean] = {
+  def exists(key: K): IOResult[Boolean] = {
     existRaw(serialize[K](key))
   }
 

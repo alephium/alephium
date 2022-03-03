@@ -238,7 +238,6 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         s"""
          |TxScript Foo {
          |  pub fn add() -> () {
-         |    return
          |  }
          |}
          |""".stripMargin

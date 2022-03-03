@@ -161,6 +161,10 @@ object Val {
     override def isNumeric: Boolean  = true
 
     override def toString: String = "U256"
+
+    def unsafe(v: Int): U256 = {
+      U256(util.U256.unsafe(v))
+    }
   }
 
   object ByteVec extends Type {

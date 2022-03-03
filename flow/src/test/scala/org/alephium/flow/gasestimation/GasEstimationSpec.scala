@@ -137,7 +137,6 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
              |
              |      i = i + 1
              |    }
-             |    return
              |  }
              |}
              |""".stripMargin
@@ -193,7 +192,6 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |  pub fn bar(a: U256, b: U256) -> () {
            |    let mut c = 0u
            |    c = a - b
-           |    return
            |  }
            |}
            |""".stripMargin
@@ -235,7 +233,6 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
           |
           |      i = i + 1
           |    }
-          |    return
           |  }
           |}
           |""".stripMargin

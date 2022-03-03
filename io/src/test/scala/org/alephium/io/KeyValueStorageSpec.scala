@@ -22,8 +22,9 @@ import org.alephium.util.AlephiumSpec
 class KeyValueStorageSpec extends AlephiumSpec {
 
   it should "write in batch" in new StorageFixture {
-    val db    = newDB[Hash, Hash]
-    val pairs = Seq.tabulate(1000)(_ => Hash.random -> Hash.random)
+    val storage = newDBStorage()
+    val db      = newDB[Hash, Hash](storage, RocksDBSource.ColumnFamily.All)
+    val pairs   = Seq.tabulate(1000)(_ => Hash.random -> Hash.random)
     db.putBatch { putAccumulate =>
       pairs.foreach { case (key, value) =>
         putAccumulate(key, value)

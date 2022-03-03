@@ -63,7 +63,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(networkConfig.networkId, headerTs, Target.Max)
+          BlockEnv(networkConfig.networkId, headerTs, Target.Max, None)
         )
       } yield ()
     }
@@ -72,7 +72,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[GasBox] = {
-      val blockEnv = BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.Max)
+      val blockEnv = BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.Max, None)
       checkGasAndWitnesses(tx, preOutputs, blockEnv)
     }
 
@@ -736,7 +736,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def tx: Transaction
     lazy val initialGas = minimalGas
     lazy val blockEnv =
-      BlockEnv(NetworkId.AlephiumMainNet, TimeStamp.now(), consensusConfig.maxMiningTarget)
+      BlockEnv(NetworkId.AlephiumMainNet, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
     lazy val prevOutputs = blockFlow
       .getBestPersistedWorldState(groupIndex)
       .rightValue

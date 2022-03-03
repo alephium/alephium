@@ -23,7 +23,7 @@ import org.alephium.util.EitherF
 final class CachedSMT[K, V](
     val underlying: SparseMerkleTrie[K, V],
     val caches: mutable.Map[K, Cache[V]]
-) extends CachedTrie[K, V, Cache[V]] {
+) extends CachedKV[K, V, Cache[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = {
     underlying.getOpt(key).map { valueOpt =>
       valueOpt.foreach(value => caches.addOne(key -> Cached(value)))

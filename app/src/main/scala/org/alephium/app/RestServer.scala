@@ -104,6 +104,9 @@ class RestServer(
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,
+      getContractEventsForBlockLogic,
+      getContractEventsWithinBlocksLogic,
+      getContractEventsWithinTimeIntervalLogic,
       metricsLogic
     ).map(route(_)) :+ swaggerUiRoute
 

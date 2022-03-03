@@ -234,9 +234,9 @@ object ServerFixture {
     override def getHeightedBlocks(
         fromTs: TimeStamp,
         toTs: TimeStamp
-    ): IOResult[AVector[AVector[(Block, Int)]]] = {
+    ): IOResult[AVector[(ChainIndex, AVector[(Block, Int)])]] = {
       blockFlowProbe ! (block.header.timestamp >= fromTs && block.header.timestamp <= toTs)
-      Right(AVector(AVector((block, 1))))
+      Right(AVector((block.chainIndex, AVector((block, 1)))))
     }
 
     override def getBalance(
@@ -318,6 +318,44 @@ object ServerFixture {
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
     override def calWeight(block: Block): IOResult[Weight]              = ???
+
+    override def getHeightedIntraBlocks(
+        fromTs: TimeStamp,
+        toTs: TimeStamp
+    ): IOResult[AVector[(ChainIndex, AVector[(Block, Int)])]] = {
+      Right(AVector((block.chainIndex, AVector((block, 10)))))
+    }
+
+    override def getEvents(
+        blockHash: BlockHash,
+        contractId: ContractId
+    ): IOResult[Option[LogStates]] = {
+      lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
+      lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
+      lazy val txId = Hash
+        .from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"))
+        .get
+
+      Right(
+        Some(
+          LogStates(
+            blockHash,
+            contractId,
+            states = AVector(
+              LogState(
+                txId = txId,
+                index = 0,
+                fields = AVector(
+                  vm.Val.U256(U256.unsafe(4)),
+                  vm.Val.Address(address1.lockupScript),
+                  vm.Val.Address(address2.lockupScript)
+                )
+              )
+            )
+          )
+        )
+      )
+    }
 
     // scalastyle:off no.equal
     override def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {

@@ -20,29 +20,69 @@ import org.alephium.api.model._
 import org.alephium.api.model.Output.Contract
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
 class VotingTest extends AlephiumActorSpec {
   it should "test the voting pipeline" in new VotingFixture {
+
     val admin  = wallets.head
     val voters = wallets.tail
-    val ContractRef(contractId, contractAddress, contractCode) =
+    val ContractRef(contractId, contractAddress @ Address.Contract(_), contractCode) =
       deployContract(admin, voters, U256.unsafe(voters.size))
     checkState(0, 0, false, false)
 
+    val startVotingTs = TimeStamp.now()
     allocateTokens(admin, voters, contractId.toHexString, contractCode)
     checkState(0, 0, false, true)
 
-    val nbYes = voters.size - 1
-    val nbNo  = voters.size - nbYes
+    checkEvents(contractAddress, startVotingTs) { events =>
+      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+
+      allEvents.length is 1
+      val votingStartedEvent = allEvents.head
+      votingStartedEvent.index is 0
+      votingStartedEvent.contractId is contractAddress.lockupScript.contractId
+    }
+
+    val startVoteCastingTs = TimeStamp.now()
+    val nbYes              = voters.size - 1
+    val nbNo               = voters.size - nbYes
     voters.take(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, true, contractCode))
     voters.drop(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, false, contractCode))
     checkState(nbYes, nbNo, false, true)
 
+    checkEvents(contractAddress, startVoteCastingTs) { events =>
+      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+
+      val expectedResult = voters.take(nbYes).map { wallet =>
+        (1, wallet.activeAddress, true)
+      } ++ voters.drop(nbYes).map { wallet =>
+        (1, wallet.activeAddress, false)
+      }
+
+      val returnedResult = allEvents.map { event =>
+        val voterAddress = event.fields(0).asInstanceOf[Val.Address]
+        val decision     = event.fields(1).asInstanceOf[Val.Bool]
+        (event.index, voterAddress.value.toBase58, decision.value)
+      }
+
+      returnedResult.toSeq is expectedResult.toSeq
+    }
+
+    val closeVotingTs = TimeStamp.now()
     close(admin, contractId.toHexString, contractCode)
     checkState(nbYes, nbNo, true, true)
+
+    checkEvents(contractAddress, closeVotingTs) { events =>
+      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+
+      allEvents.length is 1
+      val votingStartedEvent = allEvents.head
+      votingStartedEvent.index is 2
+      votingStartedEvent.contractId is contractAddress.lockupScript.contractId
+    }
 
     clique.selfClique().nodes.foreach { peer =>
       request[Boolean](stopMining, peer.restPort) is true
@@ -64,10 +104,30 @@ class VotingTest extends AlephiumActorSpec {
         voters.map(v => Val.Address(Address.fromBase58(v.activeAddress).get))
       )
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+    def checkEvents(
+        contractAddress: Address,
+        startTs: TimeStamp,
+        toTs: TimeStamp = TimeStamp.now()
+    )(
+        validate: (AVector[Events]) => Any
+    ) = {
+      import org.alephium.api.UtilJson._
+
+      val events =
+        request[AVector[Events]](
+          getEventsWithinTimeInterval(startTs, toTs, contractAddress),
+          restPort
+        )
+
+      validate(events)
+    }
   }
 }
 
 trait VotingFixture extends WalletFixture {
+  // scalastyle:off method.length
   def deployContract(admin: Wallet, voters: Seq[Wallet], tokenAmount: U256): ContractRef = {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
@@ -86,6 +146,11 @@ trait VotingFixture extends WalletFixture {
         |  admin: Address,
         |  voters: [Address; ${voters.size}]
         |) {
+        |
+        |  event VotingStarted()
+        |  event VoteCasted(voter: Address, result: Bool)
+        |  event VotingClosed()
+        |
         |  pub payable fn allocateTokens() -> () {
         |     assert!(initialized == false)
         |     assert!(txCaller!(txCallerSize!() - 1) == admin)
@@ -93,12 +158,17 @@ trait VotingFixture extends WalletFixture {
         |     yes = 0
         |     no = 0
         |     initialized = true
+        |
+        |     emit VotingStarted()
         |  }
         |
         |  pub payable fn vote(choice: Bool, voter: Address) -> () {
         |    assert!(initialized == true && isClosed == false)
         |    transferAlph!(voter, admin, $utxoFee)
         |    transferTokenToSelf!(voter, selfTokenId!(), 1)
+        |
+        |    emit VoteCasted(voter, choice)
+        |
         |    if (choice == true) {
         |       yes = yes + 1
         |    } else {
@@ -110,6 +180,8 @@ trait VotingFixture extends WalletFixture {
         |     assert!(initialized == true && isClosed == false)
         |     assert!(txCaller!(txCallerSize!() - 1) == admin)
         |     isClosed = true
+        |
+        |     emit VotingClosed()
         |   }
         | }
       """.stripMargin
@@ -119,6 +191,7 @@ trait VotingFixture extends WalletFixture {
     val state = s"[ 0, 0, false, false, @${admin.activeAddress}, [${votersList}]]"
     contract(admin, votingContract, Some(state), Some(tokenAmount))
   }
+  // scalastyle:on method.length
 
   def allocateTokens(
       adminWallet: Wallet,
@@ -310,7 +383,7 @@ trait WalletFixture extends CliqueFixture {
   val utxoFee = "50000000000000"
 }
 
-final case class ContractRef(contractId: Hash, contractAddress: Address, code: String)
+final case class ContractRef(contractId: ContractId, contractAddress: Address, code: String)
 final case class Wallet(
     creation: WalletCreation,
     result: WalletCreation.Result,

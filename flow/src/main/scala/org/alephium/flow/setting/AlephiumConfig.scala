@@ -38,6 +38,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
+import org.alephium.protocol.vm.LogConfig
 import org.alephium.util._
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
@@ -168,7 +169,14 @@ object WalletSetting {
   final case class BlockFlow(host: String, port: Int, groups: Int)
 }
 
-final case class NodeSetting(dbSyncWrite: Boolean)
+final case class NodeSetting(
+    dbSyncWrite: Boolean,
+    eventLog: Option[LogConfig]
+) {
+  lazy val logConfig: LogConfig = {
+    eventLog.getOrElse(LogConfig.disabled())
+  }
+}
 
 final case class Allocation(
     address: Address.Asset,
