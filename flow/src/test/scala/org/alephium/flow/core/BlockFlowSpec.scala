@@ -714,6 +714,7 @@ class BlockFlowSpec extends AlephiumSpec {
             ALPH.GenesisTimestamp.plusMinutesUnsafe(1)
           )
           .rightValue
+          .map(_._2)
         val expected = brokerConfig.groupRange.flatMap { fromGroup =>
           (0 until groups0).map { toGroup =>
             AVector(blockFlow.genesisBlocks(fromGroup)(toGroup) -> 0)

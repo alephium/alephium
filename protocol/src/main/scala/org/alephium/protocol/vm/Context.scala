@@ -18,15 +18,20 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector, TimeStamp, U256}
 
-final case class BlockEnv(networkId: NetworkId, timeStamp: TimeStamp, target: Target)
+final case class BlockEnv(
+    networkId: NetworkId,
+    timeStamp: TimeStamp,
+    target: Target,
+    blockId: Option[BlockHash]
+)
 object BlockEnv {
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
-    BlockEnv(networkConfig.networkId, header.timestamp, header.target)
+    BlockEnv(networkConfig.networkId, header.timestamp, header.target, Some(header.hash))
 }
 
 sealed trait TxEnv {
@@ -77,10 +82,29 @@ object TxEnv {
   ) extends TxEnv
 }
 
+final case class LogConfig(
+    enabled: Boolean,
+    contractAddresses: Option[AVector[Address.Contract]]
+) {
+  def logContractEnabled(contractAddress: Address.Contract): Boolean = {
+    val allowAllContracts = contractAddresses.isEmpty
+    val allowThisContract = contractAddresses.exists(_.contains(contractAddress))
+    enabled && (allowAllContracts || allowThisContract)
+  }
+}
+
+object LogConfig {
+  def disabled(): LogConfig = {
+    LogConfig(enabled = false, contractAddresses = None)
+  }
+}
+
 trait StatelessContext extends CostStrategy {
   def blockEnv: BlockEnv
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
+
+  def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit]
 
   def txId: Hash                   = txEnv.txId
   def signatures: Stack[Signature] = txEnv.signatures
@@ -107,7 +131,8 @@ object StatelessContext {
       val txEnv: TxEnv,
       var gasRemaining: GasBox
   ) extends StatelessContext {
-    def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
+    def getInitialBalances(): ExeResult[Balances]                                          = failed(ExpectNonPayableMethod)
+    def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = okay
   }
 }
 
@@ -115,6 +140,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
   def outputBalances: Balances
+
+  def logConfig: LogConfig
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
@@ -194,6 +221,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- markAssetFlushed(contractId)
     } yield ()
   }
+
+  def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
+    worldState
+      .writeLog(blockEnv.blockId, txId, contractIdOpt, fields, logConfig)
+      .left
+      .map(e => Left(IOErrorWriteLog(e)))
+  }
 }
 
 object StatefulContext {
@@ -202,7 +236,7 @@ object StatefulContext {
       txEnv: TxEnv,
       worldState: WorldState.Staging,
       gasRemaining: GasBox
-  ): StatefulContext = {
+  )(implicit logConfig: LogConfig): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
@@ -212,7 +246,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
-  ): StatefulContext = {
+  )(implicit logConfig: LogConfig): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
@@ -223,7 +257,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputsOpt: Option[AVector[AssetOutput]]
-  ): ExeResult[StatefulContext] = {
+  )(implicit logConfig: LogConfig): ExeResult[StatefulContext] = {
     preOutputsOpt match {
       case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
@@ -240,7 +274,8 @@ object StatefulContext {
       val txEnv: TxEnv,
       val worldState: WorldState.Staging,
       var gasRemaining: GasBox
-  ) extends StatefulContext {
+  )(implicit val logConfig: LogConfig)
+      extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 
     def nextOutputIndex: Int = txEnv.fixedOutputs.length + generatedOutputs.length

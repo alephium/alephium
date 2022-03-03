@@ -150,7 +150,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
     for {
       tip    <- getBestTip()
       target <- getNextHashTargetRaw(tip)
-    } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target)
+    } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target, Some(tip))
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {

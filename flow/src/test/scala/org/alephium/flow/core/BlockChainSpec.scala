@@ -555,10 +555,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val longChain = chainGenOf(9, genesis).sample.get
     val chain     = buildBlockChain()
     addBlocks(chain, longChain)
-    val all = chain.getHeightedBlocks(TimeStamp.zero, TimeStamp.unsafe(Long.MaxValue))
+    val all = chain
+      .getHeightedBlocks(TimeStamp.zero, TimeStamp.unsafe(Long.MaxValue))
 
-    val ts      = all.rightValue.map { case (header, _) => header.timestamp }
-    val heights = all.rightValue.map { case (_, heights) => heights }
+    val ts      = all.rightValue._2.map { case (header, _) => header.timestamp }
+    val heights = all.rightValue._2.map { case (_, heights) => heights }
 
     heights is AVector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
@@ -566,6 +567,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain
         .getHeightedBlocks(from, to)
         .rightValue
+        ._2
         .map { case (_, heights) => heights }
     }
 

@@ -18,14 +18,14 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{TxOutputRef, UnsignedTransaction}
+import org.alephium.protocol.model.{ContractId, TxOutputRef, UnsignedTransaction}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
 final case class BuildContractResult(
     unsignedTx: String,
     hash: Hash,
-    contractId: Hash,
+    contractId: ContractId,
     fromGroup: Int,
     toGroup: Int
 )

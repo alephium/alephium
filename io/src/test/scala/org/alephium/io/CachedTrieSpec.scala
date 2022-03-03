@@ -44,7 +44,7 @@ class CachedTrieSpec extends AlephiumSpec {
         val (key, value) = logs.head
         cached.get(key) isE value
         cached.getOpt(key) isE Some(value)
-        cached.exist(key) isE true
+        cached.exists(key) isE true
       }
     }
 
@@ -52,7 +52,7 @@ class CachedTrieSpec extends AlephiumSpec {
       val (key, _) = generateKV()
       cached.get(key).swap isE a[IOError.KeyNotFound]
       cached.getOpt(key) isE None
-      cached.exist(key) isE false
+      cached.exists(key) isE false
     }
 
     def testUpdate() = {
@@ -70,9 +70,9 @@ class CachedTrieSpec extends AlephiumSpec {
       if (logs.nonEmpty) {
         val (key, _) = logs.head
         logs.remove(key)
-        cached.exist(key) isE true
+        cached.exists(key) isE true
         cached.remove(key) isE ()
-        cached.exist(key) isE false
+        cached.exists(key) isE false
       }
     }
 
@@ -107,7 +107,7 @@ class CachedTrieSpec extends AlephiumSpec {
           c.underlying.persist().rightValue
       }
       logs.foreach { case (key, _) =>
-        newTrie.exist(key) isE false
+        newTrie.exists(key) isE false
       }
     }
 
@@ -176,10 +176,11 @@ object CachedTrieSpec {
   trait Fixture extends StorageFixture {
     val genesisKey   = Hash.zero
     val genesisValue = Hash.zero
-    val db           = newDB[Hash, SparseMerkleTrie.Node]
+    val storage      = newDBStorage()
+    val db           = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
     val unCached     = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
 
-    var cached: MutableTrie[Hash, Hash, Unit] = CachedSMT.from(unCached)
+    var cached: MutableKV[Hash, Hash, Unit] = CachedSMT.from(unCached)
 
     val logs = mutable.SortedMap.empty[Hash, Hash]
 

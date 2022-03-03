@@ -115,10 +115,12 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   }
 
   trait TrieFixture extends StorageFixture {
-    val db0  = newDB[Hash, SparseMerkleTrie.Node]
-    var trie = SparseMerkleTrie.unsafe[Hash, Hash](db0, genesisKey, genesisValue)
+    val storage0 = newDBStorage()
+    val db0      = newDB[Hash, SparseMerkleTrie.Node](storage0, RocksDBSource.ColumnFamily.All)
+    var trie     = SparseMerkleTrie.unsafe[Hash, Hash](db0, genesisKey, genesisValue)
 
-    val db1       = newDB[Hash, SparseMerkleTrie.Node]
+    val storage1  = newDBStorage()
+    val db1       = newDB[Hash, SparseMerkleTrie.Node](storage1, RocksDBSource.ColumnFamily.All)
     var inMemTrie = SparseMerkleTrie.inMemoryUnsafe[Hash, Hash](db1, genesisKey, genesisValue)
   }
 
@@ -212,7 +214,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     keys.foreach { key =>
       trie.getOpt(key).map(_.nonEmpty) isE true
-      trie.exist(key) isE true
+      trie.exists(key) isE true
     }
 
     keys.foreach { key =>
@@ -228,13 +230,13 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
     keys.foreach { key =>
       trie.getOpt(key).map(_.nonEmpty) isE true
-      trie.exist(key) isE true
+      trie.exists(key) isE true
     }
 
     keys.map { key =>
       update(trie.remove(key))
       trie.getOpt(key).map(_.isEmpty) isE true
-      trie.exist(key) isE false
+      trie.exists(key) isE false
     }
 
     trie.rootHash is genesisNode.hash
@@ -249,8 +251,9 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   }
 
   it should "work for explicit examples" in new StorageFixture {
-    val db    = newDB[Hash, SparseMerkleTrie.Node]
-    val trie0 = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
+    val storage = newDBStorage()
+    val db      = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
+    val trie0   = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
 
     val key0   = Hash.generate
     val key1   = Hash.generate
@@ -295,10 +298,10 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
     info("Verify the final persisted merkle tree")
     pairs.take(500).foreach { case (key, _) =>
-      persisted.exist(key) isE false
+      persisted.exists(key) isE false
     }
     pairs.drop(500).foreach { case (key, value) =>
-      persisted.exist(key) isE true
+      persisted.exists(key) isE true
       persisted.get(key) isE value
     }
     trie.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 1501

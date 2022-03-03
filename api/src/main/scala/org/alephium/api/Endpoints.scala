@@ -48,9 +48,9 @@ trait Endpoints
 
   private val timeIntervalQuery: EndpointInput[TimeInterval] =
     query[TimeStamp]("fromTs")
-      .and(query[TimeStamp]("toTs"))
+      .and(query[Option[TimeStamp]]("toTs"))
       .map { case (from, to) => TimeInterval(from, to) }(timeInterval =>
-        (timeInterval.from, timeInterval.to)
+        (timeInterval.from, timeInterval.toOpt)
       )
       .validate(TimeInterval.validator)
 
@@ -100,6 +100,11 @@ trait Endpoints
     baseEndpoint
       .in("utils")
       .tag("Utils")
+
+  private val eventsEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("events")
+      .tag("Events")
 
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
@@ -398,6 +403,33 @@ trait Endpoints
     utilsEndpoint.put
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
+
+  val getContractEventsForBlock: BaseEndpoint[(BlockHash, Address.Contract), Events] =
+    eventsEndpoint.get
+      .in("in-block")
+      .in(query[BlockHash]("block"))
+      .in(query[Address.Contract]("contractAddress"))
+      .out(jsonBody[Events])
+      .summary("Get events for a contract within a block")
+
+  val getContractEventsWithinBlocks
+      : BaseEndpoint[(BlockHash, Option[BlockHash], Address.Contract), AVector[Events]] =
+    eventsEndpoint.get
+      .in("within-blocks")
+      .in(query[BlockHash]("fromBlock"))
+      .in(query[Option[BlockHash]]("toBlock"))
+      .in(query[Address.Contract]("contractAddress"))
+      .out(jsonBody[AVector[Events]])
+      .summary("Get events for a contract within a range of blocks")
+
+  val getContractEventsWithinTimeInterval
+      : BaseEndpoint[(TimeInterval, Address.Contract), AVector[Events]] =
+    eventsEndpoint.get
+      .in("within-time-interval")
+      .in(timeIntervalQuery)
+      .in(query[Address.Contract]("contractAddress"))
+      .out(jsonBody[AVector[Events]])
+      .summary("Get events for a contract within a time interval")
 }
 
 object Endpoints {

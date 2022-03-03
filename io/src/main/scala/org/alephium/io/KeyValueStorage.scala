@@ -46,7 +46,10 @@ trait AbstractKeyValueStorage[K, V] {
   def deleteUnsafe(key: K): Unit
 }
 
-trait KeyValueStorage[K, V] extends AbstractKeyValueStorage[K, V] with RawKeyValueStorage {
+trait KeyValueStorage[K, V]
+    extends AbstractKeyValueStorage[K, V]
+    with RawKeyValueStorage
+    with ReadableKV[K, V] {
 
   protected def storageKey(key: K): ByteString = serialize(key)
 

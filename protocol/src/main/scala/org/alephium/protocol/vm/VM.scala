@@ -370,7 +370,7 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
@@ -381,7 +381,7 @@ object StatefulVM {
       preOutputsOpt: Option[AVector[AssetOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     for {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
       result  <- runTxScript(context, script)
@@ -394,7 +394,7 @@ object StatefulVM {
       txEnv: TxEnv,
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, txEnv, worldState, gasRemaining)
     runTxScript(context, script)
   }

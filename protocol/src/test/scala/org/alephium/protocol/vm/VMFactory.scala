@@ -16,12 +16,14 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.io.{SparseMerkleTrie, StorageFixture}
+import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {
-    val db = newDB[Hash, SparseMerkleTrie.Node]
-    WorldState.emptyCached(db)
+    val storage = newDBStorage()
+    val trieDb  = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
+    val logDb   = newDB[LogStatesId, LogStates](storage, RocksDBSource.ColumnFamily.Log)
+    WorldState.emptyCached(trieDb, logDb)
   }
 }

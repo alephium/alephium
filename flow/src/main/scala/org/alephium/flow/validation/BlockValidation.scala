@@ -22,7 +22,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{BlockEnv, GasPrice, WorldState}
+import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
 import org.alephium.util.U256
 
@@ -387,18 +387,25 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
 
 object BlockValidation {
   def build(blockFlow: BlockFlow): BlockValidation =
-    build(blockFlow.brokerConfig, blockFlow.networkConfig, blockFlow.consensusConfig)
+    build(
+      blockFlow.brokerConfig,
+      blockFlow.networkConfig,
+      blockFlow.consensusConfig,
+      blockFlow.logConfig
+    )
 
   def build(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfig: ConsensusConfig,
+      logConfig: LogConfig
   ): BlockValidation = new Impl()
 
   class Impl(implicit
       val brokerConfig: BrokerConfig,
       val networkConfig: NetworkConfig,
-      val consensusConfig: ConsensusConfig
+      val consensusConfig: ConsensusConfig,
+      val logConfig: LogConfig
   ) extends BlockValidation {
     override def headerValidation: HeaderValidation  = HeaderValidation.build
     override def nonCoinbaseValidation: TxValidation = TxValidation.build
