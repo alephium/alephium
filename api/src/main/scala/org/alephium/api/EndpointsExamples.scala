@@ -415,7 +415,25 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val compileResultExamples: List[Example[CompileResult]] =
-    simpleExample(CompileResult(code = hexString))
+    simpleExample(
+      CompileResult(
+        bytecode = Hex.unsafe(hexString),
+        fieldSignature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+        functions = AVector(
+          CompileResult.Function(
+            id = "bar",
+            signature =
+              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+          )
+        ),
+        events = AVector(
+          CompileResult.Event(
+            id = "Bar",
+            signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
+          )
+        )
+      )
+    )
 
   implicit val buildContractExamples: List[Example[BuildContract]] = List(
     defaultExample(BuildContract(publicKey, code = hexString)),

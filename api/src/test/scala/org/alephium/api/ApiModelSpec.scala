@@ -28,6 +28,7 @@ import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.lang.TypeSignatureFixture
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -809,6 +810,43 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |}
         """.stripMargin
     checkData(ContractStateResult(AVector(u256, i256, bool, byteVec, address1, address2)), jsonRaw)
+  }
+
+  it should "encode/decode CompilerResult" in new TypeSignatureFixture {
+    val result0 = CompileResult.from(contract, contractAst)
+    val jsonRaw0 =
+      """{
+        |  "bytecode": "05011b01010505050c05a000a001a003a004611600160116021603160402",
+        |  "fieldSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+        |  "functions": [
+        |    {
+        |      "id": "bar",
+        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+        |    }
+        |  ],
+        |  "events": [
+        |    {
+        |      "id": "Bar",
+        |      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
+        |    }
+        |  ]
+        |}""".stripMargin
+    write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
+
+    val result1 = CompileResult.from(script, scriptAst)
+    val jsonRaw1 =
+      """{
+        |  "bytecode": "010100050505061600160116021603160402",
+        |  "fieldSignature": "TxScript Foo()",
+        |  "functions": [
+        |    {
+        |      "id": "bar",
+        |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+        |    }
+        |  ],
+        |  "events": []
+        |}""".stripMargin
+    write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)
   }
 
   behavior of "TimeInterval"

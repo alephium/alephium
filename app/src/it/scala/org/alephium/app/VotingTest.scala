@@ -278,7 +278,7 @@ trait WalletFixture extends CliqueFixture {
     val buildResult = request[BuildContractResult](
       buildContract(
         fromPublicKey = wallet.publicKey.toHexString,
-        code = compileResult.code,
+        code = Hex.toHexString(compileResult.bytecode),
         state = state,
         issueTokenAmount = issueTokenAmount
       ),
@@ -293,14 +293,7 @@ trait WalletFixture extends CliqueFixture {
     val tx: Tx = block.transactions.find(_.id == txResult.txId).get
     // scalastyle:on no.equal
 
-    val Contract(_, contractAddress, _) = tx.outputs
-      .find(output =>
-        output match {
-          case Contract(_, _, _) => true
-          case _                 => false
-        }
-      )
-      .get
+    val Contract(_, contractAddress, _) = tx.outputs.find(_.isInstanceOf[Contract]).get
     ContractRef(buildResult.contractId, contractAddress, code)
   }
 
@@ -309,7 +302,7 @@ trait WalletFixture extends CliqueFixture {
     val buildResult = request[BuildScriptResult](
       buildScript(
         fromPublicKey = publicKey,
-        code = compileResult.code
+        code = Hex.toHexString(compileResult.bytecode)
       ),
       restPort
     )

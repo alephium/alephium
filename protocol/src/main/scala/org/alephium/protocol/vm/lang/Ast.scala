@@ -23,14 +23,21 @@ import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.{discard, AVector, I256, U256}
 
-// scalastyle:off number.of.methods number.of.types
+// scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
-  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean)
+  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean) {
+    def signature: String = {
+      val prefix = if (isMutable) "mut " else ""
+      s"${prefix}${ident.name}:${tpe.signature}"
+    }
+  }
 
-  final case class EventField(ident: Ident, tpe: Type)
+  final case class EventField(ident: Ident, tpe: Type) {
+    def signature: String = s"${ident.name}:${tpe.signature}"
+  }
 
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
@@ -335,7 +342,13 @@ object Ast {
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
   ) extends UniqueDef {
-    override def name: String = id.name
+    def name: String = id.name
+
+    def signature: String = {
+      val publicPrefix  = if (isPublic) "pub " else ""
+      val payablePrefix = if (isPayable) "payable " else ""
+      s"${publicPrefix}${payablePrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
+    }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
@@ -424,7 +437,9 @@ object Ast {
       id: TypeId,
       fields: Seq[EventField]
   ) extends UniqueDef {
-    override def name: String = id.name
+    def name: String = id.name
+
+    def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -696,7 +711,16 @@ object Ast {
   }
 
   sealed trait ContractWithState extends Contract[StatefulContext] {
+    def ident: TypeId
+    def name: String = ident.name
+
+    def fields: Seq[Argument]
     def events: Seq[EventDef]
+
+    def getFieldSignature(): String
+    protected def _getFieldSignature(): String = {
+      s"${name}(${fields.map(_.signature).mkString(",")})"
+    }
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       if (events.distinctBy(_.id).size != events.size) {
@@ -711,8 +735,10 @@ object Ast {
 
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
       extends ContractWithState {
-    override def events: Seq[EventDef] = Seq.empty
-    val fields: Seq[Argument]          = Seq.empty
+    val events: Seq[EventDef] = Seq.empty
+    val fields: Seq[Argument] = Seq.empty
+
+    def getFieldSignature(): String = s"TxScript ${_getFieldSignature()}"
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
@@ -731,8 +757,10 @@ object Ast {
       ident: TypeId,
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
-      override val events: Seq[EventDef]
+      events: Seq[EventDef]
   ) extends ContractWithState {
+    def getFieldSignature(): String = s"TxContract ${_getFieldSignature()}"
+
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
       StatefulContract(
@@ -751,18 +779,24 @@ object Ast {
       }
     }
 
-    def genStatefulScript(config: CompilerConfig, contractIndex: Int): StatefulScript = {
+    def genStatefulScript(
+        config: CompilerConfig,
+        contractIndex: Int
+    ): (StatefulScript, TxScript) = {
       val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
-        case script: TxScript => script.genCode(state)
+        case script: TxScript => (script.genCode(state), script)
         case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
       }
     }
 
-    def genStatefulContract(config: CompilerConfig, contractIndex: Int): StatefulContract = {
+    def genStatefulContract(
+        config: CompilerConfig,
+        contractIndex: Int
+    ): (StatefulContract, TxContract) = {
       val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
-        case contract: TxContract => contract.genCode(state)
+        case contract: TxContract => (contract.genCode(state), contract)
         case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
       }
     }

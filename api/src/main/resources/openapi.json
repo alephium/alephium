@@ -5153,7 +5153,20 @@
                   "$ref": "#/components/schemas/CompileResult"
                 },
                 "example": {
-                  "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "fieldSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                  "functions": [
+                    {
+                      "id": "bar",
+                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+                    }
+                  ],
+                  "events": [
+                    {
+                      "id": "Bar",
+                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
+                    }
+                  ]
                 }
               }
             }
@@ -5377,7 +5390,20 @@
                   "$ref": "#/components/schemas/CompileResult"
                 },
                 "example": {
-                  "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "fieldSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                  "functions": [
+                    {
+                      "id": "bar",
+                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+                    }
+                  ],
+                  "events": [
+                    {
+                      "id": "Bar",
+                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
+                    }
+                  ]
                 }
               }
             }
@@ -7887,12 +7913,30 @@
       },
       "CompileResult": {
         "required": [
-          "code"
+          "bytecode",
+          "fieldSignature",
+          "functions",
+          "events"
         ],
         "type": "object",
         "properties": {
-          "code": {
+          "bytecode": {
             "type": "string"
+          },
+          "fieldSignature": {
+            "type": "string"
+          },
+          "functions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Function"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
           }
         }
       },
@@ -8046,6 +8090,21 @@
       },
       "Event": {
         "required": [
+          "id",
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      },
+      "Event1": {
+        "required": [
           "blockHash",
           "contractId",
           "txId",
@@ -8091,7 +8150,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/Event1"
             }
           }
         }
@@ -8136,6 +8195,21 @@
                 "$ref": "#/components/schemas/BlockEntry"
               }
             }
+          }
+        }
+      },
+      "Function": {
+        "required": [
+          "id",
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
           }
         }
       },

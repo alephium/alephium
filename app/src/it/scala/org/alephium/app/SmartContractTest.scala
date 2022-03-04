@@ -59,7 +59,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val buildResult = request[BuildContractResult](
         buildContract(
           fromPublicKey = publicKey,
-          code = compileResult.code,
+          code = Hex.toHexString(compileResult.bytecode),
           gas,
           gasPrice,
           state = state,
@@ -107,7 +107,7 @@ class SmartContractTest extends AlephiumActorSpec {
       request[BuildScriptResult](
         buildScript(
           fromPublicKey = publicKey,
-          code = compileResult.code,
+          code = Hex.toHexString(compileResult.bytecode),
           alphAmount,
           gas,
           gasPrice
@@ -127,7 +127,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val compileResult = request[CompileResult](compileContract(code), restPort)
       val script = ServerUtils
         .buildContract(
-          compileResult.code,
+          Hex.toHexString(compileResult.bytecode),
           Address.fromBase58(address).value,
           state,
           dustUtxoAmount,
@@ -150,7 +150,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val lockupScript = LockupScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
 
       val compileResult = request[CompileResult](compileScript(code), restPort)
-      val script        = deserialize[StatefulScript](Hex.from(compileResult.code).value).rightValue
+      val script        = deserialize[StatefulScript](compileResult.bytecode).rightValue
 
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
       val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 10000).rightValue
@@ -194,13 +194,13 @@ class SmartContractTest extends AlephiumActorSpec {
 
     val compileResult = request[CompileResult](compileContract(contract), restPort)
     unitRequest(
-      buildContract(publicKey, compileResult.code),
+      buildContract(publicKey, Hex.toHexString(compileResult.bytecode)),
       restPort
     )
 
     val invalidState: Option[String] = Some("[1000u]")
     requestFailed(
-      buildContract(publicKey, compileResult.code, state = invalidState),
+      buildContract(publicKey, Hex.toHexString(compileResult.bytecode), state = invalidState),
       restPort,
       StatusCode.BadRequest
     )
