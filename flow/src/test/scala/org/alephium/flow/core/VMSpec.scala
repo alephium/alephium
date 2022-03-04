@@ -1238,6 +1238,7 @@ class VMSpec extends AlephiumSpec {
          |
          |  pub fn testArrayEventType() -> (U256) {
          |    emit TestEvent([1, 2])
+         |    return 0
          |  }
          |}
          |""".stripMargin

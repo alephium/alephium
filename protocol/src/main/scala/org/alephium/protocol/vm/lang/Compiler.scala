@@ -341,6 +341,19 @@ object Compiler {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
     }
 
+    def checkArguments(args: Seq[Ast.Argument]): Unit = {
+      args.foreach(_.tpe match {
+        case c: Type.Contract => checkContractType(c.id)
+        case _                =>
+      })
+    }
+
+    def checkContractType(typeId: Ast.TypeId): Unit = {
+      if (!contractTable.contains(typeId)) {
+        throw Error(s"Contract ${typeId.name} does not exist")
+      }
+    }
+
     def checkAssign(ident: Ast.Ident, tpe: Seq[Type]): Unit = {
       checkAssign(ident, expectOneType(ident, tpe))
     }

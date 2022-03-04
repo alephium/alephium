@@ -170,6 +170,7 @@ object Ast {
     }
 
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      state.checkContractType(contractType)
       if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       } else {
@@ -336,9 +337,22 @@ object Ast {
   ) extends UniqueDef {
     override def name: String = id.name
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
+      stmt match {
+        case Some(_: ReturnStmt[Ctx]) => // we checked the `rtypes` in `ReturnStmt`
+        case Some(IfElse(_, ifBranch, elseBranch)) =>
+          checkRetTypes(ifBranch.lastOption)
+          checkRetTypes(elseBranch.lastOption)
+        case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkArguments(args)
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
+      if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
     def toMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
@@ -663,6 +677,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkArguments(fields)
       ArrayTransformer.initArgVars(state, fields)
     }
 
