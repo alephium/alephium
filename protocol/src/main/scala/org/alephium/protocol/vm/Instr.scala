@@ -1415,8 +1415,9 @@ sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with 
 
   def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _ <- frame.ctx.chargeGasWithSize(this, n)
-      _ <- frame.opStack.pop(n) // TODO: send the log to an event bus
+      _      <- frame.ctx.chargeGasWithSize(this, n)
+      fields <- frame.opStack.pop(n)
+      _      <- frame.ctx.writeLog(frame.obj.contractIdOpt, fields)
     } yield ()
   }
 }

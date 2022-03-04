@@ -46,7 +46,7 @@ import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{Val => _, _}
+import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -63,10 +63,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
+
   implicit lazy val groupConfig: GroupConfig         = brokerConfig
   implicit lazy val networkConfig: NetworkSetting    = node.config.network
   implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
   implicit lazy val compilerConfig: CompilerConfig   = node.config.compiler
+  implicit lazy val logConfig: LogConfig             = node.config.node.logConfig
   implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
@@ -556,6 +558,30 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
+  val getContractEventsForBlockLogic = serverLogic(getContractEventsForBlock) {
+    case (blockHash, contractAddress) =>
+      Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
+        serverUtils.getContractEventsForBlock(blockFlow, blockHash, contractId)
+      }
+  }
+
+  val getContractEventsWithinBlocksLogic = serverLogic(getContractEventsWithinBlocks) {
+    case (fromBlock, toBlockOpt, contractAddress) =>
+      Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
+        serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlockOpt, contractId)
+      }
+  }
+
+  val getContractEventsWithinTimeIntervalLogic = serverLogic(getContractEventsWithinTimeInterval) {
+    case (timeInterval, contractAddress) =>
+      Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
+        serverUtils.getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
+      }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
@@ -601,7 +627,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def requestFromGroupIndex[P, A](
       groupIndex: GroupIndex,
       f: => Future[Either[ApiError[_ <: StatusCode], A]],

@@ -310,4 +310,42 @@ class ParserSpec extends AlephiumSpec {
       )
     )
   }
+
+  it should "parse event" in {
+    {
+      info("0 field")
+
+      val eventRaw = "event Event()"
+      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+        TypeId("Event"),
+        Seq()
+      )
+    }
+
+    {
+      info("fields of primitive types")
+
+      val eventRaw = "event Transfer(from: Address, to: Address, amount: U256)"
+      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+        TypeId("Transfer"),
+        Seq(
+          EventField(Ident("from"), Type.Address),
+          EventField(Ident("to"), Type.Address),
+          EventField(Ident("amount"), Type.U256)
+        )
+      )
+    }
+
+    {
+      info("fields of array type")
+
+      val eventRaw = "event Participants(addresses: [Address; 3])"
+      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+        TypeId("Participants"),
+        Seq(
+          EventField(Ident("addresses"), Type.FixedSizeArray(Type.Address, 3))
+        )
+      )
+    }
+  }
 }

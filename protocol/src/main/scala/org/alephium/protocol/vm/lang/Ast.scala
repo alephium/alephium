@@ -16,17 +16,21 @@
 
 package org.alephium.protocol.vm.lang
 
+import scala.annotation.switch
+
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
-import org.alephium.util.{discard, AVector, U256}
+import org.alephium.util.{discard, AVector, I256, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods number.of.types
 object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
   final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean)
+
+  final case class EventField(ident: Ident, tpe: Type)
 
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
@@ -308,6 +312,21 @@ object Ast {
       value.genCode(state) ++ variables.map(state.genStoreCode).reverse
     }
   }
+
+  sealed trait UniqueDef {
+    def name: String
+  }
+
+  object UniqueDef {
+    def duplicates(defs: Seq[UniqueDef]): String = {
+      defs
+        .groupBy(_.name)
+        .filter(_._2.size > 1)
+        .keys
+        .mkString(", ")
+    }
+  }
+
   final case class FuncDef[Ctx <: StatelessContext](
       id: FuncId,
       isPublic: Boolean,
@@ -315,7 +334,9 @@ object Ast {
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
-  ) {
+  ) extends UniqueDef {
+    override def name: String = id.name
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
       stmt match {
@@ -350,6 +371,7 @@ object Ast {
       )
     }
   }
+
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
     def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
@@ -397,6 +419,56 @@ object Ast {
       if (newIndexes == indexes) this else AssignmentArrayElementTarget(ident, newIndexes)
     }
   }
+
+  final case class EventDef(
+      id: TypeId,
+      fields: Seq[EventField]
+  ) extends UniqueDef {
+    override def name: String = id.name
+  }
+
+  final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
+      extends Statement[Ctx] {
+    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
+      val newArgs = args.map(_.fillPlaceholder(expr))
+      if (newArgs == args) this else EmitEvent(id, newArgs)
+    }
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val eventInfo = state.getEvent(id)
+      eventInfo.checkFieldTypes(args.flatMap(_.getType(state)))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val eventIndex = {
+        val index = state.eventsInfo.map(_.typeId).indexOf(id)
+        // `check` method ensures that this event is defined
+        assume(index >= 0)
+
+        Const[Ctx](Val.I256(I256.from(index))).genCode(state)
+      }
+      val argsType = args.flatMap(_.getType(state))
+      if (argsType.exists(_.isArrayType)) {
+        throw Compiler.Error(s"Array type not supported for event ${id.name}")
+      }
+      val logOpCode = (args.length: @switch) match {
+        case 0 =>
+          Log1
+        case 1 =>
+          Log2
+        case 2 =>
+          Log3
+        case 3 =>
+          Log4
+        case 4 =>
+          Log5
+        case _ =>
+          throw Compiler.Error(s"Max 4 fields allowed for event ${id.name}")
+      }
+      eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
+    }
+  }
+
   final case class Assign[Ctx <: StatelessContext](
       targets: Seq[AssignmentTarget[Ctx]],
       rhs: Expr[Ctx]
@@ -598,8 +670,8 @@ object Ast {
     lazy val funcTable: Map[FuncId, Compiler.SimpleFunc[Ctx]] = {
       val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
       if (table.size != funcs.size) {
-        val duplicates = funcs.groupBy(_.id).filter(_._2.size > 1).keys
-        throw Compiler.Error(s"These functions ${duplicates} are defined multiple times")
+        val duplicates = UniqueDef.duplicates(funcs)
+        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
       }
       table
     }
@@ -623,11 +695,24 @@ object Ast {
     }
   }
 
-  sealed trait ContractWithState extends Contract[StatefulContext]
+  sealed trait ContractWithState extends Contract[StatefulContext] {
+    def events: Seq[EventDef]
+
+    def eventsInfo(): Seq[Compiler.EventInfo] = {
+      if (events.distinctBy(_.id).size != events.size) {
+        val duplicates = UniqueDef.duplicates(events)
+        throw Compiler.Error(s"These events are defined multiple times: $duplicates")
+      }
+      events.map { event =>
+        Compiler.EventInfo(event.id, event.fields.map(_.tpe))
+      }
+    }
+  }
 
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
       extends ContractWithState {
-    val fields: Seq[Argument] = Seq.empty
+    override def events: Seq[EventDef] = Seq.empty
+    val fields: Seq[Argument]          = Seq.empty
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
@@ -645,12 +730,15 @@ object Ast {
   final case class TxContract(
       ident: TypeId,
       fields: Seq[Argument],
-      funcs: Seq[FuncDef[StatefulContext]]
+      funcs: Seq[FuncDef[StatefulContext]],
+      override val events: Seq[EventDef]
   ) extends ContractWithState {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
-      val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
-      StatefulContract(ArrayTransformer.flattenTypeLength(fields.map(_.tpe)), methods)
+      StatefulContract(
+        ArrayTransformer.flattenTypeLength(fields.map(_.tpe)),
+        AVector.from(funcs.view.map(_.toMethod(state)))
+      )
     }
   }
 
@@ -680,3 +768,4 @@ object Ast {
     }
   }
 }
+// scalastyle:on number.of.methods number.of.types

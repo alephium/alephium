@@ -25,7 +25,7 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{Block, Weight}
+import org.alephium.protocol.model.{Block, ChainIndex, Weight}
 import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
@@ -64,11 +64,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getHeightedBlocks(
       fromTs: TimeStamp,
       toTs: TimeStamp
-  ): IOResult[AVector[(Block, Int)]] =
+  ): IOResult[(ChainIndex, AVector[(Block, Int)])] =
     for {
       height <- maxHeight
       result <- searchByTimestampHeight(height, fromTs, toTs)
-    } yield result
+    } yield (chainIndex, result)
 
   //Binary search until we found an height containing blocks within time range
   @tailrec

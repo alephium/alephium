@@ -19,7 +19,6 @@ package org.alephium.io
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Keccak256
-import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.serde.Serde
 import org.alephium.util.{AlephiumFixture, Files}
 
@@ -27,13 +26,20 @@ trait StorageFixture extends AlephiumFixture {
 
   private val storages = ArrayBuffer.empty[RocksDBSource]
 
-  def newDB[K: Serde, V: Serde]: KeyValueStorage[K, V] = {
+  def newDBStorage(): RocksDBSource = {
     val tmpdir  = Files.tmpDir
     val dbname  = s"test-db-${Keccak256.generate.toHexString}"
     val dbPath  = tmpdir.resolve(dbname)
     val storage = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
     storages.append(storage)
-    RocksDBKeyValueStorage[K, V](storage, ColumnFamily.All)
+    storage
+  }
+
+  def newDB[K: Serde, V: Serde](
+      storage: RocksDBSource,
+      cf: RocksDBSource.ColumnFamily
+  ): KeyValueStorage[K, V] = {
+    RocksDBKeyValueStorage[K, V](storage, cf)
   }
 
   protected def postTest(): Unit = {

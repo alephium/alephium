@@ -142,6 +142,14 @@ trait EndpointsExamples extends ErrorExamples {
     deps = AVector(blockHash, blockHash)
   )
 
+  private val event = Event(
+    blockHash,
+    txId,
+    contractAddress.lockupScript.contractId,
+    index = 1,
+    fields = AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
+  )
+
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
@@ -524,5 +532,11 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
+
+  implicit val eventsExamples: List[Example[Events]] =
+    simpleExample(Events(0, 1, events = AVector(event)))
+
+  implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
+    simpleExample(AVector(Events(0, 1, events = AVector(event))))
 }
 // scalastyle:on magic.number

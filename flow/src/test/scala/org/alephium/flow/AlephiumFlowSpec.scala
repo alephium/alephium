@@ -615,7 +615,7 @@ trait FlowFixture
     val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
     val prevOutputs = worldState.getPreOutputs(tx0).rightValue
     val blockEnv =
-      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget)
+      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
     val txValidation = TxValidation.build
     val gasLeft      = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv).rightValue
     val gasUsed      = initialGas.use(gasLeft).rightValue

@@ -22,7 +22,7 @@ import sttp.tapir.{ValidationError, Validator}
 import org.alephium.api.ApiError
 import org.alephium.util.{Duration, TimeStamp}
 
-final case class TimeInterval(from: TimeStamp, to: TimeStamp) {
+final case class TimeInterval(from: TimeStamp, toOpt: Option[TimeStamp]) {
   def validateTimeSpan(max: Duration): Either[ApiError[_ <: StatusCode], Unit] = {
     if (durationUnsafe() > max) {
       Left(ApiError.BadRequest(s"Time span cannot be greater than ${max}"))
@@ -30,6 +30,8 @@ final case class TimeInterval(from: TimeStamp, to: TimeStamp) {
       Right(())
     }
   }
+
+  def to: TimeStamp = toOpt.getOrElse(TimeStamp.now())
 
   def durationUnsafe(): Duration = to.deltaUnsafe(from)
 }
@@ -41,5 +43,9 @@ object TimeInterval {
     } else {
       List.empty
     }
+  }
+
+  def apply(from: TimeStamp, to: TimeStamp): TimeInterval = {
+    TimeInterval(from, Some(to))
   }
 }

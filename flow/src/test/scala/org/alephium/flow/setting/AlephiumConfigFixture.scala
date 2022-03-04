@@ -72,4 +72,5 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
   implicit lazy val memPoolSetting   = config.mempool
   implicit lazy val miningSetting    = config.mining
   implicit lazy val compilerConfig   = config.compiler
+  implicit lazy val logConfig        = config.node.logConfig
 }

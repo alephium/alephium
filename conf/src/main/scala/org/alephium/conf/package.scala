@@ -121,6 +121,17 @@ package object conf {
       }
     }
 
+  implicit val contractAddressValueReader: ValueReader[Address.Contract] = {
+    ValueReader[String].map { str =>
+      Address.fromBase58(str) match {
+        case Some(address: Address.Contract) =>
+          address
+        case _ =>
+          throw new ConfigException.BadValue("ContractAddress", "oops")
+      }
+    }
+  }
+
   private val inetSocketAddressesStringReader: ValueReader[ArraySeq[InetSocketAddress]] =
     ValueReader[String].map(_.split(",")).map {
       case Array(empty) if empty == "" => ArraySeq.empty[InetSocketAddress]
