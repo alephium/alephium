@@ -418,7 +418,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CompileResult(
         bytecode = Hex.unsafe(hexString),
-        fieldSignature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+        fieldsSignature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
         functions = AVector(
           CompileResult.Function(
             id = "bar",

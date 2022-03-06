@@ -5154,7 +5154,7 @@
                 },
                 "example": {
                   "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "fieldSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                  "fieldsSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                   "functions": [
                     {
                       "id": "bar",
@@ -5391,7 +5391,7 @@
                 },
                 "example": {
                   "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "fieldSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                  "fieldsSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                   "functions": [
                     {
                       "id": "bar",
@@ -7914,7 +7914,7 @@
       "CompileResult": {
         "required": [
           "bytecode",
-          "fieldSignature",
+          "fieldsSignature",
           "functions",
           "events"
         ],
@@ -7923,7 +7923,7 @@
           "bytecode": {
             "type": "string"
           },
-          "fieldSignature": {
+          "fieldsSignature": {
             "type": "string"
           },
           "functions": {

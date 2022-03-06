@@ -817,7 +817,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val jsonRaw0 =
       """{
         |  "bytecode": "05011b01010505050c05a000a001a003a004611600160116021603160402",
-        |  "fieldSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+        |  "fieldsSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
         |  "functions": [
         |    {
         |      "id": "bar",
@@ -837,7 +837,7 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     val jsonRaw1 =
       """{
         |  "bytecode": "010100050505061600160116021603160402",
-        |  "fieldSignature": "TxScript Foo()",
+        |  "fieldsSignature": "TxScript Foo()",
         |  "functions": [
         |    {
         |      "id": "bar",
