@@ -8083,6 +8083,32 @@
           }
         }
       },
+      "ContractState": {
+        "required": [
+          "id",
+          "code",
+          "fields",
+          "asset"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "asset": {
+            "$ref": "#/components/schemas/Asset2"
+          }
+        }
+      },
       "ContractStateResult": {
         "required": [
           "fields"
@@ -8218,32 +8244,6 @@
             "items": {
               "$ref": "#/components/schemas/Event1"
             }
-          }
-        }
-      },
-      "ExistingContract": {
-        "required": [
-          "id",
-          "code",
-          "fields",
-          "asset"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "asset": {
-            "$ref": "#/components/schemas/Asset2"
           }
         }
       },
@@ -8948,7 +8948,7 @@
           "existingContracts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ExistingContract"
+              "$ref": "#/components/schemas/ContractState"
             }
           },
           "inputAssets": {
@@ -8980,7 +8980,7 @@
           "contracts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ExistingContract"
+              "$ref": "#/components/schemas/ContractState"
             }
           },
           "assetOutputs": {

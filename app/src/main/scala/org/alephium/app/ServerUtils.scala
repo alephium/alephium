@@ -25,7 +25,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model._
-import org.alephium.api.model.TestContract.ExistingContract
+import org.alephium.api.model.TestContract.ContractState
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -854,7 +854,7 @@ class ServerUtils(implicit
   private def fetchContractsState(
       worldState: WorldState.Staging,
       testContract: TestContract.Complete
-  ): Try[AVector[TestContract.ExistingContract]] = {
+  ): Try[AVector[TestContract.ContractState]] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
         fetchContractState(worldState, contract.id)
@@ -866,13 +866,13 @@ class ServerUtils(implicit
   private def fetchContractState(
       worldState: WorldState.Staging,
       contractId: ContractId
-  ): Try[TestContract.ExistingContract] = {
+  ): Try[TestContract.ContractState] = {
     val result = for {
       state          <- worldState.getContractState(contractId)
       codeRecord     <- worldState.getContractCode(state.codeHash)
       contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
-    } yield TestContract.ExistingContract(
+    } yield TestContract.ContractState(
       contractId,
       contract,
       state.fields.map(Val.from),
@@ -937,7 +937,7 @@ class ServerUtils(implicit
 
   def createContract(
       worldState: WorldState.Staging,
-      existingContract: ExistingContract
+      existingContract: ContractState
   ): Try[Unit] = {
     createContract(
       worldState,

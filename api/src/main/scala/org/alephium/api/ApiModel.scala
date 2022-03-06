@@ -266,11 +266,11 @@ trait ApiModelCodec {
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
 
-  implicit val assetRW: ReadWriter[TestContract.Asset]                       = macroRW
-  implicit val existingContractRW: ReadWriter[TestContract.ExistingContract] = macroRW
-  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]             = macroRW
-  implicit val testContractRW: ReadWriter[TestContract]                      = macroRW
-  implicit val testContractResultRW: ReadWriter[TestContractResult]          = macroRW
+  implicit val assetRW: ReadWriter[TestContract.Asset]                    = macroRW
+  implicit val existingContractRW: ReadWriter[TestContract.ContractState] = macroRW
+  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]          = macroRW
+  implicit val testContractRW: ReadWriter[TestContract]                   = macroRW
+  implicit val testContractResultRW: ReadWriter[TestContractResult]       = macroRW
 
   implicit val txResultRW: RW[TxResult] = macroRW
 

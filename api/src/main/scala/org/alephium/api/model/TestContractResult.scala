@@ -21,6 +21,6 @@ import org.alephium.util.AVector
 final case class TestContractResult(
     returns: AVector[Val],
     gasUsed: Int,
-    contracts: AVector[TestContract.ExistingContract],
+    contracts: AVector[TestContract.ContractState],
     assetOutputs: AVector[Output]
 )

@@ -35,7 +35,7 @@ final case class TestContract(
     initialAsset: Option[TestContract.Asset] = None,
     testMethodIndex: Option[Int] = None,
     testArgs: Option[AVector[Val]] = None,
-    existingContracts: Option[AVector[TestContract.ExistingContract]] = None,
+    existingContracts: Option[AVector[TestContract.ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
   def toComplete: TestContract.Complete =
@@ -53,14 +53,14 @@ final case class TestContract(
 }
 
 object TestContract {
-  val groupDefault: Int                                   = 0
-  val contractIdDefault: ContractId                       = ContractId.zero
-  val initialFieldsDefault: AVector[Val]                  = AVector.empty
-  val testMethodIndexDefault: Int                         = 0
-  val testArgsDefault: AVector[Val]                       = AVector.empty
-  val existingContractsDefault: AVector[ExistingContract] = AVector.empty
-  val inputAssetsDefault: AVector[InputAsset]             = AVector.empty
-  val initialAssetDefault: Asset                          = Asset(ALPH.alph(1))
+  val groupDefault: Int                                = 0
+  val contractIdDefault: ContractId                    = ContractId.zero
+  val initialFieldsDefault: AVector[Val]               = AVector.empty
+  val testMethodIndexDefault: Int                      = 0
+  val testArgsDefault: AVector[Val]                    = AVector.empty
+  val existingContractsDefault: AVector[ContractState] = AVector.empty
+  val inputAssetsDefault: AVector[InputAsset]          = AVector.empty
+  val initialAssetDefault: Asset                       = Asset(ALPH.alph(1))
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
@@ -71,7 +71,7 @@ object TestContract {
       initialAsset: TestContract.Asset = initialAssetDefault,
       testMethodIndex: Int = testMethodIndexDefault,
       testArgs: AVector[Val] = testArgsDefault,
-      existingContracts: AVector[TestContract.ExistingContract] = existingContractsDefault,
+      existingContracts: AVector[TestContract.ContractState] = existingContractsDefault,
       inputAssets: AVector[TestContract.InputAsset] = inputAssetsDefault
   ) {
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
@@ -97,7 +97,7 @@ object TestContract {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class ExistingContract(
+  final case class ContractState(
       id: ContractId,
       code: StatefulContract,
       fields: AVector[Val] = AVector.empty,
