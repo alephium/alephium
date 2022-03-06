@@ -21,18 +21,27 @@ import org.alephium.util.AlephiumSpec
 
 class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
-    contractAst.getFieldSignature() is
+    contractAst.getFieldsSignature() is
       "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)"
+    contractAst.getFieldTypes() is
+      Seq("Bool", "U256", "I256", "ByteVec", "Address")
     contractAst.funcs.map(_.signature) is Seq(
-      "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+      "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)"
     )
+    contractAst.funcs.map(_.getArgTypeSignatures()) is
+      Seq(Seq("Bool", "U256", "I256", "ByteVec", "Address"))
+    contractAst.funcs.map(_.getReturnSignatures()) is
+      Seq(Seq("U256", "I256", "ByteVec", "Address"))
     contractAst.events.map(_.signature) is Seq(
       "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
     )
+    contractAst.events.map(_.getFieldTypeSignatures()) is
+      Seq(Seq("Bool", "U256", "ByteVec", "Address"))
 
-    scriptAst.getFieldSignature() is "TxScript Foo()"
+    scriptAst.getFieldsSignature() is "TxScript Foo()"
+    scriptAst.getFieldTypes() is Seq.empty
     scriptAst.funcs.map(_.signature) is Seq(
-      "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+      "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)"
     )
     scriptAst.events.map(_.signature) is Seq.empty
   }
@@ -43,21 +52,21 @@ trait TypeSignatureFixture extends CompilerConfigFixture.Default {
     s"""
        |TxContract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
-       |  pub payable fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address) -> (Bool, U256, I256, ByteVec, Address) {
+       |  pub payable fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address) -> (U256, I256, ByteVec, Address) {
        |    emit Bar(aa, bb, dd, ee)
-       |    return a, b, c, d, e
+       |    return b, c, d, e
        |  }
        |}
        |""".stripMargin
-  val (contract, contractAst) = Compiler.compileContractFull(contractStr).toOption.get
+  lazy val (contract, contractAst) = Compiler.compileContractFull(contractStr).toOption.get
 
   val scriptStr =
     s"""
        |TxScript Foo {
-       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address) -> (Bool, U256, I256, ByteVec, Address) {
-       |    return a, b, c, d, e
+       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address) -> (U256, I256, ByteVec, Address) {
+       |    return b, c, d, e
        |  }
        |}
        |""".stripMargin
-  val (script, scriptAst) = Compiler.compileTxScriptFull(scriptStr).toOption.get
+  lazy val (script, scriptAst) = Compiler.compileTxScriptFull(scriptStr).toOption.get
 }

@@ -14,13 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.api
 
-import org.alephium.util.AVector
+import org.scalatest.Assertion
 
-final case class TestContractResult(
-    returns: AVector[Val],
-    gasUsed: Int,
-    contracts: AVector[TestContract.ExistingContract],
-    assetOutputs: AVector[Output]
-)
+import org.alephium.json.Json.*
+import org.alephium.util.{AlephiumSpec, Duration}
+
+trait JsonFixture extends ApiModelCodec with AlephiumSpec {
+
+  val blockflowFetchMaxAge = Duration.unsafe(1000)
+
+  def checkData[T: Reader: Writer](
+      data: T,
+      jsonRaw: String,
+      dropWhiteSpace: Boolean = true
+  ): Assertion = {
+    write(data) is jsonRaw.filterNot(v => dropWhiteSpace && v.isWhitespace)
+    read[T](jsonRaw) is data
+  }
+}

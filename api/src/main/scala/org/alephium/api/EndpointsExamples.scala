@@ -418,18 +418,24 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CompileResult(
         bytecode = Hex.unsafe(hexString),
-        fieldsSignature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+        fields = CompileResult.Fields(
+          signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
+        ),
         functions = AVector(
           CompileResult.Function(
             id = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+            argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
         ),
         events = AVector(
           CompileResult.Event(
             id = "Bar",
-            signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
+            signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+            fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
           )
         )
       )
@@ -513,15 +519,15 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val testContractExamples: List[Example[TestContract]] = {
     simpleExample(
       TestContract(
-        group = 0,
-        contractId = ContractId.zero,
-        code = code,
-        initialFields = AVector[Val](Val.U256(ALPH.oneAlph)),
-        initialAsset = asset(1),
-        testMethodIndex = 0,
-        testArgs = AVector[Val](Val.U256(ALPH.oneAlph)),
-        existingContracts = AVector(existingContract),
-        inputAssets = AVector(TestContract.InputAsset(address, asset(3)))
+        group = Some(0),
+        contractId = Some(ContractId.zero),
+        bytecode = code,
+        initialFields = Some(AVector[Val](Val.U256(ALPH.oneAlph))),
+        initialAsset = Some(asset(1)),
+        testMethodIndex = Some(0),
+        testArgs = Some(AVector[Val](Val.U256(ALPH.oneAlph))),
+        existingContracts = Some(AVector(existingContract)),
+        inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
       )
     )
   }
@@ -532,7 +538,7 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](Val.U256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
-        outputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens))
+        assetOutputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens))
       )
     )
 

@@ -349,6 +349,8 @@ object Ast {
       val payablePrefix = if (isPayable) "payable " else ""
       s"${publicPrefix}${payablePrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
     }
+    def getArgTypeSignatures(): Seq[String] = args.map(_.tpe.signature)
+    def getReturnSignatures(): Seq[String]  = rtypes.map(_.signature)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
@@ -440,6 +442,8 @@ object Ast {
     def name: String = id.name
 
     def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
+
+    def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -717,10 +721,8 @@ object Ast {
     def fields: Seq[Argument]
     def events: Seq[EventDef]
 
-    def getFieldSignature(): String
-    protected def _getFieldSignature(): String = {
-      s"${name}(${fields.map(_.signature).mkString(",")})"
-    }
+    def getFieldsSignature(): String
+    def getFieldTypes(): Seq[String]
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       if (events.distinctBy(_.id).size != events.size) {
@@ -738,7 +740,8 @@ object Ast {
     val events: Seq[EventDef] = Seq.empty
     val fields: Seq[Argument] = Seq.empty
 
-    def getFieldSignature(): String = s"TxScript ${_getFieldSignature()}"
+    def getFieldsSignature(): String = s"TxScript $name()"
+    def getFieldTypes(): Seq[String] = Seq.empty
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
@@ -759,7 +762,9 @@ object Ast {
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef]
   ) extends ContractWithState {
-    def getFieldSignature(): String = s"TxContract ${_getFieldSignature()}"
+    def getFieldsSignature(): String =
+      s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
+    def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)

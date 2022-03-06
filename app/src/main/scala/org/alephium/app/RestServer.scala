@@ -101,6 +101,7 @@ class RestServer(
       compileContractLogic,
       buildContractLogic,
       contractStateLogic,
+      testContractLogic,
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,

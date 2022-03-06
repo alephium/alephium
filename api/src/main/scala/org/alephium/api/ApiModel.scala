@@ -250,6 +250,7 @@ trait ApiModelCodec {
 
   implicit val compileContractRW: RW[Compile.Contract] = macroRW
 
+  implicit val compileResultFieldsRW: RW[CompileResult.Fields]     = macroRW
   implicit val compileResultFunctionRW: RW[CompileResult.Function] = macroRW
   implicit val compileResultEventRW: RW[CompileResult.Event]       = macroRW
   implicit val compileResultRW: RW[CompileResult]                  = macroRW

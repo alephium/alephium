@@ -25,7 +25,7 @@ import org.alephium.util.AVector
 
 final case class CompileResult(
     bytecode: ByteString,
-    fieldsSignature: String,
+    fields: CompileResult.Fields,
     functions: AVector[CompileResult.Function],
     events: AVector[CompileResult.Event]
 )
@@ -33,25 +33,38 @@ final case class CompileResult(
 object CompileResult {
 
   def from[T: Serde](contract: T, contractAst: Ast.ContractWithState): CompileResult = {
+    val fields = Fields(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
     CompileResult(
       bytecode = serialize(contract),
-      fieldsSignature = contractAst.getFieldSignature(),
+      fields = fields,
       functions = AVector.from(contractAst.funcs.view.map(Function.from)),
       events = AVector.from(contractAst.events.map(Event.from))
     )
   }
 
-  final case class Function(id: String, signature: String)
+  final case class Fields(signature: String, types: AVector[String])
+
+  final case class Function(
+      id: String,
+      signature: String,
+      argTypes: AVector[String],
+      returnTypes: AVector[String]
+  )
   object Function {
     def from(func: Ast.FuncDef[StatefulContext]): Function = {
-      Function(func.id.name, func.signature)
+      Function(
+        func.id.name,
+        func.signature,
+        AVector.from(func.getArgTypeSignatures()),
+        AVector.from(func.getReturnSignatures())
+      )
     }
   }
 
-  final case class Event(id: String, signature: String)
+  final case class Event(id: String, signature: String, fieldTypes: AVector[String])
   object Event {
     def from(event: Ast.EventDef): Event = {
-      Event(event.name, event.signature)
+      Event(event.name, event.signature, AVector.from(event.getFieldTypeSignatures()))
     }
   }
 }

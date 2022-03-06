@@ -20,7 +20,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.util.ByteString
 import org.scalacheck.Gen
-import org.scalatest.{Assertion, EitherValues}
+import org.scalatest.EitherValues
 
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
@@ -33,7 +33,7 @@ import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
 //scalastyle:off file.size.limit
-class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues with NumericHelpers {
+class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
   val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
@@ -64,8 +64,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     )
   val dummyPeerInfo = BrokerInfo.unsafe(CliqueId.generate, 1, 3, dummyAddress)
 
-  val blockflowFetchMaxAge = Duration.unsafe(1000)
-
   val apiKey = Hash.generate.toHexString
 
   val inetAddress = InetAddress.getByName("127.0.0.1")
@@ -73,14 +71,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
     Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
-  def checkData[T: Reader: Writer](
-      data: T,
-      jsonRaw: String,
-      dropWhiteSpace: Boolean = true
-  ): Assertion = {
-    write(data) is jsonRaw.filterNot(v => dropWhiteSpace && v.isWhitespace)
-    read[T](jsonRaw) is data
-  }
 
   def blockEntryJson(blockEntry: BlockEntry): String = {
     s"""
@@ -743,35 +733,6 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
     checkData(verifySignature, jsonRaw)
   }
 
-  it should "encode/decode Val.Bool" in {
-    checkData[Val](Val.True, """{"type": "bool", "value": true}""")
-    checkData[Val](Val.False, """{"type": "bool", "value": false}""")
-  }
-
-  it should "encode/decode Val.ByteVec" in {
-    val bytes = Hash.generate.bytes
-    checkData[Val](
-      Val.ByteVec(bytes),
-      s"""{"type": "bytevec", "value": "${Hex.toHexString(bytes)}"}"""
-    )
-  }
-
-  it should "encode/decode Val.U256" in {
-    checkData[Val](Val.U256(U256.MaxValue), s"""{"type": "u256", "value": "${U256.MaxValue}"}""")
-  }
-
-  it should "encode/decode Val.I256" in {
-    checkData[Val](Val.I256(I256.MinValue), s"""{"type": "i256", "value": "${I256.MinValue}"}""")
-  }
-
-  it should "encode/decode Val.Address" in {
-    val address = generateContractAddress()
-    checkData[Val](
-      Val.Address(address),
-      s"""{"type": "address", "value": "${address.toBase58}"}"""
-    )
-  }
-
   it should "encode/decode ContractStateResult" in {
     val u256     = Val.U256(U256.MaxValue)
     val i256     = Val.I256(I256.MaxValue)
@@ -783,27 +744,27 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
         |{
         |  "fields": [
         |     {
-        |       "type":"u256",
+        |       "type":"U256",
         |       "value": "${u256.value}"
         |     },
         |     {
-        |       "type":"i256",
+        |       "type":"I256",
         |       "value": "${i256.value}"
         |     },
         |     {
-        |       "type":"bool",
+        |       "type":"Bool",
         |       "value": ${bool.value}
         |     },
         |     {
-        |       "type":"bytevec",
+        |       "type":"ByteVec",
         |       "value": "${Hex.toHexString(byteVec.value)}"
         |     },
         |     {
-        |       "type":"address",
+        |       "type":"Address",
         |       "value": "${address1.value.toBase58}"
         |     },
         |     {
-        |       "type":"address",
+        |       "type":"Address",
         |       "value": "${address2.value.toBase58}"
         |     }
         |   ]
@@ -815,37 +776,52 @@ class ApiModelSpec extends AlephiumSpec with ApiModelCodec with EitherValues wit
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {
     val result0 = CompileResult.from(contract, contractAst)
     val jsonRaw0 =
-      """{
-        |  "bytecode": "05011b01010505050c05a000a001a003a004611600160116021603160402",
-        |  "fieldsSignature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+      """
+        |{
+        |  "bytecode": "05011901010505040b05a000a001a003a00461160116021603160402",
+        |  "fields": {
+        |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+        |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"]
+        |  },
         |  "functions": [
         |    {
         |      "id": "bar",
-        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+        |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address"],
+        |      "returnTypes": ["U256", "I256", "ByteVec", "Address"]
         |    }
         |  ],
         |  "events": [
         |    {
         |      "id": "Bar",
-        |      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
+        |      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+        |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
         |    }
         |  ]
-        |}""".stripMargin
+        |}
+        |""".stripMargin
     write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
 
     val result1 = CompileResult.from(script, scriptAst)
     val jsonRaw1 =
-      """{
-        |  "bytecode": "010100050505061600160116021603160402",
-        |  "fieldsSignature": "TxScript Foo()",
+      """
+        |{
+        |  "bytecode": "01010005050405160116021603160402",
+        |  "fields": {
+        |    "signature": "TxScript Foo()",
+        |    "types": []
+        |  },
         |  "functions": [
         |    {
         |      "id": "bar",
-        |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(Bool,U256,I256,ByteVec,Address)"
+        |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+        |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address"],
+        |      "returnTypes": ["U256", "I256", "ByteVec", "Address"]
         |    }
         |  ],
         |  "events": []
-        |}""".stripMargin
+        |}
+        |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)
   }
 

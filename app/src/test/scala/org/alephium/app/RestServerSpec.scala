@@ -765,15 +765,15 @@ abstract class RestServerSpec(
         |      "index": 0,
         |      "fields": [
         |        {
-        |          "type": "u256",
+        |          "type": "U256",
         |          "value": "4"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
         |        }
         |      ]
@@ -822,15 +822,15 @@ abstract class RestServerSpec(
         |      "index": 0,
         |      "fields": [
         |        {
-        |          "type": "u256",
+        |          "type": "U256",
         |          "value": "4"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
         |        }
         |      ]

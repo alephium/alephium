@@ -821,7 +821,10 @@ class ServerUtils(implicit
     result.left.map(failedInIO(_))
   }
 
-  def runTestContract(blockFlow: BlockFlow, testContract: TestContract): Try[TestContractResult] = {
+  def runTestContract(
+      blockFlow: BlockFlow,
+      testContract: TestContract.Complete
+  ): Try[TestContractResult] = {
     val contractId = testContract.contractId
     for {
       groupIndex <- testContract.groupIndex
@@ -843,14 +846,14 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
-        outputs = executionResult.generatedOutputs.map(Output.from)
+        assetOutputs = executionResult.generatedOutputs.map(Output.from)
       )
     }
   }
 
   private def fetchContractsState(
       worldState: WorldState.Staging,
-      testContract: TestContract
+      testContract: TestContract.Complete
   ): Try[AVector[TestContract.ExistingContract]] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
@@ -881,7 +884,7 @@ class ServerUtils(implicit
   private def executeTestContract(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      testContract: TestContract,
+      testContract: TestContract.Complete,
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv =
@@ -912,7 +915,7 @@ class ServerUtils(implicit
   }
 
   private def approveAsset(
-      testContract: TestContract,
+      testContract: TestContract.Complete,
       gasFee: U256
   ): AVector[Instr[StatefulContext]] = {
     testContract.inputAssets.flatMapWithIndex { (asset, index) =>
@@ -922,7 +925,7 @@ class ServerUtils(implicit
   }
 
   private def callExternal(
-      testContract: TestContract,
+      testContract: TestContract.Complete,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
     testContract.testArgs.map(_.toVmVal.toConstInstr: Instr[StatefulContext]) ++
@@ -948,7 +951,7 @@ class ServerUtils(implicit
   def createContract(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      testContract: TestContract
+      testContract: TestContract.Complete
   ): Try[Unit] = {
     createContract(
       worldState,
