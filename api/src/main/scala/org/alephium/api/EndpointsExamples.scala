@@ -424,7 +424,7 @@ trait EndpointsExamples extends ErrorExamples {
         ),
         functions = AVector(
           CompileResult.Function(
-            id = "bar",
+            name = "bar",
             signature =
               "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
@@ -433,7 +433,7 @@ trait EndpointsExamples extends ErrorExamples {
         ),
         events = AVector(
           CompileResult.Event(
-            id = "Bar",
+            name = "Bar",
             signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
           )

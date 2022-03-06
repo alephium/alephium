@@ -5166,7 +5166,7 @@
                   },
                   "functions": [
                     {
-                      "id": "bar",
+                      "name": "bar",
                       "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argTypes": [
                         "Bool",
@@ -5185,7 +5185,7 @@
                   ],
                   "events": [
                     {
-                      "id": "Bar",
+                      "name": "Bar",
                       "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
                       "fieldTypes": [
                         "Bool",
@@ -5431,7 +5431,7 @@
                   },
                   "functions": [
                     {
-                      "id": "bar",
+                      "name": "bar",
                       "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argTypes": [
                         "Bool",
@@ -5450,7 +5450,7 @@
                   ],
                   "events": [
                     {
-                      "id": "Bar",
+                      "name": "Bar",
                       "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
                       "fieldTypes": [
                         "Bool",
@@ -8149,13 +8149,13 @@
       },
       "Event": {
         "required": [
-          "id",
+          "name",
           "signature",
           "fieldTypes"
         ],
         "type": "object",
         "properties": {
-          "id": {
+          "name": {
             "type": "string"
           },
           "signature": {
@@ -8284,14 +8284,14 @@
       },
       "Function": {
         "required": [
-          "id",
+          "name",
           "signature",
           "argTypes",
           "returnTypes"
         ],
         "type": "object",
         "properties": {
-          "id": {
+          "name": {
             "type": "string"
           },
           "signature": {

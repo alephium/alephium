@@ -45,7 +45,7 @@ object CompileResult {
   final case class Fields(signature: String, types: AVector[String])
 
   final case class Function(
-      id: String,
+      name: String,
       signature: String,
       argTypes: AVector[String],
       returnTypes: AVector[String]
@@ -61,7 +61,7 @@ object CompileResult {
     }
   }
 
-  final case class Event(id: String, signature: String, fieldTypes: AVector[String])
+  final case class Event(name: String, signature: String, fieldTypes: AVector[String])
   object Event {
     def from(event: Ast.EventDef): Event = {
       Event(event.name, event.signature, AVector.from(event.getFieldTypeSignatures()))

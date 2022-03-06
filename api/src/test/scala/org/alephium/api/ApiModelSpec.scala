@@ -785,7 +785,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  },
         |  "functions": [
         |    {
-        |      "id": "bar",
+        |      "name": "bar",
         |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address"]
@@ -793,7 +793,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  ],
         |  "events": [
         |    {
-        |      "id": "Bar",
+        |      "name": "Bar",
         |      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
         |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
         |    }
@@ -813,7 +813,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  },
         |  "functions": [
         |    {
-        |      "id": "bar",
+        |      "name": "bar",
         |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address"]
