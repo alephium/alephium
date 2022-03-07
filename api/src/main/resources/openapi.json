@@ -5802,7 +5802,7 @@
               },
               "example": {
                 "group": 0,
-                "contractId": "0000000000000000000000000000000000000000000000000000000000000000",
+                "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                 "bytecode": "00010700000000000118",
                 "initialFields": [
                   {
@@ -5828,7 +5828,7 @@
                 ],
                 "existingContracts": [
                   {
-                    "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
+                    "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                     "code": "00010700000000000118",
                     "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "fields": [
@@ -5884,7 +5884,7 @@
                   "gasUsed": 20000,
                   "contracts": [
                     {
-                      "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
+                      "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "code": "00010700000000000118",
                       "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "fields": [
@@ -8093,7 +8093,7 @@
       },
       "ContractState": {
         "required": [
-          "id",
+          "address",
           "code",
           "codeHash",
           "fields",
@@ -8101,7 +8101,7 @@
         ],
         "type": "object",
         "properties": {
-          "id": {
+          "address": {
             "type": "string"
           },
           "code": {
@@ -8933,7 +8933,7 @@
           "group": {
             "type": "integer"
           },
-          "contractId": {
+          "address": {
             "type": "string"
           },
           "bytecode": {

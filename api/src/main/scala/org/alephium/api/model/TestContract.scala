@@ -29,7 +29,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
     group: Option[Int] = None,
-    contractId: Option[ContractId] = None,
+    address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
     initialFields: Option[AVector[Val]] = None,
     initialAsset: Option[TestContract.Asset] = None,
@@ -41,7 +41,7 @@ final case class TestContract(
   def toComplete: TestContract.Complete =
     Complete(
       group.getOrElse(groupDefault),
-      contractId.getOrElse(contractIdDefault),
+      address.getOrElse(addressDefault).contractId,
       code = bytecode,
       initialFields.getOrElse(initialFieldsDefault),
       initialAsset.getOrElse(initialAssetDefault),
@@ -54,7 +54,7 @@ final case class TestContract(
 
 object TestContract {
   val groupDefault: Int                                = 0
-  val contractIdDefault: ContractId                    = ContractId.zero
+  val addressDefault: Address.Contract                 = Address.contract(ContractId.zero)
   val initialFieldsDefault: AVector[Val]               = AVector.empty
   val testMethodIndexDefault: Int                      = 0
   val testArgsDefault: AVector[Val]                    = AVector.empty
@@ -65,7 +65,7 @@ object TestContract {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
       group: Int = groupDefault,
-      contractId: ContractId = contractIdDefault,
+      contractId: ContractId = addressDefault.contractId,
       code: StatefulContract,
       initialFields: AVector[Val] = initialFieldsDefault,
       initialAsset: TestContract.Asset = initialAssetDefault,
@@ -98,12 +98,14 @@ object TestContract {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class ContractState(
-      id: ContractId,
+      address: Address.Contract,
       code: StatefulContract,
       codeHash: Hash,
       fields: AVector[Val] = AVector.empty,
       asset: Asset
-  )
+  ) {
+    def id: ContractId = address.lockupScript.contractId
+  }
 
   final case class InputAsset(address: Address.Asset, asset: Asset) {
     def toAssetOutput: AssetOutput =

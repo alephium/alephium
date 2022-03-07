@@ -512,7 +512,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val anotherContractId = ContractId.hash("contract")
   private val code              = StatefulContract.forSMT.toContract().toOption.get
   private lazy val existingContract = TestContract.ContractState(
-    id = anotherContractId,
+    address = Address.contract(anotherContractId),
     code = code,
     codeHash = code.hash,
     fields = AVector[Val](Val.U256(ALPH.alph(2))),
@@ -522,7 +522,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       TestContract(
         group = Some(0),
-        contractId = Some(ContractId.zero),
+        address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
         initialFields = Some(AVector[Val](Val.U256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),

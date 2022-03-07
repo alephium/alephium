@@ -873,7 +873,7 @@ class ServerUtils(implicit
       contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
     } yield TestContract.ContractState(
-      contractId,
+      Address.contract(contractId),
       contract,
       contract.hash,
       state.fields.map(Val.from),
