@@ -24,8 +24,8 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
-import org.alephium.protocol.vm.{LockupScript, UnlockScript}
-import org.alephium.serde.serialize
+import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
+import org.alephium.serde._
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -182,6 +182,14 @@ trait EndpointsExamples extends ErrorExamples {
     chainTo = 2,
     height = height,
     deps = AVector(blockHash, blockHash)
+  )
+
+  private val event = Event(
+    blockHash,
+    txId,
+    contractAddress.lockupScript.contractId,
+    index = 1,
+    fields = AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
   )
 
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
@@ -364,11 +372,22 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
-    simpleExample(BuildTransactionResult(unsignedTx = hexString, hash, fromGroup = 2, toGroup = 1))
+    simpleExample(
+      BuildTransactionResult(
+        unsignedTx = hexString,
+        minimalGas,
+        defaultGasPrice,
+        hash,
+        fromGroup = 2,
+        toGroup = 1
+      )
+    )
 
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
-    val sweepAddressTxs = AVector(SweepAddressTransaction(hash, hexString))
+    val sweepAddressTxs = AVector(
+      SweepAddressTransaction(hash, hexString, minimalGas, defaultGasPrice)
+    )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
 
@@ -509,6 +528,45 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  private def asset(n: Long) = TestContract.Asset(
+    ALPH.alph(n),
+    AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
+  )
+  private val anotherContractId = ContractId.hash("contract")
+  private val code              = StatefulContract.forSMT.toContract().toOption.get
+  private lazy val existingContract = TestContract.ExistingContract(
+    id = anotherContractId,
+    code = code,
+    fields = AVector[Val](Val.U256(ALPH.alph(2))),
+    asset = asset(2)
+  )
+  implicit val testContractExamples: List[Example[TestContract]] = {
+    simpleExample(
+      TestContract(
+        group = 0,
+        contractId = ContractId.zero,
+        code = code,
+        initialFields = AVector[Val](Val.U256(ALPH.oneAlph)),
+        initialAsset = asset(1),
+        testMethodIndex = 0,
+        testArgs = AVector[Val](Val.U256(ALPH.oneAlph)),
+        existingContracts = AVector(existingContract),
+        inputAssets = AVector(TestContract.InputAsset(address, asset(3)))
+      )
+    )
+  }
+
+  implicit val testContractResultExamples: List[Example[TestContractResult]] =
+    simpleExample(
+      TestContractResult(
+        returns = AVector[Val](Val.U256(ALPH.oneAlph)),
+        gasUsed = 20000,
+        contracts = AVector(existingContract),
+        outputs =
+          AVector(Output.Contract(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens))
+      )
+    )
+
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))
 
@@ -523,5 +581,11 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
+
+  implicit val eventsExamples: List[Example[Events]] =
+    simpleExample(Events(0, 1, events = AVector(event)))
+
+  implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
+    simpleExample(AVector(Events(0, 1, events = AVector(event))))
 }
 // scalastyle:on magic.number

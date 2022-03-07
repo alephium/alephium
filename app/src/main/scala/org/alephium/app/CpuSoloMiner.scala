@@ -42,12 +42,10 @@ class CpuSoloMiner(config: AlephiumConfig, system: ActorSystem, rawApiAddresses:
   val miner: ActorRef = {
     val props = rawApiAddresses match {
       case None =>
-        ExternalMinerMock.singleNode(config).withDispatcher("akka.actor.mining-dispatcher")
+        ExternalMinerMock.singleNode(config)
       case Some(rawAddresses) =>
         val addresses = rawAddresses.split(",").map(parseHostAndPort)
-        ExternalMinerMock
-          .props(config, AVector.unsafe(addresses))
-          .withDispatcher("akka.actor.mining-dispatcher")
+        ExternalMinerMock.props(config, AVector.unsafe(addresses))
     }
     system.actorOf(props)
   }

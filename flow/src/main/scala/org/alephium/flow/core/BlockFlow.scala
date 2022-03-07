@@ -24,11 +24,12 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{AVector, Env, TimeStamp}
+import org.alephium.protocol.vm.{LogConfig, WorldState}
+import org.alephium.util.{AVector, Env, Files, TimeStamp}
 
 trait BlockFlow
     extends MultiChain
@@ -70,8 +71,9 @@ trait BlockFlow
       if (maxHeight == ALPH.GenesisHeight) {
         AVector.empty
       } else {
+        val startHeight = Math.max(ALPH.GenesisHeight + 1, maxHeight - 2 * maxForkDepth)
         HistoryLocators
-          .sampleHeights(ALPH.GenesisHeight + 1, maxHeight)
+          .sampleHeights(startHeight, maxHeight)
           .map(height => Utils.unsafe(chain.getHashes(height).map(_.head)))
       }
     } else {
@@ -118,12 +120,27 @@ trait BlockFlow
 object BlockFlow extends StrictLogging {
   type WorldStateUpdater = (WorldState.Cached, Block) => IOResult[Unit]
 
+  def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
+    val storages =
+      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, Settings.writeOptions)(
+        config.broker
+      )
+    fromGenesisUnsafe(storages, config.genesisBlocks)(
+      config.broker,
+      config.network,
+      config.consensus,
+      config.mempool,
+      config.node.logConfig
+    )
+  }
+
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
     fromGenesisUnsafe(storages, config.genesisBlocks)(
       config.broker,
       config.network,
       config.consensus,
-      config.mempool
+      config.mempool,
+      config.node.logConfig
     )
   }
 
@@ -131,7 +148,8 @@ object BlockFlow extends StrictLogging {
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
       consensusSetting: ConsensusSetting,
-      memPoolSetting: MemPoolSetting
+      memPoolSetting: MemPoolSetting,
+      logConfig: LogConfig
   ): BlockFlow = {
     Env.forProd(logger.info(s"Initialize storage for BlockFlow"))
     val blockFlow = new BlockFlowImpl(
@@ -149,7 +167,8 @@ object BlockFlow extends StrictLogging {
       config.broker,
       config.network,
       config.consensus,
-      config.mempool
+      config.mempool,
+      config.node.logConfig
     )
   }
 
@@ -194,7 +213,8 @@ object BlockFlow extends StrictLogging {
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
       consensusSetting: ConsensusSetting,
-      memPoolSetting: MemPoolSetting
+      memPoolSetting: MemPoolSetting,
+      logConfig: LogConfig
   ): BlockFlow = {
     val blockflow = new BlockFlowImpl(
       genesisBlocks,
@@ -218,7 +238,8 @@ object BlockFlow extends StrictLogging {
       val brokerConfig: BrokerConfig,
       val networkConfig: NetworkConfig,
       val consensusConfig: ConsensusSetting,
-      val mempoolSetting: MemPoolSetting
+      val mempoolSetting: MemPoolSetting,
+      val logConfig: LogConfig
   ) extends BlockFlow {
 
     // for intra-group block, worldStateOpt should not be empty

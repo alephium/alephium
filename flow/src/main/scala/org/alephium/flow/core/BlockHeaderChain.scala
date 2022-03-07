@@ -18,17 +18,19 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import com.typesafe.scalalogging.LazyLogging
+
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{ALPH, BlockHash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{BlockHeader, Target, Weight}
+import org.alephium.protocol.model.{BlockHeader, ChainIndex, Target, Weight}
 import org.alephium.protocol.vm.BlockEnv
 import org.alephium.util._
 
-trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
+trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogging {
   implicit def networkConfig: NetworkConfig
 
   def headerStorage: BlockHeaderStorage
@@ -77,7 +79,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
       parentState <- getState(parentHash)
       height = parentState.height + 1
       _           <- addHeader(header)
-      isCanonical <- checkCanonicality(header.hash, weight)
+      isCanonical <- checkCanonicality(header.hash, height)
       _           <- addHash(header.hash, parentHash, height, weight, header.timestamp, isCanonical)
       _           <- if (isCanonical) reorgFrom(header.parentHash, height - 1) else Right(())
     } yield ()
@@ -91,9 +93,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     } yield ()
   }
 
-  private def checkCanonicality(hash: BlockHash, weight: Weight): IOResult[Boolean] = {
+  // We use height for canonicality checking. This will converge to weight based checking eventually
+  private def checkCanonicality(hash: BlockHash, height: Int): IOResult[Boolean] = {
     EitherF.forallTry(tips.keys()) { tip =>
-      getWeight(tip).map(BlockHashPool.compare(hash, weight, tip, _) > 0)
+      getHeight(tip).map(BlockHashPool.compareHeight(hash, height, tip, _) > 0)
     }
   }
 
@@ -147,7 +150,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
     for {
       tip    <- getBestTip()
       target <- getNextHashTargetRaw(tip)
-    } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target)
+    } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target, Some(tip))
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
@@ -198,6 +201,41 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain {
   def getBlockTime(header: BlockHeader): IOResult[Duration] = {
     getBlockHeader(header.parentHash)
       .map(header.timestamp deltaUnsafe _.timestamp)
+  }
+
+  def checkHashIndexingUnsafe(): Unit = {
+    val maxHeight   = maxHeightUnsafe
+    var startHeight = maxHeight - maxForkDepth
+
+    if (startHeight > ALPH.GenesisHeight) {
+      while (getHashesUnsafe(startHeight).length > 1) {
+        startHeight = startHeight - 1
+      }
+      checkHashIndexingUnsafe(startHeight)
+      logger.info(s"Start checking hash indexing for $chainIndex from height $startHeight")
+    } else {
+      logger.info(s"No need to check hash indexing for $chainIndex due to too few blocks")
+    }
+  }
+
+  def checkHashIndexingUnsafe(startHeight: Int): Unit = {
+    val startHash  = getHashesUnsafe(startHeight).head
+    val chainIndex = ChainIndex.from(startHash)
+
+    var currentHeight = startHeight
+    var currentHeader = getBlockHeaderUnsafe(startHash)
+    while (!currentHeader.isGenesis) {
+      val nextHeight = currentHeight - 1
+      val nextHash   = currentHeader.parentHash
+      val nextHashes = getHashesUnsafe(nextHeight)
+      if (nextHashes.head != nextHash) {
+        logger.warn(s"Update hashes order at: chainIndex $chainIndex; height $nextHeight")
+        heightIndexStorage.put(nextHeight, nextHash +: nextHashes.filter(_ != nextHash))
+      }
+
+      currentHeight = nextHeight
+      currentHeader = getBlockHeaderUnsafe(nextHash)
+    }
   }
 }
 

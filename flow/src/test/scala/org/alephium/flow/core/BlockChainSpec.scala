@@ -323,7 +323,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     longChain.foreach { block => chain.isCanonicalUnsafe(block.hash) is true }
   }
 
-  it should "check reorg when weights of blocks are equal" in new Fixture {
+  it should "update mainchain hash based on heights" in new Fixture {
     val longChain  = chainGenOf(3, genesis).sample.get
     val shortChain = chainGenOf(2, genesis).sample.get
 
@@ -332,22 +332,31 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(shortChain(0).hash)
     chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash)
 
-    addBlocks(chain, longChain.take(2))
-    if (chain.blockHashOrdering.compare(longChain(1).hash, shortChain(1).hash) > 0) {
-      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
-      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
-    } else {
-      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
-      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
-    }
-
-    addBlocks(chain, longChain.drop(2))
+    addBlocks(chain, longChain)
     chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
     chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
-    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
   }
 
-  it should "check reorg when weights of blocks are different" in new Fixture {
+  it should "update mainchain hash when heights of blocks are equal" in new Fixture {
+    val chain0 = chainGenOf(2, genesis).sample.get
+    val chain1 = chainGenOf(2, genesis).sample.get
+
+    val chain = buildBlockChain()
+    addBlocks(chain, chain0)
+    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(chain0(0).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain0(1).hash)
+
+    addBlocks(chain, chain1)
+    if (chain.blockHashOrdering.compare(chain1(1).hash, chain0(1).hash) > 0) {
+      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(chain1(0).hash, chain0(0).hash)
+      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain1(1).hash, chain0(1).hash)
+    } else {
+      chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(chain0(0).hash, chain1(0).hash)
+      chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(chain0(1).hash, chain1(1).hash)
+    }
+  }
+
+  it should "update mainchain hash based on heights instead of weight" in new Fixture {
     override val configValues = Map(
       ("alephium.consensus.num-zeros-at-least-in-hash", 10)
     )
@@ -369,18 +378,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     val chain = buildBlockChain()
     addBlocks(chain, longChain)
-    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash)
-    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash)
-    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
-
-    addBlocks(chain, shortChain.take(1))
+    addBlocks(chain, shortChain)
     chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(longChain(0).hash, shortChain(0).hash)
-    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash)
-    chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
-
-    addBlocks(chain, shortChain.drop(1))
-    chain.getHashes(ALPH.GenesisHeight + 1) isE AVector(shortChain(0).hash, longChain(0).hash)
-    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash, longChain(1).hash)
+    chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
     chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain(2).hash)
   }
 
@@ -555,10 +555,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val longChain = chainGenOf(9, genesis).sample.get
     val chain     = buildBlockChain()
     addBlocks(chain, longChain)
-    val all = chain.getHeightedBlocks(TimeStamp.zero, TimeStamp.unsafe(Long.MaxValue))
+    val all = chain
+      .getHeightedBlocks(TimeStamp.zero, TimeStamp.unsafe(Long.MaxValue))
 
-    val ts      = all.rightValue.map { case (header, _) => header.timestamp }
-    val heights = all.rightValue.map { case (_, heights) => heights }
+    val ts      = all.rightValue._2.map { case (header, _) => header.timestamp }
+    val heights = all.rightValue._2.map { case (_, heights) => heights }
 
     heights is AVector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
@@ -566,6 +567,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain
         .getHeightedBlocks(from, to)
         .rightValue
+        ._2
         .map { case (_, heights) => heights }
     }
 
@@ -582,5 +584,24 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     subset(ts(6), ts(9).minusUnsafe(Duration.ofMillisUnsafe(1))) is AVector(6, 7, 8)
     val ten = ts(9).plusMillisUnsafe(1)
     subset(ten, ten) is AVector.empty[Int]
+  }
+
+  it should "fix hash indexing" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val shortChain = chainGenOf(2, genesis).sample.get
+    val longChain  = chainGenOf(4, genesis).sample.get
+    val chain      = buildBlockChain()
+    addBlocks(chain, shortChain)
+    addBlocks(chain, longChain)
+
+    val shortHash = shortChain(1).hash
+    val longHash  = longChain(1).hash
+    chain.getHashes(2) isE AVector(longHash, shortHash)
+    chain.heightIndexStorage.put(2, AVector(shortHash, longHash))
+    chain.getHashes(2) isE AVector(shortHash, longHash)
+
+    chain.checkHashIndexingUnsafe(3)
+    chain.getHashes(2) isE AVector(longHash, shortHash)
   }
 }

@@ -33,6 +33,7 @@ import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidation
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LogConfig
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -44,7 +45,8 @@ object TxHandler {
   )(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
-      networkSetting: NetworkSetting
+      networkSetting: NetworkSetting,
+      logConfig: LogConfig
   ): Props =
     Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
 
@@ -96,7 +98,8 @@ class TxHandler(
 )(implicit
     brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
-    networkSetting: NetworkSetting
+    networkSetting: NetworkSetting,
+    logConfig: LogConfig
 ) extends IOBaseActor
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
@@ -322,7 +325,7 @@ class TxHandler(
   ): Unit = {
     val currentTs = TimeStamp.now()
     val result    = mempool.addNewTx(chainIndex, tx, currentTs)
-    log.info(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
+    log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
       case MemPool.AddedToSharedPool =>
         if (needToDelay(chainIndex, tx)) {

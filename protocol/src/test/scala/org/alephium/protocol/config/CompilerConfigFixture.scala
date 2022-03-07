@@ -14,10 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.io
+package org.alephium.protocol.config
 
-trait MutableTrie[K, V, T] extends ReadableTrie[K, V] {
-  def remove(key: K): IOResult[T]
+trait CompilerConfigFixture { self =>
+  def loopUnrollingLimit: Int
 
-  def put(key: K, value: V): IOResult[T]
+  implicit lazy val compilerConfig: CompilerConfig = new CompilerConfig {
+    override def loopUnrollingLimit: Int = self.loopUnrollingLimit
+  }
+}
+
+object CompilerConfigFixture {
+  trait Default extends CompilerConfigFixture {
+    val loopUnrollingLimit: Int = 1000
+  }
 }

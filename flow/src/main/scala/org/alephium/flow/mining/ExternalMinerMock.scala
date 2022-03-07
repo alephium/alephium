@@ -51,7 +51,7 @@ object ExternalMinerMock {
       config.broker,
       config.network,
       config.mining
-    )
+    ).withDispatcher(MiningDispatcher)
   }
 
   def props(nodes: AVector[InetSocketAddress])(implicit

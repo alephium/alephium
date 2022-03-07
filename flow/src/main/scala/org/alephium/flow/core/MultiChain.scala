@@ -40,6 +40,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
       f: BlockChain => IOResult[T]
   ): IOResult[AVector[T]]
 
+  protected def concatIntraBlockChainsE[T: ClassTag](
+      f: BlockChain => IOResult[T]
+  ): IOResult[AVector[T]]
+
   def numHashes: Int = aggregateHash(_.numHashes)(_ + _)
 
   /* BlockHash apis */
@@ -73,8 +77,14 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getHeightedBlocks(
       fromTs: TimeStamp,
       toTs: TimeStamp
-  ): IOResult[AVector[AVector[(Block, Int)]]] =
+  ): IOResult[AVector[(ChainIndex, AVector[(Block, Int)])]] =
     concatOutBlockChainsE(_.getHeightedBlocks(fromTs, toTs))
+
+  def getHeightedIntraBlocks(
+      fromTs: TimeStamp,
+      toTs: TimeStamp
+  ): IOResult[AVector[(ChainIndex, AVector[(Block, Int)])]] =
+    concatIntraBlockChainsE(_.getHeightedBlocks(fromTs, toTs))
 
   def getHashesAfter(locator: BlockHash): IOResult[AVector[BlockHash]] =
     getHashChain(locator).getHashesAfter(locator)

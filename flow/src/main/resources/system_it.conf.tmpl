@@ -33,6 +33,7 @@ alephium {
 
     fast-sync-frequency = 2 second
     stable-sync-frequency = 20 second
+    sync-peer-sample-size = 5
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 10 minute
@@ -66,6 +67,10 @@ alephium {
     max-clique-from-same-ip = 2
   }
 
+  compiler {
+    loop-unrolling-limit = 1000
+  }
+
   api {
     network-interface = "127.0.0.1"
     blockflow-fetch-max-age = 30 minutes
@@ -93,6 +98,9 @@ alephium {
 
   node {
     db-sync-write = false
+    event-log {
+      enabled = true
+    }
   }
 }
 
@@ -111,6 +119,7 @@ akka {
       executor = "fork-join-executor"
       fork-join-executor {
         parallelism-min = 1
+        parallelism-max = 4
         parallelism-factor = 0.5
       }
       throughput = 1

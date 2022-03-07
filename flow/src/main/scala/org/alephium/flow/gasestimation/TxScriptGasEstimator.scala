@@ -32,7 +32,7 @@ object TxScriptGasEstimator {
   final case class Default(
       inputs: AVector[TxInput],
       flow: BlockFlow
-  )(implicit networkConfig: NetworkConfig, config: GroupConfig)
+  )(implicit networkConfig: NetworkConfig, config: GroupConfig, logConfig: LogConfig)
       extends TxScriptGasEstimator {
     def estimate(script: StatefulScript): Either[String, GasBox] = {
       val chainIndexOpt =

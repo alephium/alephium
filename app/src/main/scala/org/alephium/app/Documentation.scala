@@ -58,13 +58,18 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     compileContract,
     buildContract,
     contractState,
+    testContract,
     buildMultisigAddress,
     buildMultisig,
     submitMultisigTransaction,
     verifySignature,
+    checkHashIndexing,
     minerAction,
     minerListAddresses,
-    minerUpdateAddresses
+    minerUpdateAddresses,
+    getContractEventsForBlock,
+    getContractEventsWithinBlocks,
+    getContractEventsWithinTimeInterval
   )
 
   private lazy val servers = List(

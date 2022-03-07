@@ -60,7 +60,7 @@ object ContractState {
       contractOutputRef: ContractOutputRef
   ): ContractState = {
     assume(code.validate(fields))
-    val initialStateHash = Hash.doubleHash(code.hash.bytes ++ fieldsSerde.serialize(fields))
+    val initialStateHash = code.initialStateHash(fields)
     new ContractState(code.hash, initialStateHash, fields, contractOutputRef)
   }
 }

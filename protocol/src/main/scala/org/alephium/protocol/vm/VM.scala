@@ -370,7 +370,7 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
   }
 
@@ -381,11 +381,47 @@ object StatefulVM {
       preOutputsOpt: Option[AVector[AssetOutput]],
       script: StatefulScript,
       gasRemaining: GasBox
-  ): ExeResult[TxScriptExecution] = {
+  )(implicit logConfig: LogConfig): ExeResult[TxScriptExecution] = {
     for {
       context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
-      _       <- execute(context, script.toObject, AVector.empty)
-      _       <- checkRemainingSignatures(context)
+      result  <- runTxScript(context, script)
+    } yield result
+  }
+
+  def runTxScript(
+      worldState: WorldState.Staging,
+      blockEnv: BlockEnv,
+      txEnv: TxEnv,
+      script: StatefulScript,
+      gasRemaining: GasBox
+  )(implicit logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+    val context = StatefulContext(blockEnv, txEnv, worldState, gasRemaining)
+    runTxScript(context, script)
+  }
+
+  def runTxScript(
+      context: StatefulContext,
+      script: StatefulScript
+  ): ExeResult[TxScriptExecution] = {
+    for {
+      _      <- execute(context, script.toObject, AVector.empty)
+      result <- prepareResult(context)
+    } yield result
+  }
+
+  def runTxScriptWithOutputs(
+      context: StatefulContext,
+      script: StatefulScript
+  ): ExeResult[(AVector[Val], TxScriptExecution)] = {
+    for {
+      outputs <- executeWithOutputs(context, script.toObject, AVector.empty)
+      result  <- prepareResult(context)
+    } yield (outputs, result)
+  }
+
+  private def prepareResult(context: StatefulContext): ExeResult[TxScriptExecution] = {
+    for {
+      _ <- checkRemainingSignatures(context)
     } yield {
       TxScriptExecution(
         context.gasRemaining,

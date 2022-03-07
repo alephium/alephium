@@ -92,6 +92,12 @@ object AlephiumActorSpec {
       |      executor = "fork-join-executor"
       |      throughput = 1
       |    }
+      |
+      |    mining-dispatcher {
+      |      parallelism-min = 1
+      |      parallelism-max = 4
+      |      parallelism-factor = 0.5
+      |    }
       |  }
       |}
     """.stripMargin)

@@ -19,11 +19,12 @@ package org.alephium.protocol.vm.lang
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
+import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
 
-// scalastyle:off no.equal
+// scalastyle:off no.equal file.size.limit
 class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "parse asset script" in {
     val script =
@@ -39,42 +40,115 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "parse tx script" in {
-    val script =
-      s"""
-         |// comment
-         |TxScript Foo {
-         |  pub fn bar(a: U256, b: U256) -> (U256) {
-         |    return (a + b)
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileTxScript(script).isRight is true
+    {
+      info("success")
+
+      val script =
+        s"""
+           |// comment
+           |TxScript Foo {
+           |  pub fn bar(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(script).isRight is true
+    }
+
+    {
+      info("fail with event definition")
+
+      val script =
+        s"""
+           |TxScript Foo {
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn bar(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(script)
+        .leftValue
+        .message is """Parser failed: Parsed.Failure(Position 3:3, found "event Add(")"""
+    }
   }
 
   it should "parse contracts" in {
-    val contract =
-      s"""
-         |// comment
-         |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
-         |  // comment
-         |  pub fn add0(a: U256, b: U256) -> (U256) {
-         |    return (a + b)
-         |  }
-         |
-         |  fn add1() -> (U256) {
-         |    return (x + y)
-         |  }
-         |
-         |  fn add2(d: U256) -> () {
-         |    let mut z = 0u
-         |    z = d
-         |    x = x + z // comment
-         |    y = y + z // comment
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileContract(contract).isRight is true
+    {
+      info("success")
+
+      val contract =
+        s"""
+           |// comment
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  // comment
+           |  pub fn add0(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |
+           |  fn add1() -> (U256) {
+           |    return (x + y)
+           |  }
+           |
+           |  fn add2(d: U256) -> () {
+           |    let mut z = 0u
+           |    z = d
+           |    x = x + z // comment
+           |    y = y + z // comment
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("no function definition")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  event Add(a: U256, b: U256)
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "No function definition in TxContract Foo"
+    }
+
+    {
+      info("duplicated function definitions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |  pub fn add1(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add2(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add3(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |
+           |  pub fn add1(b: U256, a: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |  pub fn add2(b: U256, a: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "These functions are defined multiple times: add1, add2"
+    }
+
   }
 
   it should "infer types" in {
@@ -140,6 +214,170 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     Compiler.compileContract(input, 0).isRight is true
     Compiler.compileTxScript(input, 1).isRight is true
+  }
+
+  it should "check function return types" in {
+    val failed = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 1
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |    let mut x = 0
+         |    return 0
+         |    x = 1
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 0
+         |    } else {
+         |      if (value > 20) {
+         |        return 1
+         |      }
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    )
+    failed.foreach { code =>
+      Compiler.compileContract(code).leftValue is Compiler.Error(
+        "Expect return statement for function foo"
+      )
+    }
+
+    val succeed = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 0
+         |    } else {
+         |      return 1
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      return 0
+         |    } else {
+         |      if (value > 20) {
+         |        return 1
+         |      }
+         |      return 2
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(value: U256) -> (U256) {
+         |    if (value > 10) {
+         |      if (value < 8) {
+         |        return 0
+         |      } else {
+         |        return 1
+         |      }
+         |    } else {
+         |      if (value > 20) {
+         |        return 2
+         |      } else {
+         |        return 3
+         |      }
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    )
+    succeed.foreach { code =>
+      Compiler.compileContract(code).isRight is true
+    }
+  }
+
+  it should "check contract type" in {
+    val failed = Seq(
+      s"""
+         |TxContract Foo(bar: Bar) {
+         |  fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(bar: Bar) -> () {
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let bar = Bar(#00)
+         |  }
+         |}
+         |""".stripMargin
+    )
+    failed.foreach { code =>
+      Compiler.compileContract(code).leftValue is Compiler.Error(
+        "Contract Bar does not exist"
+      )
+    }
+
+    val barContract =
+      s"""
+         |TxContract Bar() {
+         |  fn bar() -> () {
+         |  }
+         |}
+         |""".stripMargin
+    val succeed = Seq(
+      s"""
+         |TxContract Foo(bar: Bar) {
+         |  fn foo() -> () {
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo(bar: Bar) -> () {
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let bar = Bar(#00)
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin
+    )
+    succeed.foreach { code =>
+      Compiler.compileContract(code).isRight is true
+    }
   }
 
   trait Fixture {
@@ -537,9 +775,112 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     codes.foreach(code => Compiler.compileContract(code).isLeft is true)
   }
 
-  trait ArrayTestFixture {
+  it should "compile loop failed" in {
+    val codes = List(
+      s"""
+         |// invalid loop step
+         |TxContract Foo() {
+         |  fn bar(value: U256) -> () {
+         |    return
+         |  }
+         |
+         |  fn foo() -> () {
+         |    loop(1, 4, 0, bar(?))
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// nested loop
+         |TxContract Foo() {
+         |  fn bar(value: U256) -> () {
+         |    return
+         |  }
+         |
+         |  fn foo() -> () {
+         |    loop(1, 4, 1, loop(1, 4, 1, bar(?)))
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid placeholder
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1, 2, 3]
+         |    x[0] = ?
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid placeholder
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1, 2, 3]
+         |    loop(4, 0, -1, x[? - 1] = ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// invalid array index
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1, 2, 3]
+         |    loop(4, 0, -1, x[?] = ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// cannot define new variable in loop
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    loop(0, 4, 1, let x = ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// cannot return in loop
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    loop(0, 4, 1, return ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// loop body must be statements
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    loop(0, 4, 1, ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// only allow one statement in loop body
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 1
+         |    loop(0, 4, 1,
+         |      a = a + ?
+         |      b = b + ?
+         |    )
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    )
+    codes.foreach(code => Compiler.compileContract(code).isLeft is true)
+  }
+
+  trait TestContractMethodFixture {
     def code: String
-    def fields: AVector[Val]
+    def fields: AVector[Val] = AVector.empty
 
     lazy val contract       = Compiler.compileContract(code).rightValue
     lazy val (obj, context) = prepareContract(contract, fields)
@@ -549,7 +890,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "test array" in new ArrayTestFixture {
+  it should "test array" in new TestContractMethodFixture {
     val code =
       s"""
          |TxContract ArrayTest() {
@@ -649,85 +990,385 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val fields: AVector[Val] = AVector.empty
-
-    test(0, AVector.empty, AVector(Val.Bool(true)))
+    test(0, AVector.empty, AVector(Val.True))
     test(1, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(2, AVector.fill(4)(Val.Bool(true)), AVector(Val.Bool(false)))
-    test(3, AVector.fill(4)(Val.U256(10)), AVector(Val.Bool(true)))
+    test(2, AVector.fill(4)(Val.True), AVector(Val.False))
+    test(3, AVector.fill(4)(Val.U256(10)), AVector(Val.True))
     test(4, AVector(Val.U256(4)), AVector.fill(2)(Val.U256(4)))
     test(5, AVector(Val.U256(1)), AVector(Val.U256(2), Val.U256(2), Val.U256(3), Val.U256(3)))
     test(7, AVector(Val.U256(3)), AVector(Val.U256(3)))
     test(9, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(10, AVector.empty, AVector(Val.Bool(true)))
-    test(11, AVector.empty, AVector(Val.Bool(true)))
-    test(12, AVector.empty, AVector(Val.Bool(true)))
-    test(13, AVector.empty, AVector(Val.Bool(true)))
+    test(10, AVector.empty, AVector(Val.True))
+    test(11, AVector.empty, AVector(Val.True))
+    test(12, AVector.empty, AVector(Val.True))
+    test(13, AVector.empty, AVector(Val.True))
   }
 
-  it should "test contract array fields" in new ArrayTestFixture {
+  it should "test contract array fields" in new TestContractMethodFixture {
     val code =
       s"""
          |TxContract Foo(
-         |  arr0: [U256; 2],
-         |  mut arr1: [[U256; 2]; 4],
+         |  mut array: [[U256; 2]; 4],
          |  mut x: U256
          |) {
-         |  pub fn getArr0() -> ([U256; 2]) {
-         |    return arr0
-         |  }
-         |
-         |  pub fn getArr1() -> ([[U256; 2]; 4]) {
-         |    return arr1
-         |  }
-         |
-         |  pub fn setArr1(arr: [[U256; 2]; 4]) -> () {
-         |    arr1 = arr
+         |  fn foo0(a: [U256; 2], b: [U256; 2]) -> () {
+         |    loop(0, 2, 1, assert!(a[?] == b[?]))
          |    return
          |  }
          |
-         |  pub fn add() -> ([U256; 4]) {
+         |  pub fn test1(a: [[U256; 2]; 4]) -> () {
+         |    array = a
+         |    loop(0, 4, 1, foo0(array[?], a[?]))
+         |    return
+         |  }
+         |
+         |  fn foo1() -> (U256) {
          |    x = x + 1
-         |    return [x + 1, x + 2, x + 3, x + 4]
-         |  }
-         |
-         |  pub fn addTest1() -> (U256) {
-         |    let res = [add(), add(), add(), add()]
          |    return x
          |  }
          |
-         |  pub fn addTest2() -> (U256) {
-         |    let res = [add(), add(), add(), add()][2]
-         |    return x
+         |  pub fn test3() -> (Bool) {
+         |    x = 0
+         |    let res = [foo1(), foo1(), foo1(), foo1()]
+         |    return x == 4
          |  }
          |
-         |  pub fn addTest3() -> (U256) {
-         |    let res = [add(); 4]
-         |    return x
+         |  pub fn test4() -> (Bool) {
+         |    x = 0
+         |    let res = [foo1(), foo1(), foo1(), foo1()][2]
+         |    return x == 4
          |  }
          |
-         |  pub fn addTest4() -> (U256) {
-         |    let res = add()
-         |    return x
-         |  }
-         |
-         |  pub fn test8() -> (U256) {
-         |    let a = add()[1]
-         |    return a
+         |  pub fn test5() -> (Bool) {
+         |    x = 0
+         |    let res = [foo1(); 4]
+         |    return x == 4
          |  }
          |}
          |""".stripMargin
 
-    val fields: AVector[Val] = AVector.fill(11)(Val.U256(7))
-    test(0, AVector.empty, AVector.fill(2)(Val.U256(7)))
-    test(1, AVector.empty, AVector.fill(8)(Val.U256(7)))
-    test(2, AVector.fill(8)(Val.U256(3)), AVector.empty)
-    test(1, AVector.empty, AVector.fill(8)(Val.U256(3)))
-    test(4, AVector.empty, AVector(Val.U256(11)))
-    test(5, AVector.empty, AVector(Val.U256(15)))
-    test(6, AVector.empty, AVector(Val.U256(19)))
-    test(7, AVector.empty, AVector(Val.U256(20)))
-    test(8, AVector.empty, AVector(Val.U256(23)))
+    override val fields: AVector[Val] = AVector.fill(9)(Val.U256(0))
+    test(1, AVector.fill(8)(Val.U256(3)), AVector.empty)
+    test(3, AVector.empty, AVector(Val.True))
+    test(4, AVector.empty, AVector(Val.True))
+    test(5, AVector.empty, AVector(Val.True))
+  }
+
+  it should "compile failed if loop range too large" in {
+    val code =
+      s"""
+         |TxContract LoopTest() {
+         |  fn foo() -> () {
+         |    let mut x = 0
+         |    loop(0, 10, 1, x = x + ?)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val config = new CompilerConfig {
+      override def loopUnrollingLimit: Int = 5
+    }
+    Compiler.compileContract(code)(config) is Left(Compiler.Error("loop range too large"))
+  }
+
+  it should "test loop" in new TestContractMethodFixture {
+    val code =
+      s"""
+         |TxContract LoopTest(mut array: [U256; 3]) {
+         |  pub fn test0() -> (Bool) {
+         |    let mut x = [0; 3]
+         |    loop(0, 3, 1, x[?] = ?)
+         |    return x[0] == 0 &&
+         |           x[1] == 1 &&
+         |           x[2] == 2
+         |  }
+         |
+         |  pub fn test1() -> (Bool) {
+         |    let mut x = [0; 3]
+         |    loop(2, 0, -1, x[?] = ?)
+         |    x[0] = 0
+         |    return x[0] == 0 &&
+         |           x[1] == 1 &&
+         |           x[2] == 2
+         |  }
+         |
+         |  pub fn test2() -> (Bool) {
+         |    let mut x = [[0; 2]; 3]
+         |    loop(0, 3, 1, x[?][0] = ?)
+         |    return x[0][0] == 0 &&
+         |           x[1][0] == 1 &&
+         |           x[2][0] == 2
+         |  }
+         |
+         |  pub fn test3() -> (Bool) {
+         |    let mut x = [0; 3]
+         |    let mut y = [1; 3]
+         |    loop(0, 3, 1, x[?] = ?)
+         |    loop(0, 3, 1, y[?] = ?)
+         |    return x[0] == y[0] &&
+         |           x[1] == y[1] &&
+         |           x[2] == y[2]
+         |  }
+         |
+         |  pub fn test4() -> (Bool) {
+         |    loop(0, 3, 1, array[?] = ?)
+         |    return array[0] == 0 &&
+         |           array[1] == 1 &&
+         |           array[2] == 2
+         |  }
+         |
+         |  fn foo(value: U256) -> () {
+         |    loop(0, 3, 1, array[?] = array[?] + value)
+         |    return
+         |  }
+         |
+         |  pub fn test6() -> (Bool) {
+         |    loop(0, 3, 1, array[?] = 0)
+         |    loop(0, 3, 1, foo(?))
+         |    return array[0] == 3 &&
+         |           array[1] == 3 &&
+         |           array[2] == 3
+         |  }
+         |
+         |  pub fn test7() -> (Bool) {
+         |    let mut x = 0
+         |    let mut y = 0
+         |    loop(0, 3, 1,
+         |      if (? >= 1) {
+         |        x = x + ?
+         |      } else {
+         |        y = y + ?
+         |      }
+         |    )
+         |    return x == 3 && y == 0
+         |  }
+         |
+         |  pub fn test8() -> (Bool) {
+         |    let mut x = 0
+         |    let mut i = 0
+         |    loop(0, 3, 1,
+         |      while (i < ?) {
+         |        x = ? + x
+         |        i = i + 1
+         |      }
+         |    )
+         |    return x == 3
+         |  }
+         |
+         |  pub fn bar() -> ([U256; 3]) {
+         |    return [0, 1, 2]
+         |  }
+         |
+         |  pub fn test10() -> (Bool) {
+         |    let mut x = [0; 3]
+         |    loop(0, 3, 1, x[?] = bar()[?])
+         |    return x[0] == 0 &&
+         |           x[1] == 1 &&
+         |           x[2] == 2
+         |  }
+         |}
+         |""".stripMargin
+
+    override val fields: AVector[Val] = AVector.fill(3)(Val.U256(0))
+    test(0, AVector.empty, AVector(Val.True))
+    test(1, AVector.empty, AVector(Val.True))
+    test(2, AVector.empty, AVector(Val.True))
+    test(3, AVector.empty, AVector(Val.True))
+    test(4, AVector.empty, AVector(Val.True))
+    test(6, AVector.empty, AVector(Val.True))
+    test(7, AVector.empty, AVector(Val.True))
+    test(8, AVector.empty, AVector(Val.True))
+    test(10, AVector.empty, AVector(Val.True))
+  }
+
+  it should "compile return multiple values failed" in {
+    val codes = Seq(
+      s"""
+         |// Assign to immutable variable
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let b = 1
+         |    a, b = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// Assign ByteVec to U256
+         |TxContract Foo() {
+         |  fn bar() -> (U256, ByteVec) {
+         |    return 1, #00
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 1
+         |    a, b = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// Assign (U256, U256) to (U256, U256, U256)
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 0
+         |    let mut c = 0
+         |    a, b, c = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |// Assign (U256, U256, U256) to (U256, U256)
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256, U256) {
+         |    return 1, 2, 3
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let mut a = 0
+         |    let mut b = 0
+         |    a, b = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn bar() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn foo() -> () {
+         |    let (a, mut b, c) = bar()
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    )
+
+    codes.foreach(Compiler.compileContract(_).isLeft is true)
+  }
+
+  it should "test return multiple values" in new TestContractMethodFixture {
+    val code: String =
+      s"""
+         |TxContract Foo(mut array: [U256; 3]) {
+         |  fn foo0() -> (U256, U256) {
+         |    return 1, 2
+         |  }
+         |
+         |  pub fn test1() -> (Bool) {
+         |    let mut a = 0
+         |    let mut b = 0
+         |    a, b = foo0()
+         |    return a == 1 && b == 2
+         |  }
+         |
+         |  pub fn test2() -> (Bool) {
+         |    array[0], array[1] = foo0()
+         |    return array[0] == 1 && array[1] == 2
+         |  }
+         |
+         |  pub fn foo1() -> ([U256; 3], [U256; 3], U256) {
+         |    return [1, 2, 3], [4, 5, 6], 7
+         |  }
+         |
+         |  pub fn test4() -> (Bool) {
+         |    let mut i = 0
+         |    let mut x = [[0; 3]; 2]
+         |    x[0], array, i = foo1()
+         |    return x[0][0] == 1 &&
+         |           x[0][1] == 2 &&
+         |           x[0][2] == 3 &&
+         |           array[0] == 4 &&
+         |           array[1] == 5 &&
+         |           array[2] == 6 &&
+         |           i == 7
+         |  }
+         |
+         |  pub fn foo2(value: U256) -> ([U256; 3], U256) {
+         |    loop(0, 3, 1, array[?] = array[?] + value)
+         |    return array, value
+         |  }
+         |
+         |  pub fn test6() -> (Bool) {
+         |    array = [1, 2, 3]
+         |    let mut x = [[0; 3]; 3]
+         |    let mut y = [0; 3]
+         |    loop(0, 3, 1, x[?], y[?] = foo2(?))
+         |    return x[0][0] == 1 &&
+         |           x[0][1] == 2 &&
+         |           x[0][2] == 3 &&
+         |           x[1][0] == 2 &&
+         |           x[1][1] == 3 &&
+         |           x[1][2] == 4 &&
+         |           x[2][0] == 4 &&
+         |           x[2][1] == 5 &&
+         |           x[2][2] == 6 &&
+         |           y[0] == 0 &&
+         |           y[1] == 1 &&
+         |           y[2] == 2
+         |  }
+         |
+         |  fn foo3() -> ([U256; 2], U256, U256) {
+         |    return [1; 2], 1, 1
+         |  }
+         |
+         |  pub fn test8() -> () {
+         |    let (mut a, mut b, c) = foo3()
+         |    assert!(b == 1 && c == 1 && a[0] == 1 && a[1] == 1)
+         |    b = 2
+         |    loop(0, 2, 1, a[?] = ?)
+         |    assert!(b == 2 && a[0] == 0 && a[1] == 1)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    override val fields = AVector.fill(3)(Val.U256(0))
+    test(1, AVector.empty, AVector(Val.True))
+    test(2, AVector.empty, AVector(Val.True))
+    test(4, AVector.empty, AVector(Val.True))
+    test(6, AVector.empty, AVector(Val.True))
+    test(8, AVector.empty, AVector.empty)
+  }
+
+  it should "return from if block" in new TestContractMethodFixture {
+    val code: String =
+      s"""
+         |TxContract Foo(mut value: U256) {
+         |  pub fn foo() -> () {
+         |    if (true) {
+         |      value = 1
+         |      return
+         |    }
+         |
+         |    value = 2
+         |    return
+         |  }
+         |
+         |  pub fn getValue() -> (U256) {
+         |    return value
+         |  }
+         |}
+         |""".stripMargin
+
+    override val fields = AVector(Val.U256(0))
+    test(0, AVector.empty, AVector.empty)
+    test(1, AVector.empty, AVector(Val.U256(1)))
   }
 
   it should "generate efficient code for arrays" in {
@@ -753,13 +1394,122 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           U256Const2,
           U256Const3,
           U256Const4,
-          StoreLocal(4),
           StoreLocal(3),
           StoreLocal(2),
           StoreLocal(1),
-          LoadLocal(1),
-          StoreLocal(0)
+          StoreLocal(0),
+          LoadLocal(0),
+          StoreLocal(4),
+          Return
         )
       )
+  }
+
+  it should "parse events definition and emission" in {
+
+    {
+      info("event definition and emission")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add(a, b)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("multiple event definitions and emissions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add1(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add1(a, b)
+           |    emit Add2(a, b)
+           |    return (a + b)
+           |  }
+           |
+           |  event Add2(a: U256, b: U256)
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).isRight is true
+    }
+
+    {
+      info("event doesn't exist")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add2(a, b)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(contract).leftValue.message is "Event Add2 does not exist"
+    }
+
+    {
+      info("duplicated event definitions")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add1(a: U256, b: U256)
+           |  event Add2(a: U256, b: U256)
+           |  event Add3(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    emit Add(a, b)
+           |    return (a + b)
+           |  }
+           |
+           |  event Add1(b: U256, a: U256)
+           |  event Add2(b: U256, a: U256)
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "These events are defined multiple times: Add1, Add2"
+    }
+
+    {
+      info("emit event with wrong args")
+
+      val contract =
+        s"""
+           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |
+           |  event Add(a: U256, b: U256)
+           |
+           |  pub fn add(a: U256, b: U256) -> (U256) {
+           |    let z = false
+           |    emit Add(a, z)
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "Invalid args type List(U256, Bool) for event Add(U256, U256)"
+    }
   }
 }

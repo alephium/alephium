@@ -31,8 +31,8 @@ import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.serde.RandomBytes
+import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
+import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -267,6 +267,23 @@ trait ApiModelCodec {
 
   implicit val compileResultRW: RW[CompileResult] = macroRW
 
+  implicit val statefulContractReader: Reader[StatefulContract] = StringReader.map { input =>
+    val bs =
+      Hex.from(input).getOrElse(throw Abort(s"Invalid hex string for stateful contract $input"))
+    deserialize[StatefulContract](bs) match {
+      case Right(contract) => contract
+      case Left(error)     => throw Abort(s"Invalid stateful contract $input: $error")
+    }
+  }
+  implicit val statefulContractWriter: Writer[StatefulContract] =
+    StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
+
+  implicit val assetRW: ReadWriter[TestContract.Asset]                       = macroRW
+  implicit val existingContractRW: ReadWriter[TestContract.ExistingContract] = macroRW
+  implicit val testContractInputAssetRW: ReadWriter[TestContract.InputAsset] = macroRW
+  implicit val testContractRW: ReadWriter[TestContract]                      = macroRW
+  implicit val testContractResultRW: ReadWriter[TestContractResult]          = macroRW
+
   implicit val txResultRW: RW[TxResult] = macroRW
 
   implicit val getHashesAtHeightRW: RW[GetHashesAtHeight] = macroRW
@@ -369,6 +386,9 @@ trait ApiModelCodec {
       case None          => throw Abort(s"Cannot decode version: $raw")
     }
   }
+
+  implicit val eventRW: RW[Event]   = macroRW
+  implicit val eventsRW: RW[Events] = macroRW
 
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)

@@ -67,6 +67,9 @@ sealed trait Contract[Ctx <: StatelessContext] {
   def methodsLength: Int
   def getMethod(index: Int): ExeResult[Method[Ctx]]
   def hash: Hash
+
+  def initialStateHash(fields: AVector[Val]): Hash =
+    Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
@@ -234,7 +237,9 @@ object StatefulContract {
     }
 
     def toContract(): SerdeResult[StatefulContract] = {
-      AVector.tabulateE(methodsLength)(deserializeMethod).map(StatefulContract(fieldLength, _))
+      AVector
+        .tabulateE(methodsLength)(deserializeMethod)
+        .map(StatefulContract(fieldLength, _))
     }
 
     // For testing purpose
@@ -268,7 +273,11 @@ object StatefulContract {
           val methodBytes = data.take(length)
           val rest        = data.drop(length)
           Staging(
-            HalfDecoded(fieldLengthRest.value, methodIndexesRest.value, methodBytes),
+            HalfDecoded(
+              fieldLengthRest.value,
+              methodIndexesRest.value,
+              methodBytes
+            ),
             rest
           )
         }
@@ -380,5 +389,16 @@ object StatefulContractObject {
       initialFields.toArray,
       contractId
     )
+  }
+
+  def from(
+      contract: StatefulContract,
+      initialFields: AVector[Val],
+      contractId: ContractId
+  ): StatefulContractObject = {
+    val code             = contract.toHalfDecoded()
+    val codeHash         = code.hash
+    val initialStateHash = code.initialStateHash(initialFields)
+    unsafe(codeHash, code, initialStateHash, initialFields, contractId)
   }
 }

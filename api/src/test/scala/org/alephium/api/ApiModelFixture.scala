@@ -26,6 +26,7 @@ trait ApiModelFixture
     extends ModelGenerators
     with ConsensusConfigFixture.Default
     with NetworkConfigFixture.Default
+    with CompilerConfigFixture.Default
     with ApiModelCodec {
 
   val blockflowFetchMaxAge = Duration.unsafe(1000)

@@ -21,31 +21,4 @@ import scala.collection.mutable
 final class StagingSMT[K, V](
     val underlying: CachedSMT[K, V],
     val caches: mutable.Map[K, Modified[V]]
-) extends CachedTrie[K, V, Modified[V]] {
-  protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = underlying.getOpt(key)
-
-  def rollback(): Unit = {
-    caches.clear()
-  }
-
-  def commit(): Unit = {
-    caches.foreach {
-      case (key, updated: Updated[V]) =>
-        underlying.caches.get(key) match {
-          case Some(_: Inserted[V]) => underlying.caches += key -> Inserted(updated.value)
-          case _                    => underlying.caches += key -> updated
-        }
-      case (key, inserted: Inserted[V]) =>
-        underlying.caches.get(key) match {
-          case Some(_: Removed[V]) => underlying.caches += key -> Updated(inserted.value)
-          case _                   => underlying.caches += key -> inserted
-        }
-      case (key, removed: Removed[V]) =>
-        underlying.caches.get(key) match {
-          case Some(_: Inserted[V]) => underlying.caches -= key
-          case _                    => underlying.caches += key -> removed
-        }
-    }
-    caches.clear()
-  }
-}
+) extends StagingKV[K, V]

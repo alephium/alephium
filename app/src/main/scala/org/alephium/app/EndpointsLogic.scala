@@ -30,9 +30,9 @@ import sttp.model.{StatusCode, Uri}
 import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
-import org.alephium.api.{ApiError, Endpoints}
+import org.alephium.api.{ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
-import org.alephium.app.ServerUtils.FutureTry
+import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
@@ -45,9 +45,9 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -64,9 +64,13 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit def executionContext: ExecutionContext
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
-  implicit lazy val groupConfig: GroupConfig      = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting = node.config.network
-  implicit lazy val askTimeout: Timeout           = Timeout(apiConfig.askTimeout.asScala)
+
+  implicit lazy val groupConfig: GroupConfig         = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting    = node.config.network
+  implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
+  implicit lazy val compilerConfig: CompilerConfig   = node.config.compiler
+  implicit lazy val logConfig: LogConfig             = node.config.node.logConfig
+  implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -274,7 +278,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   private def serverLogicRedirectWith[R, P, A](
       endpoint: BaseEndpoint[R, A]
   )(
-      paramsConvert: R => ServerUtils.Try[P],
+      paramsConvert: R => Try[P],
       localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]],
       getIndex: P => GroupIndex
   ) = {
@@ -377,7 +381,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       txId: Hash,
       chainFrom: Option[GroupIndex],
       chainTo: Option[GroupIndex]
-  ): Future[ServerUtils.Try[TxStatus]] = {
+  ): FutureTry[TxStatus] = {
     (chainFrom, chainTo) match {
       case (Some(from), Some(to)) =>
         Future.successful(
@@ -404,12 +408,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   private def searchLocalTransactionStatus(
       txId: Hash,
       chainIndexes: AVector[ChainIndex]
-  ): ServerUtils.Try[TxStatus] = {
+  ): Try[TxStatus] = {
     @tailrec
     def rec(
         indexes: AVector[ChainIndex],
-        currentRes: ServerUtils.Try[TxStatus]
-    ): ServerUtils.Try[TxStatus] = {
+        currentRes: Try[TxStatus]
+    ): Try[TxStatus] = {
       if (indexes.isEmpty) {
         currentRes
       } else {
@@ -426,7 +430,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def searchTransactionStatusInOtherNodes(txId: Hash): Future[ServerUtils.Try[TxStatus]] = {
+  private def searchTransactionStatusInOtherNodes(txId: Hash): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
       Future.successful(Right(NotFound))
@@ -435,7 +439,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       def rec(
           from: GroupIndex,
           remaining: AVector[GroupIndex]
-      ): Future[ServerUtils.Try[TxStatus]] = {
+      ): FutureTry[TxStatus] = {
         requestFromGroupIndex(
           from,
           Future.successful(Right(NotFound)),
@@ -518,6 +522,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.verifySignature(query))
   }
 
+  val checkHashIndexingLogic = serverLogic(checkHashIndexing) { _ =>
+    Future.apply(blockFlow.checkHashIndexingUnsafe()) // Let's run it in the background
+    Future.successful(Right(()))
+  }
+
   val contractStateLogic = serverLogic(contractState) { case (contractAddress, groupIndex) =>
     requestFromGroupIndex(
       groupIndex,
@@ -525,6 +534,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       contractState,
       (contractAddress, groupIndex)
     )
+  }
+
+  val testContractLogic = serverLogic(testContract) { testContract: TestContract =>
+    val blockFlow = BlockFlow.emptyUnsafe(node.config)
+    Future(serverUtils.runTestContract(blockFlow, testContract))
   }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
@@ -543,6 +557,30 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         .left
         .map(error => ApiError.BadRequest(error.getMessage))
     }
+  }
+
+  val getContractEventsForBlockLogic = serverLogic(getContractEventsForBlock) {
+    case (blockHash, contractAddress) =>
+      Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
+        serverUtils.getContractEventsForBlock(blockFlow, blockHash, contractId)
+      }
+  }
+
+  val getContractEventsWithinBlocksLogic = serverLogic(getContractEventsWithinBlocks) {
+    case (fromBlock, toBlockOpt, contractAddress) =>
+      Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
+        serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlockOpt, contractId)
+      }
+  }
+
+  val getContractEventsWithinTimeIntervalLogic = serverLogic(getContractEventsWithinTimeInterval) {
+    case (timeInterval, contractAddress) =>
+      Future.successful {
+        val contractId = contractAddress.lockupScript.contractId
+        serverUtils.getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
+      }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -590,7 +628,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def requestFromGroupIndex[P, A](
       groupIndex: GroupIndex,
       f: => Future[Either[ApiError[_ <: StatusCode], A]],

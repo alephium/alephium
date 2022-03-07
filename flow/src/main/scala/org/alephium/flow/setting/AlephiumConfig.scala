@@ -37,6 +37,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
+import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, AVector, Duration, Env, U256}
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
@@ -101,6 +102,7 @@ final case class NetworkSetting(
     connectionBufferCapacityInByte: Long,
     fastSyncFrequency: Duration,
     stableSyncFrequency: Duration,
+    syncPeerSampleSize: Int,
     syncCleanupFrequency: Duration,
     syncExpiryPeriod: Duration,
     dependencyExpiryPeriod: Duration,
@@ -165,7 +167,14 @@ object WalletSetting {
   final case class BlockFlow(host: String, port: Int, groups: Int)
 }
 
-final case class NodeSetting(dbSyncWrite: Boolean)
+final case class NodeSetting(
+    dbSyncWrite: Boolean,
+    eventLog: Option[LogConfig]
+) {
+  lazy val logConfig: LogConfig = {
+    eventLog.getOrElse(LogConfig.disabled())
+  }
+}
 
 final case class Allocation(
     address: Address.Asset,
@@ -182,6 +191,8 @@ object Allocation {
 
 final case class GenesisSetting(allocations: AVector[Allocation])
 
+final case class CompilerSetting(loopUnrollingLimit: Int) extends CompilerConfig
+
 final case class AlephiumConfig(
     broker: BrokerSetting,
     consensus: ConsensusSetting,
@@ -191,7 +202,8 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     node: NodeSetting,
-    genesis: GenesisSetting
+    genesis: GenesisSetting,
+    compiler: CompilerSetting
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesis.allocations)(
@@ -239,6 +251,7 @@ object AlephiumConfig {
       backoffResetDelay: Duration,
       fastSyncFrequency: Duration,
       stableSyncFrequency: Duration,
+      syncPeerSampleSize: Int,
       syncCleanupFrequency: Duration,
       syncExpiryPeriod: Duration,
       dependencyExpiryPeriod: Duration,
@@ -272,6 +285,7 @@ object AlephiumConfig {
         connectionBufferCapacityInByte,
         fastSyncFrequency,
         stableSyncFrequency,
+        syncPeerSampleSize,
         syncCleanupFrequency,
         syncExpiryPeriod,
         dependencyExpiryPeriod,
@@ -317,7 +331,8 @@ object AlephiumConfig {
       mempool: MemPoolSetting,
       wallet: WalletSetting,
       node: NodeSetting,
-      genesis: GenesisSetting
+      genesis: GenesisSetting,
+      compiler: CompilerSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
@@ -332,7 +347,8 @@ object AlephiumConfig {
           mempool,
           wallet,
           node,
-          genesis
+          genesis,
+          compiler
         )
       } match {
         case Right(value) => value
@@ -352,7 +368,8 @@ object AlephiumConfig {
         as[MemPoolSetting]("mempool"),
         as[WalletSetting]("wallet"),
         as[NodeSetting]("node"),
-        as[GenesisSetting]("genesis")
+        as[GenesisSetting]("genesis"),
+        as[CompilerSetting]("compiler")
       ).toAlephiumConfig
     }
 

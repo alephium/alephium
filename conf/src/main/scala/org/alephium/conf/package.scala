@@ -19,6 +19,7 @@ package org.alephium
 import java.io.File
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.Path
+import java.util.Locale
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.MILLISECONDS
@@ -30,14 +31,20 @@ import com.typesafe.config.{Config, ConfigException}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import net.ceedubs.ficus.readers.CollectionReaders.traversableReader
-import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 
 import org.alephium.protocol.model.Address
 import org.alephium.util.{AVector, Duration, U256}
 
 package object conf {
 
-  implicit val nameMapper: NameMapper = HyphenNameMapper
+  implicit val nameMapper: NameMapper = new NameMapper {
+    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?<=[a-zA-Z])[0-9]|(?!^)[A-Z](?=[a-z]))".r
+
+    /** Maps from a camelCasedName to a hyphenated-name
+      */
+    override def map(name: String): String =
+      r.replaceAllIn(name, m => s"-${m.group(1)}").toLowerCase(Locale.ROOT)
+  }
 
   def valueReader[A](f: Cfg => A): ValueReader[A] = ValueReader.relative { config =>
     f(Cfg(config))
@@ -113,6 +120,17 @@ package object conf {
         }
       }
     }
+
+  implicit val contractAddressValueReader: ValueReader[Address.Contract] = {
+    ValueReader[String].map { str =>
+      Address.fromBase58(str) match {
+        case Some(address: Address.Contract) =>
+          address
+        case _ =>
+          throw new ConfigException.BadValue("ContractAddress", "oops")
+      }
+    }
+  }
 
   private val inetSocketAddressesStringReader: ValueReader[ArraySeq[InetSocketAddress]] =
     ValueReader[String].map(_.split(",")).map {

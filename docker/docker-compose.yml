@@ -4,6 +4,7 @@ volumes:
   prometheus_data: {}
   grafana_data: {}
   alephium-data: {}
+  alephium-wallets: {}
 
 services:
   alephium:
@@ -26,8 +27,8 @@ services:
     volumes:
       # The provided file user.conf is a minimal default config to connect your container to the mainnet.
       - alephium-data:/alephium-home/.alephium
+      - alephium-wallets:/alephium-home/.alephium-wallets
       - ./user.conf:/alephium-home/.alephium/user.conf
-#      - ./alephium-wallets:/alephium-home/.alephium-wallets
 
   grafana:
     image: grafana/grafana:7.2.1

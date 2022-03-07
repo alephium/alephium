@@ -28,6 +28,8 @@ sealed trait Val extends Any {
   def toByteVec(): Val.ByteVec
 
   def estimateByteSize(): Int
+
+  def toConstInstr: Instr[StatelessContext]
 }
 
 // scalastyle:off number.of.methods
@@ -92,6 +94,8 @@ object Val {
     override def toByteVec(): ByteVec = ByteVec(encode(v))
 
     override def estimateByteSize(): Int = 1
+
+    override def toConstInstr: Instr[StatelessContext] = if (v) ConstTrue else ConstFalse
   }
   final case class I256(v: util.I256) extends Val {
     def tpe: Val.Type = I256
@@ -99,6 +103,8 @@ object Val {
     override def toByteVec(): ByteVec = ByteVec(encode(v))
 
     override def estimateByteSize(): Int = 32
+
+    override def toConstInstr: Instr[StatelessContext] = ConstInstr.i256(this)
   }
   final case class U256(v: util.U256) extends Val {
     def tpe: Val.Type = U256
@@ -106,6 +112,8 @@ object Val {
     override def toByteVec(): ByteVec = ByteVec(encode(v))
 
     override def estimateByteSize(): Int = 32
+
+    override def toConstInstr: Instr[StatelessContext] = ConstInstr.u256(this)
   }
 
   final case class ByteVec(bytes: ByteString) extends AnyVal with Val {
@@ -114,6 +122,8 @@ object Val {
     override def toByteVec(): ByteVec = this
 
     override def estimateByteSize(): Int = bytes.length
+
+    override def toConstInstr: Instr[StatelessContext] = BytesConst(this)
   }
   final case class Address(lockupScript: LockupScript) extends AnyVal with Val {
     def tpe: Val.Type = Address
@@ -124,6 +134,8 @@ object Val {
       case LockupScript.P2MPKH(mpkh, _) => mpkh.length * 32
       case _                            => 32
     }
+
+    override def toConstInstr: Instr[StatelessContext] = AddressConst(this)
   }
 
   object Bool extends Type {
@@ -149,6 +161,10 @@ object Val {
     override def isNumeric: Boolean  = true
 
     override def toString: String = "U256"
+
+    def unsafe(v: Int): U256 = {
+      U256(util.U256.unsafe(v))
+    }
   }
 
   object ByteVec extends Type {

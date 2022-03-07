@@ -81,6 +81,8 @@ class ParserSpec extends AlephiumSpec {
         FuncId("bar", false),
         List(Variable(Ident("x")))
       )
+    fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
+      CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
   }
 
   it should "parse return" in {
@@ -194,16 +196,53 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
-  it should "parse array expression" in {
-    def check(str: String, expr: Ast.Expr[StatelessContext]) = {
-      fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
-    }
+  def constantIndex[Ctx <: StatelessContext](value: Int): Ast.Const[Ctx] =
+    Ast.Const[Ctx](Val.U256(U256.unsafe(value)))
 
+  def checkParseExpr(str: String, expr: Ast.Expr[StatelessContext]) = {
+    fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
+  }
+
+  def checkParseStat(str: String, stat: Ast.Statement[StatelessContext]) = {
+    fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
+  }
+
+  it should "parse variable definitions" in {
+    val states: List[(String, Ast.Statement[StatelessContext])] = List(
+      "let (a, b) = foo()" -> Ast.VarDef(
+        Seq((false, Ast.Ident("a")), (false, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+      ),
+      "let (a, mut b) = foo()" -> Ast.VarDef(
+        Seq((false, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+      ),
+      "let (mut a, mut b) = foo()" -> Ast.VarDef(
+        Seq((true, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+      )
+    )
+    states.foreach { case (code, ast) =>
+      checkParseStat(code, ast)
+    }
+  }
+
+  it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
-      "a[0][1]" -> Ast.ArrayElement(Ast.ArrayElement(Variable(Ast.Ident("a")), 0), 1),
+      "a[0][?]" -> Ast.ArrayElement(
+        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+        Ast.Placeholder()
+      ),
+      "a[0][1]" -> Ast.ArrayElement(
+        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+        constantIndex(1)
+      ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(Ast.ArrayElement(Variable(Ast.Ident("a")), 0), 1)
+        Ast.ArrayElement(
+          Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+          constantIndex(1)
+        )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -216,26 +255,97 @@ class ParserSpec extends AlephiumSpec {
     )
 
     exprs.foreach { case (str, expr) =>
-      check(str, expr)
+      checkParseExpr(str, expr)
     }
   }
 
-  it should "parse array assign" in {
-    def check(str: String, stat: Ast.Statement[StatelessContext]) = {
-      fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
-    }
-
+  it should "parse assign statement" in {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
-      "a[0] = b" -> Ast.ArrayElementAssign(Ident("a"), Seq(0), Ast.Variable(Ast.Ident("b"))),
-      "a[0][1] = b[0]" -> Ast.ArrayElementAssign(
-        Ident("a"),
-        Seq(0, 1),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), 0)
+      "a[0] = b" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0)))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[0][1] = b[0]" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
+      ),
+      "a[?][0] = ?" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Ast.Placeholder(), constantIndex(0)))),
+        Ast.Placeholder()
+      ),
+      "a, b = foo()" -> Assign(
+        Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
+        CallExpr(FuncId("foo", false), Seq.empty)
+      ),
+      "a, b[?] = foo()" -> Assign(
+        Seq(
+          AssignmentSimpleTarget(Ident("a")),
+          AssignmentArrayElementTarget(Ident("b"), Seq(Placeholder()))
+        ),
+        CallExpr(FuncId("foo", false), Seq.empty)
       )
     )
 
-    stats.foreach { case (str, expr) =>
-      check(str, expr)
+    stats.foreach { case (str, ast) =>
+      checkParseStat(str, ast)
+    }
+  }
+
+  it should "parse loop" in {
+    checkParseStat(
+      "loop(0, 4, 1, x[?] = ?)",
+      Ast.Loop[StatelessContext](
+        0,
+        4,
+        1,
+        Ast.Assign(
+          Seq(
+            Ast.AssignmentArrayElementTarget(
+              Ast.Ident("x"),
+              Seq(Ast.Placeholder[StatelessContext]())
+            )
+          ),
+          Ast.Placeholder[StatelessContext]()
+        )
+      )
+    )
+  }
+
+  it should "parse event" in {
+    {
+      info("0 field")
+
+      val eventRaw = "event Event()"
+      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+        TypeId("Event"),
+        Seq()
+      )
+    }
+
+    {
+      info("fields of primitive types")
+
+      val eventRaw = "event Transfer(from: Address, to: Address, amount: U256)"
+      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+        TypeId("Transfer"),
+        Seq(
+          EventField(Ident("from"), Type.Address),
+          EventField(Ident("to"), Type.Address),
+          EventField(Ident("amount"), Type.U256)
+        )
+      )
+    }
+
+    {
+      info("fields of array type")
+
+      val eventRaw = "event Participants(addresses: [Address; 3])"
+      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+        TypeId("Participants"),
+        Seq(
+          EventField(Ident("addresses"), Type.FixedSizeArray(Type.Address, 3))
+        )
+      )
     }
   }
 }

@@ -27,7 +27,7 @@ import org.alephium.api.model.{Amount, Script}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TapirSchemasLike {
@@ -57,6 +57,8 @@ trait TapirSchemasLike {
   implicit val cliqueIdSchema: Schema[CliqueId]                   = Schema(SString())
   implicit val mnemonicSchema: Schema[Mnemonic]                   = Schema(SString())
   implicit val mnemonicSizeSchema: Schema[Mnemonic.Size]          = Schema(SInteger())
+
+  implicit val statefulContractSchema: Schema[StatefulContract] = Schema(SString())
 }
 
 object TapirSchemas extends TapirSchemasLike

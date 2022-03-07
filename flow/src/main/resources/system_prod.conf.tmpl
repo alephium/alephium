@@ -9,7 +9,7 @@ alephium {
     batch-delay = 0 milli
 
     # the polling interval for block templates, when there is no new blocks generated
-    polling-interval = 0.5 seconds
+    polling-interval = 2 seconds
   }
 
   network {
@@ -37,8 +37,9 @@ alephium {
     # Size of the outbound TCP buffer (in bytes).
     connection-buffer-capacity-in-byte = 100000000
 
-    fast-sync-frequency = 2 second
+    fast-sync-frequency = 1 second
     stable-sync-frequency = 20 second
+    sync-peer-sample-size = 5
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 10 minute
@@ -81,6 +82,10 @@ alephium {
     max-clique-from-same-ip = 2
   }
 
+  compiler {
+    loop-unrolling-limit = 1000
+  }
+
   mempool {
     shared-pool-capacity = 1000
     pending-pool-capacity = 1000
@@ -114,6 +119,9 @@ alephium {
     # a boolean flag to indicate whether a write with rocksdb should be synchronized
     # Note that if it is just the process that crashes (i.e., the machine does not reboot), no writes will be lost even if sync==false
     db-sync-write = false
+    event-log {
+      enabled = false
+    }
   }
 }
 
@@ -131,8 +139,9 @@ akka {
       type = Dispatcher
       executor = "fork-join-executor"
       fork-join-executor {
-        parallelism-min = 1
-        parallelism-factor = 0.5
+        parallelism-min = 8
+        parallelism-max = 8
+        parallelism-factor = 1
       }
       throughput = 1
     }

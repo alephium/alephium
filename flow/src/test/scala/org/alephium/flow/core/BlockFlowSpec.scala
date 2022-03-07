@@ -323,9 +323,7 @@ class BlockFlowSpec extends AlephiumSpec {
         AVector.tabulate(groupConfig.groups) { toGroup =>
           val hashes: AVector[BlockHash] = if (toGroup equals testToGroup) {
             AVector(
-              hashes0(0),
               hashes0(1),
-              hashes0(2),
               hashes0(3),
               hashes0(4),
               hashes0(5)
@@ -551,7 +549,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val blockFlow2 = storageBlockFlow()
     blockFlow2.getGroupCache(GroupIndex.unsafe(0)).size is
-      consensusConfig.blockCacheCapacityPerChain + 4
+      consensusConfig.blockCacheCapacityPerChain + 5
     blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).headerCache.size is
       consensusConfig.blockCacheCapacityPerChain + 1
     blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).stateCache.size is
@@ -716,6 +714,7 @@ class BlockFlowSpec extends AlephiumSpec {
             ALPH.GenesisTimestamp.plusMinutesUnsafe(1)
           )
           .rightValue
+          .map(_._2)
         val expected = brokerConfig.groupRange.flatMap { fromGroup =>
           (0 until groups0).map { toGroup =>
             AVector(blockFlow.genesisBlocks(fromGroup)(toGroup) -> 0)

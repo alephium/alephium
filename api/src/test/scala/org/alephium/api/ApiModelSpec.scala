@@ -508,9 +508,22 @@ class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues w
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val txId    = Hash.generate
-    val result  = BuildTransactionResult("tx", txId, 1, 2)
-    val jsonRaw = s"""{"unsignedTx":"tx","txId":"${txId.toHexString}","fromGroup":1,"toGroup":2}"""
+    val txId     = Hash.generate
+    val gas      = GasBox.unsafe(1)
+    val gasPrice = GasPrice(1)
+    val result   = BuildTransactionResult("tx", gas, gasPrice, txId, 1, 2)
+    val jsonRaw =
+      s"""{"unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1", "txId":"${txId.toHexString}", "fromGroup":1,"toGroup":2}"""
+    checkData(result, jsonRaw)
+  }
+
+  it should "encode/decode SweepAddressTransaction" in {
+    val txId     = Hash.generate
+    val gas      = GasBox.unsafe(1)
+    val gasPrice = GasPrice(1)
+    val result   = SweepAddressTransaction(txId, "tx", gas, gasPrice)
+    val jsonRaw =
+      s"""{"txId":"${txId.toHexString}","unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1"}"""
     checkData(result, jsonRaw)
   }
 
@@ -818,7 +831,8 @@ class ApiModelSpec extends AlephiumSpec with ApiModelFixture with EitherValues w
   it should "validate the time span" in {
     val timestamp = TimeStamp.now()
     val timespan  = Duration.ofHoursUnsafe(1)
-    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(61)).validateTimeSpan(timespan) is Left(
+    TimeInterval(timestamp, timestamp.plusMinutesUnsafe(61))
+      .validateTimeSpan(timespan) is Left(
       ApiError.BadRequest(s"Time span cannot be greater than ${timespan}")
     )
     TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()

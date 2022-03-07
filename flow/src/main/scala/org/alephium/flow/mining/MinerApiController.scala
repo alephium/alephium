@@ -42,7 +42,7 @@ object MinerApiController {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
   ): Props =
-    Props(new MinerApiController(allHandlers))
+    Props(new MinerApiController(allHandlers)).withDispatcher(MiningDispatcher)
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
@@ -51,7 +51,7 @@ object MinerApiController {
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting
   ): Props = {
-    Props(new MyConnectionHandler(remote, connection))
+    Props(new MyConnectionHandler(remote, connection)).withDispatcher(MiningDispatcher)
   }
 
   class MyConnectionHandler(
@@ -87,6 +87,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
+  var latestJobs: Option[AVector[Job]]                                   = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
 
@@ -98,11 +99,15 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     case ViewHandler.SubscribeResult(succeeded) =>
       if (succeeded) {
         pendings.foreach { case (remote, connection) =>
+          log.info(s"Remote $remote subscribed")
           val connectionHandler = ActorRefT[ConnectionHandler.Command](
             context.actorOf(MinerApiController.connection(remote, connection))
           )
           context.watch(connectionHandler.ref)
           connections.addOne(connectionHandler)
+          latestJobs.foreach(jobs =>
+            connectionHandler ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs)))
+          )
         }
       } else {
         log.error(s"Failed in subscribing mining tasks. Closing all the connections")
@@ -137,10 +142,14 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   }
 
   def publishTemplates(templatess: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
+    log.info(
+      s"Sending block templates to subscribers: #${connections.length} connections, #${pendings.length} pending connections"
+    )
     val jobs = templatess.foldLeft(AVector.ofSize[Job](templatess.length * brokerConfig.groups)) {
       case (acc, templates) =>
         acc ++ AVector.from(templates.view.map(Job.from))
     }
+    latestJobs = Some(jobs)
     connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
   }
 

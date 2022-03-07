@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{NetworkId, TxGenerators}
 import org.alephium.util.{AlephiumSpec, U256}
 
@@ -124,6 +124,11 @@ class BalanceStateSpec extends AlephiumSpec {
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3
+      }
+
+    implicit override val compilerConfig: CompilerConfig =
+      new CompilerConfig {
+        override def loopUnrollingLimit: Int = 1000
       }
 
     val tokenId    = hashGen.sample.get

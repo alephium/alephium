@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## 1.2.8
+* Improve logging and thread pool for mining controller
+* Send latest mining jobs to new mining connections always
+
+## 1.2.7
+* Add gasAmount and gasPrice to sweep endpoint
+
+## 1.2.6
+* Improve block cache
+* Cosmetic updates
+
+## 1.2.5
+
+* Add gas info to tx building information for tx endpoints
+* Increasing polling interval to 2 seconds for mining api
+* Improve full node syncing
+
+## 1.2.4
+
+* Improve logging message for 1.2.3 fix
+
+## 1.2.3
+
+* Fix docker volume for wallets
+* Fix height indexing for hashes
+
+## 1.2.2
+
+* Add docker volume for wallet
+* Improve dispatcher for mining related actors
+* Fix locale issue for configuration keys
+
 ## 1.2.1
 
 * Check estimated gas for `/transactions/build` endpoint.

@@ -40,7 +40,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val probe  = TestProbe()
     val broker = brokerInfoGen.sample.get
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.HandShaked(broker))
-    eventually(blockFlowSynchronizerActor.brokerInfos.contains(probe.ref) is true)
+    eventually(blockFlowSynchronizerActor.brokerInfos.toMap.contains(probe.ref) is true)
 
     system.stop(probe.ref)
     eventually(blockFlowSynchronizerActor.brokerInfos.isEmpty is true)
@@ -52,7 +52,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val blockHash  = BlockHash.generate
 
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.HandShaked(brokerInfo))
-    eventually(blockFlowSynchronizerActor.brokerInfos.contains(broker.ref) is true)
+    eventually(blockFlowSynchronizerActor.brokerInfos.toMap.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
     eventually(blockFlowSynchronizerActor.fetching.states.contains(blockHash) is true)
