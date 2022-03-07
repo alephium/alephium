@@ -5154,6 +5154,7 @@
                 },
                 "example": {
                   "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "types": [
@@ -5419,6 +5420,7 @@
                 },
                 "example": {
                   "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "types": [
@@ -5828,6 +5830,7 @@
                   {
                     "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
                     "code": "00010700000000000118",
+                    "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "fields": [
                       {
                         "type": "U256",
@@ -5883,6 +5886,7 @@
                     {
                       "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
                       "code": "00010700000000000118",
+                      "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "fields": [
                         {
                           "type": "U256",
@@ -7973,6 +7977,7 @@
       "CompileResult": {
         "required": [
           "bytecode",
+          "codeHash",
           "fields",
           "functions",
           "events"
@@ -7980,6 +7985,9 @@
         "type": "object",
         "properties": {
           "bytecode": {
+            "type": "string"
+          },
+          "codeHash": {
             "type": "string"
           },
           "fields": {
@@ -8087,6 +8095,7 @@
         "required": [
           "id",
           "code",
+          "codeHash",
           "fields",
           "asset"
         ],
@@ -8096,6 +8105,9 @@
             "type": "string"
           },
           "code": {
+            "type": "string"
+          },
+          "codeHash": {
             "type": "string"
           },
           "fields": {

@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{vm, ALPH}
+import org.alephium.protocol.{vm, ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, AssetOutput, ContractId, ContractOutput, GroupIndex}
 import org.alephium.protocol.vm.{Val => _, _}
@@ -100,6 +100,7 @@ object TestContract {
   final case class ContractState(
       id: ContractId,
       code: StatefulContract,
+      codeHash: Hash,
       fields: AVector[Val] = AVector.empty,
       asset: Asset
   )

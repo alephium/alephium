@@ -875,6 +875,7 @@ class ServerUtils(implicit
     } yield TestContract.ContractState(
       contractId,
       contract,
+      contract.hash,
       state.fields.map(Val.from),
       TestContract.Asset.from(contractOutput)
     )

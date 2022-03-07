@@ -18,6 +18,7 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.protocol.{vm, Hash}
 import org.alephium.protocol.vm.StatefulContext
 import org.alephium.protocol.vm.lang.Ast
 import org.alephium.serde.{serialize, Serde}
@@ -25,6 +26,7 @@ import org.alephium.util.AVector
 
 final case class CompileResult(
     bytecode: ByteString,
+    codeHash: Hash,
     fields: CompileResult.Fields,
     functions: AVector[CompileResult.Function],
     events: AVector[CompileResult.Event]
@@ -32,10 +34,14 @@ final case class CompileResult(
 
 object CompileResult {
 
-  def from[T: Serde](contract: T, contractAst: Ast.ContractWithState): CompileResult = {
+  def from[T <: vm.Contract[_]: Serde](
+      contract: T,
+      contractAst: Ast.ContractWithState
+  ): CompileResult = {
     val fields = Fields(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
     CompileResult(
       bytecode = serialize(contract),
+      codeHash = contract.hash,
       fields = fields,
       functions = AVector.from(contractAst.funcs.view.map(Function.from)),
       events = AVector.from(contractAst.events.map(Event.from))

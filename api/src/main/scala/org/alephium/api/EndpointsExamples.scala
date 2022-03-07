@@ -418,6 +418,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CompileResult(
         bytecode = Hex.unsafe(hexString),
+        codeHash = hash,
         fields = CompileResult.Fields(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
@@ -513,6 +514,7 @@ trait EndpointsExamples extends ErrorExamples {
   private lazy val existingContract = TestContract.ContractState(
     id = anotherContractId,
     code = code,
+    codeHash = code.hash,
     fields = AVector[Val](Val.U256(ALPH.alph(2))),
     asset = asset(2)
   )

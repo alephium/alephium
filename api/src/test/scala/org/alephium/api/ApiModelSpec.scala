@@ -779,6 +779,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       """
         |{
         |  "bytecode": "05011901010505040b05a000a001a003a00461160116021603160402",
+        |  "codeHash":"f69e4ebb8f06d90699aff5c0828dd9cda64fbaddd6d73fcb8f4e00c0ec73f17a",
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"]
@@ -807,6 +808,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       """
         |{
         |  "bytecode": "01010005050405160116021603160402",
+        |  "codeHash":"0186c93daba791049446b19f0e9cfd45de70f28b98e6fc734530ad39b23aefb0",
         |  "fields": {
         |    "signature": "TxScript Foo()",
         |    "types": []
