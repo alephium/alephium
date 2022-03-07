@@ -242,7 +242,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       val request: Output = Output.Contract(amount, address, tokens)
       val jsonRaw         = s"""
         |{
-        |  "type": "contract",
+        |  "type": "Contract",
         |  "amount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [
@@ -265,7 +265,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         Output.Asset(amount, address, AVector.empty, TimeStamp.unsafe(1234), ByteString.empty)
       val jsonRaw = s"""
         |{
-        |  "type": "asset",
+        |  "type": "Asset",
         |  "amount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [],

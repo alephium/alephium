@@ -3275,7 +3275,7 @@
                             ],
                             "outputs": [
                               {
-                                "type": "asset",
+                                "type": "Asset",
                                 "amount": "10000000000000000000",
                                 "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                 "tokens": [
@@ -3426,7 +3426,7 @@
                       ],
                       "outputs": [
                         {
-                          "type": "asset",
+                          "type": "Asset",
                           "amount": "10000000000000000000",
                           "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                           "tokens": [
@@ -4377,7 +4377,7 @@
                         ],
                         "outputs": [
                           {
-                            "type": "asset",
+                            "type": "Asset",
                             "amount": "10000000000000000000",
                             "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                             "tokens": [
@@ -4897,7 +4897,7 @@
                   ],
                   "outputs": [
                     {
-                      "type": "asset",
+                      "type": "Asset",
                       "amount": "10000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
@@ -5906,7 +5906,7 @@
                   ],
                   "assetOutputs": [
                     {
-                      "type": "contract",
+                      "type": "Contract",
                       "amount": "1000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
