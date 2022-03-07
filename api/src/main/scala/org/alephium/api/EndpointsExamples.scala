@@ -540,7 +540,7 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](Val.U256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
-        assetOutputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens))
+        txOutputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens))
       )
     )
 

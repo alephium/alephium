@@ -5904,7 +5904,7 @@
                       }
                     }
                   ],
-                  "assetOutputs": [
+                  "txOutputs": [
                     {
                       "type": "Contract",
                       "amount": "1000000000000000000",
@@ -8976,7 +8976,7 @@
           "returns",
           "gasUsed",
           "contracts",
-          "assetOutputs"
+          "txOutputs"
         ],
         "type": "object",
         "properties": {
@@ -8995,7 +8995,7 @@
               "$ref": "#/components/schemas/ContractState"
             }
           },
-          "assetOutputs": {
+          "txOutputs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Output"

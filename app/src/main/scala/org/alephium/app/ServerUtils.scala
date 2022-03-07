@@ -846,7 +846,7 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
-        assetOutputs = executionResult.generatedOutputs.map(Output.from)
+        txOutputs = executionResult.generatedOutputs.map(Output.from)
       )
     }
   }

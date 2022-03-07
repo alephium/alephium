@@ -22,5 +22,5 @@ final case class TestContractResult(
     returns: AVector[Val],
     gasUsed: Int,
     contracts: AVector[TestContract.ContractState],
-    assetOutputs: AVector[Output]
+    txOutputs: AVector[Output]
 )
