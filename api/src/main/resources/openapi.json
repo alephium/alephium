@@ -5269,13 +5269,13 @@
         }
       }
     },
-    "/contracts/build-script": {
+    "/contracts/unsigned-tx/build-script": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned script",
-        "operationId": "postContractsBuild-script",
+        "operationId": "postContractsUnsigned-txBuild-script",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5535,13 +5535,13 @@
         }
       }
     },
-    "/contracts/build-contract": {
+    "/contracts/unsigned-tx/build-contract": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned contract",
-        "operationId": "postContractsBuild-contract",
+        "operationId": "postContractsUnsigned-txBuild-contract",
         "requestBody": {
           "content": {
             "application/json": {
