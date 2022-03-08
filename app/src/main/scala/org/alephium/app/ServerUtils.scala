@@ -943,7 +943,7 @@ class ServerUtils(implicit
     createContract(
       worldState,
       existingContract.id,
-      existingContract.code,
+      existingContract.bytecode,
       existingContract.fields,
       existingContract.asset
     )

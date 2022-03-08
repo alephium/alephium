@@ -513,7 +513,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val code              = StatefulContract.forSMT.toContract().toOption.get
   private lazy val existingContract = TestContract.ContractState(
     address = Address.contract(anotherContractId),
-    code = code,
+    bytecode = code,
     codeHash = code.hash,
     fields = AVector[Val](Val.U256(ALPH.alph(2))),
     asset = asset(2)

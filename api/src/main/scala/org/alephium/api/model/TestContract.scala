@@ -99,7 +99,7 @@ object TestContract {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class ContractState(
       address: Address.Contract,
-      code: StatefulContract,
+      bytecode: StatefulContract,
       codeHash: Hash,
       fields: AVector[Val] = AVector.empty,
       asset: Asset
