@@ -74,6 +74,7 @@ trait EndpointsExamples extends ErrorExamples {
     .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
     .get
   val hexString    = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  val byteString   = Hex.unsafe(hexString)
   protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
     Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
@@ -443,12 +444,13 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildContractExamples: List[Example[BuildContract]] = List(
-    defaultExample(BuildContract(publicKey, code = hexString)),
+    defaultExample(BuildContract(publicKey, bytecode = byteString)),
     moreSettingsExample(
       BuildContract(
         publicKey,
-        hexString,
-        Some("#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7"),
+        byteString,
+        Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
+        Some(twoAlph),
         Some(twoAlph),
         Some(minimalGas),
         Some(defaultGasPrice),
@@ -474,11 +476,10 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
     simpleExample(
       BuildContractResult(
+        group = 2,
         unsignedTx = hexString,
         hash = hash,
-        contractId = contractId,
-        fromGroup = 2,
-        toGroup = 2
+        contractAddress = Address.contract(contractId)
       )
     )
 

@@ -294,7 +294,7 @@ trait WalletFixture extends CliqueFixture {
     // scalastyle:on no.equal
 
     val Contract(_, contractAddress, _) = tx.outputs.find(_.isInstanceOf[Contract]).get
-    ContractRef(buildResult.contractId, contractAddress, code)
+    ContractRef(buildResult.contractAddress.contractId, contractAddress, code)
   }
 
   def script(publicKey: String, code: String, walletName: String) = {

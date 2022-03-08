@@ -739,15 +739,14 @@ class ServerUtils(implicit
       query: BuildContract
   ): Try[BuildContractResult] = {
     for {
-      codeByteString <- decodeCodeHexString(query.code)
-      contract <- deserialize[StatefulContract](codeByteString).left.map(serdeError =>
+      contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      state <- parseState(query.state)
-      _     <- validateStateLength(contract, state).left.map(badRequest)
+      state = query.initialFields.map(_.map(_.toVmVal)).getOrElse(AVector.empty)
+      _ <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildContractWithParsedState(
-        query.code,
+        Hex.toHexString(query.bytecode),
         address,
         state,
         dustUtxoAmount,
@@ -1031,11 +1030,11 @@ object ServerUtils {
   def buildContractWithParsedState(
       codeRaw: String,
       address: Address,
-      initialState: AVector[vm.Val],
+      initialFields: AVector[vm.Val],
       alphAmount: U256,
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
-    val stateRaw = Hex.toHexString(serialize(initialState))
+    val stateRaw = Hex.toHexString(serialize(initialFields))
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
       case None         => s"createContract!(#$codeRaw, #$stateRaw)"

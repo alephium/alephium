@@ -629,8 +629,8 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val publicKey = PublicKey.generate
     val buildContract = BuildContract(
       fromPublicKey = publicKey,
-      code = "0000",
-      state = Some("10u"),
+      bytecode = ByteString(0, 0),
+      initialFields = Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
       issueTokenAmount = Some(Amount(1)),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
@@ -640,8 +640,8 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
-         |  "code": "0000",
-         |  "state": "10u",
+         |  "bytecode": "0000",
+         |  "initialFields":[{"type":"Bool","value":true},{"type":"U256","value":"123"}],
          |  "issueTokenAmount": "1",
          |  "gas": 1,
          |  "gasPrice": "1",
@@ -655,20 +655,18 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val txId       = Hash.generate
     val contractId = Hash.generate
     val buildContractResult = BuildContractResult(
+      group = 2,
       unsignedTx = "0000",
       hash = txId,
-      contractId = contractId,
-      fromGroup = 2,
-      toGroup = 3
+      contractAddress = Address.contract(contractId)
     )
     val jsonRaw =
       s"""
          |{
+         |  "group": 2,
          |  "unsignedTx": "0000",
          |  "hash": "${txId.toHexString}",
-         |  "contractId": "${contractId.toHexString}",
-         |  "fromGroup": 2,
-         |  "toGroup": 3
+         |  "contractAddress": "${Address.contract(contractId).toBase58}"
          |}
          |""".stripMargin
     checkData(buildContractResult, jsonRaw)

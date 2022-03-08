@@ -16,14 +16,18 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildContract(
     fromPublicKey: PublicKey,
-    code: String,
-    state: Option[String] = None,
+    bytecode: ByteString,
+    initialFields: Option[AVector[Val]] = None,
+    alphAmount: Option[Amount] = None,
     issueTokenAmount: Option[Amount] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,

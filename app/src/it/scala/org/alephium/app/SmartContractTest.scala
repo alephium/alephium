@@ -240,7 +240,7 @@ class SmartContractTest extends AlephiumActorSpec {
         state = Some("[0u]"),
         issueTokenAmount = Some(1024)
       )
-    val tokenContractKey = tokenContractBuildResult.contractId
+    val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
 
     val tokenWithdrawScript = {
       SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
@@ -272,7 +272,7 @@ class SmartContractTest extends AlephiumActorSpec {
         state = Some("[0u]"),
         issueTokenAmount = Some(1024)
       )
-    val tokenContractKey = tokenContractBuildResult.contractId
+    val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
 
     info("Transfer 1024 token back to self")
     script(SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024)))
@@ -283,7 +283,7 @@ class SmartContractTest extends AlephiumActorSpec {
       Some(s"[#${tokenContractKey.toHexString},0,0]"),
       issueTokenAmount = Some(10000)
     )
-    val swapContractKey = swapContractBuildResult.contractId
+    val swapContractKey = swapContractBuildResult.contractAddress.contractId
 
     info("Add liquidity to the swap contract")
     script(
@@ -361,7 +361,7 @@ class SmartContractTest extends AlephiumActorSpec {
         state = Some("[0u]"),
         issueTokenAmount = Some(1024)
       )
-    val tokenContractKey = tokenContractBuildResult.contractId
+    val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
 
     checkUTXOs { currentUTXOs =>
       // Create the token contract
@@ -416,7 +416,7 @@ class SmartContractTest extends AlephiumActorSpec {
       Some(s"[#${tokenContractKey.toHexString},0,0]"),
       issueTokenAmount = Some(10000)
     )
-    val swapContractKey = swapContractBuildResult.contractId
+    val swapContractKey = swapContractBuildResult.contractAddress.contractId
 
     checkUTXOs { currentUTXOs =>
       // Create the swap contract
