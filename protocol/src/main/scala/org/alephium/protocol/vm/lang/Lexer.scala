@@ -22,7 +22,7 @@ import fastparse._
 import fastparse.NoWhitespace._
 
 import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm.{LockupScript, Val}
 import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.protocol.vm.lang.LogicalOperator._
@@ -88,7 +88,12 @@ object Lexer {
         case None          => throw Compiler.Error(s"Invalid byteVec: $hexString")
       }
     }
-  def bytes[_: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
+  def bytes[_: P]: P[Val.ByteVec] = P("#" ~ (bytesInternal | contractAddress))
+  def contractAddress[_: P]: P[Val.ByteVec] =
+    address.map {
+      case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
+      case addr                                      => throw Compiler.Error(s"Invalid contract id: #@${addr.toBase58}")
+    }
 
   def addressInternal[_: P]: P[Val.Address] =
     P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
