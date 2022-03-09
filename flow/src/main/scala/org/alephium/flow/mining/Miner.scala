@@ -54,9 +54,31 @@ object Miner extends LazyLogging {
     }
   }
 
+  def mineForDev(index: ChainIndex, template: MiningBlob)(implicit
+      groupConfig: GroupConfig
+  ): Block = {
+    val target    = Target.unsafe(template.target)
+    val nonceStep = U256.unsafe(Int.MaxValue)
+    mine(index, template.headerBlob, target, nonceStep) match {
+      case Some((nonce, _)) =>
+        val blockBlob = nonce.value ++ template.headerBlob ++ template.txsBlob
+        deserialize[Block](blockBlob) match {
+          case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
+          case Right(block) => block
+        }
+      case None => throw new RuntimeException(s"Difficulty is set too high for dev")
+    }
+  }
+
   def mine(index: ChainIndex, headerBlob: ByteString, target: Target)(implicit
       groupConfig: GroupConfig,
       miningConfig: MiningSetting
+  ): Option[(Nonce, U256)] = {
+    mine(index, headerBlob, target, miningConfig.nonceStep)
+  }
+
+  def mine(index: ChainIndex, headerBlob: ByteString, target: Target, nonceStep: U256)(implicit
+      groupConfig: GroupConfig
   ): Option[(Nonce, U256)] = {
     val noncePostfixArray = Array.ofDim[Byte](Nonce.byteLength - 4)
     UnsecureRandom.source.nextBytes(noncePostfixArray)
@@ -71,7 +93,7 @@ object Miner extends LazyLogging {
         val rawNonce      = noncePrefix ++ noncePostfix
         val newHeaderBlob = rawNonce ++ headerBlob
         if (PoW.checkMined(index, newHeaderBlob, target)) {
-          Some(Nonce.unsafe(rawNonce) -> (miningConfig.nonceStep subUnsafe toTry))
+          Some(Nonce.unsafe(rawNonce) -> (nonceStep subUnsafe toTry))
         } else {
           iter(toTry.subUnsafe(U256.One))
         }
@@ -80,7 +102,7 @@ object Miner extends LazyLogging {
       }
     }
 
-    iter(miningConfig.nonceStep.subUnsafe(U256.One))
+    iter(nonceStep.subUnsafe(U256.One))
   }
 
   def validateAddresses(

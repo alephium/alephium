@@ -18,7 +18,7 @@ package org.alephium.api
 
 import org.scalatest.Assertion
 
-import org.alephium.json.Json.*
+import org.alephium.json.Json._
 import org.alephium.util.{AlephiumSpec, Duration}
 
 trait JsonFixture extends ApiModelCodec with AlephiumSpec {

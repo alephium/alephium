@@ -158,7 +158,8 @@ final case class MemPoolSetting(
     cleanSharedPoolFrequency: Duration,
     cleanPendingPoolFrequency: Duration,
     batchBroadcastTxsFrequency: Duration,
-    batchDownloadTxsFrequency: Duration
+    batchDownloadTxsFrequency: Duration,
+    autoMine: Boolean // for dev only
 )
 
 final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
