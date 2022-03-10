@@ -17,6 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.api.{ApiModelCodec, JsonFixture}
+import org.alephium.json.Json.read
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
@@ -41,10 +42,12 @@ class ValSpec extends ApiModelCodec with JsonFixture {
 
   it should "encode/decode Val.U256" in {
     checkData[Val](Val.U256(U256.MaxValue), s"""{"type": "U256", "value": "${U256.MaxValue}"}""")
+    read[Val](s"""{"type": "U256", "value": 1}""") is Val.U256(U256.unsafe(1))
   }
 
   it should "encode/decode Val.I256" in {
     checkData[Val](Val.I256(I256.MinValue), s"""{"type": "I256", "value": "${I256.MinValue}"}""")
+    read[Val](s"""{"type": "I256", "value": -1}""") is Val.I256(I256.unsafe(-1))
   }
 
   it should "encode/decode Val.Address" in {

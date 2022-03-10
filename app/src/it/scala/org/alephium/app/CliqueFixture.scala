@@ -609,26 +609,31 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/wallets/${walletName}/miner-addresses")
   }
 
+  def convertFields(fields: AVector[Val]): String = {
+    fields.map(write[Val](_)).mkString("[", ",", "]")
+  }
+
   def buildContract(
       fromPublicKey: String,
       code: String,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None,
-      state: Option[String] = None,
+      initialFields: Option[AVector[Val]] = None,
       issueTokenAmount: Option[U256] = None
   ) = {
-    val query =
+    val query = {
       s"""
-         {
-           "fromPublicKey": "$fromPublicKey",
-           "code": "$code"
-           ${gas.map(g => s""","gas": $g""").getOrElse("")}
-           ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
-           ${state.map(s => s""","state": "$s"""").getOrElse("")}
-           ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
-         }
-         """
-    httpPost("/contracts/build-contract", Some(query))
+         |{
+         |  "fromPublicKey": "$fromPublicKey",
+         |  "bytecode": "$code"
+         |  ${gas.map(g => s""","gas": $g""").getOrElse("")}
+         |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+         |  ${initialFields.map(fs => s""","initialFields": ${convertFields(fs)}""").getOrElse("")}
+         |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
+         |}
+         |""".stripMargin
+    }
+    httpPost("/contracts/unsigned-tx/build-contract", Some(query))
   }
 
   def buildScript(
@@ -642,13 +647,13 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       s"""
          {
            "fromPublicKey": "$fromPublicKey",
-           "code": "$code"
+           "bytecode": "$code"
            ${gas.map(g => s""","gas": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
-           ${alphAmount.map(a => s""","amount": "${a.value.v}"""").getOrElse("")}
+           ${alphAmount.map(a => s""","alphAmount": "${a.value.v}"""").getOrElse("")}
          }
          """
-    httpPost("/contracts/build-script", Some(query))
+    httpPost("/contracts/unsigned-tx/build-script", Some(query))
   }
 
   val startMining = httpPost("/miners/cpu-mining?action=start-mining")

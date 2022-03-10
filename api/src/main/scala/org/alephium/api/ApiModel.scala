@@ -47,8 +47,6 @@ object ApiModel {
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ApiModelCodec {
 
-  def blockflowFetchMaxAge: Duration
-
   implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
   implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
 
