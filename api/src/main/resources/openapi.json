@@ -3276,7 +3276,7 @@
                             "outputs": [
                               {
                                 "type": "Asset",
-                                "amount": "10000000000000000000",
+                                "alphAmount": "10000000000000000000",
                                 "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                 "tokens": [
                                   {
@@ -3427,7 +3427,7 @@
                       "outputs": [
                         {
                           "type": "Asset",
-                          "amount": "10000000000000000000",
+                          "alphAmount": "10000000000000000000",
                           "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                           "tokens": [
                             {
@@ -4378,7 +4378,7 @@
                         "outputs": [
                           {
                             "type": "Asset",
-                            "amount": "10000000000000000000",
+                            "alphAmount": "10000000000000000000",
                             "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                             "tokens": [
                               {
@@ -4898,7 +4898,7 @@
                   "outputs": [
                     {
                       "type": "Asset",
-                      "amount": "10000000000000000000",
+                      "alphAmount": "10000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
                         {
@@ -5915,7 +5915,7 @@
                   "txOutputs": [
                     {
                       "type": "Contract",
-                      "amount": "1000000000000000000",
+                      "alphAmount": "1000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
                         {
@@ -7358,7 +7358,7 @@
       },
       "Asset1": {
         "required": [
-          "amount",
+          "alphAmount",
           "address",
           "tokens",
           "lockTime",
@@ -7367,7 +7367,7 @@
         ],
         "type": "object",
         "properties": {
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -8062,14 +8062,14 @@
       },
       "Contract1": {
         "required": [
-          "amount",
+          "alphAmount",
           "address",
           "tokens",
           "type"
         ],
         "type": "object",
         "properties": {
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
           },

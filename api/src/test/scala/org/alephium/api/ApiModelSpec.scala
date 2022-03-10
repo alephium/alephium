@@ -243,7 +243,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       val jsonRaw         = s"""
         |{
         |  "type": "Contract",
-        |  "amount": "$amountStr",
+        |  "alphAmount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [
         |    {
@@ -266,7 +266,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       val jsonRaw = s"""
         |{
         |  "type": "Asset",
-        |  "amount": "$amountStr",
+        |  "alphAmount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [],
         |  "lockTime": 1234,

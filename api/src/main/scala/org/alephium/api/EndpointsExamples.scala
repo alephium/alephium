@@ -93,7 +93,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val tx = Tx(
     txId,
     AVector(Input.Asset(outputRef, serialize(unlockScript))),
-    AVector(Output.Asset(amount = balance, address, tokens, ts, ByteString.empty)),
+    AVector(Output.Asset(alphAmount = balance, address, tokens, ts, ByteString.empty)),
     minimalGas.value,
     defaultGasPrice.value
   )
