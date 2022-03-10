@@ -329,7 +329,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1"
+        |      "alphAmount": "1"
         |    }
         |  ]
         |}
@@ -352,7 +352,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "lockTime": 1234
         |    }
         |  ],
@@ -387,7 +387,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": [
         |        {
         |          "id": "${tokenId1.toHexString}",
@@ -427,7 +427,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": [
         |        {
         |          "id": "${tokenId1.toHexString}",
@@ -468,7 +468,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  "destinations": [
         |    {
         |      "address": "${toAddress.toBase58}",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": [
         |        {
         |          "id": "${tokenId1.toHexString}",

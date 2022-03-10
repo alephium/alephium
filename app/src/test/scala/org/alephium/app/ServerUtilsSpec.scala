@@ -88,7 +88,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.amount.value - destination2.amount.value
+        genesisBalance - destination1.alphAmount.value - destination2.alphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkDestinationBalance(destination1)
@@ -146,7 +146,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.amount.value - destination2.amount.value
+        genesisBalance - destination1.alphAmount.value - destination2.alphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkAddressBalance(destination1.address, U256.unsafe(0), 0)
@@ -632,7 +632,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "not create transaction with overflowing ALPH amount" in new MultipleUtxos {
     val alphAmountOverflowDestinations = AVector(
       destination1,
-      destination2.copy(amount = Amount(ALPH.MaxALPHValue))
+      destination2.copy(alphAmount = Amount(ALPH.MaxALPHValue))
     )
     serverUtils
       .prepareUnsignedTransaction(
@@ -1094,6 +1094,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    checkAddressBalance(destination.address, destination.amount.value, utxoNum)
+    checkAddressBalance(destination.address, destination.alphAmount.value, utxoNum)
   }
 }

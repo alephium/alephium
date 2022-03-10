@@ -416,7 +416,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         |  "destinations": [
         |    {
         |      "address": "$toAddress",
-        |      "amount": "$amount"
+        |      "alphAmount": "$amount"
         |    }
         |  ]
         |}
@@ -467,7 +467,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
-      Some(s"""{"destinations":[{"address":"${address}","amount":"${amount}","tokens":[]}]}""")
+      Some(s"""{"destinations":[{"address":"${address}","alphAmount":"${amount}","tokens":[]}]}""")
     )
   }
 

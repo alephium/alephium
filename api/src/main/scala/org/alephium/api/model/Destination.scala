@@ -22,7 +22,7 @@ import org.alephium.util.{AVector, TimeStamp}
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Destination(
     address: Address.Asset,
-    amount: Amount,
+    alphAmount: Amount,
     tokens: Option[AVector[Token]] = None,
     lockTime: Option[TimeStamp] = None
 )

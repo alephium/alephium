@@ -520,7 +520,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.amount.value,
+        destination.alphAmount.value,
         tokensInfo,
         destination.lockTime
       )
