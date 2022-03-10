@@ -264,11 +264,11 @@ trait ApiModelCodec {
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
 
-  implicit val assetRW: ReadWriter[TestContract.Asset]                    = macroRW
-  implicit val existingContractRW: ReadWriter[TestContract.ContractState] = macroRW
-  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]          = macroRW
-  implicit val testContractRW: ReadWriter[TestContract]                   = macroRW
-  implicit val testContractResultRW: ReadWriter[TestContractResult]       = macroRW
+  implicit val assetRW: ReadWriter[ContractState.Asset]             = macroRW
+  implicit val existingContractRW: ReadWriter[ContractState]        = macroRW
+  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]    = macroRW
+  implicit val testContractRW: ReadWriter[TestContract]             = macroRW
+  implicit val testContractResultRW: ReadWriter[TestContractResult] = macroRW
 
   implicit val txResultRW: RW[TxResult] = macroRW
 
@@ -290,7 +290,7 @@ trait ApiModelCodec {
     {
       case "start-mining" => MinerAction.StartMining
       case "stop-mining"  => MinerAction.StopMining
-      case other          => throw new Abort(s"Invalid miner action: $other")
+      case other          => throw Abort(s"Invalid miner action: $other")
     }
   )
 
@@ -352,8 +352,6 @@ trait ApiModelCodec {
     valAddressRW,
     valByteVecRW
   )
-
-  implicit val contractStateRW: RW[ContractStateResult] = macroRW
 
   implicit val apiKeyEncoder: Writer[ApiKey] = StringWriter.comap(_.value)
   implicit val apiKeyDecoder: Reader[ApiKey] = StringReader.map { raw =>

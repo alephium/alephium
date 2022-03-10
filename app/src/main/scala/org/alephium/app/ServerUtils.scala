@@ -23,9 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.api._
 import org.alephium.api.ApiError
-import org.alephium.api.model
 import org.alephium.api.model._
-import org.alephium.api.model.TestContract.ContractState
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -36,7 +34,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{failed => _, Val => _, _}
+import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
@@ -805,15 +803,11 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       address: Address.Contract,
       groupIndex: GroupIndex
-  ): Try[ContractStateResult] = {
-    val result = for {
-      worldState <- blockFlow.getBestCachedWorldState(groupIndex)
-      state      <- worldState.getContractState(address.lockupScript.contractId)
-    } yield {
-      val convertedFields = state.fields.map(model.Val.from)
-      ContractStateResult(convertedFields)
-    }
-    result.left.map(failedInIO(_))
+  ): Try[ContractState] = {
+    for {
+      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
+      state      <- fetchContractState(worldState, address.contractId)
+    } yield state
   }
 
   def runTestContract(
@@ -849,7 +843,7 @@ class ServerUtils(implicit
   private def fetchContractsState(
       worldState: WorldState.Staging,
       testContract: TestContract.Complete
-  ): Try[AVector[TestContract.ContractState]] = {
+  ): Try[AVector[ContractState]] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
         fetchContractState(worldState, contract.id)
@@ -859,20 +853,20 @@ class ServerUtils(implicit
   }
 
   private def fetchContractState(
-      worldState: WorldState.Staging,
+      worldState: WorldState.AbstractCached,
       contractId: ContractId
-  ): Try[TestContract.ContractState] = {
+  ): Try[ContractState] = {
     val result = for {
       state          <- worldState.getContractState(contractId)
       codeRecord     <- worldState.getContractCode(state.codeHash)
       contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
-    } yield TestContract.ContractState(
+    } yield ContractState(
       Address.contract(contractId),
       contract,
       contract.hash,
       state.fields.map(Val.from),
-      TestContract.Asset.from(contractOutput)
+      ContractState.Asset.from(contractOutput)
     )
     wrapResult(result)
   }
@@ -963,7 +957,7 @@ class ServerUtils(implicit
       contractId: ContractId,
       code: StatefulContract,
       initialState: AVector[Val],
-      asset: TestContract.Asset
+      asset: ContractState.Asset
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
     val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)

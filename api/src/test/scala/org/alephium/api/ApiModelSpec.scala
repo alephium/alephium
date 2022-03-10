@@ -27,7 +27,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.protocol.vm.lang.TypeSignatureFixture
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -735,38 +735,53 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val bool     = Val.True
     val byteVec  = Val.ByteVec(U256.MaxValue.toBytes)
     val address1 = Val.Address(generateContractAddress())
-    val address2 = Val.Address(generateAddress())
-    val jsonRaw  = s"""
-        |{
-        |  "fields": [
-        |     {
-        |       "type":"U256",
-        |       "value": "${u256.value}"
-        |     },
-        |     {
-        |       "type":"I256",
-        |       "value": "${i256.value}"
-        |     },
-        |     {
-        |       "type":"Bool",
-        |       "value": ${bool.value}
-        |     },
-        |     {
-        |       "type":"ByteVec",
-        |       "value": "${Hex.toHexString(byteVec.value)}"
-        |     },
-        |     {
-        |       "type":"Address",
-        |       "value": "${address1.value.toBase58}"
-        |     },
-        |     {
-        |       "type":"Address",
-        |       "value": "${address2.value.toBase58}"
-        |     }
-        |   ]
-        |}
-        """.stripMargin
-    checkData(ContractStateResult(AVector(u256, i256, bool, byteVec, address1, address2)), jsonRaw)
+    val state = ContractState(
+      generateContractAddress(),
+      StatefulContract.forSMT.toContract().rightValue,
+      Hash.zero,
+      AVector(u256, i256, bool, byteVec, address1),
+      ContractState.Asset(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+         |  "bytecode": "00010700000000000118",
+         |  "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "fields": [
+         |    {
+         |      "type": "U256",
+         |      "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+         |    },
+         |    {
+         |      "type": "I256",
+         |      "value": "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+         |    },
+         |    {
+         |      "type": "Bool",
+         |      "value": true
+         |    },
+         |    {
+         |      "type": "ByteVec",
+         |      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+         |    },
+         |    {
+         |      "type": "Address",
+         |      "value": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+         |    }
+         |  ],
+         |  "asset": {
+         |    "alphAmount": "1000000000000000000",
+         |    "tokens": [
+         |      {
+         |        "id": "0000000000000000000000000000000000000000000000000000000000000000",
+         |        "amount": "2000000000000000000"
+         |      }
+         |    ]
+         |  }
+         |}
+         |""".stripMargin
+    checkData(state, jsonRaw)
   }
 
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {

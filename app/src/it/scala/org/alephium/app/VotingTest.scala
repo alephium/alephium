@@ -91,7 +91,7 @@ class VotingTest extends AlephiumActorSpec {
 
     def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
       val contractState =
-        request[ContractStateResult](
+        request[ContractState](
           getContractState(contractAddress.toBase58, activeAddressesGroup),
           restPort
         )

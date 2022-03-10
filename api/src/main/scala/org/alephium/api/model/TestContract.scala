@@ -20,10 +20,10 @@ import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{vm, ALPH, Hash}
+import org.alephium.protocol.{vm, ALPH}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, AssetOutput, ContractId, ContractOutput, GroupIndex}
-import org.alephium.protocol.vm.{Val => _, _}
+import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex}
+import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -32,10 +32,10 @@ final case class TestContract(
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
     initialFields: Option[AVector[Val]] = None,
-    initialAsset: Option[TestContract.Asset] = None,
+    initialAsset: Option[ContractState.Asset] = None,
     testMethodIndex: Option[Int] = None,
     testArgs: Option[AVector[Val]] = None,
-    existingContracts: Option[AVector[TestContract.ContractState]] = None,
+    existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
   def toComplete: TestContract.Complete =
@@ -60,7 +60,7 @@ object TestContract {
   val testArgsDefault: AVector[Val]                    = AVector.empty
   val existingContractsDefault: AVector[ContractState] = AVector.empty
   val inputAssetsDefault: AVector[InputAsset]          = AVector.empty
-  val initialAssetDefault: Asset                       = Asset(ALPH.alph(1))
+  val initialAssetDefault: ContractState.Asset         = ContractState.Asset(ALPH.alph(1))
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
@@ -68,10 +68,10 @@ object TestContract {
       contractId: ContractId = addressDefault.contractId,
       code: StatefulContract,
       initialFields: AVector[Val] = initialFieldsDefault,
-      initialAsset: TestContract.Asset = initialAssetDefault,
+      initialAsset: ContractState.Asset = initialAssetDefault,
       testMethodIndex: Int = testMethodIndexDefault,
       testArgs: AVector[Val] = testArgsDefault,
-      existingContracts: AVector[TestContract.ContractState] = existingContractsDefault,
+      existingContracts: AVector[ContractState] = existingContractsDefault,
       inputAssets: AVector[TestContract.InputAsset] = inputAssetsDefault
   ) {
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
@@ -79,35 +79,7 @@ object TestContract {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Asset(alphAmount: U256, tokens: AVector[Token] = AVector.empty) {
-    def toContractOutput(contractId: ContractId): ContractOutput = {
-      ContractOutput(
-        alphAmount,
-        LockupScript.p2c(contractId),
-        tokens.map(token => (token.id, token.amount))
-      )
-    }
-  }
-
-  object Asset {
-    def from(output: ContractOutput): Asset = {
-      Asset(output.amount, output.tokens.map(pair => Token(pair._1, pair._2)))
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class ContractState(
-      address: Address.Contract,
-      bytecode: StatefulContract,
-      codeHash: Hash,
-      fields: AVector[Val] = AVector.empty,
-      asset: Asset
-  ) {
-    def id: ContractId = address.lockupScript.contractId
-  }
-
-  final case class InputAsset(address: Address.Asset, asset: Asset) {
+  final case class InputAsset(address: Address.Asset, asset: ContractState.Asset) {
     def toAssetOutput: AssetOutput =
       AssetOutput(
         asset.alphAmount,

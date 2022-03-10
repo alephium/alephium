@@ -5697,31 +5697,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ContractStateResult"
+                  "$ref": "#/components/schemas/ContractState"
                 },
                 "example": {
+                  "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
+                  "bytecode": "00010700000000000118",
+                  "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "fields": [
                     {
-                      "type": "I256",
-                      "value": "-10"
-                    },
-                    {
                       "type": "U256",
-                      "value": "10"
-                    },
-                    {
-                      "type": "Bool",
-                      "value": true
-                    },
-                    {
-                      "type": "Address",
-                      "value": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
-                    },
-                    {
-                      "type": "ByteVec",
-                      "value": "000000000000000000000000000000000000000000000000000000000000000a"
+                      "value": "2000000000000000000"
                     }
-                  ]
+                  ],
+                  "asset": {
+                    "alphAmount": "2000000000000000000",
+                    "tokens": [
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "2000000000"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -8125,20 +8121,6 @@
           },
           "asset": {
             "$ref": "#/components/schemas/Asset2"
-          }
-        }
-      },
-      "ContractStateResult": {
-        "required": [
-          "fields"
-        ],
-        "type": "object",
-        "properties": {
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
           }
         }
       },

@@ -678,7 +678,7 @@ abstract class RestServerSpec(
     Get(s"/contracts/${dummyContractAddress}/state?group=${dummyContractGroup.group}") check {
       response =>
         response.code is StatusCode.Ok
-        response.as[ContractStateResult] is ContractStateResult(AVector(Val.U256(U256.Zero)))
+        response.as[ContractState].address.toBase58 is dummyContractAddress
     }
   }
 

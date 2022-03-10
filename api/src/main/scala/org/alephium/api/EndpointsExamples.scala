@@ -492,26 +492,16 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val contractStateExamples: List[Example[ContractStateResult]] =
-    simpleExample(
-      ContractStateResult(
-        AVector(
-          Val.I256(I256.from(-10)),
-          Val.U256(U256.unsafe(10)),
-          Val.True,
-          Val.Address(contractAddress),
-          Val.ByteVec(U256.Ten.toBytes)
-        )
-      )
-    )
+  implicit lazy val contractStateExamples: List[Example[ContractState]] =
+    simpleExample(existingContract)
 
-  private def asset(n: Long) = TestContract.Asset(
+  private def asset(n: Long) = ContractState.Asset(
     ALPH.alph(n),
     AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )
   private val anotherContractId = ContractId.hash("contract")
   private val code              = StatefulContract.forSMT.toContract().toOption.get
-  private lazy val existingContract = TestContract.ContractState(
+  private lazy val existingContract = ContractState(
     address = Address.contract(anotherContractId),
     bytecode = code,
     codeHash = code.hash,
