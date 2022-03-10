@@ -16,21 +16,17 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.UnsignedTransaction
-import org.alephium.serde.serialize
-import org.alephium.util.Hex
+import akka.util.ByteString
 
-final case class BuildScriptResult(unsignedTx: String, hash: Hash, fromGroup: Int, toGroup: Int)
-object BuildScriptResult {
-  def from(
-      unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildScriptResult =
-    BuildScriptResult(
-      Hex.toHexString(serialize(unsignedTx)),
-      unsignedTx.hash,
-      unsignedTx.fromGroup.value,
-      unsignedTx.toGroup.value
-    )
-}
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildScriptTx(
+    fromPublicKey: PublicKey,
+    bytecode: ByteString,
+    alphAmount: Option[Amount] = None,
+    gas: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None,
+    utxosLimit: Option[Int] = None
+) extends UtxoBasedModel

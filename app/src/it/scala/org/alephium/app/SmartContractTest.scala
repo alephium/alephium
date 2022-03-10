@@ -93,7 +93,7 @@ class SmartContractTest extends AlephiumActorSpec {
         gasPrice: Option[GasPrice] = None
     ) = {
       val buildResult = buildScript(code, alphAmount, gas, gasPrice)
-      submitTx(buildResult.unsignedTx, buildResult.hash)
+      submitTx(buildResult.unsignedTx, buildResult.txId)
       buildResult
     }
 
@@ -102,9 +102,9 @@ class SmartContractTest extends AlephiumActorSpec {
         alphAmount: Option[Amount],
         gas: Option[Int],
         gasPrice: Option[GasPrice]
-    ): BuildScriptResult = {
+    ): BuildScriptTxResult = {
       val compileResult = request[CompileResult](compileScript(code), restPort)
-      request[BuildScriptResult](
+      request[BuildScriptTxResult](
         buildScript(
           fromPublicKey = publicKey,
           code = Hex.toHexString(compileResult.bytecode),

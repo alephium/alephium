@@ -672,11 +672,11 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     checkData(buildContractResult, jsonRaw)
   }
 
-  it should "encode/decode BuildScript" in {
+  it should "encode/decode BuildScriptTx" in {
     val publicKey = PublicKey.generate
-    val buildScript = BuildScript(
+    val buildScript = BuildScriptTx(
       fromPublicKey = publicKey,
-      code = "0000",
+      bytecode = ByteString(0, 0),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
       utxosLimit = Some(defaultUtxosLimit)
@@ -685,7 +685,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
-         |  "code": "0000",
+         |  "bytecode": "0000",
          |  "gas": 1,
          |  "gasPrice": "1",
          |  "utxosLimit": 1024
@@ -694,21 +694,19 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     checkData(buildScript, jsonRaw)
   }
 
-  it should "encode/decode BuildScriptResult" in {
+  it should "encode/decode BuildScriptTxResult" in {
     val txId = Hash.generate
-    val buildScriptResult = BuildScriptResult(
+    val buildScriptResult = BuildScriptTxResult(
       unsignedTx = "0000",
-      hash = txId,
-      fromGroup = 1,
-      toGroup = 2
+      txId = txId,
+      group = 1
     )
     val jsonRaw =
       s"""
          |{
          |  "unsignedTx": "0000",
-         |  "hash": "${txId.toHexString}",
-         |  "fromGroup": 1,
-         |  "toGroup": 2
+         |  "txId": "${txId.toHexString}",
+         |  "group": 1
          |}
          |""".stripMargin
     checkData(buildScriptResult, jsonRaw)

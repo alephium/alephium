@@ -343,11 +343,11 @@ trait Endpoints
       .out(jsonBody[CompileResult])
       .summary("Compile a script")
 
-  val buildScript: BaseEndpoint[BuildScript, BuildScriptResult] =
+  val buildScript: BaseEndpoint[BuildScriptTx, BuildScriptTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("build-script")
-      .in(jsonBody[BuildScript])
-      .out(jsonBody[BuildScriptResult])
+      .in(jsonBody[BuildScriptTx])
+      .out(jsonBody[BuildScriptTxResult])
       .summary("Build an unsigned script")
 
   val compileContract: BaseEndpoint[Compile.Contract, CompileResult] =

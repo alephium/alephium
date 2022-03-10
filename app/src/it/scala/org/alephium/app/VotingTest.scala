@@ -299,14 +299,14 @@ trait WalletFixture extends CliqueFixture {
 
   def script(publicKey: String, code: String, walletName: String) = {
     val compileResult = request[CompileResult](compileScript(code), restPort)
-    val buildResult = request[BuildScriptResult](
+    val buildResult = request[BuildScriptTxResult](
       buildScript(
         fromPublicKey = publicKey,
         code = Hex.toHexString(compileResult.bytecode)
       ),
       restPort
     )
-    submitTx(buildResult.unsignedTx, buildResult.hash, walletName)
+    submitTx(buildResult.unsignedTx, buildResult.txId, walletName)
   }
 
   def createWallets(nWallets: Int, restPort: Int, walletsBalance: U256): Seq[Wallet] = {

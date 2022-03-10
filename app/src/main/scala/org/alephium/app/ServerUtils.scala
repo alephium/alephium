@@ -18,7 +18,7 @@ package org.alephium.app
 
 import scala.concurrent._
 
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.api._
@@ -730,9 +730,6 @@ class ServerUtils(implicit
     }
   }
 
-  @inline private def decodeCodeHexString(str: String): Try[ByteString] =
-    Hex.from(str).toRight(badRequest("Cannot decode code hex string"))
-
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(
       blockFlow: BlockFlow,
@@ -768,11 +765,10 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
-    val alphAmount = query.amount.map(_.value).getOrElse(U256.Zero)
+  def buildScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
+    val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
     for {
-      codeByteString <- decodeCodeHexString(query.code)
-      script <- deserialize[StatefulScript](codeByteString).left.map(serdeError =>
+      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
       utx <- unsignedTxFromScript(
@@ -784,7 +780,7 @@ class ServerUtils(implicit
         query.gasPrice,
         query.utxosLimit
       )
-    } yield BuildScriptResult.from(utx)
+    } yield BuildScriptTxResult.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

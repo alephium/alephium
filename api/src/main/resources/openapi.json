@@ -5280,22 +5280,22 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildScript"
+                "$ref": "#/components/schemas/BuildScriptTx"
               },
               "examples": {
                 "Example0": {
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                    "amount": "1000000000000",
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "alphAmount": "1000000000000",
                     "gas": 20000,
                     "gasPrice": "100000000000",
                     "utxosLimit": 512
@@ -5311,13 +5311,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildScriptResult"
+                  "$ref": "#/components/schemas/BuildScriptTxResult"
                 },
                 "example": {
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "fromGroup": 2,
-                  "toGroup": 2
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "group": 2
                 }
               }
             }
@@ -7780,20 +7779,20 @@
           }
         }
       },
-      "BuildScript": {
+      "BuildScriptTx": {
         "required": [
           "fromPublicKey",
-          "code"
+          "bytecode"
         ],
         "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string"
           },
-          "code": {
+          "bytecode": {
             "type": "string"
           },
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -7809,25 +7808,21 @@
           }
         }
       },
-      "BuildScriptResult": {
+      "BuildScriptTxResult": {
         "required": [
           "unsignedTx",
-          "hash",
-          "fromGroup",
-          "toGroup"
+          "txId",
+          "group"
         ],
         "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
           },
-          "hash": {
+          "txId": {
             "type": "string"
           },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
+          "group": {
             "type": "integer"
           }
         }
