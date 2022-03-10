@@ -729,7 +729,22 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     checkData(verifySignature, jsonRaw)
   }
 
-  it should "encode/decode ContractStateResult" in {
+  it should "encode/decode ContractState.Asset" in {
+    val asset1   = ContractState.Asset(U256.unsafe(100))
+    val jsonRaw1 = s"""{"alphAmount": "100"}"""
+    checkData(asset1, jsonRaw1)
+
+    val asset2 = ContractState.Asset(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
+    val jsonRaw2 =
+      s"""
+         |{
+         |  "alphAmount": "100",
+         |  "tokens":[{"id": "0000000000000000000000000000000000000000000000000000000000000000","amount":"123"}]
+         |}""".stripMargin
+    checkData(asset2, jsonRaw2)
+  }
+
+  it should "encode/decode ContractState" in {
     val u256     = Val.U256(U256.MaxValue)
     val i256     = Val.I256(I256.MaxValue)
     val bool     = Val.True
