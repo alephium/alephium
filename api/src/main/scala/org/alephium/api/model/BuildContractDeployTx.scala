@@ -23,7 +23,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildContract(
+final case class BuildContractDeployTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
     initialFields: Option[AVector[Val]] = None,

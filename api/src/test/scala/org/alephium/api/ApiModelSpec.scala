@@ -203,14 +203,14 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     {
       val data: Input = Input.Contract(outputRef)
       val jsonRaw =
-        s"""{"type":"contract","outputRef":{"hint":1234,"key":"${key.toHexString}"}}"""
+        s"""{"type":"ContractInput","outputRef":{"hint":1234,"key":"${key.toHexString}"}}"""
       checkData(data, jsonRaw)
     }
 
     {
       val data: Input = Input.Asset(outputRef, hex"abcd")
       val jsonRaw =
-        s"""{"type":"asset","outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
+        s"""{"type":"AssetInput","outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
       checkData(data, jsonRaw)
     }
   }
@@ -242,7 +242,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       val request: Output = Output.Contract(amount, address, tokens)
       val jsonRaw         = s"""
         |{
-        |  "type": "Contract",
+        |  "type": "ContractOutput",
         |  "alphAmount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [
@@ -265,7 +265,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         Output.Asset(amount, address, AVector.empty, TimeStamp.unsafe(1234), ByteString.empty)
       val jsonRaw = s"""
         |{
-        |  "type": "Asset",
+        |  "type": "AssetOutput",
         |  "alphAmount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [],
@@ -627,7 +627,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
 
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
-    val buildContract = BuildContract(
+    val buildContract = BuildContractDeployTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       initialFields = Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
@@ -651,10 +651,10 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     checkData(buildContract, jsonRaw)
   }
 
-  it should "encode/decode BuildContractResult" in {
+  it should "encode/decode BuildContractDeployTxResult" in {
     val txId       = Hash.generate
     val contractId = Hash.generate
-    val buildContractResult = BuildContractResult(
+    val buildContractResult = BuildContractDeployTxResult(
       group = 2,
       unsignedTx = "0000",
       hash = txId,

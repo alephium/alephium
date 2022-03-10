@@ -733,8 +733,8 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(
       blockFlow: BlockFlow,
-      query: BuildContract
-  ): Try[BuildContractResult] = {
+      query: BuildContractDeployTx
+  ): Try[BuildContractDeployTxResult] = {
     for {
       contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -758,7 +758,7 @@ class ServerUtils(implicit
         query.gasPrice,
         query.utxosLimit
       )
-    } yield BuildContractResult.from(utx)
+    } yield BuildContractDeployTxResult.from(utx)
   }
 
   def verifySignature(query: VerifySignature): Try[Boolean] = {

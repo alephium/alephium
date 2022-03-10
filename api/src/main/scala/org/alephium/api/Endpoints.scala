@@ -357,11 +357,11 @@ trait Endpoints
       .out(jsonBody[CompileResult])
       .summary("Compile a smart contract")
 
-  val buildContract: BaseEndpoint[BuildContract, BuildContractResult] =
+  val buildContract: BaseEndpoint[BuildContractDeployTx, BuildContractDeployTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("build-contract")
-      .in(jsonBody[BuildContract])
-      .out(jsonBody[BuildContractResult])
+      .in(jsonBody[BuildContractDeployTx])
+      .out(jsonBody[BuildContractDeployTxResult])
       .summary("Build an unsigned contract")
 
   lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractStateResult] =

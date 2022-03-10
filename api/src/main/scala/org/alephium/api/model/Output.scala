@@ -30,7 +30,7 @@ sealed trait Output {
 
 object Output {
 
-  @upickle.implicits.key("Asset")
+  @upickle.implicits.key("AssetOutput")
   final case class Asset(
       alphAmount: Amount,
       address: Address,
@@ -39,7 +39,7 @@ object Output {
       additionalData: ByteString
   ) extends Output
 
-  @upickle.implicits.key("Contract")
+  @upickle.implicits.key("ContractOutput")
   final case class Contract(
       alphAmount: Amount,
       address: Address,

@@ -443,10 +443,10 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildContractExamples: List[Example[BuildContract]] = List(
-    defaultExample(BuildContract(publicKey, bytecode = byteString)),
+  implicit val buildContractExamples: List[Example[BuildContractDeployTx]] = List(
+    defaultExample(BuildContractDeployTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildContract(
+      BuildContractDeployTx(
         publicKey,
         byteString,
         Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
@@ -473,9 +473,9 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildContractResultExamples: List[Example[BuildContractResult]] =
+  implicit val buildContractResultExamples: List[Example[BuildContractDeployTxResult]] =
     simpleExample(
-      BuildContractResult(
+      BuildContractDeployTxResult(
         group = 2,
         unsignedTx = hexString,
         hash = hash,
