@@ -627,7 +627,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
 
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
-    val buildContract = BuildContractDeployTx(
+    val buildContract = BuildContractDeployScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       initialFields = Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
@@ -651,10 +651,10 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     checkData(buildContract, jsonRaw)
   }
 
-  it should "encode/decode BuildContractDeployTxResult" in {
+  it should "encode/decode BuildContractDeployScriptTxResult" in {
     val txId       = Hash.generate
     val contractId = Hash.generate
-    val buildContractResult = BuildContractDeployTxResult(
+    val buildContractResult = BuildContractDeployScriptTxResult(
       group = 2,
       unsignedTx = "0000",
       hash = txId,

@@ -57,8 +57,4 @@ class ValSpec extends ApiModelCodec with JsonFixture {
       s"""{"type": "Address", "value": "${address.toBase58}"}"""
     )
   }
-
-  it should "encode/decode Vals" in {
-    checkData[Val](Val.Bool(true), """{"type":"Bool","value":true}""")
-  }
 }

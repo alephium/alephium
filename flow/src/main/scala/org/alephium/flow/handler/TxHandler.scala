@@ -153,20 +153,20 @@ class TxHandler(
 
   def handleCommand: Receive = {
     case TxHandler.AddToSharedPool(txs) =>
-      if (!memPoolSetting.autoMine) {
+      if (!memPoolSetting.autoMineForDev) {
         txs.foreach(
           handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
         )
       } else {
-        mineTxsDirectly(txs)
+        mineTxsForDev(txs)
       }
     case TxHandler.AddToGrandPool(txs) =>
-      if (!memPoolSetting.autoMine) {
+      if (!memPoolSetting.autoMineForDev) {
         txs.foreach(
           handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate, None, acknowledge = true)
         )
       } else {
-        mineTxsDirectly(txs)
+        mineTxsForDev(txs)
       }
     case TxHandler.Broadcast(txs)          => handleReadyTxsFromPendingPool(txs)
     case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
@@ -203,7 +203,7 @@ class TxHandler(
       removeConfirmedTxsFromStorage()
   }
 
-  def mineTxsDirectly(txs: AVector[TransactionTemplate]): Unit = {
+  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
       TxHandler.mineTxForDev(blockFlow, tx) match {
         case Left(error) => addFailed(tx, error)

@@ -731,8 +731,8 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(
       blockFlow: BlockFlow,
-      query: BuildContractDeployTx
-  ): Try[BuildContractDeployTxResult] = {
+      query: BuildContractDeployScriptTx
+  ): Try[BuildContractDeployScriptTxResult] = {
     for {
       contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -744,7 +744,7 @@ class ServerUtils(implicit
         Hex.toHexString(query.bytecode),
         address,
         state,
-        dustUtxoAmount,
+        query.alphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -756,7 +756,7 @@ class ServerUtils(implicit
         query.gasPrice,
         query.utxosLimit
       )
-    } yield BuildContractDeployTxResult.from(utx)
+    } yield BuildContractDeployScriptTxResult.from(utx)
   }
 
   def verifySignature(query: VerifySignature): Try[Boolean] = {

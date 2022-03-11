@@ -55,9 +55,9 @@ class SmartContractTest extends AlephiumActorSpec {
         issueTokenAmount: Option[U256],
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
-    ): BuildContractDeployTxResult = {
+    ): BuildContractDeployScriptTxResult = {
       val compileResult = request[CompileResult](compileContract(code), restPort)
-      val buildResult = request[BuildContractDeployTxResult](
+      val buildResult = request[BuildContractDeployScriptTxResult](
         buildContract(
           fromPublicKey = publicKey,
           code = Hex.toHexString(compileResult.bytecode),

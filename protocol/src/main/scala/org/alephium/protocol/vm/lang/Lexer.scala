@@ -92,7 +92,7 @@ object Lexer {
   def contractAddress[_: P]: P[Val.ByteVec] =
     address.map {
       case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
-      case addr                                      => throw Compiler.Error(s"Invalid contract id: #@${addr.toBase58}")
+      case addr                                      => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
     }
 
   def addressInternal[_: P]: P[Val.Address] =

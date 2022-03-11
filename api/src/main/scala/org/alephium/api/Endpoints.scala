@@ -92,10 +92,7 @@ trait Endpoints
       .tag("Contracts")
 
   private val contractsUnsignedTxEndpoint: BaseEndpoint[Unit, Unit] =
-    baseEndpoint
-      .in("contracts")
-      .in("unsigned-tx")
-      .tag("Contracts")
+    contractsEndpoint.in("unsigned-tx")
 
   private val blockflowEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
@@ -357,11 +354,11 @@ trait Endpoints
       .out(jsonBody[CompileResult])
       .summary("Compile a smart contract")
 
-  val buildContract: BaseEndpoint[BuildContractDeployTx, BuildContractDeployTxResult] =
+  val buildContract: BaseEndpoint[BuildContractDeployScriptTx, BuildContractDeployScriptTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("build-contract")
-      .in(jsonBody[BuildContractDeployTx])
-      .out(jsonBody[BuildContractDeployTxResult])
+      .in(jsonBody[BuildContractDeployScriptTx])
+      .out(jsonBody[BuildContractDeployScriptTxResult])
       .summary("Build an unsigned contract")
 
   lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractState] =

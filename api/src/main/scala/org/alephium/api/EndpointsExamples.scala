@@ -56,7 +56,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val inetAddress       = inetSocketAddress.getAddress
   private val peerAddress       = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
   private val peers             = AVector(peerAddress)
-  private val twoAlph           = Amount(ALPH.oneAlph.mulUnsafe(U256.Two))
+  private val bigAmount         = Amount(ALPH.oneAlph.mulUnsafe(U256.Two))
   private def alph(value: Int)  = Amount(ALPH.oneAlph.mulUnsafe(U256.unsafe(value)))
   private val height            = 42
   val balance                   = alph(10)
@@ -84,9 +84,9 @@ trait EndpointsExamples extends ErrorExamples {
     Token(Hash.hash("token1"), alph(42).value),
     Token(Hash.hash("token2"), alph(1000).value)
   )
-  val defaultDestinations = AVector(Destination(address, twoAlph, None, None))
+  val defaultDestinations = AVector(Destination(address, bigAmount, None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, twoAlph, Some(tokens), Some(ts))
+    Destination(address, bigAmount, Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
@@ -443,15 +443,15 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildContractExamples: List[Example[BuildContractDeployTx]] = List(
-    defaultExample(BuildContractDeployTx(publicKey, bytecode = byteString)),
+  implicit val buildContractExamples: List[Example[BuildContractDeployScriptTx]] = List(
+    defaultExample(BuildContractDeployScriptTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildContractDeployTx(
+      BuildContractDeployScriptTx(
         publicKey,
         byteString,
         Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
-        Some(twoAlph),
-        Some(twoAlph),
+        Some(bigAmount),
+        Some(bigAmount),
         Some(minimalGas),
         Some(defaultGasPrice),
         Some(defaultUtxosLimit)
@@ -473,9 +473,9 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildContractResultExamples: List[Example[BuildContractDeployTxResult]] =
+  implicit val buildContractResultExamples: List[Example[BuildContractDeployScriptTxResult]] =
     simpleExample(
-      BuildContractDeployTxResult(
+      BuildContractDeployScriptTxResult(
         group = 2,
         unsignedTx = hexString,
         hash = hash,

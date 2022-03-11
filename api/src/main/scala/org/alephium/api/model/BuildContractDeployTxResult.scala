@@ -22,18 +22,18 @@ import org.alephium.protocol.model.{Address, TxOutputRef, UnsignedTransaction}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildContractDeployTxResult(
+final case class BuildContractDeployScriptTxResult(
     group: Int,
     unsignedTx: String,
     hash: Hash,
     contractAddress: Address.Contract
 )
-object BuildContractDeployTxResult {
+object BuildContractDeployScriptTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildContractDeployTxResult = {
+  )(implicit groupConfig: GroupConfig): BuildContractDeployScriptTxResult = {
     val contractId = TxOutputRef.key(unsignedTx.hash, unsignedTx.fixedOutputs.length)
-    BuildContractDeployTxResult(
+    BuildContractDeployScriptTxResult(
       unsignedTx.fromGroup.value,
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.hash,

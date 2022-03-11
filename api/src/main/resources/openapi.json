@@ -5545,7 +5545,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildContractDeployTx"
+                "$ref": "#/components/schemas/BuildContractDeployScriptTx"
               },
               "examples": {
                 "Example0": {
@@ -5587,7 +5587,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildContractDeployTxResult"
+                  "$ref": "#/components/schemas/BuildContractDeployScriptTxResult"
                 },
                 "example": {
                   "group": 2,
@@ -7645,7 +7645,7 @@
           }
         }
       },
-      "BuildContractDeployTx": {
+      "BuildContractDeployScriptTx": {
         "required": [
           "fromPublicKey",
           "bytecode"
@@ -7684,7 +7684,7 @@
           }
         }
       },
-      "BuildContractDeployTxResult": {
+      "BuildContractDeployScriptTxResult": {
         "required": [
           "group",
           "unsignedTx",

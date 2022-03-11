@@ -532,8 +532,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "mine new block if auto-mine is enabled" in new Fixture {
-    override val configValues = Map(("alephium.mempool.auto-mine", true))
-    config.mempool.autoMine is true
+    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    config.mempool.autoMineForDev is true
 
     val block = transfer(blockFlow, chainIndex)
     val tx    = block.transactions.head
