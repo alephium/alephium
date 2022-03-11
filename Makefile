@@ -11,7 +11,7 @@ clean:
 	sbt clean
 
 format:
-	sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle it:scalafmt it:scalastyle
+	sbt format
 
 unit-test:
 	sbt test

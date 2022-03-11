@@ -91,7 +91,7 @@ class VotingTest extends AlephiumActorSpec {
 
     def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
       val contractState =
-        request[ContractStateResult](
+        request[ContractState](
           getContractState(contractAddress.toBase58, activeAddressesGroup),
           restPort
         )
@@ -186,10 +186,17 @@ trait VotingFixture extends WalletFixture {
         | }
       """.stripMargin
     // scalastyle:on no.equal
-    val votersList: String =
-      voters.map(wallet => s"@${wallet.activeAddress}").mkString(",")
-    val state = s"[ 0, 0, false, false, @${admin.activeAddress}, [${votersList}]]"
-    contract(admin, votingContract, Some(state), Some(tokenAmount))
+    val votersList: AVector[Val] =
+      AVector.from(voters.map(wallet => Val.Address(Address.fromBase58(wallet.activeAddress).get)))
+    voters.map(wallet => s"@${wallet.activeAddress}").mkString(",")
+    val initialFields = AVector[Val](
+      Val.U256(U256.Zero),
+      Val.U256(U256.Zero),
+      Val.False,
+      Val.False,
+      Val.Address(Address.fromBase58(admin.activeAddress).get)
+    ) ++ votersList
+    contract(admin, votingContract, Some(initialFields), Some(tokenAmount))
   }
   // scalastyle:on method.length
 
@@ -271,15 +278,15 @@ trait WalletFixture extends CliqueFixture {
   def contract(
       wallet: Wallet,
       code: String,
-      state: Option[String],
+      initialFields: Option[AVector[Val]],
       issueTokenAmount: Option[U256]
   ): ContractRef = {
     val compileResult = request[CompileResult](compileContract(code), restPort)
-    val buildResult = request[BuildContractResult](
+    val buildResult = request[BuildContractDeployScriptTxResult](
       buildContract(
         fromPublicKey = wallet.publicKey.toHexString,
-        code = compileResult.code,
-        state = state,
+        code = Hex.toHexString(compileResult.bytecode),
+        initialFields = initialFields,
         issueTokenAmount = issueTokenAmount
       ),
       restPort
@@ -293,27 +300,20 @@ trait WalletFixture extends CliqueFixture {
     val tx: Tx = block.transactions.find(_.id == txResult.txId).get
     // scalastyle:on no.equal
 
-    val Contract(_, contractAddress, _) = tx.outputs
-      .find(output =>
-        output match {
-          case Contract(_, _, _) => true
-          case _                 => false
-        }
-      )
-      .get
-    ContractRef(buildResult.contractId, contractAddress, code)
+    val Contract(_, contractAddress, _) = tx.outputs.find(_.isInstanceOf[Contract]).get
+    ContractRef(buildResult.contractAddress.contractId, contractAddress, code)
   }
 
   def script(publicKey: String, code: String, walletName: String) = {
     val compileResult = request[CompileResult](compileScript(code), restPort)
-    val buildResult = request[BuildScriptResult](
+    val buildResult = request[BuildScriptTxResult](
       buildScript(
         fromPublicKey = publicKey,
-        code = compileResult.code
+        code = Hex.toHexString(compileResult.bytecode)
       ),
       restPort
     )
-    submitTx(buildResult.unsignedTx, buildResult.hash, walletName)
+    submitTx(buildResult.unsignedTx, buildResult.txId, walletName)
   }
 
   def createWallets(nWallets: Int, restPort: Int, walletsBalance: U256): Seq[Wallet] = {

@@ -129,6 +129,7 @@ object Val {
     def tpe: Val.Type = Address
 
     override def toByteVec(): ByteVec = ByteVec(encode(lockupScript))
+    def toBase58: String              = Base58.encode(encode(lockupScript))
 
     override def estimateByteSize(): Int = lockupScript match {
       case LockupScript.P2MPKH(mpkh, _) => mpkh.length * 32

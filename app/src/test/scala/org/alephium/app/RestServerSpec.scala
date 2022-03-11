@@ -200,7 +200,7 @@ abstract class RestServerSpec(
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": []
         |    }
         |  ]
@@ -223,7 +223,7 @@ abstract class RestServerSpec(
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": [],
         |      "lockTime": "1234"
         |    }
@@ -257,7 +257,7 @@ abstract class RestServerSpec(
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": []
         |    }
         |  ]
@@ -457,7 +457,7 @@ abstract class RestServerSpec(
         |  "destinations": [
         |    {
         |      "address": "$dummyToAddress",
-        |      "amount": "1",
+        |      "alphAmount": "1",
         |      "tokens": []
         |    }
         |  ]
@@ -678,7 +678,7 @@ abstract class RestServerSpec(
     Get(s"/contracts/${dummyContractAddress}/state?group=${dummyContractGroup.group}") check {
       response =>
         response.code is StatusCode.Ok
-        response.as[ContractStateResult] is ContractStateResult(AVector(Val.U256(U256.Zero)))
+        response.as[ContractState].address.toBase58 is dummyContractAddress
     }
   }
 
@@ -765,15 +765,15 @@ abstract class RestServerSpec(
         |      "index": 0,
         |      "fields": [
         |        {
-        |          "type": "u256",
+        |          "type": "U256",
         |          "value": "4"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
         |        }
         |      ]
@@ -822,15 +822,15 @@ abstract class RestServerSpec(
         |      "index": 0,
         |      "fields": [
         |        {
-        |          "type": "u256",
+        |          "type": "U256",
         |          "value": "4"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
         |        },
         |        {
-        |          "type": "address",
+        |          "type": "Address",
         |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
         |        }
         |      ]

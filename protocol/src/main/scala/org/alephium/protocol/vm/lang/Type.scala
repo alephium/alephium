@@ -22,6 +22,9 @@ import org.alephium.util.AVector
 sealed trait Type {
   def toVal: Val.Type
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def signature: String = toVal.toString
+
   def isArrayType: Boolean = this match {
     case _: Type.FixedSizeArray => true
     case _                      => false

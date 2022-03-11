@@ -22,6 +22,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.reflect.ClassTag
 
 import akka.util.ByteString
+import upickle.core.Util
 
 import org.alephium.json.Json._
 import org.alephium.util.{AVector, Hex, TimeStamp}
@@ -36,8 +37,22 @@ object UtilJson {
   implicit def avectorReadWriter[A: ReadWriter: ClassTag]: ReadWriter[AVector[A]] =
     ReadWriter.join(avectorReader, avectorWriter)
 
-  implicit val javaBigIntegerReader: Reader[BigInteger] = BigIntReader.map {
-    _.bigInteger
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  implicit val javaBigIntegerReader: Reader[BigInteger] = new SimpleReader[BigInteger] {
+    override def expectedMsg                              = "expected bigint"
+    override def visitString(s: CharSequence, index: Int) = new BigInteger(s.toString)
+    override def visitFloat64StringParts(
+        s: CharSequence,
+        decIndex: Int,
+        expIndex: Int,
+        index: Int
+    ) = {
+      if (decIndex == -1 && expIndex == -1) {
+        BigInteger.valueOf(Util.parseIntegralNum(s, decIndex, expIndex, index))
+      } else {
+        throw upickle.core.Abort(expectedMsg + " but got float")
+      }
+    }
   }
 
   implicit val javaBigIntegerWriter: Writer[BigInteger] = BigIntWriter.comap[BigInteger] { jbi =>

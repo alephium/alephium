@@ -28,10 +28,10 @@ sealed trait Input {
 
 object Input {
 
-  @upickle.implicits.key("asset")
+  @upickle.implicits.key("AssetInput")
   final case class Asset(outputRef: OutputRef, unlockScript: ByteString) extends Input
 
-  @upickle.implicits.key("contract")
+  @upickle.implicits.key("ContractInput")
   final case class Contract(outputRef: OutputRef) extends Input
 
   def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Asset = {

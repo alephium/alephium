@@ -16,15 +16,20 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.UnsignedTransaction
+import org.alephium.serde.serialize
+import org.alephium.util.Hex
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildScript(
-    fromPublicKey: PublicKey,
-    code: String,
-    amount: Option[Amount] = None,
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
-) extends UtxoBasedModel
+final case class BuildScriptTxResult(unsignedTx: String, txId: Hash, group: Int)
+object BuildScriptTxResult {
+  def from(
+      unsignedTx: UnsignedTransaction
+  )(implicit groupConfig: GroupConfig): BuildScriptTxResult =
+    BuildScriptTxResult(
+      Hex.toHexString(serialize(unsignedTx)),
+      unsignedTx.hash,
+      unsignedTx.fromGroup.value
+    )
+}
