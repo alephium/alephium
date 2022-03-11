@@ -81,16 +81,19 @@ object Lexer {
       }
 
   def bytesInternal[_: P]: P[Val.ByteVec] =
-    P(hex).!.map { hexString =>
-      val byteVecOpt = Hex.from(hexString).map(ByteVec(_))
-      byteVecOpt match {
-        case Some(byteVec) => byteVec
-        case None          => throw Compiler.Error(s"Invalid byteVec: $hexString")
+    P(CharsWhileIn("0-9a-zA-Z")).!.map { string =>
+      Hex.from(string) match {
+        case Some(bytes) => ByteVec(bytes)
+        case None =>
+          Address.extractLockupScript(string) match {
+            case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
+            case _                                  => throw Compiler.Error(s"Invalid byteVec: $string")
+          }
       }
     }
-  def bytes[_: P]: P[Val.ByteVec] = P("#" ~ (bytesInternal | contractAddress))
+  def bytes[_: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
   def contractAddress[_: P]: P[Val.ByteVec] =
-    address.map {
+    addressInternal.map {
       case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
       case addr                                      => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
     }
