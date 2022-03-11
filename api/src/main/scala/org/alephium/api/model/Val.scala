@@ -37,27 +37,27 @@ object Val {
       Address(model.Address.from(lockupScript))
   }
 
-  @upickle.implicits.key("bool")
+  @upickle.implicits.key("Bool")
   final case class Bool(value: Boolean) extends Val {
     override def toVmVal: vm.Val = vm.Val.Bool(value)
   }
 
-  @upickle.implicits.key("i256")
+  @upickle.implicits.key("I256")
   final case class I256(value: util.I256) extends Val {
     override def toVmVal: vm.Val = vm.Val.I256(value)
   }
 
-  @upickle.implicits.key("u256")
+  @upickle.implicits.key("U256")
   final case class U256(value: util.U256) extends Val {
     override def toVmVal: vm.Val = vm.Val.U256(value)
   }
 
-  @upickle.implicits.key("bytevec")
+  @upickle.implicits.key("ByteVec")
   final case class ByteVec(value: ByteString) extends Val {
     override def toVmVal: vm.Val = vm.Val.ByteVec(value)
   }
 
-  @upickle.implicits.key("address")
+  @upickle.implicits.key("Address")
   final case class Address(value: model.Address) extends Val {
     override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
   }

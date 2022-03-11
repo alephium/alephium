@@ -91,6 +91,9 @@ trait Endpoints
       .in("contracts")
       .tag("Contracts")
 
+  private val contractsUnsignedTxEndpoint: BaseEndpoint[Unit, Unit] =
+    contractsEndpoint.in("unsigned-tx")
+
   private val blockflowEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
       .in("blockflow")
@@ -337,11 +340,11 @@ trait Endpoints
       .out(jsonBody[CompileResult])
       .summary("Compile a script")
 
-  val buildScript: BaseEndpoint[BuildScript, BuildScriptResult] =
-    contractsEndpoint.post
+  val buildScript: BaseEndpoint[BuildScriptTx, BuildScriptTxResult] =
+    contractsUnsignedTxEndpoint.post
       .in("build-script")
-      .in(jsonBody[BuildScript])
-      .out(jsonBody[BuildScriptResult])
+      .in(jsonBody[BuildScriptTx])
+      .out(jsonBody[BuildScriptTxResult])
       .summary("Build an unsigned script")
 
   val compileContract: BaseEndpoint[Compile.Contract, CompileResult] =
@@ -351,19 +354,19 @@ trait Endpoints
       .out(jsonBody[CompileResult])
       .summary("Compile a smart contract")
 
-  val buildContract: BaseEndpoint[BuildContract, BuildContractResult] =
-    contractsEndpoint.post
+  val buildContract: BaseEndpoint[BuildContractDeployScriptTx, BuildContractDeployScriptTxResult] =
+    contractsUnsignedTxEndpoint.post
       .in("build-contract")
-      .in(jsonBody[BuildContract])
-      .out(jsonBody[BuildContractResult])
+      .in(jsonBody[BuildContractDeployScriptTx])
+      .out(jsonBody[BuildContractDeployScriptTxResult])
       .summary("Build an unsigned contract")
 
-  lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractStateResult] =
+  lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractState] =
     contractsEndpoint.get
       .in(path[Address.Contract]("address"))
       .in("state")
       .in(query[GroupIndex]("group"))
-      .out(jsonBody[ContractStateResult])
+      .out(jsonBody[ContractState])
       .summary("Get contract state")
 
   lazy val testContract: BaseEndpoint[TestContract, TestContractResult] =

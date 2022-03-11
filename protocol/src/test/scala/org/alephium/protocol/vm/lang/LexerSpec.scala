@@ -61,11 +61,16 @@ class LexerSpec extends AlephiumSpec {
   }
 
   it should "parse bytes and address" in {
-    val hash    = Hash.random
-    val address = Address.p2pkh(PublicKey.generate)
+    val hash     = Hash.random
+    val address  = Address.p2pkh(PublicKey.generate)
+    val contract = Address.contract(Hash.random)
     fastparse.parse(s"#${hash.toHexString}", Lexer.bytes(_)).get.value is
       Val.ByteVec(hash.bytes)
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
       Val.Address(address.lockupScript)
+    intercept[Compiler.Error](fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))) is Compiler
+      .Error(s"Invalid byteVec: ${address.toBase58}")
+    fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
+      Val.ByteVec(contract.contractId.bytes)
   }
 }

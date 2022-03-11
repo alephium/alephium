@@ -29,8 +29,6 @@ trait ApiModelFixture
     with CompilerConfigFixture.Default
     with ApiModelCodec {
 
-  val blockflowFetchMaxAge = Duration.unsafe(1000)
-
   val instrs: AVector[vm.Instr[vm.StatefulContext]] =
     AVector(vm.ConstTrue, vm.ConstFalse, vm.I256Const3)
   val method  = vm.Method[vm.StatefulContext](true, true, 1, 2, 3, instrs)

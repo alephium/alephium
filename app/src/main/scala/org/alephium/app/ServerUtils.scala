@@ -18,14 +18,13 @@ package org.alephium.app
 
 import scala.concurrent._
 
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{TransactionTemplate => _, _}
-import org.alephium.api.model.TestContract.ExistingContract
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -36,7 +35,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{failed => _, Val => _, _}
+import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
@@ -522,7 +521,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.amount.value,
+        destination.alphAmount.value,
         tokensInfo,
         destination.lockTime
       )
@@ -730,27 +729,23 @@ class ServerUtils(implicit
     }
   }
 
-  @inline private def decodeCodeHexString(str: String): Try[ByteString] =
-    Hex.from(str).toRight(badRequest("Cannot decode code hex string"))
-
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(
       blockFlow: BlockFlow,
-      query: BuildContract
-  ): Try[BuildContractResult] = {
+      query: BuildContractDeployScriptTx
+  ): Try[BuildContractDeployScriptTxResult] = {
     for {
-      codeByteString <- decodeCodeHexString(query.code)
-      contract <- deserialize[StatefulContract](codeByteString).left.map(serdeError =>
+      contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      state <- parseState(query.state)
-      _     <- validateStateLength(contract, state).left.map(badRequest)
+      state = query.initialFields.map(_.map(_.toVmVal)).getOrElse(AVector.empty)
+      _ <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildContractWithParsedState(
-        query.code,
+        Hex.toHexString(query.bytecode),
         address,
         state,
-        dustUtxoAmount,
+        query.alphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -762,18 +757,17 @@ class ServerUtils(implicit
         query.gasPrice,
         query.utxosLimit
       )
-    } yield BuildContractResult.from(utx)
+    } yield BuildContractDeployScriptTxResult.from(utx)
   }
 
   def verifySignature(query: VerifySignature): Try[Boolean] = {
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  def buildScript(blockFlow: BlockFlow, query: BuildScript): Try[BuildScriptResult] = {
-    val alphAmount = query.amount.map(_.value).getOrElse(U256.Zero)
+  def buildScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
+    val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
     for {
-      codeByteString <- decodeCodeHexString(query.code)
-      script <- deserialize[StatefulScript](codeByteString).left.map(serdeError =>
+      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
       utx <- unsignedTxFromScript(
@@ -785,14 +779,14 @@ class ServerUtils(implicit
         query.gasPrice,
         query.utxosLimit
       )
-    } yield BuildScriptResult.from(utx)
+    } yield BuildScriptTxResult.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileScript(query: Compile.Script): Try[CompileResult] = {
     Compiler
-      .compileTxScript(query.code)
-      .map(script => CompileResult(Hex.toHexString(serialize(script))))
+      .compileTxScriptFull(query.code)
+      .map(CompileResult.from[StatefulScript].tupled)
       .left
       .map(error => failed(error.toString))
   }
@@ -800,8 +794,8 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileContract(query: Compile.Contract): Try[CompileResult] = {
     Compiler
-      .compileContract(query.code)
-      .map(contract => CompileResult(Hex.toHexString(serialize(contract))))
+      .compileContractFull(query.code)
+      .map(CompileResult.from[StatefulContract].tupled)
       .left
       .map(error => failed(error.toString))
   }
@@ -810,18 +804,17 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       address: Address.Contract,
       groupIndex: GroupIndex
-  ): Try[ContractStateResult] = {
-    val result = for {
-      worldState <- blockFlow.getBestCachedWorldState(groupIndex)
-      state      <- worldState.getContractState(address.lockupScript.contractId)
-    } yield {
-      val convertedFields = state.fields.map(model.Val.from)
-      ContractStateResult(convertedFields)
-    }
-    result.left.map(failedInIO(_))
+  ): Try[ContractState] = {
+    for {
+      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
+      state      <- fetchContractState(worldState, address.contractId)
+    } yield state
   }
 
-  def runTestContract(blockFlow: BlockFlow, testContract: TestContract): Try[TestContractResult] = {
+  def runTestContract(
+      blockFlow: BlockFlow,
+      testContract: TestContract.Complete
+  ): Try[TestContractResult] = {
     val contractId = testContract.contractId
     for {
       groupIndex <- testContract.groupIndex
@@ -843,15 +836,16 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
-        outputs = executionResult.generatedOutputs.map(output => Output.from(output, Hash.zero, 0))
+        txOutputs =
+          executionResult.generatedOutputs.map(output => Output.from(output, Hash.zero, 0))
       )
     }
   }
 
   private def fetchContractsState(
       worldState: WorldState.Staging,
-      testContract: TestContract
-  ): Try[AVector[TestContract.ExistingContract]] = {
+      testContract: TestContract.Complete
+  ): Try[AVector[ContractState]] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
         fetchContractState(worldState, contract.id)
@@ -861,19 +855,20 @@ class ServerUtils(implicit
   }
 
   private def fetchContractState(
-      worldState: WorldState.Staging,
+      worldState: WorldState.AbstractCached,
       contractId: ContractId
-  ): Try[TestContract.ExistingContract] = {
+  ): Try[ContractState] = {
     val result = for {
       state          <- worldState.getContractState(contractId)
       codeRecord     <- worldState.getContractCode(state.codeHash)
       contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
-    } yield TestContract.ExistingContract(
-      contractId,
+    } yield ContractState(
+      Address.contract(contractId),
       contract,
+      contract.hash,
       state.fields.map(Val.from),
-      TestContract.Asset.from(contractOutput)
+      ContractState.Asset.from(contractOutput)
     )
     wrapResult(result)
   }
@@ -881,7 +876,7 @@ class ServerUtils(implicit
   private def executeTestContract(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      testContract: TestContract,
+      testContract: TestContract.Complete,
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv =
@@ -912,7 +907,7 @@ class ServerUtils(implicit
   }
 
   private def approveAsset(
-      testContract: TestContract,
+      testContract: TestContract.Complete,
       gasFee: U256
   ): AVector[Instr[StatefulContext]] = {
     testContract.inputAssets.flatMapWithIndex { (asset, index) =>
@@ -922,7 +917,7 @@ class ServerUtils(implicit
   }
 
   private def callExternal(
-      testContract: TestContract,
+      testContract: TestContract.Complete,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
     testContract.testArgs.map(_.toVmVal.toConstInstr: Instr[StatefulContext]) ++
@@ -934,12 +929,12 @@ class ServerUtils(implicit
 
   def createContract(
       worldState: WorldState.Staging,
-      existingContract: ExistingContract
+      existingContract: ContractState
   ): Try[Unit] = {
     createContract(
       worldState,
       existingContract.id,
-      existingContract.code,
+      existingContract.bytecode,
       existingContract.fields,
       existingContract.asset
     )
@@ -948,7 +943,7 @@ class ServerUtils(implicit
   def createContract(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      testContract: TestContract
+      testContract: TestContract.Complete
   ): Try[Unit] = {
     createContract(
       worldState,
@@ -964,7 +959,7 @@ class ServerUtils(implicit
       contractId: ContractId,
       code: StatefulContract,
       initialState: AVector[Val],
-      asset: TestContract.Asset
+      asset: ContractState.Asset
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
     val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)
@@ -1027,11 +1022,11 @@ object ServerUtils {
   def buildContractWithParsedState(
       codeRaw: String,
       address: Address,
-      initialState: AVector[vm.Val],
+      initialFields: AVector[vm.Val],
       alphAmount: U256,
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
-    val stateRaw = Hex.toHexString(serialize(initialState))
+    val stateRaw = Hex.toHexString(serialize(initialFields))
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
       case None         => s"createContract!(#$codeRaw, #$stateRaw)"

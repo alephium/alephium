@@ -24,16 +24,17 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.{PendingTxStorage, ReadyTxStorage}
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.model.{PersistedTxId, ReadyTxInfo}
+import org.alephium.flow.mining.Miner
+import org.alephium.flow.model.{MiningBlob, PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
-import org.alephium.flow.validation.{InvalidTxStatus, TxValidation, TxValidationResult}
+import org.alephium.flow.validation._
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LogConfig
+import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -89,6 +90,40 @@ object TxHandler {
       true
     }
   }
+
+  def mineTxForDev(blockFlow: BlockFlow, txTemplate: TransactionTemplate)(implicit
+      groupConfig: GroupConfig
+  ): Either[String, Unit] = {
+    val chainIndex = txTemplate.chainIndex
+    val memPool    = blockFlow.getMemPool(chainIndex)
+    memPool.addNewTx(chainIndex, txTemplate, TimeStamp.now()) match {
+      case MemPool.AddedToSharedPool =>
+        val (_, minerPubKey) = chainIndex.to.generateKey
+        val miner            = LockupScript.p2pkh(minerPubKey)
+        val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+        val miningBlob       = MiningBlob.from(flowTemplate)
+        val block            = Miner.mineForDev(chainIndex, miningBlob)
+        memPool.clear()
+        validateAndAddBlock(blockFlow, block)
+      case _ =>
+        memPool.clear()
+        Left("Unable to add the tx the mempool: maybe the parent tx is not confirmed")
+    }
+  }
+
+  private def validateAndAddBlock(blockFlow: BlockFlow, block: Block): Either[String, Unit] = {
+    val blockValidator = BlockValidation.build(blockFlow)
+    blockValidator.validate(block, blockFlow) match {
+      case Left(error) => Left(s"Failed in validating the mined block: $error")
+      case Right(worldStateOpt) =>
+        blockFlow.add(block, worldStateOpt) match {
+          case Left(error) => Left(s"Failed in add the mined block: $error")
+          case Right(_) =>
+            blockFlow.updateBestDepsUnsafe()
+            Right(())
+        }
+    }
+  }
 }
 
 class TxHandler(
@@ -118,13 +153,21 @@ class TxHandler(
 
   def handleCommand: Receive = {
     case TxHandler.AddToSharedPool(txs) =>
-      txs.foreach(
-        handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
-      )
+      if (!memPoolSetting.autoMineForDev) {
+        txs.foreach(
+          handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
+        )
+      } else {
+        mineTxsForDev(txs)
+      }
     case TxHandler.AddToGrandPool(txs) =>
-      txs.foreach(
-        handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate, None, acknowledge = true)
-      )
+      if (!memPoolSetting.autoMineForDev) {
+        txs.foreach(
+          handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate, None, acknowledge = true)
+        )
+      } else {
+        mineTxsForDev(txs)
+      }
     case TxHandler.Broadcast(txs)          => handleReadyTxsFromPendingPool(txs)
     case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
     case TxHandler.BroadcastTxs            => broadcastTxs()
@@ -158,6 +201,15 @@ class TxHandler(
         }
       }
       removeConfirmedTxsFromStorage()
+  }
+
+  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
+    txs.foreach { tx =>
+      TxHandler.mineTxForDev(blockFlow, tx) match {
+        case Left(error) => addFailed(tx, error)
+        case Right(_)    => addSucceeded(tx)
+      }
+    }
   }
 
   private def removeConfirmedTxsFromStorage(): Unit = {
