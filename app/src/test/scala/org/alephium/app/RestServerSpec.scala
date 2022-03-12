@@ -760,9 +760,9 @@ abstract class RestServerSpec(
         |  "events": [
         |    {
         |      "blockHash": "$blockHash",
-        |      "contractId": "${counterContract.hash.toHexString}",
+        |      "contractAddress": "${dummyContractAddress}",
         |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-        |      "index": 0,
+        |      "eventIndex": 0,
         |      "fields": [
         |        {
         |          "type": "U256",
@@ -817,7 +817,7 @@ abstract class RestServerSpec(
         |  "events": [
         |    {
         |      "blockHash": "$blockHash",
-        |      "contractId": "${counterContract.hash.toHexString}",
+        |      "contractAddress": "${counterContract.hash.toHexString}",
         |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
         |      "index": 0,
         |      "fields": [

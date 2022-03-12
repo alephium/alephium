@@ -145,9 +145,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val event = Event(
     blockHash,
-    txId,
+    Address.contract(txId),
     contractAddress.lockupScript.contractId,
-    index = 1,
+    eventIndex = 1,
     fields = AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
   )
 

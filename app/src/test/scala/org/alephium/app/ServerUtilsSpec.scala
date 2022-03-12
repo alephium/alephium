@@ -831,7 +831,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       ByteString.empty
     )
     result0.events.length is 1
-    result0.events(0).index is 0
+    result0.events(0).eventIndex is 0
     result0.events(0).fields is AVector[Val](
       Val.Address(lp),
       Val.U256(ALPH.alph(100)),
@@ -920,7 +920,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       ByteString.empty
     )
     result0.events.length is 1
-    result0.events(0).index is 1
+    result0.events(0).eventIndex is 1
     result0.events(0).fields is AVector[Val](Val.Address(buyer), Val.U256(ALPH.alph(10)))
 
     val testContract1 = TestContract.Complete(
@@ -1005,7 +1005,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       ByteString.empty
     )
     result0.events.length is 1
-    result0.events(0).index is 2
+    result0.events(0).eventIndex is 2
     result0.events(0).fields is AVector[Val](Val.Address(buyer), Val.U256(100))
 
     val testContract1 = TestContract.Complete(
