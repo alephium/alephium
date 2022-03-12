@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.0"
+    "version": "1.3.0"
   },
   "servers": [
     {
@@ -7333,6 +7333,24 @@
           }
         }
       },
+      "Array": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "Asset": {
         "required": [
           "outputRef",
@@ -7648,7 +7666,8 @@
       "BuildContractDeployScriptTx": {
         "required": [
           "fromPublicKey",
-          "bytecode"
+          "bytecode",
+          "initialFields"
         ],
         "type": "object",
         "properties": {
@@ -8915,7 +8934,9 @@
       },
       "TestContract": {
         "required": [
-          "bytecode"
+          "bytecode",
+          "initialFields",
+          "testArgs"
         ],
         "type": "object",
         "properties": {
@@ -9239,6 +9260,9 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/Address"
+          },
+          {
+            "$ref": "#/components/schemas/Array"
           },
           {
             "$ref": "#/components/schemas/Bool"

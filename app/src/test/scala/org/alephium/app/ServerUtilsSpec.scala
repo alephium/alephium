@@ -29,6 +29,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -1036,6 +1037,39 @@ class ServerUtilsSpec extends AlephiumSpec {
       Address.contract(testContractId1),
       AVector.empty
     )
+  }
+
+  it should "test array parameters in contract" in new Fixture {
+    val contract =
+      s"""
+         |TxContract ArrayTest(mut array: [U256; 2]) {
+         |  pub fn swap(input: [U256; 2]) -> ([U256; 2]) {
+         |    array[0] = input[1]
+         |    array[1] = input[0]
+         |    return array
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val testContract = TestContract(
+      bytecode = code,
+      initialFields = AVector[Val](Val.Array(AVector(Val.U256(U256.Zero), Val.U256(U256.One)))),
+      testArgs = AVector[Val](Val.Array(AVector(Val.U256(U256.Zero), Val.U256(U256.One))))
+    ).toComplete
+
+    val serverUtils   = new ServerUtils()
+    val compileResult = serverUtils.compileContract(Compile.Contract(contract)).rightValue
+    compileResult.fields.types is AVector("[U256; 2]")
+    val func = compileResult.functions.head
+    func.argTypes is AVector("[U256; 2]")
+    func.returnTypes is AVector("[U256; 2]")
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    lazy val result = serverUtils.runTestContract(testFlow, testContract).rightValue
+    result.contracts.length is 1
+    result.contracts(0).fields is AVector[Val](Val.U256(U256.One), Val.U256(U256.Zero))
+    result.returns is AVector[Val](Val.U256(U256.One), Val.U256(U256.Zero))
   }
 
   private def generateDestination(

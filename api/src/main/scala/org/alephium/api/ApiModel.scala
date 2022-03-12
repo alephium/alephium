@@ -345,12 +345,14 @@ trait ApiModelCodec {
   implicit val valI256RW: RW[Val.I256]       = macroRW
   implicit val valAddressRW: RW[Val.Address] = macroRW
   implicit val valByteVecRW: RW[Val.ByteVec] = macroRW
+  implicit val valArrayRW: RW[Val.Array]     = macroRW
   implicit val valRW: RW[Val] = RW.merge(
     valBoolRW,
     valU256RW,
     valI256RW,
     valAddressRW,
-    valByteVecRW
+    valByteVecRW,
+    valArrayRW
   )
 
   implicit val apiKeyEncoder: Writer[ApiKey] = StringWriter.comap(_.value)

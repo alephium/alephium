@@ -630,7 +630,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val buildContract = BuildContractDeployScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
-      initialFields = Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
+      initialFields = AVector(Val.True, Val.U256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),

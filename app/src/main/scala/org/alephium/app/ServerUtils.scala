@@ -737,7 +737,7 @@ class ServerUtils(implicit
       contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      state = query.initialFields.map(_.map(_.toVmVal)).getOrElse(AVector.empty)
+      state = toVmVal(query.initialFields)
       _ <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildContractWithParsedState(
@@ -757,6 +757,21 @@ class ServerUtils(implicit
         query.utxosLimit
       )
     } yield BuildContractDeployScriptTxResult.from(utx)
+  }
+
+  def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
+    values match {
+      case Some(vs) => toVmVal(vs)
+      case None     => AVector.empty
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
+    values.fold(AVector.ofSize[vm.Val](values.length)) {
+      case (acc, value: Val.Simple) => acc :+ value.toVmVal
+      case (acc, value: Val.Array)  => acc ++ toVmVal(value.value)
+    }
   }
 
   def verifySignature(query: VerifySignature): Try[Boolean] = {
@@ -918,7 +933,7 @@ class ServerUtils(implicit
       testContract: TestContract.Complete,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
-    testContract.testArgs.map(_.toVmVal.toConstInstr: Instr[StatefulContext]) ++
+    toVmVal(testContract.testArgs).map(_.toConstInstr: Instr[StatefulContext]) ++
       AVector[Instr[StatefulContext]](
         BytesConst(vm.Val.ByteVec(contractId.bytes)),
         CallExternal(testContract.testMethodIndex.toByte)
@@ -933,7 +948,7 @@ class ServerUtils(implicit
       worldState,
       existingContract.id,
       existingContract.bytecode,
-      existingContract.fields,
+      toVmVal(existingContract.fields),
       existingContract.asset
     )
   }
@@ -947,7 +962,7 @@ class ServerUtils(implicit
       worldState,
       contractId,
       testContract.code,
-      testContract.initialFields,
+      toVmVal(testContract.initialFields),
       testContract.initialAsset
     )
   }
@@ -956,7 +971,7 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       contractId: ContractId,
       code: StatefulContract,
-      initialState: AVector[Val],
+      initialState: AVector[vm.Val],
       asset: ContractState.Asset
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
@@ -965,7 +980,7 @@ class ServerUtils(implicit
     wrapResult(
       worldState.createContractUnsafe(
         code.toHalfDecoded(),
-        initialState.map(_.toVmVal),
+        initialState,
         outputRef,
         output
       )
