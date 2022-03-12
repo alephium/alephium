@@ -360,9 +360,9 @@ class ServerUtils(implicit
   ): Try[Events] = {
     val chainIndex = ChainIndex.from(blockHash)
     if (chainIndex.isIntraGroup) {
-      wrapResult(blockFlow.getEvents(blockHash, contractId)).flatMap {
+      wrapResult(blockFlow.getEvents(blockHash, contractId)).map {
         case Some(logs) => Events.from(chainIndex, logs)
-        case None       => Right(Events.empty(chainIndex))
+        case None       => Events.empty(chainIndex)
       }
     } else {
       Right(Events.empty(chainIndex))
@@ -850,7 +850,8 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
-        txOutputs = executionResult.generatedOutputs.map(Output.from)
+        txOutputs = executionResult.generatedOutputs.map(Output.from),
+        events = fetchContractEvents(worldState)
       )
     }
   }
@@ -865,6 +866,11 @@ class ServerUtils(implicit
       )
       testContractState <- fetchContractState(worldState, testContract.contractId)
     } yield existingContractsState ++ AVector(testContractState)
+  }
+
+  private def fetchContractEvents(worldState: WorldState.Staging): AVector[Event] = {
+    val logStates = worldState.logState.getNewLogs()
+    logStates.flatMap(Events.from)
   }
 
   private def fetchContractState(
