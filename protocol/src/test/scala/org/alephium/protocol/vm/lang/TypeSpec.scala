@@ -22,16 +22,16 @@ import org.alephium.util.AlephiumSpec
 class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
     contractAst.getFieldsSignature() is
-      "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)"
+      "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])"
     contractAst.getFieldTypes() is
-      Seq("Bool", "U256", "I256", "ByteVec", "Address")
+      Seq("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
     contractAst.funcs.map(_.signature) is Seq(
-      "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)"
+      "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     contractAst.funcs.map(_.getArgTypeSignatures()) is
-      Seq(Seq("Bool", "U256", "I256", "ByteVec", "Address"))
+      Seq(Seq("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"))
     contractAst.funcs.map(_.getReturnSignatures()) is
-      Seq(Seq("U256", "I256", "ByteVec", "Address"))
+      Seq(Seq("U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"))
     contractAst.events.map(_.signature) is Seq(
       "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
     )
@@ -41,7 +41,7 @@ class TypeSpec extends AlephiumSpec {
     scriptAst.getFieldsSignature() is "TxScript Foo()"
     scriptAst.getFieldTypes() is Seq.empty
     scriptAst.funcs.map(_.signature) is Seq(
-      "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)"
+      "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     scriptAst.events.map(_.signature) is Seq.empty
   }
@@ -50,11 +50,11 @@ class TypeSpec extends AlephiumSpec {
 trait TypeSignatureFixture extends CompilerConfigFixture.Default {
   val contractStr =
     s"""
-       |TxContract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address) {
+       |TxContract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
-       |  pub payable fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address) -> (U256, I256, ByteVec, Address) {
+       |  pub payable fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Bar(aa, bb, dd, ee)
-       |    return b, c, d, e
+       |    return b, c, d, e, f
        |  }
        |}
        |""".stripMargin
@@ -63,8 +63,8 @@ trait TypeSignatureFixture extends CompilerConfigFixture.Default {
   val scriptStr =
     s"""
        |TxScript Foo {
-       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address) -> (U256, I256, ByteVec, Address) {
-       |    return b, c, d, e
+       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
+       |    return b, c, d, e, f
        |  }
        |}
        |""".stripMargin

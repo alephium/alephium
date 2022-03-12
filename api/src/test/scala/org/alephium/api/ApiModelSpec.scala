@@ -804,18 +804,18 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val jsonRaw0 =
       """
         |{
-        |  "bytecode": "05011901010505040b05a000a001a003a00461160116021603160402",
-        |  "codeHash":"f69e4ebb8f06d90699aff5c0828dd9cda64fbaddd6d73fcb8f4e00c0ec73f17a",
+        |  "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602",
+        |  "codeHash":"4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
         |  "fields": {
-        |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
-        |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"]
+        |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
+        |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |  },
         |  "functions": [
         |    {
         |      "name": "bar",
-        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
-        |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address"],
-        |      "returnTypes": ["U256", "I256", "ByteVec", "Address"]
+        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
+        |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
         |  ],
         |  "events": [
@@ -833,8 +833,8 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val jsonRaw1 =
       """
         |{
-        |  "bytecode": "01010005050405160116021603160402",
-        |  "codeHash":"0186c93daba791049446b19f0e9cfd45de70f28b98e6fc734530ad39b23aefb0",
+        |  "bytecode": "0101000707060716011602160316041605160602",
+        |  "codeHash":"dc8eec0f7757b68625a09b027c52c3125631cc7dd8d7f40386cbb1c1365b0693",
         |  "fields": {
         |    "signature": "TxScript Foo()",
         |    "types": []
@@ -842,9 +842,9 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         |  "functions": [
         |    {
         |      "name": "bar",
-        |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
-        |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address"],
-        |      "returnTypes": ["U256", "I256", "ByteVec", "Address"]
+        |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
+        |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
         |  ],
         |  "events": []

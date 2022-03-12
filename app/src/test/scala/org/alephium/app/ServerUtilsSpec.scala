@@ -1073,10 +1073,10 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils   = new ServerUtils()
     val compileResult = serverUtils.compileContract(Compile.Contract(contract)).rightValue
-    compileResult.fields.types is AVector("[U256; 2]")
+    compileResult.fields.types is AVector("[U256;2]")
     val func = compileResult.functions.head
-    func.argTypes is AVector("[U256; 2]")
-    func.returnTypes is AVector("[U256; 2]")
+    func.argTypes is AVector("[U256;2]")
+    func.returnTypes is AVector("[U256;2]")
 
     val testFlow    = BlockFlow.emptyUnsafe(config)
     lazy val result = serverUtils.runTestContract(testFlow, testContract).rightValue
