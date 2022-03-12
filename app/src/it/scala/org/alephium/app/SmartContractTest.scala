@@ -68,7 +68,7 @@ class SmartContractTest extends AlephiumActorSpec {
         ),
         restPort
       )
-      submitTx(buildResult.unsignedTx, buildResult.hash)
+      submitTx(buildResult.unsignedTx, buildResult.txId)
       buildResult
     }
 

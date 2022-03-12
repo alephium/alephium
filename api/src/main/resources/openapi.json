@@ -5592,7 +5592,7 @@
                 "example": {
                   "group": 2,
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                 }
               }
@@ -7725,7 +7725,7 @@
         "required": [
           "group",
           "unsignedTx",
-          "hash",
+          "txId",
           "contractAddress"
         ],
         "type": "object",
@@ -7736,7 +7736,7 @@
           "unsignedTx": {
             "type": "string"
           },
-          "hash": {
+          "txId": {
             "type": "string"
           },
           "contractAddress": {

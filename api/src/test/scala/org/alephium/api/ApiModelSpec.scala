@@ -657,7 +657,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     val buildContractResult = BuildContractDeployScriptTxResult(
       group = 2,
       unsignedTx = "0000",
-      hash = txId,
+      txId = txId,
       contractAddress = Address.contract(contractId)
     )
     val jsonRaw =
@@ -665,7 +665,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
          |{
          |  "group": 2,
          |  "unsignedTx": "0000",
-         |  "hash": "${txId.toHexString}",
+         |  "txId": "${txId.toHexString}",
          |  "contractAddress": "${Address.contract(contractId).toBase58}"
          |}
          |""".stripMargin

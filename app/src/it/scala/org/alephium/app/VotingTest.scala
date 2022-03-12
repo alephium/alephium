@@ -291,7 +291,7 @@ trait WalletFixture extends CliqueFixture {
       ),
       restPort
     )
-    val txResult = submitTx(buildResult.unsignedTx, buildResult.hash, wallet.creation.walletName)
+    val txResult = submitTx(buildResult.unsignedTx, buildResult.txId, wallet.creation.walletName)
     val Confirmed(blockHash, _, _, _, _) =
       request[TxStatus](getTransactionStatus(txResult), restPort)
     val block = request[BlockEntry](getBlock(blockHash.toHexString), restPort)

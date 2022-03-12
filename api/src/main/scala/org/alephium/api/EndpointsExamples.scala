@@ -478,7 +478,7 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractDeployScriptTxResult(
         group = 2,
         unsignedTx = hexString,
-        hash = hash,
+        txId = hash,
         contractAddress = Address.contract(contractId)
       )
     )
