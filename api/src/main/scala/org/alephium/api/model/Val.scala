@@ -63,7 +63,7 @@ object Val {
     override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
   }
 
-  @upickle.implicits.key("ValArray")
+  @upickle.implicits.key("Array")
   final case class Array(value: util.AVector[Val]) extends Val
 
   val True: Bool  = Bool(true)

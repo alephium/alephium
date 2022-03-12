@@ -69,11 +69,11 @@ class ValSpec extends ApiModelCodec with JsonFixture {
       ),
       s"""
          |{
-         |  "type":"ValArray",
+         |  "type":"Array",
          |  "value":[
          |    {"type":"Bool","value":true},
          |    {"type":"U256","value":"0"},
-         |    {"type":"ValArray","value":[{"type":"Bool","value":true},{"type":"U256","value":"1"}]}
+         |    {"type":"Array","value":[{"type":"Bool","value":true},{"type":"U256","value":"1"}]}
          |  ]
          |}
          |""".stripMargin
