@@ -810,7 +810,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17301
+    result0.gasUsed is 17495
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -830,6 +830,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
+    result0.events.length is 1
+    result0.events(0).index is 0
+    result0.events(0).fields is AVector[Val](
+      Val.Address(lp),
+      Val.U256(ALPH.alph(100)),
+      Val.U256(100)
+    )
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
@@ -848,7 +855,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 24905
+    result1.gasUsed is 25099
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -892,7 +899,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17333
+    result0.gasUsed is 17504
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -912,6 +919,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
+    result0.events.length is 1
+    result0.events(0).index is 1
+    result0.events(0).fields is AVector[Val](Val.Address(buyer), Val.U256(ALPH.alph(10)))
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
@@ -930,7 +940,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 24898
+    result1.gasUsed is 25069
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -974,7 +984,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17333
+    result0.gasUsed is 17504
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -994,6 +1004,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
+    result0.events.length is 1
+    result0.events(0).index is 2
+    result0.events(0).fields is AVector[Val](Val.Address(buyer), Val.U256(100))
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
@@ -1012,7 +1025,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 24859
+    result1.gasUsed is 25030
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero

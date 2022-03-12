@@ -898,8 +898,12 @@ class ServerUtils(implicit
       testContract: TestContract.Complete,
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val blockEnv =
-      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
+    val blockEnv = BlockEnv(
+      networkConfig.networkId,
+      TimeStamp.now(),
+      consensusConfig.maxMiningTarget,
+      Some(BlockHash.zero)
+    )
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
       txId = Hash.random,
