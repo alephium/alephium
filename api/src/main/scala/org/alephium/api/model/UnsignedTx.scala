@@ -24,7 +24,7 @@ import org.alephium.util.{AVector, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class UnsignedTx(
-    hash: Option[Hash] = None,
+    hash: Hash,
     version: Byte,
     networkId: Byte,
     scriptOpt: Option[Script] = None,
@@ -51,7 +51,7 @@ final case class UnsignedTx(
         assetInputs,
         outputs.map(_.toProtocol())
       )
-      _ <- hash.map(h => Either.cond(h == utx.hash, (), "Invalid hash")).getOrElse(Right(()))
+      _ <- Either.cond(hash == utx.hash, (), "Invalid hash")
     } yield utx
   }
 }
@@ -59,7 +59,7 @@ final case class UnsignedTx(
 object UnsignedTx {
   def fromProtocol(unsignedTx: UnsignedTransaction): UnsignedTx = {
     UnsignedTx(
-      Some(unsignedTx.hash),
+      unsignedTx.hash,
       unsignedTx.version,
       unsignedTx.networkId.id,
       unsignedTx.scriptOpt.map(Script.fromProtocol),

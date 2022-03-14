@@ -115,7 +115,7 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   private val unsignedTx = UnsignedTx(
-    Some(hash),
+    hash,
     1,
     1,
     None,

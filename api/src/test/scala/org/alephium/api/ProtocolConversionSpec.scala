@@ -68,7 +68,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
 
     UnsignedTx
       .fromProtocol(unsignedTransaction)
-      .copy(hash = Some(hashGen.sample.get))
+      .copy(hash = hashGen.sample.get)
       .toProtocol()
       .leftValue is "Invalid hash"
   }
