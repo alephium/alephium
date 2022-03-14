@@ -102,6 +102,12 @@ final case class TxIndexes(
   def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = readOnly {
     outputIndex.get(outputRef)
   }
+
+  def clear(): Unit = {
+    inputIndex.clear()
+    outputIndex.clear()
+    addressIndex.clear()
+  }
 }
 
 object TxIndexes {

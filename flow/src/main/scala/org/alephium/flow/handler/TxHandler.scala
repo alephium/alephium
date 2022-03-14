@@ -157,6 +157,7 @@ class TxHandler(
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
 
+  // scalastyle:off method.length
   def handleCommand: Receive = {
     case TxHandler.AddToSharedPool(txs) =>
       if (!memPoolSetting.autoMineForDev) {

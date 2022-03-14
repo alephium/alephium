@@ -34,12 +34,20 @@ class FailedTxTest extends AlephiumActorSpec {
     val index      = group.group % selfClique.brokerNum
     val restPort   = selfClique.nodes(index).restPort
 
-    val (unsignedTx, txId) = {
-      val code   = "TxScript Main { pub fn main() -> () {} }"
-      val result = buildScriptWithPort(code, restPort)
-      (result.unsignedTx, result.txId)
+    def test() = {
+      val (unsignedTx, txId) = {
+        val code   = "TxScript Main { pub fn main() -> () {} }"
+        val result = buildScriptWithPort(code, restPort)
+        (result.unsignedTx, result.txId)
+      }
+      val txQuery0 = submitTxQuery(unsignedTx, txId)
+      requestFailed(txQuery0, restPort, StatusCode.InternalServerError)
+
+      val txQuery1 = submitTxQuery(unsignedTx, txId)
+      requestFailed(txQuery1, restPort, StatusCode.InternalServerError)
     }
-    val txQuery = submitTxQuery(unsignedTx, txId)
-    requestFailed(txQuery, restPort, StatusCode.InternalServerError)
+
+    test()
+    test() // make the same test fail with the same error
   }
 }
