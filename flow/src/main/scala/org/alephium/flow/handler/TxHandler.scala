@@ -107,7 +107,9 @@ object TxHandler {
           memPool.clear()
           validateAndAddBlock(blockFlow, block)
         } catch {
-          case error: Throwable => Left(error.getMessage)
+          case error: Throwable =>
+            memPool.clear()
+            Left(error.getMessage)
         }
       case _ =>
         memPool.clear()
