@@ -145,9 +145,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val event = Event(
     blockHash,
-    txId,
+    Address.contract(txId),
     contractAddress.lockupScript.contractId,
-    index = 1,
+    eventIndex = 1,
     fields = AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
   )
 
@@ -449,7 +449,7 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractDeployScriptTx(
         publicKey,
         byteString,
-        Some(AVector(Val.True, Val.U256(U256.unsafe(123)))),
+        AVector(Val.True, Val.U256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
         Some(minimalGas),
@@ -478,7 +478,7 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractDeployScriptTxResult(
         group = 2,
         unsignedTx = hexString,
-        hash = hash,
+        txId = hash,
         contractAddress = Address.contract(contractId)
       )
     )
@@ -514,10 +514,10 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        initialFields = Some(AVector[Val](Val.U256(ALPH.oneAlph))),
+        initialFields = AVector[Val](Val.U256(ALPH.oneAlph)),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
-        testArgs = Some(AVector[Val](Val.U256(ALPH.oneAlph))),
+        testArgs = AVector[Val](Val.U256(ALPH.oneAlph)),
         existingContracts = Some(AVector(existingContract)),
         inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
       )
@@ -530,7 +530,8 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](Val.U256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
-        txOutputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens))
+        txOutputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens)),
+        events = AVector(event)
       )
     )
 

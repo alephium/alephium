@@ -26,7 +26,7 @@ import org.alephium.util.AVector
 final case class BuildContractDeployScriptTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
-    initialFields: Option[AVector[Val]] = None,
+    initialFields: AVector[Val] = AVector.empty,
     alphAmount: Option[Amount] = None,
     issueTokenAmount: Option[Amount] = None,
     gas: Option[GasBox] = None,

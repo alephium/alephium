@@ -19,8 +19,16 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import org.alephium.io._
+import org.alephium.util.AVector
 
 final class StagingLogStates(
     val underlying: CachedLogStates,
     val caches: mutable.Map[LogStatesId, Modified[LogStates]]
-) extends StagingKV[LogStatesId, LogStates]
+) extends StagingKV[LogStatesId, LogStates] {
+  def getNewLogs(): AVector[LogStates] = {
+    caches.foldLeft(AVector.empty[LogStates]) {
+      case (acc, (_, updated: ValueExists[LogStates] @unchecked)) => acc :+ updated.value
+      case (acc, _)                                               => acc
+    }
+  }
+}

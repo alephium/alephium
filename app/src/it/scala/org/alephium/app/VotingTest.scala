@@ -42,7 +42,7 @@ class VotingTest extends AlephiumActorSpec {
 
       allEvents.length is 1
       val votingStartedEvent = allEvents.head
-      votingStartedEvent.index is 0
+      votingStartedEvent.eventIndex is 0
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
@@ -65,7 +65,7 @@ class VotingTest extends AlephiumActorSpec {
       val returnedResult = allEvents.map { event =>
         val voterAddress = event.fields(0).asInstanceOf[Val.Address]
         val decision     = event.fields(1).asInstanceOf[Val.Bool]
-        (event.index, voterAddress.value.toBase58, decision.value)
+        (event.eventIndex, voterAddress.value.toBase58, decision.value)
       }
 
       returnedResult.toSeq is expectedResult.toSeq
@@ -80,7 +80,7 @@ class VotingTest extends AlephiumActorSpec {
 
       allEvents.length is 1
       val votingStartedEvent = allEvents.head
-      votingStartedEvent.index is 2
+      votingStartedEvent.eventIndex is 2
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
@@ -291,7 +291,7 @@ trait WalletFixture extends CliqueFixture {
       ),
       restPort
     )
-    val txResult = submitTx(buildResult.unsignedTx, buildResult.hash, wallet.creation.walletName)
+    val txResult = submitTx(buildResult.unsignedTx, buildResult.txId, wallet.creation.walletName)
     val Confirmed(blockHash, _, _, _, _) =
       request[TxStatus](getTransactionStatus(txResult), restPort)
     val block = request[BlockEntry](getBlock(blockHash.toHexString), restPort)

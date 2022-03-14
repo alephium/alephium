@@ -21,7 +21,7 @@ import org.alephium.json.Json.read
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{Hex, I256, U256}
+import org.alephium.util.{AVector, Hex, I256, U256}
 
 class ValSpec extends ApiModelCodec with JsonFixture {
   def generateContractAddress(): Address.Contract =
@@ -55,6 +55,28 @@ class ValSpec extends ApiModelCodec with JsonFixture {
     checkData[Val](
       Val.Address(address),
       s"""{"type": "Address", "value": "${address.toBase58}"}"""
+    )
+  }
+
+  it should "endcode/decode Val.Array" in {
+    checkData[Val](
+      Val.Array(
+        AVector[Val](
+          Val.True,
+          Val.U256(U256.Zero),
+          Val.Array(AVector(Val.True, Val.U256(U256.One)))
+        )
+      ),
+      s"""
+         |{
+         |  "type":"Array",
+         |  "value":[
+         |    {"type":"Bool","value":true},
+         |    {"type":"U256","value":"0"},
+         |    {"type":"Array","value":[{"type":"Bool","value":true},{"type":"U256","value":"1"}]}
+         |  ]
+         |}
+         |""".stripMargin
     )
   }
 }

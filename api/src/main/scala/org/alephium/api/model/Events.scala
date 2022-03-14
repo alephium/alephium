@@ -16,11 +16,8 @@
 
 package org.alephium.api.model
 
-import scala.util.control.NonFatal
-
-import org.alephium.api.{failed, Try}
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{ChainIndex, ContractId}
+import org.alephium.protocol.model.{Address, ChainIndex, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
@@ -32,27 +29,29 @@ final case class Events(
 
 final case class Event(
     blockHash: BlockHash,
-    contractId: ContractId,
+    contractAddress: Address.Contract,
     txId: Hash,
-    index: Int,
+    eventIndex: Int,
     fields: AVector[Val]
-)
+) {
+  def contractId: ContractId = contractAddress.contractId
+}
 
 object Events {
-  def from(chainIndex: ChainIndex, logStates: LogStates): Try[Events] = try {
-    val events: AVector[Event] = logStates.states.map { logState =>
+  def from(logStates: LogStates): AVector[Event] = {
+    logStates.states.map { logState =>
       Event(
         logStates.blockHash,
-        logStates.contractId,
+        Address.contract(logStates.contractId),
         logState.txId,
         logState.index.toInt,
         logState.fields.map(Val.from)
       )
     }
+  }
 
-    Right(Events(chainIndex.from.value, chainIndex.to.value, events))
-  } catch {
-    case NonFatal(_) => Left(failed("Invalid event index"))
+  def from(chainIndex: ChainIndex, logStates: LogStates): Events = {
+    Events(chainIndex.from.value, chainIndex.to.value, Events.from(logStates))
   }
 
   def empty(chainIndex: ChainIndex): Events = {

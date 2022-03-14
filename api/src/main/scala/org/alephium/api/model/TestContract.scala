@@ -31,10 +31,10 @@ final case class TestContract(
     group: Option[Int] = None,
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
-    initialFields: Option[AVector[Val]] = None,
+    initialFields: AVector[Val] = TestContract.initialFieldsDefault,
     initialAsset: Option[ContractState.Asset] = None,
     testMethodIndex: Option[Int] = None,
-    testArgs: Option[AVector[Val]] = None,
+    testArgs: AVector[Val] = TestContract.testArgsDefault,
     existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
@@ -43,10 +43,10 @@ final case class TestContract(
       group.getOrElse(groupDefault),
       address.getOrElse(addressDefault).contractId,
       code = bytecode,
-      initialFields.getOrElse(initialFieldsDefault),
+      initialFields,
       initialAsset.getOrElse(initialAssetDefault),
       testMethodIndex.getOrElse(testMethodIndexDefault),
-      testArgs.getOrElse(testArgsDefault),
+      testArgs,
       existingContracts.getOrElse(existingContractsDefault),
       inputAssets.getOrElse(inputAssetsDefault)
     )
