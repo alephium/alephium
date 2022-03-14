@@ -73,18 +73,7 @@ class SmartContractTest extends AlephiumActorSpec {
     }
 
     def submitTx(unsignedTx: String, txId: Hash): Hash = {
-      val signature: Signature =
-        SignatureSchema.sign(txId.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
-      val txResult = request[TxResult](
-        submitTransaction(s"""
-          {
-            "unsignedTx": "$unsignedTx",
-            "signature":"${signature.toHexString}"
-          }"""),
-        restPort
-      )
-      confirmTx(txResult, restPort)
-      txResult.txId
+      submitTxWithPort(unsignedTx, txId, restPort)
     }
 
     def script(
@@ -92,10 +81,8 @@ class SmartContractTest extends AlephiumActorSpec {
         alphAmount: Option[Amount] = None,
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
-    ) = {
-      val buildResult = buildScript(code, alphAmount, gas, gasPrice)
-      submitTx(buildResult.unsignedTx, buildResult.txId)
-      buildResult
+    ): BuildScriptTxResult = {
+      scriptWithPort(code, restPort, alphAmount, gas, gasPrice)
     }
 
     def buildScript(
@@ -104,17 +91,7 @@ class SmartContractTest extends AlephiumActorSpec {
         gas: Option[Int],
         gasPrice: Option[GasPrice]
     ): BuildScriptTxResult = {
-      val compileResult = request[CompileResult](compileScript(code), restPort)
-      request[BuildScriptTxResult](
-        buildScript(
-          fromPublicKey = publicKey,
-          code = Hex.toHexString(compileResult.bytecode),
-          alphAmount,
-          gas,
-          gasPrice
-        ),
-        restPort
-      )
+      buildScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
     }
 
     def estimateBuildContractGas(
