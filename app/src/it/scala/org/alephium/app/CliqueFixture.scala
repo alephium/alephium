@@ -58,6 +58,7 @@ import org.alephium.wallet.api.model._
 
 // scalastyle:off method.length
 // scalastyle:off number.of.methods
+// scalastyle:off file.size.limit
 class CliqueFixture(implicit spec: AlephiumActorSpec)
     extends AlephiumSpec
     with ItConfigFixture

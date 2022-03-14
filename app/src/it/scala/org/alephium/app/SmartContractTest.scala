@@ -294,11 +294,11 @@ class SmartContractTest extends AlephiumActorSpec {
     )
 
     info("Swap ALPH with tokens")
-    script(SwapContracts.swapTokenForAlphTxScript(address, swapContractKey, ALPH.alph(10)))
+    script(SwapContracts.swapAlphForTokenTxScript(address, swapContractKey, ALPH.alph(10)))
 
     info("Swap tokens with ALPH")
     script(
-      SwapContracts.swapAlphForTokenTxScript(
+      SwapContracts.swapTokenForAlphTxScript(
         address,
         swapContractKey,
         tokenContractKey,
@@ -476,7 +476,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Swap ALPH with tokens")
     script(
-      SwapContracts.swapTokenForAlphTxScript(address, swapContractKey, ALPH.alph(100))
+      SwapContracts.swapAlphForTokenTxScript(address, swapContractKey, ALPH.alph(100))
     )
 
     checkUTXOs { currentUTXOs =>
@@ -501,7 +501,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Swap tokens with ALPH")
     script(
-      SwapContracts.swapAlphForTokenTxScript(
+      SwapContracts.swapTokenForAlphTxScript(
         address,
         swapContractKey,
         tokenContractKey,
@@ -607,7 +607,7 @@ object SwapContracts {
     |$swapContract
     |""".stripMargin
 
-  def swapAlphForTokenTxScript(
+  def swapTokenForAlphTxScript(
       address: String,
       swapContractKey: Hash,
       tokenId: Hash,
@@ -624,7 +624,7 @@ object SwapContracts {
     |$swapContract
     |""".stripMargin
 
-  def swapTokenForAlphTxScript(address: String, swapContractKey: Hash, alphAmount: U256) = s"""
+  def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, alphAmount: U256) = s"""
     |TxScript Main {
     |  pub payable fn main() -> () {
     |    approveAlph!(@${address}, $alphAmount)
