@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.1.0"
+    "version": "1.3.0"
   },
   "servers": [
     {
@@ -5426,6 +5426,16 @@
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
                     "alphAmount": "1000000000000",
+                    "tokens": [
+                      {
+                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                        "amount": "42000000000000000000"
+                      },
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "1000000000000000000000"
+                      }
+                    ],
                     "gas": 20000,
                     "gasPrice": "100000000000",
                     "utxosLimit": 512
@@ -5722,7 +5732,7 @@
                 "example": {
                   "group": 2,
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                 }
               }
@@ -6053,6 +6063,24 @@
                         {
                           "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
                           "amount": "1000000000000000000000"
+                        }
+                      ]
+                    }
+                  ],
+                  "events": [
+                    {
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
+                      "eventIndex": 1,
+                      "fields": [
+                        {
+                          "type": "Address",
+                          "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                        },
+                        {
+                          "type": "U256",
+                          "value": "10"
                         }
                       ]
                     }
@@ -7002,9 +7030,9 @@
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "contractId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                      "index": 1,
+                      "eventIndex": 1,
                       "fields": [
                         {
                           "type": "Address",
@@ -7140,9 +7168,9 @@
                     "events": [
                       {
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "index": 1,
+                        "eventIndex": 1,
                         "fields": [
                           {
                             "type": "Address",
@@ -7283,9 +7311,9 @@
                     "events": [
                       {
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "index": 1,
+                        "eventIndex": 1,
                         "fields": [
                           {
                             "type": "Address",
@@ -7462,6 +7490,24 @@
             "items": {
               "$ref": "#/components/schemas/AddressInfo"
             }
+          }
+        }
+      },
+      "Array": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -7780,7 +7826,8 @@
       "BuildContractDeployScriptTx": {
         "required": [
           "fromPublicKey",
-          "bytecode"
+          "bytecode",
+          "initialFields"
         ],
         "type": "object",
         "properties": {
@@ -7820,7 +7867,7 @@
         "required": [
           "group",
           "unsignedTx",
-          "hash",
+          "txId",
           "contractAddress"
         ],
         "type": "object",
@@ -7831,7 +7878,7 @@
           "unsignedTx": {
             "type": "string"
           },
-          "hash": {
+          "txId": {
             "type": "string"
           },
           "contractAddress": {
@@ -7923,6 +7970,12 @@
           "alphAmount": {
             "type": "string",
             "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
           },
           "gas": {
             "type": "integer"
@@ -8324,9 +8377,9 @@
       "Event1": {
         "required": [
           "blockHash",
-          "contractId",
+          "contractAddress",
           "txId",
-          "index",
+          "eventIndex",
           "fields"
         ],
         "type": "object",
@@ -8334,13 +8387,13 @@
           "blockHash": {
             "type": "string"
           },
-          "contractId": {
+          "contractAddress": {
             "type": "string"
           },
           "txId": {
             "type": "string"
           },
-          "index": {
+          "eventIndex": {
             "type": "integer"
           },
           "fields": {
@@ -9027,7 +9080,9 @@
       },
       "TestContract": {
         "required": [
-          "bytecode"
+          "bytecode",
+          "initialFields",
+          "testArgs"
         ],
         "type": "object",
         "properties": {
@@ -9077,7 +9132,8 @@
           "returns",
           "gasUsed",
           "contracts",
-          "txOutputs"
+          "txOutputs",
+          "events"
         ],
         "type": "object",
         "properties": {
@@ -9100,6 +9156,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Output"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event1"
             }
           }
         }
@@ -9383,6 +9445,7 @@
       },
       "UnsignedTx": {
         "required": [
+          "hash",
           "version",
           "networkId",
           "gasAmount",
@@ -9429,6 +9492,9 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/Address"
+          },
+          {
+            "$ref": "#/components/schemas/Array"
           },
           {
             "$ref": "#/components/schemas/Bool"

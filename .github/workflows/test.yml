@@ -14,6 +14,8 @@ jobs:
         java: [ '1.8', '11' ]
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: olafurpg/setup-scala@v10
         with:
           java-version: ${{ matrix.java }}

@@ -21,6 +21,7 @@ import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
 import sttp.tapir.openapi.{OpenAPI, Server, ServerVariable}
 
 import org.alephium.api.Endpoints
+import org.alephium.protocol.model.ReleaseVersion
 
 trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
 
@@ -85,7 +86,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     toOpenAPI(
       walletEndpoints ++ blockflowEndpoints.map(_.endpoint),
       "Alephium API",
-      "1.1.0"
+      ReleaseVersion.current.toString.tail
     )
       .servers(servers)
 }

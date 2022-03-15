@@ -25,7 +25,7 @@ import org.alephium.util.Hex
 final case class BuildContractDeployScriptTxResult(
     group: Int,
     unsignedTx: String,
-    hash: Hash,
+    txId: Hash,
     contractAddress: Address.Contract
 )
 object BuildContractDeployScriptTxResult {

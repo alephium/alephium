@@ -20,12 +20,14 @@ import akka.util.ByteString
 
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildScriptTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
     alphAmount: Option[Amount] = None,
+    tokens: Option[AVector[Token]] = None,
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None

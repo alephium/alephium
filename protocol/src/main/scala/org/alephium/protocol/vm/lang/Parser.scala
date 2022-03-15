@@ -161,7 +161,10 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   def funParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
-  def returnType[_: P]: P[Seq[Type]] =
+  def returnType[_: P]: P[Seq[Type]]        = P(simpleReturnType | bracketReturnType)
+  def simpleReturnType[_: P]: P[Seq[Type]] =
+    P("->" ~ parseType(Type.Contract.stack)).map(tpe => Seq(tpe))
+  def bracketReturnType[_: P]: P[Seq[Type]] =
     P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(

@@ -361,9 +361,9 @@ class ServerUtils(implicit
   ): Try[Events] = {
     val chainIndex = ChainIndex.from(blockHash)
     if (chainIndex.isIntraGroup) {
-      wrapResult(blockFlow.getEvents(blockHash, contractId)).flatMap {
+      wrapResult(blockFlow.getEvents(blockHash, contractId)).map {
         case Some(logs) => Events.from(chainIndex, logs)
-        case None       => Right(Events.empty(chainIndex))
+        case None       => Events.empty(chainIndex)
       }
     } else {
       Right(Events.empty(chainIndex))
@@ -683,6 +683,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       script: StatefulScript,
       amount: U256,
+      tokens: AVector[(TokenId, U256)],
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
@@ -697,7 +698,7 @@ class ServerUtils(implicit
       unsignedTx <- UtxoSelectionAlgo
         .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
         .select(
-          AssetAmounts(amount, AVector.empty),
+          AssetAmounts(amount, tokens),
           unlockScript,
           allUtxos,
           txOutputsLength = 0,
@@ -738,7 +739,7 @@ class ServerUtils(implicit
       contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      state = query.initialFields.map(_.map(_.toVmVal)).getOrElse(AVector.empty)
+      state = toVmVal(query.initialFields)
       _ <- validateStateLength(contract, state).left.map(badRequest)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildContractWithParsedState(
@@ -752,6 +753,7 @@ class ServerUtils(implicit
         blockFlow,
         script,
         dustUtxoAmount,
+        AVector.empty,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,
@@ -760,12 +762,28 @@ class ServerUtils(implicit
     } yield BuildContractDeployScriptTxResult.from(utx)
   }
 
+  def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
+    values match {
+      case Some(vs) => toVmVal(vs)
+      case None     => AVector.empty
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
+    values.fold(AVector.ofSize[vm.Val](values.length)) {
+      case (acc, value: Val.Simple) => acc :+ value.toVmVal
+      case (acc, value: Val.Array)  => acc ++ toVmVal(value.value)
+    }
+  }
+
   def verifySignature(query: VerifySignature): Try[Boolean] = {
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
   def buildScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
     val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
+    val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -774,6 +792,7 @@ class ServerUtils(implicit
         blockFlow,
         script,
         alphAmount,
+        tokens,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,
@@ -837,7 +856,8 @@ class ServerUtils(implicit
         gasUsed = gasUsed.value,
         contracts = postState,
         txOutputs =
-          executionResult.generatedOutputs.map(output => Output.from(output, Hash.zero, 0))
+          executionResult.generatedOutputs.map(output => Output.from(output, Hash.zero, 0)),
+        events = fetchContractEvents(worldState)
       )
     }
   }
@@ -852,6 +872,11 @@ class ServerUtils(implicit
       )
       testContractState <- fetchContractState(worldState, testContract.contractId)
     } yield existingContractsState ++ AVector(testContractState)
+  }
+
+  private def fetchContractEvents(worldState: WorldState.Staging): AVector[Event] = {
+    val logStates = worldState.logState.getNewLogs()
+    logStates.flatMap(Events.from)
   }
 
   private def fetchContractState(
@@ -879,8 +904,12 @@ class ServerUtils(implicit
       testContract: TestContract.Complete,
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val blockEnv =
-      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
+    val blockEnv = BlockEnv(
+      networkConfig.networkId,
+      TimeStamp.now(),
+      consensusConfig.maxMiningTarget,
+      Some(BlockHash.zero)
+    )
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
       txId = Hash.random,
@@ -920,7 +949,7 @@ class ServerUtils(implicit
       testContract: TestContract.Complete,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
-    testContract.testArgs.map(_.toVmVal.toConstInstr: Instr[StatefulContext]) ++
+    toVmVal(testContract.testArgs).map(_.toConstInstr: Instr[StatefulContext]) ++
       AVector[Instr[StatefulContext]](
         BytesConst(vm.Val.ByteVec(contractId.bytes)),
         CallExternal(testContract.testMethodIndex.toByte)
@@ -935,7 +964,7 @@ class ServerUtils(implicit
       worldState,
       existingContract.id,
       existingContract.bytecode,
-      existingContract.fields,
+      toVmVal(existingContract.fields),
       existingContract.asset
     )
   }
@@ -949,7 +978,7 @@ class ServerUtils(implicit
       worldState,
       contractId,
       testContract.code,
-      testContract.initialFields,
+      toVmVal(testContract.initialFields),
       testContract.initialAsset
     )
   }
@@ -958,7 +987,7 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       contractId: ContractId,
       code: StatefulContract,
-      initialState: AVector[Val],
+      initialState: AVector[vm.Val],
       asset: ContractState.Asset
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
@@ -967,7 +996,7 @@ class ServerUtils(implicit
     wrapResult(
       worldState.createContractUnsafe(
         code.toHalfDecoded(),
-        initialState.map(_.toVmVal),
+        initialState,
         outputRef,
         output
       )

@@ -144,6 +144,12 @@ class PendingPool(
   def measureTransactionsTotal(): Unit = {
     transactionTotalLabeled.set(txs.size.toDouble)
   }
+
+  def clear(): Unit = {
+    txs.clear()
+    timestamps.clear()
+    indexes.clear()
+  }
 }
 
 object PendingPool {

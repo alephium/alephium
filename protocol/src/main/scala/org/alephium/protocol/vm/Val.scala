@@ -190,7 +190,7 @@ object Val {
     override def id: scala.Byte     = throw new RuntimeException("FixedArray has no type id")
     override def default: Val       = throw new RuntimeException("FixedArray has no default value")
     override def isNumeric: Boolean = false
-    override def toString: String   = s"[$baseType; $size]"
+    override def toString: String   = s"[$baseType;$size]"
   }
 
   val True: Bool  = Bool(true)
