@@ -23,25 +23,25 @@ import org.alephium.protocol.model.{Address, TxOutput}
 import org.alephium.util.{AVector, TimeStamp}
 
 sealed trait Output {
-  def amount: Amount
+  def alphAmount: Amount
   def address: Address
   def tokens: AVector[Token]
 }
 
 object Output {
 
-  @upickle.implicits.key("asset")
+  @upickle.implicits.key("AssetOutput")
   final case class Asset(
-      amount: Amount,
+      alphAmount: Amount,
       address: Address,
       tokens: AVector[Token],
       lockTime: TimeStamp,
       additionalData: ByteString
   ) extends Output
 
-  @upickle.implicits.key("contract")
+  @upickle.implicits.key("ContractOutput")
   final case class Contract(
-      amount: Amount,
+      alphAmount: Amount,
       address: Address,
       tokens: AVector[Token]
   ) extends Output

@@ -23,14 +23,21 @@ import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.{discard, AVector, I256, U256}
 
-// scalastyle:off number.of.methods number.of.types
+// scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
-  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean)
+  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean) {
+    def signature: String = {
+      val prefix = if (isMutable) "mut " else ""
+      s"${prefix}${ident.name}:${tpe.signature}"
+    }
+  }
 
-  final case class EventField(ident: Ident, tpe: Type)
+  final case class EventField(ident: Ident, tpe: Type) {
+    def signature: String = s"${ident.name}:${tpe.signature}"
+  }
 
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
@@ -170,6 +177,7 @@ object Ast {
     }
 
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      state.checkContractType(contractType)
       if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       } else {
@@ -334,11 +342,32 @@ object Ast {
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
   ) extends UniqueDef {
-    override def name: String = id.name
+    def name: String = id.name
+
+    def signature: String = {
+      val publicPrefix  = if (isPublic) "pub " else ""
+      val payablePrefix = if (isPayable) "payable " else ""
+      s"${publicPrefix}${payablePrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
+    }
+    def getArgTypeSignatures(): Seq[String] = args.map(_.tpe.signature)
+    def getReturnSignatures(): Seq[String]  = rtypes.map(_.signature)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
+      stmt match {
+        case Some(_: ReturnStmt[Ctx]) => // we checked the `rtypes` in `ReturnStmt`
+        case Some(IfElse(_, ifBranch, elseBranch)) =>
+          checkRetTypes(ifBranch.lastOption)
+          checkRetTypes(elseBranch.lastOption)
+        case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
+      }
+    }
 
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkArguments(args)
       ArrayTransformer.initArgVars(state, args)
       body.foreach(_.check(state))
+      if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
     def toMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
@@ -410,7 +439,11 @@ object Ast {
       id: TypeId,
       fields: Seq[EventField]
   ) extends UniqueDef {
-    override def name: String = id.name
+    def name: String = id.name
+
+    def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
+
+    def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -663,6 +696,7 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkArguments(fields)
       ArrayTransformer.initArgVars(state, fields)
     }
 
@@ -681,7 +715,14 @@ object Ast {
   }
 
   sealed trait ContractWithState extends Contract[StatefulContext] {
+    def ident: TypeId
+    def name: String = ident.name
+
+    def fields: Seq[Argument]
     def events: Seq[EventDef]
+
+    def getFieldsSignature(): String
+    def getFieldTypes(): Seq[String]
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       if (events.distinctBy(_.id).size != events.size) {
@@ -696,8 +737,11 @@ object Ast {
 
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
       extends ContractWithState {
-    override def events: Seq[EventDef] = Seq.empty
-    val fields: Seq[Argument]          = Seq.empty
+    val events: Seq[EventDef] = Seq.empty
+    val fields: Seq[Argument] = Seq.empty
+
+    def getFieldsSignature(): String = s"TxScript $name()"
+    def getFieldTypes(): Seq[String] = Seq.empty
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
@@ -716,8 +760,12 @@ object Ast {
       ident: TypeId,
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
-      override val events: Seq[EventDef]
+      events: Seq[EventDef]
   ) extends ContractWithState {
+    def getFieldsSignature(): String =
+      s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
+    def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
+
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
       StatefulContract(
@@ -736,18 +784,24 @@ object Ast {
       }
     }
 
-    def genStatefulScript(config: CompilerConfig, contractIndex: Int): StatefulScript = {
+    def genStatefulScript(
+        config: CompilerConfig,
+        contractIndex: Int
+    ): (StatefulScript, TxScript) = {
       val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
-        case script: TxScript => script.genCode(state)
+        case script: TxScript => (script.genCode(state), script)
         case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
       }
     }
 
-    def genStatefulContract(config: CompilerConfig, contractIndex: Int): StatefulContract = {
+    def genStatefulContract(
+        config: CompilerConfig,
+        contractIndex: Int
+    ): (StatefulContract, TxContract) = {
       val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
-        case contract: TxContract => contract.genCode(state)
+        case contract: TxContract => (contract.genCode(state), contract)
         case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
       }
     }

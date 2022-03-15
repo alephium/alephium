@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.0"
+    "version": "1.3.0"
   },
   "servers": [
     {
@@ -1040,7 +1040,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "amount": "2000000000000000000"
+                        "alphAmount": "2000000000000000000"
                       }
                     ]
                   }
@@ -1051,7 +1051,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "amount": "2000000000000000000",
+                        "alphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3265,7 +3265,7 @@
                             "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                             "inputs": [
                               {
-                                "type": "asset",
+                                "type": "AssetInput",
                                 "outputRef": {
                                   "hint": 23412,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -3275,8 +3275,8 @@
                             ],
                             "outputs": [
                               {
-                                "type": "asset",
-                                "amount": "10000000000000000000",
+                                "type": "AssetOutput",
+                                "alphAmount": "10000000000000000000",
                                 "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                 "tokens": [
                                   {
@@ -3416,7 +3416,7 @@
                       "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                       "inputs": [
                         {
-                          "type": "asset",
+                          "type": "AssetInput",
                           "outputRef": {
                             "hint": 23412,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -3426,8 +3426,8 @@
                       ],
                       "outputs": [
                         {
-                          "type": "asset",
-                          "amount": "10000000000000000000",
+                          "type": "AssetOutput",
+                          "alphAmount": "10000000000000000000",
                           "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                           "tokens": [
                             {
@@ -4367,7 +4367,7 @@
                         "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                         "inputs": [
                           {
-                            "type": "asset",
+                            "type": "AssetInput",
                             "outputRef": {
                               "hint": 23412,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -4377,8 +4377,8 @@
                         ],
                         "outputs": [
                           {
-                            "type": "asset",
-                            "amount": "10000000000000000000",
+                            "type": "AssetOutput",
+                            "alphAmount": "10000000000000000000",
                             "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                             "tokens": [
                               {
@@ -4494,7 +4494,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "amount": "2000000000000000000"
+                        "alphAmount": "2000000000000000000"
                       }
                     ]
                   }
@@ -4506,7 +4506,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "amount": "2000000000000000000",
+                        "alphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -4887,7 +4887,7 @@
                   "id": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "inputs": [
                     {
-                      "type": "asset",
+                      "type": "AssetInput",
                       "outputRef": {
                         "hint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -4897,8 +4897,8 @@
                   ],
                   "outputs": [
                     {
-                      "type": "asset",
-                      "amount": "10000000000000000000",
+                      "type": "AssetOutput",
+                      "alphAmount": "10000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
                         {
@@ -5153,7 +5153,49 @@
                   "$ref": "#/components/schemas/CompileResult"
                 },
                 "example": {
-                  "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "fields": {
+                    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                    "types": [
+                      "Bool",
+                      "U256",
+                      "I256",
+                      "ByteVec",
+                      "Address"
+                    ]
+                  },
+                  "functions": [
+                    {
+                      "name": "bar",
+                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "argTypes": [
+                        "Bool",
+                        "U256",
+                        "I256",
+                        "ByteVec",
+                        "Address"
+                      ],
+                      "returnTypes": [
+                        "U256",
+                        "I256",
+                        "ByteVec",
+                        "Address"
+                      ]
+                    }
+                  ],
+                  "events": [
+                    {
+                      "name": "Bar",
+                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+                      "fieldTypes": [
+                        "Bool",
+                        "U256",
+                        "ByteVec",
+                        "Address"
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -5227,33 +5269,43 @@
         }
       }
     },
-    "/contracts/build-script": {
+    "/contracts/unsigned-tx/build-script": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned script",
-        "operationId": "postContractsBuild-script",
+        "operationId": "postContractsUnsigned-txBuild-script",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildScript"
+                "$ref": "#/components/schemas/BuildScriptTx"
               },
               "examples": {
                 "Example0": {
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                    "amount": "1000000000000",
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "alphAmount": "1000000000000",
+                    "tokens": [
+                      {
+                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                        "amount": "42000000000000000000"
+                      },
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "1000000000000000000000"
+                      }
+                    ],
                     "gas": 20000,
                     "gasPrice": "100000000000",
                     "utxosLimit": 512
@@ -5269,13 +5321,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildScriptResult"
+                  "$ref": "#/components/schemas/BuildScriptTxResult"
                 },
                 "example": {
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "fromGroup": 2,
-                  "toGroup": 2
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "group": 2
                 }
               }
             }
@@ -5377,7 +5428,49 @@
                   "$ref": "#/components/schemas/CompileResult"
                 },
                 "example": {
-                  "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "fields": {
+                    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                    "types": [
+                      "Bool",
+                      "U256",
+                      "I256",
+                      "ByteVec",
+                      "Address"
+                    ]
+                  },
+                  "functions": [
+                    {
+                      "name": "bar",
+                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "argTypes": [
+                        "Bool",
+                        "U256",
+                        "I256",
+                        "ByteVec",
+                        "Address"
+                      ],
+                      "returnTypes": [
+                        "U256",
+                        "I256",
+                        "ByteVec",
+                        "Address"
+                      ]
+                    }
+                  ],
+                  "events": [
+                    {
+                      "name": "Bar",
+                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+                      "fieldTypes": [
+                        "Bool",
+                        "U256",
+                        "ByteVec",
+                        "Address"
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -5451,33 +5544,43 @@
         }
       }
     },
-    "/contracts/build-contract": {
+    "/contracts/unsigned-tx/build-contract": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned contract",
-        "operationId": "postContractsBuild-contract",
+        "operationId": "postContractsUnsigned-txBuild-contract",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildContract"
+                "$ref": "#/components/schemas/BuildContractDeployScriptTx"
               },
               "examples": {
                 "Example0": {
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "code": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                    "state": "#0ef875c5a01c48ec4c0332b1036cdbfabca2d71622b67c29ee32c0dce74f2dc7",
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "initialFields": [
+                      {
+                        "type": "Bool",
+                        "value": true
+                      },
+                      {
+                        "type": "U256",
+                        "value": "123"
+                      }
+                    ],
+                    "alphAmount": "2000000000000000000",
                     "issueTokenAmount": "2000000000000000000",
                     "gas": 20000,
                     "gasPrice": "100000000000",
@@ -5494,14 +5597,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildContractResult"
+                  "$ref": "#/components/schemas/BuildContractDeployScriptTxResult"
                 },
                 "example": {
+                  "group": 2,
                   "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "contractId": "1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8",
-                  "fromGroup": 2,
-                  "toGroup": 2
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                 }
               }
             }
@@ -5605,31 +5707,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ContractStateResult"
+                  "$ref": "#/components/schemas/ContractState"
                 },
                 "example": {
+                  "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
+                  "bytecode": "00010700000000000118",
+                  "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "fields": [
                     {
-                      "type": "i256",
-                      "value": "-10"
-                    },
-                    {
-                      "type": "u256",
-                      "value": "10"
-                    },
-                    {
-                      "type": "bool",
-                      "value": true
-                    },
-                    {
-                      "type": "address",
-                      "value": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
-                    },
-                    {
-                      "type": "bytevec",
-                      "value": "000000000000000000000000000000000000000000000000000000000000000a"
+                      "type": "U256",
+                      "value": "2000000000000000000"
                     }
-                  ]
+                  ],
+                  "asset": {
+                    "alphAmount": "2000000000000000000",
+                    "tokens": [
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "2000000000"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -5717,10 +5815,12 @@
                 "$ref": "#/components/schemas/TestContract"
               },
               "example": {
-                "code": "00010700000000000118",
+                "group": 0,
+                "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
+                "bytecode": "00010700000000000118",
                 "initialFields": [
                   {
-                    "type": "u256",
+                    "type": "U256",
                     "value": "1000000000000000000"
                   }
                 ],
@@ -5733,19 +5833,21 @@
                     }
                   ]
                 },
+                "testMethodIndex": 0,
                 "testArgs": [
                   {
-                    "type": "u256",
+                    "type": "U256",
                     "value": "1000000000000000000"
                   }
                 ],
                 "existingContracts": [
                   {
-                    "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
-                    "code": "00010700000000000118",
+                    "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
+                    "bytecode": "00010700000000000118",
+                    "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "fields": [
                       {
-                        "type": "u256",
+                        "type": "U256",
                         "value": "2000000000000000000"
                       }
                     ],
@@ -5789,18 +5891,19 @@
                 "example": {
                   "returns": [
                     {
-                      "type": "u256",
+                      "type": "U256",
                       "value": "1000000000000000000"
                     }
                   ],
                   "gasUsed": 20000,
                   "contracts": [
                     {
-                      "id": "1b914f58e9efdef4673b2a49a253d9152ff013526830214a4397056e47a5b755",
-                      "code": "00010700000000000118",
+                      "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
+                      "bytecode": "00010700000000000118",
+                      "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "fields": [
                         {
-                          "type": "u256",
+                          "type": "U256",
                           "value": "2000000000000000000"
                         }
                       ],
@@ -5815,10 +5918,10 @@
                       }
                     }
                   ],
-                  "outputs": [
+                  "txOutputs": [
                     {
-                      "type": "contract",
-                      "amount": "1000000000000000000",
+                      "type": "ContractOutput",
+                      "alphAmount": "1000000000000000000",
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                       "tokens": [
                         {
@@ -5828,6 +5931,24 @@
                         {
                           "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
                           "amount": "1000000000000000000000"
+                        }
+                      ]
+                    }
+                  ],
+                  "events": [
+                    {
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
+                      "eventIndex": 1,
+                      "fields": [
+                        {
+                          "type": "Address",
+                          "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                        },
+                        {
+                          "type": "U256",
+                          "value": "10"
                         }
                       ]
                     }
@@ -6036,7 +6157,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "amount": "2000000000000000000"
+                        "alphAmount": "2000000000000000000"
                       }
                     ]
                   }
@@ -6051,7 +6172,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "amount": "2000000000000000000",
+                        "alphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -6777,16 +6898,16 @@
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "contractId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                      "index": 1,
+                      "eventIndex": 1,
                       "fields": [
                         {
-                          "type": "address",
+                          "type": "Address",
                           "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                         },
                         {
-                          "type": "u256",
+                          "type": "U256",
                           "value": "10"
                         }
                       ]
@@ -6915,16 +7036,16 @@
                     "events": [
                       {
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "index": 1,
+                        "eventIndex": 1,
                         "fields": [
                           {
-                            "type": "address",
+                            "type": "Address",
                             "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                           },
                           {
-                            "type": "u256",
+                            "type": "U256",
                             "value": "10"
                           }
                         ]
@@ -7058,16 +7179,16 @@
                     "events": [
                       {
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "index": 1,
+                        "eventIndex": 1,
                         "fields": [
                           {
-                            "type": "address",
+                            "type": "Address",
                             "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                           },
                           {
-                            "type": "u256",
+                            "type": "U256",
                             "value": "10"
                           }
                         ]
@@ -7240,6 +7361,24 @@
           }
         }
       },
+      "Array": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "Asset": {
         "required": [
           "outputRef",
@@ -7261,7 +7400,7 @@
       },
       "Asset1": {
         "required": [
-          "amount",
+          "alphAmount",
           "address",
           "tokens",
           "lockTime",
@@ -7270,7 +7409,7 @@
         ],
         "type": "object",
         "properties": {
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -7552,21 +7691,29 @@
           }
         }
       },
-      "BuildContract": {
+      "BuildContractDeployScriptTx": {
         "required": [
           "fromPublicKey",
-          "code"
+          "bytecode",
+          "initialFields"
         ],
         "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string"
           },
-          "code": {
+          "bytecode": {
             "type": "string"
           },
-          "state": {
-            "type": "string"
+          "initialFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
           },
           "issueTokenAmount": {
             "type": "string",
@@ -7584,30 +7731,26 @@
           }
         }
       },
-      "BuildContractResult": {
+      "BuildContractDeployScriptTxResult": {
         "required": [
+          "group",
           "unsignedTx",
-          "hash",
-          "contractId",
-          "fromGroup",
-          "toGroup"
+          "txId",
+          "contractAddress"
         ],
         "type": "object",
         "properties": {
+          "group": {
+            "type": "integer"
+          },
           "unsignedTx": {
             "type": "string"
           },
-          "hash": {
+          "txId": {
             "type": "string"
           },
-          "contractId": {
+          "contractAddress": {
             "type": "string"
-          },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
-            "type": "integer"
           }
         }
       },
@@ -7679,22 +7822,28 @@
           }
         }
       },
-      "BuildScript": {
+      "BuildScriptTx": {
         "required": [
           "fromPublicKey",
-          "code"
+          "bytecode"
         ],
         "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string"
           },
-          "code": {
+          "bytecode": {
             "type": "string"
           },
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
           },
           "gas": {
             "type": "integer"
@@ -7708,25 +7857,21 @@
           }
         }
       },
-      "BuildScriptResult": {
+      "BuildScriptTxResult": {
         "required": [
           "unsignedTx",
-          "hash",
-          "fromGroup",
-          "toGroup"
+          "txId",
+          "group"
         ],
         "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
           },
-          "hash": {
+          "txId": {
             "type": "string"
           },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
+          "group": {
             "type": "integer"
           }
         }
@@ -7887,12 +8032,34 @@
       },
       "CompileResult": {
         "required": [
-          "code"
+          "bytecode",
+          "codeHash",
+          "fields",
+          "functions",
+          "events"
         ],
         "type": "object",
         "properties": {
-          "code": {
+          "bytecode": {
             "type": "string"
+          },
+          "codeHash": {
+            "type": "string"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/Fields"
+          },
+          "functions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Function"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
           }
         }
       },
@@ -7944,14 +8111,14 @@
       },
       "Contract1": {
         "required": [
-          "amount",
+          "alphAmount",
           "address",
           "tokens",
           "type"
         ],
         "type": "object",
         "properties": {
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -7980,17 +8147,33 @@
           }
         }
       },
-      "ContractStateResult": {
+      "ContractState": {
         "required": [
-          "fields"
+          "address",
+          "bytecode",
+          "codeHash",
+          "fields",
+          "asset"
         ],
         "type": "object",
         "properties": {
+          "address": {
+            "type": "string"
+          },
+          "bytecode": {
+            "type": "string"
+          },
+          "codeHash": {
+            "type": "string"
+          },
           "fields": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Val"
             }
+          },
+          "asset": {
+            "$ref": "#/components/schemas/Asset2"
           }
         }
       },
@@ -8008,14 +8191,14 @@
       "Destination": {
         "required": [
           "address",
-          "amount"
+          "alphAmount"
         ],
         "type": "object",
         "properties": {
           "address": {
             "type": "string"
           },
-          "amount": {
+          "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -8046,10 +8229,32 @@
       },
       "Event": {
         "required": [
+          "name",
+          "signature",
+          "fieldTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "fieldTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Event1": {
+        "required": [
           "blockHash",
-          "contractId",
+          "contractAddress",
           "txId",
-          "index",
+          "eventIndex",
           "fields"
         ],
         "type": "object",
@@ -8057,13 +8262,13 @@
           "blockHash": {
             "type": "string"
           },
-          "contractId": {
+          "contractAddress": {
             "type": "string"
           },
           "txId": {
             "type": "string"
           },
-          "index": {
+          "eventIndex": {
             "type": "integer"
           },
           "fields": {
@@ -8091,34 +8296,8 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/Event1"
             }
-          }
-        }
-      },
-      "ExistingContract": {
-        "required": [
-          "id",
-          "code",
-          "fields",
-          "asset"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "asset": {
-            "$ref": "#/components/schemas/Asset2"
           }
         }
       },
@@ -8135,6 +8314,53 @@
               "items": {
                 "$ref": "#/components/schemas/BlockEntry"
               }
+            }
+          }
+        }
+      },
+      "Fields": {
+        "required": [
+          "signature",
+          "types"
+        ],
+        "type": "object",
+        "properties": {
+          "signature": {
+            "type": "string"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Function": {
+        "required": [
+          "name",
+          "signature",
+          "argTypes",
+          "returnTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "argTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "returnTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }
@@ -8742,25 +8968,19 @@
       },
       "TestContract": {
         "required": [
-          "group",
-          "contractId",
-          "code",
+          "bytecode",
           "initialFields",
-          "initialAsset",
-          "testMethodIndex",
-          "testArgs",
-          "existingContracts",
-          "inputAssets"
+          "testArgs"
         ],
         "type": "object",
         "properties": {
           "group": {
             "type": "integer"
           },
-          "contractId": {
+          "address": {
             "type": "string"
           },
-          "code": {
+          "bytecode": {
             "type": "string"
           },
           "initialFields": {
@@ -8784,7 +9004,7 @@
           "existingContracts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ExistingContract"
+              "$ref": "#/components/schemas/ContractState"
             }
           },
           "inputAssets": {
@@ -8800,7 +9020,8 @@
           "returns",
           "gasUsed",
           "contracts",
-          "outputs"
+          "txOutputs",
+          "events"
         ],
         "type": "object",
         "properties": {
@@ -8816,13 +9037,19 @@
           "contracts": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ExistingContract"
+              "$ref": "#/components/schemas/ContractState"
             }
           },
-          "outputs": {
+          "txOutputs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Output"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event1"
             }
           }
         }
@@ -9074,6 +9301,9 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/Address"
+          },
+          {
+            "$ref": "#/components/schemas/Array"
           },
           {
             "$ref": "#/components/schemas/Bool"

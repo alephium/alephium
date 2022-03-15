@@ -47,8 +47,6 @@ object ApiModel {
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ApiModelCodec {
 
-  def blockflowFetchMaxAge: Duration
-
   implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
   implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
 
@@ -230,13 +228,13 @@ trait ApiModelCodec {
   implicit val txStatusRW: RW[TxStatus] =
     RW.merge(macroRW[Confirmed], macroRW[MemPooled.type], macroRW[NotFound.type])
 
-  implicit val buildContractRW: RW[BuildContract] = macroRW
+  implicit val buildContractRW: RW[BuildContractDeployScriptTx] = macroRW
 
-  implicit val buildScriptRW: RW[BuildScript] = macroRW
+  implicit val buildScriptRW: RW[BuildScriptTx] = macroRW
 
-  implicit val buildContractResultRW: RW[BuildContractResult] = macroRW
+  implicit val buildContractResultRW: RW[BuildContractDeployScriptTxResult] = macroRW
 
-  implicit val buildScriptResultRW: RW[BuildScriptResult] = macroRW
+  implicit val buildScriptResultRW: RW[BuildScriptTxResult] = macroRW
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 
@@ -250,7 +248,10 @@ trait ApiModelCodec {
 
   implicit val compileContractRW: RW[Compile.Contract] = macroRW
 
-  implicit val compileResultRW: RW[CompileResult] = macroRW
+  implicit val compileResultFieldsRW: RW[CompileResult.Fields]     = macroRW
+  implicit val compileResultFunctionRW: RW[CompileResult.Function] = macroRW
+  implicit val compileResultEventRW: RW[CompileResult.Event]       = macroRW
+  implicit val compileResultRW: RW[CompileResult]                  = macroRW
 
   implicit val statefulContractReader: Reader[StatefulContract] = StringReader.map { input =>
     val bs =
@@ -263,11 +264,11 @@ trait ApiModelCodec {
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
 
-  implicit val assetRW: ReadWriter[TestContract.Asset]                       = macroRW
-  implicit val existingContractRW: ReadWriter[TestContract.ExistingContract] = macroRW
-  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]             = macroRW
-  implicit val testContractRW: ReadWriter[TestContract]                      = macroRW
-  implicit val testContractResultRW: ReadWriter[TestContractResult]          = macroRW
+  implicit val assetRW: ReadWriter[ContractState.Asset]             = macroRW
+  implicit val existingContractRW: ReadWriter[ContractState]        = macroRW
+  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]    = macroRW
+  implicit val testContractRW: ReadWriter[TestContract]             = macroRW
+  implicit val testContractResultRW: ReadWriter[TestContractResult] = macroRW
 
   implicit val txResultRW: RW[TxResult] = macroRW
 
@@ -289,7 +290,7 @@ trait ApiModelCodec {
     {
       case "start-mining" => MinerAction.StartMining
       case "stop-mining"  => MinerAction.StopMining
-      case other          => throw new Abort(s"Invalid miner action: $other")
+      case other          => throw Abort(s"Invalid miner action: $other")
     }
   )
 
@@ -344,15 +345,15 @@ trait ApiModelCodec {
   implicit val valI256RW: RW[Val.I256]       = macroRW
   implicit val valAddressRW: RW[Val.Address] = macroRW
   implicit val valByteVecRW: RW[Val.ByteVec] = macroRW
+  implicit val valArrayRW: RW[Val.Array]     = macroRW
   implicit val valRW: RW[Val] = RW.merge(
     valBoolRW,
     valU256RW,
     valI256RW,
     valAddressRW,
-    valByteVecRW
+    valByteVecRW,
+    valArrayRW
   )
-
-  implicit val contractStateRW: RW[ContractStateResult] = macroRW
 
   implicit val apiKeyEncoder: Writer[ApiKey] = StringWriter.comap(_.value)
   implicit val apiKeyDecoder: Reader[ApiKey] = StringReader.map { raw =>

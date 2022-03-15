@@ -129,6 +129,20 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPayable is true
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
+
+    info("Simple return type")
+    val parsed2 = fastparse
+      .parse(
+        "pub payable fn add(x: U256, y: U256) -> U256 { return x + y }",
+        StatelessParser.func(_)
+      )
+      .get
+      .value
+    parsed2.id is Ast.FuncId("add", false)
+    parsed2.isPublic is true
+    parsed2.isPayable is true
+    parsed2.args.size is 2
+    parsed2.rtypes is Seq(Type.U256)
   }
 
   it should "parser contract initial states" in {

@@ -16,6 +16,20 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
-final case class ContractStateResult(fields: AVector[Val])
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildContractDeployScriptTx(
+    fromPublicKey: PublicKey,
+    bytecode: ByteString,
+    initialFields: AVector[Val] = AVector.empty,
+    alphAmount: Option[Amount] = None,
+    issueTokenAmount: Option[Amount] = None,
+    gas: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None,
+    utxosLimit: Option[Int] = None
+) extends UtxoBasedModel

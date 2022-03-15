@@ -129,6 +129,7 @@ object Val {
     def tpe: Val.Type = Address
 
     override def toByteVec(): ByteVec = ByteVec(encode(lockupScript))
+    def toBase58: String              = Base58.encode(encode(lockupScript))
 
     override def estimateByteSize(): Int = lockupScript match {
       case LockupScript.P2MPKH(mpkh, _) => mpkh.length * 32
@@ -189,7 +190,7 @@ object Val {
     override def id: scala.Byte     = throw new RuntimeException("FixedArray has no type id")
     override def default: Val       = throw new RuntimeException("FixedArray has no default value")
     override def isNumeric: Boolean = false
-    override def toString: String   = s"[$baseType; $size]"
+    override def toString: String   = s"[$baseType;$size]"
   }
 
   val True: Bool  = Bool(true)

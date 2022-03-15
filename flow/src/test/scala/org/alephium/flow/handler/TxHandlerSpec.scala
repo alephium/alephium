@@ -531,6 +531,24 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     ) is true
   }
 
+  it should "mine new block if auto-mine is enabled" in new Fixture {
+    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    config.mempool.autoMineForDev is true
+
+    val block = transfer(blockFlow, chainIndex)
+    val tx    = block.transactions.head
+    txHandler ! addTx(tx)
+    expectMsg(TxHandler.AddSucceeded(tx.id))
+    blockFlow.getMemPool(chainIndex).size is 0
+
+    val status = blockFlow.getTxStatus(tx.id, chainIndex).rightValue.get
+    status.chainConfirmations is 1
+    status.fromGroupConfirmations is 1
+    status.toGroupConfirmations is 1
+    val blockHash = status.index.hash
+    blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
+  }
+
   trait Fixture extends FlowFixture with TxGenerators {
     // use lazy here because we want to override config values
     lazy val chainIndex = ChainIndex.unsafe(0, 0)

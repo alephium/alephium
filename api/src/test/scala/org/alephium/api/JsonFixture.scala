@@ -14,23 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.api
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.UnsignedTransaction
-import org.alephium.serde.serialize
-import org.alephium.util.Hex
+import org.scalatest.Assertion
 
-final case class BuildScriptResult(unsignedTx: String, hash: Hash, fromGroup: Int, toGroup: Int)
-object BuildScriptResult {
-  def from(
-      unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildScriptResult =
-    BuildScriptResult(
-      Hex.toHexString(serialize(unsignedTx)),
-      unsignedTx.hash,
-      unsignedTx.fromGroup.value,
-      unsignedTx.toGroup.value
-    )
+import org.alephium.json.Json._
+import org.alephium.util.{AlephiumSpec, Duration}
+
+trait JsonFixture extends ApiModelCodec with AlephiumSpec {
+
+  val blockflowFetchMaxAge = Duration.unsafe(1000)
+
+  def checkData[T: Reader: Writer](
+      data: T,
+      jsonRaw: String,
+      dropWhiteSpace: Boolean = true
+  ): Assertion = {
+    write(data) is jsonRaw.filterNot(v => dropWhiteSpace && v.isWhitespace)
+    read[T](jsonRaw) is data
+  }
 }

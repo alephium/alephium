@@ -22,11 +22,12 @@ import org.alephium.protocol.model
 import org.alephium.protocol.vm
 import org.alephium.util
 
-sealed trait Val {
-  def toVmVal: vm.Val
-}
+sealed trait Val
 
 object Val {
+  sealed trait Simple extends Val {
+    def toVmVal: vm.Val
+  }
 
   def from(value: vm.Val): Val = value match {
     case vm.Val.Bool(v)    => Bool(v)
@@ -37,30 +38,33 @@ object Val {
       Address(model.Address.from(lockupScript))
   }
 
-  @upickle.implicits.key("bool")
-  final case class Bool(value: Boolean) extends Val {
+  @upickle.implicits.key("Bool")
+  final case class Bool(value: Boolean) extends Simple {
     override def toVmVal: vm.Val = vm.Val.Bool(value)
   }
 
-  @upickle.implicits.key("i256")
-  final case class I256(value: util.I256) extends Val {
+  @upickle.implicits.key("I256")
+  final case class I256(value: util.I256) extends Simple {
     override def toVmVal: vm.Val = vm.Val.I256(value)
   }
 
-  @upickle.implicits.key("u256")
-  final case class U256(value: util.U256) extends Val {
+  @upickle.implicits.key("U256")
+  final case class U256(value: util.U256) extends Simple {
     override def toVmVal: vm.Val = vm.Val.U256(value)
   }
 
-  @upickle.implicits.key("bytevec")
-  final case class ByteVec(value: ByteString) extends Val {
+  @upickle.implicits.key("ByteVec")
+  final case class ByteVec(value: ByteString) extends Simple {
     override def toVmVal: vm.Val = vm.Val.ByteVec(value)
   }
 
-  @upickle.implicits.key("address")
-  final case class Address(value: model.Address) extends Val {
+  @upickle.implicits.key("Address")
+  final case class Address(value: model.Address) extends Simple {
     override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
   }
+
+  @upickle.implicits.key("Array")
+  final case class Array(value: util.AVector[Val]) extends Val
 
   val True: Bool  = Bool(true)
   val False: Bool = Bool(false)

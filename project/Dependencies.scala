@@ -17,9 +17,9 @@
 import sbt._
 
 object Version {
-  lazy val akka       = "2.6.13"
-  lazy val tapir      = "0.18.1"
-  lazy val sttp       = "3.3.11"
+  lazy val akka       = "2.6.18"
+  lazy val tapir      = "0.18.3"
+  lazy val sttp       = "3.3.18"
   lazy val prometheus = "0.10.0"
 }
 
@@ -30,7 +30,7 @@ object Dependencies {
 
   lazy val vertx = "io.vertx" % "vertx-core" % "4.1.1"
 
-  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.3.8"
+  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.4.4"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.0"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk15on"  % "1.68"

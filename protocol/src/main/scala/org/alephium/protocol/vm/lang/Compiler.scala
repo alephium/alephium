@@ -49,6 +49,16 @@ object Compiler {
   def compileTxScript(input: String, index: Int)(implicit
       config: CompilerConfig
   ): Either[Error, StatefulScript] =
+    compileTxScriptFull(input, index).map(_._1)
+
+  def compileTxScriptFull(input: String)(implicit
+      config: CompilerConfig
+  ): Either[Error, (StatefulScript, Ast.TxScript)] =
+    compileTxScriptFull(input, 0)
+
+  def compileTxScriptFull(input: String, index: Int)(implicit
+      config: CompilerConfig
+  ): Either[Error, (StatefulScript, Ast.TxScript)] =
     compileStateful(input, _.genStatefulScript(config, index))
 
   def compileContract(input: String)(implicit
@@ -59,6 +69,16 @@ object Compiler {
   def compileContract(input: String, index: Int)(implicit
       config: CompilerConfig
   ): Either[Error, StatefulContract] =
+    compileContractFull(input, index).map(_._1)
+
+  def compileContractFull(input: String)(implicit
+      config: CompilerConfig
+  ): Either[Error, (StatefulContract, Ast.TxContract)] =
+    compileContractFull(input, 0)
+
+  def compileContractFull(input: String, index: Int)(implicit
+      config: CompilerConfig
+  ): Either[Error, (StatefulContract, Ast.TxContract)] =
     compileStateful(input, _.genStatefulContract(config, index))
 
   private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
@@ -339,6 +359,19 @@ object Compiler {
 
     private def getNewFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
+    }
+
+    def checkArguments(args: Seq[Ast.Argument]): Unit = {
+      args.foreach(_.tpe match {
+        case c: Type.Contract => checkContractType(c.id)
+        case _                =>
+      })
+    }
+
+    def checkContractType(typeId: Ast.TypeId): Unit = {
+      if (!contractTable.contains(typeId)) {
+        throw Error(s"Contract ${typeId.name} does not exist")
+      }
     }
 
     def checkAssign(ident: Ast.Ident, tpe: Seq[Type]): Unit = {

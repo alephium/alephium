@@ -151,7 +151,6 @@ object BlockFlow extends StrictLogging {
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): BlockFlow = {
-    Env.forProd(logger.info(s"Initialize storage for BlockFlow"))
     val blockFlow = new BlockFlowImpl(
       genesisBlocks,
       BlockChainWithState.fromGenesisUnsafe(storages),
