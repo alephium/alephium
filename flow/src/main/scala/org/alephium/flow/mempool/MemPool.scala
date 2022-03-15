@@ -172,6 +172,8 @@ class MemPool private (
 
   def clear(): Unit = {
     sharedPools.foreach(_.clear())
+    txIndexes.clear()
+    pendingPool.clear()
   }
 
   def cleanPendingPool(

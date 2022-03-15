@@ -466,6 +466,7 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         byteString,
         Some(Amount(dustUtxoAmount)),
+        Some(tokens),
         Some(minimalGas),
         Some(defaultGasPrice),
         Some(defaultUtxosLimit)

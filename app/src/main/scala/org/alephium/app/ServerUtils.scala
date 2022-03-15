@@ -682,6 +682,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       script: StatefulScript,
       amount: U256,
+      tokens: AVector[(TokenId, U256)],
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
@@ -696,7 +697,7 @@ class ServerUtils(implicit
       unsignedTx <- UtxoSelectionAlgo
         .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
         .select(
-          AssetAmounts(amount, AVector.empty),
+          AssetAmounts(amount, tokens),
           unlockScript,
           allUtxos,
           txOutputsLength = 0,
@@ -751,6 +752,7 @@ class ServerUtils(implicit
         blockFlow,
         script,
         dustUtxoAmount,
+        AVector.empty,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,
@@ -780,6 +782,7 @@ class ServerUtils(implicit
 
   def buildScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
     val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
+    val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -788,6 +791,7 @@ class ServerUtils(implicit
         blockFlow,
         script,
         alphAmount,
+        tokens,
         query.fromPublicKey,
         query.gas,
         query.gasPrice,

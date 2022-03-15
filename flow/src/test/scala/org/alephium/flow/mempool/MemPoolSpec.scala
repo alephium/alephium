@@ -150,4 +150,10 @@ class MemPoolSpec
     pool.size is 1
     pool.contains(index2, tx2) is true
   }
+
+  it should "clear mempool" in new Fixture {
+    tx0.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
+    pool.clear()
+    tx0.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is false)
+  }
 }

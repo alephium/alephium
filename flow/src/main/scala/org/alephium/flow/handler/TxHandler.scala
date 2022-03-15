@@ -98,13 +98,19 @@ object TxHandler {
     val memPool    = blockFlow.getMemPool(chainIndex)
     memPool.addNewTx(chainIndex, txTemplate, TimeStamp.now()) match {
       case MemPool.AddedToSharedPool =>
-        val (_, minerPubKey) = chainIndex.to.generateKey
-        val miner            = LockupScript.p2pkh(minerPubKey)
-        val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-        val miningBlob       = MiningBlob.from(flowTemplate)
-        val block            = Miner.mineForDev(chainIndex, miningBlob)
-        memPool.clear()
-        validateAndAddBlock(blockFlow, block)
+        try {
+          val (_, minerPubKey) = chainIndex.to.generateKey
+          val miner            = LockupScript.p2pkh(minerPubKey)
+          val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+          val miningBlob       = MiningBlob.from(flowTemplate)
+          val block            = Miner.mineForDev(chainIndex, miningBlob)
+          validateAndAddBlock(blockFlow, block)
+        } catch {
+          case error: Throwable =>
+            Left(error.getMessage)
+        } finally {
+          memPool.clear()
+        }
       case _ =>
         memPool.clear()
         Left("Unable to add the tx the mempool: maybe the parent tx is not confirmed")
@@ -151,6 +157,7 @@ class TxHandler(
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
 
+  // scalastyle:off method.length
   def handleCommand: Receive = {
     case TxHandler.AddToSharedPool(txs) =>
       if (!memPoolSetting.autoMineForDev) {
