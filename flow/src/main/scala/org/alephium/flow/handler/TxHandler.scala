@@ -104,12 +104,12 @@ object TxHandler {
           val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
           val miningBlob       = MiningBlob.from(flowTemplate)
           val block            = Miner.mineForDev(chainIndex, miningBlob)
-          memPool.clear()
           validateAndAddBlock(blockFlow, block)
         } catch {
           case error: Throwable =>
-            memPool.clear()
             Left(error.getMessage)
+        } finally {
+          memPool.clear()
         }
       case _ =>
         memPool.clear()
