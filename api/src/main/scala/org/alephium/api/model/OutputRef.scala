@@ -31,6 +31,4 @@ final case class OutputRef(hint: Int, key: Hash) {
 object OutputRef {
   def from(outputRef: TxOutputRef): OutputRef =
     OutputRef(outputRef.hint.value, outputRef.key)
-
-  val emptyKey: Hash = TxOutputRef.key(Hash.zero, 0)
 }

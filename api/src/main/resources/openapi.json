@@ -4982,13 +4982,13 @@
         }
       }
     },
-    "/transactions/decode": {
+    "/transactions/decode-unsigned-tx": {
       "post": {
         "tags": [
           "Transactions"
         ],
         "summary": "Decode an unsigned transaction",
-        "operationId": "postTransactionsDecode",
+        "operationId": "postTransactionsDecode-unsigned-tx",
         "requestBody": {
           "content": {
             "application/json": {

@@ -54,6 +54,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   trait Fixture extends FlowFixture with ApiConfigFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
+
+    val emptyKey: Hash = TxOutputRef.key(Hash.zero, 0)
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
@@ -821,14 +823,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs.length is 2
     result0.txOutputs(0) is Output.Contract(
       result0.txOutputs(0).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.alph(110)),
       contractAddress,
       AVector(Token(tokenId, 200))
     )
     result0.txOutputs(1) is Output.Asset(
       result0.txOutputs(1).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(937500000000000000L),
       lp,
       AVector.empty,
@@ -870,21 +872,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs.length is 3
     result1.txOutputs(0) is Output.Contract(
       result1.txOutputs(0).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.alph(210)),
       contractAddress,
       AVector(Token(tokenId, 300))
     )
     result1.txOutputs(1) is Output.Contract(
       result1.txOutputs(1).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(1000000000000000000L),
       Address.contract(testContractId1),
       AVector.empty
     )
     result1.txOutputs(2) is Output.Asset(
       result1.txOutputs(2).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(937500000000000000L),
       lp,
       AVector.empty,
@@ -920,14 +922,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs.length is 2
     result0.txOutputs(0) is Output.Contract(
       result0.txOutputs(0).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.alph(20)),
       contractAddress,
       AVector(Token(tokenId, 50))
     )
     result0.txOutputs(1) is Output.Asset(
       result0.txOutputs(1).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.nanoAlph(90937500000L)),
       buyer,
       AVector(Token(tokenId, 150)),
@@ -965,14 +967,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs.length is 3
     result1.txOutputs(0) is Output.Contract(
       result1.txOutputs(0).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.alph(10)),
       contractAddress,
       AVector(Token(tokenId, 100))
     )
     result1.txOutputs(1) is Output.Asset(
       result1.txOutputs(1).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.nanoAlph(110937500000L)),
       lp,
       AVector.empty,
@@ -981,7 +983,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
     result1.txOutputs(2) is Output.Contract(
       result1.txOutputs(2).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(1000000000000000000L),
       Address.contract(testContractId1),
       AVector.empty
@@ -1015,14 +1017,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs.length is 2
     result0.txOutputs(0) is Output.Contract(
       result0.txOutputs(0).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.alph(5)),
       contractAddress,
       AVector(Token(tokenId, 200))
     )
     result0.txOutputs(1) is Output.Asset(
       result0.txOutputs(1).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.nanoAlph(105937500000L)),
       buyer,
       AVector.empty,
@@ -1060,14 +1062,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs.length is 3
     result1.txOutputs(0) is Output.Contract(
       result1.txOutputs(0).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.alph(10)),
       contractAddress,
       AVector(Token(tokenId, 100))
     )
     result1.txOutputs(1) is Output.Asset(
       result1.txOutputs(1).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(ALPH.nanoAlph(95937500000L)),
       lp,
       AVector(Token(tokenId, 100)),
@@ -1076,7 +1078,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
     result1.txOutputs(2) is Output.Contract(
       result1.txOutputs(2).hint,
-      OutputRef.emptyKey,
+      emptyKey,
       Amount(1000000000000000000L),
       Address.contract(testContractId1),
       AVector.empty

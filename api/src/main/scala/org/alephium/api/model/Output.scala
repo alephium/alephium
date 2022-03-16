@@ -29,6 +29,7 @@ sealed trait Output {
   def alphAmount: Amount
   def address: Address
   def tokens: AVector[Token]
+  def toProtocol(): model.TxOutput
 }
 
 object Output {

@@ -855,8 +855,9 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
-        txOutputs =
-          executionResult.generatedOutputs.map(output => Output.from(output, Hash.zero, 0)),
+        txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
+          Output.from(output, Hash.zero, index)
+        },
         events = fetchContractEvents(worldState)
       )
     }
