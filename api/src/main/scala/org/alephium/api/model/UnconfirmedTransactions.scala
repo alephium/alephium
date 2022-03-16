@@ -21,5 +21,5 @@ import org.alephium.util.AVector
 final case class UnconfirmedTransactions(
     fromGroup: Int,
     toGroup: Int,
-    unconfirmedTransactions: AVector[Tx]
+    unconfirmedTransactions: AVector[TransactionTemplate]
 )

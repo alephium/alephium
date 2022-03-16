@@ -18,38 +18,73 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Address, TxOutput}
 import org.alephium.util.{AVector, TimeStamp}
 
 sealed trait Output {
+  def hint: Int
+  def key: Hash
   def alphAmount: Amount
   def address: Address
   def tokens: AVector[Token]
+  def toProtocol(): model.TxOutput
 }
 
 object Output {
 
+  def toProtocol(output: Output): TxOutput = {
+    output match {
+      case asset: Asset       => asset.toProtocol()
+      case contract: Contract => contract.toProtocol()
+    }
+  }
+
   @upickle.implicits.key("AssetOutput")
   final case class Asset(
+      hint: Int,
+      key: Hash,
       alphAmount: Amount,
-      address: Address,
+      address: Address.Asset,
       tokens: AVector[Token],
       lockTime: TimeStamp,
       additionalData: ByteString
-  ) extends Output
+  ) extends Output {
+    def toProtocol(): model.AssetOutput = {
+      model.AssetOutput(
+        alphAmount.value,
+        address.lockupScript,
+        lockTime,
+        tokens.map { token => (token.id, token.amount) },
+        additionalData
+      )
+    }
+  }
 
   @upickle.implicits.key("ContractOutput")
   final case class Contract(
+      hint: Int,
+      key: Hash,
       alphAmount: Amount,
-      address: Address,
+      address: Address.Contract,
       tokens: AVector[Token]
-  ) extends Output
+  ) extends Output {
+    def toProtocol(): model.ContractOutput = {
+      model.ContractOutput(
+        alphAmount.value,
+        address.lockupScript,
+        tokens.map(token => (token.id, token.amount))
+      )
+    }
+  }
 
-  def from(output: TxOutput): Output = {
+  def from(output: TxOutput, txId: Hash, index: Int): Output = {
     output match {
       case o: model.AssetOutput =>
         Asset(
+          o.hint.value,
+          model.TxOutputRef.key(txId, index),
           Amount(o.amount),
           Address.Asset(o.lockupScript),
           o.tokens.map(Token.tupled),
@@ -58,10 +93,25 @@ object Output {
         )
       case o: model.ContractOutput =>
         Contract(
+          o.hint.value,
+          model.TxOutputRef.key(txId, index),
           Amount(o.amount),
           Address.Contract(o.lockupScript),
           o.tokens.map(Token.tupled)
         )
+    }
+  }
+  object Asset {
+    def fromProtocol(assetOutput: model.AssetOutput, txId: Hash, index: Int): Asset = {
+      Asset(
+        assetOutput.hint.value,
+        model.TxOutputRef.key(txId, index),
+        Amount(assetOutput.amount),
+        Address.Asset(assetOutput.lockupScript),
+        assetOutput.tokens.map(Token.tupled),
+        assetOutput.lockTime,
+        assetOutput.additionalData
+      )
     }
   }
 }

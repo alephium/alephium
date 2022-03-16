@@ -17,7 +17,7 @@
 package org.alephium.app
 
 import org.alephium.api.ApiError
-import org.alephium.api.model._
+import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
@@ -46,9 +46,9 @@ class MultisigTest extends AlephiumActorSpec {
     unsignedTx.inputs.length is 2
 
     val decodedTx =
-      request[Tx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
+      request[UnsignedTx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
 
-    decodedTx is Tx.from(unsignedTx)
+    decodedTx is UnsignedTx.fromProtocol(unsignedTx)
 
     val submitTx = submitTransaction(buildTxResult, privateKey)
     request[ApiError.InternalServerError](
@@ -266,9 +266,10 @@ class MultisigTest extends AlephiumActorSpec {
     ): UnsignedTransaction = {
       val unsignedTx =
         deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
-      val decodedTx = request[Tx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
+      val decodedTx =
+        request[UnsignedTx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
 
-      decodedTx is Tx.from(unsignedTx)
+      decodedTx is UnsignedTx.fromProtocol(unsignedTx)
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
       val multisigTx       = request[TxResult](submitMultisigTx, restPort)

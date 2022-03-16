@@ -30,7 +30,7 @@ import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
@@ -168,13 +168,28 @@ trait ApiModelCodec {
 
   implicit val tokenRW: RW[Token] = macroRW
 
+  implicit val scriptRW: RW[Script] = readwriter[String].bimap(
+    _.value,
+    Script(_)
+  )
+
+  implicit val outputAssetRW: RW[Output.Asset]       = macroRW[Output.Asset]
+  implicit val outputContractRW: RW[Output.Contract] = macroRW[Output.Contract]
+
   implicit val outputRW: RW[Output] =
-    RW.merge(macroRW[Output.Asset], macroRW[Output.Contract])
+    RW.merge(outputAssetRW, outputContractRW)
+
+  implicit val inputAssetRW: RW[Input.Asset]       = macroRW[Input.Asset]
+  implicit val inputContractRW: RW[Input.Contract] = macroRW[Input.Contract]
 
   implicit val inputRW: RW[Input] =
-    RW.merge(macroRW[Input.Asset], macroRW[Input.Contract])
+    RW.merge(inputAssetRW, inputContractRW)
 
-  implicit val txRW: RW[Tx] = macroRW
+  implicit val unsignedTxRW: RW[UnsignedTx] = macroRW
+
+  implicit val transactionTemplateRW: RW[TransactionTemplate] = macroRW
+
+  implicit val transactionRW: RW[Transaction] = macroRW
 
   implicit val exportFileRW: RW[ExportFile] = macroRW
 
@@ -264,11 +279,11 @@ trait ApiModelCodec {
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
 
-  implicit val assetRW: ReadWriter[ContractState.Asset]             = macroRW
-  implicit val existingContractRW: ReadWriter[ContractState]        = macroRW
-  implicit val inputAssetRW: ReadWriter[TestContract.InputAsset]    = macroRW
-  implicit val testContractRW: ReadWriter[TestContract]             = macroRW
-  implicit val testContractResultRW: ReadWriter[TestContractResult] = macroRW
+  implicit val assetRW: ReadWriter[ContractState.Asset]                      = macroRW
+  implicit val existingContractRW: ReadWriter[ContractState]                 = macroRW
+  implicit val testContractInputAssetRW: ReadWriter[TestContract.InputAsset] = macroRW
+  implicit val testContractRW: ReadWriter[TestContract]                      = macroRW
+  implicit val testContractResultRW: ReadWriter[TestContractResult]          = macroRW
 
   implicit val txResultRW: RW[TxResult] = macroRW
 

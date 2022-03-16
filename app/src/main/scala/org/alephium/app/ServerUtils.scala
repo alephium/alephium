@@ -23,7 +23,8 @@ import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.api._
 import org.alephium.api.ApiError
-import org.alephium.api.model._
+import org.alephium.api.model
+import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -164,7 +165,7 @@ class ServerUtils(implicit
             blockFlow
               .getMemPool(chainIndex)
               .getAll(chainIndex)
-              .map(Tx.fromTemplate(_))
+              .map(model.TransactionTemplate.fromProtocol(_))
           )
         }
         .filter(_.unconfirmedTransactions.nonEmpty)
@@ -854,7 +855,9 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
-        txOutputs = executionResult.generatedOutputs.map(Output.from),
+        txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
+          Output.from(output, Hash.zero, index)
+        },
         events = fetchContractEvents(worldState)
       )
     }

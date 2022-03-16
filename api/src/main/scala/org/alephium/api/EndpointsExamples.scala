@@ -19,12 +19,11 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.util.ByteString
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.model._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
@@ -39,9 +38,11 @@ trait EndpointsExamples extends ErrorExamples {
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
-  private val unlockScript: UnlockScript = UnlockScript.p2pkh(publicKey)
-  protected val defaultUtxosLimit: Int   = 512
-  val address                            = Address.Asset(lockupScript)
+  private val unlockupScript: UnlockScript =
+    UnlockScript.p2pkh(publicKey)
+  private val unlockupScriptBytes      = serialize(unlockupScript)
+  protected val defaultUtxosLimit: Int = 512
+  val address                          = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
       Hash.unsafe(Hex.unsafe("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"))
@@ -90,12 +91,53 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
-  private val tx = Tx(
-    txId,
-    AVector(Input.Asset(outputRef, serialize(unlockScript))),
-    AVector(Output.Asset(alphAmount = balance, address, tokens, ts, ByteString.empty)),
-    minimalGas.value,
-    defaultGasPrice.value
+  private val inputAsset = Input.Asset(
+    outputRef,
+    unlockupScriptBytes
+  )
+
+  private val outputAsset: Output.Asset = Output.Asset(
+    1,
+    hash,
+    bigAmount,
+    address,
+    tokens,
+    ts,
+    hash.bytes
+  )
+
+  private val outputContract: Output = Output.Contract(
+    1,
+    hash,
+    bigAmount,
+    contractAddress,
+    tokens
+  )
+
+  private val unsignedTx = UnsignedTx(
+    hash,
+    1,
+    1,
+    None,
+    defaultGas.value,
+    defaultGasPrice.value,
+    AVector(inputAsset),
+    AVector(outputAsset)
+  )
+
+  private val transaction = Transaction(
+    unsignedTx,
+    true,
+    AVector(outputRef),
+    AVector(outputAsset, outputContract),
+    AVector(signature.bytes),
+    AVector(signature.bytes)
+  )
+
+  private val transactionTemplate = TransactionTemplate(
+    unsignedTx,
+    AVector(signature.bytes),
+    AVector(signature.bytes)
   )
 
   private val utxo = UTXO(
@@ -103,7 +145,7 @@ trait EndpointsExamples extends ErrorExamples {
     balance,
     tokens,
     ts,
-    ByteString.empty
+    hash.bytes
   )
 
   private val blockEntry = BlockEntry(
@@ -113,12 +155,12 @@ trait EndpointsExamples extends ErrorExamples {
     chainTo = 2,
     height,
     deps = AVector(blockHash, blockHash),
-    transactions = AVector(tx),
-    ByteString.empty,
+    transactions = AVector(transaction),
+    hash.bytes,
     1.toByte,
     hash,
     hash,
-    ByteString.empty
+    hash.bytes
   )
 
   private val blockCandidate = BlockCandidate(
@@ -235,7 +277,13 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val unreachableBrokersExamples: List[Example[AVector[InetAddress]]] =
     simpleExample(AVector(inetAddress))
 
-  implicit val txExamples: List[Example[Tx]] = simpleExample(tx)
+  implicit val unsignedTxExamples: List[Example[UnsignedTx]] = List(
+    defaultExample(unsignedTx)
+  )
+
+  implicit val transactionExamples: List[Example[Transaction]] = List(
+    defaultExample(transaction)
+  )
 
   implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
     simpleExample(HashRateResponse("100 MH/s"))
@@ -244,7 +292,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(FetchResponse(AVector(AVector(blockEntry))))
 
   implicit val unconfirmedTransactionsExamples: List[Example[AVector[UnconfirmedTransactions]]] =
-    simpleExample(AVector(UnconfirmedTransactions(0, 1, AVector(tx))))
+    simpleExample(AVector(UnconfirmedTransactions(0, 1, AVector(transactionTemplate))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
@@ -531,7 +579,8 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](Val.U256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
-        txOutputs = AVector(Output.Contract(Amount(ALPH.oneAlph), address, tokens)),
+        txOutputs =
+          AVector(Output.Contract(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         events = AVector(event)
       )
     )

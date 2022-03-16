@@ -307,11 +307,11 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
-  val decodeUnsignedTransaction: BaseEndpoint[DecodeTransaction, Tx] =
+  val decodeUnsignedTransaction: BaseEndpoint[DecodeTransaction, UnsignedTx] =
     transactionsEndpoint.post
-      .in("decode")
+      .in("decode-unsigned-tx")
       .in(jsonBody[DecodeTransaction])
-      .out(jsonBody[Tx])
+      .out(jsonBody[UnsignedTx])
       .summary("Decode an unsigned transaction")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =

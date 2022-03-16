@@ -22,6 +22,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 
+import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
@@ -33,7 +34,7 @@ import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
 //scalastyle:off file.size.limit
-class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
+class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues with NumericHelpers {
   val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
@@ -52,8 +53,7 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       Hash.zero,
       ByteString.empty
     )
-  val dummyAddress     = new InetSocketAddress("127.0.0.1", 9000)
-  val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
+  val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
     CliqueInfo.unsafe(
       CliqueId.generate,
@@ -229,20 +229,24 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
   }
 
   it should "encode/decode Output with big amount" in {
-    val address    = generateAddress()
-    val addressStr = address.toBase58
-    val amount     = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
-    val amountStr  = "15000000000000000000"
-    val tokenId1   = Hash.hash("token1")
-    val tokenId2   = Hash.hash("token2")
+    val amount    = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
+    val amountStr = "15000000000000000000"
+    val tokenId1  = Hash.hash("token1")
+    val tokenId2  = Hash.hash("token2")
     val tokens =
       AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
+    val hint = 1234
+    val key  = hashGen.sample.get
 
     {
-      val request: Output = Output.Contract(amount, address, tokens)
+      val address         = generateContractAddress()
+      val addressStr      = address.toBase58
+      val request: Output = Output.Contract(hint, key, amount, address, tokens)
       val jsonRaw         = s"""
         |{
         |  "type": "ContractOutput",
+        |  "hint": $hint,
+        |  "key": "${key.toHexString}",
         |  "alphAmount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [
@@ -261,11 +265,23 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
     }
 
     {
+      val address    = generateAddress()
+      val addressStr = address.toBase58
       val request: Output =
-        Output.Asset(amount, address, AVector.empty, TimeStamp.unsafe(1234), ByteString.empty)
+        Output.Asset(
+          hint,
+          key,
+          amount,
+          address,
+          AVector.empty,
+          TimeStamp.unsafe(1234),
+          ByteString.empty
+        )
       val jsonRaw = s"""
         |{
         |  "type": "AssetOutput",
+        |  "hint": $hint,
+        |  "key": "${key.toHexString}",
         |  "alphAmount": "$amountStr",
         |  "address": "$addressStr",
         |  "tokens": [],
@@ -275,14 +291,6 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
         """.stripMargin
       checkData(request, jsonRaw)
     }
-  }
-
-  it should "encode/decode Tx" in {
-    val hash = Hash.generate
-    val tx   = Tx(hash, AVector.empty, AVector.empty, 1, U256.unsafe(100))
-    val jsonRaw =
-      s"""{"id":"${hash.toHexString}","inputs":[],"outputs":[],"gasAmount":1,"gasPrice":"100"}"""
-    checkData(tx, jsonRaw)
   }
 
   it should "encode/decode GetGroup" in {
@@ -872,5 +880,49 @@ class ApiModelSpec extends JsonFixture with EitherValues with NumericHelpers {
       ApiError.BadRequest(s"Time span cannot be greater than ${timespan}")
     )
     TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
+  }
+
+  it should "encode/decode UnsignedTx" in {
+    val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
+    val jsonRaw    = s"""
+       |{
+       |  "hash": "${unsignedTransaction.hash.toHexString}",
+       |  "version": ${unsignedTransaction.version},
+       |  "networkId": ${unsignedTransaction.networkId.id},
+       |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
+       |  "gasAmount": ${defaultGas.value},
+       |  "gasPrice": "${defaultGasPrice.value}",
+       |  "inputs": ${write(unsignedTx.inputs)},
+       |  "outputs": ${write(unsignedTx.outputs)}
+       |}""".stripMargin
+
+    checkData(unsignedTx, jsonRaw)
+  }
+
+  it should "encode/decode Transaction" in {
+    val tx      = api.Transaction.fromProtocol(transaction)
+    val jsonRaw = s"""
+       |{
+       |  "unsigned": ${write(tx.unsigned)},
+       |  "scriptExecutionOk": ${tx.scriptExecutionOk},
+       |  "contractInputs": ${write(tx.contractInputs)},
+       |  "generatedOutputs": ${write(tx.generatedOutputs)},
+       |  "inputSignatures": ${write(tx.inputSignatures)},
+       |  "scriptSignatures": ${write(tx.scriptSignatures)}
+       |}""".stripMargin
+
+    checkData(tx, jsonRaw)
+  }
+
+  it should "encode/decode TransactionTemplate" in {
+    val tx      = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val jsonRaw = s"""
+       |{
+       |  "unsigned": ${write(tx.unsigned)},
+       |  "inputSignatures": ${write(tx.inputSignatures)},
+       |  "scriptSignatures": ${write(tx.scriptSignatures)}
+       |}""".stripMargin
+
+    checkData(tx, jsonRaw)
   }
 }
