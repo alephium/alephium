@@ -40,7 +40,7 @@ final case class BlockEntry(
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
     for {
-      header       <- toBlockHeader
+      header       <- toBlockHeader()
       _            <- Either.cond(hash == header.hash, (), "Invalid hash")
       transactions <- transactions.mapE(_.toProtocol())
     } yield {
@@ -51,7 +51,7 @@ final case class BlockEntry(
     }
   }
 
-  lazy val toBlockHeader: Either[String, BlockHeader] =
+  def toBlockHeader(): Either[String, BlockHeader] =
     for {
       _nonce <- Nonce.from(nonce).toRight("Invalid nonce")
     } yield {
