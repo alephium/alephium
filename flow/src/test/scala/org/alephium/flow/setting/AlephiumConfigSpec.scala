@@ -36,8 +36,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.LogConfig
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Env}
-import org.alephium.util.Hex
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex}
 
 class AlephiumConfigSpec extends AlephiumSpec {
   import ConfigUtils._
@@ -56,8 +55,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "load mainnet config" in {
-    lazy val rootPath = Platform.getRootPath(Env.Test)
-    val config        = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+    val rootPath = Files.tmpDir
+    val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
     config.broker.groups is 4
     config.consensus.numZerosAtLeastInHash is 37
