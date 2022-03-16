@@ -16,19 +16,23 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{AssetOutputRef, ContractOutputRef, Hint, TxOutputRef}
+import org.alephium.protocol.vm
+import org.alephium.serde.{deserialize, serialize}
+import org.alephium.util.Hex
 
-final case class OutputRef(hint: Int, key: Hash) {
-  def unsafeToAssetOutputRef(): AssetOutputRef = {
-    AssetOutputRef.unsafe(Hint.unsafe(hint), key)
-  }
-  def unsafeToContractOutputRef(): ContractOutputRef = {
-    ContractOutputRef.unsafe(Hint.unsafe(hint), key)
+final case class Script(value: String) extends AnyVal {
+  def toProtocol(): Either[String, vm.StatefulScript] = {
+    for {
+      bytes  <- Hex.from(value).toRight("Invalid script hex string")
+      script <- deserialize[vm.StatefulScript](bytes).left.map(_.getMessage)
+    } yield script
   }
 }
 
-object OutputRef {
-  def from(outputRef: TxOutputRef): OutputRef =
-    OutputRef(outputRef.hint.value, outputRef.key)
+object Script {
+  def fromProtocol(script: vm.StatefulScript): Script = {
+    Script(
+      Hex.toHexString(serialize(script))
+    )
+  }
 }

@@ -31,7 +31,8 @@ import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
 import org.alephium.api.{ApiError, Endpoints, Try}
-import org.alephium.api.model._
+import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
@@ -461,7 +462,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val decodeUnsignedTransactionLogic = serverLogic(decodeUnsignedTransaction) { tx =>
     Future.successful(
-      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(Tx.from(_))
+      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(UnsignedTx.fromProtocol(_))
     )
   }
 

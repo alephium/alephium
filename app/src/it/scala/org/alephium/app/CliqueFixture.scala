@@ -603,7 +603,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         |  "unsignedTx": "$unsignedTx"
         |}
         """.stripMargin
-    httpPost(s"/transactions/decode", maybeBody = Some(body))
+    httpPost(s"/transactions/decode-unsigned-tx", maybeBody = Some(body))
   }
 
   def getMinerAddresses(walletName: String) = {

@@ -297,10 +297,11 @@ trait WalletFixture extends CliqueFixture {
     val block = request[BlockEntry](getBlock(blockHash.toHexString), restPort)
 
     // scalastyle:off no.equal
-    val tx: Tx = block.transactions.find(_.id == txResult.txId).get
+    val tx: Transaction = block.transactions.find(_.unsigned.hash == txResult.txId).get
     // scalastyle:on no.equal
 
-    val Contract(_, contractAddress, _) = tx.outputs.find(_.isInstanceOf[Contract]).get
+    val Contract(_, _, _, contractAddress, _) =
+      tx.generatedOutputs.find(_.isInstanceOf[Contract]).get
     ContractRef(buildResult.contractAddress.contractId, contractAddress, code)
   }
 
