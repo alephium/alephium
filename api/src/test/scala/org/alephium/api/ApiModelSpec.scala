@@ -196,12 +196,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(request2, jsonRaw2)
   }
 
-  it should "encode/decode Input" in {
+  it should "encode/decode AssetInput" in {
     val key       = Hash.generate
     val outputRef = OutputRef(1234, key)
-    val data      = Input.Asset(outputRef, hex"abcd")
+    val data      = AssetInput(outputRef, hex"abcd")
     val jsonRaw =
-      s"""{"type":"AssetInput","outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
+      s"""{"outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
     checkData(data, jsonRaw)
   }
 

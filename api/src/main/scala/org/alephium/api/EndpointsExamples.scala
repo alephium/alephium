@@ -91,7 +91,7 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
-  private val inputAsset = Input.Asset(
+  private val inputAsset = AssetInput(
     outputRef,
     unlockupScriptBytes
   )

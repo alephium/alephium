@@ -3270,7 +3270,6 @@
                               "gasPrice": "100000000000",
                               "inputs": [
                                 {
-                                  "type": "AssetInput",
                                   "outputRef": {
                                     "hint": 23412,
                                     "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -3477,7 +3476,6 @@
                         "gasPrice": "100000000000",
                         "inputs": [
                           {
-                            "type": "AssetInput",
                             "outputRef": {
                               "hint": 23412,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -4484,7 +4482,6 @@
                           "gasPrice": "100000000000",
                           "inputs": [
                             {
-                              "type": "AssetInput",
                               "outputRef": {
                                 "hint": 23412,
                                 "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -5014,7 +5011,6 @@
                   "gasPrice": "100000000000",
                   "inputs": [
                     {
-                      "type": "AssetInput",
                       "outputRef": {
                         "hint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -7509,21 +7505,6 @@
       },
       "Asset": {
         "required": [
-          "outputRef",
-          "unlockScript"
-        ],
-        "type": "object",
-        "properties": {
-          "outputRef": {
-            "$ref": "#/components/schemas/OutputRef"
-          },
-          "unlockScript": {
-            "type": "string"
-          }
-        }
-      },
-      "Asset1": {
-        "required": [
           "hint",
           "key",
           "alphAmount",
@@ -7566,7 +7547,7 @@
           }
         }
       },
-      "Asset2": {
+      "Asset1": {
         "required": [
           "alphAmount",
           "tokens"
@@ -7582,6 +7563,21 @@
             "items": {
               "$ref": "#/components/schemas/Token"
             }
+          }
+        }
+      },
+      "AssetInput": {
+        "required": [
+          "outputRef",
+          "unlockScript"
+        ],
+        "type": "object",
+        "properties": {
+          "outputRef": {
+            "$ref": "#/components/schemas/OutputRef"
+          },
+          "unlockScript": {
+            "type": "string"
           }
         }
       },
@@ -8298,7 +8294,7 @@
             }
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/Asset1"
           }
         }
       },
@@ -8581,7 +8577,7 @@
             "type": "string"
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/Asset1"
           }
         }
       },
@@ -8730,7 +8726,7 @@
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/Asset"
           },
           {
             "$ref": "#/components/schemas/Contract"
@@ -9142,7 +9138,7 @@
             }
           },
           "initialAsset": {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/Asset1"
           },
           "testMethodIndex": {
             "type": "integer"
@@ -9517,7 +9513,7 @@
           "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset"
+              "$ref": "#/components/schemas/AssetInput"
             }
           },
           "fixedOutputs": {

@@ -30,7 +30,7 @@ final case class UnsignedTx(
     scriptOpt: Option[Script] = None,
     gasAmount: Int,
     gasPrice: U256,
-    inputs: AVector[Input.Asset],
+    inputs: AVector[AssetInput],
     fixedOutputs: AVector[FixedAssetOutput]
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
@@ -65,7 +65,7 @@ object UnsignedTx {
       unsignedTx.scriptOpt.map(Script.fromProtocol),
       unsignedTx.gasAmount.value,
       unsignedTx.gasPrice.value,
-      unsignedTx.inputs.map(Input.from),
+      unsignedTx.inputs.map(AssetInput.from),
       unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
         FixedAssetOutput.fromProtocol(out, unsignedTx.hash, index)
       }

@@ -181,7 +181,7 @@ trait ApiModelCodec {
   implicit val outputRW: RW[Output] =
     RW.merge(outputAssetRW, outputContractRW)
 
-  implicit val inputAssetRW: RW[Input.Asset] = macroRW[Input.Asset]
+  implicit val inputAssetRW: RW[AssetInput] = macroRW[AssetInput]
 
   implicit val unsignedTxRW: RW[UnsignedTx] = macroRW
 

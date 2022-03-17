@@ -44,9 +44,9 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   }
 
   it should "convert TxInput" in new Fixture {
-    checkData[Input.Asset, protocol.TxInput](
+    checkData[AssetInput, protocol.TxInput](
       txInput,
-      Input.Asset.fromProtocol,
+      AssetInput.fromProtocol,
       _.toProtocol().rightValue
     )
   }

@@ -22,38 +22,30 @@ import org.alephium.protocol.model.{TxInput, TxOutputRef}
 import org.alephium.protocol.vm.UnlockScript
 import org.alephium.serde.{deserialize, serialize}
 
-sealed trait Input {
-  def outputRef: OutputRef
+final case class AssetInput(outputRef: OutputRef, unlockScript: ByteString) {
+  def toProtocol(): Either[String, TxInput] = {
+    deserialize[UnlockScript](unlockScript)
+      .map { unlock =>
+        TxInput(
+          outputRef.unsafeToAssetOutputRef(),
+          unlock
+        )
+      }
+      .left
+      .map(_.getMessage)
+  }
 }
 
-object Input {
-
-  @upickle.implicits.key("AssetInput")
-  final case class Asset(outputRef: OutputRef, unlockScript: ByteString) extends Input {
-    def toProtocol(): Either[String, TxInput] = {
-      deserialize[UnlockScript](unlockScript)
-        .map { unlock =>
-          TxInput(
-            outputRef.unsafeToAssetOutputRef(),
-            unlock
-          )
-        }
-        .left
-        .map(_.getMessage)
-    }
+object AssetInput {
+  def fromProtocol(txInput: TxInput): AssetInput = {
+    AssetInput(OutputRef.from(txInput.outputRef), serialize(txInput.unlockScript))
   }
 
-  object Asset {
-    def fromProtocol(txInput: TxInput): Input.Asset = {
-      Input.Asset(OutputRef.from(txInput.outputRef), serialize(txInput.unlockScript))
-    }
+  def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): AssetInput = {
+    AssetInput(OutputRef.from(outputRef), serialize(unlockScript))
   }
 
-  def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Asset = {
-    Asset(OutputRef.from(outputRef), serialize(unlockScript))
-  }
-
-  def from(input: TxInput): Asset = {
+  def from(input: TxInput): AssetInput = {
     apply(input.outputRef, input.unlockScript)
   }
 }
