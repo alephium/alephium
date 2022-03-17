@@ -27,26 +27,24 @@ final case class ContractState(
     bytecode: StatefulContract,
     codeHash: Hash,
     fields: AVector[Val] = AVector.empty,
-    asset: ContractState.Asset
+    asset: AssetState
 ) {
   def id: ContractId = address.lockupScript.contractId
 }
 
-object ContractState {
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Asset(alphAmount: U256, tokens: AVector[Token] = AVector.empty) {
-    def toContractOutput(contractId: ContractId): ContractOutput = {
-      ContractOutput(
-        alphAmount,
-        LockupScript.p2c(contractId),
-        tokens.map(token => (token.id, token.amount))
-      )
-    }
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class AssetState(alphAmount: U256, tokens: AVector[Token] = AVector.empty) {
+  def toContractOutput(contractId: ContractId): ContractOutput = {
+    ContractOutput(
+      alphAmount,
+      LockupScript.p2c(contractId),
+      tokens.map(token => (token.id, token.amount))
+    )
   }
+}
 
-  object Asset {
-    def from(output: ContractOutput): Asset = {
-      ContractState.Asset(output.amount, output.tokens.map(pair => Token(pair._1, pair._2)))
-    }
+object AssetState {
+  def from(output: ContractOutput): AssetState = {
+    AssetState(output.amount, output.tokens.map(pair => Token(pair._1, pair._2)))
   }
 }

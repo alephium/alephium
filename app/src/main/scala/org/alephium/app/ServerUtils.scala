@@ -894,7 +894,7 @@ class ServerUtils(implicit
       contract,
       contract.hash,
       state.fields.map(Val.from),
-      ContractState.Asset.from(contractOutput)
+      AssetState.from(contractOutput)
     )
     wrapResult(result)
   }
@@ -989,7 +989,7 @@ class ServerUtils(implicit
       contractId: ContractId,
       code: StatefulContract,
       initialState: AVector[vm.Val],
-      asset: ContractState.Asset
+      asset: AssetState
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
     val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)

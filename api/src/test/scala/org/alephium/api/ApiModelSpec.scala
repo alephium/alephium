@@ -727,12 +727,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(verifySignature, jsonRaw)
   }
 
-  it should "encode/decode ContractState.Asset" in {
-    val asset1   = ContractState.Asset(U256.unsafe(100))
+  it should "encode/decode AssetState" in {
+    val asset1   = AssetState(U256.unsafe(100))
     val jsonRaw1 = s"""{"alphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
-    val asset2 = ContractState.Asset(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
+    val asset2 = AssetState(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
@@ -753,7 +753,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       StatefulContract.forSMT.toContract().rightValue,
       Hash.zero,
       AVector(u256, i256, bool, byteVec, address1),
-      ContractState.Asset(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
+      AssetState(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
     val jsonRaw =
       s"""

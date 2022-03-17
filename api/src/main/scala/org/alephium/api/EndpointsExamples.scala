@@ -545,7 +545,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
 
-  private def asset(n: Long) = ContractState.Asset(
+  private def asset(n: Long) = AssetState(
     ALPH.alph(n),
     AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )

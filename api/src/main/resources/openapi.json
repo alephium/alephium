@@ -7485,25 +7485,6 @@
           }
         }
       },
-      "Asset": {
-        "required": [
-          "alphAmount",
-          "tokens"
-        ],
-        "type": "object",
-        "properties": {
-          "alphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          }
-        }
-      },
       "AssetInput": {
         "required": [
           "outputRef",
@@ -7560,6 +7541,25 @@
           },
           "type": {
             "type": "string"
+          }
+        }
+      },
+      "AssetState": {
+        "required": [
+          "alphAmount",
+          "tokens"
+        ],
+        "type": "object",
+        "properties": {
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
           }
         }
       },
@@ -8276,7 +8276,7 @@
             }
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset"
+            "$ref": "#/components/schemas/AssetState"
           }
         }
       },
@@ -8559,7 +8559,7 @@
             "type": "string"
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset"
+            "$ref": "#/components/schemas/AssetState"
           }
         }
       },
@@ -9120,7 +9120,7 @@
             }
           },
           "initialAsset": {
-            "$ref": "#/components/schemas/Asset"
+            "$ref": "#/components/schemas/AssetState"
           },
           "testMethodIndex": {
             "type": "integer"

@@ -278,7 +278,7 @@ trait ApiModelCodec {
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
 
-  implicit val assetRW: ReadWriter[ContractState.Asset]                      = macroRW
+  implicit val assetRW: ReadWriter[AssetState]                               = macroRW
   implicit val existingContractRW: ReadWriter[ContractState]                 = macroRW
   implicit val testContractInputAssetRW: ReadWriter[TestContract.InputAsset] = macroRW
   implicit val testContractRW: ReadWriter[TestContract]                      = macroRW
