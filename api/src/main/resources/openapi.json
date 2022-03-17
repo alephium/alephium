@@ -5171,7 +5171,7 @@
                   "Example2": {
                     "summary": "Cannot find tx with the id",
                     "value": {
-                      "type": "not-found"
+                      "type": "tx-not-found"
                     }
                   }
                 }
@@ -8694,17 +8694,6 @@
           }
         }
       },
-      "NotFound1": {
-        "required": [
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "Output": {
         "oneOf": [
           {
@@ -9292,6 +9281,17 @@
           }
         }
       },
+      "TxNotFound": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "TxResult": {
         "required": [
           "txId",
@@ -9320,7 +9320,7 @@
             "$ref": "#/components/schemas/MemPooled"
           },
           {
-            "$ref": "#/components/schemas/NotFound1"
+            "$ref": "#/components/schemas/TxNotFound"
           }
         ],
         "discriminator": {

@@ -518,7 +518,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(transfer, jsonRaw)
   }
 
-  it should "encode/decode TxStatus" in {
+  it should "encode/decode PeerStatus" in {
     val blockHash         = BlockHash.generate
     val status0: TxStatus = Confirmed(blockHash, 0, 1, 2, 3)
     val jsonRaw0 =
@@ -532,7 +532,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     )
   }
 
-  it should "encode/decode PeerStatus" in {
+  it should "encode/decode TxStatus" in {
     checkData(MemPooled: TxStatus, s"""{"type":"mem-pooled"}""")
     checkData(TxNotFound: TxStatus, s"""{"type":"tx-not-found"}""")
   }
