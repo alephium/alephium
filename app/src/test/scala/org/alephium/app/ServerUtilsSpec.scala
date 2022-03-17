@@ -28,7 +28,7 @@ import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.util._
@@ -821,14 +821,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(110)), Val.U256(200))
     contractState.asset is ContractState.Asset(ALPH.alph(110), AVector(Token(tokenId, 200)))
     result0.txOutputs.length is 2
-    result0.txOutputs(0) is Output.Contract(
+    result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
       emptyKey(0),
       Amount(ALPH.alph(110)),
       contractAddress,
       AVector(Token(tokenId, 200))
     )
-    result0.txOutputs(1) is Output.Asset(
+    result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
       Amount(937500000000000000L),
@@ -870,21 +870,21 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(210)), Val.U256(300))
     contractState1.asset is ContractState.Asset(ALPH.alph(210), AVector(Token(tokenId, 300)))
     result1.txOutputs.length is 3
-    result1.txOutputs(0) is Output.Contract(
+    result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
       Amount(ALPH.alph(210)),
       contractAddress,
       AVector(Token(tokenId, 300))
     )
-    result1.txOutputs(1) is Output.Contract(
+    result1.txOutputs(1) is ContractOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
       Amount(1000000000000000000L),
       Address.contract(testContractId1),
       AVector.empty
     )
-    result1.txOutputs(2) is Output.Asset(
+    result1.txOutputs(2) is AssetOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
       Amount(937500000000000000L),
@@ -920,14 +920,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(20)), Val.U256(50))
     contractState.asset is ContractState.Asset(ALPH.alph(20), AVector(Token(tokenId, 50)))
     result0.txOutputs.length is 2
-    result0.txOutputs(0) is Output.Contract(
+    result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
       emptyKey(0),
       Amount(ALPH.alph(20)),
       contractAddress,
       AVector(Token(tokenId, 50))
     )
-    result0.txOutputs(1) is Output.Asset(
+    result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
       Amount(ALPH.nanoAlph(90937500000L)),
@@ -965,14 +965,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100))
     contractState1.asset is ContractState.Asset(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txOutputs.length is 3
-    result1.txOutputs(0) is Output.Contract(
+    result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
       Amount(ALPH.alph(10)),
       contractAddress,
       AVector(Token(tokenId, 100))
     )
-    result1.txOutputs(1) is Output.Asset(
+    result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
       Amount(ALPH.nanoAlph(110937500000L)),
@@ -981,7 +981,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result1.txOutputs(2) is Output.Contract(
+    result1.txOutputs(2) is ContractOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
       Amount(1000000000000000000L),
@@ -1015,14 +1015,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(5)), Val.U256(200))
     contractState.asset is ContractState.Asset(ALPH.alph(5), AVector(Token(tokenId, 200)))
     result0.txOutputs.length is 2
-    result0.txOutputs(0) is Output.Contract(
+    result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
       emptyKey(0),
       Amount(ALPH.alph(5)),
       contractAddress,
       AVector(Token(tokenId, 200))
     )
-    result0.txOutputs(1) is Output.Asset(
+    result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
       Amount(ALPH.nanoAlph(105937500000L)),
@@ -1060,14 +1060,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector[Val](Val.ByteVec(tokenId.bytes), Val.U256(ALPH.alph(10)), Val.U256(100))
     contractState1.asset is ContractState.Asset(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txOutputs.length is 3
-    result1.txOutputs(0) is Output.Contract(
+    result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
       Amount(ALPH.alph(10)),
       contractAddress,
       AVector(Token(tokenId, 100))
     )
-    result1.txOutputs(1) is Output.Asset(
+    result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
       Amount(ALPH.nanoAlph(95937500000L)),
@@ -1076,7 +1076,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result1.txOutputs(2) is Output.Contract(
+    result1.txOutputs(2) is ContractOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
       Amount(1000000000000000000L),

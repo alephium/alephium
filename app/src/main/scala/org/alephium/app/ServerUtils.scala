@@ -24,7 +24,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.api.model.{AssetOutput => _, TransactionTemplate => _, _}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._

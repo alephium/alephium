@@ -30,7 +30,8 @@ import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Address, CliqueId, GroupIndex, NetworkId, Nonce}
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
@@ -173,8 +174,8 @@ trait ApiModelCodec {
     Script(_)
   )
 
-  implicit val outputAssetRW: RW[Output.Asset]       = macroRW[Output.Asset]
-  implicit val outputContractRW: RW[Output.Contract] = macroRW[Output.Contract]
+  implicit val outputAssetRW: RW[AssetOutput]       = macroRW[AssetOutput]
+  implicit val outputContractRW: RW[ContractOutput] = macroRW[ContractOutput]
 
   implicit val fixedAssetOutputRW: RW[FixedAssetOutput] = macroRW[FixedAssetOutput]
 
@@ -319,8 +320,8 @@ trait ApiModelCodec {
 
   implicit val minerAddressesRW: RW[MinerAddresses] = macroRW
 
-  implicit val peerInfoRW: ReadWriter[BrokerInfo] = {
-    readwriter[ujson.Value].bimap[BrokerInfo](
+  implicit val peerInfoRW: ReadWriter[model.BrokerInfo] = {
+    readwriter[ujson.Value].bimap[model.BrokerInfo](
       peer =>
         ujson.Obj(
           "cliqueId"  -> writeJs(peer.cliqueId),
@@ -329,7 +330,7 @@ trait ApiModelCodec {
           "address"   -> writeJs(peer.address)
         ),
       json =>
-        BrokerInfo.unsafe(
+        model.BrokerInfo.unsafe(
           read[CliqueId](json("cliqueId")),
           read[Int](json("brokerId")),
           read[Int](json("brokerNum")),
@@ -378,9 +379,9 @@ trait ApiModelCodec {
 
   implicit val verifySignatureRW: RW[VerifySignature] = macroRW
 
-  implicit val releaseVersionEncoder: Writer[ReleaseVersion] = StringWriter.comap(_.toString)
-  implicit val releaseVersionDecoder: Reader[ReleaseVersion] = StringReader.map { raw =>
-    ReleaseVersion.from(raw) match {
+  implicit val releaseVersionEncoder: Writer[model.ReleaseVersion] = StringWriter.comap(_.toString)
+  implicit val releaseVersionDecoder: Reader[model.ReleaseVersion] = StringReader.map { raw =>
+    model.ReleaseVersion.from(raw) match {
       case Some(version) => version
       case None          => throw Abort(s"Cannot decode version: $raw")
     }

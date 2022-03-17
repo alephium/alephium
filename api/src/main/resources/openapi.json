@@ -5533,7 +5533,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Contract1"
+                "$ref": "#/components/schemas/Contract"
               },
               "example": {
                 "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
@@ -7505,6 +7505,40 @@
       },
       "Asset": {
         "required": [
+          "alphAmount",
+          "tokens"
+        ],
+        "type": "object",
+        "properties": {
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          }
+        }
+      },
+      "AssetInput": {
+        "required": [
+          "outputRef",
+          "unlockScript"
+        ],
+        "type": "object",
+        "properties": {
+          "outputRef": {
+            "$ref": "#/components/schemas/OutputRef"
+          },
+          "unlockScript": {
+            "type": "string"
+          }
+        }
+      },
+      "AssetOutput": {
+        "required": [
           "hint",
           "key",
           "alphAmount",
@@ -7543,40 +7577,6 @@
             "type": "string"
           },
           "type": {
-            "type": "string"
-          }
-        }
-      },
-      "Asset1": {
-        "required": [
-          "alphAmount",
-          "tokens"
-        ],
-        "type": "object",
-        "properties": {
-          "alphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          }
-        }
-      },
-      "AssetInput": {
-        "required": [
-          "outputRef",
-          "unlockScript"
-        ],
-        "type": "object",
-        "properties": {
-          "outputRef": {
-            "$ref": "#/components/schemas/OutputRef"
-          },
-          "unlockScript": {
             "type": "string"
           }
         }
@@ -8224,6 +8224,17 @@
       },
       "Contract": {
         "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "ContractOutput": {
+        "required": [
           "hint",
           "key",
           "alphAmount",
@@ -8257,17 +8268,6 @@
           }
         }
       },
-      "Contract1": {
-        "required": [
-          "code"
-        ],
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          }
-        }
-      },
       "ContractState": {
         "required": [
           "address",
@@ -8294,7 +8294,7 @@
             }
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/Asset"
           }
         }
       },
@@ -8577,7 +8577,7 @@
             "type": "string"
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/Asset"
           }
         }
       },
@@ -8726,10 +8726,10 @@
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset"
+            "$ref": "#/components/schemas/AssetOutput"
           },
           {
-            "$ref": "#/components/schemas/Contract"
+            "$ref": "#/components/schemas/ContractOutput"
           }
         ],
         "discriminator": {
@@ -9138,7 +9138,7 @@
             }
           },
           "initialAsset": {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/Asset"
           },
           "testMethodIndex": {
             "type": "integer"

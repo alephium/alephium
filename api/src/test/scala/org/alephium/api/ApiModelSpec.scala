@@ -27,7 +27,7 @@ import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.protocol.vm.lang.TypeSignatureFixture
 import org.alephium.util._
@@ -231,7 +231,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     {
       val address         = generateContractAddress()
       val addressStr      = address.toBase58
-      val request: Output = Output.Contract(hint, key, amount, address, tokens)
+      val request: Output = ContractOutput(hint, key, amount, address, tokens)
       val jsonRaw         = s"""
         |{
         |  "type": "ContractOutput",
@@ -258,7 +258,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val address    = generateAddress()
       val addressStr = address.toBase58
       val request: Output =
-        Output.Asset(
+        AssetOutput(
           hint,
           key,
           amount,

@@ -17,7 +17,6 @@
 package org.alephium.app
 
 import org.alephium.api.model._
-import org.alephium.api.model.Output.Contract
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
@@ -300,8 +299,8 @@ trait WalletFixture extends CliqueFixture {
     val tx: Transaction = block.transactions.find(_.unsigned.hash == txResult.txId).get
     // scalastyle:on no.equal
 
-    val Contract(_, _, _, contractAddress, _) =
-      tx.generatedOutputs.find(_.isInstanceOf[Contract]).get
+    val ContractOutput(_, _, _, contractAddress, _) =
+      tx.generatedOutputs.find(_.isInstanceOf[ContractOutput]).get
     ContractRef(buildResult.contractAddress.contractId, contractAddress, code)
   }
 
