@@ -3278,9 +3278,8 @@
                                   "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                                 }
                               ],
-                              "outputs": [
+                              "fixedOutputs": [
                                 {
-                                  "type": "AssetOutput",
                                   "hint": 1,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                                   "alphAmount": "2000000000000000000",
@@ -3486,9 +3485,8 @@
                             "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                           }
                         ],
-                        "outputs": [
+                        "fixedOutputs": [
                           {
-                            "type": "AssetOutput",
                             "hint": 1,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                             "alphAmount": "2000000000000000000",
@@ -4494,9 +4492,8 @@
                               "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                             }
                           ],
-                          "outputs": [
+                          "fixedOutputs": [
                             {
-                              "type": "AssetOutput",
                               "hint": 1,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                               "alphAmount": "2000000000000000000",
@@ -5025,9 +5022,8 @@
                       "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                     }
                   ],
-                  "outputs": [
+                  "fixedOutputs": [
                     {
-                      "type": "AssetOutput",
                       "hint": 1,
                       "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "alphAmount": "2000000000000000000",
@@ -7534,7 +7530,8 @@
           "address",
           "tokens",
           "lockTime",
-          "additionalData"
+          "additionalData",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7562,6 +7559,9 @@
             "format": "int64"
           },
           "additionalData": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -8458,6 +8458,46 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "FixedAssetOutput": {
+        "required": [
+          "hint",
+          "key",
+          "alphAmount",
+          "address",
+          "tokens",
+          "lockTime",
+          "additionalData"
+        ],
+        "type": "object",
+        "properties": {
+          "hint": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "additionalData": {
+            "type": "string"
           }
         }
       },
@@ -9451,7 +9491,7 @@
           "gasAmount",
           "gasPrice",
           "inputs",
-          "outputs"
+          "fixedOutputs"
         ],
         "type": "object",
         "properties": {
@@ -9480,10 +9520,10 @@
               "$ref": "#/components/schemas/Asset"
             }
           },
-          "outputs": {
+          "fixedOutputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset1"
+              "$ref": "#/components/schemas/FixedAssetOutput"
             }
           }
         }

@@ -96,7 +96,7 @@ trait EndpointsExamples extends ErrorExamples {
     unlockupScriptBytes
   )
 
-  private val outputAsset: Output.Asset = Output.Asset(
+  private val outputAsset: FixedAssetOutput = FixedAssetOutput(
     1,
     hash,
     bigAmount,
@@ -129,7 +129,7 @@ trait EndpointsExamples extends ErrorExamples {
     unsignedTx,
     true,
     AVector(outputRef),
-    AVector(outputAsset, outputContract),
+    AVector(outputAsset.upCast(), outputContract),
     AVector(signature.bytes),
     AVector(signature.bytes)
   )

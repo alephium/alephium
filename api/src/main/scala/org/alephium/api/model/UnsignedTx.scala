@@ -31,7 +31,7 @@ final case class UnsignedTx(
     gasAmount: Int,
     gasPrice: U256,
     inputs: AVector[Input.Asset],
-    outputs: AVector[Output.Asset]
+    fixedOutputs: AVector[FixedAssetOutput]
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
     val gas = vm.GasPrice(gasPrice)
@@ -49,7 +49,7 @@ final case class UnsignedTx(
         gasBox,
         gas,
         assetInputs,
-        outputs.map(_.toProtocol())
+        fixedOutputs.map(_.toProtocol())
       )
       _ <- Either.cond(hash == utx.hash, (), "Invalid hash")
     } yield utx
@@ -67,7 +67,7 @@ object UnsignedTx {
       unsignedTx.gasPrice.value,
       unsignedTx.inputs.map(Input.from),
       unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
-        Output.Asset.fromProtocol(out, unsignedTx.hash, index)
+        FixedAssetOutput.fromProtocol(out, unsignedTx.hash, index)
       }
     )
   }

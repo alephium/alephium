@@ -94,17 +94,42 @@ object Output {
         )
     }
   }
-  object Asset {
-    def fromProtocol(assetOutput: model.AssetOutput, txId: Hash, index: Int): Asset = {
-      Asset(
-        assetOutput.hint.value,
-        model.TxOutputRef.key(txId, index),
-        Amount(assetOutput.amount),
-        Address.Asset(assetOutput.lockupScript),
-        assetOutput.tokens.map(Token.tupled),
-        assetOutput.lockTime,
-        assetOutput.additionalData
-      )
-    }
+}
+
+final case class FixedAssetOutput(
+    hint: Int,
+    key: Hash,
+    alphAmount: Amount,
+    address: Address.Asset,
+    tokens: AVector[Token],
+    lockTime: TimeStamp,
+    additionalData: ByteString
+) {
+  def toProtocol(): model.AssetOutput = {
+    model.AssetOutput(
+      alphAmount.value,
+      address.lockupScript,
+      lockTime,
+      tokens.map { token => (token.id, token.amount) },
+      additionalData
+    )
+  }
+
+  def upCast(): Output.Asset = {
+    Output.Asset(hint, key, alphAmount, address, tokens, lockTime, additionalData)
+  }
+}
+
+object FixedAssetOutput {
+  def fromProtocol(assetOutput: model.AssetOutput, txId: Hash, index: Int): FixedAssetOutput = {
+    FixedAssetOutput(
+      assetOutput.hint.value,
+      model.TxOutputRef.key(txId, index),
+      Amount(assetOutput.amount),
+      Address.Asset(assetOutput.lockupScript),
+      assetOutput.tokens.map(Token.tupled),
+      assetOutput.lockTime,
+      assetOutput.additionalData
+    )
   }
 }

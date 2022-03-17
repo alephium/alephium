@@ -872,6 +872,52 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
   }
 
+  it should "encode/decode FixedAssetOutput" in {
+    val jsonRaw =
+      s"""
+         |{
+         |  "hint": -383063803,
+         |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
+         |  "alphAmount": "1000000000000000000",
+         |  "address": "111111111111111111111111111111111",
+         |  "tokens": [],
+         |  "lockTime": 0,
+         |  "additionalData": ""
+         |}
+         |""".stripMargin
+    checkData(FixedAssetOutput.fromProtocol(assetOutput, Hash.zero, 0), jsonRaw)
+  }
+
+  it should "endcode/decode Output" in {
+    val assetOutputJson =
+      s"""
+         |{
+         |  "type": "AssetOutput",
+         |  "hint": -383063803,
+         |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
+         |  "alphAmount": "1000000000000000000",
+         |  "address": "111111111111111111111111111111111",
+         |  "tokens": [],
+         |  "lockTime": 0,
+         |  "additionalData": ""
+         |}
+         |""".stripMargin
+    checkData[Output](Output.from(assetOutput, Hash.zero, 0), assetOutputJson)
+
+    val contractOutputJson =
+      s"""
+         |{
+         |  "type": "ContractOutput",
+         |  "hint": -383063804,
+         |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
+         |  "alphAmount": "1000000000000000000",
+         |  "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
+         |  "tokens": []
+         |}
+         |""".stripMargin
+    checkData[Output](Output.from(contractOutput, Hash.zero, 0), contractOutputJson)
+  }
+
   it should "encode/decode UnsignedTx" in {
     val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
     val jsonRaw    = s"""
@@ -883,7 +929,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
        |  "gasAmount": ${defaultGas.value},
        |  "gasPrice": "${defaultGasPrice.value}",
        |  "inputs": ${write(unsignedTx.inputs)},
-       |  "outputs": ${write(unsignedTx.outputs)}
+       |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
        |}""".stripMargin
 
     checkData(unsignedTx, jsonRaw)
