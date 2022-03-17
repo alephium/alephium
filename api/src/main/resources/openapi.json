@@ -3263,7 +3263,7 @@
                         "transactions": [
                           {
                             "unsigned": {
-                              "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                               "version": 1,
                               "networkId": 1,
                               "gasAmount": 20000,
@@ -3469,7 +3469,7 @@
                   "transactions": [
                     {
                       "unsigned": {
-                        "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                         "version": 1,
                         "networkId": 1,
                         "gasAmount": 20000,
@@ -4475,7 +4475,7 @@
                     "unconfirmedTransactions": [
                       {
                         "unsigned": {
-                          "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                           "version": 1,
                           "networkId": 1,
                           "gasAmount": 20000,
@@ -5004,7 +5004,7 @@
                   "$ref": "#/components/schemas/UnsignedTx"
                 },
                 "example": {
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "version": 1,
                   "networkId": 1,
                   "gasAmount": 20000,
@@ -9437,7 +9437,7 @@
       },
       "UnsignedTx": {
         "required": [
-          "hash",
+          "txId",
           "version",
           "networkId",
           "gasAmount",
@@ -9447,7 +9447,7 @@
         ],
         "type": "object",
         "properties": {
-          "hash": {
+          "txId": {
             "type": "string"
           },
           "version": {

@@ -922,7 +922,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
     val jsonRaw    = s"""
        |{
-       |  "hash": "${unsignedTransaction.hash.toHexString}",
+       |  "txId": "${unsignedTransaction.hash.toHexString}",
        |  "version": ${unsignedTransaction.version},
        |  "networkId": ${unsignedTransaction.networkId.id},
        |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
