@@ -252,7 +252,7 @@ trait ApiModelCodec {
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 
-  implicit val buildMultisigAddressResultRW: RW[BuildMultisigAddress.Result] = macroRW
+  implicit val buildMultisigAddressResultRW: RW[BuildMultisigAddressResult] = macroRW
 
   implicit val buildMultisigRW: RW[BuildMultisig] = macroRW
 

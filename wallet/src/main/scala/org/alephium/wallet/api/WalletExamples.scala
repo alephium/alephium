@@ -77,8 +77,8 @@ trait WalletExamples extends EndpointsExamples {
       "Miner (with pass phrase)"
     )
   )
-  implicit val walletCreationResultExamples: List[Example[WalletCreation.Result]] =
-    simpleExample(WalletCreation.Result(walletName, mnemonic))
+  implicit val walletCreationResultExamples: List[Example[WalletCreationResult]] =
+    simpleExample(WalletCreationResult(walletName, mnemonic))
 
   implicit val walletRestoreExamples: List[Example[WalletRestore]] =
     List(
@@ -96,8 +96,8 @@ trait WalletExamples extends EndpointsExamples {
       )
     )
 
-  implicit val walletRestoreResultExamples: List[Example[WalletRestore.Result]] =
-    simpleExample(WalletRestore.Result(walletName))
+  implicit val walletRestoreResultExamples: List[Example[WalletRestoreResult]] =
+    simpleExample(WalletRestoreResult(walletName))
 
   implicit val walletStatusExamples: List[Example[WalletStatus]] =
     simpleExample(WalletStatus(walletName, locked = true))
@@ -138,8 +138,8 @@ trait WalletExamples extends EndpointsExamples {
   implicit val revealMnemonicExamples: List[Example[RevealMnemonic]] =
     simpleExample(RevealMnemonic(password))
 
-  implicit val revealMnemonicResultExamples: List[Example[RevealMnemonic.Result]] =
-    simpleExample(RevealMnemonic.Result(mnemonic))
+  implicit val revealMnemonicResultExamples: List[Example[RevealMnemonicResult]] =
+    simpleExample(RevealMnemonicResult(mnemonic))
 
   implicit val transferExamples: List[Example[Transfer]] = List(
     defaultExample(Transfer(defaultDestinations)),
@@ -156,8 +156,8 @@ trait WalletExamples extends EndpointsExamples {
   implicit val signTransactionExamples: List[Example[Sign]] =
     simpleExample(Sign(hexString))
 
-  implicit val signTransactionResultExamples: List[Example[Sign.Result]] =
-    simpleExample(Sign.Result(signature))
+  implicit val signTransactionResultExamples: List[Example[SignResult]] =
+    simpleExample(SignResult(signature))
 
   implicit val sweepAllExamples: List[Example[Sweep]] =
     List(
@@ -173,11 +173,11 @@ trait WalletExamples extends EndpointsExamples {
       )
     )
 
-  implicit val transferResultExamples: List[Example[Transfer.Result]] =
-    simpleExample(Transfer.Result(txId, fromGroup, toGroup))
+  implicit val transferResultExamples: List[Example[TransferResult]] =
+    simpleExample(TransferResult(txId, fromGroup, toGroup))
 
-  implicit val transferResultsExamples: List[Example[Transfer.Results]] =
-    simpleExample(Transfer.Results(AVector(Transfer.Result(txId, fromGroup, toGroup))))
+  implicit val transferResultsExamples: List[Example[TransferResults]] =
+    simpleExample(TransferResults(AVector(TransferResult(txId, fromGroup, toGroup))))
 
   implicit val addressesExamples: List[Example[Addresses]] =
     simpleExample(Addresses(address, AVector(addressInfo)))

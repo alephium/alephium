@@ -20,6 +20,4 @@ import org.alephium.crypto.wallet.Mnemonic
 
 final case class RevealMnemonic(password: String)
 
-object RevealMnemonic {
-  final case class Result(mnemonic: Mnemonic)
-}
+final case class RevealMnemonicResult(mnemonic: Mnemonic)

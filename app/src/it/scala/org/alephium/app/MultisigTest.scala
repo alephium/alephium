@@ -142,7 +142,7 @@ class MultisigTest extends AlephiumActorSpec {
     val restPort = clique.getRestPort(group.group)
 
     val walletName = "wallet-name"
-    request[WalletCreation.Result](createWallet(password, walletName), restPort)
+    request[WalletCreationResult](createWallet(password, walletName), restPort)
 
     val address2 =
       request[Addresses](getAddresses(walletName), restPort).activeAddress
@@ -154,7 +154,7 @@ class MultisigTest extends AlephiumActorSpec {
       ).publicKey.toHexString
 
     val multisigAddress =
-      request[BuildMultisigAddress.Result](
+      request[BuildMultisigAddressResult](
         multisig(AVector(publicKey, publicKey2), 2),
         restPort
       ).address.toBase58
@@ -182,7 +182,7 @@ class MultisigTest extends AlephiumActorSpec {
     )
 
     val signature2: Signature =
-      request[Sign.Result](sign(walletName, buildTxResult.txId.toHexString), restPort).signature
+      request[SignResult](sign(walletName, buildTxResult.txId.toHexString), restPort).signature
 
     request[Boolean](
       verify(buildTxResult.txId.toHexString, signature1, publicKey),
@@ -232,7 +232,7 @@ class MultisigTest extends AlephiumActorSpec {
         unlockPubKeys: AVector[String]
     ): BuildTransactionResult = {
       val multisigAddress =
-        request[BuildMultisigAddress.Result](
+        request[BuildMultisigAddressResult](
           multisig(allPubKeys, unlockPubKeys.length),
           restPort
         ).address.toBase58

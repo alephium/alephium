@@ -27,6 +27,4 @@ final case class WalletCreation(
     mnemonicSize: Option[Mnemonic.Size] = None
 )
 
-object WalletCreation {
-  final case class Result(walletName: String, mnemonic: Mnemonic)
-}
+final case class WalletCreationResult(walletName: String, mnemonic: Mnemonic)

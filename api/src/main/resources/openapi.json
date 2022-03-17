@@ -169,7 +169,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result1"
+                  "$ref": "#/components/schemas/WalletRestoreResult"
                 },
                 "example": {
                   "walletName": "wallet-super-name"
@@ -295,7 +295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result"
+                  "$ref": "#/components/schemas/WalletCreationResult"
                 },
                 "example": {
                   "walletName": "wallet-super-name",
@@ -932,7 +932,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result2"
+                  "$ref": "#/components/schemas/RevealMnemonicResult"
                 },
                 "example": {
                   "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
@@ -1080,7 +1080,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result3"
+                  "$ref": "#/components/schemas/TransferResult"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -1209,7 +1209,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Results"
+                  "$ref": "#/components/schemas/TransferResults"
                 },
                 "example": {
                   "results": [
@@ -1342,7 +1342,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Results"
+                  "$ref": "#/components/schemas/TransferResults"
                 },
                 "example": {
                   "results": [
@@ -1460,7 +1460,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result4"
+                  "$ref": "#/components/schemas/SignResult"
                 },
                 "example": {
                   "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
@@ -6180,7 +6180,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result5"
+                  "$ref": "#/components/schemas/BuildMultisigAddressResult"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
@@ -7932,6 +7932,17 @@
           }
         }
       },
+      "BuildMultisigAddressResult": {
+        "required": [
+          "address"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          }
+        }
+      },
       "BuildScriptTx": {
         "required": [
           "fromPublicKey",
@@ -8825,98 +8836,6 @@
           }
         }
       },
-      "Result": {
-        "required": [
-          "walletName",
-          "mnemonic"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          },
-          "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "Result1": {
-        "required": [
-          "walletName"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          }
-        }
-      },
-      "Result2": {
-        "required": [
-          "mnemonic"
-        ],
-        "type": "object",
-        "properties": {
-          "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "Result3": {
-        "required": [
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "txId": {
-            "type": "string"
-          },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
-            "type": "integer"
-          }
-        }
-      },
-      "Result4": {
-        "required": [
-          "signature"
-        ],
-        "type": "object",
-        "properties": {
-          "signature": {
-            "type": "string"
-          }
-        }
-      },
-      "Result5": {
-        "required": [
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "Results": {
-        "required": [
-          "results"
-        ],
-        "type": "object",
-        "properties": {
-          "results": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Result3"
-            }
-          }
-        }
-      },
       "RevealMnemonic": {
         "required": [
           "password"
@@ -8924,6 +8843,17 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RevealMnemonicResult": {
+        "required": [
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "mnemonic": {
             "type": "string"
           }
         }
@@ -8999,6 +8929,17 @@
         "type": "object",
         "properties": {
           "data": {
+            "type": "string"
+          }
+        }
+      },
+      "SignResult": {
+        "required": [
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "signature": {
             "type": "string"
           }
         }
@@ -9278,6 +9219,39 @@
           },
           "utxosLimit": {
             "type": "integer"
+          }
+        }
+      },
+      "TransferResult": {
+        "required": [
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string"
+          },
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
+            "type": "integer"
+          }
+        }
+      },
+      "TransferResults": {
+        "required": [
+          "results"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferResult"
+            }
           }
         }
       },
@@ -9592,6 +9566,21 @@
           }
         }
       },
+      "WalletCreationResult": {
+        "required": [
+          "walletName",
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
+            "type": "string"
+          },
+          "mnemonic": {
+            "type": "string"
+          }
+        }
+      },
       "WalletDeletion": {
         "required": [
           "password"
@@ -9624,6 +9613,17 @@
             "type": "boolean"
           },
           "mnemonicPassphrase": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletRestoreResult": {
+        "required": [
+          "walletName"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
             "type": "string"
           }
         }

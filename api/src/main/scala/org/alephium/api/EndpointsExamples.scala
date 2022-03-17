@@ -404,9 +404,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddress.Result]] =
+  implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddressResult]] =
     simpleExample(
-      BuildMultisigAddress.Result(
+      BuildMultisigAddressResult(
         address
       )
     )

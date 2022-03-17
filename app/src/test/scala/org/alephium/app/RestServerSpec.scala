@@ -432,7 +432,7 @@ abstract class RestServerSpec(
     ) check { response =>
       response.code is StatusCode.Ok
 
-      val result   = response.as[BuildMultisigAddress.Result]
+      val result   = response.as[BuildMultisigAddressResult]
       val expected = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
 
       result.address is expected

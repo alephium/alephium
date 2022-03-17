@@ -667,11 +667,11 @@ class ServerUtils(implicit
   def buildMultisigAddress(
       keys: AVector[PublicKey],
       mrequired: Int
-  ): Either[String, BuildMultisigAddress.Result] = {
+  ): Either[String, BuildMultisigAddressResult] = {
     LockupScript.p2mpkh(keys, mrequired) match {
       case Some(lockupScript) =>
         Right(
-          BuildMultisigAddress.Result(
+          BuildMultisigAddressResult(
             Address.Asset(lockupScript)
           )
         )
