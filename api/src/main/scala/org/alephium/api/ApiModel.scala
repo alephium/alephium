@@ -240,7 +240,7 @@ trait ApiModelCodec {
   implicit val decodeTransactionRW: RW[DecodeTransaction] = macroRW
 
   implicit val txStatusRW: RW[TxStatus] =
-    RW.merge(macroRW[Confirmed], macroRW[MemPooled.type], macroRW[NotFound.type])
+    RW.merge(macroRW[Confirmed], macroRW[MemPooled.type], macroRW[TxNotFound.type])
 
   implicit val buildContractRW: RW[BuildContractDeployScriptTx] = macroRW
 

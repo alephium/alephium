@@ -325,7 +325,7 @@ class ServerUtils(implicit
       _ <- checkTxChainIndex(chainIndex, txId)
       status <- blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
         case Some(status) => convert(status)
-        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
+        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else TxNotFound
       }
     } yield status
   }

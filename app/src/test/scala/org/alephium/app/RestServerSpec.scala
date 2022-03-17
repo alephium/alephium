@@ -390,7 +390,7 @@ abstract class RestServerSpec(
             status is dummyTxStatus
           } else {
             response.code is StatusCode.Ok
-            response.as[TxStatus] is NotFound
+            response.as[TxStatus] is TxNotFound
           }
         }
 
@@ -404,7 +404,7 @@ abstract class RestServerSpec(
             status is dummyTxStatus
           } else {
             response.code is StatusCode.Ok
-            response.as[TxStatus] is NotFound
+            response.as[TxStatus] is TxNotFound
           }
         }
       }

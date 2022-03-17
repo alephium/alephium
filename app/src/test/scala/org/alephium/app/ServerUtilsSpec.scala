@@ -1151,7 +1151,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .createTxTemplate(SubmitTransaction(unsignedTx, signature))
         .rightValue
 
-    serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE NotFound
+    serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound
 
     blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled

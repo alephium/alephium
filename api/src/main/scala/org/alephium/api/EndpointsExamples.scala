@@ -445,7 +445,7 @@ trait EndpointsExamples extends ErrorExamples {
     List[Example[TxStatus]](
       Example(Confirmed(blockHash, 0, 1, 2, 3), None, None),
       Example(MemPooled, None, Some("Tx is still in mempool")),
-      Example(NotFound, None, Some("Cannot find tx with the id"))
+      Example(TxNotFound, None, Some("Cannot find tx with the id"))
     )
 
   implicit val compileScriptExamples: List[Example[Compile.Script]] =
