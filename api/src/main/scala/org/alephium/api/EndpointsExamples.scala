@@ -469,12 +469,12 @@ trait EndpointsExamples extends ErrorExamples {
       CompileResult(
         bytecode = Hex.unsafe(hexString),
         codeHash = hash,
-        fields = CompileResult.Fields(
+        fields = CompileResult.FieldsSig(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
         ),
         functions = AVector(
-          CompileResult.Function(
+          CompileResult.FunctionSig(
             name = "bar",
             signature =
               "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
@@ -483,7 +483,7 @@ trait EndpointsExamples extends ErrorExamples {
           )
         ),
         events = AVector(
-          CompileResult.Event(
+          CompileResult.EventSig(
             name = "Bar",
             signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")

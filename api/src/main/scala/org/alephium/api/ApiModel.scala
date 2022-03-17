@@ -262,10 +262,10 @@ trait ApiModelCodec {
 
   implicit val compileContractRW: RW[Compile.Contract] = macroRW
 
-  implicit val compileResultFieldsRW: RW[CompileResult.Fields]     = macroRW
-  implicit val compileResultFunctionRW: RW[CompileResult.Function] = macroRW
-  implicit val compileResultEventRW: RW[CompileResult.Event]       = macroRW
-  implicit val compileResultRW: RW[CompileResult]                  = macroRW
+  implicit val compileResultFieldsRW: RW[CompileResult.FieldsSig]     = macroRW
+  implicit val compileResultFunctionRW: RW[CompileResult.FunctionSig] = macroRW
+  implicit val compileResultEventRW: RW[CompileResult.EventSig]       = macroRW
+  implicit val compileResultRW: RW[CompileResult]                     = macroRW
 
   implicit val statefulContractReader: Reader[StatefulContract] = StringReader.map { input =>
     val bs =

@@ -8157,18 +8157,18 @@
             "type": "string"
           },
           "fields": {
-            "$ref": "#/components/schemas/Fields"
+            "$ref": "#/components/schemas/FieldsSig"
           },
           "functions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Function"
+              "$ref": "#/components/schemas/FunctionSig"
             }
           },
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/EventSig"
             }
           }
         }
@@ -8332,28 +8332,6 @@
       },
       "Event": {
         "required": [
-          "name",
-          "signature",
-          "fieldTypes"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "signature": {
-            "type": "string"
-          },
-          "fieldTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "Event1": {
-        "required": [
           "blockHash",
           "contractAddress",
           "txId",
@@ -8382,6 +8360,28 @@
           }
         }
       },
+      "EventSig": {
+        "required": [
+          "name",
+          "signature",
+          "fieldTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "fieldTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Events": {
         "required": [
           "chainFrom",
@@ -8399,7 +8399,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event1"
+              "$ref": "#/components/schemas/Event"
             }
           }
         }
@@ -8421,7 +8421,7 @@
           }
         }
       },
-      "Fields": {
+      "FieldsSig": {
         "required": [
           "signature",
           "types"
@@ -8479,7 +8479,7 @@
           }
         }
       },
-      "Function": {
+      "FunctionSig": {
         "required": [
           "name",
           "signature",
@@ -9179,7 +9179,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event1"
+              "$ref": "#/components/schemas/Event"
             }
           }
         }
