@@ -42,7 +42,7 @@ final case class Transaction(
         unsignedTx,
         scriptExecutionOk,
         contractInputs.map(_.unsafeToContractOutputRef()),
-        generatedOutputs.map(Output.toProtocol(_)),
+        generatedOutputs.map(_.toProtocol()),
         inputSig,
         scriptSig
       )

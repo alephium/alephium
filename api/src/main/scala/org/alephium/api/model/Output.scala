@@ -34,13 +34,6 @@ sealed trait Output {
 
 object Output {
 
-  def toProtocol(output: Output): TxOutput = {
-    output match {
-      case asset: Asset       => asset.toProtocol()
-      case contract: Contract => contract.toProtocol()
-    }
-  }
-
   @upickle.implicits.key("AssetOutput")
   final case class Asset(
       hint: Int,

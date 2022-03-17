@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.{ContractOutputRef, TxInput, TxOutputRef}
+import org.alephium.protocol.model.{TxInput, TxOutputRef}
 import org.alephium.protocol.vm.UnlockScript
 import org.alephium.serde.{deserialize, serialize}
 
@@ -49,9 +49,6 @@ object Input {
     }
   }
 
-  @upickle.implicits.key("ContractInput")
-  final case class Contract(outputRef: OutputRef) extends Input
-
   def apply(outputRef: TxOutputRef, unlockScript: UnlockScript): Asset = {
     Asset(OutputRef.from(outputRef), serialize(unlockScript))
   }
@@ -59,7 +56,4 @@ object Input {
   def from(input: TxInput): Asset = {
     apply(input.outputRef, input.unlockScript)
   }
-
-  def from(input: ContractOutputRef): Contract =
-    Contract(OutputRef.from(input))
 }
