@@ -7485,24 +7485,6 @@
           }
         }
       },
-      "Array": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "Asset": {
         "required": [
           "alphAmount",
@@ -9530,9 +9512,6 @@
             "$ref": "#/components/schemas/Address"
           },
           {
-            "$ref": "#/components/schemas/Array"
-          },
-          {
             "$ref": "#/components/schemas/Bool"
           },
           {
@@ -9543,10 +9522,31 @@
           },
           {
             "$ref": "#/components/schemas/U256"
+          },
+          {
+            "$ref": "#/components/schemas/ValArray"
           }
         ],
         "discriminator": {
           "propertyName": "type"
+        }
+      },
+      "ValArray": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
         }
       },
       "VerifySignature": {

@@ -1100,8 +1100,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract = TestContract(
       bytecode = code,
-      initialFields = AVector[Val](Val.Array(AVector(Val.U256(U256.Zero), Val.U256(U256.One)))),
-      testArgs = AVector[Val](Val.Array(AVector(Val.U256(U256.Zero), Val.U256(U256.One))))
+      initialFields = AVector[Val](Val.ValArray(AVector(Val.U256(U256.Zero), Val.U256(U256.One)))),
+      testArgs = AVector[Val](Val.ValArray(AVector(Val.U256(U256.Zero), Val.U256(U256.One))))
     ).toComplete
 
     val serverUtils   = new ServerUtils()

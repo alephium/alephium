@@ -58,13 +58,13 @@ class ValSpec extends ApiModelCodec with JsonFixture {
     )
   }
 
-  it should "endcode/decode Val.Array" in {
+  it should "endcode/decode Val.ValArray" in {
     checkData[Val](
-      Val.Array(
+      Val.ValArray(
         AVector[Val](
           Val.True,
           Val.U256(U256.Zero),
-          Val.Array(AVector(Val.True, Val.U256(U256.One)))
+          Val.ValArray(AVector(Val.True, Val.U256(U256.One)))
         )
       ),
       s"""
