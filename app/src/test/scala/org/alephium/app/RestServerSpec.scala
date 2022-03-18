@@ -663,7 +663,7 @@ abstract class RestServerSpec(
   }
 
   it should "call POST /infos/misbehaviors" in {
-    val body = """{"type":"unban","peers":["123.123.123.123"]}"""
+    val body = """{"type":"Unban","peers":["123.123.123.123"]}"""
     Post(s"/infos/misbehaviors", body) check { response =>
       response.code is StatusCode.Ok
     }

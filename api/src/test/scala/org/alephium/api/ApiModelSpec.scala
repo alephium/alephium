@@ -522,29 +522,29 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val blockHash         = BlockHash.generate
     val status0: TxStatus = Confirmed(blockHash, 0, 1, 2, 3)
     val jsonRaw0 =
-      s"""{"type":"confirmed","blockHash":"${blockHash.toHexString}","txIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}"""
+      s"""{"type":"Confirmed","blockHash":"${blockHash.toHexString}","txIndex":0,"chainConfirmations":1,"fromGroupConfirmations":2,"toGroupConfirmations":3}"""
     checkData(status0, jsonRaw0)
 
-    checkData[PeerStatus](PeerStatus.Penalty(10), s"""{"type":"penalty","value":10}""")
+    checkData[PeerStatus](PeerStatus.Penalty(10), s"""{"type":"Penalty","value":10}""")
     checkData[PeerStatus](
       PeerStatus.Banned(TimeStamp.unsafe(1L)),
-      s"""{"type":"banned","until":1}"""
+      s"""{"type":"Banned","until":1}"""
     )
   }
 
   it should "encode/decode TxStatus" in {
-    checkData(MemPooled: TxStatus, s"""{"type":"mem-pooled"}""")
-    checkData(TxNotFound: TxStatus, s"""{"type":"tx-not-found"}""")
+    checkData(MemPooled: TxStatus, s"""{"type":"MemPooled"}""")
+    checkData(TxNotFound: TxStatus, s"""{"type":"TxNotFound"}""")
   }
 
   it should "encode/decode MisbehaviorAction" in {
     checkData(
       MisbehaviorAction.Ban(AVector(inetAddress)),
-      s"""{"type":"ban","peers":["127.0.0.1"]}"""
+      s"""{"type":"Ban","peers":["127.0.0.1"]}"""
     )
     checkData(
       MisbehaviorAction.Unban(AVector(inetAddress)),
-      s"""{"type":"unban","peers":["127.0.0.1"]}"""
+      s"""{"type":"Unban","peers":["127.0.0.1"]}"""
     )
   }
 
