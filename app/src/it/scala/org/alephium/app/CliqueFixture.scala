@@ -179,7 +179,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     checkConfirmations(txStatus)
   }
 
-  def confirmTx(tx: Transfer.Result, restPort: Int): Assertion = eventually {
+  def confirmTx(tx: TransferResult, restPort: Int): Assertion = eventually {
     val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
     checkConfirmations(txStatus)
   }
@@ -195,13 +195,13 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     confirmed.toGroupConfirmations > 1 is true
   }
 
-  def transferFromWallet(toAddress: String, amount: U256, restPort: Int): Transfer.Result =
+  def transferFromWallet(toAddress: String, amount: U256, restPort: Int): TransferResult =
     eventually {
       val walletName = "wallet-name"
 
-      request[WalletRestore.Result](restoreWallet(password, mnemonic, walletName), restPort)
+      request[WalletRestoreResult](restoreWallet(password, mnemonic, walletName), restPort)
       val transfer = transferWallet(walletName, toAddress, amount)
-      val res      = request[Transfer.Result](transfer, restPort)
+      val res      = request[TransferResult](transfer, restPort)
       res
     }
 
@@ -561,7 +561,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
     )
   }
-  def getTransactionStatus(tx: Transfer.Result) = {
+  def getTransactionStatus(tx: TransferResult) = {
     httpGet(
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup.value}&toGroup=${tx.toGroup.value}"
     )

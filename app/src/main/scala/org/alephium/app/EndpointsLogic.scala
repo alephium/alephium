@@ -397,7 +397,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         )
       case (None, None) =>
         searchLocalTransactionStatus(txId, brokerConfig.chainIndexes) match {
-          case Right(NotFound) =>
+          case Right(TxNotFound) =>
             searchTransactionStatusInOtherNodes(txId)
           case other => Future.successful(other)
         }
@@ -420,20 +420,20 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         val index = indexes.head
         val res   = serverUtils.getTransactionStatus(blockFlow, txId, index)
         res match {
-          case Right(NotFound) => rec(indexes.tail, res)
-          case Right(_)        => res
-          case Left(_)         => res
+          case Right(TxNotFound) => rec(indexes.tail, res)
+          case Right(_)          => res
+          case Left(_)           => res
         }
       }
     }
-    rec(chainIndexes, Right(NotFound))
+    rec(chainIndexes, Right(TxNotFound))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def searchTransactionStatusInOtherNodes(txId: Hash): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
-      Future.successful(Right(NotFound))
+      Future.successful(Right(TxNotFound))
     } else {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def rec(
@@ -442,13 +442,13 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       ): FutureTry[TxStatus] = {
         requestFromGroupIndex(
           from,
-          Future.successful(Right(NotFound)),
+          Future.successful(Right(TxNotFound)),
           getTransactionStatus,
           (txId, Some(from), None)
         ).flatMap {
-          case Right(NotFound) =>
+          case Right(TxNotFound) =>
             if (remaining.isEmpty) {
-              Future.successful(Right(NotFound))
+              Future.successful(Right(TxNotFound))
             } else {
               rec(remaining.head, remaining.tail)
             }

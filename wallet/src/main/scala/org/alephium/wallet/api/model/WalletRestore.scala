@@ -26,6 +26,5 @@ final case class WalletRestore(
     isMiner: Option[Boolean] = None,
     mnemonicPassphrase: Option[String] = None
 )
-object WalletRestore {
-  final case class Result(walletName: String)
-}
+
+final case class WalletRestoreResult(walletName: String)

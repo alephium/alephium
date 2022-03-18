@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.{Transaction => _, _}
+import org.alephium.api.model.{AssetOutput => _, ContractOutput => _, Transaction => _, _}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex

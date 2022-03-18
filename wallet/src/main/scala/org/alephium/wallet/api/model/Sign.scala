@@ -20,6 +20,4 @@ import org.alephium.protocol.Signature
 
 final case class Sign(data: String)
 
-object Sign {
-  final case class Result(signature: Signature)
-}
+final case class SignResult(signature: Signature)

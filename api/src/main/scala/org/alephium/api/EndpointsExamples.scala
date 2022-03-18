@@ -23,7 +23,8 @@ import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.model._
 import org.alephium.protocol._
-import org.alephium.protocol.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Address, CliqueId, ContractId, NetworkId}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
@@ -91,12 +92,12 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
-  private val inputAsset = Input.Asset(
+  private val inputAsset = AssetInput(
     outputRef,
     unlockupScriptBytes
   )
 
-  private val outputAsset: Output.Asset = Output.Asset(
+  private val outputAsset: FixedAssetOutput = FixedAssetOutput(
     1,
     hash,
     bigAmount,
@@ -106,7 +107,7 @@ trait EndpointsExamples extends ErrorExamples {
     hash.bytes
   )
 
-  private val outputContract: Output = Output.Contract(
+  private val outputContract: Output = ContractOutput(
     1,
     hash,
     bigAmount,
@@ -119,8 +120,8 @@ trait EndpointsExamples extends ErrorExamples {
     1,
     1,
     None,
-    defaultGas.value,
-    defaultGasPrice.value,
+    model.defaultGas.value,
+    model.defaultGasPrice.value,
     AVector(inputAsset),
     AVector(outputAsset)
   )
@@ -129,7 +130,7 @@ trait EndpointsExamples extends ErrorExamples {
     unsignedTx,
     true,
     AVector(outputRef),
-    AVector(outputAsset, outputContract),
+    AVector(outputAsset.upCast(), outputContract),
     AVector(signature.bytes),
     AVector(signature.bytes)
   )
@@ -227,7 +228,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val nodeInfoExamples: List[Example[NodeInfo]] =
     simpleExample(
       NodeInfo(
-        ReleaseVersion(0, 0, 1),
+        model.ReleaseVersion(0, 0, 1),
         NodeInfo.BuildInfo(
           "1.2.3",
           "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
@@ -268,8 +269,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val discoveredNeighborExamples: List[Example[AVector[BrokerInfo]]] =
-    simpleExample(AVector(BrokerInfo.unsafe(cliqueId, 1, 1, inetSocketAddress)))
+  implicit val discoveredNeighborExamples: List[Example[AVector[model.BrokerInfo]]] =
+    simpleExample(AVector(model.BrokerInfo.unsafe(cliqueId, 1, 1, inetSocketAddress)))
 
   implicit val misbehaviorsExamples: List[Example[AVector[PeerMisbehavior]]] =
     simpleExample(AVector(PeerMisbehavior(inetAddress, PeerStatus.Penalty(42))))
@@ -345,8 +346,8 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         moreSettingsDestinations,
         Some(AVector(outputRef)),
-        Some(minimalGas),
-        Some(defaultGasPrice),
+        Some(model.minimalGas),
+        Some(model.defaultGasPrice),
         Some(defaultUtxosLimit)
       )
     )
@@ -365,8 +366,8 @@ trait EndpointsExamples extends ErrorExamples {
           publicKey,
           address,
           Some(ts),
-          Some(minimalGas),
-          Some(defaultGasPrice),
+          Some(model.minimalGas),
+          Some(model.defaultGasPrice),
           Some(defaultUtxosLimit)
         )
       )
@@ -376,8 +377,8 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       BuildTransactionResult(
         unsignedTx = hexString,
-        minimalGas,
-        defaultGasPrice,
+        model.minimalGas,
+        model.defaultGasPrice,
         hash,
         fromGroup = 2,
         toGroup = 1
@@ -387,7 +388,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
-      SweepAddressTransaction(hash, hexString, minimalGas, defaultGasPrice)
+      SweepAddressTransaction(hash, hexString, model.minimalGas, model.defaultGasPrice)
     )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
@@ -403,9 +404,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddress.Result]] =
+  implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddressResult]] =
     simpleExample(
-      BuildMultisigAddress.Result(
+      BuildMultisigAddressResult(
         address
       )
     )
@@ -425,8 +426,8 @@ trait EndpointsExamples extends ErrorExamples {
         address,
         AVector(publicKey),
         moreSettingsDestinations,
-        Some(minimalGas),
-        Some(defaultGasPrice)
+        Some(model.minimalGas),
+        Some(model.defaultGasPrice)
       )
     )
   )
@@ -444,7 +445,7 @@ trait EndpointsExamples extends ErrorExamples {
     List[Example[TxStatus]](
       Example(Confirmed(blockHash, 0, 1, 2, 3), None, None),
       Example(MemPooled, None, Some("Tx is still in mempool")),
-      Example(NotFound, None, Some("Cannot find tx with the id"))
+      Example(TxNotFound, None, Some("Cannot find tx with the id"))
     )
 
   implicit val compileScriptExamples: List[Example[Compile.Script]] =
@@ -468,12 +469,12 @@ trait EndpointsExamples extends ErrorExamples {
       CompileResult(
         bytecode = Hex.unsafe(hexString),
         codeHash = hash,
-        fields = CompileResult.Fields(
+        fields = CompileResult.FieldsSig(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
         ),
         functions = AVector(
-          CompileResult.Function(
+          CompileResult.FunctionSig(
             name = "bar",
             signature =
               "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
@@ -482,7 +483,7 @@ trait EndpointsExamples extends ErrorExamples {
           )
         ),
         events = AVector(
-          CompileResult.Event(
+          CompileResult.EventSig(
             name = "Bar",
             signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
@@ -500,8 +501,8 @@ trait EndpointsExamples extends ErrorExamples {
         AVector(Val.True, Val.U256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
-        Some(minimalGas),
-        Some(defaultGasPrice),
+        Some(model.minimalGas),
+        Some(model.defaultGasPrice),
         Some(defaultUtxosLimit)
       )
     )
@@ -513,10 +514,10 @@ trait EndpointsExamples extends ErrorExamples {
       BuildScriptTx(
         publicKey,
         byteString,
-        Some(Amount(dustUtxoAmount)),
+        Some(Amount(model.dustUtxoAmount)),
         Some(tokens),
-        Some(minimalGas),
-        Some(defaultGasPrice),
+        Some(model.minimalGas),
+        Some(model.defaultGasPrice),
         Some(defaultUtxosLimit)
       )
     )
@@ -544,7 +545,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
 
-  private def asset(n: Long) = ContractState.Asset(
+  private def asset(n: Long) = AssetState(
     ALPH.alph(n),
     AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )
@@ -580,7 +581,7 @@ trait EndpointsExamples extends ErrorExamples {
         gasUsed = 20000,
         contracts = AVector(existingContract),
         txOutputs =
-          AVector(Output.Contract(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
+          AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         events = AVector(event)
       )
     )

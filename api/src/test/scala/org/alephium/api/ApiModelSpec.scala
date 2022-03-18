@@ -27,7 +27,7 @@ import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.protocol.vm.lang.TypeSignatureFixture
 import org.alephium.util._
@@ -196,23 +196,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(request2, jsonRaw2)
   }
 
-  it should "encode/decode Input" in {
+  it should "encode/decode AssetInput" in {
     val key       = Hash.generate
     val outputRef = OutputRef(1234, key)
-
-    {
-      val data: Input = Input.Contract(outputRef)
-      val jsonRaw =
-        s"""{"type":"ContractInput","outputRef":{"hint":1234,"key":"${key.toHexString}"}}"""
-      checkData(data, jsonRaw)
-    }
-
-    {
-      val data: Input = Input.Asset(outputRef, hex"abcd")
-      val jsonRaw =
-        s"""{"type":"AssetInput","outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
-      checkData(data, jsonRaw)
-    }
+    val data      = AssetInput(outputRef, hex"abcd")
+    val jsonRaw =
+      s"""{"outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
+    checkData(data, jsonRaw)
   }
 
   it should "encode/decode Token" in {
@@ -241,7 +231,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     {
       val address         = generateContractAddress()
       val addressStr      = address.toBase58
-      val request: Output = Output.Contract(hint, key, amount, address, tokens)
+      val request: Output = ContractOutput(hint, key, amount, address, tokens)
       val jsonRaw         = s"""
         |{
         |  "type": "ContractOutput",
@@ -268,7 +258,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val address    = generateAddress()
       val addressStr = address.toBase58
       val request: Output =
-        Output.Asset(
+        AssetOutput(
           hint,
           key,
           amount,
@@ -528,7 +518,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(transfer, jsonRaw)
   }
 
-  it should "encode/decode TxStatus" in {
+  it should "encode/decode PeerStatus" in {
     val blockHash         = BlockHash.generate
     val status0: TxStatus = Confirmed(blockHash, 0, 1, 2, 3)
     val jsonRaw0 =
@@ -542,9 +532,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     )
   }
 
-  it should "encode/decode PeerStatus" in {
+  it should "encode/decode TxStatus" in {
     checkData(MemPooled: TxStatus, s"""{"type":"mem-pooled"}""")
-    checkData(NotFound: TxStatus, s"""{"type":"not-found"}""")
+    checkData(TxNotFound: TxStatus, s"""{"type":"tx-not-found"}""")
   }
 
   it should "encode/decode MisbehaviorAction" in {
@@ -737,12 +727,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(verifySignature, jsonRaw)
   }
 
-  it should "encode/decode ContractState.Asset" in {
-    val asset1   = ContractState.Asset(U256.unsafe(100))
+  it should "encode/decode AssetState" in {
+    val asset1   = AssetState(U256.unsafe(100))
     val jsonRaw1 = s"""{"alphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
-    val asset2 = ContractState.Asset(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
+    val asset2 = AssetState(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
@@ -763,7 +753,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       StatefulContract.forSMT.toContract().rightValue,
       Hash.zero,
       AVector(u256, i256, bool, byteVec, address1),
-      ContractState.Asset(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
+      AssetState(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
     val jsonRaw =
       s"""
@@ -882,18 +872,64 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     TimeInterval(timestamp, timestamp.plusMinutesUnsafe(60)).validateTimeSpan(timespan) isE ()
   }
 
+  it should "encode/decode FixedAssetOutput" in {
+    val jsonRaw =
+      s"""
+         |{
+         |  "hint": -383063803,
+         |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
+         |  "alphAmount": "1000000000000000000",
+         |  "address": "111111111111111111111111111111111",
+         |  "tokens": [],
+         |  "lockTime": 0,
+         |  "additionalData": ""
+         |}
+         |""".stripMargin
+    checkData(FixedAssetOutput.fromProtocol(assetOutput, Hash.zero, 0), jsonRaw)
+  }
+
+  it should "endcode/decode Output" in {
+    val assetOutputJson =
+      s"""
+         |{
+         |  "type": "AssetOutput",
+         |  "hint": -383063803,
+         |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
+         |  "alphAmount": "1000000000000000000",
+         |  "address": "111111111111111111111111111111111",
+         |  "tokens": [],
+         |  "lockTime": 0,
+         |  "additionalData": ""
+         |}
+         |""".stripMargin
+    checkData[Output](Output.from(assetOutput, Hash.zero, 0), assetOutputJson)
+
+    val contractOutputJson =
+      s"""
+         |{
+         |  "type": "ContractOutput",
+         |  "hint": -383063804,
+         |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
+         |  "alphAmount": "1000000000000000000",
+         |  "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
+         |  "tokens": []
+         |}
+         |""".stripMargin
+    checkData[Output](Output.from(contractOutput, Hash.zero, 0), contractOutputJson)
+  }
+
   it should "encode/decode UnsignedTx" in {
     val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
     val jsonRaw    = s"""
        |{
-       |  "hash": "${unsignedTransaction.hash.toHexString}",
+       |  "txId": "${unsignedTransaction.hash.toHexString}",
        |  "version": ${unsignedTransaction.version},
        |  "networkId": ${unsignedTransaction.networkId.id},
        |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
        |  "gasAmount": ${defaultGas.value},
        |  "gasPrice": "${defaultGasPrice.value}",
        |  "inputs": ${write(unsignedTx.inputs)},
-       |  "outputs": ${write(unsignedTx.outputs)}
+       |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
        |}""".stripMargin
 
     checkData(unsignedTx, jsonRaw)

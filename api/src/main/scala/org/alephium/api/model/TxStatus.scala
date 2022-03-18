@@ -30,5 +30,5 @@ final case class Confirmed(
 ) extends TxStatus
 @upickle.implicits.key("mem-pooled")
 final case object MemPooled extends TxStatus
-@upickle.implicits.key("not-found")
-final case object NotFound extends TxStatus
+@upickle.implicits.key("tx-not-found")
+final case object TxNotFound extends TxStatus

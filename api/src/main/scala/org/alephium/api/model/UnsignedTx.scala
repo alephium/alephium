@@ -24,14 +24,14 @@ import org.alephium.util.{AVector, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class UnsignedTx(
-    hash: Hash,
+    txId: Hash,
     version: Byte,
     networkId: Byte,
     scriptOpt: Option[Script] = None,
     gasAmount: Int,
     gasPrice: U256,
-    inputs: AVector[Input.Asset],
-    outputs: AVector[Output.Asset]
+    inputs: AVector[AssetInput],
+    fixedOutputs: AVector[FixedAssetOutput]
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
     val gas = vm.GasPrice(gasPrice)
@@ -49,9 +49,9 @@ final case class UnsignedTx(
         gasBox,
         gas,
         assetInputs,
-        outputs.map(_.toProtocol())
+        fixedOutputs.map(_.toProtocol())
       )
-      _ <- Either.cond(hash == utx.hash, (), "Invalid hash")
+      _ <- Either.cond(txId == utx.hash, (), "Invalid hash")
     } yield utx
   }
 }
@@ -65,9 +65,9 @@ object UnsignedTx {
       unsignedTx.scriptOpt.map(Script.fromProtocol),
       unsignedTx.gasAmount.value,
       unsignedTx.gasPrice.value,
-      unsignedTx.inputs.map(Input.from),
+      unsignedTx.inputs.map(AssetInput.from),
       unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
-        Output.Asset.fromProtocol(out, unsignedTx.hash, index)
+        FixedAssetOutput.fromProtocol(out, unsignedTx.hash, index)
       }
     )
   }

@@ -50,10 +50,10 @@ trait WalletEndpoints
       "This endpoint can only be called if the wallet was created with the `isMiner = true` flag"
     )
 
-  val createWallet: BaseEndpoint[WalletCreation, WalletCreation.Result] =
+  val createWallet: BaseEndpoint[WalletCreation, WalletCreationResult] =
     wallets.post
       .in(jsonBody[WalletCreation])
-      .out(jsonBody[WalletCreation.Result])
+      .out(jsonBody[WalletCreationResult])
       .summary("Create a new wallet")
       .description(
         "A new wallet will be created and respond with a mnemonic. " +
@@ -61,10 +61,10 @@ trait WalletEndpoints
           s"Default mnemonic size is 24, (options: $mnemonicSizes)."
       )
 
-  val restoreWallet: BaseEndpoint[WalletRestore, WalletRestore.Result] =
+  val restoreWallet: BaseEndpoint[WalletRestore, WalletRestoreResult] =
     wallets.put
       .in(jsonBody[WalletRestore])
-      .out(jsonBody[WalletRestore.Result])
+      .out(jsonBody[WalletRestoreResult])
       .summary("Restore a wallet from your mnemonic")
 
   val listWallets: BaseEndpoint[Unit, AVector[WalletStatus]] =
@@ -100,32 +100,32 @@ trait WalletEndpoints
       .out(jsonBodyWithAlph[Balances])
       .summary("Get your total balance")
 
-  val transfer: BaseEndpoint[(String, Transfer), Transfer.Result] =
+  val transfer: BaseEndpoint[(String, Transfer), TransferResult] =
     wallet.post
       .in("transfer")
       .in(jsonBodyWithAlph[Transfer])
-      .out(jsonBody[Transfer.Result])
+      .out(jsonBody[TransferResult])
       .summary("Transfer ALPH from the active address")
 
-  val sign: BaseEndpoint[(String, Sign), Sign.Result] =
+  val sign: BaseEndpoint[(String, Sign), SignResult] =
     wallet.post
       .in("sign")
       .in(jsonBody[Sign])
-      .out(jsonBody[Sign.Result])
+      .out(jsonBody[SignResult])
       .summary("Sign the given data and return back the signature")
 
-  val sweepActiveAddress: BaseEndpoint[(String, Sweep), Transfer.Results] =
+  val sweepActiveAddress: BaseEndpoint[(String, Sweep), TransferResults] =
     wallet.post
       .in("sweep-active-address")
       .in(jsonBody[Sweep])
-      .out(jsonBody[Transfer.Results])
+      .out(jsonBody[TransferResults])
       .summary("Transfer all unlocked ALPH from the active address to another address")
 
-  val sweepAllAddresses: BaseEndpoint[(String, Sweep), Transfer.Results] =
+  val sweepAllAddresses: BaseEndpoint[(String, Sweep), TransferResults] =
     wallet.post
       .in("sweep-all-addresses")
       .in(jsonBody[Sweep])
-      .out(jsonBody[Transfer.Results])
+      .out(jsonBody[TransferResults])
       .summary(
         "Transfer unlocked ALPH from all addresses (including all mining addresses if applicable) to another address"
       )
@@ -157,11 +157,11 @@ trait WalletEndpoints
       .in(jsonBody[ChangeActiveAddress])
       .summary("Choose the active address")
 
-  val revealMnemonic: BaseEndpoint[(String, RevealMnemonic), RevealMnemonic.Result] =
+  val revealMnemonic: BaseEndpoint[(String, RevealMnemonic), RevealMnemonicResult] =
     wallet.post
       .in("reveal-mnemonic")
       .in(jsonBody[RevealMnemonic])
-      .out(jsonBody[RevealMnemonic.Result])
+      .out(jsonBody[RevealMnemonicResult])
       .summary("Reveal your mnemonic. !!! use it with caution !!!")
 
   val getMinerAddresses: BaseEndpoint[String, AVector[MinerAddressesInfo]] =

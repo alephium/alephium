@@ -17,7 +17,6 @@
 package org.alephium.app
 
 import org.alephium.api.model._
-import org.alephium.api.model.Output.Contract
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
@@ -262,7 +261,7 @@ trait WalletFixture extends CliqueFixture {
   val genesisWalletName     = "genesis-wallet"
   def submitTx(unsignedTx: String, txId: Hash, walletName: String): TxResult = {
     val signature =
-      request[Sign.Result](sign(walletName, s"${txId.toHexString}"), restPort).signature
+      request[SignResult](sign(walletName, s"${txId.toHexString}"), restPort).signature
     val tx = request[TxResult](
       submitTransaction(s"""
           {
@@ -297,11 +296,11 @@ trait WalletFixture extends CliqueFixture {
     val block = request[BlockEntry](getBlock(blockHash.toHexString), restPort)
 
     // scalastyle:off no.equal
-    val tx: Transaction = block.transactions.find(_.unsigned.hash == txResult.txId).get
+    val tx: Transaction = block.transactions.find(_.unsigned.txId == txResult.txId).get
     // scalastyle:on no.equal
 
-    val Contract(_, _, _, contractAddress, _) =
-      tx.generatedOutputs.find(_.isInstanceOf[Contract]).get
+    val ContractOutput(_, _, _, contractAddress, _) =
+      tx.generatedOutputs.find(_.isInstanceOf[ContractOutput]).get
     ContractRef(buildResult.contractAddress.contractId, contractAddress, code)
   }
 
@@ -318,13 +317,13 @@ trait WalletFixture extends CliqueFixture {
   }
 
   def createWallets(nWallets: Int, restPort: Int, walletsBalance: U256): Seq[Wallet] = {
-    request[WalletRestore.Result](restoreWallet(password, mnemonic, genesisWalletName), restPort)
+    request[WalletRestoreResult](restoreWallet(password, mnemonic, genesisWalletName), restPort)
     unitRequest(unlockWallet(password, genesisWalletName), restPort)
     val walletsCreation: IndexedSeq[WalletCreation] =
       (1 to nWallets).map(i => WalletCreation("password", s"walletName-$i", isMiner = Some(true)))
-    val walletsCreationResult: IndexedSeq[WalletCreation.Result] =
+    val walletsCreationResult: IndexedSeq[WalletCreationResult] =
       walletsCreation.map(walletCreation =>
-        request[WalletCreation.Result](
+        request[WalletCreationResult](
           createWallet(
             walletCreation.password,
             walletCreation.walletName,
@@ -353,7 +352,7 @@ trait WalletFixture extends CliqueFixture {
           postWalletChangeActiveAddress(walletCreation.walletName, newActiveAddress),
           restPort
         )
-        val txResult = request[Transfer.Result](
+        val txResult = request[TransferResult](
           transferWallet(genesisWalletName, newActiveAddress, walletsBalance),
           restPort
         )
@@ -387,7 +386,7 @@ trait WalletFixture extends CliqueFixture {
 final case class ContractRef(contractId: ContractId, contractAddress: Address, code: String)
 final case class Wallet(
     creation: WalletCreation,
-    result: WalletCreation.Result,
+    result: WalletCreationResult,
     activeAddress: String,
     publicKey: PublicKey
 )

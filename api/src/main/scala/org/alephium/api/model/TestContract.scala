@@ -32,7 +32,7 @@ final case class TestContract(
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
     initialFields: AVector[Val] = TestContract.initialFieldsDefault,
-    initialAsset: Option[ContractState.Asset] = None,
+    initialAsset: Option[AssetState] = None,
     testMethodIndex: Option[Int] = None,
     testArgs: AVector[Val] = TestContract.testArgsDefault,
     existingContracts: Option[AVector[ContractState]] = None,
@@ -60,7 +60,7 @@ object TestContract {
   val testArgsDefault: AVector[Val]                    = AVector.empty
   val existingContractsDefault: AVector[ContractState] = AVector.empty
   val inputAssetsDefault: AVector[InputAsset]          = AVector.empty
-  val initialAssetDefault: ContractState.Asset         = ContractState.Asset(ALPH.alph(1))
+  val initialAssetDefault: AssetState                  = AssetState(ALPH.alph(1))
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
@@ -68,7 +68,7 @@ object TestContract {
       contractId: ContractId = addressDefault.contractId,
       code: StatefulContract,
       initialFields: AVector[Val] = initialFieldsDefault,
-      initialAsset: ContractState.Asset = initialAssetDefault,
+      initialAsset: AssetState = initialAssetDefault,
       testMethodIndex: Int = testMethodIndexDefault,
       testArgs: AVector[Val] = testArgsDefault,
       existingContracts: AVector[ContractState] = existingContractsDefault,
@@ -79,7 +79,7 @@ object TestContract {
     }
   }
 
-  final case class InputAsset(address: Address.Asset, asset: ContractState.Asset) {
+  final case class InputAsset(address: Address.Asset, asset: AssetState) {
     def toAssetOutput: AssetOutput =
       AssetOutput(
         asset.alphAmount,

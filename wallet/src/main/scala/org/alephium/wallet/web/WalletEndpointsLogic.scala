@@ -48,7 +48,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
           walletCreation.mnemonicPassphrase
         )
         .map { case (walletName, mnemonic) =>
-          model.WalletCreation.Result(walletName, mnemonic)
+          model.WalletCreationResult(walletName, mnemonic)
         }
         .left
         .map(toApiError)
@@ -64,7 +64,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
           walletRestore.walletName,
           walletRestore.mnemonicPassphrase
         )
-        .map(model.WalletRestore.Result)
+        .map(model.WalletRestoreResult)
         .left
         .map(toApiError)
     )
@@ -137,7 +137,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     Future.successful(
       walletService
         .revealMnemonic(wallet, revealMnemonicParam.password)
-        .map(model.RevealMnemonic.Result.apply)
+        .map(model.RevealMnemonicResult.apply)
         .left
         .map(toApiError)
     )
@@ -147,20 +147,20 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     walletService
       .transfer(wallet, tr.destinations, tr.gas, tr.gasPrice, tr.utxosLimit)
       .map(_.map { case (txId, fromGroup, toGroup) =>
-        model.Transfer.Result(txId, fromGroup, toGroup)
+        model.TransferResult(txId, fromGroup, toGroup)
       }.left.map(toApiError))
   }
 
   val sweepActiveAddressLogic = serverLogic(sweepActiveAddress) { case (wallet, sa) =>
     walletService
       .sweepActiveAddress(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice, sa.utxosLimit)
-      .map(_.map(model.Transfer.Results.from).left.map(toApiError))
+      .map(_.map(model.TransferResults.from).left.map(toApiError))
   }
 
   val sweepAllAddressesLogic = serverLogic(sweepAllAddresses) { case (wallet, sa) =>
     walletService
       .sweepAllAddresses(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice, sa.utxosLimit)
-      .map(_.map(model.Transfer.Results.from).left.map(toApiError))
+      .map(_.map(model.TransferResults.from).left.map(toApiError))
   }
 
   val signLogic = serverLogic(sign) { case (wallet, sign) =>
@@ -168,7 +168,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       walletService
         .sign(wallet, sign.data)
         .map { signature =>
-          model.Sign.Result(signature)
+          model.SignResult(signature)
         }
         .left
         .map(toApiError)

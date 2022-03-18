@@ -81,7 +81,7 @@ class BroadcastTxTest extends AlephiumActorSpec {
     val tx1 =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
     checkTx(tx1, restPort(masterPortClique1), MemPooled)
-    checkTx(tx1, restPort(masterPortClique2), NotFound)
+    checkTx(tx1, restPort(masterPortClique2), TxNotFound)
 
     clique2.startMining()
 

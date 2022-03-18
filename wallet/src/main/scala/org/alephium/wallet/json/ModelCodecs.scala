@@ -44,13 +44,13 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val signTransactionRW: RW[Sign] = macroRW
 
-  implicit val signTransactionResultRW: RW[Sign.Result] = macroRW
+  implicit val signTransactionResultRW: RW[SignResult] = macroRW
 
   implicit val sweepAllRW: RW[Sweep] = macroRW
 
-  implicit val transferResultRW: RW[Transfer.Result] = macroRW
+  implicit val transferResultRW: RW[TransferResult] = macroRW
 
-  implicit val transferResultsRW: RW[Transfer.Results] = macroRW
+  implicit val transferResultsRW: RW[TransferResults] = macroRW
 
   implicit val mnemonicRW: RW[Mnemonic] = readwriter[String].bimap[Mnemonic](
     _.toLongString,
@@ -67,15 +67,15 @@ trait ModelCodecs extends ApiModelCodec {
 
   implicit val walletRestoreRW: RW[WalletRestore] = macroRW
 
-  implicit val walletRestoreResultRW: RW[WalletRestore.Result] = macroRW
+  implicit val walletRestoreResultRW: RW[WalletRestoreResult] = macroRW
 
   implicit val walletCreationRW: RW[WalletCreation] = macroRW
 
-  implicit val walletCreationResultRW: RW[WalletCreation.Result] = macroRW
+  implicit val walletCreationResultRW: RW[WalletCreationResult] = macroRW
 
   implicit val walletSatusRW: RW[WalletStatus] = macroRW
 
   implicit val revealMnemonicRW: RW[RevealMnemonic] = macroRW
 
-  implicit val revealMnemonicResultRW: RW[RevealMnemonic.Result] = macroRW
+  implicit val revealMnemonicResultRW: RW[RevealMnemonicResult] = macroRW
 }
