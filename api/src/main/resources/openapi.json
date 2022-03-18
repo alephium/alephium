@@ -2612,7 +2612,7 @@
                   {
                     "peer": "1.2.3.4",
                     "status": {
-                      "type": "penalty",
+                      "type": "Penalty",
                       "value": 42
                     }
                   }
@@ -2704,7 +2704,7 @@
                 "Example0": {
                   "summary": "Unban",
                   "value": {
-                    "type": "unban",
+                    "type": "Unban",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -2713,7 +2713,7 @@
                 "Example1": {
                   "summary": "Ban",
                   "value": {
-                    "type": "ban",
+                    "type": "Ban",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -2906,7 +2906,7 @@
                 "Example0": {
                   "summary": "Set unreachable",
                   "value": {
-                    "type": "unreachable",
+                    "type": "Unreachable",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -2915,7 +2915,7 @@
                 "Example1": {
                   "summary": "Set reachable",
                   "value": {
-                    "type": "reachable",
+                    "type": "Reachable",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -5154,7 +5154,7 @@
                 "examples": {
                   "Example0": {
                     "value": {
-                      "type": "confirmed",
+                      "type": "Confirmed",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "txIndex": 0,
                       "chainConfirmations": 1,
@@ -5165,13 +5165,13 @@
                   "Example1": {
                     "summary": "Tx is still in mempool",
                     "value": {
-                      "type": "mem-pooled"
+                      "type": "MemPooled"
                     }
                   },
                   "Example2": {
                     "summary": "Cannot find tx with the id",
                     "value": {
-                      "type": "tx-not-found"
+                      "type": "TxNotFound"
                     }
                   }
                 }

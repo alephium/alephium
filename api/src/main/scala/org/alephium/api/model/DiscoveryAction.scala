@@ -22,8 +22,8 @@ import org.alephium.util.AVector
 
 sealed trait DiscoveryAction
 object DiscoveryAction {
-  @upickle.implicits.key("unreachable")
+  @upickle.implicits.key("Unreachable")
   final case class Unreachable(peers: AVector[InetAddress]) extends DiscoveryAction
-  @upickle.implicits.key("reachable")
+  @upickle.implicits.key("Reachable")
   final case class Reachable(peers: AVector[InetAddress]) extends DiscoveryAction
 }

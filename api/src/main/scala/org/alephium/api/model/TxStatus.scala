@@ -20,7 +20,7 @@ import org.alephium.protocol.BlockHash
 
 sealed trait TxStatus
 
-@upickle.implicits.key("confirmed")
+@upickle.implicits.key("Confirmed")
 final case class Confirmed(
     blockHash: BlockHash,
     txIndex: Int,
@@ -28,7 +28,7 @@ final case class Confirmed(
     fromGroupConfirmations: Int,
     toGroupConfirmations: Int
 ) extends TxStatus
-@upickle.implicits.key("mem-pooled")
+@upickle.implicits.key("MemPooled")
 final case object MemPooled extends TxStatus
-@upickle.implicits.key("tx-not-found")
+@upickle.implicits.key("TxNotFound")
 final case object TxNotFound extends TxStatus
