@@ -101,10 +101,10 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     check(transfer, json)
   }
 
-  it should "Transfer.Result" in {
+  it should "TransferResult" in {
     val json =
       s"""{"txId":"${hash.toHexString}","fromGroup":${group.value},"toGroup":${group.value}}"""
-    val transfer = Transfer.Result(hash, group, group)
+    val transfer = TransferResult(hash, group, group)
     check(transfer, json)
   }
 
@@ -147,9 +147,9 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     check(walletRestore2, json2)
   }
 
-  it should "WalletRestore.Result" in {
+  it should "WalletRestoreResult" in {
     val json                = s"""{"walletName":"$walletName"}"""
-    val walletRestoreResult = WalletRestore.Result(walletName)
+    val walletRestoreResult = WalletRestoreResult(walletName)
     check(walletRestoreResult, json)
   }
 
@@ -170,9 +170,9 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     check(walletCreation2, json2)
   }
 
-  it should "WalletCreation.Result" in {
+  it should "WalletCreationResult" in {
     val json                 = s"""{"walletName":"$walletName","mnemonic":"${mnemonic.toLongString}"}"""
-    val walletCreationResult = WalletCreation.Result(walletName, mnemonic)
+    val walletCreationResult = WalletCreationResult(walletName, mnemonic)
     check(walletCreationResult, json)
   }
 

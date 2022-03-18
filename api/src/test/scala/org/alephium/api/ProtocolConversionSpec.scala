@@ -44,17 +44,17 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   }
 
   it should "convert TxInput" in new Fixture {
-    checkData[Input.Asset, protocol.TxInput](
+    checkData[AssetInput, protocol.TxInput](
       txInput,
-      Input.Asset.fromProtocol,
+      AssetInput.fromProtocol,
       _.toProtocol().rightValue
     )
   }
 
-  it should "convert AssetOutput" in new Fixture {
-    checkData[Output.Asset, protocol.AssetOutput](
+  it should "convert FixedAssetOutput" in new Fixture {
+    checkData[FixedAssetOutput, protocol.AssetOutput](
       assetOutput,
-      out => Output.Asset.fromProtocol(out, hashGen.sample.get, 0),
+      out => FixedAssetOutput.fromProtocol(out, hashGen.sample.get, 0),
       _.toProtocol()
     )
   }
@@ -68,7 +68,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
 
     UnsignedTx
       .fromProtocol(unsignedTransaction)
-      .copy(hash = hashGen.sample.get)
+      .copy(txId = hashGen.sample.get)
       .toProtocol()
       .leftValue is "Invalid hash"
   }

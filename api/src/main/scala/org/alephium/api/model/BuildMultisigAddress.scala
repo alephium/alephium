@@ -26,6 +26,4 @@ final case class BuildMultisigAddress(
     mrequired: Int
 )
 
-object BuildMultisigAddress {
-  final case class Result(address: Address)
-}
+final case class BuildMultisigAddressResult(address: Address)

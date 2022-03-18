@@ -20,6 +20,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
 trait ApiModelFixture
@@ -52,12 +53,12 @@ trait ApiModelFixture
   val assetOutput = TxOutput.asset(
     ALPH.oneAlph,
     AVector.empty,
-    scriptPair.lockup
+    LockupScript.p2pkh(Hash.zero)
   )
 
   val contractOutput = TxOutput.contract(
     ALPH.oneAlph,
-    p2cLockupGen(GroupIndex.unsafe(0)).sample.get
+    LockupScript.p2c(Hash.zero)
   )
 
   val unsignedTransaction = UnsignedTransaction(

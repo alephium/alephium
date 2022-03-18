@@ -24,7 +24,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.api.model.{AssetOutput => _, TransactionTemplate => _, _}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -325,7 +325,7 @@ class ServerUtils(implicit
       _ <- checkTxChainIndex(chainIndex, txId)
       status <- blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
         case Some(status) => convert(status)
-        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else NotFound
+        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else TxNotFound
       }
     } yield status
   }
@@ -667,11 +667,11 @@ class ServerUtils(implicit
   def buildMultisigAddress(
       keys: AVector[PublicKey],
       mrequired: Int
-  ): Either[String, BuildMultisigAddress.Result] = {
+  ): Either[String, BuildMultisigAddressResult] = {
     LockupScript.p2mpkh(keys, mrequired) match {
       case Some(lockupScript) =>
         Right(
-          BuildMultisigAddress.Result(
+          BuildMultisigAddressResult(
             Address.Asset(lockupScript)
           )
         )
@@ -772,8 +772,8 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
     values.fold(AVector.ofSize[vm.Val](values.length)) {
-      case (acc, value: Val.Simple) => acc :+ value.toVmVal
-      case (acc, value: Val.Array)  => acc ++ toVmVal(value.value)
+      case (acc, value: Val.Simple)   => acc :+ value.toVmVal
+      case (acc, value: Val.ValArray) => acc ++ toVmVal(value.value)
     }
   }
 
@@ -894,7 +894,7 @@ class ServerUtils(implicit
       contract,
       contract.hash,
       state.fields.map(Val.from),
-      ContractState.Asset.from(contractOutput)
+      AssetState.from(contractOutput)
     )
     wrapResult(result)
   }
@@ -989,7 +989,7 @@ class ServerUtils(implicit
       contractId: ContractId,
       code: StatefulContract,
       initialState: AVector[vm.Val],
-      asset: ContractState.Asset
+      asset: AssetState
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
     val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)

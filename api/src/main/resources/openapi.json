@@ -169,7 +169,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result1"
+                  "$ref": "#/components/schemas/WalletRestoreResult"
                 },
                 "example": {
                   "walletName": "wallet-super-name"
@@ -295,7 +295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result"
+                  "$ref": "#/components/schemas/WalletCreationResult"
                 },
                 "example": {
                   "walletName": "wallet-super-name",
@@ -932,7 +932,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result2"
+                  "$ref": "#/components/schemas/RevealMnemonicResult"
                 },
                 "example": {
                   "mnemonic": "vault alarm sad mass witness property virus style good flower rice alpha viable evidence run glare pretty scout evil judge enroll refuse another lava"
@@ -1080,7 +1080,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result3"
+                  "$ref": "#/components/schemas/TransferResult"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -1209,7 +1209,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Results"
+                  "$ref": "#/components/schemas/TransferResults"
                 },
                 "example": {
                   "results": [
@@ -1342,7 +1342,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Results"
+                  "$ref": "#/components/schemas/TransferResults"
                 },
                 "example": {
                   "results": [
@@ -1460,7 +1460,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result4"
+                  "$ref": "#/components/schemas/SignResult"
                 },
                 "example": {
                   "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
@@ -3263,14 +3263,13 @@
                         "transactions": [
                           {
                             "unsigned": {
-                              "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                               "version": 1,
                               "networkId": 1,
                               "gasAmount": 20000,
                               "gasPrice": "100000000000",
                               "inputs": [
                                 {
-                                  "type": "AssetInput",
                                   "outputRef": {
                                     "hint": 23412,
                                     "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -3278,9 +3277,8 @@
                                   "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                                 }
                               ],
-                              "outputs": [
+                              "fixedOutputs": [
                                 {
-                                  "type": "AssetOutput",
                                   "hint": 1,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                                   "alphAmount": "2000000000000000000",
@@ -3471,14 +3469,13 @@
                   "transactions": [
                     {
                       "unsigned": {
-                        "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                         "version": 1,
                         "networkId": 1,
                         "gasAmount": 20000,
                         "gasPrice": "100000000000",
                         "inputs": [
                           {
-                            "type": "AssetInput",
                             "outputRef": {
                               "hint": 23412,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -3486,9 +3483,8 @@
                             "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                           }
                         ],
-                        "outputs": [
+                        "fixedOutputs": [
                           {
-                            "type": "AssetOutput",
                             "hint": 1,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                             "alphAmount": "2000000000000000000",
@@ -4479,14 +4475,13 @@
                     "unconfirmedTransactions": [
                       {
                         "unsigned": {
-                          "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                           "version": 1,
                           "networkId": 1,
                           "gasAmount": 20000,
                           "gasPrice": "100000000000",
                           "inputs": [
                             {
-                              "type": "AssetInput",
                               "outputRef": {
                                 "hint": 23412,
                                 "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -4494,9 +4489,8 @@
                               "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                             }
                           ],
-                          "outputs": [
+                          "fixedOutputs": [
                             {
-                              "type": "AssetOutput",
                               "hint": 1,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                               "alphAmount": "2000000000000000000",
@@ -5010,14 +5004,13 @@
                   "$ref": "#/components/schemas/UnsignedTx"
                 },
                 "example": {
-                  "hash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "version": 1,
                   "networkId": 1,
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "inputs": [
                     {
-                      "type": "AssetInput",
                       "outputRef": {
                         "hint": 23412,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
@@ -5025,9 +5018,8 @@
                       "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                     }
                   ],
-                  "outputs": [
+                  "fixedOutputs": [
                     {
-                      "type": "AssetOutput",
                       "hint": 1,
                       "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "alphAmount": "2000000000000000000",
@@ -5179,7 +5171,7 @@
                   "Example2": {
                     "summary": "Cannot find tx with the id",
                     "value": {
-                      "type": "not-found"
+                      "type": "tx-not-found"
                     }
                   }
                 }
@@ -5541,7 +5533,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Contract1"
+                "$ref": "#/components/schemas/Contract"
               },
               "example": {
                 "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
@@ -6188,7 +6180,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Result5"
+                  "$ref": "#/components/schemas/BuildMultisigAddressResult"
                 },
                 "example": {
                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
@@ -7493,25 +7485,7 @@
           }
         }
       },
-      "Array": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "Asset": {
+      "AssetInput": {
         "required": [
           "outputRef",
           "unlockScript"
@@ -7526,7 +7500,7 @@
           }
         }
       },
-      "Asset1": {
+      "AssetOutput": {
         "required": [
           "hint",
           "key",
@@ -7534,7 +7508,8 @@
           "address",
           "tokens",
           "lockTime",
-          "additionalData"
+          "additionalData",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -7563,10 +7538,13 @@
           },
           "additionalData": {
             "type": "string"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
-      "Asset2": {
+      "AssetState": {
         "required": [
           "alphAmount",
           "tokens"
@@ -7954,6 +7932,17 @@
           }
         }
       },
+      "BuildMultisigAddressResult": {
+        "required": [
+          "address"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          }
+        }
+      },
       "BuildScriptTx": {
         "required": [
           "fromPublicKey",
@@ -8179,18 +8168,18 @@
             "type": "string"
           },
           "fields": {
-            "$ref": "#/components/schemas/Fields"
+            "$ref": "#/components/schemas/FieldsSig"
           },
           "functions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Function"
+              "$ref": "#/components/schemas/FunctionSig"
             }
           },
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/EventSig"
             }
           }
         }
@@ -8228,6 +8217,17 @@
       },
       "Contract": {
         "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "ContractOutput": {
+        "required": [
           "hint",
           "key",
           "alphAmount",
@@ -8261,17 +8261,6 @@
           }
         }
       },
-      "Contract1": {
-        "required": [
-          "code"
-        ],
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          }
-        }
-      },
       "ContractState": {
         "required": [
           "address",
@@ -8298,7 +8287,7 @@
             }
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/AssetState"
           }
         }
       },
@@ -8354,28 +8343,6 @@
       },
       "Event": {
         "required": [
-          "name",
-          "signature",
-          "fieldTypes"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "signature": {
-            "type": "string"
-          },
-          "fieldTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "Event1": {
-        "required": [
           "blockHash",
           "contractAddress",
           "txId",
@@ -8404,6 +8371,28 @@
           }
         }
       },
+      "EventSig": {
+        "required": [
+          "name",
+          "signature",
+          "fieldTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "fieldTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Events": {
         "required": [
           "chainFrom",
@@ -8421,7 +8410,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event1"
+              "$ref": "#/components/schemas/Event"
             }
           }
         }
@@ -8443,7 +8432,7 @@
           }
         }
       },
-      "Fields": {
+      "FieldsSig": {
         "required": [
           "signature",
           "types"
@@ -8461,7 +8450,47 @@
           }
         }
       },
-      "Function": {
+      "FixedAssetOutput": {
+        "required": [
+          "hint",
+          "key",
+          "alphAmount",
+          "address",
+          "tokens",
+          "lockTime",
+          "additionalData"
+        ],
+        "type": "object",
+        "properties": {
+          "hint": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "lockTime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "additionalData": {
+            "type": "string"
+          }
+        }
+      },
+      "FunctionSig": {
         "required": [
           "name",
           "signature",
@@ -8541,7 +8570,7 @@
             "type": "string"
           },
           "asset": {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/AssetState"
           }
         }
       },
@@ -8676,24 +8705,13 @@
           }
         }
       },
-      "NotFound1": {
-        "required": [
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "Output": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Asset1"
+            "$ref": "#/components/schemas/AssetOutput"
           },
           {
-            "$ref": "#/components/schemas/Contract"
+            "$ref": "#/components/schemas/ContractOutput"
           }
         ],
         "discriminator": {
@@ -8818,98 +8836,6 @@
           }
         }
       },
-      "Result": {
-        "required": [
-          "walletName",
-          "mnemonic"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          },
-          "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "Result1": {
-        "required": [
-          "walletName"
-        ],
-        "type": "object",
-        "properties": {
-          "walletName": {
-            "type": "string"
-          }
-        }
-      },
-      "Result2": {
-        "required": [
-          "mnemonic"
-        ],
-        "type": "object",
-        "properties": {
-          "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "Result3": {
-        "required": [
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "txId": {
-            "type": "string"
-          },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
-            "type": "integer"
-          }
-        }
-      },
-      "Result4": {
-        "required": [
-          "signature"
-        ],
-        "type": "object",
-        "properties": {
-          "signature": {
-            "type": "string"
-          }
-        }
-      },
-      "Result5": {
-        "required": [
-          "address"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string"
-          }
-        }
-      },
-      "Results": {
-        "required": [
-          "results"
-        ],
-        "type": "object",
-        "properties": {
-          "results": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Result3"
-            }
-          }
-        }
-      },
       "RevealMnemonic": {
         "required": [
           "password"
@@ -8917,6 +8843,17 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RevealMnemonicResult": {
+        "required": [
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "mnemonic": {
             "type": "string"
           }
         }
@@ -8992,6 +8929,17 @@
         "type": "object",
         "properties": {
           "data": {
+            "type": "string"
+          }
+        }
+      },
+      "SignResult": {
+        "required": [
+          "signature"
+        ],
+        "type": "object",
+        "properties": {
+          "signature": {
             "type": "string"
           }
         }
@@ -9102,7 +9050,7 @@
             }
           },
           "initialAsset": {
-            "$ref": "#/components/schemas/Asset2"
+            "$ref": "#/components/schemas/AssetState"
           },
           "testMethodIndex": {
             "type": "integer"
@@ -9161,7 +9109,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event1"
+              "$ref": "#/components/schemas/Event"
             }
           }
         }
@@ -9274,6 +9222,50 @@
           }
         }
       },
+      "TransferResult": {
+        "required": [
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string"
+          },
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
+            "type": "integer"
+          }
+        }
+      },
+      "TransferResults": {
+        "required": [
+          "results"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferResult"
+            }
+          }
+        }
+      },
+      "TxNotFound": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "TxResult": {
         "required": [
           "txId",
@@ -9302,7 +9294,7 @@
             "$ref": "#/components/schemas/MemPooled"
           },
           {
-            "$ref": "#/components/schemas/NotFound1"
+            "$ref": "#/components/schemas/TxNotFound"
           }
         ],
         "discriminator": {
@@ -9445,17 +9437,17 @@
       },
       "UnsignedTx": {
         "required": [
-          "hash",
+          "txId",
           "version",
           "networkId",
           "gasAmount",
           "gasPrice",
           "inputs",
-          "outputs"
+          "fixedOutputs"
         ],
         "type": "object",
         "properties": {
-          "hash": {
+          "txId": {
             "type": "string"
           },
           "version": {
@@ -9477,13 +9469,13 @@
           "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset"
+              "$ref": "#/components/schemas/AssetInput"
             }
           },
-          "outputs": {
+          "fixedOutputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Asset1"
+              "$ref": "#/components/schemas/FixedAssetOutput"
             }
           }
         }
@@ -9492,9 +9484,6 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/Address"
-          },
-          {
-            "$ref": "#/components/schemas/Array"
           },
           {
             "$ref": "#/components/schemas/Bool"
@@ -9507,10 +9496,31 @@
           },
           {
             "$ref": "#/components/schemas/U256"
+          },
+          {
+            "$ref": "#/components/schemas/ValArray"
           }
         ],
         "discriminator": {
           "propertyName": "type"
+        }
+      },
+      "ValArray": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
         }
       },
       "VerifySignature": {
@@ -9556,6 +9566,21 @@
           }
         }
       },
+      "WalletCreationResult": {
+        "required": [
+          "walletName",
+          "mnemonic"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
+            "type": "string"
+          },
+          "mnemonic": {
+            "type": "string"
+          }
+        }
+      },
       "WalletDeletion": {
         "required": [
           "password"
@@ -9588,6 +9613,17 @@
             "type": "boolean"
           },
           "mnemonicPassphrase": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletRestoreResult": {
+        "required": [
+          "walletName"
+        ],
+        "type": "object",
+        "properties": {
+          "walletName": {
             "type": "string"
           }
         }

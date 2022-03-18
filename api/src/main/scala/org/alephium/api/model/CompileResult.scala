@@ -27,9 +27,9 @@ import org.alephium.util.AVector
 final case class CompileResult(
     bytecode: ByteString,
     codeHash: Hash,
-    fields: CompileResult.Fields,
-    functions: AVector[CompileResult.Function],
-    events: AVector[CompileResult.Event]
+    fields: CompileResult.FieldsSig,
+    functions: AVector[CompileResult.FunctionSig],
+    events: AVector[CompileResult.EventSig]
 )
 
 object CompileResult {
@@ -38,27 +38,28 @@ object CompileResult {
       contract: T,
       contractAst: Ast.ContractWithState
   ): CompileResult = {
-    val fields = Fields(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
+    val fields =
+      FieldsSig(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
     CompileResult(
       bytecode = serialize(contract),
       codeHash = contract.hash,
       fields = fields,
-      functions = AVector.from(contractAst.funcs.view.map(Function.from)),
-      events = AVector.from(contractAst.events.map(Event.from))
+      functions = AVector.from(contractAst.funcs.view.map(FunctionSig.from)),
+      events = AVector.from(contractAst.events.map(EventSig.from))
     )
   }
 
-  final case class Fields(signature: String, types: AVector[String])
+  final case class FieldsSig(signature: String, types: AVector[String])
 
-  final case class Function(
+  final case class FunctionSig(
       name: String,
       signature: String,
       argTypes: AVector[String],
       returnTypes: AVector[String]
   )
-  object Function {
-    def from(func: Ast.FuncDef[StatefulContext]): Function = {
-      Function(
+  object FunctionSig {
+    def from(func: Ast.FuncDef[StatefulContext]): FunctionSig = {
+      FunctionSig(
         func.id.name,
         func.signature,
         AVector.from(func.getArgTypeSignatures()),
@@ -67,10 +68,10 @@ object CompileResult {
     }
   }
 
-  final case class Event(name: String, signature: String, fieldTypes: AVector[String])
-  object Event {
-    def from(event: Ast.EventDef): Event = {
-      Event(event.name, event.signature, AVector.from(event.getFieldTypeSignatures()))
+  final case class EventSig(name: String, signature: String, fieldTypes: AVector[String])
+  object EventSig {
+    def from(event: Ast.EventDef): EventSig = {
+      EventSig(event.name, event.signature, AVector.from(event.getFieldTypeSignatures()))
     }
   }
 }

@@ -64,7 +64,7 @@ object Val {
   }
 
   @upickle.implicits.key("Array")
-  final case class Array(value: util.AVector[Val]) extends Val
+  final case class ValArray(value: util.AVector[Val]) extends Val
 
   val True: Bool  = Bool(true)
   val False: Bool = Bool(false)

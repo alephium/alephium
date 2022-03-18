@@ -30,13 +30,10 @@ final case class Transfer(
     utxosLimit: Option[Int] = None
 )
 
-object Transfer {
-  final case class Result(txId: Hash, fromGroup: GroupIndex, toGroup: GroupIndex)
-  final case class Results(results: AVector[Result])
-
-  object Results {
-    def from(input: AVector[(Hash, GroupIndex, GroupIndex)]): Results = {
-      Results(input.map((Result.apply _).tupled))
-    }
+final case class TransferResult(txId: Hash, fromGroup: GroupIndex, toGroup: GroupIndex)
+final case class TransferResults(results: AVector[TransferResult])
+object TransferResults {
+  def from(input: AVector[(Hash, GroupIndex, GroupIndex)]): TransferResults = {
+    TransferResults(input.map((TransferResult.apply _).tupled))
   }
 }
