@@ -20,8 +20,9 @@ import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.serde.deserialize
-import org.alephium.util.{AVector, Bytes, I256}
+import org.alephium.util.{AVector, Bytes}
 
 // scalastyle:off number.of.methods
 abstract class Frame[Ctx <: StatelessContext] {
@@ -271,9 +272,6 @@ final class StatefulFrame(
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit] = {
-    //scalastyle:off magic.number
-    val createContractEventIndex: Val = Val.I256(I256.from(-1))
-    //scalastyle:on magic.number
     for {
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
@@ -283,9 +281,6 @@ final class StatefulFrame(
   }
 
   def destroyContract(address: LockupScript): ExeResult[Unit] = {
-    //scalastyle:off magic.number
-    val destroyContractEventIndex: Val = Val.I256(I256.from(-2))
-    //scalastyle:on magic.number
     for {
       contractId   <- obj.getContractId()
       callerFrame  <- getCallerFrame()

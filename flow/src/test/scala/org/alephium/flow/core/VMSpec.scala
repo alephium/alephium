@@ -1064,19 +1064,20 @@ class VMSpec extends AlephiumSpec {
     def contractRaw: String
     def callingScriptRaw: String
 
-    lazy val contract     = Compiler.compileContract(contractRaw).rightValue
-    lazy val initialState = AVector[Val](Val.U256.unsafe(10))
-    lazy val chainIndex   = ChainIndex.unsafe(0, 0)
-    lazy val fromLockup   = getGenesisLockupScript(chainIndex)
+    lazy val contract       = Compiler.compileContract(contractRaw).rightValue
+    lazy val initialState   = AVector[Val](Val.U256.unsafe(10))
+    lazy val chainIndex     = ChainIndex.unsafe(0, 0)
+    lazy val fromLockup     = getGenesisLockupScript(chainIndex)
+    lazy val genesisAddress = Address.Asset(fromLockup)
     lazy val contractCreationScript =
       contractCreation(contract, initialState, fromLockup, ALPH.alph(1))
-    lazy val contractCreationBlock =
+    lazy val createContractBlock =
       payableCall(blockFlow, chainIndex, contractCreationScript)
     lazy val contractOutputRef =
-      TxOutputRef.unsafe(contractCreationBlock.transactions.head, 0).asInstanceOf[ContractOutputRef]
+      TxOutputRef.unsafe(createContractBlock.transactions.head, 0).asInstanceOf[ContractOutputRef]
     lazy val contractId = contractOutputRef.key
 
-    addAndCheck(blockFlow, contractCreationBlock, 1)
+    addAndCheck(blockFlow, createContractBlock, 1)
     checkState(blockFlow, chainIndex, contractId, initialState, contractOutputRef)
 
     val callingScript = Compiler.compileTxScript(callingScriptRaw, 1).rightValue
@@ -1097,6 +1098,10 @@ class VMSpec extends AlephiumSpec {
          |    result = result + a
          |    emit Added()
          |    return result
+         |  }
+         |
+         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    destroySelf!(targetAddress)
          |  }
          |}
          |""".stripMargin
@@ -1141,20 +1146,51 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Events emitted from the contract creation block")
+      info("Events emitted from the create contract block")
 
       val logStatesOpt =
-        getLogStates(blockFlow, chainIndex.from, contractCreationBlock.hash, contractId)
+        getLogStates(blockFlow, chainIndex.from, createContractBlock.hash, contractId)
       val logStates = logStatesOpt.value
 
-      logStates.blockHash is contractCreationBlock.hash
+      logStates.blockHash is createContractBlock.hash
       logStates.contractId is contractId
       logStates.states.length is 1
 
-      val contractCreationLogState = logStates.states(0)
-      contractCreationLogState.txId is contractCreationBlock.nonCoinbase.head.id
-      contractCreationLogState.index is -1.toByte
-      contractCreationLogState.fields.length is 0
+      val createContractLogState = logStates.states(0)
+      createContractLogState.txId is createContractBlock.nonCoinbase.head.id
+      createContractLogState.index is -1.toByte
+      createContractLogState.fields.length is 0
+    }
+
+    {
+      info("Events emitted from the destroy contract block")
+      def destroyScriptRaw: String =
+        s"""
+           |$contractRaw
+           |
+           |TxScript Main {
+           |  pub payable fn main() -> () {
+           |    Foo(#${contractId.toHexString}).destroy(@${genesisAddress.toBase58})
+           |  }
+           |}
+           |""".stripMargin
+
+      val destroyScript        = Compiler.compileTxScript(destroyScriptRaw, 1).rightValue
+      val destroyContractBlock = payableCall(blockFlow, chainIndex, destroyScript)
+      addAndCheck(blockFlow, destroyContractBlock, 3)
+
+      val logStatesOpt =
+        getLogStates(blockFlow, chainIndex.from, destroyContractBlock.hash, contractId)
+      val logStates = logStatesOpt.value
+
+      logStates.blockHash is destroyContractBlock.hash
+      logStates.contractId is contractId
+      logStates.states.length is 1
+
+      val destroyContractLogState = logStates.states(0)
+      destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
+      destroyContractLogState.index is -2.toByte
+      destroyContractLogState.fields.length is 0
     }
 
     {
