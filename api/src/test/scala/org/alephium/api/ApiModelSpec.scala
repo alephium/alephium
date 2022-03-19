@@ -628,7 +628,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val buildContract = BuildContractDeployScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
-      initialFields = AVector(Val.True, Val.U256(U256.unsafe(123))),
+      initialFields = AVector(Val.True, ValU256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
@@ -743,11 +743,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode ContractState" in {
-    val u256     = Val.U256(U256.MaxValue)
-    val i256     = Val.I256(I256.MaxValue)
+    val u256     = ValU256(U256.MaxValue)
+    val i256     = ValI256(I256.MaxValue)
     val bool     = Val.True
-    val byteVec  = Val.ByteVec(U256.MaxValue.toBytes)
-    val address1 = Val.Address(generateContractAddress())
+    val byteVec  = ValByteVec(U256.MaxValue.toBytes)
+    val address1 = ValAddress(generateContractAddress())
     val state = ContractState(
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,

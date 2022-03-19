@@ -354,12 +354,12 @@ trait ApiModelCodec {
     }
   )
 
-  implicit val valBoolRW: RW[Val.Bool]       = macroRW
-  implicit val valU256RW: RW[Val.U256]       = macroRW
-  implicit val valI256RW: RW[Val.I256]       = macroRW
-  implicit val valAddressRW: RW[Val.Address] = macroRW
-  implicit val valByteVecRW: RW[Val.ByteVec] = macroRW
-  implicit val valArrayRW: RW[Val.ValArray]  = macroRW
+  implicit val valBoolRW: RW[ValBool]       = macroRW
+  implicit val valU256RW: RW[ValU256]       = macroRW
+  implicit val valI256RW: RW[ValI256]       = macroRW
+  implicit val valAddressRW: RW[ValAddress] = macroRW
+  implicit val valByteVecRW: RW[ValByteVec] = macroRW
+  implicit val valArrayRW: RW[ValArray]     = macroRW
   implicit val valRW: RW[Val] = RW.merge(
     valBoolRW,
     valU256RW,
