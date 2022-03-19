@@ -45,7 +45,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
@@ -111,6 +111,10 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         )
       )
     )
+  }
+
+  val getChainParamsLogic = serverLogic(getChainParams) { _ =>
+    fetchChainParams()
   }
 
   val getSelfCliqueLogic = serverLogic(getSelfClique) { _ =>
@@ -599,6 +603,19 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
+  def fetchChainParams(): FutureTry[ChainParams] = {
+    Future.successful(
+      Right(
+        ChainParams(
+          networkConfig.networkId,
+          consenseConfig.numZerosAtLeastInHash,
+          brokerConfig.groupNumPerBroker,
+          brokerConfig.groups
+        )
+      )
+    )
+  }
+
   def fetchSelfClique(): FutureTry[SelfClique] = {
     for {
       selfReady <- node.cliqueManager.ask(CliqueManager.IsSelfCliqueReady).mapTo[Boolean]
@@ -615,7 +632,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     } yield {
       val selfClique = EndpointsLogic.selfCliqueFrom(
         cliqueInfo,
-        node.config.consensus,
         selfReady = selfReady,
         synced = synced
       )
@@ -666,21 +682,16 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 object EndpointsLogic {
   def selfCliqueFrom(
       cliqueInfo: IntraCliqueInfo,
-      consensus: ConsensusSetting,
       selfReady: Boolean,
       synced: Boolean
-  )(implicit brokerConfig: BrokerConfig, networkConfig: NetworkConfig): SelfClique = {
+  ): SelfClique = {
     SelfClique(
       cliqueInfo.id,
-      networkConfig.networkId,
-      consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
       ),
       selfReady = selfReady,
-      synced = synced,
-      groupNumPerBroker = cliqueInfo.groupNumPerBroker,
-      brokerConfig.groups
+      synced = synced
     )
   }
 

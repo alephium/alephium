@@ -241,17 +241,23 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val getBlockHeaderEntryExample: List[Example[BlockHeaderEntry]] =
     simpleExample(blockHeaderEntry)
 
+  implicit val chainParamsExamples: List[Example[ChainParams]] =
+    simpleExample(
+      ChainParams(
+        networkId,
+        numZerosAtLeastInHash = 18,
+        groupNumPerBroker = 1,
+        groups = 2
+      )
+    )
+
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(
       SelfClique(
         cliqueId,
-        networkId,
-        numZerosAtLeastInHash = 18,
         peers,
         selfReady = true,
-        synced = true,
-        groupNumPerBroker = 1,
-        groups = 2
+        synced = true
       )
     )
 

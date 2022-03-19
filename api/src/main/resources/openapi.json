@@ -2302,8 +2302,6 @@
                 },
                 "example": {
                   "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "networkId": 0,
-                  "numZerosAtLeastInHash": 18,
                   "nodes": [
                     {
                       "address": "1.2.3.4",
@@ -2313,9 +2311,7 @@
                     }
                   ],
                   "selfReady": true,
-                  "synced": true,
-                  "groupNumPerBroker": 1,
-                  "groups": 2
+                  "synced": true
                 }
               }
             }
@@ -8812,24 +8808,14 @@
       "SelfClique": {
         "required": [
           "cliqueId",
-          "networkId",
-          "numZerosAtLeastInHash",
           "nodes",
           "selfReady",
-          "synced",
-          "groupNumPerBroker",
-          "groups"
+          "synced"
         ],
         "type": "object",
         "properties": {
           "cliqueId": {
             "type": "string"
-          },
-          "networkId": {
-            "type": "integer"
-          },
-          "numZerosAtLeastInHash": {
-            "type": "integer"
           },
           "nodes": {
             "type": "array",
@@ -8842,12 +8828,6 @@
           },
           "synced": {
             "type": "boolean"
-          },
-          "groupNumPerBroker": {
-            "type": "integer"
-          },
-          "groups": {
-            "type": "integer"
           }
         }
       },

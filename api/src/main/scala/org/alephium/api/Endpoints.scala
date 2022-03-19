@@ -115,6 +115,12 @@ trait Endpoints
       .out(jsonBody[NodeInfo])
       .summary("Get info about that node")
 
+  val getChainParams: BaseEndpoint[Unit, ChainParams] =
+    infosEndpoint.get
+      .in("chain-params")
+      .out(jsonBody[ChainParams])
+      .summary("Get key params about your blockchain")
+
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
     infosEndpoint.get
       .in("self-clique")

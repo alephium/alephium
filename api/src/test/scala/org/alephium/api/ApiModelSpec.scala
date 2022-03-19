@@ -153,23 +153,32 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(nodeInfo, jsonRaw)
   }
 
+  it should "encode/decode ChainParams" in {
+    val chainParams = ChainParams(NetworkId.AlephiumMainNet, 18, 1, 2)
+    val jsonRaw =
+      s"""
+         |{
+         |  "networkId": 0,
+         |  "numZerosAtLeastInHash": 18,
+         |  "groupNumPerBroker": 1,
+         |  "groups": 2
+         |}""".stripMargin
+    checkData(chainParams, jsonRaw)
+  }
+
   it should "encode/decode SelfClique" in {
     val cliqueId = CliqueId.generate
     val peerAddress =
       PeerAddress(inetAddress, 9001, 9002, 9003)
     val selfClique =
-      SelfClique(cliqueId, NetworkId.AlephiumMainNet, 18, AVector(peerAddress), true, false, 1, 2)
+      SelfClique(cliqueId, AVector(peerAddress), true, false)
     val jsonRaw =
       s"""
          |{
          |  "cliqueId": "${cliqueId.toHexString}",
-         |  "networkId": 0,
-         |  "numZerosAtLeastInHash": 18,
          |  "nodes": [{"address":"127.0.0.1","restPort":9001,"wsPort":9002,"minerApiPort":9003}],
          |  "selfReady": true,
-         |  "synced": false,
-         |  "groupNumPerBroker": 1,
-         |  "groups": 2
+         |  "synced": false
          |}""".stripMargin
     checkData(selfClique, jsonRaw)
   }

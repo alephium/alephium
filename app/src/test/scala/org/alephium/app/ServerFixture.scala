@@ -63,7 +63,7 @@ trait ServerFixture
   )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique =
-    EndpointsLogic.selfCliqueFrom(dummyIntraCliqueInfo, config.consensus, true, true)
+    EndpointsLogic.selfCliqueFrom(dummyIntraCliqueInfo, true, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
   lazy val dummyBalance         = Balance.from(Amount.Zero, Amount.Zero, 0)

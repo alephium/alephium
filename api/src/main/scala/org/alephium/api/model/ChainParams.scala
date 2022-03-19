@@ -16,16 +16,11 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{CliqueId, GroupIndex}
-import org.alephium.util.AVector
+import org.alephium.protocol.model.NetworkId
 
-final case class SelfClique(
-    cliqueId: CliqueId,
-    nodes: AVector[PeerAddress],
-    selfReady: Boolean,
-    synced: Boolean
-) {
-  def brokerNum: Int = nodes.length
-
-  def peer(groupIndex: GroupIndex): PeerAddress = nodes(groupIndex.value % brokerNum)
-}
+final case class ChainParams(
+    networkId: NetworkId,
+    numZerosAtLeastInHash: Int,
+    groupNumPerBroker: Int,
+    groups: Int
+)

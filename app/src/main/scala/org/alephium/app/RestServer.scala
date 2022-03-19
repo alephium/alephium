@@ -65,6 +65,7 @@ class RestServer(
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(
       getNodeInfoLogic,
+      getChainParamsLogic,
       getSelfCliqueLogic,
       getInterCliquePeerInfoLogic,
       getDiscoveredNeighborsLogic,
