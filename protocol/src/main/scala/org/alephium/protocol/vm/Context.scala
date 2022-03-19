@@ -173,7 +173,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       initialBalances: BalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit] = {
+  ): ExeResult[Hash] = {
     val contractId = TxOutputRef.key(txId, nextOutputIndex)
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
@@ -190,7 +190,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
-    } yield ()
+    } yield contractId
   }
 
   def destroyContract(

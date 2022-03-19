@@ -1141,10 +1141,28 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
+      info("Events emitted from the contract creation block")
+
+      val logStatesOpt =
+        getLogStates(blockFlow, chainIndex.from, contractCreationBlock.hash, contractId)
+      val logStates = logStatesOpt.value
+
+      logStates.blockHash is contractCreationBlock.hash
+      logStates.contractId is contractId
+      logStates.states.length is 1
+
+      val contractCreationLogState = logStates.states(0)
+      contractCreationLogState.txId is contractCreationBlock.nonCoinbase.head.id
+      contractCreationLogState.index is -1.toByte
+      contractCreationLogState.fields.length is 0
+    }
+
+    {
       info("Events emitted from the contract does not exist in the block")
 
+      val wrongBlockId = BlockHash.generate
       val logStatesOpt1 =
-        getLogStates(blockFlow, chainIndex.from, contractCreationBlock.hash, contractId)
+        getLogStates(blockFlow, chainIndex.from, wrongBlockId, contractId)
       logStatesOpt1 is None
 
       val wrongContractId = Hash.generate
