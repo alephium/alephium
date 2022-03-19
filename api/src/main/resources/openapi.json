@@ -7395,21 +7395,6 @@
   },
   "components": {
     "schemas": {
-      "Address": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "AddressBalance": {
         "required": [
           "address",
@@ -7763,21 +7748,6 @@
           }
         }
       },
-      "Bool": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "boolean"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "BrokerInfo": {
         "required": [
           "cliqueId",
@@ -8111,21 +8081,6 @@
           },
           "toGroup": {
             "type": "integer"
-          }
-        }
-      },
-      "ByteVec": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
           }
         }
       },
@@ -8541,21 +8496,6 @@
             "items": {
               "type": "string"
             }
-          }
-        }
-      },
-      "I256": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
           }
         }
       },
@@ -9301,22 +9241,6 @@
           "propertyName": "type"
         }
       },
-      "U256": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "UTXO": {
         "required": [
           "ref",
@@ -9483,26 +9407,41 @@
       "Val": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Address"
-          },
-          {
-            "$ref": "#/components/schemas/Bool"
-          },
-          {
-            "$ref": "#/components/schemas/ByteVec"
-          },
-          {
-            "$ref": "#/components/schemas/I256"
-          },
-          {
-            "$ref": "#/components/schemas/U256"
+            "$ref": "#/components/schemas/ValAddress"
           },
           {
             "$ref": "#/components/schemas/ValArray"
+          },
+          {
+            "$ref": "#/components/schemas/ValBool"
+          },
+          {
+            "$ref": "#/components/schemas/ValByteVec"
+          },
+          {
+            "$ref": "#/components/schemas/ValI256"
+          },
+          {
+            "$ref": "#/components/schemas/ValU256"
           }
         ],
         "discriminator": {
           "propertyName": "type"
+        }
+      },
+      "ValAddress": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
         }
       },
       "ValArray": {
@@ -9517,6 +9456,67 @@
             "items": {
               "$ref": "#/components/schemas/Val"
             }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValBool": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValByteVec": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValI256": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValU256": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uint256"
           },
           "type": {
             "type": "string"
