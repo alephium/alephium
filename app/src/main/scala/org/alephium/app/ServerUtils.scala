@@ -772,8 +772,8 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
     values.fold(AVector.ofSize[vm.Val](values.length)) {
-      case (acc, value: Val.Simple)   => acc :+ value.toVmVal
-      case (acc, value: Val.ValArray) => acc ++ toVmVal(value.value)
+      case (acc, value: Val.Primitive) => acc :+ value.toVmVal
+      case (acc, value: Val.ValArray)  => acc ++ toVmVal(value.value)
     }
   }
 

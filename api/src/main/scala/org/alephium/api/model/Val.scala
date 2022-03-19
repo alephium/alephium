@@ -25,7 +25,7 @@ import org.alephium.util
 sealed trait Val
 
 object Val {
-  sealed trait Simple extends Val {
+  sealed trait Primitive extends Val {
     def toVmVal: vm.Val
   }
 
@@ -39,27 +39,27 @@ object Val {
   }
 
   @upickle.implicits.key("Bool")
-  final case class Bool(value: Boolean) extends Simple {
+  final case class Bool(value: Boolean) extends Primitive {
     override def toVmVal: vm.Val = vm.Val.Bool(value)
   }
 
   @upickle.implicits.key("I256")
-  final case class I256(value: util.I256) extends Simple {
+  final case class I256(value: util.I256) extends Primitive {
     override def toVmVal: vm.Val = vm.Val.I256(value)
   }
 
   @upickle.implicits.key("U256")
-  final case class U256(value: util.U256) extends Simple {
+  final case class U256(value: util.U256) extends Primitive {
     override def toVmVal: vm.Val = vm.Val.U256(value)
   }
 
   @upickle.implicits.key("ByteVec")
-  final case class ByteVec(value: ByteString) extends Simple {
+  final case class ByteVec(value: ByteString) extends Primitive {
     override def toVmVal: vm.Val = vm.Val.ByteVec(value)
   }
 
   @upickle.implicits.key("Address")
-  final case class Address(value: model.Address) extends Simple {
+  final case class Address(value: model.Address) extends Primitive {
     override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
   }
 
