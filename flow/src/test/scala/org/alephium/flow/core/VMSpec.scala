@@ -1149,17 +1149,18 @@ class VMSpec extends AlephiumSpec {
       info("Events emitted from the create contract block")
 
       val logStatesOpt =
-        getLogStates(blockFlow, chainIndex.from, createContractBlock.hash, contractId)
+        getLogStates(blockFlow, chainIndex.from, createContractBlock.hash, ContractId.zero)
       val logStates = logStatesOpt.value
 
       logStates.blockHash is createContractBlock.hash
-      logStates.contractId is contractId
+      logStates.contractId is ContractId.zero
       logStates.states.length is 1
 
       val createContractLogState = logStates.states(0)
       createContractLogState.txId is createContractBlock.nonCoinbase.head.id
       createContractLogState.index is -1.toByte
-      createContractLogState.fields.length is 0
+      createContractLogState.fields.length is 1
+      createContractLogState.fields(0) is Val.Address(LockupScript.p2c(contractId))
     }
 
     {
@@ -1180,17 +1181,18 @@ class VMSpec extends AlephiumSpec {
       addAndCheck(blockFlow, destroyContractBlock, 3)
 
       val logStatesOpt =
-        getLogStates(blockFlow, chainIndex.from, destroyContractBlock.hash, contractId)
+        getLogStates(blockFlow, chainIndex.from, destroyContractBlock.hash, ContractId.zero)
       val logStates = logStatesOpt.value
 
       logStates.blockHash is destroyContractBlock.hash
-      logStates.contractId is contractId
+      logStates.contractId is ContractId.zero
       logStates.states.length is 1
 
       val destroyContractLogState = logStates.states(0)
       destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
       destroyContractLogState.index is -2.toByte
-      destroyContractLogState.fields.length is 0
+      destroyContractLogState.fields.length is 1
+      destroyContractLogState.fields(0) is Val.Address(LockupScript.p2c(contractId))
     }
 
     {

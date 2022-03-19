@@ -273,10 +273,17 @@ final class StatefulFrame(
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit] = {
     for {
-      balanceState <- getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      contractId   <- ctx.createContract(code, balances, fields, tokenAmount)
-      _            <- ctx.writeLog(Some(contractId), AVector(createContractEventIndex))
+      balanceState      <- getBalanceState()
+      balances          <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      createdContractId <- ctx.createContract(code, balances, fields, tokenAmount)
+      callerContractId = obj.contractIdOpt.getOrElse(ContractId.zero)
+      _ <- ctx.writeLog(
+        Some(callerContractId),
+        AVector(
+          createContractEventIndex,
+          Val.Address(LockupScript.p2c(createdContractId))
+        )
+      )
     } yield ()
   }
 
@@ -290,7 +297,11 @@ final class StatefulFrame(
         .useAll(LockupScript.p2c(contractId))
         .toRight(Right(InvalidBalances))
       _ <- ctx.destroyContract(contractId, contractAssets, address)
-      _ <- ctx.writeLog(Some(contractId), AVector(destroyContractEventIndex))
+      callerContractId = callerFrame.obj.contractIdOpt.getOrElse(ContractId.zero)
+      _ <- ctx.writeLog(
+        Some(callerContractId),
+        AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId)))
+      )
       _ <- runReturn()
     } yield {
       pc -= 1 // because of the `advancePC` call following this instruction
