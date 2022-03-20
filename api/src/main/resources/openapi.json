@@ -6061,6 +6061,7 @@
                   ],
                   "events": [
                     {
+                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7021,6 +7022,7 @@
                   "chainTo": 1,
                   "events": [
                     {
+                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7159,6 +7161,7 @@
                     "chainTo": 1,
                     "events": [
                       {
+                        "type": "ContractEvent",
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7302,6 +7305,7 @@
                     "chainTo": 1,
                     "events": [
                       {
+                        "type": "ContractEvent",
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -8226,6 +8230,40 @@
           }
         }
       },
+      "ContractEvent": {
+        "required": [
+          "blockHash",
+          "contractAddress",
+          "txId",
+          "eventIndex",
+          "fields",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "blockHash": {
+            "type": "string"
+          },
+          "contractAddress": {
+            "type": "string"
+          },
+          "txId": {
+            "type": "string"
+          },
+          "eventIndex": {
+            "type": "integer"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "ContractOutput": {
         "required": [
           "hint",
@@ -8342,33 +8380,16 @@
         }
       },
       "Event": {
-        "required": [
-          "blockHash",
-          "contractAddress",
-          "txId",
-          "eventIndex",
-          "fields"
-        ],
-        "type": "object",
-        "properties": {
-          "blockHash": {
-            "type": "string"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ContractEvent"
           },
-          "contractAddress": {
-            "type": "string"
-          },
-          "txId": {
-            "type": "string"
-          },
-          "eventIndex": {
-            "type": "integer"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
+          {
+            "$ref": "#/components/schemas/TransactionEvent"
           }
+        ],
+        "discriminator": {
+          "propertyName": "type"
         }
       },
       "EventSig": {
@@ -9170,6 +9191,36 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "TransactionEvent": {
+        "required": [
+          "blockHash",
+          "txId",
+          "eventIndex",
+          "fields",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "blockHash": {
+            "type": "string"
+          },
+          "txId": {
+            "type": "string"
+          },
+          "eventIndex": {
+            "type": "integer"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },

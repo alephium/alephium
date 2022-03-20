@@ -27,26 +27,51 @@ final case class Events(
     events: AVector[Event]
 )
 
-final case class Event(
+sealed trait Event {
+  def blockHash: BlockHash
+  def txId: Hash
+  def eventIndex: Int
+  def fields: AVector[Val]
+}
+
+@upickle.implicits.key("ContractEvent")
+final case class ContractEvent(
     blockHash: BlockHash,
     contractAddress: Address.Contract,
     txId: Hash,
     eventIndex: Int,
     fields: AVector[Val]
-) {
+) extends Event {
   def contractId: ContractId = contractAddress.contractId
 }
+
+@upickle.implicits.key("TransactionEvent")
+final case class TransactionEvent(
+    blockHash: BlockHash,
+    txId: Hash,
+    eventIndex: Int,
+    fields: AVector[Val]
+) extends Event
 
 object Events {
   def from(logStates: LogStates): AVector[Event] = {
     logStates.states.map { logState =>
-      Event(
-        logStates.blockHash,
-        Address.contract(logStates.contractId),
-        logState.txId,
-        logState.index.toInt,
-        logState.fields.map(Val.from)
-      )
+      if (logStates.eventKey == logState.txId) {
+        TransactionEvent(
+          logStates.blockHash,
+          logState.txId,
+          logState.index.toInt,
+          logState.fields.map(Val.from)
+        )
+      } else {
+        ContractEvent(
+          logStates.blockHash,
+          Address.contract(logStates.eventKey),
+          logState.txId,
+          logState.index.toInt,
+          logState.fields.map(Val.from)
+        )
+      }
     }
   }
 

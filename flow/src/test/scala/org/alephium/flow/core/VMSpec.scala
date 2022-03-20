@@ -1129,7 +1129,7 @@ class VMSpec extends AlephiumSpec {
       val logStates    = logStatesOpt.value
 
       logStates.blockHash is callingBlock.hash
-      logStates.contractId is contractId
+      logStates.eventKey is contractId
       logStates.states.length is 2
 
       val addingLogState = logStates.states(0)
@@ -1154,7 +1154,7 @@ class VMSpec extends AlephiumSpec {
       val logStates = logStatesOpt.value
 
       logStates.blockHash is createContractBlock.hash
-      logStates.contractId is createContractTxId
+      logStates.eventKey is createContractTxId
       logStates.states.length is 1
 
       val createContractLogState = logStates.states(0)
@@ -1187,7 +1187,7 @@ class VMSpec extends AlephiumSpec {
       val logStates = logStatesOpt.value
 
       logStates.blockHash is destroyContractBlock.hash
-      logStates.contractId is destroyContractTxId
+      logStates.eventKey is destroyContractTxId
       logStates.states.length is 1
 
       val destroyContractLogState = logStates.states(0)
@@ -1265,7 +1265,7 @@ class VMSpec extends AlephiumSpec {
     val logStates    = logStatesOpt.value
 
     logStates.blockHash is callingBlock.hash
-    logStates.contractId is contractId
+    logStates.eventKey is contractId
     logStates.states.length is 2
 
     val testEventLogState1 = logStates.states(0)

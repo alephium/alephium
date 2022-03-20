@@ -434,7 +434,7 @@ object WorldState {
           case Some(logStates) =>
             logState.put(id, logStates.copy(states = logStates.states :+ state))
           case None =>
-            logState.put(id, LogStates(id.blockHash, id.contractId, AVector(state)))
+            logState.put(id, LogStates(id.blockHash, id.eventKey, AVector(state)))
         }
       } yield ()
     }

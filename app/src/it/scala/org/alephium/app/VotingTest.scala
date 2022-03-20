@@ -40,7 +40,7 @@ class VotingTest extends AlephiumActorSpec {
       val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
 
       allEvents.length is 1
-      val votingStartedEvent = allEvents.head
+      val votingStartedEvent = allEvents.head.asInstanceOf[ContractEvent]
       votingStartedEvent.eventIndex is 0
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
@@ -78,7 +78,7 @@ class VotingTest extends AlephiumActorSpec {
       val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
 
       allEvents.length is 1
-      val votingStartedEvent = allEvents.head
+      val votingStartedEvent = allEvents.head.asInstanceOf[ContractEvent]
       votingStartedEvent.eventIndex is 2
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
