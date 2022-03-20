@@ -749,7 +749,7 @@ abstract class RestServerSpec(
     val blockHash  = block.hash.toHexString
     val chainIndex = block.chainIndex
 
-    Get(s"/events/in-block?block=$blockHash&contractAddress=$dummyContractAddress") check {
+    Get(s"/events/contract/in-block?block=$blockHash&contractAddress=$dummyContractAddress") check {
       response =>
         response.code is StatusCode.Ok
         val events = response.body.rightValue
@@ -793,7 +793,7 @@ abstract class RestServerSpec(
     val fromTs = (now - Duration.ofMinutes(10).get).get
     val toTs   = (now - Duration.ofMinutes(3).get).get
 
-    val urlBase = s"/events/within-time-interval?contractAddress=$dummyContractAddress"
+    val urlBase = s"/events/contract/within-time-interval?contractAddress=$dummyContractAddress"
 
     info("with valid fromTs and toTs")
     Get(s"$urlBase&fromTs=${fromTs.millis}&toTs=${toTs.millis}").check(validResponse)
@@ -850,6 +850,50 @@ abstract class RestServerSpec(
         |}]
         |""".stripMargin.filterNot(_.isWhitespace)
       }
+    }
+  }
+
+  it should "get events for a TxScript from a given block" in {
+    val block = blockGen
+      .map(_.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get))
+      .retryUntil(_.chainIndex.isIntraGroup)
+      .sample
+      .get
+    val blockHash  = block.hash.toHexString
+    val chainIndex = block.chainIndex
+    val txId       = "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+
+    Get(s"/events/tx-script?block=$blockHash&txId=${txId}") check { response =>
+      response.code is StatusCode.Ok
+      val events = response.body.rightValue
+      events is s"""
+        |{
+        |  "chainFrom": ${chainIndex.from.value},
+        |  "chainTo": ${chainIndex.to.value},
+        |  "events": [
+        |    {
+        |      "type": "TxScriptEvent",
+        |      "blockHash": "$blockHash",
+        |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+        |      "eventIndex": 0,
+        |      "fields": [
+        |        {
+        |          "type": "U256",
+        |          "value": "4"
+        |        },
+        |        {
+        |          "type": "Address",
+        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+        |        },
+        |        {
+        |          "type": "Address",
+        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+        |        }
+        |      ]
+        |    }
+        |  ]
+        |}
+        |""".stripMargin.filterNot(_.isWhitespace)
     }
   }
 }

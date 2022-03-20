@@ -45,8 +45,8 @@ final case class ContractEvent(
   def contractId: ContractId = contractAddress.contractId
 }
 
-@upickle.implicits.key("TransactionEvent")
-final case class TransactionEvent(
+@upickle.implicits.key("TxScriptEvent")
+final case class TxScriptEvent(
     blockHash: BlockHash,
     txId: Hash,
     eventIndex: Int,
@@ -57,7 +57,7 @@ object Events {
   def from(logStates: LogStates): AVector[Event] = {
     logStates.states.map { logState =>
       if (logStates.eventKey == logState.txId) {
-        TransactionEvent(
+        TxScriptEvent(
           logStates.blockHash,
           logState.txId,
           logState.index.toInt,
