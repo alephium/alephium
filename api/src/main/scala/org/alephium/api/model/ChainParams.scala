@@ -16,17 +16,11 @@
 
 package org.alephium.api.model
 
-import java.net.InetSocketAddress
+import org.alephium.protocol.model.NetworkId
 
-final case class NodeInfo(
-    buildInfo: NodeInfo.BuildInfo,
-    upnp: Boolean,
-    externalAddress: Option[InetSocketAddress]
+final case class ChainParams(
+    networkId: NetworkId,
+    numZerosAtLeastInHash: Int,
+    groupNumPerBroker: Int,
+    groups: Int
 )
-
-object NodeInfo {
-  final case class BuildInfo(
-      releaseVersion: String,
-      commit: String
-  )
-}

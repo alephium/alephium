@@ -488,10 +488,17 @@ object WalletAppSpec extends {
       complete(ctx, TxResult(Hash.generate, 0, 0))
     }
 
+    router.route().path("/infos/chain-params").handler { ctx =>
+      complete(
+        ctx,
+        ChainParams(NetworkId.AlephiumMainNet, 18, 1, 2)
+      )
+    }
+
     router.route().path("/infos/self-clique").handler { ctx =>
       complete(
         ctx,
-        SelfClique(cliqueId, NetworkId.AlephiumMainNet, 18, AVector(peer, peer), true, true, 1, 2)
+        SelfClique(cliqueId, AVector(peer, peer), true, true)
       )
     }
 

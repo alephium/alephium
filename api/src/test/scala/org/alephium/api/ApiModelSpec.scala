@@ -136,7 +136,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode NodeInfo" in {
     val nodeInfo =
       NodeInfo(
-        ReleaseVersion(0, 0, 0),
         NodeInfo.BuildInfo("1.2.3", "07b7f3e044"),
         true,
         Some(dummyAddress)
@@ -144,7 +143,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw = {
       s"""
          |{
-         |  "version": "v0.0.0",
          |  "buildInfo": { "releaseVersion": "1.2.3", "commit": "07b7f3e044" },
          |  "upnp": true,
          |  "externalAddress": { "addr": "127.0.0.1", "port": 9000 }
@@ -153,23 +151,42 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(nodeInfo, jsonRaw)
   }
 
+  it should "encode/decode NodeVersion" in {
+    val nodeVersion = NodeVersion(ReleaseVersion(0, 0, 0))
+    val jsonRaw =
+      s"""
+         |{
+         |  "version": "v0.0.0"
+         |}""".stripMargin
+    checkData(nodeVersion, jsonRaw)
+  }
+
+  it should "encode/decode ChainParams" in {
+    val chainParams = ChainParams(NetworkId.AlephiumMainNet, 18, 1, 2)
+    val jsonRaw =
+      s"""
+         |{
+         |  "networkId": 0,
+         |  "numZerosAtLeastInHash": 18,
+         |  "groupNumPerBroker": 1,
+         |  "groups": 2
+         |}""".stripMargin
+    checkData(chainParams, jsonRaw)
+  }
+
   it should "encode/decode SelfClique" in {
     val cliqueId = CliqueId.generate
     val peerAddress =
       PeerAddress(inetAddress, 9001, 9002, 9003)
     val selfClique =
-      SelfClique(cliqueId, NetworkId.AlephiumMainNet, 18, AVector(peerAddress), true, false, 1, 2)
+      SelfClique(cliqueId, AVector(peerAddress), true, false)
     val jsonRaw =
       s"""
          |{
          |  "cliqueId": "${cliqueId.toHexString}",
-         |  "networkId": 0,
-         |  "numZerosAtLeastInHash": 18,
          |  "nodes": [{"address":"127.0.0.1","restPort":9001,"wsPort":9002,"minerApiPort":9003}],
          |  "selfReady": true,
-         |  "synced": false,
-         |  "groupNumPerBroker": 1,
-         |  "groups": 2
+         |  "synced": false
          |}""".stripMargin
     checkData(selfClique, jsonRaw)
   }
@@ -628,7 +645,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val buildContract = BuildContractDeployScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
-      initialFields = AVector(Val.True, Val.U256(U256.unsafe(123))),
+      initialFields = AVector(Val.True, ValU256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
       gas = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
@@ -743,11 +760,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode ContractState" in {
-    val u256     = Val.U256(U256.MaxValue)
-    val i256     = Val.I256(I256.MaxValue)
+    val u256     = ValU256(U256.MaxValue)
+    val i256     = ValI256(I256.MaxValue)
     val bool     = Val.True
-    val byteVec  = Val.ByteVec(U256.MaxValue.toBytes)
-    val address1 = Val.Address(generateContractAddress())
+    val byteVec  = ValByteVec(U256.MaxValue.toBytes)
+    val address1 = ValAddress(generateContractAddress())
     val state = ContractState(
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,

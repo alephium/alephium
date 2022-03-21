@@ -611,30 +611,32 @@ abstract class RestServerSpec(
 
   it should "call GET /infos/node" in {
     val buildInfo = NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId)
-    minerProbe.setAutoPilot(new TestActor.AutoPilot {
-      var miningStarted: Boolean = false
-      def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
-        msg match {
-          case Miner.IsMining =>
-            sender ! miningStarted
-            TestActor.KeepRunning
-          case Miner.Start =>
-            miningStarted = true
-            TestActor.KeepRunning
-          case Miner.Stop =>
-            miningStarted = false
-            TestActor.KeepRunning
-        }
-
-    })
 
     Get(s"/infos/node") check { response =>
       response.code is StatusCode.Ok
       response.as[NodeInfo] is NodeInfo(
-        ReleaseVersion.current,
         buildInfo,
         networkConfig.upnp.enabled,
         networkConfig.externalAddressInferred
+      )
+    }
+  }
+
+  it should "call GET /infos/version" in {
+    Get(s"/infos/version") check { response =>
+      response.code is StatusCode.Ok
+      response.as[NodeVersion] is NodeVersion(ReleaseVersion.current)
+    }
+  }
+
+  it should "call GET /infos/chain-params" in {
+    Get(s"/infos/chain-params") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ChainParams] is ChainParams(
+        networkConfig.networkId,
+        consensusConfig.numZerosAtLeastInHash,
+        brokerConfig.groupNumPerBroker,
+        brokerConfig.groups
       )
     }
   }

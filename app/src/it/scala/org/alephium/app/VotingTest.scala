@@ -62,8 +62,8 @@ class VotingTest extends AlephiumActorSpec {
       }
 
       val returnedResult = allEvents.map { event =>
-        val voterAddress = event.fields(0).asInstanceOf[Val.Address]
-        val decision     = event.fields(1).asInstanceOf[Val.Bool]
+        val voterAddress = event.fields(0).asInstanceOf[ValAddress]
+        val decision     = event.fields(1).asInstanceOf[ValBool]
         (event.eventIndex, voterAddress.value.toBase58, decision.value)
       }
 
@@ -94,13 +94,13 @@ class VotingTest extends AlephiumActorSpec {
           getContractState(contractAddress.toBase58, activeAddressesGroup),
           restPort
         )
-      contractState.fields.get(0).get is Val.U256(U256.unsafe(nbYes))
-      contractState.fields.get(1).get is Val.U256(U256.unsafe(nbNo))
-      contractState.fields.get(2).get is Val.Bool(isClosed)
-      contractState.fields.get(3).get is Val.Bool(isInitialized)
-      contractState.fields.get(4).get is Val.Address(Address.fromBase58(admin.activeAddress).get)
+      contractState.fields.get(0).get is ValU256(U256.unsafe(nbYes))
+      contractState.fields.get(1).get is ValU256(U256.unsafe(nbNo))
+      contractState.fields.get(2).get is ValBool(isClosed)
+      contractState.fields.get(3).get is ValBool(isInitialized)
+      contractState.fields.get(4).get is ValAddress(Address.fromBase58(admin.activeAddress).get)
       contractState.fields.drop(5) is AVector.from[Val](
-        voters.map(v => Val.Address(Address.fromBase58(v.activeAddress).get))
+        voters.map(v => ValAddress(Address.fromBase58(v.activeAddress).get))
       )
     }
 
@@ -186,14 +186,14 @@ trait VotingFixture extends WalletFixture {
       """.stripMargin
     // scalastyle:on no.equal
     val votersList: AVector[Val] =
-      AVector.from(voters.map(wallet => Val.Address(Address.fromBase58(wallet.activeAddress).get)))
+      AVector.from(voters.map(wallet => ValAddress(Address.fromBase58(wallet.activeAddress).get)))
     voters.map(wallet => s"@${wallet.activeAddress}").mkString(",")
     val initialFields = AVector[Val](
-      Val.U256(U256.Zero),
-      Val.U256(U256.Zero),
+      ValU256(U256.Zero),
+      ValU256(U256.Zero),
       Val.False,
       Val.False,
-      Val.Address(Address.fromBase58(admin.activeAddress).get)
+      ValAddress(Address.fromBase58(admin.activeAddress).get)
     ) ++ votersList
     contract(admin, votingContract, Some(initialFields), Some(tokenAmount))
   }

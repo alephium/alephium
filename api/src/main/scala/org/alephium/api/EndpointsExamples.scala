@@ -191,7 +191,7 @@ trait EndpointsExamples extends ErrorExamples {
     Address.contract(txId),
     contractAddress.lockupScript.contractId,
     eventIndex = 1,
-    fields = AVector(Val.Address(address), Val.U256(U256.unsafe(10)))
+    fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
@@ -228,7 +228,6 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val nodeInfoExamples: List[Example[NodeInfo]] =
     simpleExample(
       NodeInfo(
-        model.ReleaseVersion(0, 0, 1),
         NodeInfo.BuildInfo(
           "1.2.3",
           "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
@@ -238,20 +237,33 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val nodeVersionExamples: List[Example[NodeVersion]] =
+    simpleExample(
+      NodeVersion(
+        model.ReleaseVersion(0, 0, 1)
+      )
+    )
+
   implicit val getBlockHeaderEntryExample: List[Example[BlockHeaderEntry]] =
     simpleExample(blockHeaderEntry)
+
+  implicit val chainParamsExamples: List[Example[ChainParams]] =
+    simpleExample(
+      ChainParams(
+        networkId,
+        numZerosAtLeastInHash = 18,
+        groupNumPerBroker = 1,
+        groups = 2
+      )
+    )
 
   implicit val selfCliqueExamples: List[Example[SelfClique]] =
     simpleExample(
       SelfClique(
         cliqueId,
-        networkId,
-        numZerosAtLeastInHash = 18,
         peers,
         selfReady = true,
-        synced = true,
-        groupNumPerBroker = 1,
-        groups = 2
+        synced = true
       )
     )
 
@@ -498,7 +510,7 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractDeployScriptTx(
         publicKey,
         byteString,
-        AVector(Val.True, Val.U256(U256.unsafe(123))),
+        AVector(Val.True, ValU256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
         Some(model.minimalGas),
@@ -555,7 +567,7 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(anotherContractId),
     bytecode = code,
     codeHash = code.hash,
-    fields = AVector[Val](Val.U256(ALPH.alph(2))),
+    fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
   implicit val testContractExamples: List[Example[TestContract]] = {
@@ -564,10 +576,10 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        initialFields = AVector[Val](Val.U256(ALPH.oneAlph)),
+        initialFields = AVector[Val](ValU256(ALPH.oneAlph)),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
-        testArgs = AVector[Val](Val.U256(ALPH.oneAlph)),
+        testArgs = AVector[Val](ValU256(ALPH.oneAlph)),
         existingContracts = Some(AVector(existingContract)),
         inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
       )
@@ -577,7 +589,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val testContractResultExamples: List[Example[TestContractResult]] =
     simpleExample(
       TestContractResult(
-        returns = AVector[Val](Val.U256(ALPH.oneAlph)),
+        returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
         txOutputs =
