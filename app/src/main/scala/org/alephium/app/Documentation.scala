@@ -30,6 +30,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
 
   private lazy val blockflowEndpoints = List(
     getNodeInfo,
+    getChainParams,
     getSelfClique,
     getInterCliquePeerInfo,
     getDiscoveredNeighbors,
