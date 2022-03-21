@@ -16,17 +16,6 @@
 
 package org.alephium.api.model
 
-import java.net.InetSocketAddress
+import org.alephium.protocol.model.ReleaseVersion
 
-final case class NodeInfo(
-    buildInfo: NodeInfo.BuildInfo,
-    upnp: Boolean,
-    externalAddress: Option[InetSocketAddress]
-)
-
-object NodeInfo {
-  final case class BuildInfo(
-      releaseVersion: String,
-      commit: String
-  )
-}
+final case class NodeVersion(version: ReleaseVersion)

@@ -115,6 +115,12 @@ trait Endpoints
       .out(jsonBody[NodeInfo])
       .summary("Get info about that node")
 
+  val getNodeVersion: BaseEndpoint[Unit, NodeVersion] =
+    infosEndpoint.get
+      .in("version")
+      .out(jsonBody[NodeVersion])
+      .summary("Get version about that node")
+
   val getChainParams: BaseEndpoint[Unit, ChainParams] =
     infosEndpoint.get
       .in("chain-params")

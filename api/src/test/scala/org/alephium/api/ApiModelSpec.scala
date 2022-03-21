@@ -136,7 +136,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode NodeInfo" in {
     val nodeInfo =
       NodeInfo(
-        ReleaseVersion(0, 0, 0),
         NodeInfo.BuildInfo("1.2.3", "07b7f3e044"),
         true,
         Some(dummyAddress)
@@ -144,13 +143,22 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw = {
       s"""
          |{
-         |  "version": "v0.0.0",
          |  "buildInfo": { "releaseVersion": "1.2.3", "commit": "07b7f3e044" },
          |  "upnp": true,
          |  "externalAddress": { "addr": "127.0.0.1", "port": 9000 }
          |}""".stripMargin
     }
     checkData(nodeInfo, jsonRaw)
+  }
+
+  it should "encode/decode NodeVersion" in {
+    val nodeVersion = NodeVersion(ReleaseVersion(0, 0, 0))
+    val jsonRaw =
+      s"""
+         |{
+         |  "version": "v0.0.0"
+         |}""".stripMargin
+    checkData(nodeVersion, jsonRaw)
   }
 
   it should "encode/decode ChainParams" in {

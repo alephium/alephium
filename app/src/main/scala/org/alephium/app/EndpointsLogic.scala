@@ -104,10 +104,19 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(
       Right(
         NodeInfo(
-          ReleaseVersion.current,
           NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId),
           networkConfig.upnp.enabled,
           networkConfig.externalAddressInferred
+        )
+      )
+    )
+  }
+
+  val getNodeVersionLogic = serverLogic(getNodeVersion) { _ =>
+    Future.successful(
+      Right(
+        NodeVersion(
+          ReleaseVersion.current
         )
       )
     )

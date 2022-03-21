@@ -204,6 +204,8 @@ trait ApiModelCodec {
 
   implicit val nodeInfoRW: RW[NodeInfo] = macroRW
 
+  implicit val nodeVersionRW: RW[NodeVersion] = macroRW
+
   implicit val buildInfoRW: RW[NodeInfo.BuildInfo] = macroRW
 
   implicit val chainParamsRW: RW[ChainParams] = macroRW
