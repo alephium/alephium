@@ -140,30 +140,29 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       contractId <- hashGen
     } yield (blockHash, txId, contractId)
 
-    forAll(Gen.listOf(logInputGen)) { logInputs =>
-      val storage = newDBStorage()
-      val worldState = WorldState
-        .emptyCached(
-          newDB(storage, RocksDBSource.ColumnFamily.All),
-          newDB(storage, RocksDBSource.ColumnFamily.Log)
-        )
-        .staging()
+    val storage = newDBStorage()
+    val worldState = WorldState
+      .emptyCached(
+        newDB(storage, RocksDBSource.ColumnFamily.All),
+        newDB(storage, RocksDBSource.ColumnFamily.Log)
+      )
+      .staging()
 
-      val logStates = logInputs.map { case (blockHash, txId, contractId) =>
-        worldState.writeLogForContract(
-          Some(blockHash),
-          txId,
-          contractId,
-          AVector(Val.I256(I256.unsafe(1))),
-          LogConfig(enabled = true, contractAddresses = None)
-        )
+    val logInputs = Gen.listOfN(10, logInputGen).sample.value
+    val logStates = logInputs.map { case (blockHash, txId, contractId) =>
+      worldState.writeLogForContract(
+        Some(blockHash),
+        txId,
+        contractId,
+        AVector(Val.I256(I256.unsafe(1))),
+        LogConfig(enabled = true, contractAddresses = None)
+      )
 
-        LogStates(blockHash, contractId, AVector(LogState(txId, 1, AVector.empty)))
-      }
-
-      val newLogs = worldState.logState.getNewLogs()
-      newLogs is AVector.from(logStates)
+      LogStates(blockHash, contractId, AVector(LogState(txId, 1, AVector.empty)))
     }
+
+    val newLogs = worldState.logState.getNewLogs()
+    newLogs is AVector.from(logStates)
   }
 
   trait StagingFixture {
