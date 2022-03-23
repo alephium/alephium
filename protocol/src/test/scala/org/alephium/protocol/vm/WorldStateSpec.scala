@@ -20,7 +20,7 @@ import org.scalacheck.Gen
 
 import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, U256}
+import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
   def generateAsset: Gen[(TxOutputRef, TxOutput)] = {
@@ -131,6 +131,38 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         newDB(storage, RocksDBSource.ColumnFamily.Log)
       )
     )
+  }
+
+  it should "maintain the order of the cached logs" in {
+    val logInputGen = for {
+      blockHash  <- blockHashGen
+      txId       <- hashGen
+      contractId <- hashGen
+    } yield (blockHash, txId, contractId)
+
+    val storage = newDBStorage()
+    val worldState = WorldState
+      .emptyCached(
+        newDB(storage, RocksDBSource.ColumnFamily.All),
+        newDB(storage, RocksDBSource.ColumnFamily.Log)
+      )
+      .staging()
+
+    val logInputs = Gen.listOfN(10, logInputGen).sample.value
+    val logStates = logInputs.map { case (blockHash, txId, contractId) =>
+      worldState.writeLogForContract(
+        Some(blockHash),
+        txId,
+        contractId,
+        AVector(Val.I256(I256.unsafe(1))),
+        LogConfig(enabled = true, contractAddresses = None)
+      )
+
+      LogStates(blockHash, contractId, AVector(LogState(txId, 1, AVector.empty)))
+    }
+
+    val newLogs = worldState.logState.getNewLogs()
+    newLogs is AVector.from(logStates)
   }
 
   trait StagingFixture {

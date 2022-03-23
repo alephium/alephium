@@ -17,16 +17,15 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.Val
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-final case class LogStatesId(blockHash: BlockHash, contractId: ContractId)
+final case class LogStatesId(blockHash: BlockHash, eventKey: Hash)
 
 object LogStatesId {
   implicit val serde: Serde[LogStatesId] =
-    Serde.forProduct2(LogStatesId.apply, id => (id.blockHash, id.contractId))
+    Serde.forProduct2(LogStatesId.apply, id => (id.blockHash, id.eventKey))
 }
 
 final case class LogState(
@@ -42,11 +41,11 @@ object LogState {
 
 final case class LogStates(
     blockHash: BlockHash,
-    contractId: ContractId,
+    eventKey: Hash,
     states: AVector[LogState]
 )
 
 object LogStates {
   implicit val serde: Serde[LogStates] =
-    Serde.forProduct3(LogStates.apply, s => (s.blockHash, s.contractId, s.states))
+    Serde.forProduct3(LogStates.apply, s => (s.blockHash, s.eventKey, s.states))
 }

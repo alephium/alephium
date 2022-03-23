@@ -186,7 +186,7 @@ trait EndpointsExamples extends ErrorExamples {
     deps = AVector(blockHash, blockHash)
   )
 
-  private val event = Event(
+  private val event = ContractEvent(
     blockHash,
     Address.contract(txId),
     contractAddress.lockupScript.contractId,

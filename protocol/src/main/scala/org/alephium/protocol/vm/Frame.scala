@@ -20,6 +20,7 @@ import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
 
@@ -272,9 +273,16 @@ final class StatefulFrame(
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit] = {
     for {
-      balanceState <- getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- ctx.createContract(code, balances, fields, tokenAmount)
+      balanceState      <- getBalanceState()
+      balances          <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      createdContractId <- ctx.createContract(code, balances, fields, tokenAmount)
+      _ <- ctx.writeLog(
+        obj.contractIdOpt,
+        AVector(
+          createContractEventIndex,
+          Val.Address(LockupScript.p2c(createdContractId))
+        )
+      )
     } yield ()
   }
 
@@ -288,6 +296,10 @@ final class StatefulFrame(
         .useAll(LockupScript.p2c(contractId))
         .toRight(Right(InvalidBalances))
       _ <- ctx.destroyContract(contractId, contractAssets, address)
+      _ <- ctx.writeLog(
+        callerFrame.obj.contractIdOpt,
+        AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId)))
+      )
       _ <- runReturn()
     } yield {
       pc -= 1 // because of the `advancePC` call following this instruction

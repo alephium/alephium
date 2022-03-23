@@ -17,15 +17,15 @@
 package org.alephium.flow.core
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{ChainIndex, ContractId}
+import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.model.ChainIndex
 import org.alephium.protocol.vm.LogStates
 import org.alephium.protocol.vm.LogStatesId
 
 trait LogUtils { Self: FlowUtils =>
-  def getEvents(blockHash: BlockHash, contractId: ContractId): IOResult[Option[LogStates]] = {
+  def getEvents(blockHash: BlockHash, eventKey: Hash): IOResult[Option[LogStates]] = {
     val chainIndex  = ChainIndex.from(blockHash)
-    val logStatesId = LogStatesId(blockHash, contractId)
+    val logStatesId = LogStatesId(blockHash, eventKey)
 
     for {
       worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)

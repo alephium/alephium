@@ -22,7 +22,7 @@ import org.alephium.io._
 
 final class CachedLogStates(
     val underlying: KeyValueStorage[LogStatesId, LogStates],
-    val caches: mutable.Map[LogStatesId, Cache[LogStates]]
+    val caches: mutable.LinkedHashMap[LogStatesId, Cache[LogStates]]
 ) extends CachedKV[LogStatesId, LogStates, Cache[LogStates]] {
   protected def getOptFromUnderlying(key: LogStatesId): IOResult[Option[LogStates]] = {
     underlying.getOpt(key).map { valueOpt =>
@@ -45,11 +45,11 @@ final class CachedLogStates(
       .map(_ => underlying)
   }
 
-  def staging(): StagingLogStates = new StagingLogStates(this, mutable.Map.empty)
+  def staging(): StagingLogStates = new StagingLogStates(this, mutable.LinkedHashMap.empty)
 }
 
 object CachedLogStates {
   def from(storage: KeyValueStorage[LogStatesId, LogStates]): CachedLogStates = {
-    new CachedLogStates(storage, mutable.Map.empty)
+    new CachedLogStates(storage, mutable.LinkedHashMap.empty)
   }
 }

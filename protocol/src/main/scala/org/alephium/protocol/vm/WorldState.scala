@@ -390,46 +390,61 @@ object WorldState {
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
 
-    def writeLog(
+    def writeLogForContract(
         blockHashOpt: Option[BlockHash],
         txId: Hash,
-        contractIdOpt: Option[ContractId],
+        contractId: ContractId,
         fields: AVector[Val],
         logConfig: LogConfig
     ): IOResult[Unit] = {
-      val indexOpt = fields.headOption.flatMap {
-        case Val.I256(i) => i.toByte
-        case _           => None
-      }
-      (blockHashOpt, contractIdOpt, indexOpt) match {
-        case (Some(blockHash), Some(contractId), Some(index)) =>
-          writeLog(blockHash, txId, contractId, index, fields.tail, logConfig)
+      (blockHashOpt, getIndex(fields)) match {
+        case (Some(blockHash), Some(index)) =>
+          if (logConfig.logContractEnabled(Address.contract(contractId))) {
+            val id    = LogStatesId(blockHash, contractId)
+            val state = LogState(txId, index, fields.tail)
+            writeLog(id, state)
+          } else {
+            Right(())
+          }
         case _ => Right(())
       }
     }
 
-    def writeLog(
-        blockHash: BlockHash,
+    def writeLogForTxScript(
+        blockHashOpt: Option[BlockHash],
         txId: Hash,
-        contractId: ContractId,
-        index: Byte,
-        fields: AVector[Val],
-        logConfig: LogConfig
+        fields: AVector[Val]
     ): IOResult[Unit] = {
-      if (logConfig.logContractEnabled(Address.contract(contractId))) {
-        val id    = LogStatesId(blockHash, contractId)
-        val state = LogState(txId, index, fields)
-        for {
-          logStatesOpt <- logState.getOpt(id)
-          _ <- logStatesOpt match {
-            case Some(logStates) =>
-              logState.put(id, logStates.copy(states = logStates.states :+ state))
-            case None =>
-              logState.put(id, LogStates(blockHash, contractId, AVector(state)))
-          }
-        } yield ()
-      } else {
-        Right(())
+      (blockHashOpt, getIndex(fields)) match {
+        case (Some(blockHash), Some(index)) =>
+          val id    = LogStatesId(blockHash, txId)
+          val state = LogState(txId, index, fields.tail)
+          writeLog(id, state)
+        case _ => Right(())
+      }
+    }
+
+    private[WorldState] def writeLog(
+        id: LogStatesId,
+        state: LogState
+    ): IOResult[Unit] = {
+      for {
+        logStatesOpt <- logState.getOpt(id)
+        _ <- logStatesOpt match {
+          case Some(logStates) =>
+            logState.put(id, logStates.copy(states = logStates.states :+ state))
+          case None =>
+            logState.put(id, LogStates(id.blockHash, id.eventKey, AVector(state)))
+        }
+      } yield ()
+    }
+
+    private[WorldState] def getIndex(
+        fields: AVector[Val]
+    ): Option[Byte] = {
+      fields.headOption.flatMap {
+        case Val.I256(i) => i.toByte
+        case _           => None
       }
     }
   }
