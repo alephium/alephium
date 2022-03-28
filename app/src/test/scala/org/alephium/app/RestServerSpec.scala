@@ -611,30 +611,32 @@ abstract class RestServerSpec(
 
   it should "call GET /infos/node" in {
     val buildInfo = NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId)
-    minerProbe.setAutoPilot(new TestActor.AutoPilot {
-      var miningStarted: Boolean = false
-      def run(sender: ActorRef, msg: Any): TestActor.AutoPilot =
-        msg match {
-          case Miner.IsMining =>
-            sender ! miningStarted
-            TestActor.KeepRunning
-          case Miner.Start =>
-            miningStarted = true
-            TestActor.KeepRunning
-          case Miner.Stop =>
-            miningStarted = false
-            TestActor.KeepRunning
-        }
-
-    })
 
     Get(s"/infos/node") check { response =>
       response.code is StatusCode.Ok
       response.as[NodeInfo] is NodeInfo(
-        ReleaseVersion.current,
         buildInfo,
         networkConfig.upnp.enabled,
         networkConfig.externalAddressInferred
+      )
+    }
+  }
+
+  it should "call GET /infos/version" in {
+    Get(s"/infos/version") check { response =>
+      response.code is StatusCode.Ok
+      response.as[NodeVersion] is NodeVersion(ReleaseVersion.current)
+    }
+  }
+
+  it should "call GET /infos/chain-params" in {
+    Get(s"/infos/chain-params") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ChainParams] is ChainParams(
+        networkConfig.networkId,
+        consensusConfig.numZerosAtLeastInHash,
+        brokerConfig.groupNumPerBroker,
+        brokerConfig.groups
       )
     }
   }
@@ -663,7 +665,7 @@ abstract class RestServerSpec(
   }
 
   it should "call POST /infos/misbehaviors" in {
-    val body = """{"type":"unban","peers":["123.123.123.123"]}"""
+    val body = """{"type":"Unban","peers":["123.123.123.123"]}"""
     Post(s"/infos/misbehaviors", body) check { response =>
       response.code is StatusCode.Ok
     }
@@ -749,7 +751,7 @@ abstract class RestServerSpec(
     val blockHash  = block.hash.toHexString
     val chainIndex = block.chainIndex
 
-    Get(s"/events/in-block?block=$blockHash&contractAddress=$dummyContractAddress") check {
+    Get(s"/events/contract/in-block?block=$blockHash&contractAddress=$dummyContractAddress") check {
       response =>
         response.code is StatusCode.Ok
         val events = response.body.rightValue
@@ -759,6 +761,7 @@ abstract class RestServerSpec(
         |  "chainTo": ${chainIndex.to.value},
         |  "events": [
         |    {
+        |      "type": "ContractEvent",
         |      "blockHash": "$blockHash",
         |      "contractAddress": "${dummyContractAddress}",
         |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -792,7 +795,7 @@ abstract class RestServerSpec(
     val fromTs = (now - Duration.ofMinutes(10).get).get
     val toTs   = (now - Duration.ofMinutes(3).get).get
 
-    val urlBase = s"/events/within-time-interval?contractAddress=$dummyContractAddress"
+    val urlBase = s"/events/contract/within-time-interval?contractAddress=$dummyContractAddress"
 
     info("with valid fromTs and toTs")
     Get(s"$urlBase&fromTs=${fromTs.millis}&toTs=${toTs.millis}").check(validResponse)
@@ -816,6 +819,7 @@ abstract class RestServerSpec(
         |  "chainTo": ${chainIndex.to.value},
         |  "events": [
         |    {
+        |      "type": "ContractEvent",
         |      "blockHash": "$blockHash",
         |      "contractAddress": "${dummyContractAddress}",
         |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -848,6 +852,50 @@ abstract class RestServerSpec(
         |}]
         |""".stripMargin.filterNot(_.isWhitespace)
       }
+    }
+  }
+
+  it should "get events for a TxScript from a given block" in {
+    val block = blockGen
+      .map(_.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get))
+      .retryUntil(_.chainIndex.isIntraGroup)
+      .sample
+      .get
+    val blockHash  = block.hash.toHexString
+    val chainIndex = block.chainIndex
+    val txId       = "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+
+    Get(s"/events/tx-script?block=$blockHash&txId=${txId}") check { response =>
+      response.code is StatusCode.Ok
+      val events = response.body.rightValue
+      events is s"""
+        |{
+        |  "chainFrom": ${chainIndex.from.value},
+        |  "chainTo": ${chainIndex.to.value},
+        |  "events": [
+        |    {
+        |      "type": "TxScriptEvent",
+        |      "blockHash": "$blockHash",
+        |      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+        |      "eventIndex": 0,
+        |      "fields": [
+        |        {
+        |          "type": "U256",
+        |          "value": "4"
+        |        },
+        |        {
+        |          "type": "Address",
+        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+        |        },
+        |        {
+        |          "type": "Address",
+        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+        |        }
+        |      ]
+        |    }
+        |  ]
+        |}
+        |""".stripMargin.filterNot(_.isWhitespace)
     }
   }
 }

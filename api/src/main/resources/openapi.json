@@ -2203,7 +2203,6 @@
                   "$ref": "#/components/schemas/NodeInfo"
                 },
                 "example": {
-                  "version": "v0.0.1",
                   "buildInfo": {
                     "releaseVersion": "1.2.3",
                     "commit": "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
@@ -2213,6 +2212,187 @@
                     "addr": "1.2.3.4",
                     "port": 12344
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/infos/version": {
+      "get": {
+        "tags": [
+          "Infos"
+        ],
+        "summary": "Get version about that node",
+        "operationId": "getInfosVersion",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeVersion"
+                },
+                "example": {
+                  "version": "v0.0.1"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/infos/chain-params": {
+      "get": {
+        "tags": [
+          "Infos"
+        ],
+        "summary": "Get key params about your blockchain",
+        "operationId": "getInfosChain-params",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainParams"
+                },
+                "example": {
+                  "networkId": 0,
+                  "numZerosAtLeastInHash": 18,
+                  "groupNumPerBroker": 1,
+                  "groups": 2
                 }
               }
             }
@@ -2302,8 +2482,6 @@
                 },
                 "example": {
                   "cliqueId": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                  "networkId": 0,
-                  "numZerosAtLeastInHash": 18,
                   "nodes": [
                     {
                       "address": "1.2.3.4",
@@ -2313,9 +2491,7 @@
                     }
                   ],
                   "selfReady": true,
-                  "synced": true,
-                  "groupNumPerBroker": 1,
-                  "groups": 2
+                  "synced": true
                 }
               }
             }
@@ -2612,7 +2788,7 @@
                   {
                     "peer": "1.2.3.4",
                     "status": {
-                      "type": "penalty",
+                      "type": "Penalty",
                       "value": 42
                     }
                   }
@@ -2704,7 +2880,7 @@
                 "Example0": {
                   "summary": "Unban",
                   "value": {
-                    "type": "unban",
+                    "type": "Unban",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -2713,7 +2889,7 @@
                 "Example1": {
                   "summary": "Ban",
                   "value": {
-                    "type": "ban",
+                    "type": "Ban",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -2906,7 +3082,7 @@
                 "Example0": {
                   "summary": "Set unreachable",
                   "value": {
-                    "type": "unreachable",
+                    "type": "Unreachable",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -2915,7 +3091,7 @@
                 "Example1": {
                   "summary": "Set reachable",
                   "value": {
-                    "type": "reachable",
+                    "type": "Reachable",
                     "peers": [
                       "1.2.3.4"
                     ]
@@ -5154,7 +5330,7 @@
                 "examples": {
                   "Example0": {
                     "value": {
-                      "type": "confirmed",
+                      "type": "Confirmed",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "txIndex": 0,
                       "chainConfirmations": 1,
@@ -5165,13 +5341,13 @@
                   "Example1": {
                     "summary": "Tx is still in mempool",
                     "value": {
-                      "type": "mem-pooled"
+                      "type": "MemPooled"
                     }
                   },
                   "Example2": {
                     "summary": "Cannot find tx with the id",
                     "value": {
-                      "type": "tx-not-found"
+                      "type": "TxNotFound"
                     }
                   }
                 }
@@ -6061,6 +6237,7 @@
                   ],
                   "events": [
                     {
+                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -6984,13 +7161,13 @@
         }
       }
     },
-    "/events/in-block": {
+    "/events/contract/in-block": {
       "get": {
         "tags": [
           "Events"
         ],
         "summary": "Get events for a contract within a block",
-        "operationId": "getEventsIn-block",
+        "operationId": "getEventsContractIn-block",
         "parameters": [
           {
             "name": "block",
@@ -7021,6 +7198,7 @@
                   "chainTo": 1,
                   "events": [
                     {
+                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7110,13 +7288,13 @@
         }
       }
     },
-    "/events/within-blocks": {
+    "/events/contract/within-blocks": {
       "get": {
         "tags": [
           "Events"
         ],
         "summary": "Get events for a contract within a range of blocks",
-        "operationId": "getEventsWithin-blocks",
+        "operationId": "getEventsContractWithin-blocks",
         "parameters": [
           {
             "name": "fromBlock",
@@ -7159,6 +7337,7 @@
                     "chainTo": 1,
                     "events": [
                       {
+                        "type": "ContractEvent",
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7249,13 +7428,13 @@
         }
       }
     },
-    "/events/within-time-interval": {
+    "/events/contract/within-time-interval": {
       "get": {
         "tags": [
           "Events"
         ],
         "summary": "Get events for a contract within a time interval",
-        "operationId": "getEventsWithin-time-interval",
+        "operationId": "getEventsContractWithin-time-interval",
         "parameters": [
           {
             "name": "fromTs",
@@ -7302,6 +7481,7 @@
                     "chainTo": 1,
                     "events": [
                       {
+                        "type": "ContractEvent",
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                         "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7391,25 +7571,137 @@
           }
         }
       }
+    },
+    "/events/tx-script": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get events for a TxScript",
+        "operationId": "getEventsTx-script",
+        "parameters": [
+          {
+            "name": "block",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "txId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Events"
+                },
+                "example": {
+                  "chainFrom": 0,
+                  "chainTo": 1,
+                  "events": [
+                    {
+                      "type": "ContractEvent",
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
+                      "eventIndex": 1,
+                      "fields": [
+                        {
+                          "type": "Address",
+                          "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                        },
+                        {
+                          "type": "U256",
+                          "value": "10"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
-      "Address": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "AddressBalance": {
         "required": [
           "address",
@@ -7763,21 +8055,6 @@
           }
         }
       },
-      "Bool": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "boolean"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "BrokerInfo": {
         "required": [
           "cliqueId",
@@ -8114,21 +8391,6 @@
           }
         }
       },
-      "ByteVec": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "ChainInfo": {
         "required": [
           "currentHeight"
@@ -8136,6 +8398,29 @@
         "type": "object",
         "properties": {
           "currentHeight": {
+            "type": "integer"
+          }
+        }
+      },
+      "ChainParams": {
+        "required": [
+          "networkId",
+          "numZerosAtLeastInHash",
+          "groupNumPerBroker",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "integer"
+          },
+          "numZerosAtLeastInHash": {
+            "type": "integer"
+          },
+          "groupNumPerBroker": {
+            "type": "integer"
+          },
+          "groups": {
             "type": "integer"
           }
         }
@@ -8222,6 +8507,40 @@
         "type": "object",
         "properties": {
           "code": {
+            "type": "string"
+          }
+        }
+      },
+      "ContractEvent": {
+        "required": [
+          "blockHash",
+          "contractAddress",
+          "txId",
+          "eventIndex",
+          "fields",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "blockHash": {
+            "type": "string"
+          },
+          "contractAddress": {
+            "type": "string"
+          },
+          "txId": {
+            "type": "string"
+          },
+          "eventIndex": {
+            "type": "integer"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
             "type": "string"
           }
         }
@@ -8342,33 +8661,16 @@
         }
       },
       "Event": {
-        "required": [
-          "blockHash",
-          "contractAddress",
-          "txId",
-          "eventIndex",
-          "fields"
-        ],
-        "type": "object",
-        "properties": {
-          "blockHash": {
-            "type": "string"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ContractEvent"
           },
-          "contractAddress": {
-            "type": "string"
-          },
-          "txId": {
-            "type": "string"
-          },
-          "eventIndex": {
-            "type": "integer"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
+          {
+            "$ref": "#/components/schemas/TxScriptEvent"
           }
+        ],
+        "discriminator": {
+          "propertyName": "type"
         }
       },
       "EventSig": {
@@ -8544,21 +8846,6 @@
           }
         }
       },
-      "I256": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "InputAsset": {
         "required": [
           "address",
@@ -8670,15 +8957,11 @@
       },
       "NodeInfo": {
         "required": [
-          "version",
           "buildInfo",
           "upnp"
         ],
         "type": "object",
         "properties": {
-          "version": {
-            "$ref": "#/components/schemas/ReleaseVersion"
-          },
           "buildInfo": {
             "$ref": "#/components/schemas/BuildInfo"
           },
@@ -8687,6 +8970,17 @@
           },
           "externalAddress": {
             "type": "string"
+          }
+        }
+      },
+      "NodeVersion": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ReleaseVersion"
           }
         }
       },
@@ -8872,24 +9166,14 @@
       "SelfClique": {
         "required": [
           "cliqueId",
-          "networkId",
-          "numZerosAtLeastInHash",
           "nodes",
           "selfReady",
-          "synced",
-          "groupNumPerBroker",
-          "groups"
+          "synced"
         ],
         "type": "object",
         "properties": {
           "cliqueId": {
             "type": "string"
-          },
-          "networkId": {
-            "type": "integer"
-          },
-          "numZerosAtLeastInHash": {
-            "type": "integer"
           },
           "nodes": {
             "type": "array",
@@ -8902,12 +9186,6 @@
           },
           "synced": {
             "type": "boolean"
-          },
-          "groupNumPerBroker": {
-            "type": "integer"
-          },
-          "groups": {
-            "type": "integer"
           }
         }
       },
@@ -9285,6 +9563,36 @@
           }
         }
       },
+      "TxScriptEvent": {
+        "required": [
+          "blockHash",
+          "txId",
+          "eventIndex",
+          "fields",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "blockHash": {
+            "type": "string"
+          },
+          "txId": {
+            "type": "string"
+          },
+          "eventIndex": {
+            "type": "integer"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "TxStatus": {
         "oneOf": [
           {
@@ -9299,22 +9607,6 @@
         ],
         "discriminator": {
           "propertyName": "type"
-        }
-      },
-      "U256": {
-        "required": [
-          "value",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "type": {
-            "type": "string"
-          }
         }
       },
       "UTXO": {
@@ -9483,26 +9775,41 @@
       "Val": {
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Address"
-          },
-          {
-            "$ref": "#/components/schemas/Bool"
-          },
-          {
-            "$ref": "#/components/schemas/ByteVec"
-          },
-          {
-            "$ref": "#/components/schemas/I256"
-          },
-          {
-            "$ref": "#/components/schemas/U256"
+            "$ref": "#/components/schemas/ValAddress"
           },
           {
             "$ref": "#/components/schemas/ValArray"
+          },
+          {
+            "$ref": "#/components/schemas/ValBool"
+          },
+          {
+            "$ref": "#/components/schemas/ValByteVec"
+          },
+          {
+            "$ref": "#/components/schemas/ValI256"
+          },
+          {
+            "$ref": "#/components/schemas/ValU256"
           }
         ],
         "discriminator": {
           "propertyName": "type"
+        }
+      },
+      "ValAddress": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
         }
       },
       "ValArray": {
@@ -9517,6 +9824,67 @@
             "items": {
               "$ref": "#/components/schemas/Val"
             }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValBool": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValByteVec": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValI256": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ValU256": {
+        "required": [
+          "value",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uint256"
           },
           "type": {
             "type": "string"

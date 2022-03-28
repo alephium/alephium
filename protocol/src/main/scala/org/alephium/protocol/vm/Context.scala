@@ -135,7 +135,8 @@ object StatelessContext {
       var gasRemaining: GasBox
   )(implicit val networkConfig: NetworkConfig)
       extends StatelessContext {
-    def getInitialBalances(): ExeResult[Balances]                                          = failed(ExpectNonPayableMethod)
+    def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
+
     def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = okay
   }
 }
@@ -177,7 +178,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       initialBalances: BalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit] = {
+  ): ExeResult[Hash] = {
     val contractId = TxOutputRef.key(txId, nextOutputIndex)
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
@@ -194,7 +195,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
-    } yield ()
+    } yield contractId
   }
 
   def destroyContract(
@@ -227,10 +228,15 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
-    worldState
-      .writeLog(blockEnv.blockId, txId, contractIdOpt, fields, logConfig)
-      .left
-      .map(e => Left(IOErrorWriteLog(e)))
+    val blockId = blockEnv.blockId
+    val result = contractIdOpt match {
+      case Some(contractId) =>
+        worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig)
+      case None =>
+        worldState.writeLogForTxScript(blockId, txId, fields)
+    }
+
+    result.left.map(e => Left(IOErrorWriteLog(e)))
   }
 }
 

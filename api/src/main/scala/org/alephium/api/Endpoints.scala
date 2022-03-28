@@ -109,11 +109,31 @@ trait Endpoints
       .in("events")
       .tag("Events")
 
+  private val contractEventsEndpoint: BaseEndpoint[Unit, Unit] =
+    eventsEndpoint
+      .in("contract")
+
+  private val txScriptEventsEndpoint: BaseEndpoint[Unit, Unit] =
+    eventsEndpoint
+      .in("tx-script")
+
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
       .in("node")
       .out(jsonBody[NodeInfo])
       .summary("Get info about that node")
+
+  val getNodeVersion: BaseEndpoint[Unit, NodeVersion] =
+    infosEndpoint.get
+      .in("version")
+      .out(jsonBody[NodeVersion])
+      .summary("Get version about that node")
+
+  val getChainParams: BaseEndpoint[Unit, ChainParams] =
+    infosEndpoint.get
+      .in("chain-params")
+      .out(jsonBody[ChainParams])
+      .summary("Get key params about your blockchain")
 
   val getSelfClique: BaseEndpoint[Unit, SelfClique] =
     infosEndpoint.get
@@ -408,7 +428,7 @@ trait Endpoints
       .summary("Check and repair the indexing of block hashes")
 
   val getContractEventsForBlock: BaseEndpoint[(BlockHash, Address.Contract), Events] =
-    eventsEndpoint.get
+    contractEventsEndpoint.get
       .in("in-block")
       .in(query[BlockHash]("block"))
       .in(query[Address.Contract]("contractAddress"))
@@ -417,7 +437,7 @@ trait Endpoints
 
   val getContractEventsWithinBlocks
       : BaseEndpoint[(BlockHash, Option[BlockHash], Address.Contract), AVector[Events]] =
-    eventsEndpoint.get
+    contractEventsEndpoint.get
       .in("within-blocks")
       .in(query[BlockHash]("fromBlock"))
       .in(query[Option[BlockHash]]("toBlock"))
@@ -427,12 +447,19 @@ trait Endpoints
 
   val getContractEventsWithinTimeInterval
       : BaseEndpoint[(TimeInterval, Address.Contract), AVector[Events]] =
-    eventsEndpoint.get
+    contractEventsEndpoint.get
       .in("within-time-interval")
       .in(timeIntervalQuery)
       .in(query[Address.Contract]("contractAddress"))
       .out(jsonBody[AVector[Events]])
       .summary("Get events for a contract within a time interval")
+
+  val getTxScriptEvents: BaseEndpoint[(BlockHash, Hash), Events] =
+    txScriptEventsEndpoint.get
+      .in(query[BlockHash]("block"))
+      .in(query[Hash]("txId"))
+      .out(jsonBody[Events])
+      .summary("Get events for a TxScript")
 }
 
 object Endpoints {

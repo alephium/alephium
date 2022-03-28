@@ -16,6 +16,8 @@
 
 package org.alephium.protocol
 
+import org.alephium.util.I256
+
 package object vm {
   type ExeResult[T] = Either[Either[IOFailure, ExeFailure], T]
 
@@ -27,4 +29,9 @@ package object vm {
   val frameStackMaxSize: Int    = 1024
   val contractPoolMaxSize: Int  = 16 // upto 16 contracts can be loaded in one tx
   val contractFieldMaxSize: Int = 512
+
+  //scalastyle:off magic.number
+  val createContractEventIndex: Val  = Val.I256(I256.from(-1))
+  val destroyContractEventIndex: Val = Val.I256(I256.from(-2))
+  //scalastyle:on magic.number
 }

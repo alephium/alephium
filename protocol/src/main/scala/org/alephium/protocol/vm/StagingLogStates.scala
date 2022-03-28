@@ -23,7 +23,7 @@ import org.alephium.util.AVector
 
 final class StagingLogStates(
     val underlying: CachedLogStates,
-    val caches: mutable.Map[LogStatesId, Modified[LogStates]]
+    val caches: mutable.LinkedHashMap[LogStatesId, Modified[LogStates]]
 ) extends StagingKV[LogStatesId, LogStates] {
   def getNewLogs(): AVector[LogStates] = {
     caches.foldLeft(AVector.empty[LogStates]) {

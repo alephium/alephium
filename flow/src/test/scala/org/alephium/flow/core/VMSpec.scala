@@ -1179,19 +1179,20 @@ class VMSpec extends AlephiumSpec {
     def contractRaw: String
     def callingScriptRaw: String
 
-    lazy val contract     = Compiler.compileContract(contractRaw).rightValue
-    lazy val initialState = AVector[Val](Val.U256.unsafe(10))
-    lazy val chainIndex   = ChainIndex.unsafe(0, 0)
-    lazy val fromLockup   = getGenesisLockupScript(chainIndex)
+    lazy val contract       = Compiler.compileContract(contractRaw).rightValue
+    lazy val initialState   = AVector[Val](Val.U256.unsafe(10))
+    lazy val chainIndex     = ChainIndex.unsafe(0, 0)
+    lazy val fromLockup     = getGenesisLockupScript(chainIndex)
+    lazy val genesisAddress = Address.Asset(fromLockup)
     lazy val contractCreationScript =
       contractCreation(contract, initialState, fromLockup, ALPH.alph(1))
-    lazy val contractCreationBlock =
+    lazy val createContractBlock =
       payableCall(blockFlow, chainIndex, contractCreationScript)
     lazy val contractOutputRef =
-      TxOutputRef.unsafe(contractCreationBlock.transactions.head, 0).asInstanceOf[ContractOutputRef]
+      TxOutputRef.unsafe(createContractBlock.transactions.head, 0).asInstanceOf[ContractOutputRef]
     lazy val contractId = contractOutputRef.key
 
-    addAndCheck(blockFlow, contractCreationBlock, 1)
+    addAndCheck(blockFlow, createContractBlock, 1)
     checkState(blockFlow, chainIndex, contractId, initialState, contractOutputRef)
 
     val callingScript = Compiler.compileTxScript(callingScriptRaw, 1).rightValue
@@ -1212,6 +1213,10 @@ class VMSpec extends AlephiumSpec {
          |    result = result + a
          |    emit Added()
          |    return result
+         |  }
+         |
+         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |    destroySelf!(targetAddress)
          |  }
          |}
          |""".stripMargin
@@ -1239,7 +1244,7 @@ class VMSpec extends AlephiumSpec {
       val logStates    = logStatesOpt.value
 
       logStates.blockHash is callingBlock.hash
-      logStates.contractId is contractId
+      logStates.eventKey is contractId
       logStates.states.length is 2
 
       val addingLogState = logStates.states(0)
@@ -1256,10 +1261,63 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
+      info("Events emitted from the create contract block")
+
+      val createContractTxId = createContractBlock.nonCoinbase.head.id
+      val logStatesOpt =
+        getLogStates(blockFlow, chainIndex.from, createContractBlock.hash, createContractTxId)
+      val logStates = logStatesOpt.value
+
+      logStates.blockHash is createContractBlock.hash
+      logStates.eventKey is createContractTxId
+      logStates.states.length is 1
+
+      val createContractLogState = logStates.states(0)
+      createContractLogState.txId is createContractBlock.nonCoinbase.head.id
+      createContractLogState.index is -1.toByte
+      createContractLogState.fields.length is 1
+      createContractLogState.fields(0) is Val.Address(LockupScript.p2c(contractId))
+    }
+
+    {
+      info("Events emitted from the destroy contract block")
+      def destroyScriptRaw: String =
+        s"""
+           |$contractRaw
+           |
+           |TxScript Main {
+           |  pub payable fn main() -> () {
+           |    Foo(#${contractId.toHexString}).destroy(@${genesisAddress.toBase58})
+           |  }
+           |}
+           |""".stripMargin
+
+      val destroyScript        = Compiler.compileTxScript(destroyScriptRaw, 1).rightValue
+      val destroyContractBlock = payableCall(blockFlow, chainIndex, destroyScript)
+      addAndCheck(blockFlow, destroyContractBlock, 3)
+
+      val destroyContractTxId = destroyContractBlock.nonCoinbase.head.id
+      val logStatesOpt =
+        getLogStates(blockFlow, chainIndex.from, destroyContractBlock.hash, destroyContractTxId)
+      val logStates = logStatesOpt.value
+
+      logStates.blockHash is destroyContractBlock.hash
+      logStates.eventKey is destroyContractTxId
+      logStates.states.length is 1
+
+      val destroyContractLogState = logStates.states(0)
+      destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
+      destroyContractLogState.index is -2.toByte
+      destroyContractLogState.fields.length is 1
+      destroyContractLogState.fields(0) is Val.Address(LockupScript.p2c(contractId))
+    }
+
+    {
       info("Events emitted from the contract does not exist in the block")
 
+      val wrongBlockId = BlockHash.generate
       val logStatesOpt1 =
-        getLogStates(blockFlow, chainIndex.from, contractCreationBlock.hash, contractId)
+        getLogStates(blockFlow, chainIndex.from, wrongBlockId, contractId)
       logStatesOpt1 is None
 
       val wrongContractId = Hash.generate
@@ -1322,7 +1380,7 @@ class VMSpec extends AlephiumSpec {
     val logStates    = logStatesOpt.value
 
     logStates.blockHash is callingBlock.hash
-    logStates.contractId is contractId
+    logStates.eventKey is contractId
     logStates.states.length is 2
 
     val testEventLogState1 = logStates.states(0)

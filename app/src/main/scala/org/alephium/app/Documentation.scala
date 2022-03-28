@@ -30,6 +30,8 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
 
   private lazy val blockflowEndpoints = List(
     getNodeInfo,
+    getNodeVersion,
+    getChainParams,
     getSelfClique,
     getInterCliquePeerInfo,
     getDiscoveredNeighbors,
@@ -70,7 +72,8 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     minerUpdateAddresses,
     getContractEventsForBlock,
     getContractEventsWithinBlocks,
-    getContractEventsWithinTimeInterval
+    getContractEventsWithinTimeInterval,
+    getTxScriptEvents
   )
 
   private lazy val servers = List(

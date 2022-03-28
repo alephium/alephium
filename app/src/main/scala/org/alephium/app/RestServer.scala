@@ -65,6 +65,8 @@ class RestServer(
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(
       getNodeInfoLogic,
+      getNodeVersionLogic,
+      getChainParamsLogic,
       getSelfCliqueLogic,
       getInterCliquePeerInfoLogic,
       getDiscoveredNeighborsLogic,
@@ -108,6 +110,7 @@ class RestServer(
       getContractEventsForBlockLogic,
       getContractEventsWithinBlocksLogic,
       getContractEventsWithinTimeIntervalLogic,
+      getTxScriptEventsLogic,
       metricsLogic
     ).map(route(_)) :+ swaggerUiRoute
 

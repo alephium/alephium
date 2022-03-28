@@ -14,22 +14,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.core
+package org.alephium.api.model
 
-import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.LogStates
-import org.alephium.protocol.vm.LogStatesId
+import org.alephium.protocol.model.ReleaseVersion
 
-trait LogUtils { Self: FlowUtils =>
-  def getEvents(blockHash: BlockHash, eventKey: Hash): IOResult[Option[LogStates]] = {
-    val chainIndex  = ChainIndex.from(blockHash)
-    val logStatesId = LogStatesId(blockHash, eventKey)
-
-    for {
-      worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      logStatesOpt <- worldState.logState.getOpt(logStatesId)
-    } yield logStatesOpt
-  }
-}
+final case class NodeVersion(version: ReleaseVersion)

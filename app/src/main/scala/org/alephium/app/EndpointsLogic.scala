@@ -45,7 +45,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
@@ -104,13 +104,26 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(
       Right(
         NodeInfo(
-          ReleaseVersion.current,
           NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId),
           networkConfig.upnp.enabled,
           networkConfig.externalAddressInferred
         )
       )
     )
+  }
+
+  val getNodeVersionLogic = serverLogic(getNodeVersion) { _ =>
+    Future.successful(
+      Right(
+        NodeVersion(
+          ReleaseVersion.current
+        )
+      )
+    )
+  }
+
+  val getChainParamsLogic = serverLogic(getChainParams) { _ =>
+    fetchChainParams()
   }
 
   val getSelfCliqueLogic = serverLogic(getSelfClique) { _ =>
@@ -563,7 +576,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     case (blockHash, contractAddress) =>
       Future.successful {
         val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getContractEventsForBlock(blockFlow, blockHash, contractId)
+        serverUtils.getEventsForBlock(blockFlow, blockHash, contractId)
       }
   }
 
@@ -583,6 +596,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
   }
 
+  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { case (blockHash, txId) =>
+    Future.successful {
+      serverUtils.getEventsForBlock(blockFlow, blockHash, txId)
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
@@ -597,6 +616,19 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         writer.close()
       }
     }
+  }
+
+  def fetchChainParams(): FutureTry[ChainParams] = {
+    Future.successful(
+      Right(
+        ChainParams(
+          networkConfig.networkId,
+          consenseConfig.numZerosAtLeastInHash,
+          brokerConfig.groupNumPerBroker,
+          brokerConfig.groups
+        )
+      )
+    )
   }
 
   def fetchSelfClique(): FutureTry[SelfClique] = {
@@ -615,7 +647,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     } yield {
       val selfClique = EndpointsLogic.selfCliqueFrom(
         cliqueInfo,
-        node.config.consensus,
         selfReady = selfReady,
         synced = synced
       )
@@ -666,21 +697,16 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 object EndpointsLogic {
   def selfCliqueFrom(
       cliqueInfo: IntraCliqueInfo,
-      consensus: ConsensusSetting,
       selfReady: Boolean,
       synced: Boolean
-  )(implicit brokerConfig: BrokerConfig, networkConfig: NetworkConfig): SelfClique = {
+  ): SelfClique = {
     SelfClique(
       cliqueInfo.id,
-      networkConfig.networkId,
-      consensus.numZerosAtLeastInHash,
       cliqueInfo.peers.map(peer =>
         PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
       ),
       selfReady = selfReady,
-      synced = synced,
-      groupNumPerBroker = cliqueInfo.groupNumPerBroker,
-      brokerConfig.groups
+      synced = synced
     )
   }
 

@@ -35,36 +35,36 @@ class ValSpec extends ApiModelCodec with JsonFixture {
   it should "encode/decode Val.ByteVec" in {
     val bytes = Hash.generate.bytes
     checkData[Val](
-      Val.ByteVec(bytes),
+      ValByteVec(bytes),
       s"""{"type": "ByteVec", "value": "${Hex.toHexString(bytes)}"}"""
     )
   }
 
   it should "encode/decode Val.U256" in {
-    checkData[Val](Val.U256(U256.MaxValue), s"""{"type": "U256", "value": "${U256.MaxValue}"}""")
-    read[Val](s"""{"type": "U256", "value": 1}""") is Val.U256(U256.unsafe(1))
+    checkData[Val](ValU256(U256.MaxValue), s"""{"type": "U256", "value": "${U256.MaxValue}"}""")
+    read[Val](s"""{"type": "U256", "value": 1}""") is ValU256(U256.unsafe(1))
   }
 
   it should "encode/decode Val.I256" in {
-    checkData[Val](Val.I256(I256.MinValue), s"""{"type": "I256", "value": "${I256.MinValue}"}""")
-    read[Val](s"""{"type": "I256", "value": -1}""") is Val.I256(I256.unsafe(-1))
+    checkData[Val](ValI256(I256.MinValue), s"""{"type": "I256", "value": "${I256.MinValue}"}""")
+    read[Val](s"""{"type": "I256", "value": -1}""") is ValI256(I256.unsafe(-1))
   }
 
   it should "encode/decode Val.Address" in {
     val address = generateContractAddress()
     checkData[Val](
-      Val.Address(address),
+      ValAddress(address),
       s"""{"type": "Address", "value": "${address.toBase58}"}"""
     )
   }
 
   it should "endcode/decode Val.ValArray" in {
     checkData[Val](
-      Val.ValArray(
+      ValArray(
         AVector[Val](
           Val.True,
-          Val.U256(U256.Zero),
-          Val.ValArray(AVector(Val.True, Val.U256(U256.One)))
+          ValU256(U256.Zero),
+          ValArray(AVector(Val.True, ValU256(U256.One)))
         )
       ),
       s"""

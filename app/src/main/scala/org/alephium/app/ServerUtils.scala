@@ -354,14 +354,14 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getContractEventsForBlock(
+  def getEventsForBlock(
       blockFlow: BlockFlow,
       blockHash: BlockHash,
-      contractId: ContractId
+      eventKey: Hash
   ): Try[Events] = {
     val chainIndex = ChainIndex.from(blockHash)
     if (chainIndex.isIntraGroup) {
-      wrapResult(blockFlow.getEvents(blockHash, contractId)).map {
+      wrapResult(blockFlow.getEvents(blockHash, eventKey)).map {
         case Some(logs) => Events.from(chainIndex, logs)
         case None       => Events.empty(chainIndex)
       }
@@ -429,7 +429,7 @@ class ServerUtils(implicit
       )
       events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
         heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
-          getContractEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
+          getEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
             eventsSoFar.copy(events = eventsSoFar.events ++ eventsForBlock.events)
           }
         }
@@ -772,8 +772,8 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
     values.fold(AVector.ofSize[vm.Val](values.length)) {
-      case (acc, value: Val.Simple)   => acc :+ value.toVmVal
-      case (acc, value: Val.ValArray) => acc ++ toVmVal(value.value)
+      case (acc, value: Val.Primitive) => acc :+ value.toVmVal
+      case (acc, value: ValArray)      => acc ++ toVmVal(value.value)
     }
   }
 
