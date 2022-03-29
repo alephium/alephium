@@ -797,6 +797,7 @@ object Ast {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def buildDependencies(
         contract: TxContract,
         parentsCache: mutable.Map[TypeId, Seq[TxContract]],
