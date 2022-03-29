@@ -268,10 +268,6 @@ object Compiler {
       varIndex = 0
     }
 
-    def addVariable(ident: Ast.Ident, tpe: Seq[Type], isMutable: Boolean): Unit = {
-      addVariable(ident, expectOneType(ident, tpe), isMutable)
-    }
-
     protected def scopedName(name: String): String = {
       if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
